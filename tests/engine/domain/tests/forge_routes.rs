@@ -1961,11 +1961,16 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
     });
     for _ in 0..150 {
         world.tick();
-        if world.assigned.len() >= 3 {
+        if world.assigned.iter().any(|run| run.task == producer.task && run.attempt != producer.attempt) {
             break;
         }
     }
-    let resumed = world.assigned.get(2).expect("lost worker's task reassigned").clone();
+    let resumed = world
+        .assigned
+        .iter()
+        .find(|run| run.task == producer.task && run.attempt != producer.attempt)
+        .expect("lost producer reassigned")
+        .clone();
     assert_eq!(resumed.task, producer.task);
     assert_ne!(resumed.attempt, producer.attempt);
     assert!(

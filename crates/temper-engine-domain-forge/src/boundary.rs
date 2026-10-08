@@ -194,6 +194,8 @@ pub struct Pushed {
 pub enum Writer {
     /// A worker attempt, fenced by the root's activation.
     Run { task: u64, attempt: u64 },
+    /// An ended attempt whose fresh branch read must release its writer.
+    Lost { task: u64, attempt: u64 },
     /// An outbox entry making a change to the resource.
     Entry(u64),
 }

@@ -1466,7 +1466,7 @@ fn claim(
         }
         match row.writer {
             Some(Writer::Run { task: owner, attempt: old }) if owner == task && old == attempt => {}
-            Some(Writer::Run { task: owner, .. }) => {
+            Some(Writer::Run { task: owner, .. } | Writer::Lost { task: owner, .. }) => {
                 emit(out, Request::Taken { task, resource: name.clone(), by: owner });
                 return;
             }
@@ -1531,11 +1531,14 @@ fn answered(
 fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Queue<Request>) {
     let mut names = List::with_capacity(env.limits.holds);
     for (name, row) in &d.holds {
-        if row.writer == Some(Writer::Run { task, attempt }) {
+        if row.writer == Some(Writer::Run { task, attempt }) || row.writer == Some(Writer::Lost { task, attempt }) {
             names.push(name.clone()).expect("list sized to holds");
         }
     }
     for name in &names {
+        let Some(row) = d.holds.get_mut(name) else { unreachable!("collected hold") };
+        row.writer = Some(Writer::Lost { task, attempt });
+        save_hold(out, row.clone());
         let Some(resource) = to_client(name, &env.limits) else { continue };
         let read = match resource.what {
             client::What::Branch(branch) => client::api::Read::Branch { branch },
@@ -1607,9 +1610,9 @@ fn lost_read(
         (None, Err(client::api::Error::Missing)) => {
             if let Some(expected) = baseline {
                 drift(d, env, resource.clone(), crate::DriftChange::Branch { expected, observed: None }, out);
-            } else {
-                emit(out, Request::Drift { task: pending.task, resource: pending.name.clone() });
             }
+            // A run can end before its first push; fresh absence releases
+            // its writer when no previous head was recorded.
             None
         }
         (_, Ok(_) | Err(_)) => {
@@ -1618,7 +1621,7 @@ fn lost_read(
         }
     };
     let Some(row) = d.holds.get_mut(&pending.name) else { return };
-    if row.writer != Some(Writer::Run { task: pending.task, attempt: pending.attempt }) {
+    if row.writer != Some(Writer::Lost { task: pending.task, attempt: pending.attempt }) {
         return;
     }
     row.writer = None;
@@ -3443,6 +3446,17 @@ fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out
 
 fn read_afresh(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     d.restart_fresh = Some(false);
+    let mut lost_runs = List::with_capacity(env.limits.holds);
+    for (_, hold) in &d.holds {
+        if let Some(Writer::Lost { task, attempt }) = hold.writer
+            && !lost_runs.as_slice().contains(&(task, attempt))
+        {
+            lost_runs.push((task, attempt)).expect("runs bounded by holds");
+        }
+    }
+    for (task, attempt) in &lost_runs {
+        lost(d, env, *task, *attempt, out);
+    }
     let mut ci = List::with_capacity(env.limits.subscriptions);
     for (_, subscriber) in &d.subscriptions {
         match &subscriber.topic {
@@ -3466,7 +3480,7 @@ fn read_afresh(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 
 fn read_afresh_complete(d: &mut Domain, out: &mut Queue<Request>) {
-    if d.restart_fresh == Some(true) && d.pending_ci.is_empty() && d.goal_file_reads.is_empty() {
+    if d.restart_fresh == Some(true) && d.pending_ci.is_empty() && d.goal_file_reads.is_empty() && d.lost.is_empty() {
         d.restart_fresh = None;
         emit(out, Request::RestartDone { stage: RestartStage::ReadAfresh });
     }

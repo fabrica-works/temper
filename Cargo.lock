@@ -702,6 +702,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-conformance-world"
+version = "0.0.0"
+dependencies = [
+ "jig-conformance",
+ "jig-core",
+ "jig-core-accounts",
+ "jig-core-authority",
+ "jig-core-fleet",
+ "jig-core-people",
+ "jig-core-tasks",
+ "jig-core-world",
+ "jig-fake-store",
+ "jig-fake-workers",
+ "jig-test-system",
+ "skein-lib",
+ "temper-engine-domain",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-change",
+ "temper-engine-domain-forge-client",
+ "temper-engine-domain-world",
+ "temper-engine-forge-world",
+ "temper-fake-forge-domain",
+]
+
+[[package]]
 name = "temper-engine-domain"
 version = "0.0.0"
 dependencies = [

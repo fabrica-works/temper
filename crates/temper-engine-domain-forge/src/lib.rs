@@ -63,8 +63,8 @@ pub const fn effect_shape(kind: u16) -> Option<(EffectForm, Recovery)> {
     match kind {
         2 => Some((EffectForm::Transition, Recovery::Unrecoverable)),
         4 => Some((EffectForm::Transition, Recovery::Conditional)),
-        3 | 9 => Some((EffectForm::Creation, Recovery::Keyed)),
-        5 | 7 | 8 => Some((EffectForm::Creation, Recovery::Unrecoverable)),
+        3 => Some((EffectForm::Creation, Recovery::Conditional)),
+        5 | 7 | 8 | 9 => Some((EffectForm::Creation, Recovery::Unrecoverable)),
         6 => Some((EffectForm::Set, Recovery::Idempotent)),
         0 | 1 | 10..=u16::MAX => None,
     }

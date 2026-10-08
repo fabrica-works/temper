@@ -1794,3 +1794,58 @@ fn a_lost_run_confirms_its_unreported_forward_head_by_fresh_reads() {
     assert_eq!(recorded.commit, head);
     assert!(recorded.owned);
 }
+
+#[test]
+fn a_lost_claim_before_its_first_push_releases_the_absent_branch_writer() {
+    let mut world = World::new(133);
+    world.adopt();
+    let name = top::Name {
+        forge: REPO.forge,
+        repository: REPO.repository,
+        what: top::What::Branch(Box::new([b"temper".as_slice().into(), b"51".as_slice().into()])),
+    };
+    world.event(top::Event::Names { task: 51, resources: Box::new([name.clone()]) });
+    world.event(top::Event::Hold { task: 51, resource: name.clone(), from: None });
+    world.event(top::Event::Claim { task: 51, attempt: 1, writes: Box::new([name.clone()]), holders: Box::new([]) });
+    world.take_seen();
+    world.event(top::Event::Lost { task: 51, attempt: 1 });
+    world.run_for(5);
+    let Some(top::Stored::Hold(hold)) = world.stored().get(&top::Key::Hold(name.clone())) else {
+        panic!("hold retained")
+    };
+    assert_eq!(hold.writer, None);
+    assert_eq!(hold.drift, None);
+    assert!(!world.stored().contains_key(&top::Key::BranchHead(name)));
+    assert!(!world.seen().iter().any(|request| matches!(request, top::Request::Drift { .. })));
+}
+
+#[test]
+fn a_lost_writer_restarts_its_unfinished_fresh_read_before_releasing() {
+    let mut world = World::new(137);
+    world.adopt();
+    let name = top::Name {
+        forge: REPO.forge,
+        repository: REPO.repository,
+        what: top::What::Branch(Box::new([b"temper".as_slice().into(), b"53".as_slice().into()])),
+    };
+    world.event(top::Event::Names { task: 53, resources: Box::new([name.clone()]) });
+    world.event(top::Event::Hold { task: 53, resource: name.clone(), from: None });
+    world.event(top::Event::Claim { task: 53, attempt: 1, writes: Box::new([name.clone()]), holders: Box::new([]) });
+    world.produce(b"temper/53");
+    world.slow_calls(skein_lib::Duration::from_secs(5));
+    world.event(top::Event::Lost { task: 53, attempt: 1 });
+    let Some(top::Stored::Hold(hold)) = world.stored().get(&top::Key::Hold(name.clone())) else {
+        panic!("hold retained")
+    };
+    assert_eq!(hold.writer, Some(top::Writer::Lost { task: 53, attempt: 1 }));
+    world.restart();
+    world.run_for(12);
+    let Some(top::Stored::Hold(hold)) = world.stored().get(&top::Key::Hold(name.clone())) else {
+        panic!("hold retained")
+    };
+    assert_eq!(hold.writer, None);
+    let Some(top::Stored::BranchHead(head)) = world.stored().get(&top::Key::BranchHead(name)) else {
+        panic!("fresh head retained")
+    };
+    assert!(head.owned);
+}

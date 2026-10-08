@@ -46,6 +46,7 @@ members = [
     "jig/tests/brief",
     "tests/engine/domain",
     "tests/system",
+    "tests/conformance",
     "jig/tests/fleet",
     "tests/engine/forge/client",
     "tests/engine/forge",

@@ -478,3 +478,25 @@ fn named_resource_reports_distinguish_private_branches_context_and_shared_landin
         &[Request::Refused { task: 7 }]
     );
 }
+
+#[test]
+fn procedure_creation_descriptions_keep_the_native_recovery_promises() {
+    let pull = client::api::Write::OpenPull {
+        title: b"change".as_slice().into(),
+        body: Box::new([]),
+        head: b"temper/c1".as_slice().into(),
+        base: b"main".as_slice().into(),
+    };
+    let branch = client::api::Write::CreateBranch { branch: b"temper/c1".as_slice().into(), commit: [1; 32] };
+    for (kind, write) in [(3, pull), (9, branch)] {
+        let (form, recovery) = effect_shape(kind).expect("creation kind");
+        assert_eq!(form, EffectForm::Creation);
+        let expected = match client::recovery(&write) {
+            client::Recovery::Keyed => Recovery::Keyed,
+            client::Recovery::Conditional => Recovery::Conditional,
+            client::Recovery::Idempotent => Recovery::Idempotent,
+            client::Recovery::Unrecoverable => Recovery::Unrecoverable,
+        };
+        assert_eq!(recovery, expected, "kind {kind}");
+    }
+}

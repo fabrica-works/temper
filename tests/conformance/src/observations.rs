@@ -1,0 +1,256 @@
+//! Store and forge translations for jig's outside referee.
+use jig_conformance::referee as r;
+use jig_core as core;
+use jig_core_people as people;
+use jig_core_tasks as tasks;
+use jig_test_system::SystemKey;
+use std::collections::{BTreeMap, BTreeSet};
+use temper_engine_domain as root;
+use temper_engine_domain_forge as forge;
+use temper_engine_domain_forge_client as client;
+
+#[must_use]
+pub fn value(bytes: &[u8]) -> u64 {
+    // Whole byte strings are reduced consistently at both independent boundaries.
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |n, b| (n ^ u64::from(*b)).wrapping_mul(0x100_0000_01b3))
+}
+#[must_use]
+pub fn repository() -> r::Name {
+    r::Name {
+        connector: 0,
+        path: vec![b"forge".to_vec(), b"forge.example".to_vec(), b"org".to_vec(), b"repo".to_vec()],
+    }
+}
+#[expect(clippy::wildcard_enum_match_arm, reason = "unexpected native writes fail this scenario binding explicitly")]
+pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64, u64) {
+    let mut name = repository();
+    let (kind, condition, target, state) = match write {
+        client::api::Write::Status { commit, context, check } => {
+            (6, None, value(format!("{context:?}:{check:?}").as_bytes()), value(commit))
+        }
+        client::api::Write::CreateIssue { title, body, .. } => {
+            (8, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
+        }
+        client::api::Write::Post { number, body, .. } => {
+            name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
+            (7, None, value(body), 0)
+        }
+        client::api::Write::Merge { number, head } => {
+            name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
+            (4, Some(value(head)), *number, value(head))
+        }
+        client::api::Write::OpenPull { title, body, head, base } => {
+            (3, None, value(format!("{title:?}:{body:?}:{head:?}:{base:?}").as_bytes()), 0)
+        }
+        client::api::Write::CreateBranch { branch, commit } => {
+            name.path.extend([b"branch".to_vec(), branch.to_vec()]);
+            (9, None, value(commit), 0)
+        }
+        client::api::Write::DeleteBranch { branch } => {
+            name.path.push(b"branch".to_vec());
+            name.path.extend(branch.split(|byte| *byte == b'/').map(<[u8]>::to_vec));
+            (2, None, 0, 0)
+        }
+        other => panic!("unbound forge effect {other:?}"),
+    };
+    (kind, vec![name], condition, target, state)
+}
+#[must_use]
+#[expect(clippy::wildcard_enum_match_arm, reason = "only named effect call rows identify this outbox entry")]
+pub fn key(store: &Store, entry: &client::Entry) -> SystemKey {
+    let call = store.rows.values().find_map(|row| match row {
+        root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if matches!(row.part, core::CallPart::Effect { entry: n, .. } if n == entry.number) => Some(row.key),
+        _ => None,
+    });
+    SystemKey {
+        deployment: [31; 16],
+        task: entry.task,
+        purpose: entry.number,
+        attempt: call.map_or(0, |x| x.attempt),
+        completion: call.map_or(0, |x| x.completion),
+        position: call.map_or(0, |x| x.position),
+    }
+}
+#[must_use]
+pub fn policy(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -> r::Policy {
+    let (config, _) = super::config::root(seed, scenario);
+    let rules = config.authority.rules();
+    let project = config.authority.policy(1).expect("configured project");
+    r::Policy {
+        deployment: jig_core_world::observations::scope(&rules.ceiling),
+        projects: BTreeMap::from([(1, jig_core_world::observations::scope(&project.ceiling))]),
+        projections: BTreeMap::from([(
+            1,
+            project
+                .projections
+                .iter()
+                .map(|g| r::Grant { connector: g.connector, kind: g.kind, pattern: pattern(&g.pattern) })
+                .collect(),
+        )]),
+        people: BTreeMap::from([((1, 1), jig_core_world::observations::scope(&project.roles[0].authority))]),
+        effect_accepters: BTreeSet::from([(1, 1)]),
+        requirements: Vec::new(),
+        implications: BTreeSet::new(),
+        kinds: BTreeMap::from(
+            [
+                (2, r::Recovery::Unrecoverable),
+                (3, r::Recovery::Conditional),
+                (4, r::Recovery::Conditional),
+                (6, r::Recovery::Idempotent),
+                (7, r::Recovery::Unrecoverable),
+                (8, r::Recovery::Unrecoverable),
+                (9, r::Recovery::Unrecoverable),
+            ]
+            .map(|(kind, recovery)| ((0, kind), r::Kind { recovery, price: 0 })),
+        ),
+        owned: vec![(0, r::Pattern { base: repository().path, terminal: Vec::new(), open: true })],
+        participating: BTreeSet::from([repository()]),
+        mechanics: BTreeSet::new(),
+        delivery_bound: 60_000_000_000,
+        uncertainty_bound: 60_000_000_000,
+        story_steps: 1_000,
+    }
+}
+#[must_use]
+pub fn pattern(p: &jig_core_authority::Pattern) -> r::Pattern {
+    let (terminal, open) = match &p.last {
+        jig_core_authority::Last::Exact(x) => (x.to_vec(), false),
+        jig_core_authority::Last::Open(x) => (x.to_vec(), true),
+    };
+    r::Pattern { base: p.segments.iter().map(|x| x.to_vec()).collect(), terminal, open }
+}
+pub type Store = jig_fake_store::Store<root::Key, root::Record>;
+
+#[expect(clippy::too_many_lines, reason = "one outside translation covers the durable row vocabulary")]
+#[must_use]
+pub fn snapshot(store: &Store) -> r::Snapshot {
+    let mut snapshot = r::Snapshot::default();
+    let mut decisions = Vec::new();
+    for record in store.rows.values() {
+        match record {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row) | tasks::Stored::Ended(row))) => {
+                snapshot.tasks.insert(row.number, jig_core_world::observations::task(row));
+                snapshot.receipts.insert(r::Receipt::Task(row.number));
+                if let tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Task(holder), entry, .. } =
+                    row.escalation
+                {
+                    snapshot.receipts.insert(r::Receipt::Word(holder, entry));
+                }
+                if matches!(row.phase, tasks::Phase::Ended(_)) {
+                    snapshot.receipts.insert(r::Receipt::Ended(row.number));
+                }
+                for word in &row.inbox {
+                    snapshot.receipts.insert(r::Receipt::Word(row.number, word.number));
+                }
+            }
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Writer(row))) => {
+                let (task, attempt) = match row.writer {
+                    tasks::Writer::Run { task, attempt } => (task, attempt),
+                    tasks::Writer::Effect { entry } => (0, entry),
+                };
+                snapshot.writers.push((
+                    r::Name {
+                        connector: row.resource.connector,
+                        path: row.resource.path.iter().map(|x| x.to_vec()).collect(),
+                    },
+                    task,
+                    attempt,
+                ));
+            }
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row))) => {
+                snapshot.balances.push((
+                    row.numbers.budget,
+                    row.numbers.spent,
+                    row.numbers.spent_below,
+                    row.numbers.reserved,
+                ));
+                if let tasks::Funder::Pool { person, .. } = row.funder {
+                    *snapshot.person_spend.entry(person).or_default() += row.numbers.spent;
+                }
+            }
+            root::Record::Core(core::Record::People(people::Stored::SignIn { number, .. })) => {
+                snapshot.receipts.insert(r::Receipt::SignIn(*number));
+            }
+            root::Record::Core(core::Record::People(people::Stored::Answer { key, .. })) => {
+                snapshot.receipts.insert(r::Receipt::Party(key.person, key.key));
+            }
+            root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(row))) => {
+                snapshot.receipts.insert(r::Receipt::Claim(row.task, row.attempt));
+            }
+            root::Record::Core(core::Record::Core(core::CoreRecord::Turn(row))) => {
+                snapshot.receipts.insert(r::Receipt::Turn(row.task, row.attempt, row.turn));
+            }
+            root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(row))) => {
+                snapshot.receipts.insert(r::Receipt::Terminal(row.task, row.attempt));
+            }
+            root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) => {
+                snapshot.receipts.insert(r::Receipt::Call(
+                    row.key.task,
+                    row.key.attempt,
+                    row.key.completion,
+                    row.key.position,
+                ));
+                if let core::CallPart::Delegated(members) = &row.part {
+                    snapshot.batches.push(members.to_vec());
+                }
+            }
+            root::Record::Core(core::Record::Core(core::CoreRecord::ProposalDecision(row)))
+                if row.choice == people::ProposalChoice::Accepted =>
+            {
+                decisions.push(*row);
+            }
+            root::Record::Forge { row } => {
+                let forge::Stored::Entry(row) = row.as_ref() else { continue };
+                let key = key(store, row);
+                let (kind, resources, condition, target, state) = parts(&row.effect.write);
+                if let Some(attempt) = row.attempt {
+                    snapshot.receipts.insert(r::Receipt::Outbox(
+                        0,
+                        key,
+                        u32::try_from(attempt.sent.as_nanos() / 1_000_000).expect("bounded attempt timestamp"),
+                    ));
+                    snapshot.attempts.insert(
+                        (0, key),
+                        (
+                            u32::try_from(attempt.sent.as_nanos() / 1_000_000).expect("bounded attempt timestamp"),
+                            attempt.expires.as_nanos(),
+                        ),
+                    );
+                }
+                snapshot.decisions.push(r::Decision {
+                    projection: key.position == 1 && key.attempt == 0,
+                    connector: 0,
+                    key,
+                    kind,
+                    resources,
+                    condition,
+                    target,
+                    judged_state: state,
+                    accepted_by: None,
+                });
+            }
+            root::Record::Core(_) => {}
+        }
+    }
+    for accepted in decisions {
+        if let Some((first, last)) = accepted.created {
+            for task in first..=last {
+                snapshot
+                    .accepted_tasks
+                    .insert(task, r::Acceptance { proposal: accepted.proposal, by: r::Source::Person(accepted.by) });
+            }
+        }
+        for decision in &mut snapshot.decisions {
+            if let tasks::Party::Task(task) = accepted.proposer
+                && decision.key.task == task
+            {
+                decision.accepted_by = Some(r::Source::Person(accepted.by));
+                snapshot.acceptances.insert(
+                    (0, decision.key),
+                    r::Acceptance { proposal: accepted.proposal, by: r::Source::Person(accepted.by) },
+                );
+            }
+        }
+    }
+    snapshot
+}
