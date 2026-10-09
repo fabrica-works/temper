@@ -550,6 +550,8 @@ and workspace suites remain within their existing budgets.
 | jig 21.2 roles of resources | merged and pushed | ad3d6e2c | Branch `jig/21-2-roles`: current roles scoped to projects govern effects, projections, accepted effects and workspace writes. Unavailable resources refuse holds and hold waiters with a reason; narrowing stops a run writer while committed effects remain made. Restored adoption reports preserve context refusal. Stories cover participating writes, project isolation, narrowing, unavailable holds and cold restart. Gate: fmt/clippy; 1,257 focused / 1.867 s; 37 fuzzy / 4.971 s. |
 | temper 05.1 reference root | merged and pushed | b0ab9ad4 | Branch `jig/temper-05-1-root`: root follows jig's `domain/root.md`, section 11, with native owner store wrappers, whole-route admission, journal-only output and native release, admitted Resume, and forge-owned timers, payloads, landing templates and save callbacks. Its bound includes core, forge and journal. Gate: fmt/clippy; 1,266 focused / 2.963 s; 38 fuzzy / 7.687 s. No dependency repin or jig change. |
 | temper 05.2 application conformance | merged and pushed | fd701a11 | Branch `jig/temper-05-2-conformance`: native engine, fake forge and shared outside referee run the seven applicable shared scenarios and all 164 baseline commit cuts; ShrinkingPool is not applicable because the forge has no pooled holds, following the decision in jig's `domain/testing.md`, section 5. Fixed pre-first-push lost writers, durable lost-writer fresh reads and stale creation recovery descriptions. Gate: fmt/clippy; 1,276 focused / 4.903 s; 39 fuzzy / 15.798 s. Final-tip serial `measure`, `-j1`, unoptimized test build: seven conformance focused / 1.189 s and one fuzzy / 6.796 s, within 1.5 s / 8 s. |
+| temper 05.3 native stories and every cut | merged and pushed | 5faffd94, a6a3d7e9, 6b4460cc | Branch `jig/temper-05-3-stories`: seven applicable shared and seven native stories retain all 365 cuts, independent uncertainty and settlement evidence, split forge kinds and native restart fixes. Gate on rebased tip: fmt/clippy; 1,282 focused / 2.610 s; 40 fuzzy / 14.142 s. Serial conformance: 15 focused / 1.820 s; 2 fuzzy / 16.503 s, within the decided 2 s / 20 s allocation. |
+| temper 05.4 composed system world | merged and pushed | 10d57825 | Branch `jig/temper-05-4-system`: actual engine and worker roots plus actual Smith agents over fake LLM IO, jig's fake store and authenticated parties, and shared API/git forge state. Seven composed cases and 24 paired seeded runs check durability, host calls, turn credit, human input/cancellation, worker-prepared mounts and restored Smith prefixes. Gate: fmt/clippy; 1,289 focused / 2.587 s; 41 fuzzy / 15.067 s. All eight Temper worlds measured serially; system 16 focused / 0.315 s and 1 fuzzy / 0.357 s. |
 
 ### temper 03 boundary and handoff
 
@@ -771,7 +773,7 @@ and workspace suites remain within their existing budgets.
   No prerequisite repository, plans, design documents, dependency pins
   or forge URLs changed in this session.
 
-### temper 05 resumed handoff: stopped on the serial fuzzy budget
+### temper 05 resumed handoff: stopped on the serial fuzzy budget (superseded below)
 
 - **Outcome:** 5.1 and 5.2 remain merged and pushed. The decided kind split
   unblocks the former recovery-vocabulary failure. The resumed 5.3 coverage
@@ -869,3 +871,110 @@ and workspace suites remain within their existing budgets.
   attribute an outside forward push without authenticated actor metadata
   remains nonblocking for these stories. No prerequisite repository,
   plan, design, dependency pin, forge URL or user draft was changed.
+
+### temper 05 completion and session 06 handoff
+
+2026-10-09. Session 05 is complete. Increments 5.1 through 5.4 are merged
+and pushed; main is `10d578255958b97b7ad4e7e6ca047d46284a80ac` before this
+Markdown-only status branch. Their worktrees and branches are removed.
+The historical stopped handoffs above preserve the decisions and evidence
+that led here; they no longer block session 06.
+
+**Root conformity:** 5.1's line-by-line audit of jig's `domain/root.md`,
+section 11, still holds. The root routes native owners' records and store
+wrappers, retains only its children and journal, releases every external
+output through that journal, and adds no policy decisions or routing by
+content. Forge timers, payloads, landing templates and save callbacks
+belong to the forge. Whole-route admission and the worst-case bound cover
+core, forge and journal. 5.4 changes worlds and test kits only, and does
+not change those root invariants.
+
+**Conformance findings and fixes:** pre-first-push lost writers and durable
+lost-writer fresh reads were corrected in 5.2, along with stale creation
+recovery descriptions. Native stories in 5.3 established pushed-head
+ownership through the durable forge writer, restored writer flags before
+background watches resume, expected branch deletion without false foreign
+drift, unknown delete answers settled from absence, and restored desired
+issue projections with their owner timer. Bounds include restored writer
+scratch storage. The changed-kind decision follows temper's `forge.md`,
+section 6, and jig's `domain/connectors.md`, section 3.1: each design table
+row has one form/class and kind, now 1 through 15. Grouped rows remain
+grouped: kind 12 closes/reopens pulls; kind 13 edits/closes/reopens issues.
+Native effect-row tests independently compare declarations with the
+client's actual recovery contract. No deployed compatibility is needed.
+The earlier per-effect referee proposal was rejected and is closed.
+
+**Coverage retained:** 171 shared cuts across LateCopy, OtherHand,
+UncertainRestarts, ChangedJudge, NarrowingPolicy, StandingTask and RunBudget;
+194 native cuts across ReviewedChange, RepairCi, GoalIssue, OtherHand,
+LostMerge, PersonWords and IssueCreation. All 365 cuts pass. ShrinkingPool
+is inapplicable to the forge by the prior decision; it has no pooled holds.
+The outside referee and its connector/kind recovery lookup are unchanged.
+Unknown/settled evidence remains correlated with the actual durable entry,
+projection identity and native answer. GoalIssue accepts a hold only for
+its independently uncertain creation or milestone comment. PersonWords
+retains a lost relay in the durable inbox for the next activation.
+Goal issues remain write-only projections with full subtree history;
+human issue comments do not become task participation. Only duplicate
+basic landing and goal projection tests were removed from the engine
+world; unique CI logs, truncation, timing, gates and approvals remain.
+
+**System composition:** actual engine and worker roots drive actual Smith
+domains, with fake LLM completions, jig's store and party fakes, and one
+Temper fake forge for API and git. The worker actually prepares the
+adopted read-only repository before Smith starts. Concrete charter, turn
+and answer values live in the ordinary process codec adapter, whose
+opaque bytes are checked at each crossing; Smith supplies actual native
+calls, turns and endings. Focused cases cover durable report and host-call
+reply, live words, cancellation, prepared repository mount, park/resume
+from the committed Smith prefix, and withheld store acknowledgements.
+The fuzzy sweep varies completion timings, store delay, calls and mounts
+across 24 paired seeds, comparing observations, durable rows and native
+Smith turns. Bound assertions caught a fixture-only call/message limit
+mismatch, which was corrected. Process read/wait rights and retired
+storage reclamation were corrected in the new adapter before verification.
+There was no additional production bug or external prerequisite in 5.4.
+
+**All Temper world timings:** serial `measure -j1` through the shared build
+lock on the final 5.4 tree, unoptimized test build, including all focused
+and fuzzy binaries. The 382 tests passed in 31.228 s; times below sum each
+world's individual test durations. The exact committed 5.4 tip separately
+passed the parallel workspace gate at 1,289 focused / 2.587 s and 41 fuzzy
+/ 15.067 s, under the unchanged 15 s / 60 s suite caps.
+
+| World | Focused tests / seconds | Fuzzy tests / seconds |
+|---|---:|---:|
+| conformance | 15 / 1.830 | 2 / 16.393 |
+| engine root | 189 / 2.990 | 7 / 6.044 |
+| forge client | 26 / 0.123 | 2 / 0.094 |
+| forge connector | 46 / 0.231 | 1 / 0.024 |
+| system | 16 / 0.315 | 1 / 0.357 |
+| web | 27 / 0.117 | 2 / 0.980 |
+| worker checkout | 31 / 0.594 | 2 / 0.928 |
+| worker root | 13 / 0.071 | 2 / 0.116 |
+
+Jig's QUESTIONS.md, item 9, now explicitly permits 2 s focused / 20 s
+fuzzy for Temper conformance; every cut fits. The system additions fit
+the permitted 0.5 s / 3 s story growth. Shared test kits without test
+targets have no separate test duration.
+
+**Questions and proposals:** no unresolved design/plan disagreement or
+blocking prerequisite remains. Authenticated provider metadata still
+cannot attribute an outside forward push when its webhook is lost;
+fresh ancestry/head reads retain safety, and this inherited limitation
+is nonblocking. Preserve the limitation; any future attribution feature
+needs an authenticated provider event. Deep referee policy cloning is
+optional performance work in session 06.1b; immutable/versioned policy
+ownership must preserve the independent referee, policy changes and every
+cut, and is not a prerequisite for this completed session.
+
+**Next session:** implement session 06's finish work from this verified
+main, including retirement of remaining superseded components and final
+measurement/report. Preserve jig 17's journal/order/release, inbox/read
+fences and settled answers; jig 21's resource identity and role restoration
+before adoption; jig 15's independent referee; Temper 03's projection and
+subtree history semantics; and Temper 04's actual Smith supervision.
+The new system world has a domain face, not a deployed serialization or
+kernel/process face; those higher-tier tests remain later work. No plans,
+design documents, independent protocol work, forge dependency URLs or user
+drafts were changed, and no dependency revision was required.
