@@ -37,11 +37,11 @@ pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64
         }
         client::api::Write::Edit { number, title, body } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
-            (8, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
+            (13, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
         }
         client::api::Write::Close { number } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
-            (8, None, 1, 0)
+            (13, None, 1, 0)
         }
         client::api::Write::Merge { number, head } => {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
@@ -57,7 +57,7 @@ pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64
         client::api::Write::DeleteBranch { branch } => {
             name.path.push(b"branch".to_vec());
             name.path.extend(branch.split(|byte| *byte == b'/').map(<[u8]>::to_vec));
-            (2, None, 0, 0)
+            (15, None, 0, 0)
         }
         other => panic!("unbound forge effect {other:?}"),
     };
@@ -66,7 +66,7 @@ pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64
 #[must_use]
 #[expect(clippy::wildcard_enum_match_arm, reason = "only named effect call rows identify this outbox entry")]
 pub fn key(store: &Store, entry: &client::Entry) -> SystemKey {
-    let call = store.rows.values().find_map(|row| match row {
+    let call = store.rows.values().map(|record| &record.0).find_map(|row| match row {
         root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if matches!(row.part, core::CallPart::Effect { entry: n, .. } if n == entry.number) => Some(row.key),
         _ => None,
     });
@@ -108,10 +108,17 @@ pub fn policy(
                 (2, r::Recovery::Unrecoverable),
                 (3, r::Recovery::Conditional),
                 (4, r::Recovery::Conditional),
+                (5, r::Recovery::Unrecoverable),
                 (6, r::Recovery::Idempotent),
                 (7, r::Recovery::Unrecoverable),
                 (8, r::Recovery::Unrecoverable),
                 (9, r::Recovery::Unrecoverable),
+                (10, r::Recovery::Idempotent),
+                (11, r::Recovery::Unrecoverable),
+                (12, r::Recovery::Idempotent),
+                (13, r::Recovery::Idempotent),
+                (14, r::Recovery::Idempotent),
+                (15, r::Recovery::Idempotent),
             ]
             .map(|(kind, recovery)| ((0, kind), r::Kind { recovery, price: 0 })),
         ),
@@ -131,14 +138,22 @@ pub fn pattern(p: &jig_core_authority::Pattern) -> r::Pattern {
     };
     r::Pattern { base: p.segments.iter().map(|x| x.to_vec()).collect(), terminal, open }
 }
-pub type Store = jig_fake_store::Store<root::Key, root::Record>;
+/// Full native row retained by the fake store, with compact harness tracing.
+#[derive(Clone)]
+pub struct Record(pub root::Record);
+impl std::fmt::Debug for Record {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Record").field(&self.0.key()).finish()
+    }
+}
+pub type Store = jig_fake_store::Store<root::Key, Record>;
 
 #[expect(clippy::too_many_lines, reason = "one outside translation covers the durable row vocabulary")]
 #[must_use]
 pub fn snapshot(store: &Store) -> r::Snapshot {
     let mut snapshot = r::Snapshot::default();
     let mut decisions = Vec::new();
-    for record in store.rows.values() {
+    for record in store.rows.values().map(|record| &record.0) {
         match record {
             root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row) | tasks::Stored::Ended(row))) => {
                 snapshot.tasks.insert(row.number, jig_core_world::observations::task(row));
@@ -230,7 +245,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     );
                 }
                 snapshot.decisions.push(r::Decision {
-                    projection: key.attempt == 0 && store.rows.values().any(|record| matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)|tasks::Stored::Ended(task))) if task.number==row.task && task.tracked.is_some())),
+                    projection: key.attempt == 0 && store.rows.values().map(|record| &record.0).any(|record| matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)|tasks::Stored::Ended(task))) if task.number==row.task && task.tracked.is_some())),
                     connector: 0,
                     key,
                     kind,
@@ -265,4 +280,96 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
         }
     }
     snapshot
+}
+
+/// Entry identity and projection ownership retained from actual durable rows.
+#[derive(Clone, Copy)]
+pub struct EffectEvidence {
+    pub kind: u16,
+    pub projection: bool,
+}
+
+/// Follow each durable entry to its named answer or connector erasure. A later
+/// hold cannot relabel a key already observed as settled.
+#[expect(clippy::wildcard_enum_match_arm, reason = "only durable named effect calls supply a connector outcome")]
+pub fn resolved(
+    store: &Store,
+    snapshot: &mut r::Snapshot,
+    seen: &mut BTreeMap<SystemKey, EffectEvidence>,
+    held: &mut BTreeMap<SystemKey, u16>,
+    settled: &mut BTreeSet<SystemKey>,
+) {
+    let mut live = BTreeSet::new();
+    for record in store.rows.values().map(|record| &record.0) {
+        if let root::Record::Forge { row } = record
+            && let forge::Stored::Entry(entry) = row.as_ref()
+        {
+            let key = key(store, entry);
+            live.insert(key);
+            let evidence = EffectEvidence {
+                kind: parts(&entry.effect.write).0,
+                projection: store.rows.values().map(|record| &record.0).any(|record| {
+                    matches!(record,
+                    root::Record::Forge { row } if matches!(row.as_ref(), forge::Stored::Issue(issue)
+                        if issue.goal == key.task && issue.pending == Some(key.purpose)))
+                }),
+            };
+            seen.entry(key)
+                .and_modify(|old| {
+                    assert_eq!(old.kind, evidence.kind, "durable entry changed kind");
+                    old.projection |= evidence.projection;
+                })
+                .or_insert(evidence);
+        }
+    }
+    for (&key, evidence) in seen.iter() {
+        if held.contains_key(&key) || settled.contains(&key) {
+            continue;
+        }
+        let answer = store.rows.values().map(|record| &record.0).find_map(|record| match record {
+            root::Record::Core(core::Record::Core(core::CoreRecord::Call(call)))
+                if call.key.task == key.task
+                    && call.key.attempt == key.attempt
+                    && call.key.completion == key.completion
+                    && call.key.position == key.position =>
+            {
+                match call.part {
+                    core::CallPart::Effect { entry, outcome, .. } if entry == key.purpose => Some(outcome),
+                    _ => None,
+                }
+            }
+            _ => None,
+        });
+        match answer {
+            Some(Some(core::connector::OutboxOutcome::Held { .. })) => {
+                held.insert(key, evidence.kind);
+            }
+            Some(Some(
+                core::connector::OutboxOutcome::Made
+                | core::connector::OutboxOutcome::Failed
+                | core::connector::OutboxOutcome::Withdrawn,
+            )) => {
+                settled.insert(key);
+            }
+            Some(None | Some(core::connector::OutboxOutcome::Uncertain)) => {}
+            None if live.contains(&key) => {}
+            None => {
+                let projection_failed = evidence.projection
+                    && store.rows.values().map(|record| &record.0).any(|record| {
+                        matches!(record,
+                    root::Record::Forge { row } if matches!(row.as_ref(), forge::Stored::Issue(issue)
+                        if issue.goal == key.task && issue.failed))
+                    });
+                if projection_failed {
+                    held.insert(key, evidence.kind);
+                } else {
+                    // A non-named connector entry has reached its terminal
+                    // before its root-owned projection/procedure erases it.
+                    settled.insert(key);
+                }
+            }
+        }
+    }
+    snapshot.held_effects.extend(held.keys().map(|key| (0, *key)));
+    snapshot.settled_effects.extend(settled.iter().map(|key| (0, *key)));
 }

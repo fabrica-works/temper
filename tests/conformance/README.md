@@ -3,9 +3,9 @@
 The concrete engine root runs on jig's conformance harness and outside referee.
 Store rows come from `jig-fake-store`; workers retain their attempts, charges and
 unacknowledged calls across engine crashes. Restoration uses the engine's real
-bounded load requests. The adapter's `Resume` probes drive the root between
+bounded load requests. The adapter's timer probes drive the root between
 external inputs; its bookkeeping adds no task or forge decisions. The fixture
-uses a one-second landing queue window and write lifetime, with restore pages
+uses bounded journal cohorts, a one-second landing queue window and write lifetime, with restore pages
 bounded to 32 rows and 64 KiB. Each shared scenario grants its real push
 workspace and the effects it exercises; issue projections are not configured
 for stories without goals.
@@ -27,10 +27,45 @@ native client's classes and temper's `forge.md`, section 6.
 | RunBudget | Twelve independently charged completions sharing one run allowance |
 | ShrinkingPool | Not applicable: temper's forge has no pooled holds |
 
-Focused tests run the baselines and three selected commit cuts per applicable
-story. The fuzzy test crashes every applicable baseline at every durable commit.
-Both suites run the same outside referee after every harness iteration.
+| Native story | Independent ending and focused cuts |
+|---|---|
+| ReviewedChange | CI and a human approval at the merged head; cuts 1 and 15 |
+| RepairCi | Failed CI, a real repair push and approval at its new head; cuts 1 and 21 |
+| GoalIssue | Owned write-only issue, subtree milestones and closure; cuts 19 and 23 |
+| OtherHand | Another actor's branch movement holds the change without overwriting it; cuts 1 and 15 |
+| LostMerge | Lost successful merge answer found at its head after restart, once; cuts 1 and 16 |
+| PersonWords | Client words delivered live or retained in the next activation's inbox after a lost relay; cuts 1 and 8 |
+| IssueCreation | Lost native creation answer found by its retained marker, once; cuts 1 and 6 |
 
-The serial `measure` profile budgets are 1.5 seconds focused and 8 seconds fuzzy
-(jig extraction QUESTIONS.md, item 9). Measurement runs retain every cut and
-the same outside observations as the gate.
+The forge kinds follow each row of `forge.md`, section 6. In particular,
+creation is kind 8, issue editing/closing/reopening is kind 13, pull opening
+is kind 3, editing is kind 10, updating from the base is kind 11, merging is
+kind 4 and closing/reopening is kind 12. Branch deletion is kind 15. Fixtures
+grant the writes they exercise; the order has no implications between these
+kinds. The native client and the independently mapped fake writes agree on
+their recovery classes.
+
+The fake retains actual lost-answer and timeout uncertainty. Cold-start
+observations also identify durable attempted entries whose acknowledgements
+may have been lost. Subsequent durable erasure, failed projection rows and
+named held outcomes establish settlement or a hold for that retained entry.
+Already settled keys cannot be relabeled by a later projection failure; no
+live root verdict is consulted. GoalIssue accepts a held projection only with independently retained
+uncertainty for an unrecoverable creation or milestone comment. Client words
+supply delivery obligations as well as durable inbox and actual worker receipts.
+
+Focused tests run each baseline and the configured cuts above. Shared stories
+keep three selected entry, middle and closing receipt cuts; their baselines run
+separately instead of being repeated to calculate those cut numbers. Each
+focused test asserts its selected cut fired. Two fuzzy tests crash every
+applicable shared and native baseline at every durable commit. Both suites run
+the same outside referee after every harness iteration. The narrow engine-domain
+world retains CI job-log contents/truncation and race/permission checks that
+these stories do not exercise.
+
+The inherited serial `measure`, `-j1`, unoptimized-test allocation is 1.5 seconds
+focused and 8 seconds fuzzy. The applicable story-growth allowance is 0.5 seconds
+focused and 3 seconds fuzzy: the final envelope is 2 seconds / 11 seconds (jig
+extraction QUESTIONS.md, item 9). Measurement retains every cut and the same
+outside observations as the gate. The current preservation checkpoint exceeds
+that fuzzy envelope; it is not a completed 5.3 increment.

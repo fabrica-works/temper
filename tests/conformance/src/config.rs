@@ -33,7 +33,8 @@ pub fn root(
     limits.tasks.parameters = 8;
     limits.tasks.spec_bytes = 512;
     limits.tasks.executor_kinds = 2;
-    limits.tasks.authority_grants = 8;
+    limits.tasks.authority_grants = 10;
+    limits.journal.run_bytes = 8192;
     limits.tasks.authority_segments = 9;
     limits.tasks.authority_bytes = 512;
     limits.tasks.contract_choices = 2;
@@ -41,7 +42,7 @@ pub fn root(
     limits.tasks.inbox_bytes = 1024;
     limits.authority.executors = 2;
     limits.authority.batch = 2;
-    limits.authority.grants = 8;
+    limits.authority.grants = 10;
     limits.authority.segments = 9;
     limits.authority.segment_bytes = 64;
     limits.authority.writes = 2;
@@ -68,6 +69,43 @@ pub fn root(
     limits.journal.deliveries = 512;
     limits.journal.held = 4096;
 
+    // Native stories use at most four tasks and two simultaneous runs. Keep
+    // the bound small without shortening their every-commit sweeps.
+    if story.is_some() {
+        limits.tasks.tasks = 5;
+        limits.tasks.project_tasks = 5;
+        limits.tasks.tree_tasks = 16;
+        limits.tasks.delegates = 4;
+        limits.tasks.funders = 8;
+        limits.tasks.batch = 2;
+        limits.call_records = 8;
+        limits.fleet.attempts = 4;
+        limits.fleet.turns = 4;
+        limits.people.requests = 16;
+        limits.journal.writes = 4096;
+        limits.journal.deliveries = 256;
+        limits.journal.held = 1024;
+    }
+
+    limits.journal.deliveries = (limits.tasks.tasks * 4 + 8 + limits.people.pending * limits.people.waiters)
+        .max(limits.fleet.workers * jig_core_fleet::max_out(&limits.fleet) + 1)
+        .max(limits.brief.sections)
+        .max(limits.tasks.saved_resources);
+    // Admission reserves three cohorts before routing; retain three more
+    // for already committed callbacks while the next cohort runs.
+    limits.journal.held = limits.journal.deliveries * 6;
+
+    // Match the root's declared whole-route reserve instead of allocating
+    // arbitrary extra record slots for every input (root limits.rs).
+    limits.journal.writes = jig_core_tasks::max_out(&limits.tasks) * 8
+        + jig_core_people::max_out(&limits.people) * 4
+        + limits.people.pending * 2
+        + jig_core_fleet::max_out(&limits.fleet) * 4
+        + temper_engine_domain_forge::max_out(&limits.forge)
+        + limits.tasks.tasks
+        + 4
+        + limits.call_records;
+
     let mut config = walking::config(seed);
     let pattern = authority::Pattern {
         segments: Box::new([b"forge".as_slice().into(), b"forge.example".as_slice().into(), b"org".as_slice().into()]),
@@ -80,18 +118,18 @@ pub fn root(
             super::stories::Story::ReviewedChange
             | super::stories::Story::RepairCi
             | super::stories::Story::OtherHand
-            | super::stories::Story::LostMerge => &[1, 2, 3, 4],
-            super::stories::Story::GoalIssue => &[1, 2, 6, 7, 8],
-            super::stories::Story::PersonWords => &[1, 2],
-            super::stories::Story::IssueCreation => &[1, 2, 8],
+            | super::stories::Story::LostMerge => &[1, 2, 3, 4, 15],
+            super::stories::Story::GoalIssue => &[1, 2, 7, 8, 13, 15],
+            super::stories::Story::PersonWords => &[1, 2, 15],
+            super::stories::Story::IssueCreation => &[1, 2, 8, 15],
         }
     } else {
         match scenario {
-            Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6],
-            Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4],
-            Some(Scenario::StandingTask | Scenario::RunBudget) => &[1, 2],
+            Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6, 15],
+            Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4, 15],
+            Some(Scenario::StandingTask | Scenario::RunBudget) => &[1, 2, 15],
             Some(Scenario::ShrinkingPool) => panic!("forge has no pooled holds"),
-            None => &[1, 8, 2, 3, 4, 6],
+            None => &[1, 8, 13, 2, 3, 4, 6, 15],
         }
     };
     let grants: Box<[authority::Grant]> =

@@ -107,7 +107,8 @@ impl World {
             limits.tasks.parameters = 8;
             limits.tasks.spec_bytes = 512;
             limits.tasks.executor_kinds = 2;
-            limits.tasks.authority_grants = 6;
+            limits.tasks.authority_grants = 10;
+            limits.journal.run_bytes = 8192;
             limits.tasks.authority_segments = 9;
             limits.tasks.authority_bytes = 512;
             limits.tasks.contract_choices = 2;
@@ -115,7 +116,7 @@ impl World {
             limits.tasks.inbox_bytes = 1024;
             limits.authority.executors = 2;
             limits.authority.batch = 2;
-            limits.authority.grants = 6;
+            limits.authority.grants = 10;
             limits.authority.segments = 9;
             limits.authority.segment_bytes = 64;
             limits.authority.writes = 2;
@@ -131,7 +132,7 @@ impl World {
         if with_read {
             limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
             if !with_change {
-                limits.authority.grants = 3;
+                limits.authority.grants = 4;
             }
             limits.authority.segments = 9;
             limits.authority.segment_bytes = 64;
@@ -169,6 +170,9 @@ impl World {
                     authority::Grant { kind: 2, ..grant.clone() },
                     authority::Grant { kind: 3, ..grant.clone() },
                     authority::Grant { kind: 4, ..grant.clone() },
+                    authority::Grant { kind: 10, ..grant.clone() },
+                    authority::Grant { kind: 11, ..grant.clone() },
+                    authority::Grant { kind: 12, ..grant.clone() },
                 ])
             } else {
                 Box::new([grant.clone(), effect_grant.clone()])
@@ -178,6 +182,7 @@ impl World {
                 ceiling_grants.push(grant.clone()).expect("configured task grants");
             }
             ceiling_grants.push(authority::Grant { kind: 7, ..grant.clone() }).expect("projection comments");
+            ceiling_grants.push(authority::Grant { kind: 13, ..grant.clone() }).expect("projection issue sets");
             rules.ceiling.grants = ceiling_grants.into_boxed();
             if approval.is_some() || agent_gate || owner_gate {
                 let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
@@ -699,7 +704,7 @@ fn change_world_with_policy(
     };
     let child_authority = tasks::Authority {
         tools: tasks::Tools(1023),
-        grants: Box::new([tasks::Grant { kind: 3, ..grant.clone() }, tasks::Grant { kind: 4, ..grant }]),
+        grants: [3, 4, 10, 11, 12].map(|kind| tasks::Grant { kind, ..grant.clone() }).into(),
         delegation: tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 4, depth: 1 },
         budget: tasks::Budget { spend: 20, deadline: None },
         notes: tasks::Scopes(0),
@@ -778,141 +783,6 @@ fn change_world_with_policy(
     );
     let branch = producer.workspace.repositories[0].push.clone().expect("writable change branch");
     (world, chat, producer, branch)
-}
-
-#[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "the full chat-to-landing story carries its worker, forge and result assertions"
-)]
-fn a_small_fix_made_in_a_chat_lands() {
-    let mut world = World::configured(true, true);
-    world.adopt();
-    world.send(engine::Event::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 2,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    });
-    world.send(engine::Event::Ask {
-        reply_to: ReplyTo::new(Token::new(92)),
-        sign_in: world.signed_in.expect("owner session"),
-        key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"make the fix"[..]) },
-    });
-    world.until(Until::Assigned);
-    let chat = world.assigned[0].clone();
-    let grant = tasks::Grant {
-        connector: 0,
-        kind: 2,
-        pattern: tasks::Pattern {
-            segments: Box::new([Box::from(&b"forge"[..]), Box::from(&b"forge.example"[..]), Box::from(&b"org"[..])]),
-            last: tasks::Last::Open(Box::from(&b"repo"[..])),
-        },
-    };
-    let child_authority = tasks::Authority {
-        tools: tasks::Tools(1023),
-        grants: Box::new([grant.clone(), tasks::Grant { kind: 3, ..grant.clone() }, tasks::Grant { kind: 4, ..grant }]),
-        delegation: tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 2, depth: 1 },
-        budget: tasks::Budget { spend: 20, deadline: None },
-        notes: tasks::Scopes(0),
-        note_resources: Box::new([]),
-    };
-    world.send(engine::Event::Call {
-        channel: Token::new(7),
-        task: chat.task,
-        attempt: chat.attempt,
-        call: Token::new(93),
-        body: engine::Call {
-            completion: 1,
-            position: 1,
-            tool: engine::Tool::Delegate {
-                batch: Box::new([engine::Delegate {
-                    executor: tasks::Executor::Procedure { connector: 0, code: 2 },
-                    spec: tasks::Spec {
-                        words: Box::from(&b"Small fix"[..]),
-                        parameters: Box::new([
-                            tasks::Parameter::Resource {
-                                name: 1,
-                                connector: 0,
-                                resource: u64::from(forge_world::REPO.repository),
-                            },
-                            tasks::Parameter::Bytes { name: 2, value: Box::from(&b"main"[..]) },
-                        ]),
-                        inputs: Box::new([]),
-                    },
-                    contract: tasks::Contract::Change { connector: 0, kind: 1, words: 32 },
-                    authority: child_authority,
-                    symbolic_grants: Box::new([]),
-                    dependencies: Box::new([]),
-                    wake: tasks::WakePolicy::DEFAULT,
-                }]),
-            },
-        },
-    });
-    world.until(Until::Delegated);
-    world.until(Until::SecondAssignment);
-    assert_ne!(world.assigned[1].task, chat.task, "change's producer is a separate task");
-    let producer = world.assigned[1].clone();
-    let repository = producer.workspace.repositories.first().expect("adopted forge workspace");
-    assert!(matches!(repository.start, engine::ForgeStart::Base(ref branch) if branch.as_ref() == b"main"));
-    let branch = repository.push.as_ref().expect("change's branch is writable");
-    assert!(branch.starts_with(b"temper/"));
-    assert!(world.store.rows.values().any(|stored| matches!(stored,
-        Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Hold(hold)
-            if matches!(hold.writer, Some(forge_top::Writer::Run { task, attempt })
-                if task == producer.task && attempt == producer.attempt))
-    )));
-    let branch = branch.clone();
-    let created = world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 }));
-    assert!(matches!(created, raw::Answer::Branch(raw::Created::Created)), "created branch: {created:?}");
-    fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
-        .expect("producer pushed its branch");
-    world.send(engine::Event::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
-            result: tasks::TaskResult::Change {
-                connector: 0,
-                kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
-                words: Box::from(&b"pushed"[..]),
-            },
-            cancel_delegates: false,
-        },
-        saved: None,
-    });
-    for _ in 0..200 {
-        world.tick();
-        if world.store.rows.values().any(|stored| matches!(stored,
-            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                if change.task != producer.task && matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-        )) { break; }
-    }
-    assert!(
-        world.store.rows.values().any(|stored| matches!(stored,
-            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-        )),
-        "change did not land: {:?}",
-        world.store.rows.values().filter(|row| matches!(row, Record::Forge { .. })).collect::<Vec<_>>()
-    );
-    for _ in 0..20 {
-        world.tick();
-    }
-    assert!(
-        world.store.rows.values().any(|stored| matches!(stored,
-            Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))) if row.requester == tasks::Party::Task(chat.task)
-                && matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Change { .. })))
-        )),
-        "change task did not report its landing"
-    );
 }
 
 #[test]
@@ -1248,8 +1118,7 @@ fn check_gate_repair(no_ci: bool) {
 }
 
 #[test]
-#[expect(clippy::too_many_lines, reason = "the failed-CI story includes repair, review, and landing")]
-fn a_change_failing_ci_is_repaired_reviewed_at_its_head_and_lands() {
+fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
     let (mut world, _chat, producer, branch) = change_world(false, 0, None);
     world.external(
         1,
@@ -1311,81 +1180,6 @@ fn a_change_failing_ci_is_repaired_reviewed_at_its_head_and_lands() {
                 && words.windows(b"[job log truncated]".len()).any(|part| part == b"[job log truncated]"))),
         "CI sections: {:?}",
         repair.sections
-    );
-    let repaired = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"repaired", 1)
-        .expect("repair pushed a new head");
-    for _ in 0..5 {
-        world.tick();
-    }
-    world.external(
-        1,
-        raw::Op::Write(raw::Write::Status {
-            commit: repaired,
-            context: Box::from(&b"build"[..]),
-            state: raw::Check::Passed,
-        }),
-    );
-    let pull = world
-        .store
-        .rows
-        .values()
-        .find_map(|stored| match stored {
-            Record::Forge { row, .. } => match row.as_ref() {
-                forge_top::Stored::Change(change) => change.pull,
-                _ => None,
-            },
-            Record::Core(_) => None,
-        })
-        .expect("opened pull request");
-    assert!(matches!(
-        world.external(
-            2,
-            raw::Op::Write(raw::Write::Review {
-                number: pull,
-                verdict: Some(raw::Verdict::Approve),
-                body: Box::from(&b"Reviewed repaired head"[..]),
-            })
-        ),
-        raw::Answer::Reviewed(_)
-    ));
-    world.send(engine::Event::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: repair.task,
-        attempt: repair.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
-            result: tasks::TaskResult::Change {
-                connector: 0,
-                kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
-                words: Box::from(&b"repaired"[..]),
-            },
-            cancel_delegates: false,
-        },
-        saved: None,
-    });
-    for _ in 0..200 {
-        world.tick();
-        if world.store.rows.values().any(|stored| {
-            matches!(stored,
-                Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                    if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-            )
-        }) {
-            break;
-        }
-    }
-    assert!(
-        world.store.rows.values().any(|stored| matches!(stored,
-            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. })
-                    && change.change.repairs == 1)
-        )),
-        "repaired change did not land: task2={:?}; pending={:?}; forge={:?}",
-        world.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(2)))),
-        world.pending,
-        world.store.rows.values().collect::<Vec<_>>()
     );
 }
 
@@ -2383,77 +2177,6 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     assert!(second.workspace.repositories.iter().any(|repository| repository.tag == 3
         && matches!(repository.start, engine::ForgeStart::Saved(ref branch)
             if branch.as_ref() == b"temper/1/s1")));
-}
-
-#[test]
-fn a_tracked_goal_opens_its_owned_issue_without_reading_participant_comments() {
-    let mut world = World::configured(true, false);
-    world.adopt();
-    world.send(engine::Event::Ask {
-        reply_to: ReplyTo::new(Token::new(94)),
-        sign_in: world.signed_in.expect("owner session"),
-        key: [94; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: Box::from(&b"Fix the small bug"[..]),
-            charter: 1,
-            budget: 50,
-            priority: 3,
-        },
-    });
-    for _ in 0..100 {
-        world.tick();
-    }
-    let issue = world
-        .store
-        .rows
-        .values()
-        .find_map(|stored| match stored {
-            Record::Forge { row, .. } => match row.as_ref() {
-                forge_top::Stored::Issue(issue) if issue.pending.is_none() => Some(issue.clone()),
-                _ => None,
-            },
-            Record::Core(_) => None,
-        })
-        .expect("tracked goal's issue was opened and acknowledged");
-    let number = issue.number.expect("provider issued an issue number");
-    assert!(!world.store.rows.values().any(|stored| matches!(stored,
-        Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Subscription(sub)
-            if sub.task == issue.goal && sub.topic == forge_top::Topic::Participation { repository: forge_world::REPO, number })
-    )), "owned projection has no participant subscription");
-    fake::step(
-        &mut world.fake,
-        &world.fake_env,
-        fake::Event::Call {
-            reply_to: ReplyTo::new(Token::new(999)),
-            user: 2,
-            repository: Box::from(&b"org/repo"[..]),
-            op: raw::Op::Write(raw::Write::Comment { number, body: Box::from(&b"Please check this"[..]) }),
-        },
-        &mut world.fake_out,
-    );
-    for _ in 0..10 {
-        if !world.fake_out.is_empty() {
-            break;
-        }
-        world.fake_env.now = world.fake_env.now.saturating_add(Duration::from_millis(100));
-        world.fake_env.wall = Wall::from_nanos(world.fake_env.now.as_nanos());
-        fake::fire(&mut world.fake, &world.fake_env, &mut world.fake_out);
-    }
-    let commented = world.fake_out.pop();
-    assert!(matches!(commented, Some(fake::Request::Reply { result: Ok(_), .. })), "comment result: {commented:?}");
-    world.send(engine::Event::ForgeHint {
-        hint: client::api::Hint { repository: forge_world::REPO, change: client::api::Change::Item(number), key: None },
-    });
-    for _ in 0..100 {
-        world.tick();
-    }
-    assert!(
-        matches!(world.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(issue.goal)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) if !row.inbox.iter().any(|word|
-            matches!(word.kind, tasks::MessageKind::News { class: tasks::NewsClass::Wakes, .. }))),
-        "comments on the owned projection do not wake its goal"
-    );
 }
 
 #[test]

@@ -1474,10 +1474,9 @@ fn describe_change_effect(
             (3, branch_what(&row.branch, env.limits.forge.name_bytes), evidence.head.unwrap_or([0; 32]))
         }
         forge_change::Effect::CreateBranch { head } => (9, branch_what(&row.branch, env.limits.forge.name_bytes), head),
-        forge_change::Effect::Reopen | forge_change::Effect::Retarget => {
-            (3, pull_what, evidence.head.unwrap_or([0; 32]))
-        }
-        forge_change::Effect::Update { head, .. } => (2, branch_what(&row.branch, env.limits.forge.name_bytes), head),
+        forge_change::Effect::Reopen => (12, pull_what, evidence.head.unwrap_or([0; 32])),
+        forge_change::Effect::Retarget => (10, pull_what, evidence.head.unwrap_or([0; 32])),
+        forge_change::Effect::Update { head, .. } => (11, branch_what(&row.branch, env.limits.forge.name_bytes), head),
         forge_change::Effect::Merge { head, .. } => (4, branch_what(&row.base, env.limits.forge.name_bytes), head),
     };
     let what = what?;

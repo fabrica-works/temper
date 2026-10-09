@@ -29,10 +29,22 @@ fn lost_issue_creation_answer_recovers_without_a_second_issue() {
     stories::run(Story::IssueCreation, Cut::None, 71).expect("issue creation uncertainty");
 }
 #[test]
-fn a_repair_writer_restores_before_its_next_push() {
-    stories::run(Story::RepairCi, Cut::AfterCommit(21), 101).expect("restored repair writer");
-}
-#[test]
-fn a_milestone_release_recovers_its_already_deleted_branch() {
-    stories::run(Story::GoalIssue, Cut::AfterCommit(19), 101).expect("recovered milestone release");
+fn native_stories_recover_their_focused_commit_cuts() {
+    // Configured receipt cuts, including writer restoration, an already deleted
+    // branch, a lost milestone comment and a retained live-run word.
+    for (story, cuts) in [
+        (Story::ReviewedChange, [1, 15]),
+        (Story::RepairCi, [1, 21]),
+        (Story::GoalIssue, [19, 23]),
+        (Story::OtherHand, [1, 15]),
+        (Story::LostMerge, [1, 16]),
+        (Story::PersonWords, [1, 8]),
+        (Story::IssueCreation, [1, 6]),
+    ] {
+        for cut in cuts {
+            let outcome = stories::run(story, Cut::AfterCommit(cut), 101)
+                .unwrap_or_else(|error| panic!("{story:?}, cut {cut}: {error:?}"));
+            assert!(outcome.crashes.contains(&cut), "{story:?} cut {cut} did not fire");
+        }
+    }
 }

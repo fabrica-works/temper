@@ -81,7 +81,8 @@ impl World {
             limits.tasks.parameters = 8;
             limits.tasks.spec_bytes = 512;
             limits.tasks.executor_kinds = 2;
-            limits.tasks.authority_grants = 6;
+            limits.tasks.authority_grants = 10;
+            limits.journal.run_bytes = 8192;
             limits.tasks.authority_segments = 9;
             limits.tasks.authority_bytes = 512;
             limits.tasks.contract_choices = 2;
@@ -89,7 +90,7 @@ impl World {
             limits.tasks.inbox_bytes = 1024;
             limits.authority.executors = 2;
             limits.authority.batch = 2;
-            limits.authority.grants = 6;
+            limits.authority.grants = 10;
             limits.authority.segments = 9;
             limits.authority.segment_bytes = 64;
             limits.authority.writes = 2;
@@ -105,7 +106,7 @@ impl World {
         if with_read {
             limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
             if !with_change {
-                limits.authority.grants = 3;
+                limits.authority.grants = 4;
             }
             limits.authority.segments = 9;
             limits.authority.segment_bytes = 64;
@@ -141,6 +142,9 @@ impl World {
                     authority::Grant { kind: 2, ..grant.clone() },
                     authority::Grant { kind: 3, ..grant.clone() },
                     authority::Grant { kind: 4, ..grant.clone() },
+                    authority::Grant { kind: 10, ..grant.clone() },
+                    authority::Grant { kind: 11, ..grant.clone() },
+                    authority::Grant { kind: 12, ..grant.clone() },
                 ])
             } else {
                 Box::new([grant.clone(), effect_grant.clone()])
@@ -150,6 +154,7 @@ impl World {
                 ceiling_grants.push(grant.clone()).expect("configured task grants");
             }
             ceiling_grants.push(authority::Grant { kind: 7, ..grant.clone() }).expect("projection comments");
+            ceiling_grants.push(authority::Grant { kind: 13, ..grant.clone() }).expect("projection issue sets");
             rules.ceiling.grants = ceiling_grants.into_boxed();
             if let Some(freshness) = approval {
                 let landing = Box::new([engine::LandingRule {

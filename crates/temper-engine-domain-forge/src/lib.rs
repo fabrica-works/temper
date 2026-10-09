@@ -58,15 +58,23 @@ pub enum Recovery {
 }
 
 /// Effect form and recovery class declared by the forge connector.
+///
+/// The kinds follow domain/forge.md, section 6, one kind per row:
+/// 3 opens pulls, 10 edits their title/body, 11 updates from the base,
+/// 4 merges, 12 closes/reopens, 5 posts reviews, 7 posts comments,
+/// 6 sets statuses, 8 creates issues, 13 edits/closes/reopens issues,
+/// 14 sets reviewers, 9 creates branches, and 15 deletes branches.
+/// Kind 1 reads and kind 2 grants workspace pushes. The order has no
+/// implications between distinct kinds: each intended write needs a grant.
 #[must_use]
 pub const fn effect_shape(kind: u16) -> Option<(EffectForm, Recovery)> {
     match kind {
-        2 => Some((EffectForm::Transition, Recovery::Unrecoverable)),
+        2 | 11 => Some((EffectForm::Transition, Recovery::Unrecoverable)),
         4 => Some((EffectForm::Transition, Recovery::Conditional)),
         3 => Some((EffectForm::Creation, Recovery::Conditional)),
         5 | 7 | 8 | 9 => Some((EffectForm::Creation, Recovery::Unrecoverable)),
-        6 => Some((EffectForm::Set, Recovery::Idempotent)),
-        0 | 1 | 10..=u16::MAX => None,
+        6 | 10 | 12..=15 => Some((EffectForm::Set, Recovery::Idempotent)),
+        0 | 1 | 16..=u16::MAX => None,
     }
 }
 
@@ -150,13 +158,13 @@ pub fn effect_access(repository: &Repository, what: &What, kind: u16) -> Access 
     let permitted = match kind {
         1 => repository.kinds.read,
         2 => repository.kinds.push,
-        3 => repository.kinds.open,
+        3 | 10..=12 => repository.kinds.open,
         4 => repository.kinds.land,
-        5 => repository.kinds.review,
+        5 | 14 => repository.kinds.review,
         6 => repository.kinds.status,
         7 => repository.kinds.comment,
-        8 => repository.kinds.issue,
-        9 => repository.kinds.branch,
+        8 | 13 => repository.kinds.issue,
+        9 | 15 => repository.kinds.branch,
         _ => false,
     };
     let shared = match what {
@@ -418,9 +426,10 @@ pub fn describe_projection_effect(
     use temper_engine_domain_forge_client as client;
     let (resource, kind, form) = match write {
         client::api::Write::CreateIssue { .. } => (What::Repository, 8, EffectForm::Creation),
-        client::api::Write::Edit { number, .. } => (What::Issue(*number), 8, EffectForm::Set),
+        client::api::Write::Edit { number, .. } | client::api::Write::Close { number } => {
+            (What::Issue(*number), 13, EffectForm::Set)
+        }
         client::api::Write::Post { number, .. } => (What::Issue(*number), 7, EffectForm::Creation),
-        client::api::Write::Close { number } => (What::Issue(*number), 8, EffectForm::Transition),
         client::api::Write::Status { .. }
         | client::api::Write::OpenPull { .. }
         | client::api::Write::Review { .. }

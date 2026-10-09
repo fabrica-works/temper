@@ -485,17 +485,34 @@ fn named_resource_reports_distinguish_private_branches_context_and_shared_landin
 }
 
 #[test]
-fn procedure_creation_descriptions_keep_the_native_recovery_promises() {
-    let pull = client::api::Write::OpenPull {
-        title: b"change".as_slice().into(),
-        body: Box::new([]),
-        head: b"temper/c1".as_slice().into(),
-        base: b"main".as_slice().into(),
-    };
-    let branch = client::api::Write::CreateBranch { branch: b"temper/c1".as_slice().into(), commit: [1; 32] };
-    for (kind, write) in [(3, pull), (9, branch)] {
-        let (form, recovery) = effect_shape(kind).expect("creation kind");
-        assert_eq!(form, EffectForm::Creation);
+fn native_effect_rows_keep_the_clients_recovery_promises() {
+    use client::api::Write;
+    let empty = || Box::<[u8]>::default();
+    let writes = [
+        (3, EffectForm::Creation, Write::OpenPull { title: empty(), body: empty(), head: empty(), base: empty() }),
+        (10, EffectForm::Set, Write::Edit { number: 1, title: None, body: None }),
+        (11, EffectForm::Transition, Write::Update { number: 1 }),
+        (4, EffectForm::Transition, Write::Merge { number: 1, head: [1; 32] }),
+        (12, EffectForm::Set, Write::Close { number: 1 }),
+        (12, EffectForm::Set, Write::Reopen { number: 1 }),
+        (
+            5,
+            EffectForm::Creation,
+            Write::Review { number: 1, key: empty(), verdict: client::api::Verdict::Approve, body: empty() },
+        ),
+        (7, EffectForm::Creation, Write::Post { number: 1, key: empty(), body: empty() }),
+        (6, EffectForm::Set, Write::Status { commit: [1; 32], context: empty(), check: client::api::Check::Passed }),
+        (8, EffectForm::Creation, Write::CreateIssue { key: empty(), title: empty(), body: empty() }),
+        (13, EffectForm::Set, Write::Edit { number: 1, title: None, body: None }),
+        (13, EffectForm::Set, Write::Close { number: 1 }),
+        (13, EffectForm::Set, Write::Reopen { number: 1 }),
+        (14, EffectForm::Set, Write::SetReviewers { number: 1, reviewers: Box::new([]) }),
+        (9, EffectForm::Creation, Write::CreateBranch { branch: empty(), commit: [1; 32] }),
+        (15, EffectForm::Set, Write::DeleteBranch { branch: empty() }),
+    ];
+    for (kind, expected_form, write) in writes {
+        let (form, recovery) = effect_shape(kind).expect("native effect kind");
+        assert_eq!(form, expected_form, "kind {kind}");
         let expected = match client::recovery(&write) {
             client::Recovery::Keyed => Recovery::Keyed,
             client::Recovery::Conditional => Recovery::Conditional,

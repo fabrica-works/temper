@@ -3415,11 +3415,23 @@ fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &c
     let Some(release) = d.releases.get(&task) else { return false };
     let Some((number, _)) = &release.pending else { return false };
     let Some(entry) = d.entries.get(number) else { return false };
-    match (&entry.effect.write, &resource.what) {
-        (client::api::Write::DeleteBranch { branch }, client::What::Branch(found)) => {
-            entry.repository == resource.repository && branch == found
-        }
-        _ => false,
+    match &entry.effect.write {
+        client::api::Write::DeleteBranch { branch } => match &resource.what {
+            client::What::Branch(found) => entry.repository == resource.repository && branch == found,
+            client::What::Repository | client::What::Pull(_) | client::What::Issue(_) => false,
+        },
+        client::api::Write::CreateIssue { .. }
+        | client::api::Write::OpenPull { .. }
+        | client::api::Write::Post { .. }
+        | client::api::Write::Review { .. }
+        | client::api::Write::Edit { .. }
+        | client::api::Write::SetReviewers { .. }
+        | client::api::Write::Close { .. }
+        | client::api::Write::Reopen { .. }
+        | client::api::Write::Merge { .. }
+        | client::api::Write::Update { .. }
+        | client::api::Write::Status { .. }
+        | client::api::Write::CreateBranch { .. } => false,
     }
 }
 

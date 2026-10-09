@@ -33,6 +33,7 @@ pub struct FakeForge {
     pub lose_merge_answer: bool,
     pub lose_issue_answer: bool,
     pub effects: Vec<Observed>,
+    pub uncertain: Vec<SystemKey>,
     pub native_observations: Vec<fake::Observation>,
     owners: BTreeMap<Vec<u8>, u64>,
     new_observations: RefCell<Vec<r::Observed>>,
@@ -91,6 +92,7 @@ impl FakeForge {
             lose_merge_answer: false,
             lose_issue_answer: false,
             effects: Vec::new(),
+            uncertain: Vec::new(),
             native_observations: Vec::new(),
             owners: BTreeMap::new(),
             new_observations: RefCell::new(Vec::new()),
@@ -117,6 +119,7 @@ impl FakeForge {
             let entry = store
                 .rows
                 .values()
+                .map(|record| &record.0)
                 .find_map(|row| match row {
                     root::Record::Forge { row } => match row.as_ref() {
                         forge::Stored::Entry(entry) if &entry.effect.write == write => Some(entry),
@@ -144,10 +147,15 @@ impl FakeForge {
         {
             self.late_next = false;
             self.late.push((call, repository, op, key));
+            self.uncertainty(key);
             return vec![engine::Event::ForgeAnswered { call, cost: 1, result: Err(api::Error::Timeout) }];
         }
         self.send(clock, call, op, key, false);
         Vec::new()
+    }
+    fn uncertainty(&mut self, key: SystemKey) {
+        self.uncertain.push(key);
+        self.new_observations.borrow_mut().push(r::Observed::Uncertain { connector: 0, key });
     }
     fn send(&mut self, clock: Clock, call: Token, op: api::Op, key: Option<SystemKey>, late: bool) {
         let native = translate::op(&op, &self.client_limits);
@@ -199,6 +207,10 @@ impl FakeForge {
             self.send(clock, call, op, Some(key), true);
         }
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one transport poll retains native replies, effects, lost answers and hooks together"
+    )]
     pub fn poll(&mut self, clock: Clock) -> Vec<engine::Event> {
         let env = Env { now: Time::from_nanos(clock.now), wall: Wall::from_nanos(clock.now), limits: self.config };
         if self.domain.is_due(env.now) {
@@ -259,6 +271,7 @@ impl FakeForge {
                         at: clock.now,
                     });
                 }
+                let key = pending.effect.as_ref().map(|(key, ..)| *key);
                 if let Some((key, write, copy, before)) = pending.effect {
                     let (kind, resources, condition, target) = raw_parts(&write);
                     let observation = Observed {
@@ -279,6 +292,7 @@ impl FakeForge {
                     && result.is_ok()
                 {
                     self.lose_merge_answer = false;
+                    self.uncertainty(key.expect("lost merge flight"));
                     continue;
                 }
                 if self.lose_issue_answer
@@ -286,6 +300,7 @@ impl FakeForge {
                     && result.is_ok()
                 {
                     self.lose_issue_answer = false;
+                    self.uncertainty(key.expect("lost issue flight"));
                     continue;
                 }
                 if pending.generation == self.generation {
@@ -372,10 +387,6 @@ impl FakeForge {
         };
         ValueObserved { state, owner: owned.then_some(key) }
     }
-    #[expect(
-        clippy::match_wildcard_for_single_variants,
-        reason = "hook outputs are retained while this helper finds its own reply"
-    )]
     pub fn external(&mut self, clock: Clock, op: raw::Op) -> raw::Answer {
         self.external_as(clock, 1, op)
     }
@@ -406,7 +417,7 @@ impl FakeForge {
                             self.out.push_back(fake::Request::Reply { to: ReplyTo::new(call), result });
                         }
                     }
-                    other => self.out.push_back(other),
+                    other @ fake::Request::Hook { .. } => self.out.push_back(other),
                 }
             }
             if answer.is_some() {
@@ -455,6 +466,10 @@ impl FakeForge {
         }
         translate::commit(commit)
     }
+    /// Inspect the independent native forge.
+    ///
+    /// # Errors
+    /// Returns the native refusal when that object cannot be read.
     pub fn inspect(&self, read: &raw::Read) -> Result<raw::Answer, raw::Error> {
         self.domain.inspect(&self.config, b"org/repo", read)
     }
@@ -480,11 +495,11 @@ fn raw_parts(write: &raw::Write) -> (u16, Vec<r::Name>, Option<u64>, u64) {
         }
         raw::Write::EditItem { number, title, body } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
-            (8, None, observations::value(format!("{title:?}:{body:?}").as_bytes()))
+            (13, None, observations::value(format!("{title:?}:{body:?}").as_bytes()))
         }
         raw::Write::Close { number } => {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
-            (8, None, 1)
+            (13, None, 1)
         }
         raw::Write::Merge { number, head } => {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
@@ -496,7 +511,7 @@ fn raw_parts(write: &raw::Write) -> (u16, Vec<r::Name>, Option<u64>, u64) {
         raw::Write::DeleteBranch { branch } => {
             name.path.push(b"branch".to_vec());
             name.path.extend(branch.split(|byte| *byte == b'/').map(<[u8]>::to_vec));
-            (2, None, 0)
+            (15, None, 0)
         }
         other => panic!("unbound native forge write {other:?}"),
     };

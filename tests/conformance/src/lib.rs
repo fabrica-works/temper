@@ -53,7 +53,6 @@ impl Config {
 pub enum Event {
     Root(engine::Event),
     Fire,
-    Resume,
 }
 impl std::fmt::Debug for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -72,7 +71,6 @@ impl std::fmt::Debug for Event {
                 }
             }
             Self::Fire => f.write_str("Fire"),
-            Self::Resume => f.write_str("Resume"),
         }
     }
 }
@@ -119,6 +117,11 @@ pub struct Peers {
     calls: std::collections::BTreeMap<u64, (u64, u64, engine::Call)>,
     retries: std::collections::BTreeMap<u64, u64>,
     generation: u64,
+    uncertain: std::collections::BTreeMap<jig_test_system::SystemKey, u16>,
+    words: std::collections::BTreeSet<(u64, u64)>,
+    effects: std::collections::BTreeMap<jig_test_system::SystemKey, observations::EffectEvidence>,
+    held: std::collections::BTreeMap<jig_test_system::SystemKey, u16>,
+    settled: std::collections::BTreeSet<jig_test_system::SystemKey>,
 }
 /// Released outputs, drained without inspecting the root.
 #[derive(Debug)]
@@ -138,7 +141,7 @@ impl Application for Temper {
     type Systems = systems::FakeForge;
     type Peers = Peers;
     type Key = root::Key;
-    type Record = root::Record;
+    type Record = observations::Record;
     type Event = Event;
     type Delivery = Delivery;
 
@@ -178,7 +181,9 @@ impl Application for Temper {
         system
     }
     fn peers(config: &Config, _: u64) -> Peers {
-        let script: Box<[workers::Script]> = if config.story.is_some() {
+        let script: Box<[workers::Script]> = if config.story == Some(stories::Story::PersonWords) {
+            Box::new([workers::Script::Silence { for_: Duration::from_secs(1) }, workers::Script::Park])
+        } else if config.story.is_some() {
             Box::new([workers::Script::Wait, workers::Script::Finish { report: b"story done".as_slice().into() }])
         } else {
             match config.scenario {
@@ -233,6 +238,11 @@ impl Application for Temper {
             calls: std::collections::BTreeMap::new(),
             retries: std::collections::BTreeMap::new(),
             generation: 0,
+            uncertain: std::collections::BTreeMap::new(),
+            words: std::collections::BTreeSet::new(),
+            effects: std::collections::BTreeMap::new(),
+            held: std::collections::BTreeMap::new(),
+            settled: std::collections::BTreeSet::new(),
         }
     }
     fn policy(peers: &Peers) -> r::Policy {
@@ -242,8 +252,8 @@ impl Application for Temper {
         assert_eq!(connector, 0);
         match kind {
             3 | 4 => r::Recovery::Conditional,
-            6 => r::Recovery::Idempotent,
-            2 | 7 | 8 | 9 => r::Recovery::Unrecoverable,
+            6 | 10 | 12..=15 => r::Recovery::Idempotent,
+            2 | 5 | 7 | 8 | 9 | 11 => r::Recovery::Unrecoverable,
             _ => panic!("unknown forge kind {kind}"),
         }
     }
@@ -252,6 +262,16 @@ impl Application for Temper {
     }
     fn cold(peers: &mut Peers, store: &Store, _: Clock) {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
+        for record in store.rows.values().map(|record| &record.0) {
+            if let root::Record::Forge { row } = record
+                && let forge::Stored::Entry(entry) = row.as_ref()
+                && entry.attempt.is_some()
+            {
+                let key = observations::key(store, entry);
+                peers.uncertain.insert(key, observations::parts(&entry.effect.write).0);
+                peers.observed.push(r::Observed::Uncertain { connector: 0, key });
+            }
+        }
         peers.worker.restart_engine();
         peers.generation += 1;
         peers.retries.extend(peers.calls.keys().map(|call| (*call, 0)));
@@ -269,13 +289,12 @@ impl Application for Temper {
     fn timers(_: &Config) -> Vec<Event> {
         vec![Event::Fire]
     }
-    fn step(domain: &mut Domain, config: &Config, clock: Clock, input: Input<Event, root::Record>) {
+    fn step(domain: &mut Domain, config: &Config, clock: Clock, input: Input<Event, observations::Record>) {
         let environment = env(config, clock);
-        domain.probed = matches!(input, Input::Event(Event::Resume | Event::Fire));
+        domain.probed = matches!(input, Input::Event(Event::Fire));
         match input {
             Input::Event(Event::Root(event)) => engine::step(&mut domain.root, &environment, event),
             Input::Event(Event::Fire) => engine::fire(&mut domain.root, &environment),
-            Input::Event(Event::Resume) => root::step(&mut domain.root, &environment, root::Event::Resume),
             Input::Committed(number) => {
                 engine::step(&mut domain.root, &environment, engine::Event::Committed { number });
             }
@@ -289,7 +308,11 @@ impl Application for Temper {
         clippy::wildcard_enum_match_arm,
         reason = "every native nonstore request is retained unchanged as a released delivery"
     )]
-    fn release(domain: &mut Domain, config: &Config, clock: Clock) -> Vec<Output<root::Key, root::Record, Delivery>> {
+    fn release(
+        domain: &mut Domain,
+        config: &Config,
+        clock: Clock,
+    ) -> Vec<Output<root::Key, observations::Record, Delivery>> {
         let environment = env(config, clock);
         engine::release(&mut domain.root, &environment, &mut domain.outputs);
         if domain.outputs.is_empty() {
@@ -304,7 +327,9 @@ impl Application for Temper {
                         .into_vec()
                         .into_iter()
                         .map(|w| match w {
-                            root::Write::Save(row) => jig_fake_store::Write::Save { key: row.key(), row },
+                            root::Write::Save(row) => {
+                                jig_fake_store::Write::Save { key: row.key(), row: observations::Record(row) }
+                            }
                             root::Write::Erase(key) => jig_fake_store::Write::Erase(key),
                         })
                         .collect(),
@@ -363,10 +388,10 @@ impl Application for Temper {
         store: &mut Store,
         clock: Clock,
         delivery: Delivery,
-    ) -> Vec<Input<Event, root::Record>> {
+    ) -> Vec<Input<Event, observations::Record>> {
         let mut events = Vec::new();
         let Delivery::Root(delivery) = delivery else {
-            return vec![Input::Event(Event::Fire), Input::Event(Event::Resume)];
+            return vec![Input::Event(Event::Fire)];
         };
         match delivery {
             engine::Request::ToChild(released) => events.push(engine::Event::Released(released)),
@@ -376,7 +401,7 @@ impl Application for Temper {
                     .iter()
                     .filter(|(key, _)| range.contains(key) && after.as_ref().is_none_or(|previous| *key > previous))
                     .take(usize::try_from(most + 1).expect("tiny load"))
-                    .map(|(_, row)| row.clone())
+                    .map(|(_, row)| row.0.clone())
                     .collect();
                 let more = rows.len() > usize::try_from(most).expect("tiny load");
                 let mut rows = rows;
@@ -493,13 +518,17 @@ impl Application for Temper {
         }
         events.into_iter().map(|event| Input::Event(Event::Root(event))).collect()
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one poll drives retained named requests, worker evidence and authenticated startup together"
+    )]
     fn poll(
         peers: &mut Peers,
         systems: &mut systems::FakeForge,
         _: &mut Store,
         clock: Clock,
         ready: bool,
-    ) -> Vec<Input<Event, root::Record>> {
+    ) -> Vec<Input<Event, observations::Record>> {
         systems.generation = peers.generation;
         let mut events = systems.poll(clock);
         if ready {
@@ -608,7 +637,23 @@ impl Application for Temper {
         let mut observations = Vec::new();
         if peers.applied != store.applied {
             peers.applied = store.applied;
-            observations.push(r::Observed::Durable { number: store.applied, snapshot: observations::snapshot(store) });
+            let mut snapshot = observations::snapshot(store);
+            observations::resolved(store, &mut snapshot, &mut peers.effects, &mut peers.held, &mut peers.settled);
+            for record in store.rows.values().map(|record| &record.0) {
+                if let root::Record::Core(jig_core::Record::Tasks(
+                    tasks::Stored::Live(task) | tasks::Stored::Ended(task),
+                )) = record
+                {
+                    for word in &task.inbox {
+                        if matches!(word.from, tasks::Party::Person(_))
+                            && peers.words.insert((task.number, word.number))
+                        {
+                            peers.observed.push(r::Observed::Words { task: task.number, message: word.number });
+                        }
+                    }
+                }
+            }
+            observations.push(r::Observed::Durable { number: store.applied, snapshot });
         }
         observations.append(&mut peers.observed);
         observations.extend(systems.take_observed());
