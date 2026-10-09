@@ -63,9 +63,7 @@ the same outside referee after every harness iteration. The narrow engine-domain
 world retains CI job-log contents/truncation and race/permission checks that
 these stories do not exercise.
 
-The inherited serial `measure`, `-j1`, unoptimized-test allocation is 1.5 seconds
-focused and 8 seconds fuzzy. The applicable story-growth allowance is 0.5 seconds
-focused and 3 seconds fuzzy: the final envelope is 2 seconds / 11 seconds (jig
-extraction QUESTIONS.md, item 9). Measurement retains every cut and the same
-outside observations as the gate. The current preservation checkpoint exceeds
-that fuzzy envelope; it is not a completed 5.3 increment.
+The serial `measure`, `-j1`, unoptimized-test allocation is 2 seconds
+focused and 20 seconds fuzzy (jig extraction QUESTIONS.md, item 9). Both
+suites retain all fourteen applicable stories, all 365 shared and native
+commit cuts, and the same outside observations and referee as the gate.
