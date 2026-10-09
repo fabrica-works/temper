@@ -164,7 +164,7 @@ An infrastructure connector, shared by the lab and the run side:
   - *inject a fault:* a partition, latency, a killed process, a full
     disk. Only the lab's policy grants it.
 - **Facts:** each slot's revision and digests, which slot is active,
-  drift, and health from the observability connector.
+  drift, and health: the targets' checks (section 9).
 - **Events:** prepared, activated, fell back, drifted.
 - **Holds:** a task holds the machine it changes; a held machine is
   pinned against convergence (section 9).
@@ -298,6 +298,11 @@ serves     outputs to peers by digest
 - **Reproducible builds help:** if an artifact depends only on its
   inputs, the lab knows before compiling whether it has it already.
   Without them, a build is made once per inputs' key and reused.
+- **The daemon is hearth** (`~/src/rust/hearth`), a skein service that
+  replaces os's tools. Its `brainstorm.md` takes this section further:
+  outputs as layers keyed by digest, slots that boot on trial before
+  they are blessed, skein's channel dialed out to the plane's engine,
+  its end of operating a service, and reproducible builds deferred.
 
 ## 8. The lab
 
@@ -405,11 +410,24 @@ A sketch, still to be designed:
   repository's main. Only machines whose specs changed do anything
   (section 6).
 - **Rollouts:** order, canaries and bake times as policy, with caution
-  following what changed (6.3); each step needs the observability
-  connector's verdict on health.
+  following what changed (6.3); each step needs a verdict on health
+  from the targets' checks.
 - **Health at commits:** posted as statuses, for the goals that wait on
   them (section 4).
-- **Incidents:** observability's alerts, triaged; an incident lead with
+- **One definition of healthy.** Each task declares its checks as data
+  in the IaC repository. The lab's experiments, blessing a slot, a
+  rollout's bake and watching a service for as long as it runs all use
+  the same checks: section 3's one activity at different stakes. A check
+  of a machine runs on it; a check of the service as its users see it
+  runs from another machine.
+- **Observability starts as the daemon's facts.** Check results,
+  resource alarms, failing units, drift and liveness (a machine that
+  stops redialling is down) reach the run side as facts, through the
+  infrastructure connector. Logs and metrics stay on the machines, and
+  triage reads them through the daemon. There is no central store for
+  either to start; if one is needed later, it is a service the factory
+  deploys, like any other, behind an observability connector of its own.
+- **Incidents:** alerts from those facts, triaged; an incident lead with
   reads of both connectors; people on call accepting what policy
   reserves to them (jig's `examples.md`, section 7, is its sketch).
 - **Rollback is a slot switch,** cheap and conditional, and may be
@@ -417,11 +435,20 @@ A sketch, still to be designed:
   until the desired state matches again: the run side files an issue,
   temper lands a revert or a fix, and the hold is released.
 - **No hand on a machine.** Agents read; their only writes are the
-  infrastructure connector's effects. Any other fix is a change.
-- **Bootstrap:** the run side's first machine is made by hand with os's
-  `provision`; after that it updates itself through its own slots,
-  which fall back on their own when a new one does not come back
-  healthy.
+  infrastructure connector's effects. Any other fix is a change. The
+  operational effects start small, with two: rolling back and restarting
+  a unit.
+- **Standing procedures:** convergence, certificate renewal and
+  backups. A backup is a snapshot of a target's data sent to a backup
+  peer; restore drills are experiments on the run side's own throwaway
+  machines, since production's data never enters the lab.
+- **The run side's own health.** Something must notice when the run
+  side's engine is down. The lean is a clustered engine, later
+  (section 14).
+- **Bootstrap:** the run side's first machine is made by hand, with
+  hearth's command line running its domain in-process; after that it
+  updates itself through its own slots, which fall back on their own
+  when a new one does not come back healthy.
 
 ## 10. A story: DKIM for the mail server
 
@@ -518,6 +545,12 @@ ops            jig's example, on fakes; its connectors may seed the real ones
   first; a store per pool or per site later, keyed the same way.
 - **Applying live:** whether it is worth the slot it modifies.
 - **The daemon's interface:** what is generic, so that os is one backend
-  among others.
+  among others. hearth's lean: the genericity lives in its wire, so
+  another backend is another daemon speaking it.
+- **A clustered engine for the run side,** which must stay up when
+  everything else is broken, and something that notices when it is not.
+  Later.
+- **A central store for metrics and logs:** none to start; when, and
+  which.
 - **Secrets:** the run side's store, and how machines prove who they are
   to it.
