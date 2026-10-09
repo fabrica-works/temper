@@ -6,9 +6,8 @@ every record the domain keeps, and session transcripts are files beside
 it. This document is the protocol and io side of what `domain/engine.md`,
 section 5 assumes. The domain's half (commits, loads, what is kept) stays
 there. The plan for building it is `plan.md`, in this directory. Read it
-with skein's `docs/design/kv.md` (the store) and
-`docs/plans/kv-implementation.md` (its plan), which this document cites as
-kv.md and skein's plan. What is still open is in section 14.
+with skein's `docs/design/kv.md`, the store, which this document cites as
+kv.md. What is still open is in section 14.
 
 ## 1. In one page
 
@@ -59,9 +58,9 @@ kv.md and skein's plan. What is still open is in section 14.
 temper-engine-domain               the root: Commit, Load, Read; Committed, Loaded, Read; numbers its commits
         │ the root's store vocabulary (crates/temper-engine-domain/src/store.rs)
 temper-engine-protocol-store       keys and records to bytes; ranges to intervals; transcript files; secrets
-        │ skein-kv's vocabulary (skein's plan, 3.2)       │ io's file requests
+        │ skein-kv's vocabulary (kv.md, section 2)        │ io's file requests
 skein-kv  ×2                       the store, and the secrets' store: map, log, snapshots
-        │ io's file requests (skein's plan, 2.1)
+        │ io's file requests (skein's io.md, section 5)
 skein-io                           files: the ring, or the simulator's disk
 ```
 
@@ -130,7 +129,7 @@ bounded pages; versions per shape; no other writer.
   (its own and its children's, wrapped) is encoded so that byte order
   equals the order Rust derives for it: a variant's index, then its
   fields in order, numbers big-endian at fixed width, bytes escaped and
-  terminated (skein's plan, 3.3). A property test holds the encoding to
+  terminated (kv.md, 2.1). A property test holds the encoding to
   the derived order on generated keys.
 - **A tag per owner, then per family.** The root's key enum already
   nests its children's (`Key::Tasks(tasks::Key)`, `Key::People(..)`).
@@ -220,7 +219,7 @@ built. Their keys are the children's to declare, under these rules.
 - **Sizes are derived, then checked.** The protocol layer computes, from
   the domain's limits, the largest encoded key, record and commit. It
   refuses to start when skein-kv's limits are smaller (its `key`,
-  `value`, `ops` and `commit`; skein's plan, 3.4), so a commit the root
+  `value`, `ops` and `commit`; kv.md, section 7), so a commit the root
   admitted is never refused as too large.
 - **Golden bytes.** Each shape's every version has a fixture of its
   bytes. A change to an encoding that breaks one fails the gate, and a
@@ -269,7 +268,7 @@ built. Their keys are the children's to declare, under these rules.
 ## 7. Loads
 
 - **Same step.** skein-kv serves a page from memory in the step that
-  asks (skein's plan, 3.2). The protocol layer answers the root's `Load`
+  asks (kv.md, section 2). The protocol layer answers the root's `Load`
   in that step too, through the root's ready list, never by recursion.
 - **The cursor is exclusive.** The root's `after` is the last key it
   has. The interval starts just past its encoding, and an absent `after`
@@ -447,7 +446,7 @@ engine. It is not the store's, so it is tested in the worlds:
 - **The budget is configured** (2 GB by default) and part of the
   engine's worst case. A store that needs more is a sign that the
   horizon should be shorter first. After that, values move to disk with
-  only keys in memory (skein's plan, section 9).
+  only keys in memory (kv.md, section 12).
 
 ## 12. Testing
 
@@ -455,7 +454,7 @@ Following `testing-strategy.md` (section 4: a fake of the service's own
 component retires once the real one exists) and `docs/design/testing.md`:
 
 - **The real store in the domain worlds.** The engine's worlds run the
-  protocol layer over skein-kv's in-memory mode (skein's plan, 5.1:
+  protocol layer over skein-kv's in-memory mode (kv.md, section 2:
   commits apply at once, no files), in place of today's fake store. The
   worlds stay free of io, and every story runs the real key encoding,
   codecs and paging.
@@ -470,7 +469,7 @@ component retires once the real one exists) and `docs/design/testing.md`:
   the same cut rule. The real files are tested in the store's world.
 - **The store's world,** `tests/engine/store`, runs the protocol layer
   over skein-kv and transcript files on the simulator's crashing disk
-  (skein's plan, 2.2). A scripted root commits, loads, appends turns and
+  (kv.md, section 8). A scripted root commits, loads, appends turns and
   reads them back, and is crashed at every file operation and sync. Its
   referee holds the domain's promises:
   - after recovery, the last acknowledged commit, or that and one whole
@@ -485,7 +484,7 @@ component retires once the real one exists) and `docs/design/testing.md`:
 - **Fuzz targets** for each shape's decoder and for a turn frame's.
 - **On the real ring,** the engine killed around each phase of a turn's
   commit and reopened, and restart time measured on a store of the
-  estimated size. As skein's plan says (section 7), a killed process
+  estimated size. As kv.md says (section 9), a killed process
   keeps the page cache, so this checks integration, not power loss.
 
 ## 13. What the other documents now owe
@@ -502,11 +501,11 @@ component retires once the real one exists) and `docs/design/testing.md`:
   protocol layer, with this document as its design.
 - **`docs/design/testing.md`:** the real store in the engine's worlds,
   the transcripts' stand-in, and the store's world.
-- **skein's plan:** skein-kv's in-memory mode (5.1) is used by temper's
-  worlds, so it stays when the files arrive; skein-io's file entity gains
-  opening an existing file to write (its 2.3, needed now for transcripts)
-  and cutting a file to a length; the fill with each `Committed`. temper
-  does not need skein-kv's payload logs (its section 6).
+- **skein:** skein-kv's in-memory mode (kv.md, section 2) is used by
+  temper's worlds, so it stays; skein-io's files gain opening an existing
+  file to write (which kv.md, section 6 also needs, later) and cutting a
+  file to a length; the fill with each `Committed`. temper does not need
+  skein-kv's payload logs (kv.md, section 6).
 
 ## 14. Open questions
 

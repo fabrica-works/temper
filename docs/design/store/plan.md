@@ -3,10 +3,9 @@
 Provisional, 2026-10-05. The plan for building the store of
 `README.md` in this directory, in increments, each a branch through
 temper's gate (`docs/development/workflow.md`). Some increments wait for
-skein's: `skein-kv`'s plan (skein's `docs/plans/kv-implementation.md`,
-here "skein's plan") builds the store itself, and this plan builds what
-temper puts on it. The domain's half moves first, since it needs nothing
-from skein.
+skein's: skein builds the store itself, `skein-kv` (skein's `kv.md`), and
+this plan builds what temper puts on it. The domain's half moves first,
+since it needs nothing from skein.
 
 ## 1. In one page
 
@@ -33,8 +32,9 @@ temper:  S1 domain ──┐         │                          │
          S9 indexes, retention, fill: after S4, before the map nears half its budget
 ```
 
-`K0` is skein's plan's 5.0 (io's file entity, the crashing disk), and
-`K1` to `K4` its 5.1 to 5.4. skein-kv's payload logs (its section 6) are
+`K0` to `K4` are skein-kv's increments, all built: io's file requests
+and the crashing disk, then memory and codecs, the log and recovery,
+snapshots, and bounds. skein-kv's payload logs (kv.md, section 6) are
 not needed.
 
 ## 2. The crate
@@ -66,18 +66,18 @@ and each emits events above and requests below, within a declared
 
 ## 3. What temper asks of skein
 
-For skein's plan, before the increments named:
+Of skein, before the increments named:
 
-1. **skein-kv's in-memory mode stays** after the files arrive (its 5.1).
-   temper's worlds run on it, with `Commit` applied at once and `Get` and
-   `Load` as they are with files.
+1. **skein-kv's in-memory mode stays** after the files arrive (kv.md,
+   section 2). temper's worlds run on it, with `Commit` applied at once
+   and `Get` and `Load` as they are with files.
 2. **The fill** (the map's bytes against its budget) with each
    `Committed`, or readable at any step (README.md, 11.3).
 3. **A second store in a process,** in a root of its own, created
-   `0o700`, its files `0o600` (its 2.1, `Create`'s mode). This is already
-   planned and is listed here to confirm it.
-4. **io's file entity** gains opening an existing file to write (its
-   2.3, which comes forward from payload logs to temper's transcripts) and
+   `0o700`, its files `0o600` (skein's io.md, section 5, `Create`'s
+   mode). This is already planned and is listed here to confirm it.
+4. **io's files** gain opening an existing file to write (which kv.md,
+   section 6 needs for payload logs, later than temper's transcripts) and
    cutting a file to a length, with the simulator's crash model for both.
 
 ## 4. Increments
@@ -121,7 +121,7 @@ visible after a cut. The views' world loses its trace stories.
 `turns.rs`, `format.rs` and `limits.rs`, for every key, range and record
 the root has after S1.
 
-- Keys use skein-kv's key writer (skein's plan, 3.3). If S2 starts
+- Keys use skein-kv's key writer (kv.md, 2.1). If S2 starts
   before K1 lands, it uses a copy of that writer's encoding, kept until
   K1 lands.
 - Every shape's codec at version 1, and the decoders' upgrade hook, unused
