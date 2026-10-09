@@ -1,9 +1,9 @@
 //! Pure, typed translation from the engine's owned run and call vocabulary
-//! into Smith's generic agent boundary (domain/agent.md, sections 4–7;
+//! into Smith's generic agent boundary (jig's domain/hosts.md, sections 5 and 8;
 //! domain/engine.md, section 7; smith's domain/run.md, sections 3, 5 and 10).
 //!
-//! The root keeps task policy, numbered calls, opaque transcripts and ordered
-//! commits. This crate keeps no state and performs no IO. Its `start` takes
+//! Jig's core keeps task policy and numbered calls; the root wraps records and
+//! orders their commits. This crate keeps no state and performs no IO. Its `start` takes
 //! already decoded concrete history and already prepared workspace mounts from
 //! the composing world; a later protocol adapter supplies the same values from
 //! bytes and worker preparation. It never chooses authority or commits a call.

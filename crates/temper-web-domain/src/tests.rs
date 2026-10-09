@@ -1,4 +1,4 @@
-//! Focused W1 steps: shell ordering, durable keys and watch recovery.
+//! Focused steps: shell ordering, durable keys and watch recovery.
 use crate::*;
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};

@@ -1,6 +1,6 @@
 //! Typed browser addresses; the shell encodes and decodes their URLs.
 
-/// A section of a task page, reserved even while W1 shows it as missing.
+/// A section of a task page, reserved while its page shows it as missing.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Section {
     Conversation,

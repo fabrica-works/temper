@@ -58,7 +58,7 @@ pub struct Limits {
 /// each slot at most, and the relays and bounces it keeps while the engine
 /// is out of reach, the run's facts for the engine, the queues
 /// that hold what each child domain emits in a step until it is routed, and the
-/// facts. Version-two retained turns add one link retry deadline per entry;
+/// facts. Retained turns add one link retry deadline per entry;
 /// the host counts their bodies and map. Retained answers still hold slots.
 /// Owned preparation conflicts belong to the workspace until moved into the
 /// agent start. What the queued requests own is counted where they end up,

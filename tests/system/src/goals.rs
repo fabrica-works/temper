@@ -10,8 +10,9 @@ use skein_lib::{Duration, Queue, ReplyTo, Token};
 use smith_agent_world::Job;
 use smith_domain as smith;
 use smith_domain_run as run;
-use temper_engine_domain::{Delivery, Key, Record, engine};
-use temper_engine_domain_world::{commits::Store, direct::Driver, walking};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record};
+use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 
 const PLAN: &[u8] = br#"{"batch":[{"executor":{"kind":"agent","charter":1},"spec":{"words":"@report Complete the goal's first task"},"contract":{"kind":"report","words":128},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":10},"notes":0}}]}"#;
 
@@ -115,14 +116,14 @@ fn configured() -> Driver {
 }
 
 fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> u64 {
-    driver.send(engine::Event::SignedIn {
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(reply)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: (user).to_be_bytes().into() },
             login: b"person".as_slice().into(),
             name: b"Person".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     driver.store.header().sign_ins
 }
@@ -132,7 +133,7 @@ fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> u64 {
 #[expect(clippy::wildcard_enum_match_arm, reason = "the story selects its committed deliveries")]
 fn a_smith_goal_is_proposed_accepted_planned_and_done() {
     let mut driver = configured();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -140,14 +141,14 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     let owner_session = sign_in(&mut driver, 7, 301);
     let maintainer_session = sign_in(&mut driver, 8, 302);
     let maintainer = driver.store.header().people;
     let member_session = sign_in(&mut driver, 9, 303);
     let member = driver.store.header().people;
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(304)),
         sign_in: owner_session,
         key: [34; 16],
@@ -159,9 +160,9 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
                 people::Holding { person: member, role: people::Role::Member },
             ]),
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(305)),
         sign_in: member_session,
         key: [35; 16],
@@ -172,7 +173,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             budget: 150,
             priority: 7,
         },
-    });
+    }));
     driver.settle();
     let proposal = driver
         .delivered
@@ -191,7 +192,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             .values()
             .any(|row| matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(_)))))
     );
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(306)),
         sign_in: maintainer_session,
         key: [36; 16],
@@ -201,7 +202,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     assert!(
         matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::PersonProposal(proposal)))),
@@ -354,7 +355,7 @@ fn burst_child_script(target: u64) -> Script {
 #[expect(clippy::wildcard_enum_match_arm, reason = "the story selects assignments and committed answers")]
 fn a_smith_coordinator_is_woken_once_by_a_burst() {
     let mut driver = configured();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -362,10 +363,10 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     let owner_session = sign_in(&mut driver, 7, 401);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(402)),
         sign_in: owner_session,
         key: [42; 16],
@@ -376,7 +377,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             budget: 50,
             priority: 1,
         },
-    });
+    }));
     driver.settle();
     let coordinator = driver
         .delivered
@@ -399,7 +400,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
     let mut planner = world::scripted_waiting_agent_for(&first, None, burst_parent_script());
     world::run_assignment(&mut driver, &first, &mut planner);
     assert!(matches!(planner.answer(), run::Answer::Parked { .. }));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(403)),
         sign_in: owner_session,
         key: [43; 16],
@@ -422,7 +423,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
                 reason: b"Gather three updates".as_slice().into(),
             },
         },
-    });
+    }));
     driver.settle();
     assert!(
         matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(coordinator)))),
@@ -487,13 +488,13 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
         let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
             .expect("declared message input");
         let before = driver.delivered.len();
-        driver.send(engine::Event::Call {
+        driver.send(engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: child.task,
             attempt: child.attempt,
             call: submission.relay.owner,
             body,
-        });
+        }));
         driver.settle();
         let answer = driver.delivered[before..]
             .iter()

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use skein_lib::{Duration, Rng, Time, Token};
+use skein_world::domain::{Key, Ledger, Schedule, Span, Stage, Trace};
 use temper_fake_checkout::Checkout;
 use temper_fake_checkout::git::{Created, Remote, Tree};
 use temper_worker_domain_checkout::git::{Done, Fault, Kind, Missing, Op, Want};
@@ -8,7 +9,6 @@ use temper_worker_domain_checkout::{
     Cached, Domain, Event, Fact, Failure, Landing, Limits, MAX_OUT, Message, Outcome, Prepared, Refusal, Repository,
     Request, Spec, Start, worst_case,
 };
-use temper_world::{Key, Ledger, Schedule, Span, Stage, Trace};
 
 use crate::client::{Client, Interrupt, Operation, Pick, Plan, Release, Repo};
 use crate::forge::{Forge, Move};
@@ -850,7 +850,7 @@ impl World {
             let repo = &client.repos[index];
             let left = &client.left[index];
             match landing {
-                Landing::Conflicted { .. } => panic!("legacy clients do not prepare merges"),
+                Landing::Conflicted { .. } => panic!("this fixture prepares one checkout branch"),
                 Landing::Landed { commit } => {
                     assert!(repo.writable, "only a writable repository is pushed");
                     let tree = self.forge.tree(translate::fake(*commit));

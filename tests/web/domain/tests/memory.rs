@@ -1,8 +1,8 @@
 use skein_lib::{Env, Queue, Time, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_web_domain::{Address, ChatLine, Domain, Event, Offset, ReadResult, Request, max_out, step};
 use temper_web_domain_world::Settings;
 use temper_web_view::{Patch, View, render};
-use temper_world::heap::{self, Meter};
 
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -47,6 +47,6 @@ fn full_chat_window_stays_within_declared_heap_plus_fixed_render_words() {
     let bound = temper_web_domain::worst_case(&settings.domain).expect("domain bound")
         + temper_web_view::worst_case(&settings.view).expect("view bound")
         + 16_384;
-    meter.check(measured, bound, "full chats view");
+    meter.check(measured, bound, &"full chats view");
     assert!(!patches.is_empty());
 }

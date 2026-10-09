@@ -1,7 +1,7 @@
 use skein_lib::{Duration, Time};
+use skein_world::domain::{Referee, Verdict};
 use temper_web_domain::{Address, Key};
 use temper_web_domain_world::referee::{Rules, Seen, observe_at};
-use temper_world::{Referee, Verdict};
 
 fn key(byte: u8) -> Key {
     Key([byte; 16])

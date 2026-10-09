@@ -1,8 +1,8 @@
 //! Expectations from durable engine facts and what the tree/address show.
 use skein_lib::{Duration, Time};
+use skein_world::domain::{Expectations, Judge};
 use std::collections::{BTreeMap, BTreeSet};
 use temper_web_domain::{Address, Key};
-use temper_world::{Expectations, Judge};
 
 #[derive(Debug)]
 pub struct Rules {
@@ -126,7 +126,7 @@ pub fn is_refused(tree: &temper_web_view::Tree) -> bool {
     })
 }
 
-pub fn observe_at(referee: &mut temper_world::Referee<Rules>, now: Time, seen: Seen) {
+pub fn observe_at(referee: &mut skein_world::domain::Referee<Rules>, now: Time, seen: Seen) {
     let mut stimuli = Vec::new();
     referee.observe(now, seen, &mut stimuli);
     assert!(stimuli.is_empty(), "referee has no immediate stimuli");

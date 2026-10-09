@@ -51,8 +51,8 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
-    /// Typed protocol handoffs follow their prerequisite commits.
-    Host(Box<crate::engine::HostDelivery>),
+    /// Host protocol handoffs follow their prerequisite commits.
+    Host(Box<crate::HostDelivery>),
     /// Release a committed connector entry to its client.
     ForgeCommitted { entry: u64 },
     /// One bounded connector call after all preceding progress commits.
@@ -144,7 +144,7 @@ pub enum Delivery {
         channel: Token,
         /// Complete claim/brief/grant; section slots and owned bytes validated at journal
         /// admission.
-        assignment: crate::engine::Assignment,
+        assignment: crate::Assignment,
     },
     /// Root to web: one terminal reply, optionally carrying its sign-in candidate; only a
     /// successful people reply admits that session.
@@ -695,7 +695,7 @@ pub fn commit(journal: &mut Journal, limits: &Limits) -> Option<Output> {
     Some(Output::Commit { number: commit.number, writes: writes.into_boxed() })
 }
 
-/// Compatibility seam for the journal's focused world: accept and take its commit.
+/// Accept the root's validated decision and take its numbered store commit.
 #[expect(clippy::result_large_err, reason = "refused root decisions return all owned writes and outputs")]
 pub fn accept(
     journal: &mut Journal,
@@ -784,7 +784,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .max(u64::from(limits.transcript_bytes))
                     .checked_add(u64::from(limits.run_bytes))?
                     .checked_add(
-                        List::<crate::engine::BriefSection>::worst_case(limits.deliveries)?
+                        List::<crate::BriefSection>::worst_case(limits.deliveries)?
                             .max(u64::try_from(size_of::<jig_core_tasks::EscalationContext>()).ok()?),
                     )?,
             )?,
@@ -816,7 +816,7 @@ fn fleet_delivery_within(event: &jig_core_fleet::Event) -> bool {
     }
 }
 
-fn assignment_within(assignment: &crate::engine::Assignment, limits: &Limits) -> bool {
+fn assignment_within(assignment: &crate::Assignment, limits: &Limits) -> bool {
     let charter_within = match crate::limits::run_charter_bytes(&assignment.run) {
         Some(bytes) => bytes <= u64::from(limits.run_bytes),
         None => false,
@@ -857,8 +857,8 @@ fn assignment_within(assignment: &crate::engine::Assignment, limits: &Limits) ->
     owned = 0;
     for section in &assignment.sections {
         let bytes = match &section.body {
-            crate::engine::BriefBody::Text(bytes) => u64::try_from(bytes.len()).expect("usize fits u64"),
-            crate::engine::BriefBody::Missing(_) => 0,
+            crate::BriefBody::Text(bytes) => u64::try_from(bytes.len()).expect("usize fits u64"),
+            crate::BriefBody::Missing(_) => 0,
         };
         let Some(total) = owned.checked_add(bytes) else {
             return false;
@@ -889,17 +889,17 @@ fn assignment_within(assignment: &crate::engine::Assignment, limits: &Limits) ->
     owned <= u64::from(limits.result_bytes) && within
 }
 
-fn host_within(host: &crate::engine::HostDelivery, limits: &Limits) -> bool {
+fn host_within(host: &crate::HostDelivery, limits: &Limits) -> bool {
     match host {
-        crate::engine::HostDelivery::Render { name, tool, answer, .. } => {
+        crate::HostDelivery::Render { name, tool, answer, .. } => {
             length_within(name.len().checked_add(tool.len()), limits.transcript_bytes)
                 && bytes_within(crate::store::call_answer_bytes(answer), limits.transcript_bytes)
         }
-        crate::engine::HostDelivery::Answer { call, .. } => match call.owned_bytes() {
+        crate::HostDelivery::Answer { call, .. } => match call.owned_bytes() {
             Some(bytes) => bytes <= u64::from(limits.transcript_bytes).checked_add(4).expect("bounded busy answer"),
             None => false,
         },
-        crate::engine::HostDelivery::Inbound { message, .. } => {
+        crate::HostDelivery::Inbound { message, .. } => {
             length_within(message.sender.len().checked_add(message.words.len()), limits.transcript_bytes)
         }
     }
@@ -919,7 +919,7 @@ fn bytes_within(bytes: Option<u64>, limit: u32) -> bool {
     }
 }
 
-fn answered_within(assignment: &crate::engine::Assignment, limits: &Limits) -> bool {
+fn answered_within(assignment: &crate::Assignment, limits: &Limits) -> bool {
     let mut previous = None;
     for row in &assignment.answered {
         let key = row.key;

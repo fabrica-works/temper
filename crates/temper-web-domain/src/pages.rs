@@ -1,4 +1,4 @@
-//! One page at a time; W1's inbox address opens the chats page.
+//! One page at a time; the inbox address opens the chats page.
 use crate::{Address, Cursor, Object, Query};
 use alloc::boxed::Box;
 use skein_lib::{Id, List, Wall};

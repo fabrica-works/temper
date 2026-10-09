@@ -79,7 +79,7 @@ pub enum Event {
         delivery: Token,
         answer: Box<[u8]>,
     },
-    ConnectedV2,
+    Connected,
     AcknowledgeTurn {
         run: Token,
         attempt: Token,
@@ -185,7 +185,7 @@ pub enum Request {
         input: Box<[u8]>,
         deadline: Duration,
     },
-    HelloV2 {
+    Hello {
         hello: Hello,
         graces: Duration,
         push_deadline: Duration,

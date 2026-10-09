@@ -15,7 +15,8 @@ use jig_core_tasks as tasks;
 use jig_fake_workers as workers;
 use observations::Store;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
-use temper_engine_domain::{self as root, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 
 /// Scenario identity and seed retained across cold starts.
@@ -58,7 +59,7 @@ impl std::fmt::Debug for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Root(event) => {
-                if let engine::Event::Loaded { owner, rows, next } = event {
+                if let engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }) = event {
                     // The store retains the exact rows; traces need the page's
                     // identity and bounds rather than another formatted copy.
                     f.debug_struct("Loaded")
@@ -258,7 +259,7 @@ impl Application for Temper {
         }
     }
     fn start(_: &Config, _: &mut Store) -> Vec<Event> {
-        vec![Event::Root(engine::Event::Start)]
+        vec![Event::Root(engine::Event::Restart)]
     }
     fn cold(peers: &mut Peers, store: &Store, _: Clock) {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
@@ -296,10 +297,18 @@ impl Application for Temper {
             Input::Event(Event::Root(event)) => engine::step(&mut domain.root, &environment, event),
             Input::Event(Event::Fire) => engine::fire(&mut domain.root, &environment),
             Input::Committed(number) => {
-                engine::step(&mut domain.root, &environment, engine::Event::Committed { number });
+                engine::step(
+                    &mut domain.root,
+                    &environment,
+                    engine::Event::Store(engine::StoreInput::Committed { number }),
+                );
             }
             Input::Failed(number) => {
-                engine::step(&mut domain.root, &environment, engine::Event::Uncommitted { number });
+                engine::step(
+                    &mut domain.root,
+                    &environment,
+                    engine::Event::Store(engine::StoreInput::Uncommitted { number }),
+                );
             }
             Input::Restore(_) => panic!("temper restores through bounded load terminals"),
         }
@@ -318,10 +327,14 @@ impl Application for Temper {
         if domain.outputs.is_empty() {
             engine::release(&mut domain.root, &environment, &mut domain.outputs);
         }
+        if domain.outputs.is_empty() {
+            engine::step(&mut domain.root, &environment, engine::Event::Resume);
+            engine::release(&mut domain.root, &environment, &mut domain.outputs);
+        }
         let mut outputs = Vec::new();
         while let Some(request) = domain.outputs.pop() {
             outputs.push(match request {
-                engine::Request::Commit { number, writes } => Output::Commit {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => Output::Commit {
                     number,
                     writes: writes
                         .into_vec()
@@ -353,21 +366,19 @@ impl Application for Temper {
     fn inbound(peers: &mut Peers, _: &Store, clock: Clock, input: &mut Event) {
         let Event::Root(input) = input else { return };
         match input {
-            engine::Event::Call { task, attempt, call, body, .. } => {
+            engine::Event::Worker(engine::WorkerInput::Call { task, attempt, call, body, .. }) => {
                 peers.calls.insert(call.raw(), (*task, *attempt, copy_call(body)));
                 peers.retries.insert(call.raw(), clock.now + 1_000_000_000);
             }
-            engine::Event::Ask { reply_to, sign_in, key, ask } => {
+            engine::Event::Party(engine::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
                 let call = destination(reply_to);
                 peers.requests.insert(call, *key);
                 peers.ask_bodies.insert(call, (*sign_in, *key, ask.clone()));
             }
-            engine::Event::Turn { task, attempt, turn, .. } => peers.observed.push(r::Observed::Completion {
-                task: *task,
-                attempt: *attempt,
-                cumulative: turn.cumulative,
-            }),
-            engine::Event::Answer { task, attempt, cumulative, .. } => {
+            engine::Event::Worker(engine::WorkerInput::Turn { task, attempt, turn, .. }) => peers
+                .observed
+                .push(r::Observed::Completion { task: *task, attempt: *attempt, cumulative: turn.cumulative }),
+            engine::Event::Worker(engine::WorkerInput::Answer { task, attempt, cumulative, .. }) => {
                 peers.observed.push(r::Observed::Completion {
                     task: *task,
                     attempt: *attempt,
@@ -395,7 +406,7 @@ impl Application for Temper {
         };
         match delivery {
             engine::Request::ToChild(released) => events.push(engine::Event::Released(released)),
-            engine::Request::Load { owner, range, after, most, .. } => {
+            engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                 let rows: Vec<_> = store
                     .rows
                     .iter()
@@ -409,12 +420,17 @@ impl Application for Temper {
                     rows.pop();
                 }
                 let next = if more { rows.last().map(root::Record::key) } else { None };
-                events.push(engine::Event::Loaded { owner, rows: rows.into_boxed_slice(), next });
+                events.push(engine::Event::Store(engine::StoreInput::Loaded {
+                    owner,
+                    rows: rows.into_boxed_slice(),
+                    next,
+                }));
             }
             engine::Request::Forge { call, repository, op } => {
                 events.extend(systems.call(store, clock, call, repository, op));
             }
-            engine::Request::Deliver(delivery) => {
+            engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+            | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => {
                 let mut requires = Vec::new();
                 match delivery {
                     root::Delivery::Assigned { channel, assignment } => {
@@ -508,12 +524,16 @@ impl Application for Temper {
                 }
             }
             engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                events.push(engine::Event::Refreshed { account, generation, valid: Duration::from_secs(60) });
+                events.push(engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                    account,
+                    generation,
+                    valid: Duration::from_secs(60),
+                }));
             }
-            engine::Request::CallBusy { call, .. } => {
+            engine::Request::Worker(engine::WorkerRequest::CallBusy { call, .. }) => {
                 peers.retries.insert(call.raw(), clock.now + 1_000_000_000);
             }
-            engine::Request::Host(_) => panic!("scripted workers use typed calls"),
+            engine::Request::Worker(engine::WorkerRequest::Host(_)) => panic!("scripted workers use typed calls"),
             _ => {}
         }
         events.into_iter().map(|event| Input::Event(Event::Root(event))).collect()
@@ -537,12 +557,12 @@ impl Application for Temper {
             for call in asks {
                 peers.ask_retries.remove(&call);
                 if let Some((sign_in, key, ask)) = peers.ask_bodies.get(&call) {
-                    events.push(engine::Event::Ask {
+                    events.push(engine::Event::Party(engine::PartyInput::Ask {
                         reply_to: ReplyTo::new(Token::new(call)),
                         sign_in: *sign_in,
                         key: *key,
                         ask: ask.clone(),
-                    });
+                    }));
                 }
             }
             let due: Vec<_> =
@@ -550,23 +570,23 @@ impl Application for Temper {
             for call in due {
                 peers.retries.insert(call, clock.now + 1_000_000_000);
                 if let Some((task, attempt, body)) = peers.calls.get(&call) {
-                    events.push(engine::Event::Call {
+                    events.push(engine::Event::Worker(engine::WorkerInput::Call {
                         channel: Token::new(7),
                         task: *task,
                         attempt: *attempt,
                         call: Token::new(call),
                         body: copy_call(body),
-                    });
+                    }));
                 }
             }
             events.extend(peers.worker.tick(Time::from_nanos(clock.now)).into_iter().map(|up| {
                 let mut event = worker_event(up);
-                if let engine::Event::Answer { task, pushed, .. } = &mut event
+                if let engine::Event::Worker(engine::WorkerInput::Answer { task, pushed, .. }) = &mut event
                     && let Some(commit) = peers.reported.get(task)
                 {
                     *pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
                 }
-                if let engine::Event::Answer { task, end, pushed, .. } = &mut event
+                if let engine::Event::Worker(engine::WorkerInput::Answer { task, end, pushed, .. }) = &mut event
                     && matches!(end, tasks::End::Finished { .. })
                     && let Some(commit) = peers.produced.get(task)
                 {
@@ -585,19 +605,19 @@ impl Application for Temper {
             }));
             if !peers.signed_in {
                 peers.signed_in = true;
-                events.push(engine::Event::SignedIn {
+                events.push(engine::Event::Party(engine::PartyInput::SignedIn {
                     reply_to: ReplyTo::new(Token::new(90)),
                     identity: people::Identity {
                         key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
                         login: b"owner".as_slice().into(),
                         name: b"Owner".as_slice().into(),
                     },
-                });
+                }));
             }
             if let Some(sign_in) = peers.sign_in {
                 if !peers.adopting {
                     peers.adopting = true;
-                    events.push(engine::Event::Ask {
+                    events.push(engine::Event::Party(engine::PartyInput::Ask {
                         reply_to: ReplyTo::new(Token::new(91)),
                         sign_in,
                         key: [91; 16],
@@ -618,16 +638,16 @@ impl Application for Temper {
                             0,
                         )
                         .expect("adoption"),
-                    });
+                    }));
                 }
                 if peers.adopted && !peers.chatted {
                     peers.chatted = true;
-                    events.push(engine::Event::Ask {
+                    events.push(engine::Event::Party(engine::PartyInput::Ask {
                         reply_to: ReplyTo::new(Token::new(92)),
                         sign_in,
                         key: [92; 16],
                         ask: people::Ask::StartChat { project: 1, words: b"work".as_slice().into() },
-                    });
+                    }));
                 }
             }
         }
@@ -695,45 +715,57 @@ impl Application for Temper {
 
 fn worker_event(up: workers::Up) -> engine::Event {
     match up {
-        workers::Up::Hello { channel, slots, stop_bound, hosting } => engine::Event::Hello {
-            channel: Token::new(channel),
-            hello: jig_core_fleet::Hello {
-                slots,
-                stop_bound,
-                workstreams: Box::new([]),
-                hosting: hosting
-                    .into_vec()
-                    .into_iter()
-                    .map(|(task, attempt, answered)| jig_core_fleet::Hosted {
-                        run: Token::new(task),
-                        attempt: Token::new(attempt),
-                        phase: if answered { jig_core_fleet::Phase::Answered } else { jig_core_fleet::Phase::Active },
-                    })
-                    .collect(),
-            },
-        },
-        workers::Up::Lost { channel } => engine::Event::Lost { channel: Token::new(channel) },
-        workers::Up::Turn { channel, task, attempt, turn, spent, read, body } => engine::Event::Turn {
-            channel: Token::new(channel),
-            task,
-            attempt,
-            turn: engine::Turn { number: turn, cumulative: spent, read, transcript: body },
-        },
-        workers::Up::Answer { channel, task, attempt, spent, end } => engine::Event::Answer {
-            channel: Token::new(channel),
-            task,
-            attempt,
-            cumulative: spent,
-            end: match end {
-                workers::End::Finished(words) => {
-                    tasks::End::Finished { result: tasks::TaskResult::Report { words }, cancel_delegates: false }
-                }
-                workers::End::Parked => tasks::End::Parked,
-                workers::End::Failed(code) => panic!("unbound host failure {code:?}"),
-            },
-            saved: None,
-            pushed: Box::new([]),
-        },
+        workers::Up::Hello { channel, slots, stop_bound, hosting } => {
+            engine::Event::Worker(engine::WorkerInput::Hello {
+                channel: Token::new(channel),
+                hello: jig_core_fleet::Hello {
+                    slots,
+                    stop_bound,
+                    workstreams: Box::new([]),
+                    hosting: hosting
+                        .into_vec()
+                        .into_iter()
+                        .map(|(task, attempt, answered)| jig_core_fleet::Hosted {
+                            run: Token::new(task),
+                            attempt: Token::new(attempt),
+                            phase: if answered {
+                                jig_core_fleet::Phase::Answered
+                            } else {
+                                jig_core_fleet::Phase::Active
+                            },
+                        })
+                        .collect(),
+                },
+            })
+        }
+        workers::Up::Lost { channel } => {
+            engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(channel) })
+        }
+        workers::Up::Turn { channel, task, attempt, turn, spent, read, body } => {
+            engine::Event::Worker(engine::WorkerInput::Turn {
+                channel: Token::new(channel),
+                task,
+                attempt,
+                turn: engine::Turn { number: turn, cumulative: spent, read, transcript: body },
+            })
+        }
+        workers::Up::Answer { channel, task, attempt, spent, end } => {
+            engine::Event::Worker(engine::WorkerInput::Answer {
+                channel: Token::new(channel),
+                task,
+                attempt,
+                cumulative: spent,
+                end: match end {
+                    workers::End::Finished(words) => {
+                        tasks::End::Finished { result: tasks::TaskResult::Report { words }, cancel_delegates: false }
+                    }
+                    workers::End::Parked => tasks::End::Parked,
+                    workers::End::Failed(code) => panic!("unbound host failure {code:?}"),
+                },
+                saved: None,
+                pushed: Box::new([]),
+            })
+        }
         workers::Up::Call { .. } => panic!("scenario sends typed calls"),
     }
 }

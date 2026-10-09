@@ -5,7 +5,8 @@ use jig_test_system::{Copy, Observed, SystemKey, ValueObserved};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use temper_engine_domain::{self as root, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client::api;
 use temper_engine_forge_world::translate;
@@ -148,7 +149,9 @@ impl FakeForge {
             self.late_next = false;
             self.late.push((call, repository, op, key));
             self.uncertainty(key);
-            return vec![engine::Event::ForgeAnswered { call, cost: 1, result: Err(api::Error::Timeout) }];
+            return vec![engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
+                temper_engine_domain_forge_client::Event::Answered { call, cost: 1, result: Err(api::Error::Timeout) },
+            )))];
         }
         self.send(clock, call, op, key, false);
         Vec::new()
@@ -239,9 +242,9 @@ impl FakeForge {
                     raw::Change::Wiki => None,
                 };
                 if let Some(change) = change {
-                    events.push(engine::Event::ForgeHint {
+                    events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
                         hint: api::Hint { repository: temper_engine_forge_world::REPO, change, key: None },
-                    });
+                    })));
                 }
             }
             if let fake::Request::Reply { to, result } = request {
@@ -304,14 +307,16 @@ impl FakeForge {
                     continue;
                 }
                 if pending.generation == self.generation {
-                    events.push(engine::Event::ForgeAnswered {
-                        call: pending.root_call,
-                        cost: 1,
-                        result: match result {
-                            Ok(answer) => Ok(translate::answer(&pending.op, answer, &self.client_limits)),
-                            Err(error) => Err(translate::error(error, fake::time(&self.config, env.now))),
+                    events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
+                        temper_engine_domain_forge_client::Event::Answered {
+                            call: pending.root_call,
+                            cost: 1,
+                            result: match result {
+                                Ok(answer) => Ok(translate::answer(&pending.op, answer, &self.client_limits)),
+                                Err(error) => Err(translate::error(error, fake::time(&self.config, env.now))),
+                            },
                         },
-                    });
+                    ))));
                 }
             }
         }

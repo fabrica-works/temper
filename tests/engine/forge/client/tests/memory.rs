@@ -2,12 +2,12 @@
 //! delivery stamps, echo ledgers, queued operations and durable retry
 //! payloads. Parent-owned output payloads are handed away before checking.
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_engine_domain_forge_client::{
     self as client, Condition, Delivery, Domain, Echo, Effect, Entry, Event, Limits, LiveRecord, Position,
     RecoveryClock, RepositoryRecord, Request, Resource, Stored, Watch, What, api,
 };
 use temper_engine_forge_client_world::{LIMITS, REPO};
-use temper_world::heap::{self, Meter};
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
 #[derive(Clone, Copy)]
@@ -90,7 +90,7 @@ impl Measured {
                 | Request::OutboxDone => {}
             }
         }
-        self.meter.check(measured, self.bound, self.env.limits);
+        self.meter.check(measured, self.bound, &self.env.limits);
         self.domain.reclaim();
     }
     fn answer(&mut self, call: Call) {

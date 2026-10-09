@@ -7,6 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+skein-world.workspace = true
 skein-lib.workspace = true
 temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-client.workspace = true
@@ -15,7 +16,6 @@ temper-engine-domain-forge-change = { path = "../../../crates/temper-engine-doma
 temper-fake-forge-domain.workspace = true
 
 [dev-dependencies]
-temper-world.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

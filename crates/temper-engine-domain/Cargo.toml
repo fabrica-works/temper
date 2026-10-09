@@ -1,6 +1,6 @@
 [package]
 name = "temper-engine-domain"
-description = "The engine's new root domain, sans-io"
+description = "The engine root composing jig and the forge, sans-io"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

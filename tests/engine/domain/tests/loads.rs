@@ -2,7 +2,7 @@ use core::mem::size_of;
 use root::loads::{self, Failure, Limits, Loads, Request};
 use skein_lib::{Queue, Token, Wall};
 use temper_engine_domain::{self as root, Key, Range, Record, TurnRecord};
-use temper_engine_domain_world::commits::World;
+use temper_engine_domain_world::store::Store;
 
 const LIMITS: Limits = Limits { loads: 2, rows: 4, bytes: 1024, reply_bytes: 2048, transcript_bytes: 128 };
 
@@ -47,11 +47,10 @@ fn begin(loads: &mut Loads, after: Option<Key>, most: u32, out: &mut Queue<Reque
 
 #[test]
 fn each_page_has_one_terminal_and_reads_the_answered_commit() {
-    let mut world = World::new();
+    let mut store = Store::new();
     for turn in 1..=4 {
-        world.decision(turn, &[u8::try_from(turn).expect("four turns")], true, false);
-        world.apply(true);
-        world.ready();
+        let row = row(turn, 1);
+        store.rows.insert(row.key(), row);
     }
     let mut loads = Loads::new(&LIMITS);
     let mut out = Queue::with_capacity(1);
@@ -59,11 +58,8 @@ fn each_page_has_one_terminal_and_reads_the_answered_commit() {
     let mut observed = Vec::new();
     for expected_turns in [vec![1, 2], vec![3, 4]] {
         let owner = begin(&mut loads, after.clone(), 2, &mut out);
-        let (rows, next) = world.store.page(
-            &Range::Core(temper_engine_domain::CoreRange::Turns { task: 1, attempt: 1 }),
-            after.as_ref(),
-            2,
-        );
+        let (rows, next) =
+            store.page(&Range::Core(temper_engine_domain::CoreRange::Turns { task: 1, attempt: 1 }), after.as_ref(), 2);
         let expected_rows = rows.clone();
         loads::loaded(&mut loads, owner, rows, next.clone(), &mut out);
         let Request::Loaded { waiter, rows, next: found, cut } = out.pop().expect("page terminal") else {
@@ -93,7 +89,6 @@ fn each_page_has_one_terminal_and_reads_the_answered_commit() {
     }
     assert_eq!(observed.len(), 4);
     assert_eq!(after, None);
-    assert!(world.referee.done());
 }
 
 #[test]
@@ -148,7 +143,7 @@ fn malformed_pages_are_refused_whole_before_any_row_is_delivered() {
         (vec![row(2, 0), row(1, 0)], None, Failure::Order),
         (
             vec![Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(
-                temper_engine_domain_world::commits::HEADER,
+                temper_engine_domain_world::store::HEADER,
             )))],
             None,
             Failure::Range,
@@ -209,15 +204,19 @@ fn byte_cut_keeps_the_whole_prefix_and_reports_exact_omissions_and_resume_cursor
 
 #[test]
 fn store_terminals_are_taken_while_the_commit_barrier_has_no_admission_room() {
-    let mut world = World::new();
+    let limits = skein_lib::JournalLimits { commits: 3, writes: 1, held: 3, now: 1, release: 1 };
+    let room = skein_lib::JournalRoom { writes: 1, held: 1 };
+    let mut journal = skein_lib::Journal::<u32, u32>::new(&limits);
     for turn in 1..=3 {
-        world.decision(turn, b"pending", true, false);
+        let mut decision = journal.decision(&room).expect("one admitted decision");
+        decision.write(turn).expect("one bounded write");
+        decision.hold(turn).expect("one bounded output");
+        journal.accept(decision);
     }
-    assert!(!root::takes(&world.journal, &temper_engine_domain_world::commits::LIMITS));
+    assert!(!journal.takes(&room));
     let mut loads = Loads::new(&LIMITS);
     let mut out = Queue::with_capacity(1);
     let owner = begin(&mut loads, None, 1, &mut out);
     loads::unloaded(&mut loads, owner, &mut out);
     assert_eq!(out.pop(), Some(Request::Unloaded { waiter: Token::new(51), failure: Failure::Store }));
-    world.settle();
 }

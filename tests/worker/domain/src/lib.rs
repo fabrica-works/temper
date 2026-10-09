@@ -7,7 +7,7 @@
 use skein_lib::Duration;
 use temper_worker_domain::{Limits, agent, checkout, host};
 
-pub mod next;
+pub mod runtime;
 pub mod whole;
 
 /// The calm worker's limits: room for three runs of one repository each,

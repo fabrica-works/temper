@@ -100,8 +100,8 @@ pub enum Start {
 /// Whether a repository may be written.
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Access {
-    /// Version-two writable branch, fenced to the expected previous head.
-    WritableV2 {
+    /// Writable branch, fenced to the expected previous head.
+    Writable {
         push: Box<[u8]>,
         expected: Option<[u8; 32]>,
     },

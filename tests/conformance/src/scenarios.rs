@@ -9,7 +9,8 @@ use jig_core as core;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{ReplyTo, Token};
-use temper_engine_domain::{self as root, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client::api;
 type World = Harness<Temper>;
@@ -30,12 +31,12 @@ fn ci_repair(record: &root::Record) -> bool {
 pub(crate) fn ask(world: &mut World, key: u8, ask: people::Ask) {
     send(
         world,
-        engine::Event::Ask {
+        engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(6_000 + u64::from(key))),
             sign_in: world.peers.sign_in.expect("owner signed in"),
             key: [key; 16],
             ask,
-        },
+        }),
     );
 }
 fn authority(world: &World) -> tasks::Authority {
@@ -76,13 +77,13 @@ fn effect(world: &mut World, completion: u32, proposal: bool) {
     };
     send(
         world,
-        engine::Event::Call {
+        engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,
             call: Token::new(7_000 + u64::from(completion)),
             body: engine::Call { completion, position: 0, tool },
-        },
+        }),
     );
 }
 pub(crate) fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
@@ -351,7 +352,7 @@ impl ScenarioApplication for Temper {
                 child.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
                 send(
                     world,
-                    engine::Event::StartRecurring {
+                    engine::Event::Party(engine::PartyInput::StartRecurring {
                         project: 1,
                         authority,
                         template: tasks::RecurringTemplate {
@@ -377,7 +378,7 @@ impl ScenarioApplication for Temper {
                                 tracked: None,
                             }]),
                         },
-                    },
+                    }),
                 );
             }
             Action::Period(period) => {
@@ -401,7 +402,7 @@ impl ScenarioApplication for Temper {
                 check(ended(world, task), "standing batch did not end")?;
                 let before = world.peers.assignments.len();
                 for _ in 0..2 {
-                    send(world, engine::Event::Period { project: 1, period, budget: 1000 });
+                    send(world, engine::Event::Party(engine::PartyInput::Period { project: 1, period, budget: 1000 }));
                     world.drain()?;
                 }
                 if world.peers.assignments.len() == before {
@@ -442,13 +443,13 @@ impl ScenarioApplication for Temper {
                 let head = world.systems.advance(world.clock(), &branch, b"other hand");
                 send(
                     world,
-                    engine::Event::ForgeHint {
+                    engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
                         hint: api::Hint {
                             repository: temper_engine_forge_world::REPO,
                             change: api::Change::BranchMoved { branch, head, actor: 4 },
                             key: None,
                         },
-                    },
+                    })),
                 );
             }
             Action::ChangeJudge => {
@@ -603,7 +604,7 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
     let before = world.peers.assignments.len();
     send(
         world,
-        engine::Event::Call {
+        engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: parent.task,
             attempt: parent.attempt,
@@ -650,7 +651,7 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
                     }]),
                 },
             },
-        },
+        }),
     );
     world.drain()?;
     for _ in 0..4 {

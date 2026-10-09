@@ -499,7 +499,7 @@ fn follow(holds: &mut Slab<Hold>, cache: &mut Cache, id: Id<Hold>) {
 /// ended so.
 #[expect(
     clippy::too_many_lines,
-    reason = "the legacy preparation transition table remains together until its step-08 contraction"
+    reason = "the preparation transition table handles every terminal workspace outcome together"
 )]
 fn prepared(holding: &mut Holding, cache: &mut Cache, step: PrepareStep, done: Done, limits: &Limits) -> Next {
     let last = count(holding.repositories.len()).checked_sub(1).expect("a spec names a repository");

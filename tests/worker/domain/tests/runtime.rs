@@ -1,5 +1,5 @@
-//! Focused v2 runtime stories and full trace replay.
-use temper_worker_domain_world::next::{Settings, World};
+//! Focused runtime stories and full trace replay.
+use temper_worker_domain_world::runtime::{Settings, World};
 
 fn run(settings: Settings) -> World {
     let mut world = World::new(settings);
@@ -32,7 +32,7 @@ fn contact_grace_abandons_retained_turns_and_the_slot_together() {
 }
 
 #[test]
-fn v2_full_boundary_and_fact_traces_replay_exactly() {
+fn full_boundary_and_fact_traces_replay_exactly() {
     let settings = Settings { seed: 27, turns: 2, byte_slots: 2, merging: true, abandon: false };
     let first = run(settings);
     let second = run(settings);
@@ -41,7 +41,7 @@ fn v2_full_boundary_and_fact_traces_replay_exactly() {
 }
 
 #[test]
-fn v2_facts_can_be_dropped_without_changing_the_runtime_boundaries() {
+fn facts_can_be_dropped_without_changing_the_runtime_boundaries() {
     let settings = Settings { seed: 13, turns: 3, byte_slots: 2, merging: false, abandon: false };
     let first = run(settings);
     let mut second = World::without_facts(settings);

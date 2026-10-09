@@ -202,7 +202,7 @@ pub(crate) fn prepare(domain: &mut Domain, env: &Env<Limits>, owner: Token, work
     for repository in &spec.repositories {
         let writable = match repository.access {
             wire::Access::ReadOnly => false,
-            wire::Access::WritableV2 { .. } => true,
+            wire::Access::Writable { .. } => true,
         };
         identities.push(repository.identity).expect("room for every repository identity");
         roots
@@ -271,7 +271,7 @@ pub(crate) fn save(domain: &mut Domain, env: &Env<Limits>, owner: Token, workspa
 /// A push or a save, as the host asks it.
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Write {
-    PushV2 { title: Box<[u8]>, body: Box<[u8]> },
+    Push { title: Box<[u8]>, body: Box<[u8]> },
     Save { branch: Box<[u8]> },
 }
 
@@ -439,7 +439,7 @@ fn abandon(hold: Token, then: &mut Then) -> State {
 /// Ready, push or save: asked of the checkout, for the host's `owner`.
 fn asked(hold: Token, directory: Token, owner: Token, write: Write, then: &mut Then) -> State {
     then.checkout = Some(match write {
-        Write::PushV2 { title, body } => checkout::Event::Push { hold, message: checkout::Message { title, body } },
+        Write::Push { title, body } => checkout::Event::Push { hold, message: checkout::Message { title, body } },
         Write::Save { branch } => checkout::Event::Save { hold, branch, message: translate::saved() },
     });
     State::Ready { hold, directory, asked: Some(owner) }

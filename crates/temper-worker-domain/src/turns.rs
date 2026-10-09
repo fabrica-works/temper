@@ -1,4 +1,4 @@
-//! Transport timing and translated answers for version-two turns. Jig's
+//! Transport timing and translated answers for worker turns. Jig's
 //! worker host owns turn bytes and credit; this link schedules retries and
 //! keeps application-shaped answers until the engine acknowledges them.
 

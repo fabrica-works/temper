@@ -37,5 +37,5 @@ pub mod translate;
 mod world;
 
 pub use noisy::{noisy, submit_noisily};
-pub use temper_world::Span;
+pub use skein_world::domain::Span;
 pub use world::{IDENTITY, LIMITS, Settings, Stats, Told, World};

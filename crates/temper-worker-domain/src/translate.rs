@@ -35,7 +35,7 @@ fn repository(repository: wire::Repository) -> checkout::Repository {
     let wire::Repository { tag: _, name, remote, start, access, identity } = repository;
     let (push, expected) = match access {
         wire::Access::ReadOnly => (None, None),
-        wire::Access::WritableV2 { push, expected } => {
+        wire::Access::Writable { push, expected } => {
             let expected = match expected {
                 Some(raw) => Some(git::Commit::new(raw)),
                 None => None,
@@ -150,11 +150,7 @@ pub(crate) const fn delivery_outcome(result: &wire::Push) -> host::DeliveryOutco
     }
 }
 
-pub(crate) fn answer_v2(
-    answer: host::Answer,
-    work: wire::Work,
-    preparation: Option<wire::Preparation>,
-) -> wire::Answer {
+pub(crate) fn answer(answer: host::Answer, work: wire::Work, preparation: Option<wire::Preparation>) -> wire::Answer {
     let ending = match answer.ending {
         host::Ending::Refused(refusal) => wire::Ending::Refused(host_refusal(refusal)),
         host::Ending::Ended { outcome, work: _ } => wire::Ending::Ended { outcome, work },

@@ -5,9 +5,10 @@ use jig_core_people as people;
 use jig_core_views as views;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
-use temper_engine_domain::{Delivery, Write, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Write};
 
-use crate::commits::Store;
+use crate::store::Store;
 use crate::walking::{config, limits};
 
 pub struct Driver {
@@ -40,7 +41,7 @@ impl Driver {
             root: engine::Domain::new(config, limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             out: Queue::with_capacity(engine::max_out(limits)),
-            events: VecDeque::from([engine::Event::Start]),
+            events: VecDeque::from([engine::Event::Restart]),
             store,
             delivered: Vec::new(),
             viewed: Vec::new(),
@@ -66,11 +67,11 @@ impl Driver {
         for _ in 0..self.out.len() {
             match self.out.pop().expect("output count") {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
-                engine::Request::Commit { number, writes } => {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     self.transactions.push(writes.to_vec());
                     self.store.pending.push_back((number, writes));
                 }
-                engine::Request::Load { owner, range, after, most, bytes } => {
+                engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, bytes }) => {
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
                     if range == temper_engine_domain::Range::Core(temper_engine_domain::CoreRange::EndedResults) {
                         self.result_loads.push((most, rows.len()));
@@ -86,27 +87,32 @@ impl Driver {
                         )
                     {
                         self.fail_archive_once = false;
-                        self.events.push_back(engine::Event::Unloaded { owner });
+                        self.events.push_back(engine::Event::Store(engine::StoreInput::Unloaded { owner }));
                     } else {
-                        self.events.push_back(engine::Event::Loaded { owner, rows, next });
+                        self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
                     }
                 }
-                engine::Request::Deliver(delivery) => self.delivered.push(delivery),
-                engine::Request::View(request) => match request {
+                engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivered.push(delivery),
+                engine::Request::Party(engine::PartyRequest::View(request)) => match request {
                     views::Request::Watching { .. }
                     | views::Request::Refused { .. }
                     | views::Request::Deliver { .. }
                     | views::Request::Ended { .. } => self.viewed.push(request),
                 },
-                engine::Request::WatchRefused { .. } => panic!("root route test did not request an invalid watch"),
+                engine::Request::Party(engine::PartyRequest::WatchRefused { .. }) => {
+                    panic!("root route test did not request an invalid watch")
+                }
                 engine::Request::Account(request) => self.accounts.push(request),
                 engine::Request::Forge { .. } => {
                     panic!("root route fixture did not adopt forge")
                 }
                 engine::Request::Stop => self.stopped = true,
-                engine::Request::Host(request) => self.host_requests.push(request),
-                engine::Request::CallBusy { call, .. } => self.call_busy.push(call),
-                engine::Request::TurnBusy { .. } | engine::Request::AnswerBusy { .. } => {
+                engine::Request::Worker(engine::WorkerRequest::Host(request)) => self.host_requests.push(request),
+                engine::Request::Worker(engine::WorkerRequest::CallBusy { call, .. }) => self.call_busy.push(call),
+                engine::Request::Worker(
+                    engine::WorkerRequest::TurnBusy { .. } | engine::WorkerRequest::AnswerBusy { .. },
+                ) => {
                     panic!("unexpected route refusal")
                 }
             }
@@ -119,9 +125,9 @@ impl Driver {
         }
         if apply && !self.store.pending.is_empty() {
             let number = self.store.apply();
-            self.send(engine::Event::Committed { number });
+            self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
         }
-        engine::release(&mut self.root, &self.env, &mut self.out);
+        crate::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
         self.root.reclaim();
     }
@@ -138,14 +144,14 @@ impl Driver {
 
     pub fn sign_in(&mut self) {
         self.serial += 1;
-        self.send(engine::Event::SignedIn {
+        self.send(engine::Event::Party(engine::PartyInput::SignedIn {
             reply_to: ReplyTo::new(Token::new(self.serial)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
                 login: b"person".as_slice().into(),
                 name: b"Person".as_slice().into(),
             },
-        });
+        }));
     }
 
     #[must_use]
@@ -191,7 +197,7 @@ impl Driver {
         self.sign_in();
         assert_eq!(self.store.pending.len(), 3);
         let number = self.store.apply();
-        self.send(engine::Event::Committed { number });
+        self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
         self.sign_in();
         assert_eq!(self.store.pending.len(), 3);
         for _ in 0..20 {

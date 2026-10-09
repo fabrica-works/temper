@@ -9,7 +9,8 @@ use jig_core as core;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::Token;
-use temper_engine_domain::{self as root, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as change;
 use temper_engine_domain_forge_client::api;
@@ -305,13 +306,13 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
     );
     send(
         world,
-        engine::Event::ForgeHint {
+        engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
             hint: api::Hint {
                 repository: temper_engine_forge_world::REPO,
                 change: api::Change::Item(number),
                 key: None,
             },
-        },
+        })),
     );
     world.drain()?;
     require(
@@ -330,7 +331,7 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
         "human issue comments woke the projected goal")?;
     send(
         world,
-        engine::Event::Call {
+        engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: goal,
             attempt: run.attempt,
@@ -354,7 +355,7 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
                     }]),
                 },
             },
-        },
+        }),
     );
     wait(world, |world| world.peers.assignments.iter().any(|run| run.task != chat.task && run.task != goal))?;
     let child =
@@ -400,7 +401,7 @@ fn issue_creation(world: &mut World) -> Result<(), Violation> {
     let run = world.peers.assignments[0].clone();
     send(
         world,
-        engine::Event::Call {
+        engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: run.task,
             attempt: run.attempt,
@@ -418,7 +419,7 @@ fn issue_creation(world: &mut World) -> Result<(), Violation> {
                     }),
                 },
             },
-        },
+        }),
     );
     wait(world, |world| {
         world.systems.effects.iter().any(|effect| effect.kind == 8 && effect.applied) || creation_held(world)

@@ -1,6 +1,6 @@
 //! The walking root with real children, an ordered paged fake store, scripted
 //! person and worker, independent durable-delivery referee and restart cuts.
-pub mod commits;
+pub mod store;
 pub mod walking;
 pub mod walking_referee;
 
@@ -16,3 +16,19 @@ pub mod roles_referee;
 
 /// Shared direct root route driver for focused and randomized scenarios.
 pub mod direct;
+
+/// Take ready journal output, then admit one owner continuation if none was ready.
+pub fn poll(
+    root: &mut temper_engine_domain::Domain,
+    env: &skein_lib::Env<temper_engine_domain::Limits>,
+    out: &mut skein_lib::Queue<temper_engine_domain::Request>,
+) {
+    temper_engine_domain::release(root, env, out);
+    if out.is_empty() {
+        temper_engine_domain::release(root, env, out);
+    }
+    if out.is_empty() {
+        temper_engine_domain::step(root, env, temper_engine_domain::Event::Resume);
+        temper_engine_domain::release(root, env, out);
+    }
+}

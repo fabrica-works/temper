@@ -10,8 +10,9 @@ use skein_lib::{Duration, ReplyTo, Time, Token};
 use smith_agent_world::{Job, Settings, World as Agent};
 use smith_domain as smith;
 use smith_domain_run as run;
-use temper_engine_domain::{Delivery, engine};
-use temper_engine_domain_world::{commits::Store, direct::Driver, walking};
+use temper_engine_domain as engine;
+use temper_engine_domain::Delivery;
+use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 
 /// Composed root and agent with the same selected task charter.
 pub struct World {
@@ -39,7 +40,7 @@ pub fn chat(words: &[u8], job: Job) -> World {
     config.resume_bytes = 8192;
     let limits = walking::limits();
     let mut root = Driver::configured(Store::new(), config, &limits);
-    root.send(engine::Event::Hello {
+    root.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -47,16 +48,16 @@ pub fn chat(words: &[u8], job: Job) -> World {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     root.settle();
     root.sign_in();
     root.settle();
-    root.send(engine::Event::Ask {
+    root.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: root.session(),
         key: [41; 16],
         ask: people::Ask::StartChat { project: 1, words: words.into() },
-    });
+    }));
     root.settle();
     let assignment = root
         .delivered
@@ -196,12 +197,12 @@ impl World {
             dialect: first.dialect,
             turns: self.agent.turns().into(),
         };
-        self.root.send(engine::Event::Ask {
+        self.root.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
             sign_in: self.root.session(),
             key: [key; 16],
             ask: people::Ask::Say { project: 1, task: self.assignment.task, words: words.into() },
-        });
+        }));
         self.root.settle();
         let assignment = self
             .root
@@ -240,13 +241,13 @@ pub fn run_assignment(root: &mut Driver, assignment: &engine::Assignment, agent:
             let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
                 .expect("script uses the declared host schema");
             let before = root.delivered.len();
-            root.send(engine::Event::Call {
+            root.send(engine::Event::Worker(engine::WorkerInput::Call {
                 channel: Token::new(7),
                 task: assignment.task,
                 attempt: assignment.attempt,
                 call: submission.relay.owner,
                 body,
-            });
+            }));
             root.settle();
             let answer = root.delivered[before..]
                 .iter()
@@ -273,16 +274,16 @@ pub fn run_assignment(root: &mut Driver, assignment: &engine::Assignment, agent:
         };
         let bytes = format!("{record:?}").into_bytes().into_boxed_slice();
         let turn = temper_engine_smith::turn(request, bytes).expect("typed turn");
-        root.send(engine::Event::Turn {
+        root.send(engine::Event::Worker(engine::WorkerInput::Turn {
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,
             turn,
-        });
+        }));
         root.settle();
     }
     let terminal = temper_engine_smith::result(copy_answer(agent.answer()), None).expect("typed terminal");
-    root.send(engine::Event::Answer {
+    root.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -290,7 +291,7 @@ pub fn run_assignment(root: &mut Driver, assignment: &engine::Assignment, agent:
         attempt: assignment.attempt,
         cumulative: terminal.cumulative,
         end: terminal.end,
-    });
+    }));
     root.settle();
 }
 

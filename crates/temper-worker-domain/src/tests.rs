@@ -86,7 +86,7 @@ impl Harness {
         };
         crate::fire(&mut h.domain, &h.env, &mut h.out);
         while h.out.pop().is_some() {}
-        h.step(Event::ConnectedV2);
+        h.step(Event::Connected);
         h
     }
     fn step(&mut self, event: Event) -> Box<[Request]> {
@@ -162,7 +162,7 @@ fn the_agent_is_gone_while_the_engine_cannot_acknowledge_turns() {
     h.env.now = h.domain.next_deadline().expect("redial");
     crate::fire(&mut h.domain, &h.env, &mut h.out);
     while h.out.pop().is_some() {}
-    let rows = h.step(Event::ConnectedV2);
+    let rows = h.step(Event::Connected);
     let mut turns = 0;
     let mut answered = false;
     for row in &rows {

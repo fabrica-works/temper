@@ -1,9 +1,9 @@
 use skein_lib::{Queue, Token, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_engine_domain::{
     self as root, Counters, Decision, Delivery, Journal, JournalOutput as Output, Record, TurnRecord, Write,
 };
-use temper_engine_domain_world::commits::{HEADER, LIMITS};
-use temper_world::heap::{self, Meter};
+use temper_engine_domain_world::store::{HEADER, LIMITS};
 
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -73,7 +73,7 @@ fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clone
         assert_eq!(row.transcript.as_ptr(), original, "owned bytes moved directly");
     }
     drop(rows);
-    meter.check(measured, loads::worst_case(&limits).expect("valid bound"), limits);
+    meter.check(measured, loads::worst_case(&limits).expect("valid bound"), &limits);
     assert!(
         loads::begin(
             &mut domain,
@@ -128,7 +128,7 @@ fn partial_delivery_transfer_never_allocates_a_second_shrinking_container() {
     root::accept(&mut journal, &mut counters, &limits, decision, &mut out).expect("reserved whole decision");
     let measured = meter.end();
     assert!(out.is_empty(), "clean header and no writes");
-    meter.check(measured, root::worst_case(&limits).expect("valid bounds"), limits);
+    meter.check(measured, root::journal_worst_case(&limits).expect("valid bounds"), &limits);
     assert!(!journal.idle());
 }
 
@@ -172,7 +172,7 @@ fn partial_write_transfer_moves_values_without_shrinking_the_source() {
     };
     assert_eq!(writes.len(), 127);
     drop(writes);
-    meter.check(measured, root::worst_case(&limits).expect("valid bounds"), limits);
+    meter.check(measured, root::journal_worst_case(&limits).expect("valid bounds"), &limits);
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
     let meter = Meter::new();
     let mut journal = Journal::from_durable(&root::journal_limits(&LIMITS), HEADER.commits);
     let mut counters = Counters::new(HEADER);
-    let bound = root::worst_case(&LIMITS).expect("valid journal limits");
+    let bound = root::journal_worst_case(&LIMITS).expect("valid journal limits");
     for commit in 1_u64..=u64::from(LIMITS.commits) {
         meter.start();
         let mut decision = Decision::new(&LIMITS);
@@ -235,7 +235,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
         root::accept(&mut journal, &mut counters, &LIMITS, decision, &mut out).expect("whole decision reserved");
         let measured = meter.end();
         drop(out.pop().expect("one commit"));
-        meter.check(measured, bound, LIMITS);
+        meter.check(measured, bound, &LIMITS);
     }
     assert!(!root::takes(&journal, &LIMITS));
     root::committed(&mut journal, u64::from(LIMITS.commits));
@@ -244,7 +244,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
         root::resume(&mut journal, &mut out);
         let measured = meter.end();
         drop(out.pop().expect("one bounded ready result"));
-        meter.check(measured, bound, LIMITS);
+        meter.check(measured, bound, &LIMITS);
     }
     assert!(journal.idle());
     assert!(root::takes(&journal, &LIMITS));
@@ -254,7 +254,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
 fn real_root_state_and_complete_walking_handoffs_fit_the_declared_counted_bound() {
     use temper_engine_domain_world::walking::{Settings, World, limits};
     let limits = limits();
-    let bound = root::engine::worst_case(&limits).expect("all child and root bounds checked");
+    let bound = root::worst_case(&limits).expect("all child and root bounds checked");
     for settings in [Settings::calm(73), Settings::terminal(74)] {
         let meter = Meter::new();
         meter.start();
@@ -264,7 +264,7 @@ fn real_root_state_and_complete_walking_handoffs_fit_the_declared_counted_bound(
         // The meter also sees the independent fake's durable map and script
         // observations. Their tiny footprint only makes this stricter: root
         // scratch queues and every real restored child are exercised together.
-        meter.check(measured, bound, limits);
+        meter.check(measured, bound, &limits);
     }
 }
 
@@ -272,7 +272,7 @@ fn real_root_state_and_complete_walking_handoffs_fit_the_declared_counted_bound(
 fn held_reasons_history_queries_and_real_escalation_handoffs_fit_counted_root_memory() {
     use temper_engine_domain_world::{escalation, escalation_referee::Story};
     let limits = escalation::limits();
-    let bound = root::engine::worst_case(&limits).expect("all escalation retained and transient ownership priced");
+    let bound = root::worst_case(&limits).expect("all escalation retained and transient ownership priced");
     for story in [Story::Release, Story::PassRelease, Story::RaceReject] {
         let meter = Meter::new();
         meter.start();
@@ -286,7 +286,7 @@ fn held_reasons_history_queries_and_real_escalation_handoffs_fit_counted_root_me
         let measured = meter.end();
         // Includes the fake's durable history and independent observations as
         // well as actual root query/context/journal and restored child copies.
-        meter.check(measured, bound, limits);
+        meter.check(measured, bound, &limits);
     }
 }
 
@@ -294,7 +294,7 @@ fn held_reasons_history_queries_and_real_escalation_handoffs_fit_counted_root_me
 fn candidate_rosters_waiting_snapshots_keyed_history_and_recovery_fit_counted_memory() {
     use temper_engine_domain_world::roles::{Base, Settings, limits, reroute_replayed};
     let limits = limits();
-    let bound = root::engine::worst_case(&limits).expect("role snapshots and every roster copy priced");
+    let bound = root::worst_case(&limits).expect("role snapshots and every roster copy priced");
     let meter = Meter::new();
     meter.start();
     let world = reroute_replayed(
@@ -305,5 +305,5 @@ fn candidate_rosters_waiting_snapshots_keyed_history_and_recovery_fit_counted_me
     let measured = meter.end();
     // Includes the fake store, immutable before-observers and exact replay
     // transcript in addition to real children and every root transient copy.
-    meter.check(measured, bound, limits);
+    meter.check(measured, bound, &limits);
 }

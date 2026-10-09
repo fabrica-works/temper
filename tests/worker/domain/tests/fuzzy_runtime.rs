@@ -1,8 +1,8 @@
 //! Small retained-turn windows and body budgets; deterministic seeds.
-use temper_worker_domain_world::next::{Settings, World};
+use temper_worker_domain_world::runtime::{Settings, World};
 
 #[test]
-fn v2_runtime_random_turn_sizes_and_tiny_windows_settle() {
+fn runtime_random_turn_sizes_and_tiny_windows_settle() {
     for seed in 0..48 {
         let turns = u32::try_from(seed % 3 + 1).expect("tiny window");
         let byte_slots = u32::try_from(seed / 3 % 3 + 1).expect("tiny budget");
@@ -13,6 +13,6 @@ fn v2_runtime_random_turn_sizes_and_tiny_windows_settle() {
             // Stopping also takes the independent agent window already sent.
             assert!(world.stats().peak_retained <= turns * 2);
         });
-        assert!(result.is_ok(), "v2 runtime seed {seed}, settings {settings:?}");
+        assert!(result.is_ok(), "runtime seed {seed}, settings {settings:?}");
     }
 }

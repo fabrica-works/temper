@@ -1,4 +1,4 @@
-//! W2 pages: starting, sign-in, missing, and the person's chats.
+//! Pages: starting, sign-in, missing, and the person's chats.
 
 use temper_web_domain::{Address, Chats, Domain, FieldRef, Form, Page};
 

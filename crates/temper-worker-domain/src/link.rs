@@ -114,12 +114,11 @@ pub(crate) struct Relay {
     pub(crate) run: Token,
     pub(crate) attempt: Token,
     pub(crate) call: Token,
-    pub(crate) body: RelayBody,
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub(crate) enum RelayBody {
-    Typed { name: Box<[u8]>, tool: Box<[u8]>, writes: bool, input: Box<[u8]>, deadline: Duration },
+    pub(crate) name: Box<[u8]>,
+    pub(crate) tool: Box<[u8]>,
+    pub(crate) writes: bool,
+    pub(crate) input: Box<[u8]>,
+    pub(crate) deadline: Duration,
 }
 
 /// A bounce for the engine, held while the channel is down.
@@ -246,7 +245,7 @@ impl Link {
     }
 
     /// The channel opened: the hello is next, made once the host reports.
-    pub(crate) fn connected_v2(&mut self) {
+    pub(crate) fn connected(&mut self) {
         assert!(self.state == State::Dialling, "a channel opens once, for a dial in flight");
         self.state = State::Up { proved: false };
         self.past = false;
@@ -375,7 +374,7 @@ impl Link {
         // A worker shutting down takes no more work.
         let slots = if self.shut { 0 } else { limits.host.slots };
         let hello = Hello { slots, workstreams: workstreams.into_boxed(), hosting: hosting.into_boxed() };
-        out.push(Request::HelloV2 {
+        out.push(Request::Hello {
             hello,
             graces: limits::declared_graces(limits).expect("startup checked the stop bound"),
             push_deadline: limits::push_deadline(limits).expect("startup checked push bound"),
@@ -411,7 +410,7 @@ impl Link {
         true
     }
 
-    pub(crate) fn answer_v2(&mut self, run: Token, attempt: Token, answer: wire::Answer, out: &mut Queue<Request>) {
+    pub(crate) fn answer(&mut self, run: Token, attempt: Token, answer: wire::Answer, out: &mut Queue<Request>) {
         self.turns.answer(run, attempt, answer, self.is_up(), out);
     }
     pub(crate) fn turn(&mut self, run: Token, attempt: Token, turn: wire::Turn, out: &mut Queue<Request>) {
@@ -439,10 +438,6 @@ impl Link {
 pub(crate) const ALARMS: u32 = 2;
 
 fn request(relay: Relay) -> Request {
-    let Relay { run, attempt, call, body } = relay;
-    match body {
-        RelayBody::Typed { name, tool, writes, input, deadline } => {
-            Request::Relay { run, attempt, call: name, delivery: call, tool, writes, input, deadline }
-        }
-    }
+    let Relay { run, attempt, call, name, tool, writes, input, deadline } = relay;
+    Request::Relay { run, attempt, delivery: call, call: name, tool, writes, input, deadline }
 }

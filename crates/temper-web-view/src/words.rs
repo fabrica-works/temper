@@ -1,4 +1,4 @@
-//! Wording for W2's frame, chats and notices, using sized bytes.
+//! Wording for the frame, chats and notices, using sized bytes.
 
 use alloc::boxed::Box;
 use skein_lib::{Decimal, Wall, Writer};

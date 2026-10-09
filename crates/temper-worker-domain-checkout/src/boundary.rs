@@ -109,7 +109,7 @@ pub struct Repository {
     pub identity: u32,
     /// The branch a change is pushed to, if the repository may be written.
     pub push: Option<Box<[u8]>>,
-    /// Exact old head required for the push branch; None retains v1's
+    /// Exact old head required for the push branch; None requests
     /// ordinary fast-forward. Successful pushes advance this condition.
     pub expected: Option<Commit>,
 }

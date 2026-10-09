@@ -508,7 +508,7 @@ pub(crate) enum Work {
     AdoptRestored,
     AdoptDone,
     Restart(jig_core::RestartRequest),
-    TypedDecoded { to: ReplyTo, body: Call },
+    Decoded { to: ReplyTo, body: Call },
     Core(jig_core::Event),
     Tasks(tasks::Event),
     People(people::Event),

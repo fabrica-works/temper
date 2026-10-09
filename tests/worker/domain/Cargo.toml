@@ -7,10 +7,10 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+skein-world.workspace = true
 skein-lib.workspace = true
 smith-channel.workspace = true
 temper-worker-domain.workspace = true
-temper-world.workspace = true
 temper-worker-checkout-world.workspace = true
 temper-fake-checkout.workspace = true
 

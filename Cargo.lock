@@ -791,9 +791,11 @@ dependencies = [
  "jig-core-people",
  "jig-core-tasks",
  "jig-core-views",
+ "jig-fake-store",
  "jig-people-world",
  "jig-tasks-world",
  "skein-lib",
+ "skein-world",
  "smith-domain",
  "smith-domain-run",
  "smith-domain-session",
@@ -804,7 +806,6 @@ dependencies = [
  "temper-engine-domain-forge-client",
  "temper-engine-forge-world",
  "temper-fake-forge-domain",
- "temper-world",
 ]
 
 [[package]]
@@ -812,9 +813,9 @@ name = "temper-engine-forge-client-world"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "temper-engine-domain-forge-client",
  "temper-fake-forge-domain",
- "temper-world",
 ]
 
 [[package]]
@@ -822,12 +823,12 @@ name = "temper-engine-forge-world"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
  "temper-fake-forge-domain",
- "temper-world",
 ]
 
 [[package]]
@@ -869,8 +870,8 @@ name = "temper-fake-forge-tests"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "temper-fake-forge-domain",
- "temper-world",
 ]
 
 [[package]]
@@ -927,10 +928,10 @@ name = "temper-web-domain-world"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "temper-fake-person",
  "temper-web-domain",
  "temper-web-view",
- "temper-world",
 ]
 
 [[package]]
@@ -946,10 +947,10 @@ name = "temper-worker-checkout-world"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "temper-fake-checkout",
  "temper-fake-forge-domain",
  "temper-worker-domain-checkout",
- "temper-world",
 ]
 
 [[package]]
@@ -975,19 +976,11 @@ name = "temper-worker-domain-world"
 version = "0.0.0"
 dependencies = [
  "skein-lib",
+ "skein-world",
  "smith-channel",
  "temper-fake-checkout",
  "temper-worker-checkout-world",
  "temper-worker-domain",
- "temper-world",
-]
-
-[[package]]
-name = "temper-world"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
- "skein-world",
 ]
 
 [[package]]

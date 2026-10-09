@@ -227,7 +227,7 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             }));
         }
         Event::Worker(crate::WorkerInput::DecodedHostCall { to, body }) => {
-            domain.work.push(Work::TypedDecoded { to, body });
+            domain.work.push(Work::Decoded { to, body });
         }
         Event::Worker(crate::WorkerInput::RenderedHostCall { to, answer }) => host_route::rendered(domain, to, answer),
         Event::Worker(crate::WorkerInput::Inbound { task, attempt, message }) => {
@@ -1440,7 +1440,7 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
                 domain.work.push(Work::Restart(request));
             }
             Work::Restart(request) => restart_request(domain, env, decision, request),
-            Work::TypedDecoded { to, body } => host_route::decoded(domain, env, decision, to, body),
+            Work::Decoded { to, body } => host_route::decoded(domain, env, decision, to, body),
             Work::Core(event) => {
                 let routed = jig_core::step(&mut domain.core, &environment_core(env), event);
                 route_core_requests(domain, env, decision, routed);

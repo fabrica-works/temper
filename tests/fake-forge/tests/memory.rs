@@ -5,11 +5,11 @@
 //! calls held, webhooks in flight and observations kept; every step checked.
 
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_fake_forge_domain::api::{
     Answer, Check, Checks, Cue, Error, File, Git, Op, Permission, Protection, Read, Setup, Verdict, Write,
 };
 use temper_fake_forge_domain::{Config, Domain, Event, Limits, MAX_OUT, Request, Skew, fire, step, worst_case};
-use temper_world::heap::{self, Meter};
 
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -152,7 +152,7 @@ fn full_merge_history_and_both_parent_traversals_stay_bounded() {
         )
         .expect("one commit per free store slot");
         let measured = forge.meter.end();
-        forge.meter.check(measured, forge.bound, "a merge commit");
+        forge.meter.check(measured, forge.bound, &"a merge commit");
         left = right;
         right = next;
     }
@@ -160,7 +160,7 @@ fn full_merge_history_and_both_parent_traversals_stay_bounded() {
     assert!(forge.domain.is_ancestor(first, right));
     assert!(forge.domain.is_ancestor(left, right));
     let measured = forge.meter.end();
-    forge.meter.check(measured, forge.bound, "both-parent ancestry");
+    forge.meter.check(measured, forge.bound, &"both-parent ancestry");
     forge.ok(AUTHOR, &repository, Op::Git(Git::Push { branch: name(b'w', 0), commit: right, expected: None }));
     assert_eq!(forge.domain.has(&repository).len(), LIMITS.commits);
     // Reading mergeability walks both histories as a real merge-base read does.
@@ -241,7 +241,7 @@ impl Measured {
         step(&mut self.domain, &self.env, event, &mut self.out);
         let measured = self.meter.end();
         assert!(self.out.is_empty(), "a call is held");
-        self.meter.check(measured, self.bound, "a call");
+        self.meter.check(measured, self.bound, &"a call");
         token
     }
 
@@ -256,7 +256,7 @@ impl Measured {
             Some(Request::Reply { to, result }) => Some((to.into_token(), outcome(result))),
             Some(Request::Hook { .. }) | None => None,
         };
-        self.meter.check(measured, self.bound, "a timer");
+        self.meter.check(measured, self.bound, &"a timer");
         self.domain.reclaim();
         outcome
     }

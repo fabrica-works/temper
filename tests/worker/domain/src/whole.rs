@@ -142,7 +142,7 @@ impl World {
     fn take(&mut self, request: Request) {
         match request {
             Request::Dial => {}
-            Request::HelloV2 { hello, graces, push_deadline } => {
+            Request::Hello { hello, graces, push_deadline } => {
                 assert_eq!(graces, temper_worker_domain::declared_graces(&self.env.limits).expect("bound"));
                 assert_eq!(push_deadline, temper_worker_domain::push_deadline(&self.env.limits).expect("push bound"));
                 assert!(hello.hosting.len() <= 1);
@@ -238,7 +238,7 @@ impl World {
 
     fn start(&mut self) {
         self.fire();
-        self.event(Event::ConnectedV2);
+        self.event(Event::Connected);
         self.event(Event::Assign {
             assignment: wire::Assignment {
                 assignment: wire::RunAssignment {
@@ -252,7 +252,7 @@ impl World {
                             remote: Box::from(REMOTE),
                             identity: 0,
                             start: wire::Start::Base { branch: Box::from(&b"main"[..]) },
-                            access: wire::Access::WritableV2 {
+                            access: wire::Access::Writable {
                                 push: Box::from(&b"topic"[..]),
                                 expected: Some(translate::commit(self.first).raw()),
                             },
@@ -342,7 +342,7 @@ impl World {
                 self.fire();
                 if case == Case::ContactWithin {
                     assert_eq!(self.report.cancellations, 0);
-                    self.event(Event::ConnectedV2);
+                    self.event(Event::Connected);
                     self.deliver();
                     self.say(agent::Up::Answer {
                         answer: agent::Answer {
@@ -357,7 +357,7 @@ impl World {
                     self.gone();
                     assert_eq!(self.report.saves, 1, "save before the cancellation answer reaches the engine");
                     assert!(self.answer.is_none());
-                    self.event(Event::ConnectedV2);
+                    self.event(Event::Connected);
                 }
             }
         }

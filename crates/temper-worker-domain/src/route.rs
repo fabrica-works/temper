@@ -15,7 +15,7 @@ use crate::boundary::{Event, Request};
 use crate::domain::{self, Domain};
 use crate::facts::Fact;
 use crate::limits::{self, Limits};
-use crate::link::{Bounced, Relay, RelayBody};
+use crate::link::{Bounced, Relay};
 use crate::translate;
 use crate::workspace::{self, Write};
 
@@ -78,8 +78,8 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
             return host_step(domain, env, host::Event::Inbound { run, attempt, name, sender, words });
         }
 
-        Event::ConnectedV2 => {
-            domain.link.connected_v2();
+        Event::Connected => {
+            domain.link.connected();
             domain::keep(domain, Fact::Connected);
             return host_step(domain, env, host::Event::Report);
         }
@@ -192,12 +192,7 @@ fn from_host(domain: &mut Domain, env: &Env<Limits>, request: host::Request, out
     match request {
         host::Request::Relay { run, attempt, call, delivery, tool, writes, input, deadline } => {
             domain.link.relay(
-                Relay {
-                    run,
-                    attempt,
-                    call: delivery,
-                    body: RelayBody::Typed { name: call, tool, writes, input, deadline },
-                },
+                Relay { run, attempt, call: delivery, name: call, tool, writes, input, deadline },
                 &domain.host,
                 out,
             );
@@ -206,15 +201,15 @@ fn from_host(domain: &mut Domain, env: &Env<Limits>, request: host::Request, out
             assert!(to.into_token() == run, "an answer is its assignment's");
             let preparation = workspace::preparation(domain, run);
             let work = workspace::finish(domain, run);
-            let answer = translate::answer_v2(answer, work, preparation);
-            domain.link.answer_v2(run, attempt, answer, out);
+            let answer = translate::answer(answer, work, preparation);
+            domain.link.answer(run, attempt, answer, out);
         }
 
         host::Request::Turn { agent: _, run, attempt, turn } => {
             domain.link.turn(run, attempt, turn, out);
         }
         host::Request::Deliver { owner, workspace, title, body } => {
-            workspace::write(domain, env, owner, workspace, Write::PushV2 { title, body });
+            workspace::write(domain, env, owner, workspace, Write::Push { title, body });
         }
 
         host::Request::CancelRelay { call } => {

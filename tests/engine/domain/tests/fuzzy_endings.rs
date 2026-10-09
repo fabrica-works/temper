@@ -6,9 +6,10 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{Duration, Queue, ReplyTo, Rng, Token};
 use std::collections::BTreeSet;
-use temper_engine_domain::{Delivery, Key, Record, engine};
-use temper_engine_domain_world::commits::Store;
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_world::direct::Driver;
+use temper_engine_domain_world::store::Store;
 use temper_engine_domain_world::walking::{config, limits};
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "the script selects one delivery from the closed vocabulary")]
@@ -48,7 +49,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -56,16 +57,16 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     driver.sign_in();
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [5; 16],
         ask: people::Ask::StartChat { project: 1, words: b"root sweep".as_slice().into() },
-    });
+    }));
     driver.settle();
     let assignment = driver
         .delivered
@@ -100,7 +101,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 } else {
                     tasks::TaskResult::Failure { reason: b"failed".as_slice().into() }
                 };
-                driver.send(engine::Event::Answer {
+                driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
                     pushed: Box::new([]),
                     saved: None,
                     channel: Token::new(7),
@@ -108,7 +109,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     attempt: assignment.attempt,
                     cumulative: 0,
                     end: tasks::End::Finished { result, cancel_delegates: false },
-                });
+                }));
                 driver.settle();
                 let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row)))) =
                     driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(assignment.task))))
@@ -146,7 +147,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
                 };
-                driver.send(engine::Event::Call {
+                driver.send(engine::Event::Worker(engine::WorkerInput::Call {
                     channel: Token::new(7),
                     task: assignment.task,
                     attempt: assignment.attempt,
@@ -156,7 +157,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                         position: 1,
                         tool: engine::Tool::Delegate { batch: Box::new([child]) },
                     },
-                });
+                }));
                 for _ in 0..30 {
                     driver.advance(true);
                 }
@@ -172,7 +173,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                         _ => None,
                     })
                     .expect("child was made atomically");
-                driver.send(engine::Event::Call {
+                driver.send(engine::Event::Worker(engine::WorkerInput::Call {
                     channel: Token::new(7),
                     task: assignment.task,
                     attempt: assignment.attempt,
@@ -182,7 +183,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                         position: 2,
                         tool: engine::Tool::Cancel { target: child, reason: b"withdrawn".as_slice().into() },
                     },
-                });
+                }));
                 driver.settle();
                 assert!(
                     matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(child)))),
@@ -194,12 +195,12 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 seen.insert("cancelled");
             }
             3 => {
-                driver.send(engine::Event::Ask {
+                driver.send(engine::Event::Party(engine::PartyInput::Ask {
                     reply_to: ReplyTo::new(Token::new(501)),
                     sign_in: driver.session(),
                     key: [6; 16],
                     ask: people::Ask::Stop { project: 1, task: assignment.task },
-                });
+                }));
                 driver.settle();
                 assert!(
                     matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))),

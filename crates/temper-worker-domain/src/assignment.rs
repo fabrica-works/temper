@@ -65,7 +65,7 @@ fn repository(repository: &Repository, limits: &Limits, next: bool) -> Result<()
     }
     match &repository.access {
         Access::ReadOnly => Ok(()),
-        Access::WritableV2 { push, .. } => {
+        Access::Writable { push, .. } => {
             if !next {
                 return Err(Invalid::Version);
             }

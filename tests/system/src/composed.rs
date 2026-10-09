@@ -21,7 +21,8 @@ use smith_agent_world::{Job, Settings, World as Agent};
 use smith_domain as smith;
 use smith_domain_run as run;
 use smith_host_domain::channel::{self, Down, Up};
-use temper_engine_domain::{Delivery, Key, Record, Write, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record, Write};
 use temper_engine_domain_world::walking;
 use temper_engine_forge_world::translate as api;
 use temper_fake_checkout::git::Tree;
@@ -196,10 +197,10 @@ impl World {
             root,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             root_out: Queue::with_capacity(engine::max_out(&limits)),
-            root_events: VecDeque::from([engine::Event::Start]),
+            root_events: VecDeque::from([engine::Event::Restart]),
             store: {
                 let mut store = store::Store::new();
-                let header = temper_engine_domain_world::commits::HEADER;
+                let header = temper_engine_domain_world::store::HEADER;
                 store.rows.insert(
                     Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)),
                     Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(header))),
@@ -273,11 +274,15 @@ impl World {
             self.root_step(event);
         }
         if let Some(number) = self.store.tick(false).expect("calm store") {
-            self.root_step(engine::Event::Committed { number });
+            self.root_step(engine::Event::Store(engine::StoreInput::Committed { number }));
         }
         engine::fire(&mut self.root, &self.env);
         for pass in 0..32 {
-            engine::release(&mut self.root, &self.env, &mut self.root_out);
+            if pass == 0 {
+                engine::release(&mut self.root, &self.env, &mut self.root_out);
+            } else {
+                temper_engine_domain_world::poll(&mut self.root, &self.env, &mut self.root_out);
+            }
             if self.root_out.is_empty() && pass > 0 {
                 break;
             }
@@ -404,7 +409,7 @@ impl World {
     /// Release withheld store terminals in their independently retained order.
     pub fn release_commits(&mut self) {
         while let Some(number) = self.store.release_held() {
-            self.root_events.push_back(engine::Event::Committed { number });
+            self.root_events.push_back(engine::Event::Store(engine::StoreInput::Committed { number }));
         }
     }
 
@@ -436,14 +441,14 @@ impl World {
 
     fn party_request(&mut self, request: parties::Up) {
         let event = match request {
-            parties::Up::SignIn { to, provider, subject } => engine::Event::SignedIn {
+            parties::Up::SignIn { to, provider, subject } => engine::Event::Party(engine::PartyInput::SignedIn {
                 reply_to: ReplyTo::new(Token::new(to)),
                 identity: people::Identity {
                     key: people::IdentityKey { provider, subject },
                     login: Box::from(&b"person"[..]),
                     name: Box::from(&b"Person"[..]),
                 },
-            },
+            }),
             parties::Up::Request { to, sign_in, project, key, ask } => {
                 let ask = match ask {
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
@@ -460,7 +465,12 @@ impl World {
                     | parties::Ask::Decide { .. }
                     | parties::Ask::Decision { .. }) => panic!("unscripted party request: {other:?}"),
                 };
-                engine::Event::Ask { reply_to: ReplyTo::new(Token::new(to)), sign_in, key, ask }
+                engine::Event::Party(engine::PartyInput::Ask {
+                    reply_to: ReplyTo::new(Token::new(to)),
+                    sign_in,
+                    key,
+                    ask,
+                })
             }
         };
         self.root_events.push_back(event);
@@ -470,7 +480,7 @@ impl World {
     fn root_request(&mut self, request: engine::Request) {
         match request {
             engine::Request::ToChild(released) => self.root_events.push_back(engine::Event::Released(released)),
-            engine::Request::Commit { number, writes } => {
+            engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                 let writes = writes
                     .into_vec()
                     .into_iter()
@@ -481,7 +491,7 @@ impl World {
                     .collect();
                 self.store.submit(number, writes, u32::try_from(self.seed % 3).expect("small seeded delay"));
             }
-            engine::Request::Load { owner, range, after, most, .. } => {
+            engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                 let mut rows: Vec<_> = self
                     .store
                     .rows
@@ -496,7 +506,11 @@ impl World {
                 } else {
                     None
                 };
-                self.root_events.push_back(engine::Event::Loaded { owner, rows: rows.into_boxed_slice(), next });
+                self.root_events.push_back(engine::Event::Store(engine::StoreInput::Loaded {
+                    owner,
+                    rows: rows.into_boxed_slice(),
+                    next,
+                }));
             }
             engine::Request::Forge { call, repository, op } => {
                 assert_eq!(repository, temper_engine_forge_world::REPO);
@@ -509,11 +523,14 @@ impl World {
                             temper_fake_forge_domain::time(&temper_worker_checkout_world::forge::CONFIG, self.env.now),
                         )
                     });
-                self.root_events.push_back(engine::Event::ForgeAnswered { call, cost: 1, result });
+                self.root_events.push_back(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
+                    temper_engine_domain_forge_client::Event::Answered { call, cost: 1, result },
+                ))));
                 let _moves = self.forge.moves();
             }
-            engine::Request::Deliver(delivery) => self.delivery(delivery),
-            engine::Request::View(_) | engine::Request::Account(_) => {}
+            engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+            | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
+            engine::Request::Party(engine::PartyRequest::View(_)) | engine::Request::Account(_) => {}
             other => panic!("unscripted engine output: {other:?}"),
         }
     }
@@ -548,7 +565,7 @@ impl World {
                 };
                 self.party.reply(to.raw(), reply);
                 if signed_in && self.repository {
-                    self.root_events.push_back(engine::Event::Ask {
+                    self.root_events.push_back(engine::Event::Party(engine::PartyInput::Ask {
                         reply_to: ReplyTo::new(Token::new(900)),
                         sign_in: self.party.sign_in.expect("authenticated party"),
                         key: [90; 16],
@@ -569,7 +586,7 @@ impl World {
                             0,
                         )
                         .expect("bounded adoption request"),
-                    });
+                    }));
                 }
             }
             Delivery::Assigned { assignment, .. } => {
@@ -671,9 +688,9 @@ impl World {
     #[expect(clippy::too_many_lines, reason = "ordinary adapter keeps each native boundary together")]
     fn worker_request(&mut self, request: worker::Request) {
         match request {
-            worker::Request::Dial => self.worker_events.push_back(worker::Event::ConnectedV2),
-            worker::Request::HelloV2 { hello, graces, push_deadline } => {
-                self.root_events.push_back(engine::Event::Hello {
+            worker::Request::Dial => self.worker_events.push_back(worker::Event::Connected),
+            worker::Request::Hello { hello, graces, push_deadline } => {
+                self.root_events.push_back(engine::Event::Worker(engine::WorkerInput::Hello {
                     channel: CHANNEL,
                     hello: fleet::Hello {
                         stop_bound: graces.saturating_add(push_deadline),
@@ -681,7 +698,7 @@ impl World {
                         workstreams: Box::new([]),
                         hosting: Box::new([]),
                     },
-                });
+                }));
             }
             worker::Request::Spawn { owner, workspace, .. } => {
                 assert_eq!(workspace.is_some(), self.repository);
@@ -705,7 +722,7 @@ impl World {
             }
             worker::Request::Turn { run, attempt, turn } => {
                 self.observed.turns += 1;
-                self.root_events.push_back(engine::Event::Turn {
+                self.root_events.push_back(engine::Event::Worker(engine::WorkerInput::Turn {
                     channel: CHANNEL,
                     task: run.raw(),
                     attempt: attempt.raw(),
@@ -715,7 +732,7 @@ impl World {
                         read: turn.read.map(Token::raw),
                         transcript: turn.body,
                     },
-                });
+                }));
             }
             worker::Request::Relay { run, attempt, call, delivery, tool, input, .. } => {
                 self.observed.relays += 1;
@@ -731,13 +748,13 @@ impl World {
                     .expect("declared engine host schema");
                 let callback = submission.relay.owner;
                 self.callbacks.insert(callback, (call, delivery));
-                self.root_events.push_back(engine::Event::Call {
+                self.root_events.push_back(engine::Event::Worker(engine::WorkerInput::Call {
                     channel: CHANNEL,
                     task: run.raw(),
                     attempt: attempt.raw(),
                     call: callback,
                     body,
-                });
+                }));
             }
             worker::Request::Answer { run, attempt, answer } => {
                 self.observed.answers += 1;
@@ -759,7 +776,7 @@ impl World {
                     }
                     wire::Ending::Refused(_) => panic!("valid assignment accepted"),
                 }
-                self.root_events.push_back(engine::Event::Answer {
+                self.root_events.push_back(engine::Event::Worker(engine::WorkerInput::Answer {
                     channel: CHANNEL,
                     task: run.raw(),
                     attempt: attempt.raw(),
@@ -767,7 +784,7 @@ impl World {
                     saved: None,
                     cumulative: terminal.cumulative,
                     end: terminal.end.clone(),
-                });
+                }));
             }
             worker::Request::Io { owner, op, .. } => {
                 self.observed.checkouts += 1;

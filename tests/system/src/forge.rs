@@ -6,10 +6,11 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
-use temper_engine_domain::{Delivery, Key, Record, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
 use temper_engine_domain_forge_client as client;
-use temper_engine_domain_world::{commits::Store, walking};
+use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
 
@@ -249,7 +250,7 @@ impl World {
             root: engine::Domain::new(config, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
-            events: VecDeque::from([engine::Event::Start]),
+            events: VecDeque::from([engine::Event::Restart]),
             store: Store::new(),
             fake,
             fake_env,
@@ -303,10 +304,12 @@ impl World {
         for _ in 0..self.out.len() {
             match self.out.pop().expect("counted root output") {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
-                engine::Request::Commit { number, writes } => self.store.pending.push_back((number, writes)),
-                engine::Request::Load { owner, range, after, most, .. } => {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
+                    self.store.pending.push_back((number, writes));
+                }
+                engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    self.events.push_back(engine::Event::Loaded { owner, rows, next });
+                    self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
                 }
                 engine::Request::Forge { call, repository, op } => {
                     let name: &[u8] = if repository == forge_world::REPO {
@@ -330,7 +333,8 @@ impl World {
                         &mut self.fake_out,
                     );
                 }
-                engine::Request::Deliver(delivery) => match delivery {
+                engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => match delivery {
                     Delivery::WebReply { sign_in, reply: people::Reply::SignedIn { .. }, .. } => {
                         self.signed_in = sign_in;
                     }
@@ -344,12 +348,15 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
-                | engine::Request::View(_)
-                | engine::Request::WatchRefused { .. }
-                | engine::Request::CallBusy { .. }
-                | engine::Request::TurnBusy { .. }
-                | engine::Request::AnswerBusy { .. } => {}
-                engine::Request::Host(_) => panic!("legacy forge world received typed input"),
+                | engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. })
+                | engine::Request::Worker(
+                    engine::WorkerRequest::CallBusy { .. }
+                    | engine::WorkerRequest::TurnBusy { .. }
+                    | engine::WorkerRequest::AnswerBusy { .. },
+                ) => {}
+                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
+                    panic!("forge fixture received an unexpected host request")
+                }
                 engine::Request::Stop => panic!("root startup or store failure"),
             }
         }
@@ -365,7 +372,7 @@ impl World {
         }
         if !self.store.pending.is_empty() {
             let number = self.store.apply();
-            self.send(engine::Event::Committed { number });
+            self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
         }
         if self.fake.is_due(self.fake_env.now) {
             fake::fire(&mut self.fake, &self.fake_env, &mut self.fake_out);
@@ -381,12 +388,14 @@ impl World {
                             Err(translate::error(error, fake::time(&self.fake_env.limits, self.fake_env.now)))
                         }
                     };
-                    self.events.push_back(engine::Event::ForgeAnswered { call, cost: 1, result });
+                    self.events.push_back(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
+                        temper_engine_domain_forge_client::Event::Answered { call, cost: 1, result },
+                    ))));
                 }
                 fake::Request::Hook { .. } => {}
             }
         }
-        engine::release(&mut self.root, &self.env, &mut self.out);
+        temper_engine_domain_world::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
         engine::fire(&mut self.root, &self.env);
         engine::release(&mut self.root, &self.env, &mut self.out);
@@ -424,16 +433,16 @@ impl World {
 
     fn adopt(&mut self) {
         self.until(Until::Ready);
-        self.send(engine::Event::SignedIn {
+        self.send(engine::Event::Party(engine::PartyInput::SignedIn {
             reply_to: ReplyTo::new(Token::new(90)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
                 login: Box::from(&b"owner"[..]),
                 name: Box::from(&b"Owner"[..]),
             },
-        });
+        }));
         self.until(Until::SignedIn);
-        self.send(engine::Event::Ask {
+        self.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
@@ -457,7 +466,7 @@ impl World {
                 0,
             )
             .expect("forge adoption shape"),
-        });
+        }));
         self.until(Until::Adopted);
         assert!(matches!(self.adopted.as_slice(), [people::Outcome::Adopted { .. }]));
     }
@@ -528,7 +537,7 @@ mod system_stories {
     fn start_change_world(passes: u32) -> (World, engine::Assignment) {
         let mut world = World::configured_policy(true, true, false, passes, None);
         world.adopt();
-        world.send(engine::Event::Hello {
+        world.send(engine::Event::Worker(engine::WorkerInput::Hello {
             channel: Token::new(7),
             hello: fleet::Hello {
                 stop_bound: Duration::from_secs(1),
@@ -536,13 +545,13 @@ mod system_stories {
                 workstreams: Box::new([]),
                 hosting: Box::new([]),
             },
-        });
-        world.send(engine::Event::Ask {
+        }));
+        world.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(92)),
             sign_in: world.signed_in.expect("owner session"),
             key: [92; 16],
             ask: people::Ask::StartChat { project: 1, words: b"@forge_chat".as_slice().into() },
-        });
+        }));
         world.until(Until::Assigned);
         let chat = world.assigned[0].clone();
         (world, chat)
@@ -571,13 +580,13 @@ mod system_stories {
                         )
                     });
                 let before = world.answers.len();
-                world.send(engine::Event::Call {
+                world.send(engine::Event::Worker(engine::WorkerInput::Call {
                     channel: Token::new(7),
                     task: assignment.task,
                     attempt: assignment.attempt,
                     call: submission.relay.owner,
                     body,
-                });
+                }));
                 for _ in 0..200 {
                     world.tick();
                     if world.answers.len() > before {
@@ -602,19 +611,19 @@ mod system_stories {
             };
             let turn = temper_engine_smith::turn(request, format!("{record:?}").into_bytes().into_boxed_slice())
                 .expect("typed Smith turn");
-            world.send(engine::Event::Turn {
+            world.send(engine::Event::Worker(engine::WorkerInput::Turn {
                 channel: Token::new(7),
                 task: assignment.task,
                 attempt: assignment.attempt,
                 turn,
-            });
+            }));
             for _ in 0..8 {
                 world.tick();
             }
         }
         let terminal =
             temper_engine_smith::result(smith_world::copy_answer(agent.answer()), change).expect("typed Smith result");
-        world.send(engine::Event::Answer {
+        world.send(engine::Event::Worker(engine::WorkerInput::Answer {
             pushed: Box::new([]),
             saved: None,
             channel: Token::new(7),
@@ -622,7 +631,7 @@ mod system_stories {
             attempt: assignment.attempt,
             cumulative: terminal.cumulative,
             end: terminal.end,
-        });
+        }));
         for _ in 0..30 {
             world.tick();
         }
@@ -639,13 +648,13 @@ mod system_stories {
             &input,
         )
         .expect("declared delegate shape");
-        world.send(engine::Event::Call {
+        world.send(engine::Event::Worker(engine::WorkerInput::Call {
             channel: Token::new(7),
             task: chat.task,
             attempt: chat.attempt,
             call: Token::new(93),
             body,
-        });
+        }));
         world.until(Until::Delegated);
         world.until(Until::SecondAssignment);
         let producer = world.assigned[1].clone();

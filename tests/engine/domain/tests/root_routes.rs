@@ -7,32 +7,32 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
-use std::collections::VecDeque;
-use temper_engine_domain::{Delivery, Key, Record, Write, engine};
-use temper_engine_domain_world::commits::Store;
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record, Write};
+use temper_engine_domain_world::store::Store;
 use temper_engine_domain_world::walking::{Settings, World, config, limits};
 use temper_engine_domain_world::walking_referee::{FINAL_SPEND, QUESTION, REPORT};
 
 use temper_engine_domain_world::direct::Driver;
 
 fn turn(driver: &mut Driver, assignment: &engine::Assignment, number: u32, cumulative: u64) {
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
         turn: engine::Turn { number, cumulative, read: None, transcript: b"step".as_slice().into() },
-    });
+    }));
 }
 
 #[test]
 fn a_watched_run_shows_each_turn_as_it_commits() {
     let (mut driver, assignment) = batch_fixture();
-    driver.send(engine::Event::Watch {
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
         watcher: Token::new(770),
         sign_in: driver.session(),
         key: [1; 16],
         subject: views::Subject::Run { task: Token::new(assignment.task), attempt: Token::new(assignment.attempt) },
-    });
+    }));
     assert!(driver.viewed.iter().any(|request| matches!(request,
         views::Request::Watching { watcher } if *watcher == Token::new(770)
     )));
@@ -40,7 +40,7 @@ fn a_watched_run_shows_each_turn_as_it_commits() {
         views::Request::Deliver { watcher, chunks, .. }
             if *watcher == Token::new(770) && matches!(&**chunks, [views::Chunk::Snapshot { .. }])
     )));
-    driver.send(engine::Event::ViewDelivered { watcher: Token::new(770), done: true });
+    driver.send(engine::Event::Party(engine::PartyInput::ViewDelivered { watcher: Token::new(770), done: true }));
     driver.viewed.clear();
     turn(&mut driver, &assignment, 1, 2);
     assert!(!driver.viewed.iter().any(|request| matches!(request,
@@ -57,7 +57,7 @@ fn a_watched_run_shows_each_turn_as_it_commits() {
                         && *attempt == Token::new(assignment.attempt)
                         && content.as_ref() == 1_u32.to_be_bytes())
     )));
-    driver.send(engine::Event::ViewDelivered { watcher: Token::new(770), done: true });
+    driver.send(engine::Event::Party(engine::PartyInput::ViewDelivered { watcher: Token::new(770), done: true }));
     driver.viewed.clear();
     turn(&mut driver, &assignment, 2, 4);
     driver.settle();
@@ -74,21 +74,36 @@ fn a_watch_key_replays_while_open_and_can_open_again_after_unwatch() {
     let (mut driver, assignment) = batch_fixture();
     let subject = views::Subject::Tree { task: Token::new(assignment.task) };
     let writes = driver.transactions.len();
-    driver.send(engine::Event::Watch { watcher: Token::new(780), sign_in: driver.session(), key: [28; 16], subject });
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
+        watcher: Token::new(780),
+        sign_in: driver.session(),
+        key: [28; 16],
+        subject,
+    }));
     assert!(driver.viewed.iter().any(|request| matches!(request,
         views::Request::Watching { watcher } if *watcher == Token::new(780)
     )));
     assert_eq!(driver.transactions.len(), writes, "opening the view writes no record");
 
     driver.viewed.clear();
-    driver.send(engine::Event::Watch { watcher: Token::new(781), sign_in: driver.session(), key: [28; 16], subject });
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
+        watcher: Token::new(781),
+        sign_in: driver.session(),
+        key: [28; 16],
+        subject,
+    }));
     assert_eq!(driver.viewed, [views::Request::Watching { watcher: Token::new(780) }]);
     assert_eq!(driver.transactions.len(), writes, "replay writes no record");
 
-    driver.send(engine::Event::Unwatch { watcher: Token::new(780) });
-    driver.send(engine::Event::ViewDelivered { watcher: Token::new(780), done: true });
+    driver.send(engine::Event::Party(engine::PartyInput::Unwatch { watcher: Token::new(780) }));
+    driver.send(engine::Event::Party(engine::PartyInput::ViewDelivered { watcher: Token::new(780), done: true }));
     driver.viewed.clear();
-    driver.send(engine::Event::Watch { watcher: Token::new(781), sign_in: driver.session(), key: [28; 16], subject });
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
+        watcher: Token::new(781),
+        sign_in: driver.session(),
+        key: [28; 16],
+        subject,
+    }));
     assert!(driver.viewed.iter().any(|request| matches!(request,
         views::Request::Watching { watcher } if *watcher == Token::new(781)
     )));
@@ -98,12 +113,12 @@ fn a_watch_key_replays_while_open_and_can_open_again_after_unwatch() {
 #[expect(clippy::wildcard_enum_match_arm, reason = "select the exact named tree snapshot")]
 fn a_task_tree_watch_carries_a_child_phase_after_its_commit() {
     let (mut driver, assignment) = batch_fixture_with(2, 2);
-    driver.send(engine::Event::Watch {
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
         watcher: Token::new(771),
         sign_in: driver.session(),
         key: [2; 16],
         subject: views::Subject::Tree { task: Token::new(assignment.task) },
-    });
+    }));
     let snapshot = driver
         .viewed
         .iter()
@@ -116,7 +131,7 @@ fn a_task_tree_watch_carries_a_child_phase_after_its_commit() {
         })
         .expect("task tree snapshot");
     assert_eq!(&snapshot[..8], &assignment.task.to_be_bytes());
-    driver.send(engine::Event::ViewDelivered { watcher: Token::new(771), done: true });
+    driver.send(engine::Event::Party(engine::PartyInput::ViewDelivered { watcher: Token::new(771), done: true }));
     driver.viewed.clear();
     let child = call_batch(&mut driver, &assignment, 772, Box::new([report_delegate(b"child", Box::new([]))]))[0];
     assert!(driver.viewed.iter().any(|request| matches!(request,
@@ -131,7 +146,7 @@ fn a_task_tree_watch_carries_a_child_phase_after_its_commit() {
 #[expect(clippy::wildcard_enum_match_arm, reason = "select the exact named goal snapshot and outcome")]
 fn a_project_goals_watch_shows_a_later_priority_change() {
     let (mut driver, _, _, maintainer_session, _, member_session) = people_roles_driver();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -139,14 +154,14 @@ fn a_project_goals_watch_shows_a_later_priority_change() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(773)),
         sign_in: member_session,
         key: [239; 16],
         ask: people::Ask::SetGoal { project: 1, spec: b"goal".as_slice().into(), charter: 1, budget: 20, priority: 1 },
-    });
+    }));
     driver.settle();
     let task = driver
         .delivered
@@ -158,12 +173,12 @@ fn a_project_goals_watch_shows_a_later_priority_change() {
             _ => None,
         })
         .expect("goal started");
-    driver.send(engine::Event::Watch {
+    driver.send(engine::Event::Party(engine::PartyInput::Watch {
         watcher: Token::new(774),
         sign_in: maintainer_session,
         key: [3; 16],
         subject: views::Subject::Goals { project: 1 },
-    });
+    }));
     let snapshot = driver
         .viewed
         .iter()
@@ -176,14 +191,14 @@ fn a_project_goals_watch_shows_a_later_priority_change() {
         })
         .expect("project goals snapshot");
     assert_eq!(&snapshot[..8], &task.to_be_bytes());
-    driver.send(engine::Event::ViewDelivered { watcher: Token::new(774), done: true });
+    driver.send(engine::Event::Party(engine::PartyInput::ViewDelivered { watcher: Token::new(774), done: true }));
     driver.viewed.clear();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(775)),
         sign_in: maintainer_session,
         key: [240; 16],
         ask: people::Ask::Prioritise { project: 1, goals: Box::new([(task, 7)]) },
-    });
+    }));
     driver.settle();
     assert!(driver.viewed.iter().any(|request| matches!(request,
         views::Request::Deliver { watcher, chunks, .. } if *watcher == Token::new(774)
@@ -231,14 +246,14 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
 }
 
 fn sign_in_person(driver: &mut Driver, user: u64, reply: u64) -> (u64, u64) {
-    driver.send(engine::Event::SignedIn {
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(reply)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: (user).to_be_bytes().into() },
             login: b"person".as_slice().into(),
             name: b"Person".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     (driver.store.header().people, driver.store.header().sign_ins)
 }
@@ -250,7 +265,7 @@ fn people_roles_driver() -> (Driver, u64, u64, u64, u64, u64) {
     let (owner, owner_session) = sign_in_person(&mut driver, 7, 2001);
     let (maintainer, maintainer_session) = sign_in_person(&mut driver, 8, 2002);
     let (member, member_session) = sign_in_person(&mut driver, 9, 2003);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2004)),
         sign_in: owner_session,
         key: [200; 16],
@@ -262,7 +277,7 @@ fn people_roles_driver() -> (Driver, u64, u64, u64, u64, u64) {
                 people::Holding { person: member, role: people::Role::Member },
             ]),
         },
-    });
+    }));
     driver.settle();
     (driver, owner_session, maintainer, maintainer_session, member, member_session)
 }
@@ -271,7 +286,7 @@ fn people_roles_driver() -> (Driver, u64, u64, u64, u64, u64) {
 fn a_member_starts_a_chat_and_an_observer_is_refused() {
     let (mut driver, owner_session, maintainer, _, member, member_session) = people_roles_driver();
     let (observer, observer_session) = sign_in_person(&mut driver, 11, 2030);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2031)),
         sign_in: owner_session,
         key: [207; 16],
@@ -284,25 +299,25 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
                 people::Holding { person: observer, role: people::Role::Observer },
             ]),
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2033)),
         sign_in: observer_session,
         key: [209; 16],
         ask: people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(
         delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Role)), .. }
     )));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2032)),
         sign_in: member_session,
         key: [208; 16],
         ask: people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
-    });
+    }));
     for _ in 0..20 {
         driver.advance(true);
         if driver.delivered.iter().any(|delivery| {
@@ -348,12 +363,12 @@ fn a_person_answers_a_numbered_question_from_their_task() {
             _ => None,
         })
         .expect("numbered question committed");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2036)),
         sign_in: driver.session(),
         key: [210; 16],
         ask: people::Ask::AnswerQuestion { project: 1, task: parent.task, question, words: b"yes".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::QuestionAnswered {
@@ -375,7 +390,7 @@ fn a_person_answers_a_numbered_question_from_their_task() {
 #[test]
 fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
     let (mut driver, _, _, maintainer_session, _, member_session) = people_roles_driver();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -383,10 +398,10 @@ fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     for index in 0..2 {
-        driver.send(engine::Event::Ask {
+        driver.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(2040 + index)),
             sign_in: member_session,
             key: [u8::try_from(211 + index).expect("small key"); 16],
@@ -397,7 +412,7 @@ fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
                 budget: 20,
                 priority: 1,
             },
-        });
+        }));
         driver.settle();
     }
     let goals: Vec<_> = driver
@@ -438,23 +453,23 @@ fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
         .collect();
     assert_eq!(goals.len(), 2);
     let priorities: Box<[(u64, u32)]> = Box::new([(goals[0], 4), (goals[1], 9)]);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2042)),
         sign_in: member_session,
         key: [213; 16],
         ask: people::Ask::Prioritise { project: 1, goals: priorities.clone() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(
         delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Role)), .. }
     )));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2043)),
         sign_in: maintainer_session,
         key: [214; 16],
         ask: people::Ask::Prioritise { project: 1, goals: priorities.clone() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(
         delivery,
@@ -473,7 +488,7 @@ fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
 #[test]
 fn a_person_amends_their_live_task_and_the_change_reaches_its_run() {
     let (mut driver, assignment) = batch_fixture();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2044)),
         sign_in: driver.session(),
         key: [215; 16],
@@ -492,7 +507,7 @@ fn a_person_amends_their_live_task_and_the_change_reaches_its_run() {
                 reason: b"new context".as_slice().into(),
             },
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Amended { task }), .. }
@@ -532,7 +547,7 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     chat(&mut driver, 46);
     driver.settle();
     let task = assigned(&driver).task;
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2046)),
         sign_in: driver.session(),
         key: [47; 16],
@@ -551,18 +566,18 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
                 reason: b"requester decides".as_slice().into(),
             },
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Amended { task: found }), .. }
             if *found == task
     )));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2047)),
         sign_in: driver.session(),
         key: [48; 16],
         ask: people::Ask::Cancel { project: 1, task, reason: b"requester closes".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Cancelled { task: found }), .. }
@@ -574,7 +589,7 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
 #[expect(clippy::wildcard_enum_match_arm, reason = "select the named proposal outcome")]
 fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
     let (mut driver, _, _, maintainer_session, _, member_session) = people_roles_driver();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -582,14 +597,14 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2045)),
         sign_in: member_session,
         key: [216; 16],
         ask: people::Ask::SetGoal { project: 1, spec: b"goal".as_slice().into(), charter: 1, budget: 50, priority: 1 },
-    });
+    }));
     driver.settle();
     let task = driver
         .delivered
@@ -601,7 +616,7 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
             _ => None,
         })
         .expect("goal committed");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2046)),
         sign_in: member_session,
         key: [217; 16],
@@ -624,7 +639,7 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
                 reason: b"more scope".as_slice().into(),
             },
         },
-    });
+    }));
     driver.settle();
     let proposal = driver
         .delivered
@@ -645,7 +660,7 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
         panic!("goal remains live")
     };
     assert_eq!(row.authority.budget.spend, 50);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2047)),
         sign_in: maintainer_session,
         key: [218; 16],
@@ -655,7 +670,7 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     assert!(
         driver.delivered.iter().any(|delivery| matches!(delivery,
@@ -680,7 +695,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
     let (mut driver, _, maintainer, maintainer_session, member, member_session) = people_roles_driver();
     hello(&mut driver);
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2010)),
         sign_in: member_session,
         key: [201; 16],
@@ -691,7 +706,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
             budget: 150,
             priority: 7,
         },
-    });
+    }));
     driver.settle();
     let proposal = driver
         .delivered
@@ -710,7 +725,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
             .values()
             .any(|row| matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(_)))))
     );
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2011)),
         sign_in: maintainer_session,
         key: [202; 16],
@@ -720,7 +735,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ProposalDecided {
@@ -744,7 +759,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
     hello(&mut driver);
     driver.settle();
     let (second, second_session) = sign_in_person(&mut driver, 10, 2020);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2021)),
         sign_in: owner_session,
         key: [203; 16],
@@ -757,9 +772,9 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
                 people::Holding { person: member, role: people::Role::Member },
             ]),
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2022)),
         sign_in: member_session,
         key: [204; 16],
@@ -770,7 +785,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
             budget: 150,
             priority: 3,
         },
-    });
+    }));
     driver.settle();
     let proposal = driver
         .delivered
@@ -782,7 +797,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
             _ => None,
         })
         .expect("member proposed goal");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2023)),
         sign_in: first_session,
         key: [205; 16],
@@ -792,10 +807,10 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     let before = driver.delivered.len();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2024)),
         sign_in: second_session,
         key: [206; 16],
@@ -805,7 +820,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
             proposal,
             decision: people::ProposalDecision::Reject { reason: b"too late".as_slice().into() },
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered[before..].iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ProposalDecided {
@@ -820,7 +835,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
 #[test]
 fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
     let mut driver = Driver::new(Store::new());
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -828,16 +843,16 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     driver.sign_in();
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(201)),
         sign_in: driver.session(),
         key: [8; 16],
         ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-    });
+    }));
     driver.pressure();
     assert!(!driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Assigned { .. })));
     driver.settle();
@@ -885,7 +900,7 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
         driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::AcknowledgeTurn { .. })).count(),
         2
     );
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -896,7 +911,7 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
             result: tasks::TaskResult::Report { words: REPORT.into() },
             cancel_delegates: false,
         },
-    });
+    }));
     driver.pressure();
     assert!(!driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Acknowledge { .. })));
     driver.settle();
@@ -937,7 +952,11 @@ fn restart_recovers_named_ended_result_without_replaying_a_raw_notice() {
     assert!(!driver.root.quiescent(), "cold startup has outstanding work");
     driver.settle();
     assert!(driver.delivered.is_empty(), "startup does not repeat any person or worker notice");
-    driver.send(engine::Event::ReadResult { reply_to: ReplyTo::new(Token::new(301)), sign_in: header.sign_ins, task });
+    driver.send(engine::Event::Party(engine::PartyInput::ReadResult {
+        reply_to: ReplyTo::new(Token::new(301)),
+        sign_in: header.sign_ins,
+        task,
+    }));
     assert!(!driver.root.quiescent(), "held result query is an obligation");
     driver.settle();
     assert_eq!(driver.store.header().messages, header.messages, "reading allocates no result position");
@@ -959,7 +978,11 @@ fn restart_recovers_named_ended_result_without_replaying_a_raw_notice() {
         ))),
         "read position commits before reply"
     );
-    driver.send(engine::Event::ReadResult { reply_to: ReplyTo::new(Token::new(302)), sign_in: header.sign_ins, task });
+    driver.send(engine::Event::Party(engine::PartyInput::ReadResult {
+        reply_to: ReplyTo::new(Token::new(302)),
+        sign_in: header.sign_ins,
+        task,
+    }));
     driver.settle();
     assert!(
         matches!(
@@ -971,11 +994,11 @@ fn restart_recovers_named_ended_result_without_replaying_a_raw_notice() {
     let rows = driver.store.rows.clone();
     let mut restarted = Driver::new(driver.store);
     restarted.settle();
-    restarted.send(engine::Event::ReadInbox {
+    restarted.send(engine::Event::Party(engine::PartyInput::ReadInbox {
         reply_to: ReplyTo::new(Token::new(303)),
         sign_in: header.sign_ins,
         most: 2,
-    });
+    }));
     restarted.settle();
     assert!(matches!(restarted.delivered.pop(), Some(Delivery::InboxPage { entries, .. }) if entries.is_empty()));
     assert_eq!(restarted.store.rows, rows, "read position survives restart");
@@ -1018,7 +1041,11 @@ fn unread_results_page_in_commit_order_across_restarts_with_bounded_loads() {
     let sign_in = header.sign_ins;
     let mut first = Driver::new(store);
     first.settle();
-    first.send(engine::Event::ReadResult { reply_to: ReplyTo::new(Token::new(939)), sign_in, task: 1 });
+    first.send(engine::Event::Party(engine::PartyInput::ReadResult {
+        reply_to: ReplyTo::new(Token::new(939)),
+        sign_in,
+        task: 1,
+    }));
     first.settle();
     assert!(
         matches!(
@@ -1028,7 +1055,11 @@ fn unread_results_page_in_commit_order_across_restarts_with_bounded_loads() {
         "a later named result cannot skip older unread results"
     );
     assert!(!first.store.rows.contains_key(&Key::Core(jig_core::Key::People(people::Key::ReadPosition(1)))));
-    first.send(engine::Event::ReadInbox { reply_to: ReplyTo::new(Token::new(940)), sign_in, most: 2 });
+    first.send(engine::Event::Party(engine::PartyInput::ReadInbox {
+        reply_to: ReplyTo::new(Token::new(940)),
+        sign_in,
+        most: 2,
+    }));
     first.settle();
     let Some(Delivery::InboxPage { entries, .. }) = first.delivered.pop() else { panic!("first page") };
     assert_eq!(entries.iter().map(|entry| (entry.task, entry.position)).collect::<Vec<_>>(), [(2, 1), (4, 2)]);
@@ -1039,11 +1070,19 @@ fn unread_results_page_in_commit_order_across_restarts_with_bounded_loads() {
     );
     let mut second = Driver::new(first.store);
     second.settle();
-    second.send(engine::Event::ReadInbox { reply_to: ReplyTo::new(Token::new(941)), sign_in, most: 2 });
+    second.send(engine::Event::Party(engine::PartyInput::ReadInbox {
+        reply_to: ReplyTo::new(Token::new(941)),
+        sign_in,
+        most: 2,
+    }));
     second.settle();
     let Some(Delivery::InboxPage { entries, .. }) = second.delivered.pop() else { panic!("second page") };
     assert_eq!(entries.iter().map(|entry| (entry.task, entry.position)).collect::<Vec<_>>(), [(1, 3), (3, 4)]);
-    second.send(engine::Event::ReadInbox { reply_to: ReplyTo::new(Token::new(942)), sign_in, most: 2 });
+    second.send(engine::Event::Party(engine::PartyInput::ReadInbox {
+        reply_to: ReplyTo::new(Token::new(942)),
+        sign_in,
+        most: 2,
+    }));
     second.settle();
     assert!(matches!(second.delivered.pop(), Some(Delivery::InboxPage { entries, .. }) if entries.is_empty()));
 }
@@ -1104,12 +1143,12 @@ fn a_full_inbox_pages_the_rest_from_the_store() {
             let Some(Delivery::InboxView { next, .. }) = driver.delivered.pop() else { panic!("prior page") };
             next
         };
-        driver.send(engine::Event::ViewInbox {
+        driver.send(engine::Event::Party(engine::PartyInput::ViewInbox {
             reply_to: ReplyTo::new(Token::new(950 + page as u64)),
             sign_in,
             most: 2,
             before,
-        });
+        }));
         driver.settle();
         let Some(Delivery::InboxView { entries, next, .. }) = driver.delivered.last() else {
             panic!("whole inbox page")
@@ -1142,18 +1181,18 @@ fn an_entry_addressed_to_a_role_leaves_every_inbox_once_one_acts() {
     driver.settle();
     driver.delivered.clear();
     for (at, sign_in) in sessions.into_iter().enumerate() {
-        driver.send(engine::Event::ViewInbox {
+        driver.send(engine::Event::Party(engine::PartyInput::ViewInbox {
             reply_to: ReplyTo::new(Token::new(960 + at as u64)),
             sign_in,
             most: 4,
             before: None,
-        });
+        }));
         driver.settle();
         let Some(Delivery::InboxView { entries, .. }) = driver.delivered.pop() else { panic!("role inbox") };
         assert!(entries.iter().any(|entry| matches!(entry,
             temper_engine_domain::InboxViewEntry::Waiting(people::Entry { task: found, kind: people::EntryKind::Escalation { .. }, .. }) if *found == task)));
     }
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(962)),
         sign_in: sessions[0],
         key: [96; 16],
@@ -1163,18 +1202,18 @@ fn an_entry_addressed_to_a_role_leaves_every_inbox_once_one_acts() {
             revision: 2,
             decision: people::EscalationDecision::Release,
         },
-    });
+    }));
     for _ in 0..50 {
         driver.advance(true);
     }
     driver.delivered.clear();
     for (at, sign_in) in sessions.into_iter().enumerate() {
-        driver.send(engine::Event::ViewInbox {
+        driver.send(engine::Event::Party(engine::PartyInput::ViewInbox {
             reply_to: ReplyTo::new(Token::new(963 + at as u64)),
             sign_in,
             most: 4,
             before: None,
-        });
+        }));
         for _ in 0..50 {
             driver.advance(true);
         }
@@ -1188,14 +1227,14 @@ fn an_entry_addressed_to_a_role_leaves_every_inbox_once_one_acts() {
 fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_another() {
     let (mut driver, root) = batch_fixture_custom(2, 1, 500, true, false, true);
     let first = driver.session();
-    driver.send(engine::Event::SignedIn {
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(970)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
             login: b"second".as_slice().into(),
             name: b"Second".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     let second = driver.store.header().sign_ins;
     let mut delegate = report_delegate(b"Choose between the reports", Box::new([]));
@@ -1208,23 +1247,23 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
     };
     let task = call_batch(&mut driver, &root, 971, Box::new([delegate]))[0];
     for (at, session) in [first, second].into_iter().enumerate() {
-        driver.send(engine::Event::ViewInbox {
+        driver.send(engine::Event::Party(engine::PartyInput::ViewInbox {
             reply_to: ReplyTo::new(Token::new(972 + at as u64)),
             sign_in: session,
             most: 4,
             before: None,
-        });
+        }));
         driver.settle();
         assert!(driver.delivered.iter().any(|item| matches!(item,
             Delivery::InboxView { entries, .. } if entries.iter().any(|entry| matches!(entry,
                 temper_engine_domain::InboxViewEntry::Waiting(people::Entry { task: found, kind: people::EntryKind::PersonTask, .. }) if *found == task)))));
     }
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(974)),
         sign_in: first,
         key: [74; 16],
         ask: people::Ask::TakePerson { project: 1, task },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::PersonTaken { task: found }), .. } if *found == task)));
@@ -1235,23 +1274,23 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
     };
     assert_eq!(row.taken_by, Some(1));
     for (at, session) in [first, second].into_iter().enumerate() {
-        driver.send(engine::Event::ViewInbox {
+        driver.send(engine::Event::Party(engine::PartyInput::ViewInbox {
             reply_to: ReplyTo::new(Token::new(978 + at as u64)),
             sign_in: session,
             most: 4,
             before: None,
-        });
+        }));
         driver.settle();
         let Some(Delivery::InboxView { entries, .. }) = driver.delivered.last() else { panic!("claimed inbox") };
         assert_eq!(entries.iter().any(|entry| matches!(entry,
             temper_engine_domain::InboxViewEntry::Waiting(people::Entry { task: found, kind: people::EntryKind::PersonTask, .. }) if *found == task)), at == 0);
     }
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(975)),
         sign_in: first,
         key: [75; 16],
         ask: people::Ask::HandBackPerson { project: 1, task },
-    });
+    }));
     driver.settle();
     let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) =
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(task))))
@@ -1259,14 +1298,14 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
         panic!("returned task")
     };
     assert_eq!(row.taken_by, None);
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(976)),
         sign_in: second,
         key: [76; 16],
         ask: people::Ask::TakePerson { project: 1, task },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(977)),
         sign_in: second,
         key: [77; 16],
@@ -1275,7 +1314,7 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
             task,
             result: people::PersonResult::Verdict { code: 2, words: b"second".as_slice().into() },
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::PersonAnswered { task: found }), .. } if *found == task)), "{:?}", driver.delivered);
@@ -1286,12 +1325,12 @@ fn a_person_task_addressed_to_a_role_taken_by_one_handed_back_answered_by_anothe
 fn a_person_stops_a_run_and_releases_it() {
     let (mut driver, assignment) = running_fixture();
     let session = driver.session();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(980)),
         sign_in: session,
         key: [80; 16],
         ask: people::Ask::Stop { project: 1, task: assignment.task },
-    });
+    }));
     for _ in 0..40 {
         driver.advance(true);
     }
@@ -1306,7 +1345,7 @@ fn a_person_stops_a_run_and_releases_it() {
         panic!("stopped task")
     };
     assert!(matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::StoppedBy { party: 1 }, .. }));
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: assignment.task,
@@ -1314,14 +1353,14 @@ fn a_person_stops_a_run_and_releases_it() {
         cumulative: 0,
         end: tasks::End::Parked,
         saved: None,
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(981)),
         sign_in: session,
         key: [81; 16],
         ask: people::Ask::Release { project: 1, task: assignment.task },
-    });
+    }));
     for _ in 0..40 {
         driver.advance(true);
     }
@@ -1331,7 +1370,7 @@ fn a_person_stops_a_run_and_releases_it() {
 }
 
 fn hello(driver: &mut Driver) {
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -1339,16 +1378,16 @@ fn hello(driver: &mut Driver) {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
 }
 
 fn chat(driver: &mut Driver, key: u8) {
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [key; 16],
         ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-    });
+    }));
 }
 
 fn assigned(driver: &Driver) -> engine::Assignment {
@@ -1419,7 +1458,11 @@ fn unavailable_account_retains_chat_until_its_real_refresh_terminal() {
             | accounts::Request::Closed { .. } => None,
         })
         .expect("real account refresh request");
-    driver.send(engine::Event::Refreshed { account, generation, valid: Duration::from_secs(60) });
+    driver.send(engine::Event::Account(jig_core_accounts::Event::Refreshed {
+        account,
+        generation,
+        valid: Duration::from_secs(60),
+    }));
     driver.settle();
     assert_eq!(assigned(&driver).grant.generation, generation);
     assert_eq!(driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::Assigned { .. })).count(), 1);
@@ -1434,7 +1477,7 @@ fn repeated_unknown_losses_under_commit_pressure_consume_no_callback_room() {
     driver.sign_in();
     assert_eq!(driver.store.pending.len(), 3);
     for channel in 1000..5000 {
-        driver.send(engine::Event::Lost { channel: Token::new(channel) });
+        driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(channel) }));
     }
     assert_eq!(driver.store.pending.len(), 3);
     driver.settle();
@@ -1451,7 +1494,7 @@ fn refused_terminal_clears_fleet_handoff_without_charging_rejected_spend() {
     chat(&mut driver, 10);
     driver.settle();
     let assignment = assigned(&driver);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -1462,7 +1505,7 @@ fn refused_terminal_clears_fleet_handoff_without_charging_rejected_spend() {
             result: tasks::TaskResult::Report { words: vec![b'x'; 129].into_boxed_slice() },
             cancel_delegates: false,
         },
-    });
+    }));
     driver.settle();
     assert_eq!(driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::Acknowledge { .. })).count(), 1);
     let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task)))) = driver
@@ -1614,7 +1657,7 @@ fn root_configuration_refuses_a_decoded_page_larger_than_synchronous_route_room(
 #[test]
 fn an_early_worker_hello_does_not_number_a_commit_before_the_durable_header() {
     let mut driver = Driver::configured(Store::new(), config(98), &limits());
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -1622,7 +1665,7 @@ fn an_early_worker_hello_does_not_number_a_commit_before_the_durable_header() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     assert!(driver.transactions.is_empty(), "the cold load must precede commit numbering");
     assert!(driver.delivered.is_empty(), "the core accepts a valid early worker");
     driver.settle();
@@ -1636,7 +1679,7 @@ fn maximum_cold_hello_batch_and_duplicate_losses_fit_one_startup_decision() {
     limits.fleet.workers = 4;
     let mut driver = Driver::configured(Store::new(), config(97), &limits);
     for channel in 1..=4 {
-        driver.send(engine::Event::Hello {
+        driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
             channel: Token::new(channel),
             hello: fleet::Hello {
                 stop_bound: Duration::from_secs(5),
@@ -1644,11 +1687,11 @@ fn maximum_cold_hello_batch_and_duplicate_losses_fit_one_startup_decision() {
                 workstreams: Box::new([]),
                 hosting: Box::new([]),
             },
-        });
-        driver.send(engine::Event::Lost { channel: Token::new(channel) });
-        driver.send(engine::Event::Lost { channel: Token::new(channel) });
+        }));
+        driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(channel) }));
+        driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(channel) }));
     }
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(1),
         hello: fleet::Hello {
             stop_bound: limits.fleet.grace,
@@ -1656,7 +1699,7 @@ fn maximum_cold_hello_batch_and_duplicate_losses_fit_one_startup_decision() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     assert_eq!(driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::Refuse { .. })).count(), 5);
     assert!(!driver.stopped);
@@ -1708,7 +1751,11 @@ fn authenticated_result_query_refuses_monotonic_expiry_after_backward_wall_jump_
     driver.settle();
     driver.env.now = Time::from_nanos(driver.env.limits.people.sign_in_lifetime.as_nanos() * 2);
     driver.env.wall = Wall::EPOCH;
-    driver.send(engine::Event::ReadResult { reply_to: ReplyTo::new(Token::new(901)), sign_in: header.sign_ins, task });
+    driver.send(engine::Event::Party(engine::PartyInput::ReadResult {
+        reply_to: ReplyTo::new(Token::new(901)),
+        sign_in: header.sign_ins,
+        task,
+    }));
     driver.settle();
     assert!(matches!(
         driver.delivered.as_slice(),
@@ -1737,13 +1784,13 @@ fn running_fixture() -> (Driver, engine::Assignment) {
 }
 
 fn unavailable_call(driver: &mut Driver, assignment: &engine::Assignment, call: u64) {
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
         call: Token::new(call),
         body: engine::Call { completion: 2, position: 0, tool: engine::Tool::Unavailable },
-    });
+    }));
 }
 
 fn delegate_fixture() -> (Driver, engine::Assignment) {
@@ -1878,7 +1925,7 @@ fn batch_fixture_custom(
     configuration.chat_authority.delegation.tasks = 3;
     configuration.chat_authority.delegation.depth = depth;
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -1886,7 +1933,7 @@ fn batch_fixture_custom(
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     driver.sign_in();
     driver.settle();
@@ -2043,7 +2090,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
     assert!(matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Notes(notes::Key::Entry { name }))),
         Some(Record::Core(jig_core::Record::Notes(notes::Record::Entry(entry)))) if entry.body.as_ref() == b"first body"
     ));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(3102)),
         sign_in: driver.session(),
         key: [31; 16],
@@ -2058,7 +2105,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
                 recalled: 1,
             }),
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { to, reply: people::Reply::Outcome(people::Outcome::NoteEdited { name: found }), .. }
@@ -2073,7 +2120,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
                 && entries[0].body.as_ref() == b"second body"
     )));
     let mut restarted = Driver::configured(driver.store, note_config(), &limits());
-    restarted.send(engine::Event::Hello {
+    restarted.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -2085,7 +2132,7 @@ fn a_note_written_corrected_by_a_person_and_recalled_is_durable() {
                 phase: fleet::Phase::Active,
             }]),
         },
-    });
+    }));
     restarted.settle();
     tool_call(
         &mut restarted,
@@ -2143,7 +2190,7 @@ fn a_person_deletes_a_note_only_in_its_authorized_scope_and_after_commit() {
         (3111, people::NoteScope::Deployment, people::Outcome::Refused(people::Refusal::NoteMoved)),
         (3112, people::NoteScope::Project, people::Outcome::NoteEdited { name }),
     ] {
-        driver.send(engine::Event::Ask {
+        driver.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(request)),
             sign_in: driver.session(),
             key: [u8::try_from(request - 3000).expect("small request"); 16],
@@ -2153,7 +2200,7 @@ fn a_person_deletes_a_note_only_in_its_authorized_scope_and_after_commit() {
                 scope: Box::new(scope),
                 change: Box::new(people::NoteChange::Delete { recalled: 1 }),
             },
-        });
+        }));
         for _ in 0..10 {
             driver.advance(false);
         }
@@ -2186,7 +2233,7 @@ fn a_pending_note_reserves_its_named_answer_until_the_store_returns() {
     chat(&mut driver, 12);
     driver.settle();
     let assignment = assigned(&driver);
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
@@ -2196,14 +2243,14 @@ fn a_pending_note_reserves_its_named_answer_until_the_store_returns() {
             position: 3120,
             tool: engine::Tool::Recall { by: notes::Recall::Name { name: 99 }, page: 0 },
         },
-    });
-    driver.send(engine::Event::Call {
+    }));
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
         call: Token::new(3121),
         body: engine::Call { completion: 1, position: 3121, tool: engine::Tool::Unavailable },
-    });
+    }));
     assert_eq!(driver.call_busy, [Token::new(3121)]);
     driver.settle();
     assert_eq!(driver.store.header().calls, 1);
@@ -2239,7 +2286,7 @@ fn call_batch(
     call: u64,
     batch: Box<[engine::Delegate]>,
 ) -> Box<[u64]> {
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
@@ -2249,7 +2296,7 @@ fn call_batch(
             position: u32::try_from(call).expect("small call"),
             tool: engine::Tool::Delegate { batch },
         },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -2280,13 +2327,13 @@ fn assigned_task(driver: &Driver, task: u64) -> engine::Assignment {
 }
 
 fn tool_call(driver: &mut Driver, source: &engine::Assignment, call: u64, tool: engine::Tool) {
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: source.task,
         attempt: source.attempt,
         call: Token::new(call),
         body: engine::Call { completion: 1, position: u32::try_from(call).expect("small call"), tool },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -2331,7 +2378,7 @@ fn a_proposal_reaches_its_covering_task_and_is_accepted() {
                     kind: tasks::ProposalKind::Batch,
                 }
     )));
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
@@ -2341,7 +2388,7 @@ fn a_proposal_reaches_its_covering_task_and_is_accepted() {
             read: Some(proposal),
             transcript: b"consider proposal".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(
         item,
@@ -2400,7 +2447,7 @@ fn a_chats_goal_accepted_as_its_persons_outlives_the_chat() {
     assert!(
         matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))), Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) if matches!(&row.proposal, Some(p) if matches!(p.state, tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Person(found), .. } if found == person)))
     );
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(406)),
         sign_in: driver.session(),
         key: [66; 16],
@@ -2410,7 +2457,7 @@ fn a_chats_goal_accepted_as_its_persons_outlives_the_chat() {
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item, Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ProposalDecided { proposer, proposal: found, choice: people::ProposalChoice::Accepted, .. }), .. } if *proposer == child && *found == proposal)));
     let goal_number = driver
@@ -2446,13 +2493,13 @@ fn a_proposal_routed_past_a_procedure_to_a_person_is_accepted() {
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::Procedure { task, step: 1, connector: 1, code: 1 } if *task == parent
     )));
-    driver.send(engine::Event::ProcedureStep {
+    driver.send(engine::Event::Party(engine::PartyInput::ProcedureStep {
         task: parent,
         step: 1,
         connector: 1,
         code: 1,
         action: engine::ProcedureAction::Delegate(Box::new([report_delegate(b"child", Box::new([]))])),
-    });
+    }));
     driver.settle();
     let child = driver
         .store
@@ -2501,7 +2548,7 @@ fn a_proposal_routed_past_a_procedure_to_a_person_is_accepted() {
             } if found == person)
         )
     ));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(603)),
         sign_in: driver.session(),
         key: [67; 16],
@@ -2511,7 +2558,7 @@ fn a_proposal_routed_past_a_procedure_to_a_person_is_accepted() {
             proposal,
             decision: people::ProposalDecision::Accept,
         },
-    });
+    }));
     driver.settle();
     assert!(
         driver.delivered.iter().any(|item| matches!(item,
@@ -2550,7 +2597,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
     authority.delegation.tasks = 2;
     authority.delegation.depth = 1;
     authority.budget.spend = 30;
-    driver.send(engine::Event::StartRecurring {
+    driver.send(engine::Event::Party(engine::PartyInput::StartRecurring {
         project: 1,
         authority,
         template: tasks::RecurringTemplate {
@@ -2558,7 +2605,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
             batch: Box::new([member]),
             overlap: tasks::RecurringOverlap::Skip,
         },
-    });
+    }));
     driver.settle();
     let master = driver
         .store
@@ -2590,7 +2637,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
         }
     ));
     let run = assigned_task(&driver, child);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -2601,9 +2648,9 @@ fn a_recurring_procedure_uses_the_root_period_route() {
             result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
             cancel_delegates: false,
         },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Period { project: 1, period: 2, budget: 1_000 });
+    driver.send(engine::Event::Party(engine::PartyInput::Period { project: 1, period: 2, budget: 1_000 }));
     driver.settle();
     let next = driver
         .store
@@ -2835,7 +2882,7 @@ fn a_narrowing_stops_the_old_run_and_offers_the_amendment_to_the_next() {
     );
     assert!(driver.delivered.iter().any(|item| matches!(item, Delivery::Cancel { task, attempt, .. }
         if *task == child && *attempt == first.attempt)));
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -2843,7 +2890,7 @@ fn a_narrowing_stops_the_old_run_and_offers_the_amendment_to_the_next() {
         attempt: first.attempt,
         cumulative: 0,
         end: tasks::End::Parked,
-    });
+    }));
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert_eq!(second.task, child);
@@ -2892,7 +2939,7 @@ fn a_cancel_closes_three_levels_with_runs_live_deepest_first() {
         Delivery::CallAnswer { call, answer: temper_engine_domain::CallAnswer::Controlled, .. }
             if *call == Token::new(92))));
     for run in [&grandchild_run, &child_run] {
-        driver.send(engine::Event::Answer {
+        driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
             pushed: Box::new([]),
             saved: None,
             channel: Token::new(7),
@@ -2900,7 +2947,7 @@ fn a_cancel_closes_three_levels_with_runs_live_deepest_first() {
             attempt: run.attempt,
             cumulative: 0,
             end: tasks::End::Parked,
-        });
+        }));
         driver.settle();
     }
     let endings: Vec<_> = driver
@@ -2925,7 +2972,7 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
     let (mut driver, parent) = batch_fixture_with(2, 1);
     let child = call_batch(&mut driver, &parent, 90, Box::new([report_delegate(b"child", Box::new([]))]))[0];
     let first = assigned_task(&driver, child);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -2933,7 +2980,7 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
         attempt: first.attempt,
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Run),
-    });
+    }));
     driver.settle();
     driver.env.now = Time::from_nanos(Duration::from_secs(2).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(2).as_nanos());
@@ -2943,7 +2990,7 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert_eq!(second.task, child);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -2951,7 +2998,7 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
         attempt: second.attempt,
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Run),
-    });
+    }));
     driver.settle();
     tool_call(&mut driver, &parent, 91, engine::Tool::Release { target: child });
     assert!(driver.delivered.iter().any(|item| matches!(item,
@@ -3064,7 +3111,7 @@ fn task_subscriptions_are_named_by_the_root_and_unsubscribe_removes_them() {
 }
 
 fn park_task(driver: &mut Driver, assignment: &engine::Assignment) {
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3072,14 +3119,14 @@ fn park_task(driver: &mut Driver, assignment: &engine::Assignment) {
         attempt: assignment.attempt,
         cumulative: 0,
         end: tasks::End::Parked,
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
 }
 
 fn finish_task(driver: &mut Driver, assignment: &engine::Assignment, result: tasks::TaskResult) {
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3087,7 +3134,7 @@ fn finish_task(driver: &mut Driver, assignment: &engine::Assignment, result: tas
         attempt: assignment.attempt,
         cumulative: 0,
         end: tasks::End::Finished { result, cancel_delegates: false },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3105,7 +3152,7 @@ fn a_delegate_batch_and_its_named_answer_commit_together() {
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
     };
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
@@ -3129,7 +3176,7 @@ fn a_delegate_batch_and_its_named_answer_commit_together() {
                 }]),
             },
         },
-    });
+    }));
     assert!(
         !driver
             .delivered
@@ -3174,7 +3221,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
     };
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
@@ -3198,7 +3245,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
                 }]),
             },
         },
-    });
+    }));
     for _ in 0..20 {
         driver.advance(true);
     }
@@ -3214,7 +3261,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
             _ => None,
         })
         .expect("one child was made");
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3222,7 +3269,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
         attempt: parent.attempt,
         cumulative: 0,
         end: tasks::End::Parked,
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3234,7 +3281,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
             _ => None,
         })
         .expect("child starts after parent parks");
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3245,7 +3292,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
             result: tasks::TaskResult::Report { words: b"spike complete".as_slice().into() },
             cancel_delegates: false,
         },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3316,7 +3363,7 @@ fn a_batch_beyond_authority_is_refused_whole() {
     let allowed = report_delegate(b"small", Box::new([]));
     let mut excessive = report_delegate(b"large", Box::new([]));
     excessive.authority.budget.spend = 200;
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
@@ -3326,7 +3373,7 @@ fn a_batch_beyond_authority_is_refused_whole() {
             position: 111,
             tool: engine::Tool::Delegate { batch: Box::new([allowed, excessive]) },
         },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3404,13 +3451,13 @@ fn a_missing_historical_input_refuses_the_whole_batch() {
     let (mut driver, parent) = batch_fixture();
     let mut member = report_delegate(b"use missing", Box::new([]));
     member.spec.inputs = Box::new([999]);
-    driver.send(engine::Event::Call {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Call {
         channel: Token::new(7),
         task: parent.task,
         attempt: parent.attempt,
         call: Token::new(115),
         body: engine::Call { completion: 1, position: 115, tool: engine::Tool::Delegate { batch: Box::new([member]) } },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3453,7 +3500,7 @@ fn a_call_asked_twice_across_a_restart_is_decided_once() {
     )));
 
     let mut restarted = Driver::new(driver.store);
-    restarted.send(engine::Event::Hello {
+    restarted.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -3465,7 +3512,7 @@ fn a_call_asked_twice_across_a_restart_is_decided_once() {
                 phase: fleet::Phase::Active,
             }]),
         },
-    });
+    }));
     restarted.settle();
     unavailable_call(&mut restarted, &assignment, 72);
     restarted.settle();
@@ -3482,7 +3529,7 @@ fn a_lost_attempt_is_told_of_the_calls_committed_after_its_last_turn() {
     let (mut driver, first) = running_fixture();
     unavailable_call(&mut driver, &first, 81);
     driver.settle();
-    driver.send(engine::Event::Lost { channel: Token::new(7) });
+    driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(7) }));
     driver.env.now = Time::from_nanos(Duration::from_secs(6).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(6).as_nanos());
     engine::fire(&mut driver.root, &driver.env);
@@ -3494,7 +3541,7 @@ fn a_lost_attempt_is_told_of_the_calls_committed_after_its_last_turn() {
     engine::fire(&mut driver.root, &driver.env);
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(8),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -3502,7 +3549,7 @@ fn a_lost_attempt_is_told_of_the_calls_committed_after_its_last_turn() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert!(second.attempt > first.attempt);
@@ -3677,7 +3724,7 @@ fn bounded_invalid_typed_terminal_preserves_original_root_evidence_and_charges_o
         result: tasks::TaskResult::Verdict { code: 99, words: b"invalid contract".as_slice().into() },
         cancel_delegates: false,
     };
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3685,7 +3732,7 @@ fn bounded_invalid_typed_terminal_preserves_original_root_evidence_and_charges_o
         attempt: assignment.attempt,
         cumulative: 8,
         end: end.clone(),
-    });
+    }));
     driver.settle();
     let key = temper_engine_domain::Key::Core(jig_core::Key::Core(jig_core::CoreKey::Terminal {
         task: assignment.task,
@@ -3713,7 +3760,7 @@ fn bounded_invalid_typed_terminal_preserves_original_root_evidence_and_charges_o
     assert_eq!(task.numbers.spent, 8);
     assert_eq!(task.tries.invalid, 1);
     let rows = driver.store.rows.clone();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -3721,7 +3768,7 @@ fn bounded_invalid_typed_terminal_preserves_original_root_evidence_and_charges_o
         attempt: assignment.attempt,
         cumulative: 8,
         end,
-    });
+    }));
     driver.settle();
     assert_eq!(driver.store.rows, rows, "fenced duplicate never reaches child priced admission");
 }
@@ -3755,7 +3802,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
     let session = driver.store.header().sign_ins;
     driver.delivered.clear();
     driver.fail_archive_once = true;
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(900)),
         sign_in: session,
         key: [9; 16],
@@ -3765,7 +3812,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
             revision: archive.revision,
             decision: people::EscalationDecision::Release,
         },
-    });
+    }));
     driver.settle();
     assert!(!driver.stopped);
     assert!(driver.root.quiescent());
@@ -3776,7 +3823,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy)), .. }
     ));
     driver.delivered.clear();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(901)),
         sign_in: session,
         key: [9; 16],
@@ -3786,7 +3833,7 @@ fn failed_named_escalation_history_read_closes_once_and_same_key_retries() {
             revision: archive.revision,
             decision: people::EscalationDecision::Release,
         },
-    });
+    }));
     driver.settle();
     assert_eq!(driver.delivered.len(), 1);
     assert!(
@@ -3801,7 +3848,10 @@ fn held_waiting_store() -> Store {
     for _ in 0..300 {
         world.iterate();
         if world.store.rows.values().any(|row| matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task))) if matches!(task.escalation, tasks::Escalation::Waiting { .. }))) {
-            return Store { applied: world.store.applied, rows: world.store.rows.clone(), pending: VecDeque::new() };
+            let mut snapshot = Store::new();
+            snapshot.applied = world.store.applied;
+            snapshot.rows = world.store.rows.clone();
+            return snapshot;
         }
     }
     panic!("actual failure never committed Waiting");
@@ -3843,7 +3893,7 @@ fn release_rejudges_a_still_expired_deadline_and_escalates_the_new_hold() {
     driver.settle();
     driver.env.wall = Wall::from_nanos(1);
     driver.delivered.clear();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(990)),
         sign_in,
         key: [90; 16],
@@ -3853,7 +3903,7 @@ fn release_rejudges_a_still_expired_deadline_and_escalates_the_new_hold() {
             revision: 1,
             decision: people::EscalationDecision::Release,
         },
-    });
+    }));
     driver.settle();
     assert!(
         driver.delivered.iter().any(|delivery| matches!(
@@ -3977,28 +4027,32 @@ fn rejected_restore_stays_rejected_and_current_read_checks_privacy_and_both_expi
     assert_eq!(driver.store.rows, before, "rejection never reopens or reroutes at startup");
     let owner_session = 1;
     driver.delivered.clear();
-    driver.send(engine::Event::ReadEscalation {
+    driver.send(engine::Event::Party(engine::PartyInput::ReadEscalation {
         reply_to: ReplyTo::new(Token::new(910)),
         sign_in: owner_session,
         task,
-    });
+    }));
     driver.settle();
     assert!(
         matches!(&driver.delivered[..], [Delivery::EscalationReply { context, .. }] if matches!(context.escalation, tasks::Escalation::Rejected { .. }))
     );
     driver.delivered.clear();
-    driver.send(engine::Event::SignedIn {
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(911)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 9_u64.to_be_bytes().into() },
             login: b"outsider".as_slice().into(),
             name: b"Outsider".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     let outsider = driver.session();
     driver.delivered.clear();
-    driver.send(engine::Event::ReadEscalation { reply_to: ReplyTo::new(Token::new(912)), sign_in: outsider, task });
+    driver.send(engine::Event::Party(engine::PartyInput::ReadEscalation {
+        reply_to: ReplyTo::new(Token::new(912)),
+        sign_in: outsider,
+        task,
+    }));
     driver.settle();
     assert!(matches!(
         &driver.delivered[..],
@@ -4007,11 +4061,11 @@ fn rejected_restore_stays_rejected_and_current_read_checks_privacy_and_both_expi
     driver.delivered.clear();
     driver.env.now = Time::from_nanos(Duration::from_secs(61).as_nanos());
     driver.env.wall = Wall::EPOCH;
-    driver.send(engine::Event::ReadEscalation {
+    driver.send(engine::Event::Party(engine::PartyInput::ReadEscalation {
         reply_to: ReplyTo::new(Token::new(913)),
         sign_in: owner_session,
         task,
-    });
+    }));
     assert!(
         matches!(
             &driver.delivered[..],
@@ -4059,7 +4113,7 @@ fn coalesced_history_waiters_survive_simultaneous_io_completion_under_full_journ
     driver.settle();
     for key in 9_u8..11 {
         for waiter in 0_u64..8 {
-            driver.send(engine::Event::Ask {
+            driver.send(engine::Event::Party(engine::PartyInput::Ask {
                 reply_to: ReplyTo::new(Token::new(950 + u64::from(key - 9) * 8 + waiter)),
                 sign_in: session,
                 key: [key; 16],
@@ -4069,11 +4123,16 @@ fn coalesced_history_waiters_survive_simultaneous_io_completion_under_full_journ
                     revision: archive.revision,
                     decision: people::EscalationDecision::Release,
                 },
-            });
+            }));
         }
     }
     for _ in 0..40 {
-        if driver.events.len() == 2 && driver.events.iter().all(|event| matches!(event, engine::Event::Loaded { .. })) {
+        if driver.events.len() == 2
+            && driver
+                .events
+                .iter()
+                .all(|event| matches!(event, engine::Event::Store(engine::StoreInput::Loaded { .. })))
+        {
             break;
         }
         if let Some(index) = driver.events.iter().position(|event| matches!(event, engine::Event::Released(_))) {
@@ -4152,7 +4211,7 @@ fn coalesced_history_waiters_survive_simultaneous_io_completion_under_full_journ
 fn restored_unreported_claim_spends_no_try_without_committed_work() {
     for kept_turn in [false, true] {
         let mut original = Driver::new(Store::new());
-        original.send(engine::Event::Hello {
+        original.send(engine::Event::Worker(engine::WorkerInput::Hello {
             channel: Token::new(7),
             hello: fleet::Hello {
                 stop_bound: Duration::from_secs(1),
@@ -4160,16 +4219,16 @@ fn restored_unreported_claim_spends_no_try_without_committed_work() {
                 workstreams: Box::new([]),
                 hosting: Box::new([]),
             },
-        });
+        }));
         original.settle();
         original.sign_in();
         original.settle();
-        original.send(engine::Event::Ask {
+        original.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(501)),
             sign_in: original.session(),
             key: [18; 16],
             ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-        });
+        }));
         original.settle();
         let assignment = original
             .delivered
@@ -4272,12 +4331,12 @@ fn an_owner_makes_a_service_once_and_the_service_cannot_start_a_chat() {
     driver.settle();
     let owner_session = driver.session();
     let ask = people::Ask::MakeService { project: 1, name: b"builder".as_slice().into(), role: people::Role::Owner };
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9502)),
         sign_in: owner_session,
         key: [95; 16],
         ask: ask.clone(),
-    });
+    }));
     driver.settle();
     let service = driver
         .delivered
@@ -4300,26 +4359,26 @@ fn an_owner_makes_a_service_once_and_the_service_cannot_start_a_chat() {
     let created = driver.store.header().people;
     let mut restarted = Driver::configured(driver.store, administration_config(9501), &limits());
     restarted.settle();
-    restarted.send(engine::Event::Ask {
+    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9503)),
         sign_in: owner_session,
         key: [95; 16],
         ask,
-    });
+    }));
     restarted.settle();
     assert_eq!(restarted.store.header().people, created);
     assert!(restarted.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ServiceMade { person }), .. }
             if *person == service
     )));
-    restarted.send(engine::Event::SignedIn {
+    restarted.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(9504)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 1, subject: service.to_be_bytes().into() },
             login: Box::new([]),
             name: b"builder".as_slice().into(),
         },
-    });
+    }));
     restarted.settle();
     let service_session = restarted
         .delivered
@@ -4335,12 +4394,12 @@ fn an_owner_makes_a_service_once_and_the_service_cannot_start_a_chat() {
             }
         })
         .expect("service sign-in uses its existing party");
-    restarted.send(engine::Event::Ask {
+    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9505)),
         sign_in: service_session,
         key: [96; 16],
         ask: people::Ask::StartChat { project: 1, words: Box::new([]) },
-    });
+    }));
     restarted.settle();
     assert!(restarted.delivered.iter().any(|delivery| matches!(
         delivery,
@@ -4357,12 +4416,12 @@ fn a_policy_change_applies_to_later_decisions_only() {
     driver.sign_in();
     driver.settle();
     let session = driver.session();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9402)),
         sign_in: session,
         key: [41; 16],
         ask: people::Ask::StartChat { project: 1, words: b"first".as_slice().into() },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -4392,7 +4451,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
             | Record::Forge { .. } => None,
         })
         .expect("first chat is durable");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9403)),
         sign_in: session,
         key: [42; 16],
@@ -4418,7 +4477,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
                 decides: authority::Proposals::ALL.0,
             }),
         },
-    });
+    }));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -4437,12 +4496,12 @@ fn a_policy_change_applies_to_later_decisions_only() {
     for _ in 0..30 {
         restarted.advance(true);
     }
-    restarted.send(engine::Event::Ask {
+    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9404)),
         sign_in: session,
         key: [43; 16],
         ask: people::Ask::StartChat { project: 1, words: b"later".as_slice().into() },
-    });
+    }));
     for _ in 0..30 {
         restarted.advance(true);
     }
@@ -4464,7 +4523,7 @@ fn a_policy_change_beyond_the_deployments_rules_is_refused() {
     driver.settle();
     driver.sign_in();
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9412)),
         sign_in: driver.session(),
         key: [44; 16],
@@ -4472,7 +4531,7 @@ fn a_policy_change_beyond_the_deployments_rules_is_refused() {
             project: 1,
             change: people::PolicyChange::ProjectSpend { period_spend: 1001 },
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(
         delivery,
@@ -4488,23 +4547,23 @@ fn a_policy_change_survives_a_restart() {
     driver.sign_in();
     driver.settle();
     let session = driver.session();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9414)),
         sign_in: session,
         key: [45; 16],
         ask: people::Ask::ChangePolicy { project: 1, change: people::PolicyChange::ProjectSpend { period_spend: 800 } },
-    });
+    }));
     driver.settle();
     assert!(matches!(driver.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Policy(1)))),
         Some(Record::Core(jig_core::Record::People(people::Stored::Policy { value, .. }))) if value.period_spend == 800));
     let mut restarted = Driver::configured(driver.store, administration_config(9413), &limits());
     restarted.settle();
-    restarted.send(engine::Event::Ask {
+    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9415)),
         sign_in: session,
         key: [46; 16],
         ask: people::Ask::StartChat { project: 1, words: b"later".as_slice().into() },
-    });
+    }));
     restarted.settle();
     assert!(restarted.delivered.iter().any(|delivery| matches!(
         delivery,
@@ -4521,26 +4580,31 @@ fn an_owner_changes_a_pool_once_with_a_key() {
     let session = driver.session();
     let person = driver.store.header().people;
     let ask = people::Ask::SetPool { project: 1, person, budget: 300 };
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9412)),
         sign_in: session,
         key: [44; 16],
         ask: ask.clone(),
-    });
+    }));
     driver.settle();
     let pool = tasks::Funder::Pool { project: 1, person, period: 1 };
     assert!(matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(pool)))),
         Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ledger(row)))) if row.numbers.budget == 300));
     let before = driver.transactions.len();
-    driver.send(engine::Event::Ask { reply_to: ReplyTo::new(Token::new(9413)), sign_in: session, key: [44; 16], ask });
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(9413)),
+        sign_in: session,
+        key: [44; 16],
+        ask,
+    }));
     driver.settle();
     assert_eq!(driver.transactions.len(), before, "saved answer does not carve again");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9414)),
         sign_in: session,
         key: [45; 16],
         ask: people::Ask::SetPool { project: 1, person, budget: 250 },
-    });
+    }));
     driver.settle();
     let period = tasks::Funder::Period { project: 1, period: 1 };
     assert!(matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(pool)))),
@@ -4572,15 +4636,15 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
     driver.settle();
     hello(&mut driver);
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1200)),
         sign_in: sessions[0],
         key: [120; 16],
         ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-    });
+    }));
     driver.settle();
     let assignment = assigned(&driver);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -4588,7 +4652,7 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
         attempt: assignment.attempt,
         cumulative: 3,
         end: tasks::End::Failed(tasks::Class::Run),
-    });
+    }));
     driver.settle();
     let original: Vec<_> = driver
         .store
@@ -4641,12 +4705,12 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
     driver.sign_in();
     driver.sign_in();
     assert_eq!(driver.store.pending.len(), 3, "real issued journal pressure");
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1201)),
         sign_in: sessions[1],
         key: [121; 16],
         ask: ask.clone(),
-    });
+    }));
     assert!(matches!(
         driver.delivered.last(),
         Some(Delivery::WebReply { reply: people::Reply::Refused(people::Refusal::Busy), .. })
@@ -4658,12 +4722,12 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
     })));
     assert!(!driver.store.rows.contains_key(&answer_key), "pressure remains retryable");
     driver.delivered.clear();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1202)),
         sign_in: sessions[1],
         key: [121; 16],
         ask,
-    });
+    }));
     assert!(driver.delivered.is_empty(), "no role success before durability");
     let (_, writes) = driver.store.pending.front().expect("one serialized role decision");
     assert!(writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_core::Record::People(people::Stored::Roles { holdings, .. }))) if holdings.as_ref() == [people::Holding { person: people[1], role: people::Role::Owner }])));
@@ -4740,7 +4804,7 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
     expected_header.commits = expected_header.commits.checked_add(1).expect("one saved refusal commit");
     let unchanged = overflow.store.rows.clone();
     overflow.delivered.clear();
-    overflow.send(engine::Event::Ask {
+    overflow.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1203)),
         sign_in: sessions[1],
         key: [122; 16],
@@ -4748,7 +4812,7 @@ fn multiple_waiting_recipients_preflight_together_and_full_journal_refuses_witho
             project: 1,
             holdings: Box::new([people::Holding { person: people[1], role: people::Role::Owner }]),
         },
-    });
+    }));
     overflow.settle();
     assert!(matches!(
         overflow.delivered.last(),
@@ -4907,7 +4971,7 @@ fn read_only_role_stages_have_one_not_ready_terminal_and_empty_projects_need_no_
 
 fn chat_driver() -> (Driver, engine::Assignment) {
     let mut driver = Driver::new(Store::new());
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(7),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -4915,16 +4979,16 @@ fn chat_driver() -> (Driver, engine::Assignment) {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     driver.sign_in();
     driver.settle();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1001)),
         sign_in: driver.session(),
         key: [31; 16],
         ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-    });
+    }));
     driver.settle();
     let assignment = assigned_from_last(&driver.delivered);
     (driver, assignment)
@@ -4966,12 +5030,12 @@ fn assigned_from_last(delivered: &[Delivery]) -> engine::Assignment {
 }
 
 fn say(driver: &mut Driver, task: u64, key: u8) -> u64 {
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
         sign_in: driver.session(),
         key: [key; 16],
         ask: people::Ask::Say { project: 1, task, words: Box::from([key]) },
-    });
+    }));
     driver.settle();
     driver
         .delivered
@@ -5033,12 +5097,12 @@ fn a_read_fence_takes_only_what_the_run_read() {
     let (mut driver, assignment) = chat_driver();
     let first = say(&mut driver, assignment.task, 42);
     let second = say(&mut driver, assignment.task, 43);
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
         turn: engine::Turn { number: 1, cumulative: 1, read: Some(first), transcript: b"read one".as_slice().into() },
-    });
+    }));
     driver.settle();
     let row =
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))).expect("live chat");
@@ -5055,7 +5119,7 @@ fn a_read_fence_takes_only_what_the_run_read() {
 #[test]
 fn words_to_a_parked_chat_wake_it() {
     let (mut driver, assignment) = chat_driver();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -5063,7 +5127,7 @@ fn words_to_a_parked_chat_wake_it() {
         attempt: assignment.attempt,
         cumulative: 0,
         end: tasks::End::Parked,
-    });
+    }));
     driver.settle();
     let number = say(&mut driver, assignment.task, 44);
     let next = assigned_from_last(&driver.delivered);
@@ -5076,14 +5140,14 @@ fn words_to_a_parked_chat_wake_it() {
 #[test]
 fn a_chat_parks_and_resumes_from_its_transcript() {
     let (mut driver, first) = chat_driver();
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: first.task,
         attempt: first.attempt,
         turn: engine::Turn { number: 1, cumulative: 1, read: None, transcript: b"first".as_slice().into() },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -5091,20 +5155,20 @@ fn a_chat_parks_and_resumes_from_its_transcript() {
         attempt: first.attempt,
         cumulative: 1,
         end: tasks::End::Parked,
-    });
+    }));
     driver.settle();
     say(&mut driver, first.task, 45);
     let second = assigned_from_last(&driver.delivered);
     assert_eq!(second.transcript.len(), 1);
     assert_eq!(second.transcript[0].as_ref(), b"first");
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: second.task,
         attempt: second.attempt,
         turn: engine::Turn { number: 1, cumulative: 1, read: None, transcript: b"second".as_slice().into() },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -5112,7 +5176,7 @@ fn a_chat_parks_and_resumes_from_its_transcript() {
         attempt: second.attempt,
         cumulative: 1,
         end: tasks::End::Parked,
-    });
+    }));
     driver.settle();
     say(&mut driver, second.task, 46);
     let third = assigned_from_last(&driver.delivered);
@@ -5127,14 +5191,14 @@ fn a_chat_past_the_resume_limit_starts_fresh_with_the_tail_in_its_brief() {
     let (mut driver, first) = chat_driver();
     let mut body = vec![b'x'; 300];
     body[298..].copy_from_slice(b"yz");
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: first.task,
         attempt: first.attempt,
         turn: engine::Turn { number: 1, cumulative: 1, read: None, transcript: body.into_boxed_slice() },
-    });
+    }));
     driver.settle();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         saved: None,
         channel: Token::new(7),
@@ -5142,7 +5206,7 @@ fn a_chat_past_the_resume_limit_starts_fresh_with_the_tail_in_its_brief() {
         attempt: first.attempt,
         cumulative: 1,
         end: tasks::End::Parked,
-    });
+    }));
     driver.settle();
     say(&mut driver, first.task, 47);
     let next = assigned_from_last(&driver.delivered);
@@ -5164,7 +5228,7 @@ fn a_chat_past_the_resume_limit_starts_fresh_with_the_tail_in_its_brief() {
 #[test]
 fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
     let (mut driver, first) = chat_driver();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: first.task,
@@ -5172,7 +5236,7 @@ fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task)))) =
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(first.task))))
@@ -5189,7 +5253,7 @@ fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert!(second.attempt > first.attempt);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: second.task,
@@ -5197,7 +5261,7 @@ fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task)))) =
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(first.task))))
@@ -5225,7 +5289,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
     let middle_run = assigned_task(&driver, middle);
     let leaf = call_batch(&mut driver, &middle_run, 602, Box::new([report_delegate(b"leaf", Box::new([]))]))[0];
     let first = assigned_task(&driver, leaf);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: leaf,
@@ -5233,7 +5297,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     driver.env.now = Time::from_nanos(Duration::from_secs(2).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(2).as_nanos());
@@ -5243,7 +5307,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert_eq!(second.task, leaf);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: leaf,
@@ -5251,7 +5315,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     let held = driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(leaf)))).expect("held delegate");
     let revision = match held {
@@ -5308,7 +5372,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
         },
         other => panic!("held delegate row: {other:?}"),
     };
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(605)),
         sign_in: driver.session(),
         key: [65; 16],
@@ -5318,7 +5382,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
             revision: person_revision,
             decision: people::EscalationDecision::Release,
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::EscalationDecided {
@@ -5327,7 +5391,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
     let third = assigned_from_last(&driver.delivered);
     assert_eq!(third.task, leaf);
     assert!(third.attempt > second.attempt);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: leaf,
@@ -5338,7 +5402,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
             cancel_delegates: false,
         },
         saved: None,
-    });
+    }));
     driver.settle();
     assert!(matches!(
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(leaf)))),
@@ -5357,20 +5421,20 @@ fn a_moved_task_is_funded_anew_by_its_new_requester() {
     let child = call_batch(&mut driver, &root, 620, Box::new([child_spec]))[0];
     let child_run = assigned_task(&driver, child);
     let grandchild = call_batch(&mut driver, &child_run, 621, Box::new([report_delegate(b"subgoal", Box::new([]))]))[0];
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: child,
         attempt: child_run.attempt,
         turn: engine::Turn { number: 1, cumulative: 5, read: None, transcript: b"worked".as_slice().into() },
-    });
+    }));
     driver.settle();
     let person = driver.store.header().people;
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(622)),
         sign_in: driver.session(),
         key: [62; 16],
         ask: people::Ask::Move { project: 1, task: child, reason: b"keep the goal".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Moved { task }), .. } if *task == child)));
@@ -5398,7 +5462,7 @@ fn a_moved_task_is_funded_anew_by_its_new_requester() {
     assert!(!old.delegates.contains(&child));
     assert!(old.references.contains(&child));
     assert_eq!((old.numbers.reserved, old.numbers.spent_below), (5, 5));
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: root.task,
@@ -5409,7 +5473,7 @@ fn a_moved_task_is_funded_anew_by_its_new_requester() {
             cancel_delegates: false,
         },
         saved: None,
-    });
+    }));
     driver.settle();
     assert!(driver.store.rows.contains_key(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))));
     assert!(driver.store.rows.contains_key(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(grandchild)))));
@@ -5423,12 +5487,12 @@ fn a_move_the_new_funder_cannot_cover_is_refused_whole() {
     let before_child = driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))).cloned();
     let pool = tasks::Funder::Pool { project: 1, person: driver.store.header().people, period: 1 };
     let before_pool = driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(pool)))).cloned();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(631)),
         sign_in: driver.session(),
         key: [63; 16],
         ask: people::Ask::Move { project: 1, task: child, reason: b"out of room".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(
         item,
@@ -5446,25 +5510,25 @@ fn a_move_the_new_funder_cannot_cover_is_refused_whole() {
 fn a_move_carves_the_new_persons_pool_in_the_same_commit() {
     let (mut driver, root) = batch_fixture_custom(2, 1, 500, true, false, false);
     let child = call_batch(&mut driver, &root, 640, Box::new([report_delegate(b"second owner goal", Box::new([]))]))[0];
-    driver.send(engine::Event::SignedIn {
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(641)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
             login: b"second".as_slice().into(),
             name: b"Second".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     let session = driver.store.header().sign_ins;
     let person = driver.store.header().people;
     let pool = tasks::Funder::Pool { project: 1, person, period: 1 };
     assert!(!driver.store.rows.contains_key(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(pool)))));
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(642)),
         sign_in: session,
         key: [64; 16],
         ask: people::Ask::Move { project: 1, task: child, reason: b"adopt goal".as_slice().into() },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Moved { task }), .. } if *task == child)));
@@ -5483,7 +5547,7 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
     let (mut driver, root) = batch_fixture_with(2, 1);
     let child = call_batch(&mut driver, &root, 650, Box::new([report_delegate(b"held goal", Box::new([]))]))[0];
     let first = assigned_task(&driver, child);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: child,
@@ -5491,7 +5555,7 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     driver.env.now = Time::from_nanos(Duration::from_secs(2).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(2).as_nanos());
@@ -5500,7 +5564,7 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
     driver.collect();
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: child,
@@ -5508,19 +5572,19 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
         cumulative: 0,
         end: tasks::End::Failed(tasks::Class::Transient),
         saved: None,
-    });
+    }));
     driver.settle();
     let before = driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))).expect("held child");
     assert!(
         matches!(before, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row))) if matches!(row.escalation,
         tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Task(parent), .. } if parent == root.task))
     );
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(651)),
         sign_in: driver.session(),
         key: [65; 16],
         ask: people::Ask::Move { project: 1, task: child, reason: b"adopt held work".as_slice().into() },
-    });
+    }));
     driver.settle();
     let person = driver.store.header().people;
     let after =
@@ -5553,12 +5617,12 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
         Some(proposal) if matches!(proposal.state,
             tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Task(holder), .. } if holder == root.task)))
     );
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(662)),
         sign_in: driver.session(),
         key: [66; 16],
         ask: people::Ask::Move { project: 1, task: child, reason: b"adopt proposal".as_slice().into() },
-    });
+    }));
     driver.settle();
     let person = driver.store.header().people;
     let after =
@@ -5571,7 +5635,7 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
 #[test]
 fn saved_work_reaches_the_next_attempt() {
     let (mut driver, first) = chat_driver();
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: first.task,
@@ -5579,7 +5643,7 @@ fn saved_work_reaches_the_next_attempt() {
         cumulative: 0,
         end: tasks::End::Parked,
         saved: Some(Box::new([3])),
-    });
+    }));
     driver.settle();
     let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task)))) =
         driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(first.task))))
@@ -5606,7 +5670,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
         attempt: first.attempt,
         turn: 1
     }))));
-    driver.send(engine::Event::Lost { channel: Token::new(7) });
+    driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(7) }));
     driver.env.now = Time::from_nanos(Duration::from_secs(6).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(6).as_nanos());
     engine::fire(&mut driver.root, &driver.env);
@@ -5624,7 +5688,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
     engine::fire(&mut driver.root, &driver.env);
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(8),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(1),
@@ -5632,7 +5696,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     driver.settle();
     let second = assigned_from_last(&driver.delivered);
     assert!(second.attempt > first.attempt);
@@ -5643,7 +5707,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
 #[test]
 fn a_worker_frozen_past_its_grace_gets_no_next_attempt_until_its_sum_has_passed() {
     let (mut driver, first) = chat_driver();
-    driver.send(engine::Event::Hello {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
         channel: Token::new(8),
         hello: fleet::Hello {
             stop_bound: Duration::from_secs(5),
@@ -5651,13 +5715,13 @@ fn a_worker_frozen_past_its_grace_gets_no_next_attempt_until_its_sum_has_passed(
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
-    });
+    }));
     assert!(
         driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Refuse { channel }
         if *channel == Token::new(8))),
         "a worker whose stop bound reaches engine grace cannot place runs"
     );
-    driver.send(engine::Event::Lost { channel: Token::new(7) });
+    driver.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(7) }));
     driver.env.now = Time::from_nanos(Duration::from_secs(4).as_nanos());
     driver.env.wall = Wall::from_nanos(Duration::from_secs(4).as_nanos());
     engine::fire(&mut driver.root, &driver.env);
@@ -5688,7 +5752,7 @@ fn a_worker_frozen_past_its_grace_gets_no_next_attempt_until_its_sum_has_passed(
 }
 
 fn typed_unavailable(driver: &mut Driver, assignment: &engine::Assignment, name: &[u8]) -> jig_core::SettledCall {
-    driver.send(engine::Event::HostCall {
+    driver.send(engine::Event::Worker(engine::WorkerInput::HostCall {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
@@ -5699,7 +5763,7 @@ fn typed_unavailable(driver: &mut Driver, assignment: &engine::Assignment, name:
             input: b"opaque-input".as_slice().into(),
             deadline: Duration::from_secs(2),
         },
-    });
+    }));
     for _ in 0..20 {
         driver.advance(true);
         if !driver.host_requests.is_empty() {
@@ -5716,10 +5780,10 @@ fn typed_unavailable(driver: &mut Driver, assignment: &engine::Assignment, name:
     assert_eq!(call.input.as_ref(), b"opaque-input");
     assert!(!call.writes);
     assert_eq!(call.deadline, Duration::from_secs(2));
-    driver.send(engine::Event::DecodedHostCall {
+    driver.send(engine::Event::Worker(engine::WorkerInput::DecodedHostCall {
         to,
         body: engine::Call { completion: 2, position: 0, tool: engine::Tool::Unavailable },
-    });
+    }));
     for _ in 0..20 {
         driver.advance(true);
         if driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Host(host) if matches!(host.as_ref(), engine::HostDelivery::Render { .. }))) { break; }
@@ -5736,13 +5800,13 @@ fn typed_unavailable(driver: &mut Driver, assignment: &engine::Assignment, name:
         driver.store.rows.contains_key(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Call(key)))),
         "render follows its durable decision"
     );
-    driver.send(engine::Event::RenderedHostCall {
+    driver.send(engine::Event::Worker(engine::WorkerInput::RenderedHostCall {
         to,
         answer: jig_core::SettledAnswer::Delivery {
             outcome: jig_core::DeliveryOutcome::Nothing,
             evidence: b"\x01opaque\x00evidence".as_slice().into(),
         },
-    });
+    }));
     assert!(!driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Host(host) if matches!(host.as_ref(), engine::HostDelivery::Answer { .. }))), "the settled evidence is held until its store commit");
     driver.settle();
     driver
@@ -5779,7 +5843,7 @@ fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
     assert!(
         matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Call(key)))), Some(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(record)))) if record.settled.as_ref()==Some(&settled))
     );
-    driver.send(engine::Event::Answer {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
         pushed: Box::new([]),
         channel: Token::new(7),
         task: first.task,
@@ -5787,7 +5851,7 @@ fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
         cumulative: 1,
         end: tasks::End::Parked,
         saved: None,
-    });
+    }));
     driver.settle();
     say(&mut driver, first.task, 93);
     let resumed = assigned_from_last(&driver.delivered);
@@ -5800,7 +5864,7 @@ fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
 fn typed_messages_keep_their_label_and_whole_words() {
     let (mut driver, assignment) = chat_driver();
     let number = say(&mut driver, assignment.task, 94);
-    driver.send(engine::Event::Inbound {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Inbound {
         task: assignment.task,
         attempt: assignment.attempt,
         message: engine::HostMessage {
@@ -5808,10 +5872,10 @@ fn typed_messages_keep_their_label_and_whole_words() {
             sender: b"Person: alice".as_slice().into(),
             words: Box::from([94]),
         },
-    });
+    }));
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Host(host) if matches!(host.as_ref(), engine::HostDelivery::Inbound { channel, task, attempt, message } if *channel==Token::new(7) && *task==assignment.task && *attempt==assignment.attempt && message.name==number && message.sender.as_ref()==b"Person: alice" && message.words.as_ref()==[94]))));
-    driver.send(engine::Event::Turn {
+    driver.send(engine::Event::Worker(engine::WorkerInput::Turn {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
@@ -5821,7 +5885,7 @@ fn typed_messages_keep_their_label_and_whole_words() {
             read: Some(number),
             transcript: b"read labeled words".as_slice().into(),
         },
-    });
+    }));
     driver.settle();
     assert!(
         matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))), Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task)))) if task.inbox.is_empty())
@@ -5835,7 +5899,7 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
     let before = driver.store.applied;
     let rows = driver.store.rows.clone();
     let delivered = driver.delivered.len();
-    driver.send(engine::Event::HostCall {
+    driver.send(engine::Event::Worker(engine::WorkerInput::HostCall {
         channel: Token::new(7),
         task: assignment.task,
         attempt: assignment.attempt,
@@ -5846,7 +5910,7 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
             input: b"opaque-input".as_slice().into(),
             deadline: Duration::from_secs(2),
         },
-    });
+    }));
     for _ in 0..20 {
         driver.advance(true);
         if !driver.host_requests.is_empty() {
@@ -5856,10 +5920,10 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
     let engine::HostRequest::Decode { to, .. } = *driver.host_requests.remove(0) else {
         panic!("typed decode request")
     };
-    driver.send(engine::Event::DecodedHostCall {
+    driver.send(engine::Event::Worker(engine::WorkerInput::DecodedHostCall {
         to,
         body: engine::Call { completion: 2, position: 0, tool: engine::Tool::Unavailable },
-    });
+    }));
     driver.settle();
     assert_eq!(driver.store.applied, before);
     assert_eq!(driver.store.rows, rows);
@@ -5870,12 +5934,12 @@ fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
 #[test]
 fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_them() {
     let (mut driver, _) = chat_driver();
-    driver.send(engine::Event::Ask {
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(9901)),
         sign_in: driver.session(),
         key: [99; 16],
         ask: people::Ask::StartChat { project: 1, words: b"another live chat".as_slice().into() },
-    });
+    }));
     for _ in 0..100 {
         driver.advance(true);
     }

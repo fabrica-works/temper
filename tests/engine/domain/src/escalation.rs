@@ -2,8 +2,8 @@
 //! scripted priced worker for held-chat decisions. Service policy and transport
 //! are driven only through actual boundaries.
 
-use crate::commits::Store;
 use crate::escalation_referee::{QUESTION, REASON, REPORT, Referee, Story};
+use crate::store::Store;
 use crate::walking;
 use jig_core_accounts as accounts;
 use jig_core_authority as authority;
@@ -12,7 +12,8 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
-use temper_engine_domain::{Delivery, Record, Write, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Record, Write};
 
 /// One durable process cut, without changing the outside scripts or store
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -236,7 +237,7 @@ impl World {
             pages: 0,
             settings,
         };
-        world.queue(engine::Event::Start, 0);
+        world.queue(engine::Event::Restart, 0);
         world.hello();
         world
     }
@@ -257,7 +258,7 @@ impl World {
             Box::new([])
         };
         self.queue(
-            engine::Event::Hello {
+            engine::Event::Worker(engine::WorkerInput::Hello {
                 channel: Token::new(7),
                 hello: fleet::Hello {
                     stop_bound: Duration::from_millis(100),
@@ -265,14 +266,14 @@ impl World {
                     workstreams: Box::new([]),
                     hosting,
                 },
-            },
+            }),
             0,
         );
     }
 
     fn sign_in(&mut self, index: usize) {
         self.queue(
-            engine::Event::SignedIn {
+            engine::Event::Party(engine::PartyInput::SignedIn {
                 reply_to: ReplyTo::new(Token::new(101 + u64::try_from(index).expect("two people"))),
                 identity: people::Identity {
                     key: people::IdentityKey {
@@ -282,19 +283,19 @@ impl World {
                     login: format!("owner{index}").into_bytes().into(),
                     name: format!("Owner {index}").into_bytes().into(),
                 },
-            },
+            }),
             0,
         );
     }
 
     fn ask_input(&mut self, to: Token, input: &AskInput) {
         self.queue(
-            engine::Event::Ask {
+            engine::Event::Party(engine::PartyInput::Ask {
                 reply_to: ReplyTo::new(to),
                 sign_in: self.sessions[input.owner].expect("authenticated outside owner"),
                 key: input.key,
                 ask: input.ask.clone(),
-            },
+            }),
             0,
         );
     }
@@ -344,11 +345,11 @@ impl World {
         let person = self.people[read.owner].expect("signed-in named reader");
         self.referee.read(read.to, person, read.escalation.clone());
         self.queue(
-            engine::Event::ReadEscalation {
+            engine::Event::Party(engine::PartyInput::ReadEscalation {
                 reply_to: ReplyTo::new(read.to),
                 sign_in: self.sessions[read.owner].expect("signed-in named reader"),
                 task: self.task.expect("named chat"),
-            },
+            }),
             delay,
         );
         self.pending_read = Some(read);
@@ -381,7 +382,7 @@ impl World {
         };
         self.worker_answer = WorkerAnswer::Retained;
         self.queue(
-            engine::Event::Answer {
+            engine::Event::Worker(engine::WorkerInput::Answer {
                 pushed: Box::new([]),
                 saved: None,
                 channel: Token::new(7),
@@ -389,7 +390,7 @@ impl World {
                 attempt: assignment.attempt,
                 cumulative,
                 end,
-            },
+            }),
             0,
         );
     }
@@ -497,7 +498,7 @@ impl World {
         self.recovery = Recovery::Pending;
         self.restarts += 1;
         self.trace.push(format!("restart {:?}", self.settings.cut));
-        self.queue(engine::Event::Start, 0);
+        self.queue(engine::Event::Restart, 0);
         self.hello();
     }
 
@@ -512,7 +513,7 @@ impl World {
             self.apply_store();
             return;
         }
-        engine::release(&mut self.domain, &self.environment, &mut self.out);
+        crate::poll(&mut self.domain, &self.environment, &mut self.out);
         self.observe();
         if self.frozen_cut.is_some() {
             self.apply_store();
@@ -558,7 +559,10 @@ impl World {
         if self.settings.cut != Cut::None
             && self.recovery == Recovery::Sent
             && self.clock_offset == 0
-            && !self.events.iter().any(|(_, event)| matches!(event, engine::Event::Answer { .. }))
+            && !self
+                .events
+                .iter()
+                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Answer { .. })))
         {
             // A decision can commit its new claim before assignment escapes.
             // No worker may invent hosting that claim; let actual fleet grace
@@ -588,7 +592,7 @@ impl World {
                 {
                     self.restart();
                 } else {
-                    self.queue(engine::Event::Committed { number }, 0);
+                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number }), 0);
                 }
             }
         }
@@ -600,7 +604,7 @@ impl World {
             self.trace.push(format!("output {request:?}"));
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
-                engine::Request::Commit { number, writes } => {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     if writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Refused)) {
                         assert!(self.unplaced_referee.is_none(), "one unassigned-claim terminal in this script");
                         self.unplaced_referee = Some(self.referee.clone());
@@ -626,14 +630,25 @@ impl World {
                         return;
                     }
                 }
-                engine::Request::Load { owner, range, after, most, .. } => {
+                engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                     self.pages += 1;
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    self.queue(engine::Event::Loaded { owner, rows, next }, self.settings.page_delay);
+                    self.queue(
+                        engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }),
+                        self.settings.page_delay,
+                    );
                 }
-                engine::Request::Deliver(delivery) => self.delivery(delivery),
+                engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                    self.queue(engine::Event::Refreshed { account, generation, valid: Duration::from_secs(60) }, 0);
+                    self.queue(
+                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                            account,
+                            generation,
+                            valid: Duration::from_secs(60),
+                        }),
+                        0,
+                    );
                 }
                 engine::Request::Account(
                     accounts::Request::Keep { .. }
@@ -643,11 +658,19 @@ impl World {
                     | accounts::Request::Refused { .. }
                     | accounts::Request::Closed { .. },
                 ) => {}
-                engine::Request::AnswerBusy { .. } => self.answer(),
-                engine::Request::TurnBusy { .. } => panic!("outside worker offered no turns"),
-                engine::Request::Host(_) => panic!("legacy fixture received a typed protocol request"),
-                engine::Request::CallBusy { .. } => panic!("escalation world sent no calls"),
-                engine::Request::View(_) | engine::Request::WatchRefused { .. } => panic!("unrequested view output"),
+                engine::Request::Worker(engine::WorkerRequest::AnswerBusy { .. }) => self.answer(),
+                engine::Request::Worker(engine::WorkerRequest::TurnBusy { .. }) => {
+                    panic!("outside worker offered no turns")
+                }
+                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
+                    panic!("fixture received an unexpected host request")
+                }
+                engine::Request::Worker(engine::WorkerRequest::CallBusy { .. }) => {
+                    panic!("escalation world sent no calls")
+                }
+                engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. }) => {
+                    panic!("unrequested view output")
+                }
                 engine::Request::Stop => panic!("escalation root stopped: {:?}", self.trace),
                 engine::Request::Forge { .. } => {
                     panic!("escalation story did not adopt forge")
@@ -688,12 +711,12 @@ impl World {
                     self.sign_in(1);
                 } else {
                     self.queue(
-                        engine::Event::Ask {
+                        engine::Event::Party(engine::PartyInput::Ask {
                             reply_to: ReplyTo::new(Token::new(103)),
                             sign_in: self.sessions[0].expect("requester signed in"),
                             key: [5; 16],
                             ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-                        },
+                        }),
                         0,
                     );
                 }

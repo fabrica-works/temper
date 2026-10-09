@@ -934,7 +934,7 @@ fn confirm(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             Decision::Reject { reason: domain.reason.text.clone() }
         }
     };
-    let ObjectKey::Escalation { task } = object_key else { unreachable!("only escalation has W4 offers") };
+    let ObjectKey::Escalation { task } = object_key else { unreachable!("only escalation has offers") };
     for (_, pending_id) in &domain.pending {
         let pending = domain.requests.get(*pending_id).expect("pending request exists");
         if pending.about == Some(object_key) {

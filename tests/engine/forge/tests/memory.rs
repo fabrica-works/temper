@@ -1,8 +1,8 @@
 use skein_lib::{Env, Queue, Time, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_client as client;
 use temper_engine_forge_world::{LIMITS, REPO};
-use temper_world::heap::{self, Meter};
 
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -37,14 +37,14 @@ fn bounded_connector_tables_and_client_fit_the_declared_heap() {
             top::step(&mut domain, &env, top::Event::Names { task, resources: Box::new([name.clone()]) }, &mut out);
             let measured = meter.end();
             drain(&mut out);
-            meter.check(measured, bound, limits);
+            meter.check(measured, bound, &limits);
             domain.reclaim();
 
             meter.start();
             top::step(&mut domain, &env, top::Event::Hold { task, resource: name, from: None }, &mut out);
             let measured = meter.end();
             drain(&mut out);
-            meter.check(measured, bound, limits);
+            meter.check(measured, bound, &limits);
             domain.reclaim();
         }
     }

@@ -6,12 +6,12 @@
 //! holds as live ones.
 
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
+use skein_world::domain::heap::{self, Meter};
 use temper_worker_domain_checkout::git::{Commit, Done, Fault, Kind, Missing};
 use temper_worker_domain_checkout::{
     Domain, Event, Limits, MAX_OUT, Message, Outcome, Preparation, Prepared, Refusal, Repository, Request, Spec, Start,
     step, worst_case,
 };
-use temper_world::heap::{self, Meter};
 
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -135,7 +135,7 @@ impl Fill {
                 Request::Cancel { .. } => Asked::Cancel,
             });
         }
-        self.meter.check(measured, self.bound, self.env.limits);
+        self.meter.check(measured, self.bound, &self.env.limits);
         asked
     }
 

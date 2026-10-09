@@ -22,7 +22,7 @@ pub struct Limits {
     /// The longest commit message, its title and body together.
     pub message_bytes: u32,
     /// Maximum originally or still conflicted paths per repository. Zero
-    /// disables merge starts while retaining legacy preparation behavior.
+    /// disables merge starts; other workspace preparation remains available.
     pub conflicts: u32,
     /// Maximum bytes of one full relative conflicted path.
     pub path_bytes: u32,

@@ -4,7 +4,8 @@ use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
 use skein_lib::{ReplyTo, Token};
 use smith_agent_world::Job;
 use smith_domain_run as run;
-use temper_engine_domain::{Delivery, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::Delivery;
 use temper_engine_domain::{Key, Record};
 use temper_system_world::world;
 
@@ -39,12 +40,12 @@ fn a_person_stops_a_smith_run_and_releases_the_chat() {
     let mut world = world::chat(b"@waiting", Job::Waiting);
     let task = world.assignment.task;
     let attempt = world.assignment.attempt;
-    world.root.send(engine::Event::Ask {
+    world.root.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(980)),
         sign_in: world.root.session(),
         key: [80; 16],
         ask: people::Ask::Stop { project: 1, task },
-    });
+    }));
     world.root.settle();
     assert!(world.root.delivered.iter().any(|item| matches!(item,
         Delivery::Cancel { task: cancelled, attempt: current, .. }
@@ -52,12 +53,12 @@ fn a_person_stops_a_smith_run_and_releases_the_chat() {
     world.agent = world::cancelled_agent_for(&world.assignment, Job::Waiting);
     world.run();
     assert!(matches!(world.agent.answer(), run::Answer::Failed { failure: run::Failure::Cancelled, .. }));
-    world.root.send(engine::Event::Ask {
+    world.root.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(981)),
         sign_in: world.root.session(),
         key: [81; 16],
         ask: people::Ask::Release { project: 1, task },
-    });
+    }));
     world.root.settle();
     assert!(world.root.delivered.iter().any(|item| matches!(item,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Released { task: released }), .. }

@@ -2,7 +2,7 @@
 //! the existing ordered fake store. Requests become later input events
 //! (domain/engine.md, section 15).
 
-use crate::commits::Store;
+use crate::store::Store;
 use crate::walking_referee::{FINAL_SPEND, QUESTION, REPORT, TURNS, WalkingReferee};
 use jig_core_accounts as accounts;
 use jig_core_authority as authority;
@@ -11,7 +11,8 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
-use temper_engine_domain::{Delivery, JournalLimits, Record, engine, loads};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, JournalLimits, Record, loads};
 
 /// Tiny counted child limits plus the root's declared synchronous-route room.
 #[must_use]
@@ -401,7 +402,7 @@ impl World {
             terminal_snapshot: None,
             settings,
         };
-        world.queue(engine::Event::Start, 0);
+        world.queue(engine::Event::Restart, 0);
         world.hello();
         world
     }
@@ -422,7 +423,7 @@ impl World {
             },
         );
         self.queue(
-            engine::Event::Hello {
+            engine::Event::Worker(engine::WorkerInput::Hello {
                 channel: Token::new(7),
                 hello: fleet::Hello {
                     stop_bound: Duration::from_millis(100),
@@ -430,7 +431,7 @@ impl World {
                     workstreams: Box::new([]),
                     hosting,
                 },
-            },
+            }),
             0,
         );
     }
@@ -438,12 +439,12 @@ impl World {
     fn turn(&mut self, number: u32) {
         let assignment = self.assignment.as_ref().expect("script has its real assignment");
         let (_, cumulative, transcript) = TURNS.iter().find(|(turn, _, _)| *turn == number).expect("scripted turn");
-        let event = engine::Event::Turn {
+        let event = engine::Event::Worker(engine::WorkerInput::Turn {
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,
             turn: engine::Turn { number, cumulative: *cumulative, read: None, transcript: (*transcript).into() },
-        };
+        });
         self.pending_turn = Some(number);
         self.queue(event, 0);
     }
@@ -461,7 +462,7 @@ impl World {
             }
             .into(),
         );
-        self.queue(engine::Event::Start, 0);
+        self.queue(engine::Event::Restart, 0);
         self.hello();
     }
 
@@ -471,7 +472,7 @@ impl World {
         self.iteration += 1;
         self.environment.now = Time::from_nanos(u64::from(self.iteration) * 1_000_000 + self.recovery_clock_offset);
         self.environment.wall = Wall::from_nanos(u64::from(self.iteration) * 1_000_000 + self.recovery_clock_offset);
-        engine::release(&mut self.domain, &self.environment, &mut self.out);
+        crate::poll(&mut self.domain, &self.environment, &mut self.out);
         self.observe();
         if self.events.front().is_some_and(|(due, _)| *due <= self.iteration) {
             let (_, event) = self.events.pop_front().expect("due input");
@@ -512,7 +513,7 @@ impl World {
                     self.terminal_snapshot = Some(self.store.rows.clone());
                     self.restart(true);
                 } else {
-                    self.queue(engine::Event::Committed { number }, 0);
+                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number }), 0);
                 }
             }
         }
@@ -536,21 +537,24 @@ impl World {
         if self.domain.ready() && !self.person_sent {
             self.person_sent = true;
             self.queue(
-                engine::Event::SignedIn {
+                engine::Event::Party(engine::PartyInput::SignedIn {
                     reply_to: ReplyTo::new(Token::new(101)),
                     identity: people::Identity {
                         key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
                         login: b"person".as_slice().into(),
                         name: b"Person".as_slice().into(),
                     },
-                },
+                }),
                 0,
             );
         }
         if self.restarts != 0
             && self.domain.ready()
             && self.pending_turn == Some(1)
-            && !self.events.iter().any(|(_, event)| matches!(event, engine::Event::Turn { .. }))
+            && !self
+                .events
+                .iter()
+                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Turn { .. })))
         {
             self.turn(1);
         }
@@ -562,18 +566,21 @@ impl World {
             self.terminal_recovery = TerminalRecovery::AwaitingRetainedAck;
             let assignment = self.assignment.as_ref().expect("worker retains terminal claim");
             self.queue(
-                engine::Event::ReadResult {
+                engine::Event::Party(engine::PartyInput::ReadResult {
                     reply_to: ReplyTo::new(Token::new(103)),
                     sign_in: self.session.expect("person retains authenticated session"),
                     task: assignment.task,
-                },
+                }),
                 0,
             );
             self.answer();
         }
         if self.terminal_recovery != TerminalRecovery::NotRequested
             && self.recovery_clock_offset == 0
-            && !self.events.iter().any(|(_, event)| matches!(event, engine::Event::Answer { .. }))
+            && !self
+                .events
+                .iter()
+                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Answer { .. })))
         {
             // The retained answer has reached the loaded fleet. Advance the
             // external clock past its five-second grace, staying within the
@@ -586,7 +593,7 @@ impl World {
         let assignment = self.assignment.as_ref().expect("worker retains terminal claim");
         self.pending_answer = true;
         self.queue(
-            engine::Event::Answer {
+            engine::Event::Worker(engine::WorkerInput::Answer {
                 pushed: Box::new([]),
                 saved: None,
                 channel: Token::new(7),
@@ -597,7 +604,7 @@ impl World {
                     result: tasks::TaskResult::Report { words: REPORT.into() },
                     cancel_delegates: false,
                 },
-            },
+            }),
             0,
         );
     }
@@ -608,7 +615,7 @@ impl World {
             self.trace.push(format!("output {request:?}"));
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
-                engine::Request::Commit { number, writes } => {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     if self.terminal_snapshot.is_some() {
                         assert!(
                             writes.iter().any(|write| matches!(
@@ -626,14 +633,25 @@ impl World {
                     }
                     self.store.pending.push_back((number, writes));
                 }
-                engine::Request::Load { owner, range, after, most, .. } => {
+                engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                     self.pages += 1;
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    self.queue(engine::Event::Loaded { owner, rows, next }, self.settings.page_delay);
+                    self.queue(
+                        engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }),
+                        self.settings.page_delay,
+                    );
                 }
-                engine::Request::Deliver(delivery) => self.delivery(delivery),
+                engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                    self.queue(engine::Event::Refreshed { account, generation, valid: Duration::from_secs(60) }, 0);
+                    self.queue(
+                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                            account,
+                            generation,
+                            valid: Duration::from_secs(60),
+                        }),
+                        0,
+                    );
                 }
                 engine::Request::Account(
                     accounts::Request::Keep { .. }
@@ -643,9 +661,9 @@ impl World {
                     | accounts::Request::Refused { .. }
                     | accounts::Request::Closed { .. },
                 ) => {}
-                engine::Request::TurnBusy { turn, .. } => self.turn(turn),
-                engine::Request::AnswerBusy { channel, task, attempt } => self.queue(
-                    engine::Event::Answer {
+                engine::Request::Worker(engine::WorkerRequest::TurnBusy { turn, .. }) => self.turn(turn),
+                engine::Request::Worker(engine::WorkerRequest::AnswerBusy { channel, task, attempt }) => self.queue(
+                    engine::Event::Worker(engine::WorkerInput::Answer {
                         pushed: Box::new([]),
                         saved: None,
                         channel,
@@ -656,12 +674,18 @@ impl World {
                             result: tasks::TaskResult::Report { words: REPORT.into() },
                             cancel_delegates: false,
                         },
-                    },
+                    }),
                     1,
                 ),
-                engine::Request::Host(_) => panic!("legacy fixture received a typed protocol request"),
-                engine::Request::CallBusy { .. } => panic!("walking story sent no calls"),
-                engine::Request::View(_) | engine::Request::WatchRefused { .. } => panic!("unrequested view output"),
+                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
+                    panic!("fixture received an unexpected host request")
+                }
+                engine::Request::Worker(engine::WorkerRequest::CallBusy { .. }) => {
+                    panic!("walking story sent no calls")
+                }
+                engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. }) => {
+                    panic!("unrequested view output")
+                }
                 engine::Request::Stop => panic!("walking story stopped: {:?}", self.trace),
                 engine::Request::Forge { .. } => {
                     panic!("walking story did not adopt forge")
@@ -678,12 +702,12 @@ impl World {
                 self.referee.signed_in(&self.store.rows, person, sign_in).expect("durable sign-in");
                 self.session = Some(sign_in);
                 self.queue(
-                    engine::Event::Ask {
+                    engine::Event::Party(engine::PartyInput::Ask {
                         reply_to: ReplyTo::new(Token::new(102)),
                         sign_in,
                         key: [5; 16],
                         ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-                    },
+                    }),
                     0,
                 );
             }
@@ -824,10 +848,7 @@ mod tests {
     use super::{Settings, World};
     use crate::walking_referee::REPORT;
     use skein_lib::Queue;
-    use temper_engine_domain::{
-        Delivery,
-        engine::{self, Request},
-    };
+    use temper_engine_domain::{self as engine, Delivery, PartyRequest, Request};
 
     #[test]
     #[should_panic(expected = "committed result reaches person once: \"person received result twice\"")]
@@ -837,7 +858,7 @@ mod tests {
         let person = world.store.header().people;
         let task = world.assignment.as_ref().expect("script retained assignment").task;
         world.out = Queue::with_capacity(engine::max_out(&world.environment.limits) + 1);
-        world.out.push(Request::Deliver(Delivery::Result { person, task, words: REPORT.into() }));
+        world.out.push(Request::Party(PartyRequest::Deliver(Delivery::Result { person, task, words: REPORT.into() })));
         assert!(!world.settled(), "queued outward work cannot be hidden by completed story counters");
         world.run();
     }

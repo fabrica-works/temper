@@ -4,6 +4,8 @@ use crate::referee::{Rules, Seen, is_link_live, is_refused, observe_at};
 use crate::scenario::Scenario;
 use crate::tab::Tab;
 use skein_lib::{Duration, Rng, Time, Token, Wall};
+use skein_world::domain::Referee;
+use skein_world::domain::Verdict;
 use std::collections::{BTreeMap, BTreeSet};
 use temper_fake_person::RandomPerson;
 use temper_fake_person::{Doing, Next, Person as ScriptedPerson, TreeFace, dom_event};
@@ -12,8 +14,6 @@ use temper_web_domain::{
     StreamEvent, Watch,
 };
 use temper_web_view::DomEvent;
-use temper_world::Referee;
-use temper_world::Verdict;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {

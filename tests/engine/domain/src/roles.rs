@@ -3,10 +3,10 @@
 //! world retains only outside session/request scripts and durable evidence;
 //! no worker claim is invented (domain/people.md, section 5.1).
 
-use crate::commits::Store;
 use crate::escalation;
 use crate::escalation_referee::Story;
 use crate::roles_referee::{Referee, Replacement};
+use crate::store::Store;
 use crate::walking;
 use jig_core_accounts as accounts;
 use jig_core_authority as authority;
@@ -14,7 +14,8 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
-use temper_engine_domain::{Delivery, Key, Record, Write, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Delivery, Key, Record, Write};
 
 /// Actual held-chat state at which the previous process stops
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -186,7 +187,7 @@ fn snapshot(settings: Settings) -> Store {
                     tasks::Escalation::Waiting { revision: 2, holder: tasks::EscalationHolder::Role { .. }, .. }
                     if settings.base == Base::FinalRole))
         });
-        let acknowledged = previous.trace.iter().any(|entry| entry.starts_with("output Deliver(Acknowledge {"));
+        let acknowledged = previous.trace.iter().any(|entry| entry.starts_with("output Worker(Deliver(Acknowledge {"));
         if waiting && acknowledged && previous.store.pending.is_empty() {
             return previous.store;
         }
@@ -292,7 +293,7 @@ impl World {
             store,
             settings,
         };
-        world.queue(engine::Event::Start, 0);
+        world.queue(engine::Event::Restart, 0);
         world.bootstrap();
         world
     }
@@ -313,12 +314,12 @@ impl World {
 
     fn dispatch(&mut self, to: Token, input: &Input) {
         self.queue(
-            engine::Event::Ask {
+            engine::Event::Party(engine::PartyInput::Ask {
                 reply_to: ReplyTo::new(to),
                 sign_in: self.sessions[input.owner],
                 key: input.key,
                 ask: input.ask.clone(),
-            },
+            }),
             0,
         );
     }
@@ -392,7 +393,7 @@ impl World {
         self.environment.now = Time::from_nanos(nanos);
         self.environment.wall = Wall::from_nanos(nanos);
         if !self.frozen_cut {
-            engine::release(&mut self.domain, &self.environment, &mut self.out);
+            crate::poll(&mut self.domain, &self.environment, &mut self.out);
             self.observe();
             if !self.frozen_cut && self.events.front().is_some_and(|(due, _)| *due <= self.iteration) {
                 let (_, event) = self.events.pop_front().expect("one due outside event");
@@ -450,9 +451,9 @@ impl World {
             self.recovering = true;
             self.restarts += 1;
             self.trace.push("restart after atomic role application".into());
-            self.queue(engine::Event::Start, 0);
+            self.queue(engine::Event::Restart, 0);
         } else {
-            self.queue(engine::Event::Committed { number }, 0);
+            self.queue(engine::Event::Store(engine::StoreInput::Committed { number }), 0);
         }
     }
 
@@ -462,7 +463,7 @@ impl World {
             self.trace.push(format!("output {request:?}"));
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
-                engine::Request::Commit { number, writes } => {
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     self.cohorts.push((self.referee.clone(), writes.to_vec()));
                     self.referee.commit(&writes).expect("independent role transaction observer");
                     let roles = writes.iter().any(|write| {
@@ -483,12 +484,16 @@ impl World {
                         return;
                     }
                 }
-                engine::Request::Load { owner, range, after, most, .. } => {
+                engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                     self.pages += 1;
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    self.queue(engine::Event::Loaded { owner, rows, next }, self.settings.page_delay);
+                    self.queue(
+                        engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }),
+                        self.settings.page_delay,
+                    );
                 }
-                engine::Request::Deliver(Delivery::WebReply { to, reply, .. }) => {
+                engine::Request::Worker(engine::WorkerRequest::Deliver(Delivery::WebReply { to, reply, .. }))
+                | engine::Request::Party(engine::PartyRequest::Deliver(Delivery::WebReply { to, reply, .. })) => {
                     let token = to.into_token();
                     assert_eq!(
                         self.referee.replied(&self.store.rows, token, reply),
@@ -497,9 +502,19 @@ impl World {
                     );
                     self.inputs.remove(&token).expect("one pending outside reply right");
                 }
-                engine::Request::Deliver(delivery) => panic!("unexpected role-world delivery {delivery:?}"),
+                engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
+                | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => {
+                    panic!("unexpected role-world delivery {delivery:?}")
+                }
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                    self.queue(engine::Event::Refreshed { account, generation, valid: Duration::from_secs(60) }, 0);
+                    self.queue(
+                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                            account,
+                            generation,
+                            valid: Duration::from_secs(60),
+                        }),
+                        0,
+                    );
                 }
                 engine::Request::Account(
                     accounts::Request::Keep { .. }
@@ -509,13 +524,19 @@ impl World {
                     | accounts::Request::Refused { .. }
                     | accounts::Request::Closed { .. },
                 ) => {}
-                engine::Request::Host(_) => panic!("legacy fixture received a typed protocol request"),
-                engine::Request::CallBusy { .. }
-                | engine::Request::AnswerBusy { .. }
-                | engine::Request::TurnBusy { .. } => {
+                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
+                    panic!("fixture received an unexpected host request")
+                }
+                engine::Request::Worker(
+                    engine::WorkerRequest::CallBusy { .. }
+                    | engine::WorkerRequest::AnswerBusy { .. }
+                    | engine::WorkerRequest::TurnBusy { .. },
+                ) => {
                     panic!("held role world offers no worker answers")
                 }
-                engine::Request::View(_) | engine::Request::WatchRefused { .. } => panic!("unrequested view output"),
+                engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. }) => {
+                    panic!("unrequested view output")
+                }
                 engine::Request::Stop => panic!("role root stopped: {:?}", self.trace),
                 engine::Request::Forge { .. } => {
                     panic!("role story did not adopt forge")

@@ -1,7 +1,8 @@
 use jig_core_fleet as fleet;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
-use temper_engine_domain::{Key, Record, Write, engine};
+use temper_engine_domain as engine;
+use temper_engine_domain::{Key, Record, Write};
 use temper_engine_domain_world::walking::{Settings, World, run_replayed};
 use temper_engine_domain_world::walking_referee::{FINAL_SPEND, REPORT, WalkingReferee};
 
@@ -190,8 +191,8 @@ fn walking_referee_rejects_wrong_task_or_uncommitted_or_duplicate_assignment() {
     use jig_core_accounts::Grant;
     use jig_core_brief as brief;
     use skein_lib::Duration;
-    use temper_engine_domain::engine::Assignment;
-    use temper_engine_domain::engine::{BriefBody as Body, BriefKind as Kind, BriefSection as Section};
+    use temper_engine_domain::Assignment;
+    use temper_engine_domain::{BriefBody as Body, BriefKind as Kind, BriefSection as Section};
     let world = settled();
     let task = ended(&world);
     let mut assignment = Assignment {

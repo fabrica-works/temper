@@ -133,7 +133,7 @@ fn a_branch_another_party_advanced_makes_the_push_moved_and_nothing_is_forced() 
         world.run(ITERATIONS);
         for landing in first_landings(&world, client) {
             match landing {
-                Landing::Conflicted { .. } => panic!("legacy clients do not prepare merges"),
+                Landing::Conflicted { .. } => panic!("this fixture prepares one checkout branch"),
                 Landing::Landed { .. } => {}
                 Landing::Moved => moved += 1,
                 other @ (Landing::Failed
@@ -226,7 +226,7 @@ fn a_push_io_reports_run_out_of_time_is_verified_and_reported_as_it_went() {
 
 #[test]
 fn a_seed_replays_to_the_same_run() {
-    let trace = temper_world::assert_replays(13, 14, |seed| {
+    let trace = skein_world::domain::assert_replays(13, 14, |seed| {
         let settings = noisy(seed);
         let mut world = World::new(settings);
         submit_noisily(&mut world, &settings, seed);

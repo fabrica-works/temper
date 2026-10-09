@@ -1,7 +1,7 @@
 use crate::decision::{
     Counters, Decision, Delivery, Journal as SkeinJournal, JournalOutput as Output, Limits, accept as accept_decision,
     committed as mark_committed, fresh as fresh_number, journal_limits, resume as release_ready,
-    takes as takes_decision, uncommitted as mark_uncommitted,
+    takes as takes_decision,
 };
 use crate::{Deployment, Family, Key, Record, TurnRecord, Write};
 use alloc::boxed::Box;
@@ -71,10 +71,6 @@ fn committed(journal: &mut Journal, number: u64) {
 fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
     release_ready(&mut journal.inner, out);
 }
-fn uncommitted(journal: &mut Journal, number: u64, out: &mut Queue<Output>) {
-    mark_uncommitted(&mut journal.inner, number, out);
-}
-
 fn bytes(len: u32) -> Box<[u8]> {
     let mut bytes = List::with_capacity(len);
     for _ in 0..len {
@@ -167,91 +163,6 @@ fn a_store_answer_makes_outputs_ready_without_draining_them() {
     assert_eq!(acknowledged(&mut out), 1);
     resume(&mut j, &mut out);
     assert!(out.is_empty());
-}
-
-#[test]
-fn a_decision_without_writes_still_waits_for_the_state_it_observed() {
-    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
-    let mut out = Queue::with_capacity(1);
-    accept(&mut j, &LIMITS, decision(1), &mut out).unwrap();
-    drop(commit(&mut out));
-    let mut read = Decision::new(&LIMITS);
-    read.deliver(&LIMITS, ack(2)).unwrap();
-    accept(&mut j, &LIMITS, read, &mut out).unwrap();
-    assert!(out.is_empty());
-    resume(&mut j, &mut out);
-    assert!(out.is_empty());
-    committed(&mut j, 1);
-    resume(&mut j, &mut out);
-    assert_eq!(acknowledged(&mut out), 1);
-    resume(&mut j, &mut out);
-    assert_eq!(acknowledged(&mut out), 2);
-    assert_eq!(j.deployment().commits, 1);
-}
-
-#[test]
-fn cumulative_store_answers_preserve_original_output_order() {
-    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
-    let mut out = Queue::with_capacity(1);
-    for turn in 1_u32..=2 {
-        accept(&mut j, &LIMITS, decision(turn), &mut out).unwrap();
-        assert_eq!(commit(&mut out).0, u64::from(turn));
-    }
-    assert!(!takes(&j, &LIMITS));
-    committed(&mut j, 2);
-    assert_eq!(j.durable(), 2);
-    for turn in 1_u32..=2 {
-        resume(&mut j, &mut out);
-        assert_eq!(out.len(), 1);
-        assert_eq!(acknowledged(&mut out), turn);
-    }
-    assert!(takes(&j, &LIMITS));
-}
-
-#[test]
-fn a_failed_commit_releases_neither_its_outputs_nor_later_outputs() {
-    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
-    let mut out = Queue::with_capacity(1);
-    for turn in 1_u32..=2 {
-        accept(&mut j, &LIMITS, decision(turn), &mut out).unwrap();
-        drop(commit(&mut out));
-    }
-    uncommitted(&mut j, 1, &mut out);
-    assert_eq!(out.pop(), Some(Output::Stop));
-    committed(&mut j, 2);
-    uncommitted(&mut j, 2, &mut out);
-    resume(&mut j, &mut out);
-    assert!(out.is_empty());
-    assert!(j.stopped());
-    assert!(!takes(&j, &LIMITS));
-    assert_eq!(fresh(&mut j, Family::Task), None);
-}
-
-#[test]
-fn held_output_pressure_is_seen_before_the_next_child_decision() {
-    let mut j = Journal::new(DEPLOYMENT, &LIMITS);
-    let mut out = Queue::with_capacity(1);
-    for _ in 0_u32..2 {
-        let mut d = Decision::new(&LIMITS);
-        for turn in 1_u32..=4 {
-            d.deliver(&LIMITS, ack(turn)).unwrap();
-        }
-        accept(&mut j, &LIMITS, d, &mut out).unwrap();
-    }
-    assert!(!takes(&j, &LIMITS));
-    let before = j.deployment();
-    let returned = accept(&mut j, &LIMITS, decision(1), &mut out).unwrap_err();
-    assert_eq!(j.deployment(), before);
-    assert!(out.is_empty());
-    for _ in 0_u32..4 {
-        resume(&mut j, &mut out);
-        drop(out.pop());
-    }
-    assert!(takes(&j, &LIMITS));
-    accept(&mut j, &LIMITS, returned, &mut out).unwrap();
-    let (_, writes) = commit(&mut out);
-    assert_eq!(writes.len(), 2);
-    assert_eq!(writes[1], turn(1, 2));
 }
 
 #[test]
@@ -410,18 +321,18 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
         run_bytes: 512,
     };
     let mut decision = Decision::new(&limits);
-    let assignment = crate::engine::Assignment {
+    let assignment = crate::Assignment {
         task: 1,
         attempt: 1,
         charter: 1,
-        run: Box::new(crate::engine::RunCharter {
-            policy: crate::engine::RunPolicy {
+        run: Box::new(crate::RunCharter {
+            policy: crate::RunPolicy {
                 instructions: Box::new([]),
                 waiting: skein_lib::Duration::from_secs(1),
                 resume: true,
                 turns: 1,
                 time: skein_lib::Duration::from_secs(1),
-                model: crate::engine::Model {
+                model: crate::Model {
                     dialect: 1,
                     account: 1,
                     endpoint: 1,
@@ -450,13 +361,13 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
             },
             budget: 1,
         }),
-        sections: Box::new([crate::engine::BriefSection {
-            kind: crate::engine::BriefKind::Core(brief::Core::Task),
-            body: crate::engine::BriefBody::Text(b"12345".as_slice().into()),
+        sections: Box::new([crate::BriefSection {
+            kind: crate::BriefKind::Core(brief::Core::Task),
+            body: crate::BriefBody::Text(b"12345".as_slice().into()),
         }]),
         inbox: Box::new([]),
         saved: Box::new([]),
-        workspace: crate::engine::ForgeWorkspace { key: Box::new([]), repositories: Box::new([]) },
+        workspace: crate::ForgeWorkspace { key: Box::new([]), repositories: Box::new([]) },
         transcript: Box::new([]),
         answered: Box::new([]),
         settled: Box::new([]),

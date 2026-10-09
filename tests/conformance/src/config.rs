@@ -2,7 +2,7 @@
 use jig_conformance::scenarios::Scenario;
 use jig_core_authority as authority;
 use skein_lib::{Duration, Queue};
-use temper_engine_domain::engine;
+use temper_engine_domain as engine;
 use temper_engine_domain_world::walking;
 
 #[expect(clippy::too_many_lines, reason = "the fixture specifies its policy and child bounds together")]

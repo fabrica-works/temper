@@ -1,16 +1,16 @@
-//! Version-two runtime world. The real root, host, checkout and agent child
+//! Runtime world. The real root, host, checkout and agent child
 //! domains meet a scripted engine and process, with deterministic git
-//! terminals. The v1 system world's scripts and random draws remain frozen.
+//! terminals.
 
 use std::collections::VecDeque;
 use std::fmt::{self, Write};
 
 use skein_lib::{Duration, Env, Queue, Rng, Time, Token, Wall};
+use skein_world::domain::heap::Meter;
 use temper_worker_domain::agent::{self as channel, Answer, Ask, CallName, Down, RunResult, Up};
 use temper_worker_domain::checkout::git::{Commit, Done, Op, Want};
 use temper_worker_domain::wire::{self as host, Access, Assignment, Repository, RunAssignment, Start, Workspace};
 use temper_worker_domain::{Domain, Event, Limits, Request, fire, max_out, step, worst_case};
-use temper_world::heap::Meter;
 
 const RUN: Token = Token::new(31);
 const ATTEMPT: Token = Token::new(932);
@@ -229,7 +229,7 @@ impl World {
             let Some(told) = self.domain.pop_told() else { break };
             self.remember_fact(&told);
         }
-        self.meter.check(measured, self.bound, self.settings);
+        self.meter.check(measured, self.bound, &self.settings);
         self.stats.peak_heap = self.stats.peak_heap.max(self.meter.held());
         self.stats.peak_retained = self.stats.peak_retained.max(self.domain.retained_turns());
         self.domain.reclaim();
@@ -253,7 +253,7 @@ impl World {
                 assert!(!self.dialling);
                 self.dialling = true;
             }
-            Request::HelloV2 { hello, graces, push_deadline } => {
+            Request::Hello { hello, graces, push_deadline } => {
                 assert_eq!(graces, temper_worker_domain::declared_graces(&self.env.limits).expect("checked"));
                 assert_eq!(push_deadline, temper_worker_domain::push_deadline(&self.env.limits).expect("checked"));
                 assert!(hello.hosting.len() <= 1);
@@ -458,7 +458,7 @@ impl World {
         self.fire();
         assert!(self.dialling);
         self.dialling = false;
-        self.send(Event::ConnectedV2);
+        self.send(Event::Connected);
         self.stats.reconnects += 1;
     }
 
@@ -469,7 +469,7 @@ impl World {
         self.fire();
         assert!(self.dialling);
         self.dialling = false;
-        self.send(Event::ConnectedV2);
+        self.send(Event::Connected);
         let repository = Repository {
             tag: 19,
             name: Box::from(&b"app"[..]),
@@ -480,7 +480,7 @@ impl World {
             } else {
                 Start::Base { branch: Box::from(&b"main"[..]) }
             },
-            access: Access::WritableV2 { push: Box::from(&b"topic"[..]), expected: Some(HEAD) },
+            access: Access::Writable { push: Box::from(&b"topic"[..]), expected: Some(HEAD) },
         };
         let assignment = Assignment {
             assignment: RunAssignment {

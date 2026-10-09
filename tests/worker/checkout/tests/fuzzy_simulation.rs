@@ -54,7 +54,7 @@ fn random_worlds_settle_with_every_client_heard() {
             for (saved, landings) in &client.landings {
                 for landing in landings {
                     let kind = match landing {
-                        Landing::Conflicted { .. } => panic!("legacy clients do not prepare merges"),
+                        Landing::Conflicted { .. } => panic!("this fixture prepares one checkout branch"),
                         Landing::Landed { .. } => "landed",
                         Landing::Moved => "moved",
                         Landing::Refused | Landing::Explained { fault: Fault::Refused, .. } => "refused",

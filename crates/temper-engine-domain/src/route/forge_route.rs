@@ -970,7 +970,7 @@ pub(crate) fn subscribe_goal(domain: &mut Domain, env: &Env<Limits>, goal: u64, 
             | Work::AdoptRestored
             | Work::AdoptDone
             | Work::Restart(_)
-            | Work::TypedDecoded { .. }
+            | Work::Decoded { .. }
             | Work::Core(_)
             | Work::Tasks(_)
             | Work::People(_)

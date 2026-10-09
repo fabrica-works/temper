@@ -254,7 +254,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // bounded transport continuations and simultaneously assembled envelopes.
     let mut bytes = core_bytes
         .checked_add(forge_bytes)?
-        .checked_add(crate::worst_case(&limits.journal)?)?
+        .checked_add(crate::journal_worst_case(&limits.journal)?)?
         .checked_add(load_bytes)?
         .checked_add(landing_bytes)?
         .checked_add(permission_bytes)?;
@@ -341,7 +341,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?
         .checked_add(role_scratch_bytes(limits)?)?
         .checked_add(Queue::<Request>::worst_case(max_out(limits))?.checked_mul(2)?)?
-        .checked_add(Queue::<crate::engine::Request>::worst_case(max_out(limits))?)?
         .checked_add(u64::try_from(size_of::<forge::Event>()).ok()?)?
         .checked_add(Queue::<Output>::worst_case(1)?)?
         .checked_add(Queue::<loads::Request>::worst_case(1)?)?;

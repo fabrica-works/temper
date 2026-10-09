@@ -7,8 +7,8 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::Token;
 use std::collections::{BTreeMap, BTreeSet};
-use temper_engine_domain::engine::{BriefBody as Body, BriefKind as Kind};
-use temper_engine_domain::{EscalationDecisionRecord, Key, Record, TerminalRecord, Write, engine::Assignment};
+use temper_engine_domain::{Assignment, EscalationDecisionRecord, Key, Record, TerminalRecord, Write};
+use temper_engine_domain::{BriefBody as Body, BriefKind as Kind};
 
 /// Independently supplied opening words.
 pub const QUESTION: &[u8] = b"retry held chat";
