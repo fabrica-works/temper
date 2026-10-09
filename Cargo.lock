@@ -74,30 +74,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-accounts-world"
-version = "0.0.0"
-dependencies = [
- "jig-core-accounts",
- "skein-lib",
- "skein-world",
-]
-
-[[package]]
-name = "jig-boundary"
-version = "0.0.0"
-
-[[package]]
-name = "jig-brief-world"
-version = "0.0.0"
-dependencies = [
- "jig-core-brief",
- "skein-lib",
- "skein-world",
-]
-
-[[package]]
 name = "jig-charter"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
  "smith-charter",
@@ -107,32 +86,9 @@ dependencies = [
 [[package]]
 name = "jig-conformance"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-fake-store",
- "jig-test-system",
- "skein-lib",
- "skein-world",
-]
-
-[[package]]
-name = "jig-conformance-world"
-version = "0.0.0"
-dependencies = [
- "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-world",
- "jig-fake-parties",
- "jig-fake-store",
- "jig-fake-workers",
- "jig-test-connector",
- "jig-test-connector-world",
- "jig-test-domain",
  "jig-test-system",
  "skein-lib",
  "skein-world",
@@ -141,6 +97,7 @@ dependencies = [
 [[package]]
 name = "jig-core"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-core-accounts",
  "jig-core-authority",
@@ -156,6 +113,7 @@ dependencies = [
 [[package]]
 name = "jig-core-accounts"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -163,6 +121,7 @@ dependencies = [
 [[package]]
 name = "jig-core-authority"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -170,6 +129,7 @@ dependencies = [
 [[package]]
 name = "jig-core-brief"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -177,6 +137,7 @@ dependencies = [
 [[package]]
 name = "jig-core-fleet"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -184,6 +145,7 @@ dependencies = [
 [[package]]
 name = "jig-core-notes"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -191,6 +153,7 @@ dependencies = [
 [[package]]
 name = "jig-core-people"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -198,6 +161,7 @@ dependencies = [
 [[package]]
 name = "jig-core-tasks"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -205,6 +169,7 @@ dependencies = [
 [[package]]
 name = "jig-core-views"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -212,6 +177,7 @@ dependencies = [
 [[package]]
 name = "jig-core-world"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-conformance",
  "jig-core",
@@ -237,6 +203,7 @@ dependencies = [
 [[package]]
 name = "jig-fake-parties"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -244,157 +211,28 @@ dependencies = [
 [[package]]
 name = "jig-fake-store"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 
 [[package]]
 name = "jig-fake-workers"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
-]
-
-[[package]]
-name = "jig-fleet-world"
-version = "0.0.0"
-dependencies = [
- "jig-core-fleet",
- "skein-lib",
- "skein-world",
 ]
 
 [[package]]
 name = "jig-host"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
-]
-
-[[package]]
-name = "jig-host-world"
-version = "0.0.0"
-dependencies = [
- "jig-charter",
- "jig-host",
- "jig-inline-agent",
- "skein-fake-llm-domain",
- "skein-lib",
- "skein-world",
- "smith-agent-world",
- "smith-charter",
- "smith-domain",
- "smith-host-domain",
- "smith-protocol-channel",
- "smith-transcript",
-]
-
-[[package]]
-name = "jig-inline-agent"
-version = "0.0.0"
-dependencies = [
- "jig-charter",
- "skein-lib",
- "smith-agent-world",
- "smith-charter",
- "smith-domain",
- "smith-domain-run",
- "smith-host-domain",
- "smith-protocol-channel",
- "smith-transcript",
-]
-
-[[package]]
-name = "jig-notes-world"
-version = "0.0.0"
-dependencies = [
- "jig-core-notes",
- "skein-lib",
- "skein-world",
-]
-
-[[package]]
-name = "jig-ops-domain"
-version = "0.0.0"
-dependencies = [
- "jig-charter",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
- "jig-core-world",
- "jig-host",
- "jig-inline-agent",
- "jig-ops-domain-infrastructure",
- "jig-ops-domain-observability",
- "jig-ops-world",
- "skein-json",
- "skein-lib",
- "smith-agent-world",
- "smith-charter",
- "smith-domain",
- "smith-domain-run",
- "smith-host-domain",
- "smith-protocol-channel",
- "smith-transcript",
-]
-
-[[package]]
-name = "jig-ops-domain-infrastructure"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-ops-domain-observability"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-ops-fake-production"
-version = "0.0.0"
-
-[[package]]
-name = "jig-ops-world"
-version = "0.0.0"
-dependencies = [
- "jig-charter",
- "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-world",
- "jig-fake-store",
- "jig-host",
- "jig-inline-agent",
- "jig-ops-domain",
- "jig-ops-domain-infrastructure",
- "jig-ops-domain-observability",
- "jig-ops-fake-production",
- "jig-test-system",
- "skein-fake-llm-domain",
- "skein-lib",
- "skein-world",
- "smith-agent-world",
- "smith-charter",
- "smith-domain",
- "smith-domain-run",
- "smith-protocol-channel",
- "smith-transcript",
 ]
 
 [[package]]
 name = "jig-people-world"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-core-people",
  "skein-lib",
@@ -404,6 +242,7 @@ dependencies = [
 [[package]]
 name = "jig-tasks-world"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-core-tasks",
  "skein-lib",
@@ -413,6 +252,7 @@ dependencies = [
 [[package]]
 name = "jig-test-connector"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "skein-lib",
 ]
@@ -420,6 +260,7 @@ dependencies = [
 [[package]]
 name = "jig-test-connector-world"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-test-connector",
  "jig-test-system",
@@ -429,6 +270,7 @@ dependencies = [
 [[package]]
 name = "jig-test-domain"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-core",
  "jig-core-accounts",
@@ -444,18 +286,9 @@ dependencies = [
 [[package]]
 name = "jig-test-system"
 version = "0.0.0"
+source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
 dependencies = [
  "jig-test-connector",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-views-world"
-version = "0.0.0"
-dependencies = [
- "jig-core-views",
- "skein-lib",
- "skein-world",
 ]
 
 [[package]]
@@ -653,21 +486,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smith-protocol-channel"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
-dependencies = [
- "skein-channel",
- "skein-lib",
- "smith-channel",
- "smith-charter",
- "smith-domain",
- "smith-domain-session",
- "smith-domain-tools",
- "smith-transcript",
-]
-
-[[package]]
 name = "smith-session-world"
 version = "0.0.0"
 source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
@@ -690,15 +508,6 @@ dependencies = [
  "skein-lib",
  "skein-world",
  "smith-domain-tools",
-]
-
-[[package]]
-name = "smith-transcript"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
-dependencies = [
- "skein-codec",
- "skein-lib",
 ]
 
 [[package]]

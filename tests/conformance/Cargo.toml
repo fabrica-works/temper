@@ -25,7 +25,7 @@ jig-conformance.workspace = true
 jig-fake-store.workspace = true
 jig-fake-workers.workspace = true
 jig-test-system.workspace = true
-jig-core-world = { path = "../../jig/tests/core" }
+jig-core-world.workspace = true
 
 temper-engine-domain-world = { path = "../engine/domain" }
 

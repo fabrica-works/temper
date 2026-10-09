@@ -31,8 +31,8 @@ smith-domain-session.workspace = true
 smith-domain-tools.workspace = true
 
 [dev-dependencies]
-jig-tasks-world = { path = "../../../jig/tests/tasks" }
-jig-people-world = { path = "../../../jig/tests/people" }
+jig-tasks-world.workspace = true
+jig-people-world.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

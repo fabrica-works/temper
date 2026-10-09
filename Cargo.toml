@@ -6,60 +6,25 @@ members = [
     "crates/temper-web-domain",
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
-    "jig/crates/jig-core-accounts",
-    "jig/testing/jig-test-connector",
-    "jig/testing/jig-test-domain",
-    "jig/testing/jig-conformance",
-    "jig/tests/conformance",
-    "jig/testing/jig-fake-store",
-    "jig/testing/jig-fake-workers",
-    "jig/testing/jig-fake-parties",
-    "jig/testing/jig-test-system",
-    "jig/testing/jig-ops-fake-production",
-    "jig/examples/ops/domain",
-    "jig/examples/ops/domain-observability",
-    "jig/examples/ops/domain-infrastructure",
-    "jig/tests/ops",
-    "jig/tests/test-connector",
-    "jig/tests/core",
-    "jig/crates/jig-core-authority",
-    "jig/crates/jig-core-brief",
-    "jig/crates/jig-core-fleet",
     "crates/temper-engine-domain-forge-client",
     "crates/temper-engine-domain-forge-change",
     "crates/temper-engine-domain-forge-issues",
     "crates/temper-engine-domain-forge",
-    "jig/crates/jig-core-notes",
-    "jig/crates/jig-core-people",
-    "jig/crates/jig-core-tasks",
-    "jig/crates/jig-core-views",
     "crates/temper-worker-domain",
     "crates/temper-worker-domain-checkout",
-    "jig/crates/jig-host",
-    "jig/crates/jig-charter",
-    "jig/crates/jig-inline-agent",
     "crates/temper-web-view",
     "testing/temper-fake-forge-domain",
     "testing/temper-fake-person",
     "tests/fake-checkout",
-    "jig/tests/accounts",
-    "jig/tests/brief",
     "tests/engine/domain",
     "tests/system",
     "tests/conformance",
-    "jig/tests/fleet",
     "tests/engine/forge/client",
     "tests/engine/forge",
-    "jig/tests/notes",
-    "jig/tests/people",
-    "jig/tests/tasks",
-    "jig/tests/views",
     "tests/fake-forge",
     "tests/worker/checkout",
-    "jig/tests/host",
     "tests/worker/domain",
     "tests/web/domain",
-    "jig/tests/boundary",
 ]
 
 [workspace.package]
@@ -88,37 +53,40 @@ smith-transcript = { git = "https://git.ekanayaka.io/ai/smith.git" }
 sha2 = { version = "=0.10.9", default-features = false }
 temper-web-view = { path = "crates/temper-web-view" }
 temper-fake-person = { path = "testing/temper-fake-person" }
-jig-core-accounts = { path = "jig/crates/jig-core-accounts" }
-jig-test-connector = { path = "jig/testing/jig-test-connector" }
-jig-test-domain = { path = "jig/testing/jig-test-domain" }
-jig-conformance = { path = "jig/testing/jig-conformance" }
-jig-fake-store = { path = "jig/testing/jig-fake-store" }
-jig-fake-workers = { path = "jig/testing/jig-fake-workers" }
-jig-fake-parties = { path = "jig/testing/jig-fake-parties" }
-jig-test-system = { path = "jig/testing/jig-test-system" }
-jig-ops-fake-production = { path = "jig/testing/jig-ops-fake-production" }
-jig-ops-domain = { path = "jig/examples/ops/domain" }
-jig-ops-domain-observability = { path = "jig/examples/ops/domain-observability" }
-jig-ops-domain-infrastructure = { path = "jig/examples/ops/domain-infrastructure" }
+jig-core-accounts = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-test-connector = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-test-domain = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-conformance = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-fake-store = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-fake-workers = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-fake-parties = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-test-system = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-ops-fake-production = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-ops-domain = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-ops-domain-observability = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-ops-domain-infrastructure = { git = "https://git.ekanayaka.io/ai/jig.git" }
 temper-engine-domain = { path = "crates/temper-engine-domain" }
 temper-engine-smith = { path = "crates/temper-engine-smith" }
-jig-core-authority = { path = "jig/crates/jig-core-authority" }
-jig-core = { path = "jig/crates/jig-core" }
-jig-core-notes = { path = "jig/crates/jig-core-notes" }
-jig-core-people = { path = "jig/crates/jig-core-people" }
-jig-core-tasks = { path = "jig/crates/jig-core-tasks" }
-jig-core-brief = { path = "jig/crates/jig-core-brief" }
-jig-core-fleet = { path = "jig/crates/jig-core-fleet" }
+jig-core-authority = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-notes = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-people = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-tasks = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-brief = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-fleet = { git = "https://git.ekanayaka.io/ai/jig.git" }
 temper-engine-domain-forge-client = { path = "crates/temper-engine-domain-forge-client" }
 temper-engine-domain-forge-change = { path = "crates/temper-engine-domain-forge-change" }
 temper-engine-domain-forge-issues = { path = "crates/temper-engine-domain-forge-issues" }
 temper-engine-domain-forge = { path = "crates/temper-engine-domain-forge" }
-jig-core-views = { path = "jig/crates/jig-core-views" }
+jig-core-views = { git = "https://git.ekanayaka.io/ai/jig.git" }
 temper-worker-domain = { path = "crates/temper-worker-domain" }
 temper-worker-domain-checkout = { path = "crates/temper-worker-domain-checkout" }
-jig-host = { path = "jig/crates/jig-host" }
-jig-charter = { path = "jig/crates/jig-charter" }
-jig-inline-agent = { path = "jig/crates/jig-inline-agent" }
+jig-host = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-charter = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-inline-agent = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-core-world = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-tasks-world = { git = "https://git.ekanayaka.io/ai/jig.git" }
+jig-people-world = { git = "https://git.ekanayaka.io/ai/jig.git" }
 temper-fake-forge-domain = { path = "testing/temper-fake-forge-domain" }
 temper-fake-checkout = { path = "tests/fake-checkout" }
 temper-worker-checkout-world = { path = "tests/worker/checkout" }
