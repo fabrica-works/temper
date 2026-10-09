@@ -204,6 +204,11 @@ at a time on each (connectors.md, section 4):
 | create a branch at a commit | a creation, named | unrecoverable: another hand can delete it, and nothing then shows it was made | the branch exists at that commit |
 | delete a branch | a set: temper's own branches only | idempotent | it is gone |
 
+- **Each row is a kind of its own,** numbered by the forge: a kind has
+  one form and one recovery class (jig's `connectors.md`, 3.1), so
+  creating an issue and editing it are different kinds, and so are
+  opening, editing, updating, merging and closing a pull request. A
+  policy that grants writing issues grants each kind it means.
 - **Classes follow what Forgejo offers.** It keeps no key it would refuse
   a second creation by, so nothing temper makes is keyed. A pull request
   is opened only while none is open for its branches, and Forgejo keeps
