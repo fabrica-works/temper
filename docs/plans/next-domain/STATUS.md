@@ -553,6 +553,10 @@ and workspace suites remain within their existing budgets.
 | temper 05.3 native stories and every cut | merged and pushed | 5faffd94, a6a3d7e9, 6b4460cc | Branch `jig/temper-05-3-stories`: seven applicable shared and seven native stories retain all 365 cuts, independent uncertainty and settlement evidence, split forge kinds and native restart fixes. Gate on rebased tip: fmt/clippy; 1,282 focused / 2.610 s; 40 fuzzy / 14.142 s. Serial conformance: 15 focused / 1.820 s; 2 fuzzy / 16.503 s, within the decided 2 s / 20 s allocation. |
 | temper 05.4 composed system world | merged and pushed | 10d57825 | Branch `jig/temper-05-4-system`: actual engine and worker roots plus actual Smith agents over fake LLM IO, jig's fake store and authenticated parties, and shared API/git forge state. Seven composed cases and 24 paired seeded runs check durability, host calls, turn credit, human input/cancellation, worker-prepared mounts and restored Smith prefixes. Gate: fmt/clippy; 1,289 focused / 2.587 s; 41 fuzzy / 15.067 s. All eight Temper worlds measured serially; system 16 focused / 0.315 s and 1 fuzzy / 0.357 s. |
 
+| temper 06.1 retire extracted code | merged and pushed | 723b11cb | Branch `jig/temper-06-1-retire`: removed `temper-world`, the flat engine facade, the duplicate journal-only world and store implementation, and four generic journal unit stories. Temper uses native root envelopes, Skein's world helpers and Jig's store fake; application record/paging translation and payload/admission checks remain. Worker APIs and comments use one vocabulary. Boundary holds. Gate: fmt/clippy; 1,259 focused / 5.226 s; 40 fuzzy / 21.765 s. All 365 conformance cuts remain. |
+| temper 06.1b policy snapshots (optional) | merged and pushed | 0739bff0 | Branch `jig/temper-06-1b-policy`: borrow the complete independent scenario policy and replace the referee's owned snapshot only when its value changes, before observing. Five files; no referee rule, observation order, cut or baseline iteration changed. Gate: fmt/clippy; 1,259 focused / 4.849 s; 40 fuzzy / 17.013 s. Serial Temper conformance fell from 1.803 s focused / 17.355 s fuzzy to 1.277 s / 11.128 s in the comparison runs. |
+| temper 06.2 measurements and report | measured; Markdown report | — | Branch `jig/temper-06-2-measure`: every current Jig and Temper world measured serially with `measure -j1`, through the shared lock, on 0739bff0. Complete focused suite: 1,259 / 13.093 s elapsed; fuzzy: 40 / 32.851 s elapsed. Both also fit 15 s / 60 s when serial. Detailed measurements, carried questions and user revision/move handoffs below. Markdown only; `git diff --check` passes. |
+
 ### temper 03 boundary and handoff
 
 - Root to forge: adopted repositories, names and holds, writer claims and run
@@ -978,3 +982,202 @@ The new system world has a domain face, not a deployed serialization or
 kernel/process face; those higher-tier tests remain later work. No plans,
 design documents, independent protocol work, forge dependency URLs or user
 drafts were changed, and no dependency revision was required.
+
+### temper 06 final serial measurements
+
+2026-10-09. Measured from the assigned worktree at code tip `0739bff0`,
+unoptimized test build, `CARGO_INCREMENTAL=0`, one test process at a time.
+Every cargo invocation used the shared build lock. The table sums individual
+test times; suite elapsed times include scheduling overhead.
+
+| World / test package | Focused tests / seconds | Fuzzy tests / seconds |
+|---|---:|---:|
+| `jig-accounts-world` | 9 / 0.036 | 1 / 0.015 |
+| `jig-boundary` | 7 / 0.223 | 0 / 0.000 |
+| `jig-brief-world` | 9 / 0.036 | 1 / 0.004 |
+| `jig-conformance-world` | 15 / 0.620 | 2 / 2.951 |
+| `jig-core-world` | 116 / 1.050 | 6 / 0.958 |
+| `jig-fleet-world` | 35 / 0.445 | 2 / 0.677 |
+| `jig-host-world` | 27 / 0.162 | 2 / 1.884 |
+| `jig-notes-world` | 9 / 0.036 | 1 / 0.032 |
+| `jig-ops-world` | 32 / 0.682 | 3 / 0.282 |
+| `jig-people-world` | 21 / 0.089 | 1 / 0.069 |
+| `jig-tasks-world` | 99 / 0.717 | 1 / 3.394 |
+| `jig-test-connector-world` | 7 / 0.029 | 1 / 0.018 |
+| `jig-views-world` | 14 / 0.056 | 1 / 0.032 |
+| `temper-conformance-world` | 15 / 1.447 | 2 / 12.179 |
+| `temper-engine-domain-world` | 181 / 3.433 | 6 / 7.391 |
+| `temper-engine-forge-world` | 46 / 0.252 | 1 / 0.027 |
+| `temper-engine-forge-client-world` | 26 / 0.144 | 2 / 0.108 |
+| `temper-fake-checkout` | 0 / 0.000 | 0 / 0.000 |
+| `temper-fake-forge-tests` | 3 / 0.018 | 0 / 0.000 |
+| `temper-system-world` | 16 / 0.351 | 1 / 0.419 |
+| `temper-web-domain-world` | 27 / 0.129 | 2 / 1.177 |
+| `temper-worker-checkout-world` | 31 / 0.703 | 2 / 1.096 |
+| `temper-worker-domain-world` | 13 / 0.079 | 2 / 0.134 |
+| ops infrastructure connector checks | 4 / 0.016 | 0 / 0.000 |
+| ops observability connector checks | 5 / 0.020 | 0 / 0.000 |
+
+The ops root plus both connector checks totals **41 focused / 0.718 s**
+and **3 fuzzy / 0.282 s**, within session 17's half allocation of
+0.75 s / 4 s. Boundary initially measured 0.223 s in the workspace sweep;
+a separate serial check measured **7 / 0.183 s summed, 0.185 s elapsed**,
+within 0.2 s. No code or coverage changed between those measurements.
+
+Explicit allocations also hold: core 1.050 s / 0.958 s against 1.5 s / 8 s;
+Jig conformance 0.620 s / 2.951 s against 1.5 s / 8 s; test connector
+0.029 s / 0.018 s against 0.5 s / 4 s; host 0.162 s / 1.884 s against
+0.5 s / 3 s; Temper conformance 1.447 s / 12.179 s against 2 s / 20 s.
+The system world remains within the permitted 0.5 s / 3 s story growth.
+Carved worlds retain their inherited allocations and existing story coverage.
+
+The complete focused suite, including every crate's unit tests, is **1,259
+tests / 12.934 s summed / 13.093 s elapsed**; fuzzy is **40 / 32.847 s
+summed / 32.851 s elapsed**. The workflow's actual concurrent gate at this
+code tip passed in **4.849 s / 17.013 s**, against **15 s / 60 s**.
+
+The fake-checkout package has no own test target; its shared Skein mechanics
+and Temper remote policy are exercised in checkout, worker and system worlds.
+Other test-kit unit tests are included in the full suite: Jig parties 3,
+store 5, workers 6, test system 6 and ops production 10; Temper fake forge
+76 and fake person 2. Retired worlds give their time back: this session
+removed 30 focused tests and one fuzzy test already covered by their owners.
+
+Evidence: `/tmp/temper06-2-focused-serial-wt.log`,
+`/tmp/temper06-2-fuzzy-serial-wt.log`,
+`/tmp/temper06-2-boundary-serial-wt.log`. Only completed runs from the assigned
+worktree enter these measurements. A discarded partial setup run used the
+wrong cwd and encountered the removed-worktree cache path; it changed no
+tracked files. The fresh worktree run rebuilt the boundary normally, without
+a timestamp wrapper or target copy.
+
+### temper 06 questions gathered from the coordination log
+
+**Resolved blockers and completed handoffs:**
+
+- Smith completion input bounds: the proposed full-request cap was replaced
+  by owned prompt bytes plus a configured protocol/provider allowance, priced
+  at the full input rate plus maximum output. Smith 01 implements reservations.
+- Skein cold commit numbering and idle inspection: `from_durable` and `idle`
+  were added by the journal follow-up and adopted by Temper 01.
+- Typed agent metadata, concrete turn history, delivery evidence and opaque
+  call names: the jig 14 follow-up, Temper 04.2a and jig 11/19 carry them;
+  the fixed 16-byte call name carries activation, completion and position.
+- Result-created follow-up proposals disappearing on closing: jig 06's
+  decided lifecycle preserves them while closing waits for decisions and
+  delegates; cancellation or final ending withdraws pending proposals.
+- Top-level standing funding: jig 08 renews each period while existing
+  delegates retain their original funder.
+- Core routing before its independent world: jig 09 moved sibling decisions
+  into the core, and transcript/restart stories followed jig 11. Generic
+  callbacks are not copied into application roots.
+- Forge creation paths and recovery: deployment identity is a path component;
+  occupied names are not durable keys. Open/merge pull effects are conditional;
+  sets are idempotent; branch/issue/comment/review/update creations are
+  unrecoverable. Attempt lifetimes, history lookup and held uncertainty address
+  late copies after deletion/closure. Temper 03 reconciles prefixed adoption.
+- Smith `Gone` versus engine ACK: the proposed separate containment event and
+  repin were rejected. The hub takes custody and ACKs Smith independently,
+  retains turns until engine ACK, and takes every sent turn while stopping.
+- Project projection authority and complete subtree/history: jig 20 supplies
+  project-policy admission and complete feeds with stable milestone identities
+  through closing. Temper 03 writes its projection without reading it back.
+  Human issue comments are not task participation; the contrary subscription
+  steer was resolved in favor of the write-only design.
+- Ops durable proposals and scale-down procedure: jig 17.0 implements the
+  missing connector handoffs and a fresh-fact conditional procedure.
+- Read replies held behind unrelated commits: jig 17.1a preserves read/write
+  metadata and answers reads through the journal's immediate door.
+- Inline readiness, accepted-batch authority, procedure news batching and
+  offered inbox consumption: jig 17.2a/b/c implements the missing readiness,
+  independent acceptance evidence, owner batch policy and committed prefix fence.
+- Resource reports ignored or restored too late: jig 21 makes unknown reports
+  delay whole-batch admission and restores project roles before adoption.
+- Eight shared stories versus an unpooled forge: ShrinkingPool is explicitly
+  inapplicable in Temper; seven shared and seven native stories retain all
+  **365 cuts** (171 shared, 194 native). The generic pool story remains in Jig.
+- Per-effect recovery classes: the proposal was rejected; each decided design
+  row is one kind, including grouped pull row 12 and issue row 13.
+- Serial conformance allowance: the former 11 s blocker was resolved by the
+  explicit 2 s / 20 s allocation; workspace caps remain 15 s / 60 s. Optional
+  deep policy copying is now avoided without changing referee rules.
+- Scripted engine hosts and later host integration: permanent channel-zero
+  fixtures remain valid independent neighbours; the ops and composed Temper
+  worlds now exercise real host/Smith domain integration as well.
+- Party note edits and the full forge connector contract were carried to jig
+  11 and Temper 03/21 and are implemented.
+
+**Still open, nonblocking for this completed extraction:**
+
+- Provider actor attribution after a lost authenticated webhook: proposed
+  authenticated provider evidence is still needed; fresh heads and ancestry
+  retain safety but cannot reconstruct the missing forward pusher's identity.
+- Deployment unit, freshness/procedure defaults and the focused cut budget:
+  QUESTIONS 13 deliberately leaves them configured and open.
+- Nested standing procedures: propose an explicit standing marker and renewal
+  route for their funding trees; top-level renewal does not settle this case.
+- Inbox watch payloads: jig 01 proposed actual snapshots/updates. The current
+  core still encodes an empty `Inbox` watch snapshot. Durable `ViewInbox` reads
+  are implemented separately; completing the stream remains a client/core need.
+- Smith verdict follow-up translation: jig 06 requested later integration.
+  Temper's codec still declares zero follow-ups and rejects nonempty verdict
+  items. The generic lifecycle is implemented; its concrete agent codec is not.
+- Smith's protocol must enforce its reserved provider-byte allowance and carry
+  actual usage on failed/cancelled terminals when the provider supplies it.
+  This session did not inspect or change the separate protocol plan.
+- Finer per-event admission bounds and an explicit Skein journal overrun
+  operation: conservative whole-route bounds remain valid; the adapter still
+  signals overrun by producing a rejected excess write.
+- Moving the inline agent into Smith requires the later shared host vocabulary,
+  protocol work and separation of its `jig-charter` dependency.
+- Jig client design/release versioning, optional root boilerplate generation
+  and multiple roots per process remain design/later work.
+
+None of these open items blocks the measured extraction; no design decision
+was made here. Deployed serialization, kernel/process integration, lower
+layers and `later.md` remain outside this session.
+
+### temper 06 user document revisions
+
+Following draft `jig.md`, section 6; these are handoffs for the user, not
+edits made by this session.
+
+| Temper document | Revision needed |
+|---|---|
+| `domain/core.md` | Describe the software factory as an application of Jig; generic primitives and promises belong to jig's `domain/core.md`. |
+| `domain/tasks.md` | Refer generic lifecycle, funding, inboxes, proposals and results to Jig; retain only factory-specific meanings and connector examples. |
+| `domain/authority.md` | Refer generic narrowing, roles, budgets and projection authority to Jig; retain forge landing requirements, CI/review/gate policy and kind mapping. |
+| `domain/connectors.md` | Refer the generic contract to Jig; document the application's forge connector, configuration and translations. |
+| `domain/engine.md` | Document the core/forge/journal root, native peer envelopes, admission/release, Resume/Released turns, owner record wrappers and core-selected restart. Remove root-owned policy/routes and the retired facade. |
+| `domain/people.md` | Refer generic parties, services, identities and project roles to Jig; retain forge sign-in providers and forge people mapping. |
+| `domain/worker.md` | Describe jig-host, Smith process supervision and Temper checkout/link composition, custody ACK versus engine ACK, stop bounds and concrete mounts. |
+| `domain/agent.md` | Keep Temper charters, tool schemas, brief/result translation and the remaining verdict codec handoff; refer shared hosting/charter behavior to Jig and Smith. |
+| `domain/forge.md` | Retain the connector specification; update all 15 kind rows/recovery classes, deployment paths, bounded attempt lifetimes, prefixed adoption, project roles/drift, fresh reads and write-only whole-subtree/history projections. |
+| `store/` | Separate generic Jig keys/records from forge-owned records and Temper wrapping/paging. Encoding, protocol and deployed store work remain later. |
+| `web/` and `web/ux/` | Record that the existing Temper web remains intact under QUESTIONS 11. Future Jig client design takes generic pages/wire/shells; retain factory objects/UX and report the Inbox stream gap. |
+| `testing.md` | Refer shared helpers/fakes/referee to Skein/Jig; describe retained fake forge/checkout, seven applicable shared plus seven native stories, 365 cuts and the composed real-root/Smith domain world. Update names, removed tests and measured budgets. |
+| design navigation and drafts | Update links/ownership after revising the above; retain `one-host.md` as reasoning and distinguish `jig.md`'s completed domain extraction from its deferred client/channel/store/cutover steps. |
+
+### temper 06 repository move and later handoff
+
+Ready for a future split: all extracted domain children/core, one host,
+inline agent and shared charter, test kits/worlds, independent conformance,
+reference ops root and history live under `jig/`; boundary tests pass with
+no Temper dependency exception. Temper composes the kit through native
+interfaces and owns forge, checkout, factory codecs and its root.
+
+The repository move itself is **not done or authorized here**. Draft `jig.md`,
+section 7, places it after the next-domain cutover and a settled boundary.
+It still needs subtree/history transfer; an independent Cargo workspace with
+lints/profiles, clippy/rustfmt and gate workflow; standalone boundary/CI path
+verification; agreed release/pin handling; conversion of Temper's path
+references to a reviewed Jig git pin; and removal of Jig's in-Temper AGENTS
+item. Client, store encoding, channel, protocol layers, credentials, iterate
+and main remain the named later work. Complete production/kernel tests follow
+the domain-face composed world. No later plan was started.
+
+No dependency repin occurred. Current forge URLs and pins remain:
+Skein `17b221b8423352d5c1d30128837ccbf5cd8025c2`, Skein JSON
+`e1152507c94c0fb6d4fd9ed190d392ec5d21da9b`, Smith
+`a54fe558421ed07ce376ac1ebf2ce09345c8d496`. User drafts and `temper.old/`
+were untouched; only this STATUS document is changed by increment 6.2.
