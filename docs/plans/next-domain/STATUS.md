@@ -548,6 +548,8 @@ and workspace suites remain within their existing budgets.
 | jig 17.2 ops conformance stories | merged and pushed | 0b8c3eb3 | The real reference root runs the scripted alert and agent-free recurring night against independent production and jig's referee. Focused cuts cover acceptance, restart entry/sent, and before/at/after scale entry; one fuzzy story sweeps every night commit. Root repairs preserve cold adoption, offered inboxes, settled answers and project resource roles. Gate: fmt/clippy; 1,265 focused / 3.054 s; 38 fuzzy / 7.346 s. Final-tip serial ops plus both connector worlds: 41 focused / 0.706 s summed (0.713 s elapsed), 3 fuzzy / 0.334 s summed (0.335 s elapsed), within the configured half allocation of 0.75 s / 4 s. |
 | jig 21.1 kinds of hold and pool slots | merged and pushed | 0868ff4e | Branch `jig/21-1-holds`: named connector reports govern shared/exclusive/pooled admission and waiting/refusing behavior. Unknown reports retain the whole batch before task creation or funding reservation; shrinking pools retain holders and admit no waiter until they drain. Both roots route reports. Gate: fmt/clippy; 1,247 focused / 3.409 s; 37 fuzzy / 8.956 s. |
 | jig 21.2 roles of resources | merged and pushed | ad3d6e2c | Branch `jig/21-2-roles`: current roles scoped to projects govern effects, projections, accepted effects and workspace writes. Unavailable resources refuse holds and hold waiters with a reason; narrowing stops a run writer while committed effects remain made. Restored adoption reports preserve context refusal. Stories cover participating writes, project isolation, narrowing, unavailable holds and cold restart. Gate: fmt/clippy; 1,257 focused / 1.867 s; 37 fuzzy / 4.971 s. |
+| temper 05.1 reference root | merged and pushed | b0ab9ad4 | Branch `jig/temper-05-1-root`: root follows jig's `domain/root.md`, section 11, with native owner store wrappers, whole-route admission, journal-only output and native release, admitted Resume, and forge-owned timers, payloads, landing templates and save callbacks. Its bound includes core, forge and journal. Gate: fmt/clippy; 1,266 focused / 2.963 s; 38 fuzzy / 7.687 s. No dependency repin or jig change. |
+| temper 05.2 application conformance | merged and pushed | fd701a11 | Branch `jig/temper-05-2-conformance`: native engine, fake forge and shared outside referee run the seven applicable shared scenarios and all 164 baseline commit cuts; ShrinkingPool is not applicable because the forge has no pooled holds, following the decision in jig's `domain/testing.md`, section 5. Fixed pre-first-push lost writers, durable lost-writer fresh reads and stale creation recovery descriptions. Gate: fmt/clippy; 1,276 focused / 4.903 s; 39 fuzzy / 15.798 s. Final-tip serial `measure`, `-j1`, unoptimized test build: seven conformance focused / 1.189 s and one fuzzy / 6.796 s, within 1.5 s / 8 s. |
 
 ### temper 03 boundary and handoff
 
@@ -686,3 +688,85 @@ and workspace suites remain within their existing budgets.
   Skein JSON dependency at `e1152507c94c0fb6d4fd9ed190d392ec5d21da9b`.
   Only the two requested stories, a few focused cuts and one night sweep
   were implemented; `later.md` work was not started.
+
+### temper 05 stopped application-story handoff
+
+- **Outcome:** 5.1 and 5.2 are merged and pushed. Session 05 stops during
+  5.3 on a shared-referee vocabulary prerequisite; 5.3 is not ready and
+  5.4 is not started. Session 06's finish work remains blocked by 05.
+  The merged branches and their worktrees have been removed. This status
+  record is the session's Markdown-only branch.
+- **Exact blocking cut:** the serial `measure` sweep in the unoptimized
+  test build passes ReviewedChange's 31 baseline commit cuts and
+  RepairCi's 39, then fails GoalIssue at cut 31:
+  `Violation { promise: Once, why: "a successful unrecoverable operation was repeated" }`.
+  The failed partial sweep took 5.733 s; it is not a completed budget
+  measurement. An issue edit is physically repeated after crash/answer
+  loss. That repeat is valid idempotent recovery under temper's
+  `domain/forge.md`, section 6, and its native client.
+- **Why this blocks:** native issue permission kind 8 covers unrecoverable
+  CreateIssue and idempotent Edit/Close/Reopen Issue. The forge's
+  `describe_projection_effect` uses the native client's recovery class
+  for the actual write. Jig's independent referee instead obtains one
+  recovery class from policy for the entire connector/kind pair, so the
+  kind's creation classification rejects the edit. Permission kind 2
+  similarly includes unrecoverable push and idempotent branch deletion.
+  The current referee vocabulary cannot express this native contract.
+- **Blocking proposal for jig:** carry recovery evidence for each durable
+  effect identity or system key, validated from connector metadata and
+  the independent native API write shape. Keep permission kinds, target
+  and authority checks, once/uncertainty promises and budgets; add
+  negative checks for false recovery evidence, changed payloads and new
+  keys. An alternative is an explicit design revision splitting native
+  permission kinds by recovery class, with policy, grants, templates and
+  stored compatibility addressed. Neither decision is taken here.
+  Classifying all issue writes as idempotent would weaken creation
+  guarantees; stopping native idempotent recovery would violate temper's
+  contract. No observations or effects were fabricated to pass this cut.
+- **Clean recovery point:** commit
+  `78e2f5e2367d44c7fef052f6aef2be9114bba402`,
+  `Preserve blocked temper application story work`, on retained branch
+  `jig/temper-05-3-stories`, based on main
+  `fd701a11c0b093b884babefd245dd5167ef9a74c`. Its clean worktree is
+  `/srv/data/git/runner/worktrees/jig-extraction/temper/jig-temper-05-3-stories`.
+  It preserves all 13 draft files; no uncommitted work remains there.
+  `cargo fmt` and `git diff --check` pass. No 5.3 clippy, full gate or
+  final-tip budget proof was run, and this preservation commit is not
+  authorized for merging as a completed increment.
+- **Preserved story work:** reviewed change, CI repair, goal/subtree
+  milestones and issue closure, another hand moving a branch, lost
+  merge answer, and a person's words to a live coder. An additional
+  native unrecoverable issue-creation story retains the coverage requested
+  after 5.2. The fake forge actually applies effects and reports native
+  observations; fixtures use real task, worker, policy and projection
+  routes. The initial seven baselines passed in 0.093 s before later
+  fixture changes. Earlier pinned repair and goal regression cuts passed
+  in 0.074 s and 0.052 s; those figures are preliminary verification,
+  not evidence for the formatted preservation tip.
+- **Preserved native fixes needing verification:** pushed-head ownership
+  is resolved by the forge's durable writer, restored writer flags are
+  rebuilt in the client before its background watches resume, expected
+  cleanup deletion does not become foreign drift, unknown delete answers
+  settle from absence, and restored desired issue projections regain
+  their owner timer. Bounds include restored writer scratch storage.
+- **Resume scope:** resolve the jig prerequisite; complete all own-story
+  cuts and independent uncertainty/held/settled evidence; strengthen the
+  exact other-hand task/head check where needed; remove only duplicated
+  engine-domain story tests, preserving their unique CI log, timing,
+  gate and approval assertions; run native regressions, clippy, final
+  serial world measures and the full gate. No duplicate tests have yet
+  been removed. The inherited conformance allocation is 1.5 s / 8 s;
+  any applicable planned story-growth allowance must be supported by
+  final measurements, with excess raised as a decision rather than
+  silently accepted.
+- **Handoffs retained:** goal issues are write-only projections; human
+  issue comments are not participation news, and clients talk to tasks
+  (temper 03). Restore project resource roles before task adoption
+  (jig 21), and retain the independent outside referee (jig 15).
+  Domain core-world channel-0 fixtures were approved, but 5.4 must use
+  the planned real Smith domains and fake LLM with the actual engine and
+  worker roots. Loss of authenticated push metadata still limits
+  attribution of an outside forward move; that inherited provider
+  limitation is nonblocking for the implemented shared scenarios.
+  No prerequisite repository, plans, design documents, dependency pins
+  or forge URLs changed in this session.
