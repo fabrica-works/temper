@@ -502,9 +502,6 @@ component retires once the real one exists) and `docs/design/testing.md`:
   protocol layer, with this document as its design.
 - **`docs/design/testing.md`:** the real store in the engine's worlds,
   the transcripts' stand-in, and the store's world.
-- **the next-domain plan's `08-after.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`):** section 2, the views child
-  loses its traces and their sweep; section 3, the store's plan is
-  `plan.md` here.
 - **skein's plan:** skein-kv's in-memory mode (5.1) is used by temper's
   worlds, so it stays when the files arrive; skein-io's file entity gains
   opening an existing file to write (its 2.3, needed now for transcripts)

@@ -515,10 +515,6 @@ branch the worker pushes is the head the engine reads.
   credential grants; the agent's notices of a rejected credential or an
   exhausted account; an LLM account's exhaustion is a failure of its own;
   static git identities (commit authors) are the worker's configuration.
-- **Still below the domain, not built:** the engine's protocol to the
-  worker is built, the rest is not: the agent channel's framing on the
-  worker's side, git invocations and their parsing, contained process
-  trees, workspace directories (`docs/development/protocol-implementation.md`).
 
 ## 12. Open questions
 

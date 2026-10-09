@@ -1,7 +1,8 @@
 # The worker's domain layer
 
-This describes the worker as built. The migration extends it towards
-`domain/worker.md` (the next-domain plan's `05-runtime.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
+This describes the worker as first built. Its root, engine link and
+checkout remain; its host and agent children are now jig's `jig-host` and
+smith's `smith-host-domain` (`domain/worker.md`; jig's `hosts.md`).
 
 Provisional, 2026-10-02. What the temper worker does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. The
@@ -473,14 +474,6 @@ yet, each to be designed before it is built:
 - **A workspace's repositories in parallel:** a checkout runs one
   operation at a time, so its repositories are cloned, fetched and pushed
   one after another.
-
-The domain now carries repository tags, identities and agent metadata,
-named inbound acknowledgements and bounces, and LLM grant names in spawns
-and later notices. The protocol supplies endpoint descriptors and secret
-grant values at the boundary (channel.md, 6.1; credentials.md, section 7).
-Static git identities remain in the worker. Integration below this domain
-is tracked in
-[protocol-implementation.md](../development/protocol-implementation.md).
 
 ## 12. Deferred conformance issues
 

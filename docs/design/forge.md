@@ -647,8 +647,8 @@ with loopback HTTP and a separate Git configuration:
 - The direct `pulls/{base}/{head}` lookup accepts a percent-encoded slash
   in the head branch and returns one pull document. It is separate from
   the collection listing, which has no advertised base/head filters.
-- Actual responses and signed webhook bodies are retained under
-  `tests/forge/forgejo/fixtures/v15/`, with their capture provenance.
+- `tools/forgejo-conformance` captures the actual responses and signed
+  webhook bodies, with their provenance.
 
 To check (section 10), each before the client relies on it:
 

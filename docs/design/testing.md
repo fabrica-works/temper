@@ -6,9 +6,8 @@ shares, what every world checks, scenarios and the referee, the two
 suites, and where a failure is fixed. This document keeps what is
 temper's: its tiers (section 2), its neighbours and their fakes (sections
 3 and 4), its scenarios and referee (section 5), what its worlds check
-beyond the strategy (section 6), its layout (section 7), where things
-stand (section 8), what is not built yet (section 9), and what is still
-open (section 10).
+beyond the strategy (section 6), its layout (section 7), what is not
+built yet (section 9), and what is still open (section 10).
 
 ## 1. In one page
 
@@ -299,73 +298,6 @@ web they make the engine's own calls, which no protocol carries yet. The
 whole worker's world reuses them; the agent's top-level world scripts its
 own, as its agents cannot take a session's turns yet.
 
-#### 4.4.1 The people child domain's parent and store
-
-The new `tests/engine/people` world plays the root, authority and tasks
-for increment 03a. Sign-ins, authoritative roles and keyed chat requests
-reach the real people child. The root scripts authority's outcome, makes
-a task and commits it alongside people's answer record. It holds every
-reply behind its commit, including a duplicate whose record exists only
-in the domain's state ahead of the store.
-
-Cold restarts keep only durable people records and task creations.
-Scenarios cut before durability, after durability before reply delivery,
-and while routing temporarily waits. Client calls lost with the process
-are abandoned and retried with a fresh reply destination and the same key.
-The referee observes client replies and durable task creations, checking
-reply order, roles and one creation per key; negative tests check each
-safety rule and a missing reply's deadline. Focused tests cover signing
-in, expiry, roles, initial-owner bootstrap, duplicate waiters and refused
-admission, replay, inert facts and counted peak memory. The fuzzy matrix
-settles every world and reaches each named ending within the people's
-world allotment (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
-
-#### 4.4.2 The tasks child domain's parent and executors
-
-`tests/engine/tasks` drives the real tasks child with always-allow
-authority and scripted agent executors in increment 02a. The parent
-commits task records and requester result mail together, and withholds
-replies, assignments, stops and closing requests until durability.
-Preparation, claimed attempts and actual running work are distinct;
-`Close`/`Settled` represents effects and resource release at the root.
-
-The independent referee observes durable task creation, assignments,
-terminals, closing/settlement and requester results. It checks whole
-batches from actual durable creations, cycles through dependency and
-delegation waits, dependency order, one run per task, increasing attempts,
-once-only durable replies/results, limits and every cancelled descendant
-ending before its requester. A table independently violates every initial
-rule. Focused stories cover failures in every class, assignment/preparation
-refusals, holds and release, a three-level cancellation and retained input
-stubs. Restart cuts independently bracket durability of make, claim,
-terminal, cancel and settlement decisions. Counting-allocator tests fill
-payloads, graph edges, stubs, alarms, held closing results and retired
-slots, and cold-restore the records against the child's worst-case bound.
-Replay agrees with facts consumed or left full. The seeded fuzzy lifecycle
-sweep adds failures, held/released tasks, failed dependency results,
-refusals, restarts and complete subtree cancellation within the tasks
-world allotment (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)). Later increments
-extend this same world with procedures, amendments, proposals and funding.
-
-The 02b parent completes result, notice, historical-result read and timer
-callbacks before making a decision durable, then releases actual relays to
-its scripted running agent. Each claim names its brief's readable IDs.
-The separate inbox referee observes persisted rows and committed reads,
-checking whole-message and promise capacity, message identities, offer
-fences, reference bounds, callback closure and exactly the offered prefix
-consumed by a turn. Its negative table violates each new invariant and each
-read rule independently. Focused stories cut message admission and turns
-before/after durability, merge a newer hint over an old offer, keep a
-policy-deferred older message, fill inboxes while accepting promised results
-and answers, cancel at full capacity, accept an introduced dependency and
-refuse a cycle spanning existing subtrees, restore held inboxes and timers,
-and clean subscriptions at owner end. The randomized lifecycle story now
-also asks/answers a question, mixes classified news and person words, commits
-or discards a drawn turn before restart, and replays with facts consumed or
-full. Counted-heap saturation includes inbox, offer, receipt, question and
-subscription arenas and cold restoration. The whole tasks world keeps its
-0.5 s focused and 4 s fuzzy serial allotments across increments.
-
 ### 4.5 Temper's own components
 
 A fake worker served until the worker's domain was built, and a fake
@@ -494,24 +426,22 @@ world's, not either suite's. The suites are told apart by binary name.
 Each fuzzy file is a binary of its own, so a memory test's counting
 allocator never runs under a sweep.
 
-### 6.2 Worker runtime v2 extension
+### 6.2 The worker's runtime world
 
-`tests/worker/domain/src/next.rs` drives the real worker root and its three
-children against scripted engine and process records and deterministic git
-terminals. The existing v1 system-world scripts and random draws are
-unchanged. Its independent boundary referee checks complete turn replay,
-exact names and cumulative spend, read credit, identical answers, separate
-push title/body, merge paths and expected heads, and release at iteration
-reclaim points. Focused stories cover busy backoff, reconnects, crossed
-acknowledgements, ordinary saved work and snapshot-free merge parking.
-Replay compares digests of the full boundary records and facts; dropping
-facts leaves every boundary record unchanged. Referee tests inject a
-changed duplicate body and an unseen turn prefix and require rejection.
-Counted memory in the root and both changed child worlds exercises
-saturated turn windows, transcripts and conflict paths; a small
-deterministic sweep varies body lengths and one-to-three count and
-byte windows. This runtime extension uses the existing worlds' shared
-suite headroom (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); legacy focused coverage stays.
+`tests/worker/domain/src/runtime.rs` drives the real worker root and its
+children against scripted engine and process records and deterministic
+git terminals. Its independent boundary referee checks complete turn
+replay, exact names and cumulative spend, read credit, identical answers,
+separate push title and body, merge paths and expected heads, and release
+at iteration reclaim points. Focused stories cover busy backoff,
+reconnects, crossed acknowledgements, ordinary saved work and
+snapshot-free merge parking. Replay compares digests of the full boundary
+records and facts; dropping facts leaves every boundary record unchanged.
+Referee tests inject a changed duplicate body and an unseen turn prefix
+and require rejection. Counted memory in the root and its children
+exercises saturated turn windows, transcripts and conflict paths; a small
+deterministic sweep varies body lengths and one-to-three count and byte
+windows.
 
 ## 7. Layout
 
@@ -543,77 +473,6 @@ replay: the link (the engine and a worker) and an agent's channel
 the engine against the fake forge (channel.md, section 15; llm.md,
 section 12; forge.md, section 10). The simulated worlds and the real loop
 find theirs when the first of each is built.
-
-## 8. Where things stand
-
-As of 2026-10-03.
-
-| Tier | Built |
-|---|---|
-| step tests | every domain crate and the fakes |
-| domain worlds | the agent's tools, session and run; the worker's checkout, agent and host; the legacy engine's work, plan and forge, the new people and tasks children, fleet, brief, notes and views (the rules by step tests alone); the engine's own |
-| system worlds | the agent's top-level world: the engine, the worker and agents; the whole worker's: the engine, the worker and scripted agents |
-| machine worlds | none: temper has no machine of its own |
-| protocol worlds | none: no protocol layer exists |
-| simulated worlds | none: no service or shell exists |
-| real loop | none |
-
-The fakes:
-
-- **LLM provider:** its domain, `testing/temper-fake-llm-domain`.
-- **Engine:** retired; the system worlds run the real one (4.5).
-- **Forge:** its domain, `testing/temper-fake-forge-domain` (4.2), with
-  its git. The forge child domain's world, the engine's and the system
-  worlds run against it, the forge child domain world's translation
-  standing in for the protocol layer; io's git reaches it through the
-  working trees' transport, with no latency or faults of its own there, as
-  io's stand for them. It has no inline review comments, and no
-  description or link on a status, which the worlds answer empty.
-- **Machine:** `temper-fake-checkout`, ordinary Rust rather than a step
-  crate, at its domain face only, through each world's translation. It has
-  files with versions, links and roots, a search, and the working trees'
-  git. A command is matched whole and answered with canned output and
-  file changes, whatever the files hold. Agents are programs already, at
-  the domain face: the agent's top-level world starts an agent domain for
-  each spawn, with its channel on the process's pipes.
-- **People:** scripted in the engine's world (4.4), and reused by the
-  whole worker's; the agent's top-level world scripts its own, and the
-  engine child domains' worlds script what people do through the parent
-  they script. The web client has `temper-fake-person`: scripts find
-  roles, accessible names and text through a tree face, then act through
-  the view's node ids. The same scripts can later use a DOM face in the
-  browser world. `tests/web/domain` drives the client domain and view
-  against a scripted engine; `tests/web/engine` will use the same person
-  against the real root. Every view patch is applied to a model DOM and
-  checked against the new tree, including node ids.
-
-The checks:
-
-- **Memory** is measured in every world, and the fake forge's and provider's
-  against their worst cases in `tests/fake-forge` and `tests/fake-llm`.
-  The provider caps queries, stored scripts and delayed answers, counting
-  their arrays and payloads, and checks reply sizes before making them.
-- **Replay** is checked in every world, by its trace.
-- **Transition coverage** is not measured, and nothing is fuzzed yet:
-  there is no protocol machine or decoder for `cargo fuzz`, and no
-  domain's step functions are fed recorded events.
-- **Scenario expectations** are a referee's (5.2) in every engine world
-  and both system worlds. The worker's child domain worlds, and the
-  agent's tools', session's and run's, check theirs inline, beside their
-  contracts. The engine's referee rejects repeated keyed creations across
-  a restart at a drawn moment as well as within one life.
-- **Focused scenarios** in the engine's world tell each of its stories
-  (engine-domain.md, section 14) on one seed, among them a tracking label
-  taken off, a garbled record, a run watched and stopped, a supervisor
-  woken once by a burst, and an approval of an earlier head.
-  Some restart the engine at a moment they choose, as the forge shows it
-  (an outcome posted, a plan's first item made, a goal's record grown, a
-  claim written, a label taken off, a record garbled); those between a
-  write and its answer assert that nothing is made twice.
-- **The whole worker's world** has another party delete branches between
-  attempts, and its sweep reaches every way a run's preparation fails.
-- **Findings:** every seed found failing is fixed and replays, passing;
-  no test is ignored.
 
 ## 9. Not built yet
 
@@ -674,42 +533,3 @@ By fake:
 - **The real loop's privileges:** the containment it shares with
   production needs user namespaces and a delegated cgroup on the test
   host.
-
-## 11. Deferred conformance issues
-
-- **The fake provider's Rust subset.** `cued` in
-  `testing/temper-fake-llm-domain/src/respond.rs` uses a `while let` loop
-  to find a script's cue. Each round consumes a byte of the bounded query,
-  so execution terminates, but programming-model.md, sections 3 and 10.3,
-  forbids `while` in step code. Rewriting it as a bounded `for` is deferred;
-  this records the discrepancy rather than granting a general exception.
-
-### Session extension (migration 05e)
-
-The session world's existing v1 scenarios and fuzzy sweep stay intact.
-`tests/agent/session/src/recorded.rs` is a scripted v2 parent/provider
-world: its referee observes requests, provider message bytes, concrete turns
-and cumulative spend. It computes expected charges independently from token
-counts, checks the original opaque bytes and provider ids/input, and feeds
-its durable turn values into a new session. The harness separately checks
-request terminals, output bounds and settled session/run/kit counts.
-
-Focused cases cover fresh v2 admission, transcript identity/structure/size
-and unresolved-ticket refusals before effects, concrete committed results
-after a turn, unanswered yielded calls, per-completion rounding, overflow,
-child spend exactly once before and after reclaim, and cancellation races.
-Owned-tool cases close with read IO outstanding and check both cancellation
-and completion winning, preserving the actual terminal result in the turn.
-The same observations and complete frozen domain states replay; observations
-remain identical with facts disabled.
-The counting allocator also fills a v2 delegated transcript and restores
-concrete history exactly to their byte cap, counting the turn and provider
-copies at emission against the session's declared worst case. The bound
-includes the record envelopes while incoming messages move into the session's
-bounded transcript list. A separate fuzzy test varies token counts,
-child spend, concrete result sizes and the closing/terminal races over 64
-seeds, asserting that every terminal race and both unit-cap outcomes occur.
-A counted negative restore fills the last assistant message with 128 unique
-historical calls and large provider ids, then leaves no room for waking
-`NotRun` results. It requires refusal before allocating that tail's copied
-ids. It adds no runtime-system scenario and changes no legacy case.

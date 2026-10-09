@@ -16,7 +16,7 @@ open.
   smith's host domain, one process per run. In the engine, something has
   to run smith's domain in memory and speak the same vocabulary: the
   inline agent (jig's `hosts.md`, 5.2). It is built, as
-  `jig-inline-agent` (55c95516).
+  `jig-inline-agent`.
 - **It is not specific to jig.** It composes smith's domains and passes
   their requests up; it knows nothing of jig's core. smith's local host
   needs the same thing for its one-process form (smith's `host.md`,

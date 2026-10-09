@@ -243,8 +243,7 @@ protocol machines, not the root's.
   rule that a rotated token is durable before its grant
   (`credentials.md`).
 - Sign-in digests and adopted credentials follow when the web's
-  sign-in and adoption are built (the next-domain plan's `08-after.md`,
-  section 3 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
+  sign-in and adoption are built.
 
 **Tests:**
 - step tests, and stories in the store's world: a rotation crashed
@@ -258,9 +257,7 @@ protocol machines, not the root's.
 **What:** the engine's shell opens both stores before the root's
 `Start`, routes the root's store requests through the protocol layer,
 sends the engine's trace records to the process's logs, and ends the
-process on `Uncommitted` (README.md, section 10). This is part of the
-shell's own plan (`08-after.md`, section 3, "the engine's `iterate` and
-shell"), which this increment joins.
+process on `Uncommitted` (README.md, section 10).
 
 **Tests:**
 - on the real ring, in a scratch directory: start, a chat's turns

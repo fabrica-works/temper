@@ -1,113 +1,11 @@
 # Increments
 
-Provisional, 2026-10-05. The increments of README.md, section 7, in
-order: what each lands in the domain, the view and the worlds; the
-stories that show it; what its joint-world stories need of the engine;
-the design documents it updates. Each is a branch that passes the gate of
-`docs/development/workflow.md` and an independent review before it
-merges (the next-domain plan's `README.md`, 5.6 and section 8 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)), and adds
-no vocabulary it does not use (README.md, section 6).
-
-## W1 The domain's spine
-
-**Lands** `temper-web-domain` with the parts every page stands on
-(01-domain.md, section 2): `boundary`, `action`, `ask`, `address`,
-`domain`, `frame`, `link`, `streams`, `reads`, `requests`, `drafts`,
-`notices`, `saved`, `facts`, `limits`, and `pages` with `Starting`,
-`SignIn`, `Missing` and `Chats`.
-
-- **Vocabulary:** every `Event` and `Request`; `Action::Go`, `Edit`,
-  `Submit`, `SignIn`; `Ask::StartChat` and `Outcome::Started`; the
-  refusals `Role`, `Limit`, `Ended`, `Unknown`, `KeyConflict`; `Query::Chats`;
-  `Watch::Person`; `Address::Inbox`, `Chats` and `Task` (a task's address
-  shows `Missing` until W4); `FieldRef::NewChat`.
-- **Behaviour:** starting from session storage (requests sent again with
-  their keys, drafts restored) and opening the frame's watch; the link's
-  states, heartbeat and backoffs; signed out to the sign-in page, requests
-  parked; the chats page: its composer's draft, starting a chat as a keyed
-  request kept before it is sent, answered with its number and going to
-  its address; the person's chats as a window of lines, live or closed.
-- **Tests:** the step tests of 01-domain.md, section 10, for these parts.
-- **Updates** `architecture.md`, section 6: a request is kept in session
-  storage before it is sent; the frame's watch is always open and carries
-  the link's state.
-
-## W2 The view's spine
-
-**Lands** `temper-web-view` (02-view.md, section 2): `tree`, `builder`,
-`binding`, `diff`, `render`, `limits`, `words` for what these pages say,
-`frame`, `notices`, and `pages` with the starting, sign-in, missing and
-chats pages, after `chats.html` and the mockups' top bar.
-
-- **Tests:** the step tests of 02-view.md, section 10, for these parts;
-  the diff's property over generated trees; decoding every binding.
-- **Measures** building and diffing a chats page at its limits in a debug
-  build, and records it here; if it is too slow for the worlds, the
-  per-section build of README.md, section 8 is designed before W4.
-  The focused `chats_render_at_window_limit_and_decode_controls` test,
-  which fills the four-row window and renders/diffs the page, took
-  0.003 s under nextest's serial `measure` profile on 2026-10-06.
-- **Updates** `architecture.md`, section 4: the browser holds node ids,
-  and bindings stay in the view's last tree; a press on a node gone from
-  it is dropped as stale.
-
-W1 and W2 run side by side: W1's first commit fixes `Action`, `FieldRef`,
-`Address`, `Frame` and the chats page's state, which W2 reads.
-
-## W3 The person and the client's world
-
-**Lands** `testing/temper-fake-person` (03-testing.md, section 2: scripts,
-the tree face, the random person) and `tests/web/domain` (section 3):
-tabs, the shell's part, the model DOM, the scripted engine with people,
-projects, chats and keyed starting, the referee's rules that apply so far
-(safety 1, 2, 4, 6, 7; liveness 1, 2), and every fault but those of two
-tabs and stale presses, which need cards (W4).
-
-- **Stories** (`slice.rs`, `faults.rs`): signing in and starting a chat;
-  starting one across an engine restart before durability (made once
-  after the client sends it again) and after it (answered by its key); a
-  reload while the request is in flight; a double press; the words of a
-  composer kept across a reload; offline and back, the requests parked
-  then sent; the sign-in expiring mid-request, signing in again, the
-  request sent again with its key.
-- **Also:** `referee.rs`, `memory.rs`, `fuzzy_web.rs` with the random
-  person.
-- **Measures** the world's focused and fuzzy cost, and sets each story's
-  seeds from it (03-testing.md, section 7). The first 32-seed sweep took
-  0.47 s on 2026-10-06; the focused binaries together ran in under 0.1 s
-  (compilation excluded). Seeds 5, 13 and 16 are pinned after finding
-  watch and draft races.
-- **Updates** `docs/design/testing.md`, sections 4.4 and 7 (03-testing.md,
-  section 8).
-
-## W4 The first slice
-
-`ux/README.md`, section 9: a chat of one exchange, and a held chat's
-escalation decided.
-
-**Lands** in the domain: `objects` with `Chip`, `Escalation` and
-`TaskResult`; `Page::Task`, led by its conversation in its first form
-(the chat's words, its phase, its report once it ends, its held card);
-`Watch::Task`; `Query::Escalation` and `Query::Result`, for a page
-opened after the task ended; `Ask::Decide` for escalations (release,
-reject with a reason as leaving held, pass where there is a holder
-above); `Outcome::Decided` and `DecidedBefore`; the refusals
-`Authority`, `Moved`, `Standing`, `NoFurther`, `NeedsAmend`; the
-confirmation (`Intend`, `Confirm`, `Dismiss`, `FieldRef::Reason`); cards'
-states and their linger. In the view: `markdown`, `confirm`, the task
-page's header, overview and conversation in their first form, and the
-chip, escalation and result cards.
-
-- **Stories:** a chat's page shows its words and phase, then its report
-  once it ends; a held chat released from its page; left held with a
-  reason; two tabs deciding it, the second told by whom (safety 3); its
-  revision moving while the confirmation is open; a press on its card
-  after it left; the report read after a reconnect; a result in Markdown
-  shown in the subset, the rest as text.
-- **The faults** of two tabs and stale presses join the sweep.
-- **Updates** `ux/chats.md`, section 9, and `ux/inbox.md`, 4.2, with what
-  the slice settles (passing up while the one person is both, the
-  wording of a release).
+Provisional, 2026-10-05. The increments of README.md, section 7, still
+to build (W1 to W4 are built), in order: what each lands in the domain,
+the view and the worlds; the stories that show it; what its joint-world
+stories need of the engine; the design documents it updates. Each is a
+branch that passes the gate and the review of README.md, section 6, and
+adds no vocabulary it does not use.
 
 ## W5 The joint world
 
@@ -228,8 +126,8 @@ amending a change's gates; drift's card and what release does;
   replaced; the queue's order following a goal raised on the board; a
   paused queue and its repair; a drifted change released.
 - **Needs of the engine:** the forge connector's reads of changes, queues
-  and branches (the next-domain plan's `04-forge-connector.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); a
-  project's changes as a watch; answering approvals.
+  and branches (`domain/forge.md`); a project's changes as a watch;
+  answering approvals.
 
 ## After W10
 

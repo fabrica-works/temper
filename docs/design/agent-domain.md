@@ -1,11 +1,7 @@
 # The agent's domain layer
 
-This describes the frozen legacy agent used during the overlap. Its crates,
-providers and component worlds now carry `legacy` in their names and paths;
-the historical names below describe the same behavior. The system world stays
-at `tests/agent/domain` until cutover. New agent work belongs to smith
-(the next-domain plan's `05s-smith.md`, sections 3 and 4 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); `domain/agent.md`
-defines temper's use of it.
+This describes the legacy agent, whose code is gone. The agent is smith;
+`domain/agent.md` says how temper uses it.
 
 Provisional, 2026-10-02. What the temper agent does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. The
@@ -408,16 +404,3 @@ yet, each to be designed before it is built:
 - **The layers below the domain** (section 8), including one io vocabulary
   for the tools' and the run's operations, which the top level carries as
   two families for now.
-
-The protocol prerequisites in llm.md, section 13, channel.md, section 14,
-and credentials.md, section 9, are now implemented in the domain: opaque
-provider blocks, grants held by name and named on completions, rejection
-and exhaustion notices, transient unauthorized failures, and the token
-budget's split. The run's refusal remains distinct in the domain; carrying
-it and spend over the channel still needs the schema decision above. The
-bounded content stream is available for the protocol's fact projection.
-The integration status is tracked in
-[protocol-implementation.md](../development/protocol-implementation.md).
-
-What the tests lack, from the fakes' layers below the domain to the tiers
-above the domain worlds, is tracked in testing.md, section 9.

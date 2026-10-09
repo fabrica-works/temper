@@ -44,9 +44,9 @@ question). This draft keeps the reasoning; smith's side is smith's draft
 ## 2. Where the two hosts come from
 
 - **History, not a design choice.** The worker host was temper's
-  worker's host child, moved into jig (69e5a044). The local host was
-  written for `ops` on smith's one-process form (36eb49cf). jig's
-  documents never compared the two.
+  worker's host child, moved into jig. The local host was written for
+  `ops` on smith's one-process form. jig's documents never compared the
+  two.
 - **The worker host is already the general one.** It does not link
   smith: its only dependency is skein's. It knows a hosted run's
   lifecycle and nothing of the application's workspaces, processes or
@@ -142,14 +142,6 @@ routes one to a channel and the other to its own hub.
     translation joins the protocol layer's, and its parent of smith's
     domains becomes the twin;
   - the twin is new, smith's or jig's (section 7).
-- **The plan:** the local host's increments (jig 13.2 to 13.4) are
-  superseded once the twin and the hub's world cover them. The order:
-  1. finish the hub's typed vocabulary, so one remains of today's
-     legacy, `V2` and typed variants;
-  2. build the twin, with smith's real domain in the hub's world;
-  3. compose the hub and the twin in `ops`'s engine and retire
-     `jig-local-host`;
-  4. rename, and update jig's documents.
 
 ## 7. Open
 

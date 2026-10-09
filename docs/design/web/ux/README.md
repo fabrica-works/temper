@@ -279,9 +279,7 @@ section 7).
 
 ## 9. The first slice
 
-What the domain builds today (`domain/people.md`, 12.1;
-`domain/tasks.md`, section 15; `domain/engine.md`, 7.6 to 7.8) gives a
-first web of a few pages:
+What the domain builds today gives a first web of a few pages:
 
 - **signing in** through the forge;
 - **a new chat:** a project and words, sent as one keyed request,

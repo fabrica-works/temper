@@ -8,7 +8,7 @@ on skein like temper. What smith is and does is its own design (smith's
 and what temper fills in: the charters its engine writes, the tools its
 engine serves, its result contracts and conventions, and its worker as
 smith's host. What is still open is listed in section 10; where the
-previous version of this document went, in README.md, 6.5.
+previous version of this document went, in README.md, 6.4.
 
 ## 1. In one page
 
@@ -83,8 +83,8 @@ people in with the forge's), supervised processes.
 
 The engine decides an agent task's charter in its own terms (engine.md,
 7.1); its protocol layer encodes it as smith's (smith's `run.md`, 3.1),
-in one place, `temper-engine-protocol` (section 11; the migration's
-07a). The agent process's translation belongs to smith's `smith-protocol`.
+in one place. The agent process's translation belongs to smith's
+`smith-protocol`.
 
 ### 4.1 Instructions and brief
 
@@ -277,5 +277,3 @@ host:
   merge in progress, budgets in a unit with prices, calls asked again)
   is built in smith, generic (smith's `run.md`, section 14), and filled in
   here.
-- **The legacy run** and the session's first version stay in temper until
-  the cutover (the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).

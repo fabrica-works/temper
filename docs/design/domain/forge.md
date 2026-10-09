@@ -826,11 +826,10 @@ Checked against the verified Forgejo 15.0.0 binary, in disposable SQLite
 state on loopback, with a non-admin write collaborator and an isolated
 Forgejo runner v3.5.1. The shell-only workflow prints a fixed marker and
 exits unsuccessfully; it downloads no actions and performs no checkout.
-The actual exchanges and signed update webhooks are in
-`tests/forge/forgejo/fixtures/v15/next-domain-observations.json`, captured
-by `tools/forgejo-conformance/run.py --next-domain`. Each case below names
-an exchange there. These are facts about this version and configuration,
-not a claim about every Forgejo deployment.
+`tools/forgejo-conformance/run.py --next-domain` captures the actual
+exchanges and signed update webhooks; each case below names an exchange
+there. These are facts about this version and configuration, not a claim
+about every Forgejo deployment.
 
 | Question | Observed fact and consequence | Evidence cases |
 |---|---|---|
@@ -842,13 +841,13 @@ not a claim about every Forgejo deployment.
 | Protection with write permission | Both listing protections and reading the existing `main` protection return `403`: `user should be an owner or a collaborator with admin write of a repository`. Adoption records protection as unknown (section 4). The token's user is non-admin and its repository permission is `write`. | `00a-writer-user`, `00a-writer-permission`, `00a-protect-main`, `00a-protection-list-as-writer`, `00a-protection-as-writer` |
 | Conditional merge and retarget | A merge naming the old head returns `409`, with message `head out of date`. After retargeting, merging the current head returns `200` with an empty body, records the retargeted base and merge commit, advances only that base and leaves `main` unchanged. Read the current base and head before landing. | `00a-merge-stale-head`, `00a-retarget-pull`, `00a-merge-retargeted-current-head`, `00a-retargeted-merged-pull`, `00a-retarget-base-after`, `00a-main-after-retarget` |
 
-Every prerequisite of step 00a is resolved by an observation or its
-specified fallback for the probed v15 configuration. Large comparison
-completeness and other workflow configurations are not inferred from this
-small fixture. The v16.0.5 log routes require their own conformance
-exchanges. The retarget probe changes the base before the merge; it
-does not establish an atomic condition on both base and head, or behavior
-when a person retargets concurrently with the merge.
+Each question is settled by an observation or its fallback for the
+probed v15 configuration. Large comparison completeness and other
+workflow configurations are not inferred from this small fixture. The
+v16.0.5 log routes require their own conformance exchanges. The retarget
+probe changes the base before the merge; it does not establish an atomic
+condition on both base and head, or behavior when a person retargets
+concurrently with the merge.
 
 ### 20.2 Open questions
 

@@ -113,23 +113,20 @@ tests/web/engine ──► the same, and temper-engine-domain-world (its store, 
 - **The scripted engine stays inside the client's world.** It takes
   liberties the real engine does not (faults on demand, shapes the engine
   has not built yet), as the worker's worlds keep their scripted agents.
-- **`docs/design/testing.md`, section 7** gains `tests/web/*` and
-  `testing/temper-fake-person` in increment W3.
 
 ## 5. What the client needs of the engine
 
 The client is designed against the web of `ux/`, and the engine is still
-being built. As of 2026-10-05 (the next-domain plan's `STATUS.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)), the
-root has these routes for people, which the joint world uses from the
-start:
+being built. The root has these routes for people, which the joint world
+uses from the start:
 
-| The client | The engine root today |
+| The client | The engine root |
 |---|---|
-| signing in: who the person is, a sign-in number | `Event::SignedIn` (03a) |
-| starting a chat, keyed, answered with its number | `Ask::StartChat` (03a, 06a) |
-| reading a held chat's escalation | `Event::ReadEscalation` (02d1) |
-| deciding it: release, reject with a reason, pass, at its revision | `Ask::DecideEscalation` (02d1) |
-| reading a chat's result after it ended | `Event::ReadResult` (06a) |
+| signing in: who the person is, a sign-in number | `Event::SignedIn` |
+| starting a chat, keyed, answered with its number | `Ask::StartChat` |
+| reading a held chat's escalation | `Event::ReadEscalation` |
+| deciding it: release, reject with a reason, pass, at its revision | `Ask::DecideEscalation` |
+| reading a chat's result after it ended | `Event::ReadResult` |
 
 And these it does not have yet, beyond what `ux/README.md`, section 10
 already lists (each listed again in the increment that needs it):
@@ -152,13 +149,12 @@ engine; only the joint world's stories do.
 
 ## 6. Conventions
 
-Every increment follows the next-domain plan's `README.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`), sections 3.1
-(built beside: everything here is new) and 5.6 (increments and the
-gate), and its review checklist (section 8): module docs name the kept
-state, what the module never knows, its entry points and contracts;
-public items are documented with their sender, terminal and bounds; code
-cites `web/architecture.md`, `web/ux/<file>.md` and `domain/<file>.md`
-by section. Beyond those:
+Every increment is a branch that passes the gate of
+`docs/development/workflow.md` and an independent review, which checks
+that module docs name the kept state, what the module never knows, its
+entry points and contracts; that public items are documented with their
+sender, terminal and bounds; and that code cites `web/architecture.md`,
+`web/ux/<file>.md` and `domain/<file>.md` by section. Beyond those:
 
 - **No dormant vocabulary.** A variant of an event, request, ask or page
   is added by the increment that builds its behaviour and tests it in the
@@ -175,12 +171,11 @@ by section. Beyond those:
   `ux/forge.md`, 2.1.
 - **Design documents move with the code.** An increment that settles a
   question of `architecture.md` or `ux/` records it there in the same
-  branch, as the domain migration does.
+  branch.
 
 ### 6.1 Budgets
 
-The focused suite stood at 10.993 of its 15 seconds at the last gate
-(03c), and the fuzzy at 26.798 of 60, so the web's tests start small:
+The web's tests start small:
 
 | New tests | Focused seconds | Fuzzy seconds |
 |---|---:|---:|
@@ -190,8 +185,8 @@ The focused suite stood at 10.993 of its 15 seconds at the last gate
 | client's world (`tests/web/domain`) | 0.5 | 4 |
 | joint world (`tests/web/engine`) | 0.3 | 3 |
 
-Measured as the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`) measures: the sum
-of a package's tests, alone, with the serial profile. A world's stories
+Each is the sum of a package's tests, alone, with the serial `measure`
+profile (`docs/development/workflow.md`, section 2). A world's stories
 use one to three seeds; its sweeps are fuzzy. A gate that finds a budget
 broken makes the web's tests cheaper first; the budgets in
 `.config/nextest.toml` are not raised.
@@ -220,23 +215,12 @@ W2 view spine ────┘                                             ├─
 | W9 board | a project's goals by priority, setting a goal, prioritising |
 | W10 forge panels | a change's panel and card, changes and landing queues, approvals at a head |
 
-W1 and W2 run in parallel (W2 needs only the domain's `Action` and the
-frame from W1, agreed in W1's first commit). After W4, W5 to W8 run in
-parallel, three at a time at most (memory: three building agents). What
-follows W10 (a project's tasks, findings, notes, settings, spend, the
+W1 to W4 are built. W5 to W8 run in parallel, three at a time at most.
+What follows W10 (a project's tasks, findings, notes, settings, spend, the
 system's page) is planned once the board is built, from `ux/projects.md`.
 
-## 8. Risks, taken first
+## 8. Risks
 
-- **The test budget.** Two worlds and three crates of step tests join a
-  focused suite at three quarters of its cap. The client's world is cheap
-  by construction (no store, no channel, a scripted engine), and its
-  stories run on one seed each; W3 measures it before more stories join.
-- **The view in debug builds.** Building a whole page's tree and diffing it
-  on every step that changed what is shown is the design's price for a
-  view with no state. W2 measures a page at its limits in a debug build;
-  if it is too slow for the worlds, the view builds only the parts whose
-  inputs changed (a per-section generation), which changes no interface.
 - **Two ends written together.** The client's world and the client are
   written by the same hands and can share a misreading of the engine. The
   joint world (W5) is the check, and later the wire's transcripts

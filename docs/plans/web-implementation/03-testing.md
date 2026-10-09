@@ -109,8 +109,8 @@ pub enum Doing {
 
 ## 3. The client's world
 
-`tests/web/domain`, package `temper-web-domain-world`, after the frozen
-template of the next-domain plan's `README.md`, 5.4 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`).
+`tests/web/domain`, package `temper-web-domain-world`, laid out as the
+other worlds are.
 
 ```
 tests/web/domain/
@@ -161,7 +161,7 @@ tests/web/domain/
   - **Keyed requests** are decided once per person and key, and their
     answers kept; a decision is volatile until a drawn latency makes it
     durable, and a restart before then loses it with its key, as the real
-    engine's would (`domain/people.md`, 5.1.1).
+    engine's would (`domain/people.md`, 5.1).
   - **Watches** start with a snapshot, then changes; a slow watcher's
     deliveries are dropped and it is told `Missed`.
   - **It checks its client:** a key reused for another ask, a decision on a
@@ -245,7 +245,7 @@ scripted worker, and the drivers that hold a chat for out of tries.
 - **It translates** as the protocol layers will, with small total
   functions in `translate.rs`: a client `Send` to the root's
   `Event::Ask`, its `Key` to the root's key, its `Ask` to
-  `temper-engine-domain-people`'s; the root's `WebReply` to an `Answered`;
+  `jig-core-people`'s; the root's `WebReply` to an `Answered`;
   the client's reads to `ReadEscalation` and `ReadResult`; `SignIn` to
   `Event::SignedIn`, keeping the sign-in number per tab as the protocol
   layer keeps a cookie. A request or watch the root has no route for is
@@ -292,22 +292,7 @@ The harness's checks of `testing-strategy.md`, section 6, with
   and 3 seconds. A failing seed is fixed and kept, as a story or a pinned
   seed (`docs/development/workflow.md`, section 3).
 
-W3 measures the client's world before a second page's stories join it,
-and sets the number of seeds each story runs on from what it finds.
-
-## 8. Where this goes in `docs/design/testing.md`
-
-W3 records it there: section 4.4 says people act on the client through
-the person's tree face, with `tests/web/domain` and `tests/web/engine`;
-section 7's layout gains:
-
-```
-testing/temper-fake-person      the person: scripts, the tree face (a DOM face later)
-tests/web/domain                the client's world: the domain and the view, a scripted engine
-tests/web/engine                the client with the real engine root
-```
-
-## 9. The tiers above
+## 8. The tiers above
 
 Not in this plan, and kept possible by it: the protocol worlds (the
 client's protocol layer on the native shell, against the engine's, through

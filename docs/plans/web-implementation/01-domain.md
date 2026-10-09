@@ -193,12 +193,12 @@ pub enum Intent {
 ### 3.3 Keyed requests
 
 The client's vocabulary for `domain/people.md`, 5.1, its own types: the
-joint world translates them to `temper-engine-domain-people`'s, and the
+joint world translates them to `jig-core-people`'s, and the
 protocol layer, later, to the wire's.
 
 ```rust
 /// 128 bits drawn from the domain's seed; the engine makes a request once
-/// per key, per person (domain/people.md, 5.1.1).
+/// per key, per person (domain/people.md, 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Key(pub [u8; 16]);
 
@@ -225,7 +225,7 @@ pub enum Answer {
     /// Durable: the engine committed it, or committed its refusal.
     Done(Outcome),
     Refused(Refusal),
-    /// Not made and not kept (domain/people.md, 5.1.1): sent again, same key.
+    /// Not made and not kept (domain/people.md, 5.1): sent again, same key.
     Busy,
     /// The sign-in is gone: kept, and sent again once signed in.
     SignedOut,
@@ -533,7 +533,7 @@ pub struct Objects {
   change while its confirmation is open marks the confirmation changed
   (section 6.5), and confirming it then is refused in place, saying what
   changed, rather than sent; the engine refuses a moved revision as well
-  (`domain/people.md`, 5.1.2).
+  (`domain/people.md`, 5.1).
 - **Full is a refusal the page shows.** A snapshot naming more objects
   than the slab holds keeps what fits and the page says how many more
   there are (`architecture.md`, section 3).
@@ -635,7 +635,7 @@ pub enum LinkState {
 - **Signed out:** a watch ended `SignedOut`, or an answer `SignedOut`,
   closes every watch, keeps every request parked and in session storage,
   and shows the sign-in page, whose button asks for `SignIn`. Keys are
-  the person's across sign-ins (`domain/people.md`, 5.1.1), so the parked
+  the person's across sign-ins (`domain/people.md`, 5.1), so the parked
   requests are sent again once they are back.
 
 ### 6.5 Drafts and the confirmation
@@ -745,7 +745,7 @@ pub struct Limits {
 
 `worst_case` sums the containers' own `worst_case` and the bytes each
 entity may hold (`programming-model.md`, 6.3), as
-`temper-engine-domain-people` does. It also bounds what the view builds
+`jig-core-people` does. It also bounds what the view builds
 (02-view.md, section 5): the view's limits are derived from these, so a
 tree always fits.
 

@@ -1,17 +1,12 @@
 # temper's domain
 
-Provisional, 2026-10-04. The next design of temper's domain layer: temper
-as a generic engine on five primitives, which owns its state in its own
-store and drives the forge as a connector. It replaces the domain
-documents in `docs/design/` (`engine-domain.md`, `worker-domain.md`,
-`agent-domain.md`) and the draft it grew from (`docs/design/drafts/core.md`,
-removed with this set), and changes what the protocol layer's documents
-say in the places section 5 lists. The legacy engine is described by
-`docs/design/engine-domain.md` until the cutover
-(the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)). New code is written against this
-directory and cites it as `domain/<file>.md`. The migration plan from today's
-code to this design is built from sections 5 and 6 and each document's
-"From today" section.
+Provisional, 2026-10-04. The design of temper's domain layer: temper as a
+generic engine on five primitives, which owns its state in its own store
+and drives the forge as a connector. It replaces the domain documents in
+`docs/design/` (`engine-domain.md`, `worker-domain.md`,
+`agent-domain.md`), and changes what the protocol layer's documents say in
+the places section 5 lists. Code is written against this directory and
+cites it as `domain/<file>.md`.
 
 ## 1. Reading order
 
@@ -126,7 +121,7 @@ code to this design is built from sections 5 and 6 and each document's
 
 ## 5. What the other documents now owe
 
-What this design changes in each, for the migration plan:
+What this design changes in each:
 
 - **smith** (smith's `docs/design/domain/`): the agent's domain, its
   protocol layer's agent half, its providers and its channel with the
@@ -218,20 +213,6 @@ What this design changes in each, for the migration plan:
   down once, at its start, and a worker holds one per slot; turns kept
   unacknowledged are bounded per run; the engine's working set is of
   tasks, no longer of forge items (section 2).
-- **`docs/development/protocol-implementation.md`:**
-  - of the paused forge increment, the committed but unexported
-    `forge_blocks.rs` and `forge_cursor.rs` are deleted, and wiki pages,
-    listing by label, label writes and the wiki's webhook in
-    `temper-forge-forgejo` and the fake forge go; Forgejo's documents and
-    webhooks, and the calls for pull requests, reviews, statuses,
-    branches, issues and keyed creations, stay;
-  - decisions it holds that this design settles: acknowledging messages
-    by the last one read, with names per attempt; spend on the channel;
-    who keeps the refresh token (the store's secret records); labels on
-    keyed creations, now for display only; opaque snapshots, which go.
-- **Citations.** About two hundred citations of the current domain
-  documents, in code, tests and the protocol documents, are repointed as
-  the migration moves each part.
 
 ## 6. Where today's documents went
 
@@ -291,23 +272,7 @@ What this design changes in each, for the migration plan:
 | 9. Open questions | smith's `run.md`, 15, `session.md`, 11, `tools.md`, 8; agent.md, 10 |
 | 10. Not built yet | smith's `session.md`, 8 (context management), `tools.md`, 8 (the commands' environment), `run.md`, 5.1 (MCP); agent.md, 11 |
 
-### 6.4 `drafts/core.md`
-
-| Section | Now |
-|---|---|
-| 1. In one page | core.md, 1 |
-| 2. temper and external systems | core.md, 7; forge.md, 4 |
-| 3. The five primitives | core.md, 3; in depth in tasks.md, authority.md, connectors.md |
-| 3.6 The store and the outbox | core.md, 4; engine.md, 5; connectors.md, 4 |
-| 4. Plans and coordinators | core.md, 6 |
-| 5. Communication | tasks.md, 7 |
-| 6. The forge connector | forge.md |
-| 7.1 A goal, as tasks | core.md, 9 |
-| 7.2 Landing, step by step | forge.md, 15 |
-| 8. What carries over | this section, and each document's "From today" |
-| 9. Open questions | core.md, 11, and each document's |
-
-### 6.5 This directory's `agent.md`, before smith
+### 6.4 This directory's `agent.md`, before smith
 
 The agent's document of 2026-10-04, which code and plans cite as
 `domain/agent.md`:

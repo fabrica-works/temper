@@ -1,11 +1,12 @@
-# Temper's conformance world
+# temper's conformance world
 
-The concrete engine root runs on jig's conformance harness and outside referee.
-Store rows come from `jig-fake-store`; workers retain their attempts, charges and
-unacknowledged calls across engine crashes. Restoration uses the engine's real
-bounded load requests. The adapter's timer probes drive the root between
-external inputs; its bookkeeping adds no task or forge decisions. The fixture
-uses bounded journal cohorts, a one-second landing queue window and write lifetime, with restore pages
+The concrete engine root runs on jig's conformance harness and outside
+referee. Store rows come from `jig-fake-store`; workers retain their
+attempts, charges and unacknowledged calls across engine crashes.
+Restoration uses the engine's real bounded load requests. The adapter's
+timer probes drive the root between external inputs; its bookkeeping adds
+no task or forge decisions. The fixture uses bounded journal cohorts, a
+one-second landing queue window and write lifetime, with restore pages
 bounded to 32 rows and 64 KiB. Each shared scenario grants its real push
 workspace and the effects it exercises; issue projections are not configured
 for stories without goals.
@@ -14,9 +15,9 @@ The independent fake forge receives translated native API operations. Its
 observations retain actual pre-write state, actor ownership, server replies and
 native changes. Released writes require durable outbox entries and attempts.
 The root contributes no effect verdicts. Recovery declarations follow the
-native client's classes and temper's `forge.md`, section 6.
+native client's classes and `docs/design/domain/forge.md`, section 6.
 
-| Shared scenario | Temper binding |
+| Shared scenario | temper's binding |
 |---|---|
 | LateCopy | An idempotent commit status set and a retained transport copy |
 | OtherHand | A real producer push, an opened pull, a decided merge and another actor's push |
@@ -37,7 +38,7 @@ native client's classes and temper's `forge.md`, section 6.
 | PersonWords | Client words delivered live or retained in the next activation's inbox after a lost relay; cuts 1 and 8 |
 | IssueCreation | Lost native creation answer found by its retained marker, once; cuts 1 and 6 |
 
-The forge kinds follow each row of `forge.md`, section 6. In particular,
+The forge kinds follow each row of that section. In particular,
 creation is kind 8, issue editing/closing/reopening is kind 13, pull opening
 is kind 3, editing is kind 10, updating from the base is kind 11, merging is
 kind 4 and closing/reopening is kind 12. Branch deletion is kind 15. Fixtures
@@ -50,8 +51,9 @@ observations also identify durable attempted entries whose acknowledgements
 may have been lost. Subsequent durable erasure, failed projection rows and
 named held outcomes establish settlement or a hold for that retained entry.
 Already settled keys cannot be relabeled by a later projection failure; no
-live root verdict is consulted. GoalIssue accepts a held projection only with independently retained
-uncertainty for an unrecoverable creation or milestone comment. Client words
+live root verdict is consulted. GoalIssue accepts a held projection only
+with independently retained uncertainty for an unrecoverable creation or
+milestone comment. Client words
 supply delivery obligations as well as durable inbox and actual worker receipts.
 
 Focused tests run each baseline and the configured cuts above. Shared stories
@@ -63,7 +65,7 @@ the same outside referee after every harness iteration. The narrow engine-domain
 world retains CI job-log contents/truncation and race/permission checks that
 these stories do not exercise.
 
-The serial `measure`, `-j1`, unoptimized-test allocation is 2 seconds
-focused and 20 seconds fuzzy (jig extraction QUESTIONS.md, item 9). Both
-suites retain all fourteen applicable stories, all 365 shared and native
-commit cuts, and the same outside observations and referee as the gate.
+The world's allocation, measured serially (`--profile measure -j 1`), is
+2 seconds focused and 20 seconds fuzzy. Both suites keep all fourteen
+applicable stories, all 365 shared and native commit cuts, and the same
+outside observations and referee.

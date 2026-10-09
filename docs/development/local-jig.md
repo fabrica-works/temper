@@ -37,10 +37,6 @@ rm .cargo/config.toml
 cargo metadata --format-version 1 > /dev/null
 ```
 
-During the jig move, run these Cargo commands through the plan's
-`locked.sh <repository> <cargo arguments>` and the four checks through
-`gate.sh <repository>`, as the plan's README requires.
-
 ## The pin rule
 
 A repin goes skein, then smith, then jig, then temper. The manifests

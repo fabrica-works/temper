@@ -1,8 +1,7 @@
 # The engine's domain layer
 
-This describes the legacy engine, frozen during the migration. It is
-removed at the cutover (the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); new engine
-code follows `domain/engine.md`.
+This describes the legacy engine, whose code is gone. The engine follows
+`domain/engine.md`.
 
 Provisional, 2026-10-02. What the temper engine does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. The
@@ -887,10 +886,3 @@ each to be designed before it is built:
   - each call's cost, charged to the request budget;
   - hints naming who caused them, so the engine's own echoes are dropped;
   - listings without text, and the wiki's listing by an opaque cursor.
-
-The channel and credential prerequisites are now implemented: an accounts
-child domain, grants scoped to attempts that use them, typed models in a
-charter, named inbound events and bounces, and landings by repository tag.
-Token values stay below the domain. The remaining forge prerequisites
-above and protocol integration are tracked in
-[protocol-implementation.md](../development/protocol-implementation.md).

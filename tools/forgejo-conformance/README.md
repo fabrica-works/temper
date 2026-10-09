@@ -10,8 +10,8 @@ the production `forgejo` wrapper or opens existing Forgejo state.
 python3 tools/forgejo-conformance/run.py --output /tmp/temper-forgejo-observations
 ```
 
-The groundwork questions in the next-domain plan's `00-groundwork.md`,
-increment 00a (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`), add an isolated Actions runner:
+`--next-domain` also checks the forge connector's groundwork questions
+(`docs/design/domain/forge.md`, 20.1) with an isolated Actions runner:
 
 ```sh
 python3 tools/forgejo-conformance/run.py --next-domain --output /tmp/temper-forgejo-next-domain
@@ -29,41 +29,32 @@ failure has a 75-second observation deadline. This is outside Cargo's
 test suites and must run separately from idle-machine budget measurements.
 
 The repository owner provisions the fixture. `reviewer` is a non-admin
-write collaborator, and all 00a repository reads/effects use its token
-except provisioning Actions and protection. Protection reads are checked
-against an existing rule. `MAX_RESPONSE_ITEMS=2`, three files/commits and
-four requested pages expose pagination rather than assuming it from a
-single response. Merge probes include a moved head and a retargeted base.
+write collaborator, and every repository read and effect of that check
+uses its token except provisioning Actions and protection. Protection
+reads are checked against an existing rule. `MAX_RESPONSE_ITEMS=2`, three
+files/commits and four requested pages expose pagination rather than
+assuming it from a single response. Merge probes include a moved head and
+a retargeted base.
 
 The output identifies the binary version and SHA256, capture time and
-isolation. HTTP request bodies and response documents are actual observations;
-authorization headers, passwords and API token creation responses are excluded.
-Webhook documents are captured after the receiver queues its 204. The synthetic
-hook secret is fixed and used only for these disposable fixtures.
-Registration tokens and runner logs are excluded too; only the presence
-of the intentional stdout marker is recorded. A secret-value scan refuses
+isolation. HTTP request bodies and response documents are actual
+observations; authorization headers, passwords and API token creation
+responses are excluded. Webhook documents are captured after the receiver
+queues its 204. The synthetic hook secret is fixed and used only for these
+disposable fixtures. Registration tokens and runner logs are excluded too;
+only the presence of the intentional stdout marker is recorded. A secret-value scan refuses
 output if a fixture password or API token appears. A failed run leaves
 `partial-observations.json` for inspection; only the completed
 `observations.json` is suitable for importing fixtures.
 
-The retained 00a capture is
-`tests/forge/forgejo/fixtures/v15/next-domain-observations.json`. It selects
-unmodified `00a-*` exchanges, the collaborator grant, and the update's
-push/synchronized-pull-request webhooks from a completed run.
-`next_domain` holds extracted observations, including the running
-binary's Swagger Actions paths; it is separate from the wire exchanges.
-Its conclusions and bounded fallbacks are in `domain/forge.md`, section
-20: comparison ignores paging, write permission cannot read protection,
-and the v15 supported REST API has no job-log route. Guessed `jobs` and
-`logs` routes return 404 on that version. The migration target is now
-Forgejo v16.0.5: its supported API lists a run's jobs and reads a job's
-plaintext logs, with attempt selection and byte ranges. The client assumes
-API log reads. Keep the v15 exchanges unchanged as historical evidence;
-new v16 conformance captures must cover the supported routes specified in
-`domain/forge.md`, 20.1.
+The output's `next_domain` holds extracted observations, including the
+running binary's Swagger Actions paths, apart from the wire exchanges.
+What the v15 capture showed, and the bounded fallbacks it led to, are in
+`docs/design/domain/forge.md`, section 20. The target is Forgejo v16,
+whose supported API lists a run's jobs and reads a job's logs; a v16
+capture must cover the routes of that document's 20.1.
 
 Other protection settings and other Actions workflow/runner configurations
-remain unverified. Tagged-source fixtures state their separate provenance.
-This runner must not turn generated codec round-trips into claimed real
-transcripts, or present these plain API probes as validation of temper's
-future protocol adapters.
+remain unverified. This runner must not turn generated codec round-trips
+into claimed real transcripts, or present these plain API probes as
+validation of temper's future protocol adapters.

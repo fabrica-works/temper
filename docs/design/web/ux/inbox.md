@@ -207,7 +207,7 @@ T4 Choose: library X or a hand-rolled flow           asked by T1, waiting 1 h
   moves under an approval, a proposal passed up, a held task's reason
   that changed. An action names the state it was taken on, and one taken
   on a state since changed is refused, saying so, not applied to the new
-  one (`domain/people.md`, 5.1.2: a decision names its exact revision).
+  one (`domain/people.md`, 5.1).
 
 ## 6. Derived and read
 
@@ -246,7 +246,7 @@ section 3):
 | The web | The domain |
 |---|---|
 | accept, reject, pass up a proposal | deciding a proposal (`domain/people.md`, 5.1; `domain/tasks.md`, section 8) |
-| release, leave held, pass up an escalation | deciding an escalation (`domain/people.md`, 5.1.2) |
+| release, leave held, pass up an escalation | deciding an escalation (`domain/people.md`, 5.1) |
 | amend, then release | an amendment and a release, in two requests, the second sent once the first is answered |
 | answer a question or a person task | answer (`domain/people.md`, 5.1 and section 8) |
 | reading updates | the read position (`domain/people.md`, section 6) |

@@ -174,25 +174,25 @@ shows, never growth.
 - **Time and the seed are inputs.** The shell reads the clock
   (`performance.now()` for deadlines, `Date` for wall time) and draws
   the seed from `crypto.getRandomValues`. Request keys are drawn from it,
-  since the web page makes them (`domain/people.md`, 5.1.1).
+  since the web page makes them (`domain/people.md`, 5.1).
 - **Addresses are domain state.** The shell reports where the browser
   went (a load, back, forward), and the domain asks for an address to be
   pushed. A task's address is its number (ux README, section 4).
 - **Session storage is the client's small store.** What a reload must not
   lose, its pending requests with their keys and the person's drafts, the
-  domain writes through the shell as it changes, and reads at start. The
-  saved state names the person who owns it; after a reload, the domain
-  waits for the person watch to confirm that identity before it shows
-  the saved page or sends pending requests with their original keys. A
-  different sign-in leaves that work parked and shows an account warning
-  (ux README, 5.3).
-  A step that creates a keyed request emits a whole-storage `Save` before
-  its `Send`; the shell applies those outputs in order. Each accepted
-  draft edit also emits `Save` in that step, so a reload immediately after
-  typing restores the person's words. Saved chat requests carry the edit
-  generation they submitted; an answer clears only that generation's draft,
-  including after a reload, while a later unsent edit remains.
-  It is never the truth; the engine's store is.
+  domain writes through the shell as it changes, and reads at start. It is
+  never the truth; the engine's store is.
+  - A step that creates a keyed request emits a whole-storage `Save`
+    before its `Send`, and the shell applies them in order. Each accepted
+    draft edit also emits `Save` in that step, so a reload just after
+    typing restores the person's words. A saved chat request carries the
+    edit generation it submitted; its answer clears only that
+    generation's draft, so a later unsent edit remains.
+  - The saved state names the person who owns it. After a reload, the
+    domain waits for the person watch to confirm that identity before it
+    shows the saved page or sends pending requests with their original
+    keys; a different sign-in leaves that work parked and shows an
+    account warning (ux README, 5.3).
 - **The frame's person watch stays open on every page.** Its first
   snapshot supplies the signed-in person, projects and inbox count. The
   client uses its events and heartbeat to show whether the link is live,
@@ -324,8 +324,8 @@ the domain, its worlds and its scenarios would not change.
   what skein has: the HTTP client and the server-sent events reader.
 - **The toolchain:** the standard library for `wasm32-unknown-unknown`
   (the development machine's rustc is Debian's, without rustup, so
-  `libstd-rust-dev-wasm32`) and the wasm-bindgen CLI. Chromium is
-  installed.
+  `libstd-rust-dev-wasm32`), the wasm-bindgen CLI, and Chromium for the
+  browser tier.
 
 ## 10. Open questions
 

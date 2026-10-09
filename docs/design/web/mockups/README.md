@@ -16,7 +16,7 @@ For state to carry reliably between pages, serve this directory locally and open
 python3 -m http.server 8765 --directory docs/design/web/mockups
 ```
 
-The HTML files also open directly for visual review. Several sample tasks and chats have no dedicated mockup page.
+Several sample tasks and chats have no mockup page of their own.
 
 The layout follows `../ux/`: the inbox is home, a chat is a task with its conversation first, the same pending proposal appears in the chat and inbox, goals are ordered on a board, and the forge contributes a changes view.
 

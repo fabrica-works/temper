@@ -43,9 +43,8 @@ section 10.
 - **A project of its own** only if QA comes to serve products temper
   does not build, or people who want no factory (6.2).
 - **Later than the domain.** temper runs only in its worlds until the
-  layers below its domain exist (the next-domain plan's `08-after.md`,
-  section 3 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)), so QA is built in steps, the first needing no agent
-  (section 8).
+  layers below its domain exist, so QA is built in steps, the first
+  needing no agent (section 8).
 
 ## 2. What it is for
 

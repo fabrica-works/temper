@@ -124,6 +124,7 @@ committed, and answered once durable (engine.md, 5.2):
   limit, a task since ended.
 - **Two people deciding one thing:** the first commit decides; the second
   is told it was decided, by whom, and how.
+
 ### 5.2 The project itself
 
 A project, its repositories and roles, and its policy are records in the

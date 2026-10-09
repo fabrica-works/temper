@@ -954,16 +954,12 @@ As testing.md applies skein's strategy.
   only by their channels. Views and operators may want the name: it
   would cross as a field of the hello, which the domain then carries.
 
+## 17. Version 2 beside version 1
 
-## 16. Version 2 beside version 1
-
-The new design's channel shapes live in `temper-channel/src/wire/v2.rs`
-and `payload/v2.rs`; the shipped payload schemas live unchanged in
-`payload/v1.rs`. This section settles step 05b of
-the next-domain plan's `05-runtime.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`). The runtime domains and their
-translations follow in 05c–05g. All legacy protocol callers explicitly
-use `payload::v1`, and `Machine::new`, codec and size entrypoints without
-`_version` keep version 1.
+Version 2 carries the records of the domain design in `domain/`: turns
+kept until acknowledged, transcripts in place of snapshots, typed
+charters, task specs and calls. Version 1 is the schema of the sections
+above.
 
 `Machine::with_versions` configures a contiguous range within 1–2.
 Opening still has its frozen layout. The chosen version must fit both
@@ -1044,19 +1040,11 @@ by a domain.
 `Turn` preserves the session's versioned provider blocks as bytes, spend
 and read watermark. `Transcript` carries its turns and calls committed
 after the last turn, each with its call name, typed ask and typed answer.
-The session's own turn vocabulary is supplied in 05e. Byte and array
-bounds are checked before allocation and codecs reject trailing bytes;
-the static schema has no recursive type or recursive parser. `Sizes`
-adds turn bytes, transcript bytes, retained turn count and conflicted-file
-count. Per-schema heap bounds count every decoded array record and owned
-field with checked arithmetic. Exact payload bounds also cap nested array
-allocation by the enclosing byte limit and each array record's minimum
-encoded footprint. Machine output reserves count retained
+Byte and array bounds are checked before allocation and codecs reject
+trailing bytes; the static schema has no recursive type or recursive
+parser. `Sizes` adds turn bytes, transcript bytes, retained turn count and
+conflicted-file count. Per-schema heap bounds count every decoded array
+record and owned field with checked arithmetic. Exact payload bounds also
+cap nested array allocation by the enclosing byte limit and each array
+record's minimum encoded footprint. Machine output reserves count retained
 turns, acknowledgements and busy replies; skipping owns no body buffer.
-
-Independent binary fixtures cover every new frame, every payload record
-and every enum arm. The fragmented machine world exercises both versions,
-v1 refusal and resynchronization, send fencing, range checks, unsupported
-floods, replay and fuzzy tapes. Heap checks include maximum v2 transcript
-and conflicted-file arrays; the v1 tapes and their random choices stay
-unchanged.
