@@ -1,6 +1,8 @@
-//! A typed composition of Temper's committed root assignments and Smith's
-//! scripted agent domain, with domain fakes for storage and people.
+//! Temper's engine and worker roots with Smith's actual agent domain over
+//! fake LLM IO, jig's fake store and parties, and Temper's fake forge.
+//! Narrow engine-to-Smith fixtures also retain forge and goal checks.
 
+pub mod composed;
 #[cfg(test)]
 mod forge;
 #[cfg(test)]

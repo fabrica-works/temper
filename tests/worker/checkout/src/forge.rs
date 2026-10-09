@@ -113,6 +113,37 @@ impl Forge {
         self.now = now;
     }
 
+    /// Use the same system for engine API calls and workspace git operations.
+    /// Every call has an immediate terminal in this fake's configuration.
+    ///
+    /// # Errors
+    /// Returns the fake forge's native authentication or operation error.
+    pub fn api(&mut self, remote: &[u8], user: u64, op: Op) -> Result<Answer, Error> {
+        self.calls += 1;
+        let env = Env { now: self.now, wall: Wall::EPOCH, limits: CONFIG };
+        let mut out = Queue::with_capacity(MAX_OUT);
+        let reply_to = ReplyTo::new(Token::new(self.calls));
+        temper_fake_forge_domain::step(
+            &mut self.domain,
+            &env,
+            Event::Call { reply_to, user, repository: remote.into(), op },
+            &mut out,
+        );
+        temper_fake_forge_domain::fire(&mut self.domain, &env, &mut out);
+        self.domain.reclaim();
+        let Some(Request::Reply { to, result }) = out.pop() else {
+            panic!("the forge answers a call at once");
+        };
+        assert_eq!(to.into_token(), Token::new(self.calls));
+        assert!(out.is_empty() && self.domain.calls() == 0);
+        result
+    }
+
+    /// Configure the authenticated identity used by an engine's adoption.
+    pub fn grant(&mut self, remote: &[u8], user: u64, permission: Permission) {
+        temper_fake_forge_domain::grant(&mut self.domain, remote, user, permission);
+    }
+
     // What a world does to the forge from outside.
 
     /// Adds the repository at `remote`, whose `default` branch is at a first
@@ -238,20 +269,7 @@ impl Forge {
     /// Makes `op` on the repository at `remote` as `user`, routed directly:
     /// the forge answers at once.
     fn call(&mut self, remote: &[u8], user: u64, op: Git) -> Result<Answer, Fault> {
-        self.calls += 1;
-        let env = Env { now: self.now, wall: Wall::EPOCH, limits: CONFIG };
-        let mut out = Queue::with_capacity(MAX_OUT);
-        let reply_to = ReplyTo::new(Token::new(self.calls));
-        let event = Event::Call { reply_to, user, repository: remote.into(), op: Op::Git(op) };
-        temper_fake_forge_domain::step(&mut self.domain, &env, event, &mut out);
-        temper_fake_forge_domain::fire(&mut self.domain, &env, &mut out);
-        self.domain.reclaim();
-        let Some(Request::Reply { to, result }) = out.pop() else {
-            panic!("the forge answers a call at once");
-        };
-        assert_eq!(to.into_token(), Token::new(self.calls), "the forge answers the call made");
-        assert!(out.is_empty() && self.domain.calls() == 0, "nothing else is in flight");
-        result.map_err(fault)
+        self.api(remote, user, Op::Git(op)).map_err(fault)
     }
 }
 

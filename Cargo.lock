@@ -892,12 +892,15 @@ dependencies = [
  "jig-core-fleet",
  "jig-core-people",
  "jig-core-tasks",
+ "jig-fake-parties",
+ "jig-fake-store",
  "skein-fake-checkout",
  "skein-fake-llm-domain",
  "skein-lib",
  "smith-agent-world",
  "smith-domain",
  "smith-domain-run",
+ "smith-host-domain",
  "temper-engine-domain",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
@@ -905,7 +908,11 @@ dependencies = [
  "temper-engine-domain-world",
  "temper-engine-forge-world",
  "temper-engine-smith",
+ "temper-fake-checkout",
  "temper-fake-forge-domain",
+ "temper-worker-checkout-world",
+ "temper-worker-domain",
+ "temper-worker-domain-world",
 ]
 
 [[package]]
