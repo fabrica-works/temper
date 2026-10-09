@@ -689,7 +689,7 @@ and workspace suites remain within their existing budgets.
   Only the two requested stories, a few focused cuts and one night sweep
   were implemented; `later.md` work was not started.
 
-### temper 05 stopped application-story handoff
+### temper 05 previous stopped application-story handoff (superseded below)
 
 - **Outcome:** 5.1 and 5.2 are merged and pushed. Session 05 stops during
   5.3 on a shared-referee vocabulary prerequisite; 5.3 is not ready and
@@ -770,3 +770,102 @@ and workspace suites remain within their existing budgets.
   limitation is nonblocking for the implemented shared scenarios.
   No prerequisite repository, plans, design documents, dependency pins
   or forge URLs changed in this session.
+
+### temper 05 resumed handoff: stopped on the serial fuzzy budget
+
+- **Outcome:** 5.1 and 5.2 remain merged and pushed. The decided kind split
+  unblocks the former recovery-vocabulary failure. The resumed 5.3 coverage
+  and repository gate pass, but its required serial fuzzy coverage exceeds
+  the planned allowance. 5.3 is incomplete and unmerged; 5.4 is not started.
+  Session 06's finish work remains blocked by 05. This status change is
+  Markdown only and does not authorize merging the preserved code.
+- **Decision followed:** main `d04c9104771d42dddf8ea242d6bc66c4789232b8`,
+  jig's `domain/connectors.md`, section 3.1, and temper's `forge.md`,
+  section 6. Every table row has its own kind, one form and one recovery
+  class. Issue creation is 8, editing/closing/reopening issues is 13;
+  pull opening is 3, editing is 10, updating from the base is 11,
+  merging is 4 and closing/reopening is 12. Branch deletion is 15.
+  Grants, policies, description routes, fixtures and native observations
+  follow. The order has no implications between distinct kinds. No
+  deployed store data needs compatibility. The earlier per-effect referee
+  proposal is discarded; there is no pending design/plan disagreement.
+- **Clean code recovery point:** branch `jig/temper-05-3-stories`, commit
+  `8a59f5b83e39a31ed1aa932c8667615c2097ee69`,
+  `Preserve split forge kinds and verified temper story cuts`, tree
+  `71fc65694d49372c6bbc88ad23c27b5b2bd45df6`, on main `d04c9104`.
+  Its clean retained worktree is
+  `/srv/data/git/runner/worktrees/jig-extraction/temper/jig-temper-05-3-stories`.
+  The original preservation commit `78e2f5e2` was rebased to
+  `e5dc27ce06d1bc4c01389c88b107e79b9e974151`; both that draft and the new
+  checkpoint remain on the unmerged branch. Earlier preliminary checks
+  and gates are historical; the evidence below ran on exactly `8a59f5b8`
+  after the final observation-bookkeeping change.
+- **Exact-commit repository gate:** fmt and clippy passed; 1,282 focused
+  tests / 2.603 s; 40 fuzzy tests / 14.022 s. It used `gate.sh` from the
+  worktree with the shared build lock/target, four build jobs and
+  `CARGO_INCREMENTAL=0`. This passes the whole-workspace 15 s / 60 s gates,
+  but does not satisfy the separate world allocation.
+- **Exact-commit serial measurement:** `locked.sh`, `nextest`, `measure`,
+  `-j1`, unoptimized test build, on `8a59f5b8`: 15 focused tests sum to
+  1.812 s; two fuzzy tests sum to 16.566 s. The shared sweep is 7.302 s and
+  the native sweep 9.264 s; the combined measurement elapsed 18.378 s.
+  The inherited 1.5 s / 8 s allocation plus QUESTIONS.md item 9's
+  applicable 0.5 s / 3 s story-growth allowance yields 2 s / 11 s.
+  Focused passes; fuzzy exceeds its envelope by 5.566 s. No exception or
+  reduction of required coverage is taken.
+- **Complete coverage:** 171 shared cuts: LateCopy 12, OtherHand 30,
+  UncertainRestarts 15, ChangedJudge 45, NarrowingPolicy 24, StandingTask
+  24 and RunBudget 21. ShrinkingPool remains explicitly inapplicable to
+  a forge without pooled holds. Native cuts total 194: ReviewedChange
+  31, RepairCi 40, GoalIssue 38, OtherHand 31, LostMerge 33, PersonWords
+  9 and IssueCreation 12. Baselines and all 365 cuts pass. Focused keeps
+  three configured cuts per shared scenario and two per native story,
+  asserting each cut actually fired.
+- **Preserved and verified fixes:** forge ownership translates pushed
+  heads, restored client watches regain their durable writers, expected
+  branch deletion avoids false drift and unknown delete answers settle
+  from absence, and desired issue projections regain their timer after
+  restore. Native effect-row tests compare all forms/classes with the
+  client's recovery contract. OtherHand checks the exact task, actual
+  actor-4 movement and preserved foreign head. PersonWords retains a lost
+  relay in the durable inbox for the next activation. Goal issues stay
+  write-only projections; human forge comments do not become task news.
+- **Independent uncertainty evidence:** actual lost answers and timeouts,
+  durable cold attempted entries, retained entry/projection identities,
+  named terminal answers and connector erasure supply the observations.
+  Settlement is retained per key, so a later failed projection cannot
+  relabel an already settled creation as held. GoalIssue accepts a hold
+  only for that goal's independently uncertain creation or milestone
+  comment (kinds 8/7), not an unrelated failure. Durable words supply
+  delivery obligations and actual worker/inbox receipts. The referee
+  logic is unchanged.
+- **Duplicate stories removed:** the engine-domain world no longer repeats
+  the complete simple landing story or the basic write-only goal issue
+  story. Its failed-CI story keeps the unique bounded job-log contents and
+  truncation assertion; other race, timing, gate, permission and approval
+  checks remain where the conformance stories do not cover them.
+- **Performance work attempted:** smaller native task/funding/call/run
+  bounds and journal cohorts, compact formatting of full retained store
+  records, removal of a redundant Resume event, grants narrowed to the
+  writes each fixture exercises, and removal of repeated focused
+  baselines while retaining every configured cut. Compact formatting of
+  all event/delivery traces had no material effect and was reverted.
+  Temporary timing instrumentation was removed. A diagnostic run measured
+  about 2.31 s of native sweep time in deep referee-policy clones; it is
+  not the final measurement. The remaining budget failure is reproducible.
+- **Blocking proposal/handoff:** investigate immutable policy ownership or
+  versioned policy delivery in the harness as a separately authorized jig
+  prerequisite, preserving independent policy changes, every referee
+  observation, its logic and all cuts. No safe in-scope fix meeting 11 s
+  was established. Resume at the clean checkpoint, obtain passing serial
+  budget evidence before 5.3 completion, then implement 5.4 with the real
+  engine and worker roots, real Smith domains and a fake LLM on jig's
+  store/party fakes; the channel-0 domain-world simplification does not
+  satisfy 5.4.
+- **Other handoffs:** 5.1's section-11 routing-only root audit remains
+  applicable. Preserve jig 17's journal/order/release, inbox fences and
+  settled answers, jig 21's project resource identity/roles before task
+  adoption, and jig 15's independent referee. The inherited inability to
+  attribute an outside forward push without authenticated actor metadata
+  remains nonblocking for these stories. No prerequisite repository,
+  plan, design, dependency pin, forge URL or user draft was changed.
