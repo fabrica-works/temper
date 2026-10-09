@@ -35,6 +35,14 @@ pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
             (7, None, value(body), 0)
         }
+        client::api::Write::Edit { number, title, body } => {
+            name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
+            (8, None, value(format!("{title:?}:{body:?}").as_bytes()), 0)
+        }
+        client::api::Write::Close { number } => {
+            name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
+            (8, None, 1, 0)
+        }
         client::api::Write::Merge { number, head } => {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
             (4, Some(value(head)), *number, value(head))
@@ -72,8 +80,12 @@ pub fn key(store: &Store, entry: &client::Entry) -> SystemKey {
     }
 }
 #[must_use]
-pub fn policy(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -> r::Policy {
-    let (config, _) = super::config::root(seed, scenario);
+pub fn policy(
+    seed: u64,
+    scenario: Option<jig_conformance::scenarios::Scenario>,
+    story: Option<super::stories::Story>,
+) -> r::Policy {
+    let (config, _) = super::config::root(seed, scenario, story);
     let rules = config.authority.rules();
     let project = config.authority.policy(1).expect("configured project");
     r::Policy {
@@ -218,7 +230,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     );
                 }
                 snapshot.decisions.push(r::Decision {
-                    projection: key.position == 1 && key.attempt == 0,
+                    projection: key.attempt == 0 && store.rows.values().any(|record| matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)|tasks::Stored::Ended(task))) if task.number==row.task && task.tracked.is_some())),
                     connector: 0,
                     key,
                     kind,

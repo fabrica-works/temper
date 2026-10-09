@@ -1031,9 +1031,8 @@ fn retain_uncertain(
         | Error::Busy => false,
     };
     if !transient {
-        // A missing creation is the answer to its recovery lookup,
-        // rather than a failed lookup to back off. Let `failed` apply the
-        // saved deadline and either wait, retry safely, or hold for a person.
+        // Absence answers creation and deletion recovery lookups. Let
+        // `failed` confirm deletion or apply a creation's saved deadline.
         if error == Error::Missing
             && let Phase::Find { .. } = phase
         {
@@ -1045,13 +1044,13 @@ fn retain_uncertain(
                 | Write::Post { .. }
                 | Write::Review { .. }
                 | Write::Merge { .. }
-                | Write::Update { .. } => return false,
+                | Write::Update { .. }
+                | Write::DeleteBranch { .. } => return false,
                 Write::Edit { .. }
                 | Write::SetReviewers { .. }
                 | Write::Close { .. }
                 | Write::Reopen { .. }
-                | Write::Status { .. }
-                | Write::DeleteBranch { .. } => {}
+                | Write::Status { .. } => {}
             }
         }
         match phase {

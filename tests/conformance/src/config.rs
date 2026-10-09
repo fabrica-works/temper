@@ -6,13 +6,20 @@ use temper_engine_domain::engine;
 use temper_engine_domain_world::walking;
 
 #[expect(clippy::too_many_lines, reason = "the fixture specifies its policy and child bounds together")]
-pub fn root(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -> (engine::Config, engine::Limits) {
+pub fn root(
+    seed: u64,
+    scenario: Option<jig_conformance::scenarios::Scenario>,
+    story: Option<super::stories::Story>,
+) -> (engine::Config, engine::Limits) {
     let mut limits = walking::limits();
     limits.people.people = 4;
     limits.people.amendment_bytes = 2048;
     limits.people.holdings = 4;
     limits.authority.requirements = 8;
     limits.authority.facts = 8;
+    if matches!(story, Some(super::stories::Story::ReviewedChange | super::stories::Story::RepairCi)) {
+        limits.authority.roles = 3;
+    }
     limits.brief.gather = Duration::from_secs(5);
     limits.brief.read_bytes = 512;
     limits.brief.budgets.pull = 384;
@@ -68,12 +75,24 @@ pub fn root(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -
     };
     // Every chat uses its real owned push workspace. Only the producer stories
     // need pull/merge grants; shared stories do not project issues.
-    let kinds: &[u16] = match scenario {
-        Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6],
-        Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4],
-        Some(Scenario::StandingTask | Scenario::RunBudget) => &[1, 2],
-        Some(Scenario::ShrinkingPool) => panic!("forge has no pooled holds"),
-        None => &[1, 8, 2, 3, 4, 6],
+    let kinds: &[u16] = if let Some(story) = story {
+        match story {
+            super::stories::Story::ReviewedChange
+            | super::stories::Story::RepairCi
+            | super::stories::Story::OtherHand
+            | super::stories::Story::LostMerge => &[1, 2, 3, 4],
+            super::stories::Story::GoalIssue => &[1, 2, 6, 7, 8],
+            super::stories::Story::PersonWords => &[1, 2],
+            super::stories::Story::IssueCreation => &[1, 2, 8],
+        }
+    } else {
+        match scenario {
+            Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6],
+            Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4],
+            Some(Scenario::StandingTask | Scenario::RunBudget) => &[1, 2],
+            Some(Scenario::ShrinkingPool) => panic!("forge has no pooled holds"),
+            None => &[1, 8, 2, 3, 4, 6],
+        }
     };
     let grants: Box<[authority::Grant]> =
         kinds.iter().map(|&kind| authority::Grant { connector: 0, kind, pattern: pattern.clone() }).collect();
@@ -82,7 +101,7 @@ pub fn root(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -
     rules.maximum_run_spend = 60;
     rules.ceiling.tools = authority::Tools(1023);
     let mut ceiling = grants.to_vec();
-    if scenario.is_none() {
+    if scenario.is_none() && story.is_none() {
         ceiling.push(authority::Grant { connector: 0, kind: 7, pattern });
     }
     rules.ceiling.grants = ceiling.into_boxed_slice();
@@ -93,10 +112,21 @@ pub fn root(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -
     policy.ceiling.tools = rules.ceiling.tools;
     policy.ceiling.grants.clone_from(&rules.ceiling.grants);
     policy.ceiling.delegation = rules.ceiling.delegation.clone();
-    policy.projections = if scenario.is_none() { rules.ceiling.grants.clone() } else { Box::new([]) };
+    policy.projections = if (scenario.is_none() && story.is_none()) || story == Some(super::stories::Story::GoalIssue) {
+        rules.ceiling.grants.clone()
+    } else {
+        Box::new([])
+    };
     policy.roles[0].authority.tools = rules.ceiling.tools;
     policy.roles[0].authority.grants.clone_from(&grants);
     policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
+    if matches!(story, Some(super::stories::Story::ReviewedChange | super::stories::Story::RepairCi)) {
+        let mut maintainer = policy.roles[0].clone();
+        maintainer.number = 1;
+        let mut member = policy.roles[0].clone();
+        member.number = 2;
+        policy.roles = Box::new([policy.roles[0].clone(), maintainer, member]);
+    }
     let mut domain = authority::Domain::new(rules, limits.authority).expect("policy limits");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
@@ -125,7 +155,11 @@ pub fn root(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -
         ci: true,
         up_to_date: true,
         gates: Box::new([]),
-        approvals: Box::new([]),
+        approvals: if matches!(story, Some(super::stories::Story::ReviewedChange | super::stories::Story::RepairCi)) {
+            Box::new([engine::Approval { role: 2, people: 1, freshness: engine::Freshness::Exact }])
+        } else {
+            Box::new([])
+        },
     }]);
     config.landing.deployment.clone_from(&landing);
     assert!(config.landing.projects.insert(1, landing).is_ok());

@@ -485,6 +485,32 @@ impl Domain {
         }
     }
 
+    /// Resolve worker head reports against this attempt's durable forge writers.
+    /// Prepared assignments leave the root when delivered; their temporary
+    /// lifetime must not determine whether a finished writer can be released.
+    #[must_use]
+    pub fn reported_heads(
+        &self,
+        limits: &Limits,
+        task: u64,
+        attempt: u64,
+        pushed: &[crate::Pushed],
+    ) -> Box<[(Name, client::api::Commit)]> {
+        let mut names = List::with_capacity(limits.resources_per_task);
+        for (name, hold) in &self.holds {
+            if hold.writer != Some(Writer::Run { task, attempt }) {
+                continue;
+            }
+            for reported in pushed {
+                if reported.tag == name.repository {
+                    names.push((name.clone(), reported.commit)).expect("claimed writer destinations are bounded");
+                    break;
+                }
+            }
+        }
+        names.into_boxed()
+    }
+
     /// Current holder and writer of one named resource for root claim checks.
     #[must_use]
     pub fn hold(&self, name: &Name) -> Option<&Hold> {
@@ -3356,7 +3382,7 @@ fn drift(
     let mut affected = List::with_capacity(env.limits.holds);
     for (name, row) in &d.holds {
         if to_client(name, &env.limits) == Some(resource.clone()) {
-            if updating_entry(d, row.task) {
+            if updating_entry(d, row.task) || deleting_entry(d, row.task, &resource, &change) {
                 continue;
             }
             emit(out, Request::Drift { task: row.task, resource: name.clone() });
@@ -3376,6 +3402,24 @@ fn drift(
             });
             emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
         }
+    }
+}
+
+fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &crate::DriftChange) -> bool {
+    match change {
+        crate::DriftChange::Branch { observed: None, .. } => {}
+        crate::DriftChange::Branch { observed: Some(_), .. }
+        | crate::DriftChange::PullClosed { .. }
+        | crate::DriftChange::Retargeted { .. } => return false,
+    }
+    let Some(release) = d.releases.get(&task) else { return false };
+    let Some((number, _)) = &release.pending else { return false };
+    let Some(entry) = d.entries.get(number) else { return false };
+    match (&entry.effect.write, &resource.what) {
+        (client::api::Write::DeleteBranch { branch }, client::What::Branch(found)) => {
+            entry.repository == resource.repository && branch == found
+        }
+        _ => false,
     }
 }
 
@@ -3423,6 +3467,11 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
             d.changes.insert(row.task, row).expect("restored change within limits");
         }
         Stored::Issue(row) => {
+            if row.pending.is_none() && !row.failed && !row.state.closed && row.desired.is_some() {
+                // A committed desired view may still await its body interval,
+                // milestone, or closing write when the transient timer is lost.
+                d.projection_due.insert(row.goal, env.wall).expect("projection timers are bounded by issues");
+            }
             d.issues.insert(row.goal, row).expect("restored issue within limits");
         }
         Stored::Release(row) => {
@@ -3433,6 +3482,24 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
 
 fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out: &mut Queue<Request>) {
     child(d, env, client::Event::Restored { clock }, out);
+    // The client's transient watcher flags are rebuilt from the connector's
+    // durable writers before any fresh background read can classify a push.
+    {
+        let mut resources = List::with_capacity(env.limits.holds);
+        for (name, hold) in &d.holds {
+            match hold.writer {
+                Some(Writer::Run { .. } | Writer::Lost { .. }) => {
+                    if let Some(resource) = to_client(name, &env.limits) {
+                        resources.push(resource).expect("writers are bounded by holds");
+                    }
+                }
+                Some(Writer::Entry(_)) | None => {}
+            }
+        }
+        for resource in &resources {
+            child(d, env, client::Event::Writer { resource: resource.clone(), taken: true }, out);
+        }
+    }
     child(d, env, client::Event::PauseOutbox, out);
     let mut entries = List::with_capacity(env.limits.entries);
     for (_, entry) in &d.entries {

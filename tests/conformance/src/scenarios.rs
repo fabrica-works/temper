@@ -27,7 +27,7 @@ fn ci_repair(record: &root::Record) -> bool {
         Some((_, temper_engine_domain_forge_change::Delegate::Repair(temper_engine_domain_forge_change::Repair::Ci)))
     )
 }
-fn ask(world: &mut World, key: u8, ask: people::Ask) {
+pub(crate) fn ask(world: &mut World, key: u8, ask: people::Ask) {
     send(
         world,
         engine::Event::Ask {
@@ -85,7 +85,7 @@ fn effect(world: &mut World, completion: u32, proposal: bool) {
         },
     );
 }
-fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
+pub(crate) fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
     if !world.peers.worker.seen.iter().any(|run| run.task == task) {
         world.advance(6_000_000_000);
         world.drain()?;
@@ -566,7 +566,7 @@ impl ScenarioApplication for Temper {
     clippy::wildcard_enum_match_arm,
     reason = "one bounded producer fixture specifies its authority and reads task facts for diagnostics"
 )]
-fn change(world: &mut World, completion: u32) -> Result<(), Violation> {
+pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation> {
     if world.peers.changes.contains(&u64::from(completion)) {
         return Ok(());
     }
@@ -676,6 +676,10 @@ fn change(world: &mut World, completion: u32) -> Result<(), Violation> {
     world.peers.worker.message(producer.task, producer.attempt, 200, b"report push".as_slice().into());
     world.drain()?;
     for _ in 0..40 {
+        if world.peers.story.is_some() && world.store.rows.values().any(|record|
+            matches!(record,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Change(change) if change.pull.is_some()))) {
+            break;
+        }
         if world.systems.delayed_merge() {
             break;
         }

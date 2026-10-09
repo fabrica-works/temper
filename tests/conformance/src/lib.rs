@@ -4,6 +4,7 @@
 mod config;
 pub mod observations;
 mod scenarios;
+pub mod stories;
 pub mod systems;
 
 use jig_conformance::referee as r;
@@ -22,17 +23,29 @@ use temper_engine_domain_forge as forge;
 pub struct Config {
     pub seed: u64,
     pub scenario: Option<jig_conformance::scenarios::Scenario>,
+    pub story: Option<stories::Story>,
     limits: engine::Limits,
     maximum: u64,
 }
 impl Config {
     #[must_use]
     pub fn new(seed: u64, scenario: Option<jig_conformance::scenarios::Scenario>) -> Self {
-        let limits = config::root(seed, scenario).1;
+        Self::configured(seed, scenario, None)
+    }
+    #[must_use]
+    pub fn for_story(seed: u64, story: stories::Story) -> Self {
+        Self::configured(seed, None, Some(story))
+    }
+    fn configured(
+        seed: u64,
+        scenario: Option<jig_conformance::scenarios::Scenario>,
+        story: Option<stories::Story>,
+    ) -> Self {
+        let limits = config::root(seed, scenario, story).1;
         let maximum = engine::worst_case(&limits).expect("finite root")
             + u64::try_from(std::mem::size_of::<Domain>() - std::mem::size_of::<engine::Domain>())
                 .expect("driver size");
-        Self { seed, scenario, limits, maximum }
+        Self { seed, scenario, story, limits, maximum }
     }
 }
 /// Timers enter independently from external root inputs.
@@ -82,6 +95,7 @@ pub struct Peers {
     pub policy: r::Policy,
     pub seed: u64,
     pub scenario: Option<jig_conformance::scenarios::Scenario>,
+    pub story: Option<stories::Story>,
     pub worker: workers::Worker,
     pub assignments: Vec<engine::Assignment>,
     pub answers: Vec<root::CallAnswer>,
@@ -101,6 +115,7 @@ pub struct Peers {
     pub changes: Vec<u64>,
     pub branches: Vec<Box<[u8]>>,
     pub produced: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
+    pub reported: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
     calls: std::collections::BTreeMap<u64, (u64, u64, engine::Call)>,
     retries: std::collections::BTreeMap<u64, u64>,
     generation: u64,
@@ -128,7 +143,7 @@ impl Application for Temper {
     type Delivery = Delivery;
 
     fn build(config: &Config) -> Domain {
-        let (mut configuration, limits) = config::root(config.seed, config.scenario);
+        let (mut configuration, limits) = config::root(config.seed, config.scenario, config.story);
         if config.scenario == Some(jig_conformance::scenarios::Scenario::ChangedJudge) {
             for rule in &mut configuration.landing.deployment {
                 rule.enforce = false;
@@ -146,40 +161,55 @@ impl Application for Temper {
         }
     }
     fn systems(config: &Config, _: u64) -> systems::FakeForge {
-        let mut system = systems::FakeForge::new(config.seed);
-        system.merge_only = matches!(
-            config.scenario,
-            Some(jig_conformance::scenarios::Scenario::OtherHand | jig_conformance::scenarios::Scenario::ChangedJudge)
+        let mut system = systems::FakeForge::new_with_ci(
+            config.seed,
+            if config.story == Some(stories::Story::RepairCi) { 0 } else { 1000 },
         );
+        system.lose_merge_answer = config.story == Some(stories::Story::LostMerge);
+        system.lose_issue_answer = config.story == Some(stories::Story::IssueCreation);
+        system.merge_only = config.story == Some(stories::Story::OtherHand)
+            || matches!(
+                config.scenario,
+                Some(
+                    jig_conformance::scenarios::Scenario::OtherHand
+                        | jig_conformance::scenarios::Scenario::ChangedJudge
+                )
+            );
         system
     }
     fn peers(config: &Config, _: u64) -> Peers {
-        let script: Box<[workers::Script]> = match config.scenario {
-            Some(jig_conformance::scenarios::Scenario::RunBudget) => {
-                let mut values = vec![workers::Script::Wait];
-                for index in 0..12 {
-                    values.push(workers::Script::Turn {
-                        body: format!("completion {index}").into_bytes().into(),
-                        cost: if index < 8 { 2 } else { 1 },
-                        read: None,
-                    });
+        let script: Box<[workers::Script]> = if config.story.is_some() {
+            Box::new([workers::Script::Wait, workers::Script::Finish { report: b"story done".as_slice().into() }])
+        } else {
+            match config.scenario {
+                Some(jig_conformance::scenarios::Scenario::RunBudget) => {
+                    let mut values = vec![workers::Script::Wait];
+                    for index in 0..12 {
+                        values.push(workers::Script::Turn {
+                            body: format!("completion {index}").into_bytes().into(),
+                            cost: if index < 8 { 2 } else { 1 },
+                            read: None,
+                        });
+                    }
+                    values.push(workers::Script::Park);
+                    values.into_boxed_slice()
                 }
-                values.push(workers::Script::Park);
-                values.into_boxed_slice()
+                Some(
+                    jig_conformance::scenarios::Scenario::OtherHand
+                    | jig_conformance::scenarios::Scenario::ChangedJudge
+                    | jig_conformance::scenarios::Scenario::StandingTask,
+                ) => Box::new([
+                    workers::Script::Wait,
+                    workers::Script::Finish { report: b"period done".as_slice().into() },
+                ]),
+                _ => Box::new([workers::Script::Wait]),
             }
-            Some(
-                jig_conformance::scenarios::Scenario::OtherHand
-                | jig_conformance::scenarios::Scenario::ChangedJudge
-                | jig_conformance::scenarios::Scenario::StandingTask,
-            ) => {
-                Box::new([workers::Script::Wait, workers::Script::Finish { report: b"period done".as_slice().into() }])
-            }
-            _ => Box::new([workers::Script::Wait]),
         };
         Peers {
             seed: config.seed,
             scenario: config.scenario,
-            policy: observations::policy(config.seed, config.scenario),
+            story: config.story,
+            policy: observations::policy(config.seed, config.scenario, config.story),
             worker: workers::Worker::new(7, 2, (0..16).map(|_| script.clone()).collect()),
             assignments: Vec::new(),
             answers: Vec::new(),
@@ -199,6 +229,7 @@ impl Application for Temper {
             changes: Vec::new(),
             branches: Vec::new(),
             produced: std::collections::BTreeMap::new(),
+            reported: std::collections::BTreeMap::new(),
             calls: std::collections::BTreeMap::new(),
             retries: std::collections::BTreeMap::new(),
             generation: 0,
@@ -501,6 +532,11 @@ impl Application for Temper {
             }
             events.extend(peers.worker.tick(Time::from_nanos(clock.now)).into_iter().map(|up| {
                 let mut event = worker_event(up);
+                if let engine::Event::Answer { task, pushed, .. } = &mut event
+                    && let Some(commit) = peers.reported.get(task)
+                {
+                    *pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
+                }
                 if let engine::Event::Answer { task, end, pushed, .. } = &mut event
                     && matches!(end, tasks::End::Finished { .. })
                     && let Some(commit) = peers.produced.get(task)

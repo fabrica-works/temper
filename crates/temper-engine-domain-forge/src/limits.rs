@@ -90,6 +90,8 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         )?
         .checked_add(Map::<u64, Box<[Name]>>::worst_case(l.tasks)?)?
         .checked_add(Map::<Name, Hold>::worst_case(l.holds)?)?
+        .checked_add(skein_lib::List::<client::Resource>::worst_case(l.holds)?)?
+        .checked_add(u64::from(l.holds).checked_mul(u64::from(l.name_bytes))?)?
         .checked_add(u64::from(l.holds).checked_mul(u64::from(l.client.answer_bytes).checked_mul(2)?)?)?
         .checked_add(Map::<(u64, Topic), Subscriber>::worst_case(l.subscriptions)?)?
         .checked_add(Map::<Name, BranchHead>::worst_case(l.client.resources)?)?

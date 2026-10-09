@@ -158,6 +158,11 @@ fn a_hold_and_writer_slot_are_exclusive_until_answered() {
         &[Request::Taken { task: 8, resource: name.clone(), by: 7 }]
     );
     outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name.clone()]), holders: Box::new([7]) });
+    let reported = [Pushed { tag: name.repository, commit: [2; 32] }];
+    assert_eq!(d.reported_heads(&LIMITS, 9, 1, &reported).as_ref(), &[(name.clone(), [2; 32])]);
+    assert!(d.reported_heads(&LIMITS, 9, 2, &reported).is_empty(), "another attempt cannot report this writer");
+    assert!(d.reported_heads(&LIMITS, 8, 1, &reported).is_empty(), "the holder cannot report its child's writer");
+    assert!(d.reported_heads(&LIMITS, 9, 1, &[Pushed { tag: 99, commit: [2; 32] }]).is_empty());
     assert_eq!(
         outputs(
             &mut d,

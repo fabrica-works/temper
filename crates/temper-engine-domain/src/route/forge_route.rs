@@ -2601,30 +2601,8 @@ fn judge_effect(
 
 /// Translate reported heads only against the assignment's granted write destinations.
 pub(crate) fn left(domain: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, pushed: Box<[forge::Pushed]>) {
-    let mut names = List::with_capacity(env.limits.forge.resources_per_task);
-    if let Some(assignment) = domain.assignments.get(&task) {
-        for repository in &assignment.workspace.repositories {
-            for reported in &pushed {
-                if repository.tag != reported.tag {
-                    continue;
-                }
-                let Some(branch) = &repository.push else { continue };
-                let Some(what) = branch_what(branch, env.limits.forge.name_bytes) else { continue };
-                names
-                    .push((
-                        forge::Name {
-                            forge: repository.provider.forge,
-                            repository: repository.provider.repository,
-                            what,
-                        },
-                        reported.commit,
-                    ))
-                    .expect("bounded assignment repositories");
-                break;
-            }
-        }
-    }
-    domain.work.push(Work::Forge(forge::Event::Answered { task, attempt, pushed: names.into_boxed() }));
+    let names = domain.forge.reported_heads(&env.limits.forge, task, attempt, &pushed);
+    domain.work.push(Work::Forge(forge::Event::Answered { task, attempt, pushed: names }));
     domain.work.push(Work::Forge(forge::Event::Lost { task, attempt }));
 }
 

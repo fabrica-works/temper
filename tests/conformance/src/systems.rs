@@ -23,13 +23,15 @@ pub struct FakeForge {
     pub domain: fake::Domain,
     config: fake::Config,
     client_limits: temper_engine_domain_forge_client::Limits,
-    out: Queue<fake::Request>,
+    out: std::collections::VecDeque<fake::Request>,
     pending: BTreeMap<Token, Pending>,
     late: Vec<(Token, api::Repository, api::Op, SystemKey)>,
     pub hold: bool,
     pub merge_only: bool,
     pub failed: bool,
     pub late_next: bool,
+    pub lose_merge_answer: bool,
+    pub lose_issue_answer: bool,
     pub effects: Vec<Observed>,
     pub native_observations: Vec<fake::Observation>,
     owners: BTreeMap<Vec<u8>, u64>,
@@ -42,6 +44,10 @@ pub struct FakeForge {
 impl FakeForge {
     #[must_use]
     pub fn new(seed: u64) -> Self {
+        Self::new_with_ci(seed, 1000)
+    }
+    #[must_use]
+    pub fn new_with_ci(seed: u64, passes: u32) -> Self {
         let mut config = temper_engine_forge_world::fake_config();
         config.latency_min = Duration::ZERO;
         config.latency_max = Duration::ZERO;
@@ -59,7 +65,7 @@ impl FakeForge {
                     latency_min: Duration::ZERO,
                     latency_max: Duration::ZERO,
                     silent: 0,
-                    passes: 1000,
+                    passes,
                     reruns: 0,
                     cue: None,
                 },
@@ -74,14 +80,16 @@ impl FakeForge {
         Self {
             domain,
             config,
-            client_limits: super::config::root(seed, None).1.forge.client,
-            out: Queue::with_capacity(fake::MAX_OUT),
+            client_limits: super::config::root(seed, None, None).1.forge.client,
+            out: std::collections::VecDeque::new(),
             pending: BTreeMap::new(),
             late: Vec::new(),
             hold: false,
             merge_only: false,
             failed: false,
             late_next: false,
+            lose_merge_answer: false,
+            lose_issue_answer: false,
             effects: Vec::new(),
             native_observations: Vec::new(),
             owners: BTreeMap::new(),
@@ -165,6 +173,7 @@ impl FakeForge {
             Pending { root_call: call, generation: if late { u64::MAX } else { self.generation }, op, effect },
         );
         let env = Env { now: Time::from_nanos(clock.now), wall: Wall::from_nanos(clock.now), limits: self.config };
+        let mut queue = Queue::with_capacity(fake::MAX_OUT);
         fake::step(
             &mut self.domain,
             &env,
@@ -174,8 +183,11 @@ impl FakeForge {
                 repository: b"org/repo".as_slice().into(),
                 op: native,
             },
-            &mut self.out,
+            &mut queue,
         );
+        while let Some(request) = queue.pop() {
+            self.out.push_back(request);
+        }
         self.collect_native();
     }
     pub fn delayed_merge(&self) -> bool {
@@ -190,10 +202,14 @@ impl FakeForge {
     pub fn poll(&mut self, clock: Clock) -> Vec<engine::Event> {
         let env = Env { now: Time::from_nanos(clock.now), wall: Wall::from_nanos(clock.now), limits: self.config };
         if self.domain.is_due(env.now) {
-            fake::fire(&mut self.domain, &env, &mut self.out);
+            let mut queue = Queue::with_capacity(fake::MAX_OUT);
+            fake::fire(&mut self.domain, &env, &mut queue);
+            while let Some(request) = queue.pop() {
+                self.out.push_back(request);
+            }
         }
         let mut events = Vec::new();
-        while let Some(request) = self.out.pop() {
+        while let Some(request) = self.out.pop_front() {
             if let fake::Request::Hook { change, number, branch, commit, by, .. } = &request {
                 let change = match change {
                     raw::Change::Push => branch.as_ref().map(|branch| match (commit, by) {
@@ -257,6 +273,20 @@ impl FakeForge {
                     };
                     self.effects.push(observation.clone());
                     self.new_observations.borrow_mut().push(r::Observed::Effect { connector: 0, effect: observation });
+                }
+                if self.lose_merge_answer
+                    && matches!(pending.op, api::Op::Write(api::Write::Merge { .. }))
+                    && result.is_ok()
+                {
+                    self.lose_merge_answer = false;
+                    continue;
+                }
+                if self.lose_issue_answer
+                    && matches!(pending.op, api::Op::Write(api::Write::CreateIssue { .. }))
+                    && result.is_ok()
+                {
+                    self.lose_issue_answer = false;
+                    continue;
                 }
                 if pending.generation == self.generation {
                     events.push(engine::Event::ForgeAnswered {
@@ -326,6 +356,17 @@ impl FakeForge {
                     )
                 })
             }
+            raw::Write::EditItem { number, .. } | raw::Write::Close { number } => {
+                match self.domain.inspect(&self.config, b"org/repo", &raw::Read::Item { number: *number, after: 0 }) {
+                    Ok(raw::Answer::Item { item, .. }) => (
+                        Some(observations::value(
+                            format!("{:?}:{:?}:{:?}", item.title, item.body, item.state).as_bytes(),
+                        )),
+                        item.author == 1,
+                    ),
+                    _ => (None, false),
+                }
+            }
             raw::Write::OpenPull { .. } | raw::Write::CreateIssue { .. } | raw::Write::Comment { .. } => (None, false),
             other => panic!("pre-write evidence outside scenario vocabulary: {other:?}"),
         };
@@ -336,33 +377,43 @@ impl FakeForge {
         reason = "hook outputs are retained while this helper finds its own reply"
     )]
     pub fn external(&mut self, clock: Clock, op: raw::Op) -> raw::Answer {
+        self.external_as(clock, 1, op)
+    }
+    pub fn external_as(&mut self, clock: Clock, user: u64, op: raw::Op) -> raw::Answer {
         let token = Token::new(self.serial);
         self.serial += 1;
         let env = Env { now: Time::from_nanos(clock.now), wall: Wall::from_nanos(clock.now), limits: self.config };
         let mut queue = Queue::with_capacity(fake::MAX_OUT);
         fake::fire(&mut self.domain, &env, &mut queue);
+        while let Some(request) = queue.pop() {
+            self.out.push_back(request);
+        }
         fake::step(
             &mut self.domain,
             &env,
-            fake::Event::Call { reply_to: ReplyTo::new(token), user: 1, repository: b"org/repo".as_slice().into(), op },
+            fake::Event::Call { reply_to: ReplyTo::new(token), user, repository: b"org/repo".as_slice().into(), op },
             &mut queue,
         );
-        fake::fire(&mut self.domain, &env, &mut queue);
         let mut answer = None;
-        while let Some(request) = queue.pop() {
-            match request {
-                fake::Request::Reply { to, result } => {
-                    let t = to.into_token();
-                    if t == token {
-                        answer = Some(result.expect("external forge operation"));
-                    } else {
-                        self.out.push(fake::Request::Reply { to: ReplyTo::new(t), result });
+        for _ in 0..1000 {
+            while let Some(request) = queue.pop() {
+                match request {
+                    fake::Request::Reply { to, result } => {
+                        let call = to.into_token();
+                        if call == token {
+                            answer = Some(result.expect("external forge operation"));
+                        } else {
+                            self.out.push_back(fake::Request::Reply { to: ReplyTo::new(call), result });
+                        }
                     }
-                }
-                other => {
-                    self.out.push(other);
+                    other => self.out.push_back(other),
                 }
             }
+            if answer.is_some() {
+                break;
+            }
+            assert!(self.domain.is_due(env.now), "zero-latency external operation remains due");
+            fake::fire(&mut self.domain, &env, &mut queue);
         }
         self.collect_native();
         answer.expect("external reply")
@@ -404,6 +455,9 @@ impl FakeForge {
         }
         translate::commit(commit)
     }
+    pub fn inspect(&self, read: &raw::Read) -> Result<raw::Answer, raw::Error> {
+        self.domain.inspect(&self.config, b"org/repo", read)
+    }
     pub fn take_observed(&self) -> Vec<r::Observed> {
         std::mem::take(&mut self.new_observations.borrow_mut())
     }
@@ -423,6 +477,14 @@ fn raw_parts(write: &raw::Write) -> (u16, Vec<r::Name>, Option<u64>, u64) {
             name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
             let unmarked = body.as_ref().splitn(2, |x| *x == b'\n').nth(1).unwrap_or(body);
             (7, None, observations::value(unmarked))
+        }
+        raw::Write::EditItem { number, title, body } => {
+            name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
+            (8, None, observations::value(format!("{title:?}:{body:?}").as_bytes()))
+        }
+        raw::Write::Close { number } => {
+            name.path.extend([b"issue".to_vec(), number.to_string().into_bytes()]);
+            (8, None, 1)
         }
         raw::Write::Merge { number, head } => {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
