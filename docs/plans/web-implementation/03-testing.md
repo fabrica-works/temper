@@ -110,7 +110,7 @@ pub enum Doing {
 ## 3. The client's world
 
 `tests/web/domain`, package `temper-web-domain-world`, after the frozen
-template of `docs/plans/next-domain/README.md`, 5.4.
+template of the next-domain plan's `README.md`, 5.4 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`).
 
 ```
 tests/web/domain/

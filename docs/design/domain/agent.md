@@ -278,4 +278,4 @@ host:
   is built in smith, generic (smith's `run.md`, section 14), and filled in
   here.
 - **The legacy run** and the session's first version stay in temper until
-  the cutover (`docs/plans/next-domain/07-cutover.md`).
+  the cutover (the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).

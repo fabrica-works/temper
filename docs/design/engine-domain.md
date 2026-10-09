@@ -1,7 +1,7 @@
 # The engine's domain layer
 
 This describes the legacy engine, frozen during the migration. It is
-removed at the cutover (`docs/plans/next-domain/07-cutover.md`); new engine
+removed at the cutover (the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); new engine
 code follows `domain/engine.md`.
 
 Provisional, 2026-10-02. What the temper engine does, as a domain layer:

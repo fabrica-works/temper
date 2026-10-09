@@ -10,8 +10,8 @@ the production `forgejo` wrapper or opens existing Forgejo state.
 python3 tools/forgejo-conformance/run.py --output /tmp/temper-forgejo-observations
 ```
 
-The groundwork questions in `docs/plans/next-domain/00-groundwork.md`,
-increment 00a, add an isolated Actions runner:
+The groundwork questions in the next-domain plan's `00-groundwork.md`,
+increment 00a (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`), add an isolated Actions runner:
 
 ```sh
 python3 tools/forgejo-conformance/run.py --next-domain --output /tmp/temper-forgejo-next-domain

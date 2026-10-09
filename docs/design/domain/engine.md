@@ -257,7 +257,7 @@ ordered `Key`s in its boundary vocabulary. Neither a sibling nor the
 store chooses their shapes. The root translates their keys and carries
 their records in its store vocabulary; the store's protocol layer encodes
 each shape with a version (5.5). The convention is shared by the children
-and their worlds (`docs/plans/next-domain/README.md`, 5.2 and 5.3):
+and their worlds (the next-domain plan's `README.md`, 5.2 and 5.3 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)):
 
 - **`Save { record: Stored }`** keeps the record under its own key, and
   **`Erase { key: Key }`** removes that key. These requests are part of

@@ -4,7 +4,7 @@ This describes the frozen legacy agent used during the overlap. Its crates,
 providers and component worlds now carry `legacy` in their names and paths;
 the historical names below describe the same behavior. The system world stays
 at `tests/agent/domain` until cutover. New agent work belongs to smith
-(`docs/plans/next-domain/05s-smith.md`, sections 3 and 4); `domain/agent.md`
+(the next-domain plan's `05s-smith.md`, sections 3 and 4 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); `domain/agent.md`
 defines temper's use of it.
 
 Provisional, 2026-10-02. What the temper agent does, as a domain layer:

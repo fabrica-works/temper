@@ -5,7 +5,7 @@ order: what each lands in the domain, the view and the worlds; the
 stories that show it; what its joint-world stories need of the engine;
 the design documents it updates. Each is a branch that passes the gate of
 `docs/development/workflow.md` and an independent review before it
-merges (`docs/plans/next-domain/README.md`, 5.6 and section 8), and adds
+merges (the next-domain plan's `README.md`, 5.6 and section 8 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)), and adds
 no vocabulary it does not use (README.md, section 6).
 
 ## W1 The domain's spine
@@ -228,7 +228,7 @@ amending a change's gates; drift's card and what release does;
   replaced; the queue's order following a goal raised on the board; a
   paused queue and its repair; a drifted change released.
 - **Needs of the engine:** the forge connector's reads of changes, queues
-  and branches (`docs/plans/next-domain/04-forge-connector.md`); a
+  and branches (the next-domain plan's `04-forge-connector.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); a
   project's changes as a watch; answering approvals.
 
 ## After W10

@@ -8,7 +8,7 @@ documents in `docs/design/` (`engine-domain.md`, `worker-domain.md`,
 removed with this set), and changes what the protocol layer's documents
 say in the places section 5 lists. The legacy engine is described by
 `docs/design/engine-domain.md` until the cutover
-(`docs/plans/next-domain/07-cutover.md`). New code is written against this
+(the next-domain plan's `07-cutover.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)). New code is written against this
 directory and cites it as `domain/<file>.md`. The migration plan from today's
 code to this design is built from sections 5 and 6 and each document's
 "From today" section.

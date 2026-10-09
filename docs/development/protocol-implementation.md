@@ -7,7 +7,7 @@ over their overview where the overview has not caught up.
 
 ## Next-domain migration: 00b
 
-The migration in `docs/plans/next-domain/README.md` supersedes the paused
+The migration in the next-domain plan's `README.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`) supersedes the paused
 forge increment below. Its domain authority is the next design in
 `docs/design/next/domain/`, moved to `docs/design/domain/` by step 00d.
 The paused handoff remains a record of the earlier work and checks;

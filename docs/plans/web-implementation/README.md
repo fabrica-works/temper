@@ -119,7 +119,7 @@ tests/web/engine ──► the same, and temper-engine-domain-world (its store, 
 ## 5. What the client needs of the engine
 
 The client is designed against the web of `ux/`, and the engine is still
-being built. As of 2026-10-05 (`docs/plans/next-domain/STATUS.md`), the
+being built. As of 2026-10-05 (the next-domain plan's `STATUS.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)), the
 root has these routes for people, which the joint world uses from the
 start:
 
@@ -152,7 +152,7 @@ engine; only the joint world's stories do.
 
 ## 6. Conventions
 
-Every increment follows `docs/plans/next-domain/README.md`, sections 3.1
+Every increment follows the next-domain plan's `README.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`), sections 3.1
 (built beside: everything here is new) and 5.6 (increments and the
 gate), and its review checklist (section 8): module docs name the kept
 state, what the module never knows, its entry points and contracts;
@@ -190,7 +190,7 @@ The focused suite stood at 10.993 of its 15 seconds at the last gate
 | client's world (`tests/web/domain`) | 0.5 | 4 |
 | joint world (`tests/web/engine`) | 0.3 | 3 |
 
-Measured as `docs/plans/next-domain/README.md`, 5.5 measures: the sum
+Measured as the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`) measures: the sum
 of a package's tests, alone, with the serial profile. A world's stories
 use one to three seeds; its sweeps are fuzzy. A gate that finds a budget
 broken makes the web's tests cheaper first; the budgets in

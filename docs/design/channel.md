@@ -960,7 +960,7 @@ As testing.md applies skein's strategy.
 The new design's channel shapes live in `temper-channel/src/wire/v2.rs`
 and `payload/v2.rs`; the shipped payload schemas live unchanged in
 `payload/v1.rs`. This section settles step 05b of
-`docs/plans/next-domain/05-runtime.md`. The runtime domains and their
+the next-domain plan's `05-runtime.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`). The runtime domains and their
 translations follow in 05c–05g. All legacy protocol callers explicitly
 use `payload::v1`, and `Machine::new`, codec and size entrypoints without
 `_version` keep version 1.

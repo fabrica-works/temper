@@ -1,7 +1,7 @@
 # The worker's domain layer
 
 This describes the worker as built. The migration extends it towards
-`domain/worker.md` (`docs/plans/next-domain/05-runtime.md`).
+`domain/worker.md` (the next-domain plan's `05-runtime.md` (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
 
 Provisional, 2026-10-02. What the temper worker does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. The

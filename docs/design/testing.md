@@ -318,7 +318,7 @@ safety rule and a missing reply's deadline. Focused tests cover signing
 in, expiry, roles, initial-owner bootstrap, duplicate waiters and refused
 admission, replay, inert facts and counted peak memory. The fuzzy matrix
 settles every world and reaches each named ending within the people's
-world allotment (`docs/plans/next-domain/README.md`, 5.5).
+world allotment (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
 
 #### 4.4.2 The tasks child domain's parent and executors
 
@@ -344,7 +344,7 @@ slots, and cold-restore the records against the child's worst-case bound.
 Replay agrees with facts consumed or left full. The seeded fuzzy lifecycle
 sweep adds failures, held/released tasks, failed dependency results,
 refusals, restarts and complete subtree cancellation within the tasks
-world allotment (`docs/plans/next-domain/README.md`, 5.5). Later increments
+world allotment (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)). Later increments
 extend this same world with procedures, amendments, proposals and funding.
 
 The 02b parent completes result, notice, historical-result read and timer
@@ -511,7 +511,7 @@ Counted memory in the root and both changed child worlds exercises
 saturated turn windows, transcripts and conflict paths; a small
 deterministic sweep varies body lengths and one-to-three count and
 byte windows. This runtime extension uses the existing worlds' shared
-suite headroom (next-domain/README.md, 5.5); legacy focused coverage stays.
+suite headroom (the next-domain plan's `README.md`, 5.5 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)); legacy focused coverage stays.
 
 ## 7. Layout
 

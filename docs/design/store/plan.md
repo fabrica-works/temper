@@ -243,8 +243,8 @@ protocol machines, not the root's.
   rule that a rotated token is durable before its grant
   (`credentials.md`).
 - Sign-in digests and adopted credentials follow when the web's
-  sign-in and adoption are built (`docs/plans/next-domain/08-after.md`,
-  section 3).
+  sign-in and adoption are built (the next-domain plan's `08-after.md`,
+  section 3 (removed; temper `e59b56034f290bb7ce17ad9fd9e14213fff382d7`)).
 
 **Tests:**
 - step tests, and stories in the store's world: a rotation crashed
