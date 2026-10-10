@@ -443,6 +443,30 @@ exercises saturated turn windows, transcripts and conflict paths; a small
 deterministic sweep varies body lengths and one-to-three count and byte
 windows.
 
+### 6.3 The client and the engine, joined from the start
+
+The client's world runs on a scripted engine, which speaks the client's
+vocabulary and so agrees with the client by construction. Only the joint
+world (`tests/web/engine`) shows where either side has drifted from
+their contract. jig's client met its engine only at the end, and the
+drift came at once (jig's `tech-debt.md`, section 9). So temper's
+client is joined to its engine from its first increment:
+
+- **The translation** between the client's vocabulary and the engine's
+  is written with the first types on both sides, exhaustive both ways.
+  Every increment that adds a variant on either side extends it, so
+  drift is a build error the day it happens, not a finding at the end.
+- **One thin story end to end,** such as signing in and seeing the
+  inbox, runs in the joint world as soon as the engine can answer it.
+  Each increment extends it, or adds its own story there beside the one
+  it adds to the client's world.
+- **The scripted engine is checked against the engine:** its scenarios
+  run in the joint world too, so the fake cannot agree with the client
+  where the engine does not.
+- **The joint world is the client's acceptance.** A client increment is
+  done when its stories pass there, not only against the scripted
+  engine.
+
 ## 7. Layout
 
 ```

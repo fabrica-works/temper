@@ -26,6 +26,10 @@ section 10. Overview: README.md.
 - **The joint world is the check.** The same person and scenarios against
   the real engine root, translated as the protocol layer would, for the
   stories the root's routes can tell, more as they land.
+- **Joined from the first increment** (`docs/design/testing.md`, 6.3):
+  the translation grows with every increment on either side, a thin
+  story runs end to end from the start, and the scripted engine's
+  scenarios run against the real root too.
 - **The referee watches what the person sees and what the engine made
   durable,** never the client's state: nothing shown as done before it
   is durable, nothing made twice, nothing typed lost.
