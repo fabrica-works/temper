@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-11. How far temper's code is from its design, and which
+Updated 2026-10-12. How far temper's code is from its design, and which
 plans take it there. The designer keeps this file (skein's
 development.md, section 3.3).
 
@@ -90,3 +90,4 @@ No plan is active. The designer marks plans active and done in this file
 |---|---|---|
 | `factory.md` | the software factory: write, prove and run planes, the lab, on jig and os | not adopted: discuss; its section 13 changes `qa.md` |
 | `qa.md` | continuous QA on a running build of main | not adopted: discuss; its order of building (section 8) waits for a running build |
+| `jig-protocol.md` | temper on jig's protocol layer: what moves to jig (store, channel, credentials, client), what stays temper's, the documents to revise, the domain to reconcile, temper's decisions | a design pass of temper's, after jig's protocol plan: revise the documents its section 4 names |
