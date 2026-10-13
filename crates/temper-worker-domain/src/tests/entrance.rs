@@ -1,0 +1,114 @@
+//! What the root refuses or answers at the entrance, and how a start comes
+//! back decoded.
+
+use super::fixtures::{assignment, fields, items, refused};
+use super::harness::Harness;
+use crate::{Event, Invalid, Request, agent, host, translate};
+use alloc::boxed::Box;
+use skein_lib::Duration;
+
+#[test]
+fn a_repository_named_twice_is_refused_as_an_invalid_start_naming_it() {
+    let mut h = Harness::new();
+    let assign =
+        Event::Assign { assignment: assignment(true, Box::new([])), items: items(&[b"app", b"app"]), save: None };
+    assert_eq!(&*h.step(assign), [refused(b"repository named twice")]);
+    assert_eq!(h.domain.host().hosted(), 0);
+}
+
+#[test]
+fn workspace_items_without_a_workstream_are_refused_as_an_invalid_start() {
+    let mut h = Harness::new();
+    let assign = Event::Assign { assignment: assignment(false, Box::new([])), items: items(&[b"app"]), save: None };
+    assert_eq!(&*h.step(assign), [refused(b"workstream")]);
+}
+
+#[test]
+fn an_undecodable_call_name_refuses_the_start_as_invalid_naming_it() {
+    let mut h = Harness::new();
+    let (agent, _) = h.decode(Box::new([]));
+    let rows = h.step(Event::Decoded { agent, start: Err(Invalid::CallName) });
+    assert!(rows.contains(&refused(b"call name")));
+}
+
+#[test]
+fn undecodable_delivery_evidence_refuses_the_start_as_invalid_naming_it() {
+    let mut h = Harness::new();
+    let (agent, _) = h.decode(Box::new([]));
+    let rows = h.step(Event::Decoded { agent, start: Err(Invalid::Evidence) });
+    assert!(rows.contains(&refused(b"delivery evidence")));
+}
+
+#[test]
+fn a_start_refused_as_invalid_frees_its_slot_unacknowledged() {
+    let mut h = Harness::new();
+    let (agent, _) = h.decode(Box::new([]));
+    h.step(Event::Decoded { agent, start: Err(Invalid::Charter) });
+    assert_eq!(h.domain.host().hosted(), 0);
+}
+
+#[test]
+fn an_assignment_hosted_already_is_a_wire_retry_and_dropped() {
+    let mut h = Harness::new();
+    h.decode(Box::new([]));
+    let again = Event::Link(host::LinkDown::Assign { assignment: assignment(false, Box::new([])) });
+    assert!(h.step(again).is_empty());
+}
+
+#[test]
+fn a_worker_shutting_down_refuses_assignments_as_busy() {
+    let mut h = Harness::new();
+    h.step(Event::Shutdown);
+    let rows = h.step(Event::Link(host::LinkDown::Assign { assignment: assignment(false, Box::new([])) }));
+    let [Request::Answer { answer, .. }] = &*rows else { panic!("one answer: {rows:?}") };
+    assert_eq!(answer.ending, host::Ending::Refused(host::Refusal::Busy));
+}
+
+#[test]
+fn a_worker_shutting_down_still_says_its_slots() {
+    let mut h = Harness::new();
+    h.step(Event::Shutdown);
+    let rows = h.step(Event::Ready);
+    let [Request::Hello(hello)] = &*rows else { panic!("one hello: {rows:?}") };
+    assert_eq!(hello.slots, 2);
+}
+
+#[test]
+fn the_hello_states_the_configured_stop_bound_whole() {
+    let mut h = Harness::new();
+    let rows = h.step(Event::Ready);
+    let [Request::Hello(hello)] = &*rows else { panic!("one hello: {rows:?}") };
+    assert_eq!(hello.stop_bound, Duration::from_secs(20));
+}
+
+#[test]
+fn a_worker_told_to_shut_down_with_nothing_left_says_stop_once() {
+    let mut h = Harness::new();
+    assert_eq!(&*h.step(Event::Shutdown), [Request::Stop]);
+    assert!(h.step(Event::Lost).is_empty());
+}
+
+#[test]
+fn an_exhausted_account_stays_a_failure_of_its_own() {
+    let exhausted = agent::ModelFault::Exhausted { account: 1, retry_after_ms: Some(5) };
+    assert_eq!(translate::run_failure(&agent::RunFailure::Model(exhausted)), host::RunFailure::Exhausted);
+}
+
+#[test]
+fn a_delivery_is_exactly_a_title_and_a_body() {
+    let both = fields(&[(b"title", b"a title"), (b"body", b"a body")]);
+    let delivered = crate::smith_delivery::fields(both, 512).expect("a commit message");
+    assert_eq!((&*delivered.title, &*delivered.body), (&b"a title"[..], &b"a body"[..]));
+}
+
+#[test]
+fn a_delivery_with_a_field_beyond_its_title_and_body_is_refused() {
+    let extra = fields(&[(b"title", b"t"), (b"body", b"b"), (b"tag", b"x")]);
+    assert!(crate::smith_delivery::fields(extra, 512).is_none());
+}
+
+#[test]
+fn a_delivery_with_an_empty_title_is_refused() {
+    let empty = fields(&[(b"title", b""), (b"body", b"b")]);
+    assert!(crate::smith_delivery::fields(empty, 512).is_none());
+}

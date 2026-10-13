@@ -1,5 +1,6 @@
 //! Complete worker stories with real child domains and outside observations.
-use temper_worker_domain_world::whole::{Case, run};
+use temper_worker_domain::{host, wire};
+use temper_worker_domain_world::whole::{Case, run, unprepared, workstreams};
 #[test]
 fn a_prepared_run_delivers_the_complete_tree_and_answers() {
     assert_eq!(run(1, Case::Delivered).cancellations, 0);
@@ -17,8 +18,25 @@ fn contact_lost_past_the_grace_saves_before_the_cancellation_answer() {
     assert_eq!(run(4, Case::ContactPast).saves, 1);
 }
 #[test]
-fn the_hello_carries_the_complete_stop_bound_and_stories_replay() {
+fn the_hello_carries_the_configured_stop_bound_whole() {
+    assert_eq!(run(71, Case::Delivered).stop_bound, temper_worker_domain_world::STOP_BOUND);
+}
+#[test]
+fn stories_replay() {
     for case in [Case::Delivered, Case::CancelledDelivery, Case::ContactWithin, Case::ContactPast] {
         assert_eq!(run(71, case), run(71, case));
     }
+}
+#[test]
+fn a_branch_the_forge_lacks_fails_the_prepare_naming_the_repository() {
+    let (ending, preparation) = unprepared(5);
+    let host::Ending::Failed { failure: host::Failure::Unprepared(host::Preparation::Permanent { .. }), .. } = ending
+    else {
+        panic!("a permanent preparation failure: {ending:?}")
+    };
+    assert_eq!(preparation, Some(wire::Preparation::Missing { repository: 0, missing: wire::Missing::Branch }));
+}
+#[test]
+fn the_hello_names_the_workstreams_the_checkout_holds() {
+    assert_eq!(&*workstreams(6), [81]);
 }

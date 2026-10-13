@@ -1,10 +1,11 @@
-//! The workspace's commit fields and sealed Smith delivery terminals (jig's
-//! domain/hosts.md, sections 7 and 9). The channel codec owns field encoding;
-//! this translation keeps commit heads as receipts and operator tails as data.
+//! A delivery's commit fields and smith's delivery terminals (jig's
+//! `domain/hosts.md`, sections 7 and 9). The fields arrive typed; this keeps
+//! temper's policy over them, and translates a push's landings into smith's
+//! terminal, commit heads as receipts and operator tails as data.
 
 use alloc::boxed::Box;
 use jig_domain_host as host;
-use skein_lib::{List, Reader};
+use skein_lib::List;
 use smith_host_domain as smith;
 
 use crate::{Domain, wire, workspace};
@@ -14,15 +15,15 @@ pub(crate) struct Fields {
     pub(crate) body: Box<[u8]>,
 }
 
-pub(crate) fn fields(bytes: &[u8], limit: u32) -> Option<Fields> {
-    let record = smith_channel::DeliverAsk::decode(&smith_channel::CEILINGS, &mut Reader::new(bytes)).ok()?;
+/// A delivery's commit message: exactly a title and a body, the title not
+/// empty, the two within `limit` bytes; nothing otherwise.
+pub(crate) fn fields(fields: smith::Fields, limit: u32) -> Option<Fields> {
     let mut title = None;
     let mut body = None;
-    for field in record.into_parts().fields.into_boxed() {
-        let field = field.into_parts();
+    for field in fields.into_value().fields {
         match field.name.as_ref() {
-            b"title" if title.is_none() => title = Some(field.text),
-            b"body" if body.is_none() => body = Some(field.text),
+            b"title" if title.is_none() => title = Some(field.value),
+            b"body" if body.is_none() => body = Some(field.value),
             _ => return None,
         }
     }
@@ -35,9 +36,11 @@ pub(crate) fn fields(bytes: &[u8], limit: u32) -> Option<Fields> {
     Some(Fields { title, body })
 }
 
+/// The hub's reply to a call, as smith takes it: a delivery's terminal is the
+/// one the workspace made of its push.
 pub(crate) fn reply(domain: &Domain, reply: host::Reply) -> smith::Reply {
     match reply {
-        host::Reply::Relayed { answer } => smith::Reply::Host { error: false, body: answer },
+        host::Reply::Relayed { error, text } => smith::Reply::Host { error, body: text },
         host::Reply::Delivered(delivery) => smith::Reply::Delivery(workspace::smith_delivery(domain, delivery.left)),
         host::Reply::Unavailable => smith::Reply::Unavailable,
         host::Reply::Withdrawn => smith::Reply::Withdrawn,
@@ -127,38 +130,5 @@ fn reason(reason: wire::PushReason) -> smith::DeliveryReason {
         wire::PushReason::Busy => smith::DeliveryReason::Busy,
         wire::PushReason::TooLarge => smith::DeliveryReason::TooLarge,
         wire::PushReason::Nothing | wire::PushReason::Unknown => smith::DeliveryReason::Unknown,
-    }
-}
-
-pub(crate) fn finish(result: smith::RunResult) -> host::Finish {
-    match result {
-        smith::RunResult::Accepted { outcome } => host::Finish::Ended { outcome },
-        smith::RunResult::Parked => host::Finish::Parked,
-        smith::RunResult::Failed { failure } => host::Finish::Failed { failure: run_failure(failure) },
-        smith::RunResult::Refused { refusal } => host::Finish::Failed {
-            failure: match refusal {
-                smith::Refusal::Busy => host::RunFailure::Model,
-                smith::Refusal::Invalid(_) => host::RunFailure::Policy,
-            },
-        },
-    }
-}
-
-fn run_failure(failure: smith::RunFailure) -> host::RunFailure {
-    match failure {
-        smith::RunFailure::Model(smith::ModelFault::Exhausted) => host::RunFailure::Exhausted,
-        smith::RunFailure::Transcript(_)
-        | smith::RunFailure::Model(
-            smith::ModelFault::Completion { .. }
-            | smith::ModelFault::Provider
-            | smith::ModelFault::ContextFull
-            | smith::ModelFault::Refused
-            | smith::ModelFault::Truncated
-            | smith::ModelFault::Malformed,
-        ) => host::RunFailure::Model,
-        smith::RunFailure::Budget(_) => host::RunFailure::Budget,
-        smith::RunFailure::Policy(_) => host::RunFailure::Policy,
-        smith::RunFailure::Cancelled => host::RunFailure::Cancelled,
-        smith::RunFailure::Stale => host::RunFailure::Stale,
     }
 }
