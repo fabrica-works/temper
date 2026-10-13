@@ -1,7 +1,7 @@
 //! Root forge stories with its durable store and the independent fake Forgejo.
 #![expect(clippy::wildcard_enum_match_arm, reason = "the fixture selects only the forge rows relevant to each story")]
 use jig_domain_authority as authority;
-use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
@@ -10,6 +10,7 @@ use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
 use temper_engine_domain_forge_client as client;
+use temper_engine_domain_world::protocol::{self, Protocol};
 use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
@@ -28,6 +29,10 @@ struct World {
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
     answers: Vec<temper_engine_domain::CallAnswer>,
+    protocol: Protocol,
+    immediate: VecDeque<engine::Event>,
+    /// Whether the funding period and the git identity were sent to the root once it was ready.
+    started: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,18 +61,7 @@ impl World {
         limits.people.people = 4;
         limits.people.holdings = 4;
         limits.journal.writes += (people::max_out(&limits.people) - people::max_out(&walking::limits().people)) * 4;
-        let mut config = walking::config(71);
-        config.run.model.account = 1;
-        config.run.model.endpoint = 0;
-        config.run.model.name = b"fake-1".as_slice().into();
-        config.run.model.input_price = 0;
-        config.run.model.cached_price = 0;
-        config.run.model.output_price = 0;
-        config.run.model.price_unit = 1;
-        config.run.model.max_tokens = 4096;
-        config.run.turns = 64;
-        config.run.time = Duration::from_secs(3600);
-        config.resume_bytes = 8192;
+        let mut config = crate::world::config(71);
         if approval.is_some() {
             limits.authority.roles = 3;
             limits.authority.requirements = 8;
@@ -96,13 +90,17 @@ impl World {
             limits.authority.segment_bytes = 64;
             limits.authority.writes = 2;
             limits.journal.writes += 64;
-            limits.journal.writes = 4096;
+            // The tasks child's whole route grew with jig's task families.
+            limits.journal.writes = 8192;
             limits.journal.deliveries = 256;
             limits.journal.held = 1024;
             limits.journal.result_bytes = 4096;
             limits.journal.transcript_bytes = 32_768;
             limits.fleet.slots = 2;
             limits.fleet.workstreams = 2;
+            // The core's inbox census and waiting entries cover every live task.
+            limits.people.inbox_tasks = 24;
+            limits.people.inbox_recipients = 32;
         }
         if with_read {
             limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
@@ -131,7 +129,7 @@ impl World {
                 },
             };
             let effect_grant = authority::Grant { kind: 8, ..grant.clone() };
-            let mut rules = config.authority.rules().clone();
+            let mut rules = config.core.authority.rules().clone();
             if with_change {
                 rules.maximum_run_spend = 60;
             }
@@ -186,7 +184,7 @@ impl World {
                 rules.ceiling.delegation.tasks = 8;
                 rules.ceiling.delegation.depth = 3;
             }
-            let mut policy = config.authority.policy(1).expect("walk policy").clone();
+            let mut policy = config.core.authority.policy(1).expect("walk policy").clone();
             policy.ceiling.tools = authority::Tools(1);
             policy.ceiling.grants.clone_from(&rules.ceiling.grants);
             policy.projections.clone_from(&rules.ceiling.grants);
@@ -207,15 +205,8 @@ impl World {
             let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
             assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-            config.authority = domain;
-            config.chat_authority.tools = authority::Tools(1);
-            config.chat_authority.grants = grants;
-            if with_change {
-                config.chat_authority.delegation.kinds =
-                    Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
-                config.chat_authority.delegation.tasks = 4;
-                config.chat_authority.delegation.depth = 2;
-            }
+            // A chat's authority is its role's, one level shallower (jig a2616181).
+            config.core.authority = domain;
         }
         limits.notes.scopes = 3 + limits.authority.grants;
         let mut fake_config = forge_world::fake_config();
@@ -260,14 +251,28 @@ impl World {
             signed_in: None,
             assigned: Vec::new(),
             answers: Vec::new(),
+            protocol: Protocol::default(),
+            immediate: VecDeque::new(),
+            started: false,
         }
     }
 
     fn send(&mut self, event: engine::Event) {
-        engine::step(&mut self.root, &self.env, event);
-        engine::release(&mut self.root, &self.env, &mut self.out);
-        self.collect();
-        self.root.reclaim();
+        self.immediate.push_back(event);
+        self.flush();
+    }
+
+    /// Step every input waiting at once: the one sent, then what the
+    /// protocol layer answered at once, as the root's door gives them.
+    fn flush(&mut self) {
+        while let Some(event) = self.immediate.pop_front() {
+            if let Err(event) = engine::try_step(&mut self.root, &self.env, event) {
+                self.events.push_back(event);
+            }
+            engine::release(&mut self.root, &self.env, &mut self.out);
+            self.collect();
+            self.root.reclaim();
+        }
     }
 
     fn external(&mut self, user: u64, op: raw::Op) -> raw::Answer {
@@ -302,7 +307,15 @@ impl World {
     #[expect(clippy::wildcard_enum_match_arm, reason = "the world records only its scripted root deliveries")]
     fn collect(&mut self) {
         for _ in 0..self.out.len() {
-            match self.out.pop().expect("counted root output") {
+            let request = match self.protocol.play(self.out.pop().expect("counted root output")) {
+                // The protocol layer answers at once (testing-strategy.md, 4).
+                Ok(events) => {
+                    self.immediate.extend(events);
+                    continue;
+                }
+                Err(request) => *request,
+            };
+            match request {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     self.store.pending.push_back((number, writes));
@@ -335,11 +348,23 @@ impl World {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => match delivery {
-                    Delivery::WebReply { sign_in, reply: people::Reply::SignedIn { .. }, .. } => {
-                        self.signed_in = sign_in;
+                    Delivery::WebReply { reply: people::Reply::SignedIn { sign_in, .. }, .. } => {
+                        self.signed_in = Some(sign_in);
                     }
                     Delivery::Assigned { assignment, .. } => self.assigned.push(assignment),
-                    Delivery::CallAnswer { answer, .. } => self.answers.push(answer),
+                    // The run has its answer once the hub relays it down.
+                    Delivery::Link {
+                        down: host::LinkDown::Relayed { answer: host::Relayed::Answer { text, .. }, .. },
+                        ..
+                    } => {
+                        let (_, answer) = self
+                            .protocol
+                            .answers
+                            .iter()
+                            .find(|(name, _)| *name == text)
+                            .expect("the world rendered every relayed answer");
+                        self.answers.push(answer.clone());
+                    }
                     Delivery::WebReply { reply: people::Reply::Outcome(outcome), .. }
                         if matches!(outcome, people::Outcome::Adopted { .. }) =>
                     {
@@ -348,15 +373,11 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
-                | engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. })
-                | engine::Request::Worker(
-                    engine::WorkerRequest::CallBusy { .. }
-                    | engine::WorkerRequest::TurnBusy { .. }
-                    | engine::WorkerRequest::AnswerBusy { .. },
-                ) => {}
-                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
-                    panic!("forge fixture received an unexpected host request")
-                }
+                | engine::Request::Party(_)
+                | engine::Request::Store(_)
+                | engine::Request::Busy(_)
+                | engine::Request::Drained => {}
+                engine::Request::Worker(other) => panic!("forge fixture received an unexpected request {other:?}"),
                 engine::Request::Stop => panic!("root startup or store failure"),
             }
         }
@@ -372,7 +393,15 @@ impl World {
         }
         if !self.store.pending.is_empty() {
             let number = self.store.apply();
-            self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
+            self.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
+        }
+        if !self.started && self.root.ready() {
+            self.started = true;
+            let period = engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None };
+            self.send(engine::Event::Party(period));
+            // The repository's git identity, an application credential from
+            // temper's own source (domain/engine.md, 12).
+            self.send(engine::Event::Credential { number: 1, generation: 1, valid: Duration::from_secs(3600) });
         }
         if self.fake.is_due(self.fake_env.now) {
             fake::fire(&mut self.fake, &self.fake_env, &mut self.fake_out);
@@ -397,9 +426,11 @@ impl World {
         }
         temper_engine_domain_world::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
+        self.flush();
         engine::fire(&mut self.root, &self.env);
         engine::release(&mut self.root, &self.env, &mut self.out);
         self.collect();
+        self.flush();
         self.root.reclaim();
         self.fake.reclaim();
     }
@@ -472,352 +503,4 @@ impl World {
     }
 }
 
-#[cfg(test)]
-mod system_stories {
-    use super::*;
-    use crate::world as smith_world;
-    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
-    use smith_agent_world::{Job, World as Agent};
-    use smith_domain as smith;
-    use smith_domain_run as run;
-    use temper_engine_smith::ChangeResource;
-
-    const DELEGATE: &[u8] = br#"{"batch":[{"executor":{"kind":"procedure","connector":0,"code":2},"spec":{"words":"@coding Small fix","parameters":[{"name":1,"kind":"resource","connector":0,"resource":2},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":0,"change_kind":1,"words":32},"authority":{"tools":1,"grants":[{"connector":0,"kind":2,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":3,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":4,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"}],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":2,"depth":1},"budget":{"spend":20},"notes":0}}]}"#;
-
-    fn chat_script() -> Script {
-        let call = |name: &[u8], arguments: &[u8]| Turn {
-            lines: Box::new([Line::Call { name: name.into(), arguments: arguments.into() }]),
-            finish: Finish::ToolCalls,
-            tokens: 20,
-        };
-        Script {
-            cue: b"@forge_chat".as_slice().into(),
-            turns: Box::new([
-                call(b"delegate", DELEGATE),
-                call(b"wait", b"{}"),
-                call(b"wait", b"{}"),
-                call(b"wait", b"{}"),
-            ]),
-        }
-    }
-
-    fn repair_script() -> Script {
-        Script {
-            cue: b"Repair the failed check".as_slice().into(),
-            turns: Box::new([
-                Turn {
-                    lines: Box::new([Line::Call {
-                        name: b"read".as_slice().into(),
-                        arguments: br#"{"path":"src/lib.rs"}"#.as_slice().into(),
-                    }]),
-                    finish: Finish::ToolCalls,
-                    tokens: 20,
-                },
-                Turn {
-                    lines: Box::new([Line::Call {
-                        name: b"edit".as_slice().into(),
-                        arguments: br#"{"path":"src/lib.rs","old":"42","new":"43"}"#.as_slice().into(),
-                    }]),
-                    finish: Finish::ToolCalls,
-                    tokens: 20,
-                },
-                Turn {
-                    lines: Box::new([Line::Call {
-                        name: b"finish".as_slice().into(),
-                        arguments:
-                            br#"{"title":"Repair the failed check","body":"The answer is 43 now."}"#.as_slice().into(),
-                    }]),
-                    finish: Finish::ToolCalls,
-                    tokens: 20,
-                },
-            ]),
-        }
-    }
-
-    fn start_change_world(passes: u32) -> (World, engine::Assignment) {
-        let mut world = World::configured_policy(true, true, false, passes, None);
-        world.adopt();
-        world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-            channel: Token::new(7),
-            hello: fleet::Hello {
-                stop_bound: Duration::from_secs(1),
-                slots: 2,
-                workstreams: Box::new([]),
-                hosting: Box::new([]),
-            },
-        }));
-        world.send(engine::Event::Party(engine::PartyInput::Ask {
-            reply_to: ReplyTo::new(Token::new(92)),
-            sign_in: world.signed_in.expect("owner session"),
-            key: [92; 16],
-            ask: people::Ask::StartChat { project: 1, words: b"@forge_chat".as_slice().into() },
-        }));
-        world.until(Until::Assigned);
-        let chat = world.assigned[0].clone();
-        (world, chat)
-    }
-
-    fn run_smith(
-        world: &mut World,
-        assignment: &engine::Assignment,
-        mut agent: Agent,
-        change: Option<ChangeResource>,
-    ) -> Agent {
-        agent.enable_parent_host_calls();
-        loop {
-            if agent.drive(1000) {
-                break;
-            }
-            let pending: Vec<_> = agent.pending_host_calls().into_iter().cloned().collect();
-            assert!(!pending.is_empty(), "Smith either settles or yields a host call");
-            for submission in pending {
-                let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
-                    .unwrap_or_else(|problem| {
-                        panic!(
-                            "declared Smith tool input: {problem:?} tool={} input={}",
-                            String::from_utf8_lossy(&submission.tool),
-                            String::from_utf8_lossy(submission.input.bytes())
-                        )
-                    });
-                let before = world.answers.len();
-                world.send(engine::Event::Worker(engine::WorkerInput::Call {
-                    channel: Token::new(7),
-                    task: assignment.task,
-                    attempt: assignment.attempt,
-                    call: submission.relay.owner,
-                    body,
-                }));
-                for _ in 0..200 {
-                    world.tick();
-                    if world.answers.len() > before {
-                        break;
-                    }
-                }
-                let answer = world.answers.get(before).expect("root committed host answer");
-                agent
-                    .return_host_reply(submission.relay, run::HostReply::Answered(temper_engine_smith::answer(answer)))
-                    .expect("one pending Smith relay");
-            }
-        }
-        for (number, read, spent) in agent.turn_metadata() {
-            let record = agent.turns()[usize::try_from(*number - 1).expect("positive turn")].clone();
-            let request = smith::Request::Turn {
-                host_run: Token::new(assignment.task),
-                number: *number,
-                position: record.sequence,
-                read: *read,
-                spent: *spent,
-                turn: record.clone(),
-            };
-            let turn = temper_engine_smith::turn(request, format!("{record:?}").into_bytes().into_boxed_slice())
-                .expect("typed Smith turn");
-            world.send(engine::Event::Worker(engine::WorkerInput::Turn {
-                channel: Token::new(7),
-                task: assignment.task,
-                attempt: assignment.attempt,
-                turn,
-            }));
-            for _ in 0..8 {
-                world.tick();
-            }
-        }
-        let terminal =
-            temper_engine_smith::result(smith_world::copy_answer(agent.answer()), change).expect("typed Smith result");
-        world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-            pushed: Box::new([]),
-            saved: None,
-            channel: Token::new(7),
-            task: assignment.task,
-            attempt: assignment.attempt,
-            cumulative: terminal.cumulative,
-            end: terminal.end,
-        }));
-        for _ in 0..30 {
-            world.tick();
-        }
-        agent
-    }
-
-    #[test]
-    fn the_smith_delegate_input_creates_the_producer() {
-        let (mut world, chat) = start_change_world(1000);
-        let input = run::HostInput::attested(DELEGATE.into()).expect("bounded Smith host input");
-        let body = temper_engine_smith::call(
-            run::CallName { activation: chat.attempt, completion: 1, position: 1 },
-            b"delegate",
-            &input,
-        )
-        .expect("declared delegate shape");
-        world.send(engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: chat.task,
-            attempt: chat.attempt,
-            call: Token::new(93),
-            body,
-        }));
-        world.until(Until::Delegated);
-        world.until(Until::SecondAssignment);
-        let producer = world.assigned[1].clone();
-        let mut agent = smith_world::agent_for(&producer, None, Job::Coding);
-        agent.run(1000);
-        assert!(
-            matches!(agent.answer(), run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }),
-            "{:?}",
-            agent.answer()
-        );
-    }
-
-    #[test]
-    fn a_small_fix_made_in_a_smith_chat_lands_through_the_fake_forge() {
-        let (mut world, chat) = start_change_world(1000);
-        let agent = smith_world::scripted_agent_for(&chat, chat_script());
-        let parent = run_smith(&mut world, &chat, agent, None);
-        assert!(matches!(parent.answer(), run::Answer::Parked { .. }));
-        world.until(Until::SecondAssignment);
-        let producer = world.assigned[1].clone();
-        let branch = producer.workspace.repositories[0].push.clone().expect("writable change branch");
-        assert!(matches!(
-            world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
-            raw::Answer::Branch(raw::Created::Created)
-        ));
-        let agent = smith_world::agent_for(&producer, None, Job::Coding);
-        let pushed = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
-            .expect("worker pushed its branch");
-        assert!(pushed > 1);
-        let producer_agent =
-            run_smith(&mut world, &producer, agent, Some(ChangeResource { connector: 0, kind: 2, resource: 2 }));
-        assert!(matches!(
-            producer_agent.answer(),
-            run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }
-        ));
-        for _ in 0..200 {
-            world.tick();
-        }
-        assert!(world.store.rows.values().any(|stored| matches!(stored,
-            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-        )));
-    }
-
-    #[test]
-    #[expect(clippy::too_many_lines, reason = "the scenario follows the Smith repair and forge landing sequence")]
-    fn a_smith_change_with_failed_ci_is_repaired_reviewed_and_landed() {
-        let (mut world, chat) = start_change_world(0);
-        let agent = smith_world::scripted_agent_for(&chat, chat_script());
-        let parent = run_smith(&mut world, &chat, agent, None);
-        assert!(matches!(parent.answer(), run::Answer::Parked { .. }));
-        world.until(Until::SecondAssignment);
-        let producer = world.assigned[1].clone();
-        let branch = producer.workspace.repositories[0].push.clone().expect("writable change branch");
-        world.external(
-            1,
-            raw::Op::Write(raw::Write::Status {
-                commit: 1,
-                context: b"build".as_slice().into(),
-                state: raw::Check::Passed,
-            }),
-        );
-        assert!(matches!(
-            world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
-            raw::Answer::Branch(raw::Created::Created)
-        ));
-        let failed_head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"first", 1)
-            .expect("producer pushed first head");
-        world.external(
-            1,
-            raw::Op::Write(raw::Write::Status {
-                commit: failed_head,
-                context: b"build".as_slice().into(),
-                state: raw::Check::Failed,
-            }),
-        );
-        let producer_agent = run_smith(
-            &mut world,
-            &producer,
-            smith_world::agent_for(&producer, None, Job::Coding),
-            Some(ChangeResource { connector: 0, kind: 2, resource: 2 }),
-        );
-        assert!(matches!(
-            producer_agent.answer(),
-            run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }
-        ));
-        for _ in 0..200 {
-            world.tick();
-            if world.assigned.len() >= 3 {
-                break;
-            }
-        }
-        let repair = world.assigned.get(2).expect("failed CI assigned a repair").clone();
-        assert!(
-            repair.sections.iter().any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Ci)
-                && matches!(&section.body, engine::BriefBody::Text(words)
-                if words.windows(b"failing check build 3".len()).any(|part| part == b"failing check build 3"))),
-            "CI sections: {:?}",
-            repair.sections
-        );
-        let repaired_head =
-            fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"repaired", 1)
-                .expect("repair pushed a new head");
-        for _ in 0..5 {
-            world.tick();
-        }
-        world.external(
-            1,
-            raw::Op::Write(raw::Write::Status {
-                commit: repaired_head,
-                context: b"build".as_slice().into(),
-                state: raw::Check::Passed,
-            }),
-        );
-        let pull = world
-            .store
-            .rows
-            .values()
-            .find_map(|stored| match stored {
-                Record::Forge { row, .. } => match row.as_ref() {
-                    forge_top::Stored::Change(change) => change.pull,
-                    _ => None,
-                },
-                Record::Core(_) => None,
-            })
-            .expect("opened pull request");
-        assert!(matches!(
-            world.external(
-                2,
-                raw::Op::Write(raw::Write::Review {
-                    number: pull,
-                    verdict: Some(raw::Verdict::Approve),
-                    body: b"Reviewed repaired head".as_slice().into(),
-                })
-            ),
-            raw::Answer::Reviewed(_)
-        ));
-        let repair_agent = run_smith(
-            &mut world,
-            &repair,
-            smith_world::scripted_coding_agent_for(&repair, repair_script()),
-            Some(ChangeResource { connector: 0, kind: 2, resource: 2 }),
-        );
-        assert!(
-            matches!(repair_agent.answer(), run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }),
-            "{:?}",
-            repair_agent.answer()
-        );
-        for _ in 0..200 {
-            world.tick();
-            if world.store.rows.values().any(|stored| {
-                matches!(stored,
-                    Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                        if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
-                )
-            }) {
-                break;
-            }
-        }
-        assert!(world.store.rows.values().any(|stored| matches!(stored,
-            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
-                if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. })
-                    && change.change.repairs == 1)
-        )));
-    }
-}
+mod stories;

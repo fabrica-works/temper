@@ -2,13 +2,11 @@
 
 use crate::world;
 use jig_domain_authority as authority;
-use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
 use skein_lib::{Duration, Queue, ReplyTo, Token};
 use smith_agent_world::Job;
-use smith_domain as smith;
 use smith_domain_run as run;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
@@ -59,6 +57,9 @@ fn configured() -> Driver {
     limits.people.holdings = 4;
     limits.people.requests = 8;
     limits.people.pending = 4;
+    // The core's inbox census and waiting entries cover every live task.
+    limits.people.inbox_tasks = 10;
+    limits.people.inbox_recipients = 21;
     limits.call_records = 4;
     limits.brief.briefs = 5;
     limits.brief.sections = 8;
@@ -69,30 +70,15 @@ fn configured() -> Driver {
     limits.journal.held = 1536;
     limits.journal.transcript_bytes = 32768;
     limits.journal.result_bytes = 1024;
-    let mut config = walking::config(903);
-    config.run.model.account = 1;
-    config.run.model.endpoint = 0;
-    config.run.model.name = b"fake-1".as_slice().into();
-    config.run.model.input_price = 0;
-    config.run.model.cached_price = 0;
-    config.run.model.output_price = 0;
-    config.run.model.price_unit = 1;
-    config.run.model.max_tokens = 4096;
-    config.run.turns = 64;
-    config.run.time = Duration::from_secs(3600);
-    config.resume_bytes = 8192;
-    config.chat_authority.tools = authority::Tools(3);
-    config.chat_authority.delegation.kinds = Box::new([authority::Executor::Charter(1)]);
-    config.chat_authority.delegation.tasks = 3;
-    config.chat_authority.delegation.depth = 1;
-    let mut rules = config.authority.rules().clone();
+    let mut config = world::config(903);
+    let mut rules = config.core.authority.rules().clone();
     // Leave the standing goal and chat room to fund their planned delegates.
     rules.maximum_run_spend = 10;
     rules.ceiling.tools = authority::Tools(3);
     rules.ceiling.delegation.depth = 2;
     rules.ceiling.delegation.tasks = 4;
     let mut domain = authority::Domain::new(rules, limits.authority).expect("larger authority");
-    let mut policy = config.authority.policy(1).expect("configured project").clone();
+    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
     policy.ceiling.tools = authority::Tools(3);
     policy.ceiling.delegation.depth = 2;
     policy.ceiling.delegation.tasks = 4;
@@ -111,11 +97,15 @@ fn configured() -> Driver {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.authority = domain;
+    config.core.authority = domain;
     Driver::configured(Store::new(), config, &limits)
 }
 
-fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> u64 {
+/// Sign `user` in; the person and session its reply names. Person numbers
+/// come from the replies: a first start seeds the configured owners (jig
+/// 0f55ef2d).
+#[expect(clippy::wildcard_enum_match_arm, reason = "the helper selects its own sign-in reply")]
+fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> (u64, u64) {
     driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
         reply_to: ReplyTo::new(Token::new(reply)),
         identity: people::Identity {
@@ -125,7 +115,30 @@ fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> u64 {
         },
     }));
     driver.settle();
-    driver.store.header().sign_ins
+    driver
+        .delivered
+        .iter()
+        .find_map(|delivery| match delivery {
+            Delivery::WebReply { to, reply: people::Reply::SignedIn { person, sign_in, .. } }
+                if *to == ReplyTo::new(Token::new(reply)) =>
+            {
+                Some((*person, *sign_in))
+            }
+            _ => None,
+        })
+        .expect("signed in")
+}
+
+/// A goal the person asks for under the deployment's charter.
+fn goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
+    people::Ask::SetGoal {
+        project: 1,
+        spec: spec.into(),
+        executor: people::GoalExecutor::Charter(1),
+        budget,
+        priority,
+        deadline: None,
+    }
 }
 
 #[test]
@@ -133,21 +146,11 @@ fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> u64 {
 #[expect(clippy::wildcard_enum_match_arm, reason = "the story selects its committed deliveries")]
 fn a_smith_goal_is_proposed_accepted_planned_and_done() {
     let mut driver = configured();
-    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 5,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    driver.send(world::hello(5));
     driver.settle();
-    let owner_session = sign_in(&mut driver, 7, 301);
-    let maintainer_session = sign_in(&mut driver, 8, 302);
-    let maintainer = driver.store.header().people;
-    let member_session = sign_in(&mut driver, 9, 303);
-    let member = driver.store.header().people;
+    let (owner, owner_session) = sign_in(&mut driver, 7, 301);
+    let (maintainer, maintainer_session) = sign_in(&mut driver, 8, 302);
+    let (member, member_session) = sign_in(&mut driver, 9, 303);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(304)),
         sign_in: owner_session,
@@ -155,7 +158,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         ask: people::Ask::SetRoles {
             project: 1,
             holdings: Box::new([
-                people::Holding { person: 1, role: people::Role::Owner },
+                people::Holding { person: owner, role: people::Role::Owner },
                 people::Holding { person: maintainer, role: people::Role::Maintainer },
                 people::Holding { person: member, role: people::Role::Member },
             ]),
@@ -166,13 +169,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         reply_to: ReplyTo::new(Token::new(305)),
         sign_in: member_session,
         key: [35; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: b"@goalplan Ship the goal".as_slice().into(),
-            charter: 1,
-            budget: 150,
-            priority: 7,
-        },
+        ask: goal(b"@goalplan Ship the goal", 150, 7),
     }));
     driver.settle();
     let proposal = driver
@@ -198,15 +195,16 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         key: [36; 16],
         ask: people::Ask::DecideProposal {
             project: 1,
-            proposer: member,
+            proposer: people::Proposer::Party(member),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
     }));
     driver.settle();
+    // A decided proposal moves to its history family (jig c231752c).
     assert!(
-        matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::PersonProposal(proposal)))),
-        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::PersonProposal(row))))
+        matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::DecidedProposal(proposal)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::DecidedProposal(row))))
             if row.state == tasks::PersonProposalState::Accepted { by: tasks::Party::Person(maintainer) }),
         "{:?}",
         driver.delivered.iter().rev().take(3).collect::<Vec<_>>()
@@ -248,13 +246,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             _ => None,
         })
         .expect("child result woke goal planner");
-    let first = planner.turns().first().expect("concrete Smith transcript");
-    let transcript = smith::Transcript {
-        version: first.version,
-        endpoint: first.endpoint,
-        dialect: first.dialect,
-        turns: planner.turns().into(),
-    };
+    let transcript = world::transcript(&planner);
     assert_eq!(resumed.transcript.len(), transcript.turns.len());
     let mut planner = world::scripted_waiting_agent_for(&resumed, Some(transcript), plan_script());
     world::run_assignment(&mut driver, &resumed, &mut planner);
@@ -355,28 +347,14 @@ fn burst_child_script(target: u64) -> Script {
 #[expect(clippy::wildcard_enum_match_arm, reason = "the story selects assignments and committed answers")]
 fn a_smith_coordinator_is_woken_once_by_a_burst() {
     let mut driver = configured();
-    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 5,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    driver.send(world::hello(5));
     driver.settle();
-    let owner_session = sign_in(&mut driver, 7, 401);
+    let (_, owner_session) = sign_in(&mut driver, 7, 401);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(402)),
         sign_in: owner_session,
         key: [42; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: b"@burstplan Coordinate updates".as_slice().into(),
-            charter: 1,
-            budget: 50,
-            priority: 1,
-        },
+        ask: goal(b"@burstplan Coordinate updates", 50, 1),
     }));
     driver.settle();
     let coordinator = driver
@@ -407,7 +385,11 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
         ask: people::Ask::Amend {
             project: 1,
             task: coordinator,
+            revision: driver.task(coordinator).expect("live coordinator").revisions.spec,
+            release: None,
             amendment: people::Amendment {
+                addressed: None,
+                instructions: None,
                 spec: None,
                 wake: Some(people::WakePolicy {
                     words: people::WakeRule::Batch { count: 3, age: Duration::from_secs(100) },
@@ -446,13 +428,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             _ => None,
         })
         .expect("amendment woke coordinator");
-    let first_turn = planner.turns().first().expect("concrete Smith transcript");
-    let transcript = smith::Transcript {
-        version: first_turn.version,
-        endpoint: first_turn.endpoint,
-        dialect: first_turn.dialect,
-        turns: planner.turns().into(),
-    };
+    let transcript = world::transcript(&planner);
     let mut planner = world::scripted_waiting_agent_for(&amended, Some(transcript), burst_parent_script());
     world::run_assignment(&mut driver, &amended, &mut planner);
     assert!(matches!(planner.answer(), run::Answer::Parked { .. }), "{:?}", planner.answer());
@@ -474,7 +450,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             .iter()
             .filter(|(key, _)| matches!(key, Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(_)))))
             .collect::<Vec<_>>(),
-        driver.delivered.iter().filter(|item| matches!(item, Delivery::CallAnswer { .. })).collect::<Vec<_>>(),
+        driver.protocol.answers,
         driver.delivered.iter().filter(|item| matches!(item, Delivery::Assigned { .. })).collect::<Vec<_>>()
     );
     let mut messengers = Vec::new();
@@ -485,27 +461,10 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
         let pending = messenger.pending_host_calls();
         assert_eq!(pending.len(), 1);
         let submission = pending[0].clone();
-        let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
-            .expect("declared message input");
-        let before = driver.delivered.len();
-        driver.send(engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: child.task,
-            attempt: child.attempt,
-            call: submission.relay.owner,
-            body,
-        }));
-        driver.settle();
-        let answer = driver.delivered[before..]
-            .iter()
-            .find_map(|delivery| match delivery {
-                Delivery::CallAnswer { call, answer, .. } if *call == submission.relay.owner => Some(answer),
-                _ => None,
-            })
-            .expect("committed message outcome");
+        let answer = world::relay(&mut driver, &child, &submission);
         assert!(matches!(answer, temper_engine_domain::CallAnswer::Sent { .. }), "message {}: {answer:?}", index + 1);
         messenger
-            .return_host_reply(submission.relay, run::HostReply::Answered(temper_engine_smith::answer(answer)))
+            .return_host_reply(submission.relay, run::HostReply::Answered(temper_engine_smith::answer(&answer)))
             .expect("one pending Smith relay");
         let wakes = driver.delivered.iter().filter(|delivery| matches!(delivery,
             Delivery::Assigned { assignment, .. } if assignment.task == coordinator && assignment.attempt > first.attempt)).count();

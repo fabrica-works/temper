@@ -1002,10 +1002,12 @@ dependencies = [
 name = "temper-system-world"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-brief",
  "jig-domain-core",
  "jig-domain-fleet",
+ "jig-domain-host",
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-fake-parties",
@@ -1014,9 +1016,13 @@ dependencies = [
  "skein-fake-llm-domain",
  "skein-lib",
  "smith-agent-world",
+ "smith-channel",
+ "smith-charter",
  "smith-domain",
  "smith-domain-run",
+ "smith-domain-session",
  "smith-host-domain",
+ "smith-protocol-channel",
  "temper-engine-domain",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",

@@ -1,3 +1,4 @@
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
@@ -13,7 +14,8 @@ use temper_system_world::world;
 fn a_chat_answers_through_a_smith_run_and_a_committed_root_result() {
     let mut world = world::chat(b"@report", Job::Reporting);
     world.run();
-    let result = world.root.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(world.assignment.task))));
+    let result =
+        world.root.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(world.assignment.task))));
     assert!(
         matches!(world.agent.answer(), run::Answer::Accepted { outcome: run::outcome::Declared::Report(_), .. }),
         "{:?}",
@@ -27,7 +29,8 @@ fn a_chat_answers_through_a_smith_run_and_a_committed_root_result() {
 fn a_chat_parks_and_resumes_from_its_concrete_smith_transcript() {
     let mut world = world::chat(b"@chat", Job::Waiting);
     world.run();
-    assert!(matches!(world.agent.answer(), run::Answer::Parked { turns: 3, .. }), "{:?}", world.agent.answer());
+    // smith says its words and waits in one turn (smith 98d8479e).
+    assert!(matches!(world.agent.answer(), run::Answer::Parked { turns: 1, .. }), "{:?}", world.agent.answer());
     let prior = world.agent.turns().len();
     world.say_and_resume(b"continue", 42, Job::Waiting);
     assert_eq!(world.assignment.transcript.len(), prior);
@@ -48,16 +51,17 @@ fn a_person_stops_a_smith_run_and_releases_the_chat() {
     }));
     world.root.settle();
     assert!(world.root.delivered.iter().any(|item| matches!(item,
-        Delivery::Cancel { task: cancelled, attempt: current, .. }
-            if *cancelled == task && *current == attempt)));
+        Delivery::Link { down: host::LinkDown::Cancel { run, attempt: current }, .. }
+            if run.raw() == task && current.raw() == attempt)));
     world.agent = world::cancelled_agent_for(&world.assignment, Job::Waiting);
     world.run();
     assert!(matches!(world.agent.answer(), run::Answer::Failed { failure: run::Failure::Cancelled, .. }));
+    let revision = world.root.task(task).expect("held chat").revisions.hold;
     world.root.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(981)),
         sign_in: world.root.session(),
         key: [81; 16],
-        ask: people::Ask::Release { project: 1, task },
+        ask: people::Ask::Release { project: 1, task, revision, again: None },
     }));
     world.root.settle();
     assert!(world.root.delivered.iter().any(|item| matches!(item,
@@ -94,6 +98,6 @@ fn a_smith_host_call_uses_the_roots_committed_answer() {
     );
     world.run();
     assert_eq!(world.agent.host_submissions().len(), 1);
-    assert!(world.root.delivered.iter().any(|delivery| matches!(delivery, Delivery::CallAnswer { .. })));
+    assert_eq!(world.root.protocol.answers.len(), 1, "the root rendered one committed call answer");
     assert_eq!(world.agent.host_terminals().len(), 1);
 }

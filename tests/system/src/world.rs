@@ -1,18 +1,23 @@
 //! One deterministic typed crossing: a committed root assignment enters a
-//! scripted Smith agent; its concrete turns and terminal return to the root.
+//! scripted Smith agent; its concrete turns and terminal return to the root
+//! as the hub's link records, which the engine world's protocol layer plays.
 //! The fake store and person remain outside both domains.
 
-use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use skein_fake_checkout::{Checkout, Exit, Program};
 use skein_fake_llm_domain::api::Script;
-use skein_lib::{Duration, ReplyTo, Time, Token};
+use skein_lib::{Duration, ReplyTo, Token};
 use smith_agent_world::{Job, Settings, World as Agent};
 use smith_domain as smith;
 use smith_domain_run as run;
+use smith_domain_session::record;
 use temper_engine_domain as engine;
 use temper_engine_domain::Delivery;
-use temper_engine_domain_world::{direct::Driver, store::Store, walking};
+use temper_engine_domain_world::{direct::Driver, protocol, store::Store, walking};
+
+/// The one worker channel of the narrow fixtures.
+pub const CHANNEL: Token = Token::new(7);
 
 /// Composed root and agent with the same selected task charter.
 pub struct World {
@@ -21,34 +26,85 @@ pub struct World {
     pub agent: Agent,
 }
 
+/// The deployment's one charter as smith's fixtures price it: smith's fake
+/// model at a unit per million tokens, with room for a scripted conversation (jig's
+/// `domain/engine.md`, 7.1).
+#[must_use]
+pub fn charter() -> engine::Charter {
+    let mut charter = walking::charter();
+    charter.policy.model = engine::Model {
+        dialect: 0,
+        account: 1,
+        endpoint: 0,
+        name: b"fake-1".as_slice().into(),
+        window: 65_536,
+        output: 4096,
+        input_price: 1,
+        cached_price: 1,
+        cache_write_price: None,
+        output_price: 1,
+        price_unit: 1_000_000,
+    };
+    charter.policy.turns = 64;
+    charter.policy.time = Duration::from_secs(3600);
+    // A change's reserve covers the agent's checks (smith's run limits).
+    charter.policy.reserve_time = CHECKS;
+    charter
+}
+
+/// How long smith's agent may run a change's checks, which its fixtures set
+/// (`smith_agent_world::LIMITS`, run `check_timeout`).
+pub const CHECKS: Duration = Duration::from_secs(60);
+
+/// The walking configuration with [`charter`] and room to resume its turns.
+#[must_use]
+pub fn config(seed: u64) -> engine::Config {
+    let mut config = walking::config(seed);
+    config.core.settings.charters = Box::new([charter()]);
+    config.core.settings.resume_bytes = 8192;
+    config
+}
+
+/// What a worker says it can host: wide enough for [`charter`] and for the
+/// configured spend, message and inbox bounds (jig's `domain/hosts.md`, 8).
+#[must_use]
+pub fn bounds() -> host::Bounds {
+    let model = charter().policy.model;
+    host::Bounds {
+        models: Box::new([host::ModelBound { name: model.name, window: model.window, output: model.output }]),
+        turns: 64,
+        spend: 1000,
+        time: Duration::from_secs(3600),
+        waiting: Duration::from_secs(60),
+        // Checks finish within a changing charter's reserved time.
+        checks: CHECKS,
+        message_bytes: 1024,
+        inbox: 16,
+        unacknowledged: walking::HUB_TURNS,
+    }
+}
+
+/// One worker's hello on [`CHANNEL`] with `slots` slots and [`bounds`].
+#[must_use]
+pub fn hello(slots: u32) -> engine::Event {
+    engine::Event::Worker(engine::WorkerInput::Link {
+        channel: CHANNEL,
+        link: engine::Link::Hello(host::Hello {
+            slots,
+            stop_bound: Duration::from_secs(1),
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+            bounds: bounds(),
+        }),
+    })
+}
+
 /// Start one person's chat, wait for a committed assignment, and pass its
 /// translated charter to the in-process Smith domain and scripted fake LLM.
 #[must_use]
-#[expect(clippy::wildcard_enum_match_arm, reason = "the world selects only committed assignments")]
 pub fn chat(words: &[u8], job: Job) -> World {
-    let mut config = walking::config(901);
-    config.run.model.account = 1;
-    config.run.model.endpoint = 0;
-    config.run.model.name = b"fake-1".as_slice().into();
-    config.run.model.input_price = 0;
-    config.run.model.cached_price = 0;
-    config.run.model.output_price = 0;
-    config.run.model.price_unit = 1;
-    config.run.model.max_tokens = 4096;
-    config.run.turns = 64;
-    config.run.time = Duration::from_secs(3600);
-    config.resume_bytes = 8192;
-    let limits = walking::limits();
-    let mut root = Driver::configured(Store::new(), config, &limits);
-    root.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    let mut root = Driver::configured(Store::new(), config(901), &walking::limits());
+    root.send(hello(1));
     root.settle();
     root.sign_in();
     root.settle();
@@ -59,14 +115,7 @@ pub fn chat(words: &[u8], job: Job) -> World {
         ask: people::Ask::StartChat { project: 1, words: words.into() },
     }));
     root.settle();
-    let assignment = root
-        .delivered
-        .iter()
-        .find_map(|delivery| match delivery {
-            Delivery::Assigned { assignment, .. } => Some(assignment.clone()),
-            _ => None,
-        })
-        .expect("durable assignment");
+    let assignment = root.last_assignment();
     let agent = agent_for(&assignment, None, job);
     World { root, assignment, agent }
 }
@@ -106,14 +155,16 @@ pub fn scripted_waiting_agent_for(
     agent_for_with_options(assignment, transcript, Job::Waiting, None, Some(script))
 }
 
-/// Resume a caller script with the actual prior Smith turns.
+/// The concrete Smith history of an agent's turns, as a resume gives it.
 #[must_use]
-pub fn scripted_agent_for_resume(
-    assignment: &engine::Assignment,
-    transcript: smith::Transcript,
-    script: Script,
-) -> Agent {
-    agent_for_with_options(assignment, Some(transcript), Job::Reporting, None, Some(script))
+pub fn transcript(agent: &Agent) -> smith::Transcript {
+    let first = agent.turns().first().expect("a concrete Smith turn");
+    smith::Transcript {
+        version: first.version,
+        endpoint: first.endpoint,
+        dialect: first.dialect,
+        turns: agent.turns().into(),
+    }
 }
 
 fn agent_for_with_options(
@@ -141,6 +192,7 @@ fn agent_for_with_options(
     let workspace = Some(run::Workspace {
         directories: Box::new([run::Directory {
             name: b"work".as_slice().into(),
+            host: b"/work".as_slice().into(),
             root: Token::new(disk.root(b"work")),
             writable: true,
             git: true,
@@ -177,45 +229,23 @@ fn agent_for_with_options(
         Some(script) => Box::new([script]),
         None => smith_agent_world::script::all(),
     };
-    let mut agent = Agent::with_workspace_scripts_start(settings, disk, scripts, start);
-    for word in &assignment.inbox {
-        let text = format!("{:?}: {}", word.from, String::from_utf8_lossy(&word.words)).into_bytes().into_boxed_slice();
-        agent.message_at(Time::from_nanos(1), Token::new(word.number), text);
-    }
-    agent
+    Agent::with_workspace_scripts_start(settings, disk, scripts, start)
 }
 
 impl World {
     /// Commit a person's new words after a parked activation and give the
     /// next Smith activation its concrete previous turns.
-    #[expect(clippy::wildcard_enum_match_arm, reason = "the world selects only the next committed assignment")]
     pub fn say_and_resume(&mut self, words: &[u8], key: u8, job: Job) {
-        let first = self.agent.turns().first().expect("parked run has a concrete turn");
-        let transcript = smith::Transcript {
-            version: first.version,
-            endpoint: first.endpoint,
-            dialect: first.dialect,
-            turns: self.agent.turns().into(),
-        };
+        let transcript = transcript(&self.agent);
         self.root.send(engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
             sign_in: self.root.session(),
             key: [key; 16],
-            ask: people::Ask::Say { project: 1, task: self.assignment.task, words: words.into() },
+            ask: people::Ask::Say { project: 1, task: self.assignment.task, words: words.into(), release: false },
         }));
         self.root.settle();
-        let assignment = self
-            .root
-            .delivered
-            .iter()
-            .rev()
-            .find_map(|delivery| match delivery {
-                Delivery::Assigned { assignment, .. } if assignment.attempt > self.assignment.attempt => {
-                    Some(assignment.clone())
-                }
-                _ => None,
-            })
-            .expect("new durable assignment");
+        let assignment = self.root.last_assignment();
+        assert!(assignment.attempt > self.assignment.attempt, "new durable assignment");
         self.agent = agent_for(&assignment, Some(transcript), job);
         self.assignment = assignment;
     }
@@ -227,8 +257,22 @@ impl World {
     }
 }
 
+/// Relay one Smith host call to the root as the hub's record and return the
+/// root's committed answer once the protocol layer rendered it.
+pub fn relay(
+    root: &mut Driver,
+    assignment: &engine::Assignment,
+    submission: &smith_agent_world::host_referee::Submission,
+) -> engine::CallAnswer {
+    let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
+        .expect("script uses the declared host schema");
+    let call = submission.relay.owner.raw();
+    root.call(CHANNEL, assignment.task, assignment.attempt, call, body);
+    root.settle();
+    root.answered(call).expect("committed root call answer").clone()
+}
+
 /// Execute one root assignment in the Smith world and commit its typed output.
-#[expect(clippy::wildcard_enum_match_arm, reason = "the world selects only the matching committed call answer")]
 pub fn run_assignment(root: &mut Driver, assignment: &engine::Assignment, agent: &mut Agent) {
     agent.enable_parent_host_calls();
     loop {
@@ -238,61 +282,48 @@ pub fn run_assignment(root: &mut Driver, assignment: &engine::Assignment, agent:
         let pending: Vec<_> = agent.pending_host_calls().into_iter().cloned().collect();
         assert!(!pending.is_empty(), "Smith must either settle or yield a host call");
         for submission in pending {
-            let body = temper_engine_smith::call(submission.name, &submission.tool, &submission.input)
-                .expect("script uses the declared host schema");
-            let before = root.delivered.len();
-            root.send(engine::Event::Worker(engine::WorkerInput::Call {
-                channel: Token::new(7),
-                task: assignment.task,
-                attempt: assignment.attempt,
-                call: submission.relay.owner,
-                body,
-            }));
-            root.settle();
-            let answer = root.delivered[before..]
-                .iter()
-                .find_map(|delivery| match delivery {
-                    Delivery::CallAnswer { call, answer, .. } if *call == submission.relay.owner => Some(answer),
-                    _ => None,
-                })
-                .expect("committed root call answer");
+            let answer = relay(root, assignment, &submission);
             agent
-                .return_host_reply(submission.relay, run::HostReply::Answered(temper_engine_smith::answer(answer)))
+                .return_host_reply(submission.relay, run::HostReply::Answered(temper_engine_smith::answer(&answer)))
                 .expect("one pending Smith host relay");
         }
     }
     for (number, read, spent) in agent.turn_metadata() {
         let index = usize::try_from(*number - 1).expect("positive turn");
-        let record = agent.turns()[index].clone();
-        let request = smith::Request::Turn {
-            host_run: Token::new(assignment.task),
-            number: *number,
-            position: record.sequence,
-            read: *read,
-            spent: *spent,
-            turn: record.clone(),
-        };
-        let bytes = format!("{record:?}").into_bytes().into_boxed_slice();
-        let turn = temper_engine_smith::turn(request, bytes).expect("typed turn");
-        root.send(engine::Event::Worker(engine::WorkerInput::Turn {
-            channel: Token::new(7),
-            task: assignment.task,
-            attempt: assignment.attempt,
-            turn,
-        }));
+        let turn = turn(assignment, *number, *read, *spent, &agent.turns()[index]);
+        root.send(protocol::up(
+            CHANNEL,
+            host::LinkUp::Turn { run: Token::new(assignment.task), attempt: Token::new(assignment.attempt), turn },
+            engine::Parts::none(),
+        ));
         root.settle();
     }
     let terminal = temper_engine_smith::result(copy_answer(agent.answer()), None).expect("typed terminal");
-    root.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        saved: None,
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        cumulative: terminal.cumulative,
-        end: terminal.end,
-    }));
+    root.answer(CHANNEL, assignment.task, assignment.attempt, terminal.cumulative, terminal.end, engine::Parts::none());
     root.settle();
+}
+
+/// One of smith's concrete turns as the hub's turn record, its body the
+/// record's own bytes as a codec would keep them.
+#[must_use]
+pub fn turn(
+    assignment: &engine::Assignment,
+    number: u32,
+    read: Option<Token>,
+    spent: run::Spend,
+    record: &record::Turn,
+) -> host::Turn {
+    let request = smith::Request::Turn {
+        host_run: Token::new(assignment.task),
+        number,
+        position: record.sequence,
+        opens_window: matches!(record.kind, record::Kind::First { .. }),
+        read,
+        spent,
+        turn: record.clone(),
+    };
+    let bytes = format!("{record:?}").into_bytes().into_boxed_slice();
+    temper_engine_smith::turn(request, bytes).expect("typed turn")
 }
 
 /// Copy a settled Smith terminal into the typed Temper result translator.
@@ -314,4 +345,16 @@ pub fn copy_answer(answer: &run::Answer) -> run::Answer {
             run::Answer::Accepted { outcome, spent: *spent, turns: *turns }
         }
     }
+}
+
+/// Every durable assignment the root delivered, oldest first.
+#[must_use]
+pub fn assignments(root: &Driver) -> Vec<engine::Assignment> {
+    let mut assignments = Vec::new();
+    for delivery in &root.delivered {
+        if let Delivery::Assigned { assignment, .. } = delivery {
+            assignments.push(assignment.clone());
+        }
+    }
+    assignments
 }

@@ -1,7 +1,7 @@
 //! Both roots and Smith's domain share every durable and process crossing.
 use jig_domain_tasks as tasks;
 use temper_engine_domain::{Key, Record};
-use temper_system_world::composed::{World, report_script};
+use temper_system_world::composed::{World, crossed_script, report_script};
 
 #[test]
 fn a_committed_chat_runs_through_the_worker_and_smith_and_returns_a_report() {
@@ -33,12 +33,13 @@ fn smiths_host_call_and_its_durable_reply_traverse_the_worker_process_channel() 
 
 #[test]
 fn a_persons_words_reach_smith_through_the_live_worker_channel() {
-    let mut world = World::chat(912, report_script(true));
+    let mut world = World::chat(912, crossed_script());
     world.until_call();
     world.act(
         jig_fake_parties::Ask::Say {
             task: jig_fake_parties::Task::Last,
             words: Box::from(&b"continue with these words"[..]),
+            release: false,
         },
         [42; 16],
     );
