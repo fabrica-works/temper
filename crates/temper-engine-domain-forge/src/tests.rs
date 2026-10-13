@@ -525,3 +525,69 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
         assert_eq!(recovery, expected, "kind {kind}");
     }
 }
+
+/// A restarted forge with one issue creation held after its lifetime ran out
+/// unanswered (domain/forge.md, 6): the person settles it.
+fn held_creation() -> (Domain, client::Entry) {
+    let mut d = domain();
+    let entry = client::Entry {
+        number: 11,
+        task: 7,
+        repository: REPO,
+        effect: client::Effect {
+            write: client::api::Write::CreateIssue {
+                key: Box::from(&b"k"[..]),
+                title: Box::from(&b"Finding"[..]),
+                body: Box::from(&b"Fix"[..]),
+            },
+            condition: client::Condition::None,
+        },
+        start: Some(client::Position { at: Time::from_nanos(1), comment: 0, review: 0, review_page: 1 }),
+        attempt: Some(client::Attempt {
+            sent: Time::from_nanos(1),
+            deadline: Time::from_nanos(2),
+            wall: Wall::from_nanos(1),
+            expires: Wall::from_nanos(2),
+        }),
+        failures: 1,
+    };
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restore { record: Stored::Held(entry.clone()) });
+    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    (d, entry)
+}
+
+#[test]
+fn a_held_effect_settled_as_not_made_is_erased_and_reported() {
+    let (mut d, _) = held_creation();
+    assert_eq!(
+        outputs(&mut d, Event::Resolve { entry: 11, again: false }).as_ref(),
+        &[Request::Erase { key: Key::Held(11) }, Request::NotMade { entry: 11, task: 7 }]
+    );
+}
+
+#[test]
+fn a_held_effect_asked_again_returns_to_the_outbox_and_is_looked_for_first() {
+    let (mut d, entry) = held_creation();
+    assert_eq!(
+        outputs(&mut d, Event::Resolve { entry: 11, again: true }).as_ref(),
+        &[
+            Request::Erase { key: Key::Held(11) },
+            Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry) }
+        ]
+    );
+    assert_eq!(
+        ready(&mut d).as_ref(),
+        &[Request::Call {
+            call: Token::new(1),
+            repository: REPO,
+            op: client::api::Op::Read(client::api::Read::Items {
+                since: Time::from_nanos(1),
+                page: 1,
+                kind: Some(client::api::Kind::Issue),
+            }),
+        }]
+    );
+}
