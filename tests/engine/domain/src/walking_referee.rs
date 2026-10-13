@@ -200,7 +200,11 @@ impl WalkingReferee {
         {
             return Err("assignment without committed claim phase");
         }
-        if assignment.charter != 1 || assignment.grant.account != 1 || assignment.grant.generation != 1 {
+        let granted = match assignment.grants.as_ref() {
+            [grant] => grant.account == 1 && grant.generation == 1,
+            _ => false,
+        };
+        if assignment.charter != 1 || !granted {
             return Err("assignment lost configured charter or real account grant");
         }
         let Some(section) = assignment.sections.first() else {
@@ -427,6 +431,21 @@ impl WalkingReferee {
     #[must_use]
     pub fn terminal_replay_done(&self) -> bool {
         self.replayed_answer_acknowledgements == 1
+    }
+
+    /// A story cut after its terminal commit: every effect but the person's
+    /// live result notice, which the cut root never released; reading the
+    /// result afterwards is the core's (jig's `client/domain/contract.md`, 6).
+    #[must_use]
+    pub fn done_after_cut(&self) -> bool {
+        self.sign_in_replies == 1
+            && self.start_replies == 1
+            && self.assignments == 1
+            && self.saved_turns.len() == TURNS.len()
+            && self.acknowledged_turns.len() == TURNS.len()
+            && self.terminal_commits == 1
+            && self.answer_acknowledgements == 1
+            && self.results == 0
     }
 
     /// The story is complete only after all independently expected effects.

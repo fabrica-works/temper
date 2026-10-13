@@ -110,7 +110,7 @@ pub struct ForgeWorkspace {
 
 /// One typed engine tool request from the current worker claim
 /// (domain/engine.md, section 7.3). Later routes extend this vocabulary.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Tool {
     /// Write or correct one scoped note by the revision this run recalled.
     Note { entry: jig_domain_notes::New, recalled: Option<u32> },
@@ -200,7 +200,7 @@ pub enum MessageForm {
 
 /// A run-named tool call. The root fills the task and attempt from the
 /// worker envelope before looking up its durable decision.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Call {
     pub completion: u32,
     pub position: u32,

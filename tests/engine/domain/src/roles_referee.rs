@@ -97,7 +97,8 @@ impl Referee {
                     Record::Core(
                         jig_domain_core::Record::People(
                             people::Stored::Person { .. }
-                            | people::Stored::ReadPosition { .. }
+                            | people::Stored::ReadResults { .. }
+                            | people::Stored::ReadChat { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Policy { .. }
                             | people::Stored::Answer { .. },
@@ -139,7 +140,8 @@ impl Referee {
                     Record::Core(
                         jig_domain_core::Record::People(
                             people::Stored::Person { .. }
-                            | people::Stored::ReadPosition { .. }
+                            | people::Stored::ReadResults { .. }
+                            | people::Stored::ReadChat { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Roles { .. }
                             | people::Stored::Policy { .. },
@@ -202,7 +204,17 @@ impl Referee {
                                 | tasks::Stored::History(_)
                                 | tasks::Stored::PersonProposal(_)
                                 | tasks::Stored::Writer(_)
-                                | tasks::Stored::Pool(_),
+                                | tasks::Stored::Pool(_)
+                                | tasks::Stored::Update(_)
+                                | tasks::Stored::Result(_)
+                                | tasks::Stored::ConversationNewest(_)
+                                | tasks::Stored::ConversationOldest(_)
+                                | tasks::Stored::Goal(_)
+                                | tasks::Stored::EndedDelegate(_)
+                                | tasks::Stored::Delegate(_)
+                                | tasks::Stored::Activity(_)
+                                | tasks::Stored::DecidedProposal(_)
+                                | tasks::Stored::ClosedLedger(_),
                             )
                             | jig_domain_core::Record::People(_)
                             | jig_domain_core::Record::Core(
@@ -281,7 +293,7 @@ impl Referee {
                         | jig_domain_core::CoreKey::RunProof(..)
                         | jig_domain_core::CoreKey::Terminal { .. }
                         | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
+                        | jig_domain_core::CoreKey::ProposalDecision { .. }
                         | jig_domain_core::CoreKey::Turn { .. },
                     )
                     | jig_domain_core::Key::Tasks(_)
@@ -336,7 +348,7 @@ impl Referee {
             key: obligation.key,
         })));
         match reply {
-            people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy | people::Refusal::NotReady)) => {
+            people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_)) => {
                 if rows.contains_key(&answer_key) {
                     return Err("retryable role refusal consumed an answered key");
                 }

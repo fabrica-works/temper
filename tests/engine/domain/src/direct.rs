@@ -1,13 +1,12 @@
 //! Direct root fixture shared by focused routes and the ending sweep.
 
-use jig_domain_accounts as accounts;
 use jig_domain_people as people;
-use jig_domain_views as views;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Write};
 
+use crate::protocol::Protocol;
 use crate::store::Store;
 use crate::walking::{config, limits};
 
@@ -18,15 +17,17 @@ pub struct Driver {
     pub events: VecDeque<engine::Event>,
     pub store: Store,
     pub delivered: Vec<Delivery>,
-    pub viewed: Vec<views::Request>,
+    /// The protocol layer this world plays: decodes, renders, outcomes, accounts.
+    pub protocol: Protocol,
     pub serial: u64,
-    pub accounts: Vec<accounts::Request>,
     pub stopped: bool,
     pub fail_archive_once: bool,
     pub transactions: Vec<Vec<Write>>,
-    pub result_loads: Vec<(u32, usize)>,
     pub host_requests: Vec<Box<engine::HostRequest>>,
-    pub call_busy: Vec<Token>,
+    /// Inputs `try_step` handed back while the journal was full.
+    pub returned: Vec<engine::Event>,
+    /// Other outputs without a durability dependency.
+    pub immediate: Vec<engine::Request>,
 }
 
 impl Driver {
@@ -44,20 +45,23 @@ impl Driver {
             events: VecDeque::from([engine::Event::Restart]),
             store,
             delivered: Vec::new(),
-            viewed: Vec::new(),
+            protocol: Protocol::default(),
             serial: 100,
-            accounts: Vec::new(),
             stopped: false,
             fail_archive_once: false,
             transactions: Vec::new(),
-            result_loads: Vec::new(),
             host_requests: Vec::new(),
-            call_busy: Vec::new(),
+            returned: Vec::new(),
+            immediate: Vec::new(),
         }
     }
 
+    /// Offer one input through admission; an input the journal cannot take
+    /// is handed back to the world, which keeps it (jig's `domain/root.md`, 3).
     pub fn send(&mut self, event: engine::Event) {
-        engine::step(&mut self.root, &self.env, event);
+        if let Err(event) = engine::try_step(&mut self.root, &self.env, event) {
+            self.returned.push(event);
+        }
         engine::release(&mut self.root, &self.env, &mut self.out);
         self.collect();
         self.root.reclaim();
@@ -65,7 +69,14 @@ impl Driver {
 
     pub fn collect(&mut self) {
         for _ in 0..self.out.len() {
-            match self.out.pop().expect("output count") {
+            let request = match self.protocol.play(self.out.pop().expect("output count")) {
+                Ok(events) => {
+                    self.events.extend(events);
+                    continue;
+                }
+                Err(request) => request,
+            };
+            match request {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     self.transactions.push(writes.to_vec());
@@ -73,9 +84,6 @@ impl Driver {
                 }
                 engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, bytes }) => {
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    if range == temper_engine_domain::Range::Core(temper_engine_domain::CoreRange::EndedResults) {
-                        self.result_loads.push((most, rows.len()));
-                    }
                     assert!(rows.len() <= usize::try_from(most).expect("small count"));
                     assert!(bytes >= self.env.limits.loads.bytes);
                     if self.fail_archive_once
@@ -94,27 +102,17 @@ impl Driver {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivered.push(delivery),
-                engine::Request::Party(engine::PartyRequest::View(request)) => match request {
-                    views::Request::Watching { .. }
-                    | views::Request::Refused { .. }
-                    | views::Request::Deliver { .. }
-                    | views::Request::Ended { .. } => self.viewed.push(request),
-                },
-                engine::Request::Party(engine::PartyRequest::WatchRefused { .. }) => {
-                    panic!("root route test did not request an invalid watch")
-                }
-                engine::Request::Account(request) => self.accounts.push(request),
                 engine::Request::Forge { .. } => {
                     panic!("root route fixture did not adopt forge")
                 }
                 engine::Request::Stop => self.stopped = true,
                 engine::Request::Worker(engine::WorkerRequest::Host(request)) => self.host_requests.push(request),
-                engine::Request::Worker(engine::WorkerRequest::CallBusy { call, .. }) => self.call_busy.push(call),
-                engine::Request::Worker(
-                    engine::WorkerRequest::TurnBusy { .. } | engine::WorkerRequest::AnswerBusy { .. },
-                ) => {
-                    panic!("unexpected route refusal")
-                }
+                other @ (engine::Request::Party(_)
+                | engine::Request::Worker(_)
+                | engine::Request::Store(_)
+                | engine::Request::Account(_)
+                | engine::Request::Busy(_)
+                | engine::Request::Drained) => self.immediate.push(other),
             }
         }
     }
@@ -125,7 +123,7 @@ impl Driver {
         }
         if apply && !self.store.pending.is_empty() {
             let number = self.store.apply();
-            self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
+            self.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
         }
         crate::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
@@ -140,6 +138,11 @@ impl Driver {
             }
         }
         panic!("direct root routes did not settle: {:?}", self.root);
+    }
+
+    /// The deployment's first period for project one, at its first start.
+    pub fn period(&mut self) {
+        self.send(engine::Event::Party(engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None }));
     }
 
     pub fn sign_in(&mut self) {
@@ -158,34 +161,12 @@ impl Driver {
     pub fn session(&self) -> u64 {
         self.delivered
             .iter()
-            .find_map(|delivery| match delivery {
-                Delivery::WebReply { sign_in, reply: people::Reply::SignedIn { .. }, .. } => *sign_in,
-                Delivery::WebReply { .. }
-                | Delivery::Reply { .. }
-                | Delivery::Acknowledge { .. }
-                | Delivery::AcknowledgeTurn { .. }
-                | Delivery::Cancel { .. }
-                | Delivery::Result { .. }
-                | Delivery::View(_)
-                | Delivery::Fleet(_)
-                | Delivery::Assigned { .. }
-                | Delivery::Refuse { .. }
-                | Delivery::EscalationReply { .. }
-                | Delivery::ReadEscalationDecision { .. }
-                | Delivery::ReadResult { .. }
-                | Delivery::TurnBusy { .. }
-                | Delivery::Relay { .. }
-                | Delivery::Inbound { .. }
-                | Delivery::Load { .. }
-                | Delivery::ResultReply { .. }
-                | Delivery::InboxPage { .. }
-                | Delivery::InboxView { .. }
-                | Delivery::BeginInboxView { .. }
-                | Delivery::Host(_)
-                | Delivery::CallAnswer { .. }
-                | Delivery::ForgeCommitted { .. }
-                | Delivery::ForgeCall { .. }
-                | Delivery::Procedure { .. } => None,
+            .find_map(|delivery| {
+                if let Delivery::WebReply { reply: people::Reply::SignedIn { sign_in, .. }, .. } = delivery {
+                    Some(*sign_in)
+                } else {
+                    None
+                }
             })
             .expect("durable sign-in reply")
     }
@@ -197,7 +178,7 @@ impl Driver {
         self.sign_in();
         assert_eq!(self.store.pending.len(), 3);
         let number = self.store.apply();
-        self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
+        self.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
         self.sign_in();
         assert_eq!(self.store.pending.len(), 3);
         for _ in 0..20 {

@@ -2,11 +2,13 @@
 //! the existing ordered fake store. Requests become later input events
 //! (domain/engine.md, section 15).
 
+use crate::protocol::{self, Protocol};
 use crate::store::Store;
 use crate::walking_referee::{FINAL_SPEND, QUESTION, REPORT, TURNS, WalkingReferee};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -42,9 +44,11 @@ pub fn limits() -> engine::Limits {
         spec_bytes: 64,
         parameters: 1,
         result_bytes: 128,
+        run_inbox: 4,
         inbox_messages: 4,
         inbox_bytes: 128,
         message_bytes: 64,
+        person_stall: Duration::from_secs(3600),
         proposal_stall: Duration::from_millis(10),
         escalation_stall: Duration::from_secs(3600),
         saved_resources: 2,
@@ -63,10 +67,13 @@ pub fn limits() -> engine::Limits {
             invalid: retry,
         },
         facts: 2,
+        room_refusals: 2,
     };
     let people = people::Limits {
         people: 2,
         inbox_entries: 2,
+        inbox_tasks: 4,
+        inbox_recipients: 4,
         sign_ins: 2,
         projects: 1,
         holdings: 2,
@@ -81,18 +88,23 @@ pub fn limits() -> engine::Limits {
         sign_in_lifetime: Duration::from_secs(60),
         request_retention: Duration::from_secs(120),
         facts: 2,
+        room_refusals: 2,
     };
     let fleet = fleet::Limits {
         workers: 1,
+        needs_bytes: 65_536,
         engine_slots: 0,
         slots: 1,
         workstreams: 1,
         attempts: 2,
+        grants: 2,
         calls: 1,
         call_name_bytes: 64,
+        progress_bytes: 0,
         turns: 2,
         grace: Duration::from_secs(5),
         facts: 2,
+        history: 2,
     };
     let writes = tasks::max_out(&tasks) * 8
         + people::max_out(&people) * 4
@@ -137,19 +149,19 @@ pub fn limits() -> engine::Limits {
         },
         accounts: accounts::Limits {
             accounts: 1,
-            refresh_margin: Duration::from_secs(1),
+            credentials: 2,
             backoff_base: Duration::from_millis(10),
             backoff_max: Duration::from_secs(1),
-            rejected_interval: Duration::from_millis(10),
+            retry: Duration::from_millis(10),
             spent_attention: Duration::from_secs(1),
             facts: 2,
         },
         views: jig_domain_views::Limits {
             runs: 2,
             watchers: 4,
-            backlog: 2,
-            report_bytes: 64,
-            snapshot_bytes: 128,
+            watchers_per_party: 4,
+            subjects_per_change: 8,
+            text_bytes: 64,
             facts: 8,
         },
         notes: jig_domain_notes::Limits {
@@ -225,9 +237,6 @@ pub fn config(seed: u64) -> engine::Config {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "real policy admitted");
-    let mut chat_authority = authority_value(100, Box::new([]));
-    chat_authority.delegation.tasks = 0;
-    chat_authority.delegation.depth = 0;
     engine::Config {
         deployment: [31; 16],
         seed,
@@ -253,22 +262,43 @@ pub fn config(seed: u64) -> engine::Config {
             projects
         },
         forge_connector: 0,
-        recurring_connector: 1,
-        charter: 1,
-        run: engine::RunPolicy {
+        charters: Box::new([charter()]),
+        chat: 1,
+        close_grace: Duration::from_secs(5),
+        resume_bytes: 256,
+        tools: jig_domain_core::ToolFamilies::JIG,
+        forge: temper_engine_domain_forge_client::Config {
+            namespace: Box::from(&b"root"[..]),
+            writers: Box::new([temper_engine_domain_forge_client::Writer { forge: 1, author: 1 }]),
+        },
+        forge_charter: 1,
+    }
+}
+
+/// The deployment's one charter: the chats' and the forge's agent work's.
+/// Its default spend holds its reserve floor (jig's `domain/authority.md`, 7).
+#[must_use]
+pub fn charter() -> engine::Charter {
+    engine::Charter {
+        number: 1,
+        policy: engine::RunPolicy {
             instructions: b"Complete the task within its authority.".as_slice().into(),
             waiting: Duration::from_secs(1),
             resume: true,
             turns: 8,
             time: Duration::from_secs(60),
+            reserve_turns: 1,
+            reserve_time: Duration::from_secs(10),
             model: engine::Model {
                 dialect: 1,
                 account: 1,
                 endpoint: 1,
                 name: b"scripted".as_slice().into(),
-                max_tokens: 1024,
+                window: 1024,
+                output: 1024,
                 input_price: 1,
                 cached_price: 1,
+                cache_write_price: None,
                 output_price: 1,
                 price_unit: 1000,
             },
@@ -279,19 +309,8 @@ pub fn config(seed: u64) -> engine::Config {
             agents: true,
             call_timeout: Duration::from_secs(10),
         },
-        resume_bytes: 256,
-        period: 1,
-        period_budget: 1000,
-        person_budget: 500,
-        chat_authority,
-        tools: jig_domain_core::ToolFamilies::standard(),
-        account: 1,
-        account_generation: 1,
-        account_valid: Some(Duration::from_secs(60)),
-        forge: temper_engine_domain_forge_client::Config {
-            namespace: Box::from(&b"root"[..]),
-            writers: Box::new([temper_engine_domain_forge_client::Writer { forge: 1, author: 1 }]),
-        },
+        hosts: fleet::Kinds::Workers,
+        spend: 100,
     }
 }
 
@@ -308,8 +327,9 @@ pub struct Settings {
     pub restart: bool,
     /// World script cuts after the final ended/financial transaction is applied
     /// before its completion or ACK/result release; mutually exclusive with
-    /// `restart`. Retained worker answer and authenticated named result read
-    /// recover through the real root routes.
+    /// `restart`. The retained worker answer recovers through the real root
+    /// routes; reading the result after the cut is the core's (jig's
+    /// `client/domain/contract.md`, 6).
     pub terminal_restart: bool,
     /// Drain observational child facts or leave their tiny queues saturated.
     pub facts: bool,
@@ -322,10 +342,8 @@ impl Settings {
         Settings { seed, commit_delay: 0, page_delay: 0, restart: true, terminal_restart: false, facts: true }
     }
 
-    /// Script one final-commit process cut and one extra worker terminal resend.
-    /// The person requests the named ended result with their restored session;
-    /// the fake checks exactly one result and unchanged durable rows after cut
-    /// (domain/people.md, section 6).
+    /// Script one final-commit process cut and one extra worker terminal resend;
+    /// the fake checks unchanged durable rows after the cut.
     #[must_use]
     pub const fn terminal(seed: u64) -> Settings {
         Settings { seed, commit_delay: 0, page_delay: 0, restart: false, terminal_restart: true, facts: true }
@@ -372,6 +390,8 @@ pub struct World {
     terminal_recovery: TerminalRecovery,
     recovery_clock_offset: u64,
     terminal_snapshot: Option<BTreeMap<temper_engine_domain::Key, Record>>,
+    protocol: Protocol,
+    period_sent: bool,
 }
 
 impl World {
@@ -400,6 +420,8 @@ impl World {
             terminal_recovery: TerminalRecovery::NotRequested,
             recovery_clock_offset: 0,
             terminal_snapshot: None,
+            protocol: Protocol::default(),
+            period_sent: false,
             settings,
         };
         world.queue(engine::Event::Restart, 0);
@@ -412,39 +434,22 @@ impl World {
     }
 
     fn hello(&mut self) {
-        let hosting = self.assignment.as_ref().map_or_else(
-            || Box::new([]) as Box<[fleet::Hosted]>,
-            |assignment| {
-                Box::new([fleet::Hosted {
-                    run: Token::new(assignment.task),
-                    attempt: Token::new(assignment.attempt),
-                    phase: if self.pending_answer { fleet::Phase::Answered } else { fleet::Phase::Active },
-                }])
-            },
-        );
-        self.queue(
-            engine::Event::Worker(engine::WorkerInput::Hello {
-                channel: Token::new(7),
-                hello: fleet::Hello {
-                    stop_bound: Duration::from_millis(100),
-                    slots: 1,
-                    workstreams: Box::new([]),
-                    hosting,
-                },
-            }),
-            0,
-        );
+        let hosting: Box<[host::Hosting]> = match self.assignment.as_ref() {
+            Some(assignment) => Box::new([protocol::hosting(
+                assignment.task,
+                assignment.attempt,
+                if self.pending_answer { host::Phase::Answered } else { host::Phase::Active },
+            )]),
+            None => Box::new([]),
+        };
+        self.queue(protocol::hello(Token::new(7), hosting), 0);
     }
 
     fn turn(&mut self, number: u32) {
         let assignment = self.assignment.as_ref().expect("script has its real assignment");
         let (_, cumulative, transcript) = TURNS.iter().find(|(turn, _, _)| *turn == number).expect("scripted turn");
-        let event = engine::Event::Worker(engine::WorkerInput::Turn {
-            channel: Token::new(7),
-            task: assignment.task,
-            attempt: assignment.attempt,
-            turn: engine::Turn { number, cumulative: *cumulative, read: None, transcript: (*transcript).into() },
-        });
+        let event =
+            protocol::turn(Token::new(7), assignment.task, assignment.attempt, number, *cumulative, None, transcript);
         self.pending_turn = Some(number);
         self.queue(event, 0);
     }
@@ -513,19 +518,14 @@ impl World {
                     self.terminal_snapshot = Some(self.store.rows.clone());
                     self.restart(true);
                 } else {
-                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number }), 0);
+                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }), 0);
                 }
             }
         }
         if let Some(snapshot) = &self.terminal_snapshot {
             for (key, row) in snapshot {
-                if !matches!(
-                    key,
-                    temper_engine_domain::Key::Core(
-                        jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)
-                            | jig_domain_core::Key::People(people::Key::ReadPosition(_))
-                    )
-                ) {
+                if !matches!(key, temper_engine_domain::Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))
+                {
                     assert_eq!(
                         self.store.rows.get(key),
                         Some(row),
@@ -534,7 +534,16 @@ impl World {
                 }
             }
         }
-        if self.domain.ready() && !self.person_sent {
+        // The deployment's first period, at its first start (jig's
+        // `protocol/configuration.md`, 5; `testing/jig-test-service/src/engine.rs`).
+        if self.domain.ready() && !self.period_sent {
+            self.period_sent = true;
+            self.queue(
+                engine::Event::Party(engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None }),
+                0,
+            );
+        }
+        if self.domain.ready() && self.period_sent && !self.person_sent {
             self.person_sent = true;
             self.queue(
                 engine::Event::Party(engine::PartyInput::SignedIn {
@@ -551,10 +560,15 @@ impl World {
         if self.restarts != 0
             && self.domain.ready()
             && self.pending_turn == Some(1)
-            && !self
-                .events
-                .iter()
-                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Turn { .. })))
+            && !self.events.iter().any(|(_, event)| {
+                matches!(
+                    event,
+                    engine::Event::Worker(engine::WorkerInput::Link {
+                        link: engine::Link::Up { up: host::LinkUp::Turn { .. }, .. },
+                        ..
+                    })
+                )
+            })
         {
             self.turn(1);
         }
@@ -564,23 +578,19 @@ impl World {
             && self.terminal_recovery == TerminalRecovery::NotRequested
         {
             self.terminal_recovery = TerminalRecovery::AwaitingRetainedAck;
-            let assignment = self.assignment.as_ref().expect("worker retains terminal claim");
-            self.queue(
-                engine::Event::Party(engine::PartyInput::ReadResult {
-                    reply_to: ReplyTo::new(Token::new(103)),
-                    sign_in: self.session.expect("person retains authenticated session"),
-                    task: assignment.task,
-                }),
-                0,
-            );
             self.answer();
         }
         if self.terminal_recovery != TerminalRecovery::NotRequested
             && self.recovery_clock_offset == 0
-            && !self
-                .events
-                .iter()
-                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Answer { .. })))
+            && !self.events.iter().any(|(_, event)| {
+                matches!(
+                    event,
+                    engine::Event::Worker(engine::WorkerInput::Link {
+                        link: engine::Link::Up { up: host::LinkUp::Answer { .. }, .. },
+                        ..
+                    })
+                )
+            })
         {
             // The retained answer has reached the loaded fleet. Advance the
             // external clock past its five-second grace, staying within the
@@ -591,41 +601,34 @@ impl World {
 
     fn answer(&mut self) {
         let assignment = self.assignment.as_ref().expect("worker retains terminal claim");
+        let (task, attempt) = (assignment.task, assignment.attempt);
         self.pending_answer = true;
-        self.queue(
-            engine::Event::Worker(engine::WorkerInput::Answer {
-                pushed: Box::new([]),
-                saved: None,
-                channel: Token::new(7),
-                task: assignment.task,
-                attempt: assignment.attempt,
-                cumulative: FINAL_SPEND,
-                end: tasks::End::Finished {
-                    result: tasks::TaskResult::Report { words: REPORT.into() },
-                    cancel_delegates: false,
-                },
-            }),
-            0,
-        );
+        let end = tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: REPORT.into() },
+            cancel_delegates: false,
+        };
+        let event = self.protocol.answer(Token::new(7), task, attempt, FINAL_SPEND, end, engine::Parts::none());
+        self.queue(event, 0);
     }
 
     fn observe(&mut self) {
         assert!(self.out.len() <= engine::max_out(&self.environment.limits));
         while let Some(request) = self.out.pop() {
             self.trace.push(format!("output {request:?}"));
+            let request = match self.protocol.play(request) {
+                Ok(events) => {
+                    for event in events {
+                        self.queue(event, 0);
+                    }
+                    continue;
+                }
+                Err(request) => request,
+            };
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     if self.terminal_snapshot.is_some() {
-                        assert!(
-                            writes.iter().any(|write| matches!(
-                                write,
-                                temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::People(
-                                    people::Stored::ReadPosition { .. }
-                                )))
-                            )),
-                            "terminal recovery only commits the person's read"
-                        );
+                        panic!("terminal recovery commits nothing: {writes:?}");
                     }
                     self.referee.commit(&writes).expect("independent transaction referee");
                     if self.store.pending.is_empty() {
@@ -643,62 +646,21 @@ impl World {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
-                engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                    self.queue(
-                        engine::Event::Account(jig_domain_accounts::Event::Refreshed {
-                            account,
-                            generation,
-                            valid: Duration::from_secs(60),
-                        }),
-                        0,
-                    );
-                }
-                engine::Request::Account(
-                    accounts::Request::Keep { .. }
-                    | accounts::Request::Cancel { .. }
-                    | accounts::Request::Granted { .. }
-                    | accounts::Request::Availability { .. }
-                    | accounts::Request::Refused { .. }
-                    | accounts::Request::Closed { .. },
-                ) => {}
-                engine::Request::Worker(engine::WorkerRequest::TurnBusy { turn, .. }) => self.turn(turn),
-                engine::Request::Worker(engine::WorkerRequest::AnswerBusy { channel, task, attempt }) => self.queue(
-                    engine::Event::Worker(engine::WorkerInput::Answer {
-                        pushed: Box::new([]),
-                        saved: None,
-                        channel,
-                        task,
-                        attempt,
-                        cumulative: FINAL_SPEND,
-                        end: tasks::End::Finished {
-                            result: tasks::TaskResult::Report { words: REPORT.into() },
-                            cancel_delegates: false,
-                        },
-                    }),
-                    1,
-                ),
-                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
-                    panic!("fixture received an unexpected host request")
-                }
-                engine::Request::Worker(engine::WorkerRequest::CallBusy { .. }) => {
-                    panic!("walking story sent no calls")
-                }
-                engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. }) => {
-                    panic!("unrequested view output")
-                }
                 engine::Request::Stop => panic!("walking story stopped: {:?}", self.trace),
-                engine::Request::Forge { .. } => {
-                    panic!("walking story did not adopt forge")
-                }
+                other @ (engine::Request::Worker(_)
+                | engine::Request::Party(_)
+                | engine::Request::Store(_)
+                | engine::Request::Account(_)
+                | engine::Request::Busy(_)
+                | engine::Request::Drained
+                | engine::Request::Forge { .. }) => panic!("unexpected walking output {other:?}"),
             }
         }
     }
 
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
-            Delivery::View(_) => panic!("internal view event reached shell"),
-            Delivery::WebReply { sign_in, reply: people::Reply::SignedIn { person, .. }, .. } => {
-                let sign_in = sign_in.expect("web sign-in receives its new session");
+            Delivery::WebReply { reply: people::Reply::SignedIn { person, sign_in, .. }, .. } => {
                 self.referee.signed_in(&self.store.rows, person, sign_in).expect("durable sign-in");
                 self.session = Some(sign_in);
                 self.queue(
@@ -720,9 +682,11 @@ impl World {
                 self.assignment = Some(assignment);
                 self.turn(1);
             }
-            Delivery::AcknowledgeTurn { channel, task, attempt, turn } => {
+            Delivery::Link { channel, down: host::LinkDown::TurnKept { run, attempt, turn } } => {
                 assert_eq!(channel, Token::new(7));
-                self.referee.turn_ack(&self.store.rows, task, attempt, turn).expect("durable atomic turn ACK");
+                self.referee
+                    .turn_ack(&self.store.rows, run.raw(), attempt.raw(), turn)
+                    .expect("durable atomic turn ACK");
                 if self.pending_turn != Some(turn) {
                     return;
                 }
@@ -733,8 +697,9 @@ impl World {
                     self.answer();
                 }
             }
-            Delivery::Acknowledge { channel, task, attempt } => {
+            Delivery::Link { channel, down: host::LinkDown::Acknowledge { run, attempt } } => {
                 assert_eq!(channel, Token::new(7));
+                let (task, attempt) = (run.raw(), attempt.raw());
                 self.pending_answer = false;
                 match self.terminal_recovery {
                     TerminalRecovery::AwaitingReplayAck => {
@@ -755,41 +720,29 @@ impl World {
                     TerminalRecovery::Complete => panic!("ACK after both scripted sends completed"),
                 }
             }
+            Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
             Delivery::TurnBusy { turn, .. } => self.turn(turn),
             Delivery::Result { person, task, words } => self
                 .referee
                 .result(&self.store.rows, person, task, &words)
                 .expect("committed result reaches person once"),
-            Delivery::ResultReply { to, person, task, words, .. } => {
-                assert!(
-                    self.settings.terminal_restart && self.terminal_recovery != TerminalRecovery::NotRequested,
-                    "named result must be requested after restart"
-                );
-                assert_eq!(to.into_token(), Token::new(103), "one actual named result request terminal");
-                self.referee
-                    .result(&self.store.rows, person, task, &words)
-                    .expect("committed result reaches person once");
-            }
             Delivery::Host(_)
-            | Delivery::CallAnswer { .. }
+            | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
-            | Delivery::Reply { .. }
-            | Delivery::InboxPage { .. }
-            | Delivery::InboxView { .. }
-            | Delivery::EscalationReply { .. }
             | Delivery::WebReply { .. }
-            | Delivery::Refuse { .. }
-            | Delivery::Cancel { .. } => {
+            | Delivery::Read { .. }
+            | Delivery::ReadLoad { .. }
+            | Delivery::Document { .. }
+            | Delivery::WatchEnded { .. }
+            | Delivery::Drained
+            | Delivery::Refuse { .. } => {
                 panic!("unexpected walking delivery {delivery:?}")
             }
             Delivery::Fleet(_)
             | Delivery::ForgeCommitted { .. }
             | Delivery::ReadEscalationDecision { .. }
-            | Delivery::ReadResult { .. }
-            | Delivery::BeginInboxView { .. }
             | Delivery::Relay { .. }
-            | Delivery::Inbound { .. }
             | Delivery::Load { .. } => {
                 panic!("internal handoff leaked to world")
             }
@@ -808,7 +761,7 @@ impl World {
     }
 
     fn settled(&self) -> bool {
-        self.referee.done()
+        (if self.settings.terminal_restart { self.referee.done_after_cut() } else { self.referee.done() })
             && (!self.settings.terminal_restart
                 || (self.terminal_recovery == TerminalRecovery::Complete && self.referee.terminal_replay_done()))
             && !self.pending_answer

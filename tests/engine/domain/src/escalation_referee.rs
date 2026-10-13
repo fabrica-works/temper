@@ -94,7 +94,6 @@ pub struct Referee {
     asks: BTreeMap<Token, AskReply>,
     reads: BTreeMap<Token, (u64, tasks::Escalation)>,
     read_terminals: BTreeSet<Token>,
-    busy_reads: BTreeSet<Token>,
     busy_asks: BTreeSet<Token>,
     start_replies: u32,
     results: u32,
@@ -129,6 +128,7 @@ fn held(record: &tasks::TaskRecord) -> bool {
         == (tasks::Phase::Held {
             why: tasks::Hold::Failures(tasks::Class::Run),
             was: tasks::Was::Active(tasks::Active::Due),
+            source: None,
         })
 }
 
@@ -158,7 +158,6 @@ impl Referee {
             asks: BTreeMap::new(),
             reads: BTreeMap::new(),
             read_terminals: BTreeSet::new(),
-            busy_reads: BTreeSet::new(),
             busy_asks: BTreeSet::new(),
             start_replies: 0,
             results: 0,
@@ -292,7 +291,11 @@ impl Referee {
         {
             return Err("assignment without fresh root proof");
         }
-        if assignment.charter != 1 || assignment.grant.account != 1 || assignment.grant.generation != 1 {
+        let granted = match assignment.grants.as_ref() {
+            [grant] => grant.account == 1 && grant.generation == 1,
+            _ => false,
+        };
+        if assignment.charter != 1 || !granted {
             return Err("assignment without configured grant");
         }
         let section = assignment.sections.first().ok_or("missing real task brief")?;
@@ -461,8 +464,9 @@ impl Referee {
                         matches!(ask.as_ref(), people::Ask::DecideEscalation { project, task, revision, decision: asked }
                             if key.person == *by && *project == 1 && *task == archive.task
                                 && *revision == archive.revision && *asked == *decision
-                                && *outcome == (people::Outcome::EscalationDecided {
-                                    task: archive.task, revision: archive.revision, by: *by, choice: choice(decision),
+                                && undated(*outcome) == (people::Outcome::EscalationDecided {
+                                    task: archive.task, revision: archive.revision, by: *by,
+                                    at: skein_lib::Wall::EPOCH, choice: choice(decision),
                                 }))
                     }
                     Write::Save(_) | Write::Erase(_) => false,
@@ -551,13 +555,16 @@ impl Referee {
                 }
             }
             ExpectedTerminal::Outcome(outcome) => {
-                if reply != people::Reply::Outcome(*outcome) {
+                let people::Reply::Outcome(replied) = reply else {
+                    return Err("keyed terminal differs from independently expected outcome wrapper");
+                };
+                if undated(replied) != undated(*outcome) {
                     return Err("keyed terminal differs from independently expected outcome wrapper");
                 }
-                if ask.as_ref() != &expected.ask || saved != outcome {
+                if ask.as_ref() != &expected.ask || *saved != replied {
                     return Err("keyed terminal and durable answer differ");
                 }
-                if let people::Outcome::EscalationDecided { task, revision, by, choice: answer } = *outcome {
+                if let people::Outcome::EscalationDecided { task, revision, by, choice: answer, .. } = *outcome {
                     let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) =
                         rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::EscalationDecision {
                             task,
@@ -581,10 +588,8 @@ impl Referee {
     /// # Errors
     /// Rejects an unsolicited terminal, a non-busy reply, or a reused reply right.
     pub fn ask_refused(&mut self, to: Token, reply: people::Reply, retry: Token) -> Result<(), &'static str> {
-        if reply != people::Reply::Refused(people::Refusal::Busy)
-            && reply != people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy))
-        {
-            return Err("named query pressure requires Busy");
+        if !matches!(reply, people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))) {
+            return Err("named query pressure requires an unsaved retry answer");
         }
         if to == retry || self.asks.contains_key(&retry) || self.busy_asks.contains(&retry) {
             return Err("named query retry requires a fresh right");
@@ -595,70 +600,30 @@ impl Referee {
         Ok(())
     }
 
-    /// Consume an immediate `Busy` terminal for an outstanding current-view read.
-    /// The person must retry using a fresh right; no keyed outcome is saved
-    /// (domain/people.md, section 5.1).
-    ///
-    /// # Errors
-    /// Rejects unsolicited/duplicate terminals and a different wrapper or refusal.
-    pub fn read_refused(&mut self, to: Token, reply: people::Reply) -> Result<(), &'static str> {
-        if !self.reads.contains_key(&to) {
-            return Err("unsolicited or duplicate read-pressure terminal");
-        }
-        if reply != people::Reply::Refused(people::Refusal::Busy) {
-            return Err("read pressure requires immediate retryable Busy refusal");
-        }
-        self.reads.remove(&to);
-        self.read_terminals.insert(to);
-        self.busy_reads.insert(to);
-        Ok(())
-    }
-
-    /// Count independently consumed pressure terminals; successful retried views
-    /// remain separate obligations.
-    #[must_use]
-    pub fn busy_reads(&self) -> usize {
-        self.busy_reads.len()
-    }
-
     /// Count the named queries that consumed Busy and retried with a fresh right.
     #[must_use]
     pub fn busy_asks(&self) -> usize {
         self.busy_asks.len()
     }
 
-    /// Check one authenticated held view and its durable semantic record.
+    /// Whether the person's expected held chat is now durable: the core owns
+    /// reading it, so the scripted person sees it in its durable row.
     ///
     /// # Errors
-    /// Rejects duplicate/wrong reader, wrong revision/recipient or premature view
-    pub fn viewed(
-        &mut self,
-        rows: &BTreeMap<Key, Record>,
-        to: Token,
-        person: u64,
-        context: &tasks::EscalationContext,
-    ) -> Result<(), &'static str> {
-        let (expected_person, expected) = self.reads.get(&to).ok_or("unsolicited or duplicate escalation view")?;
-        if person != *expected_person
-            || Some(context.task) != self.task
-            || context.project != 1
-            || Some(context.requester) != self.people[0]
-            || context.why != tasks::Hold::Failures(tasks::Class::Run)
-            || !same_decision(&context.escalation, expected)
-        {
-            return Err("held view differs from scripted authenticated revision");
+    /// Rejects an unsolicited view, or a held chat seen before its charge is durable.
+    pub fn viewed(&mut self, rows: &BTreeMap<Key, Record>, to: Token) -> Result<bool, &'static str> {
+        let (_, expected) = self.reads.get(&to).ok_or("unsolicited or duplicate escalation view")?;
+        let Some(number) = self.task else { return Ok(false) };
+        let Some(record) = task(rows, number) else { return Ok(false) };
+        if !held(record) || !same_decision(&record.escalation, expected) {
+            return Ok(false);
         }
-        let record = task(rows, context.task).ok_or("view without durable held task")?;
-        if !held(record)
-            || record.escalation != context.escalation
-            || record.numbers.spent != 3
-            || record.run_spent != 3
-        {
+        if record.numbers.spent != 3 || record.run_spent != 3 {
             return Err("held view preceded routed priced durability");
         }
         self.reads.remove(&to);
         self.read_terminals.insert(to);
-        Ok(())
+        Ok(true)
     }
 
     /// Check one ACK per scripted worker terminal after durable evidence.
@@ -790,5 +755,16 @@ impl Referee {
             && self.reads.is_empty()
             && self.archives.len() == if self.story.passes() { 2 } else { 1 }
             && self.results == u32::from(self.story.succeeds())
+    }
+}
+
+/// An outcome without the wall time its decision kept, which the outside
+/// script cannot predict.
+fn undated(outcome: people::Outcome) -> people::Outcome {
+    match outcome {
+        people::Outcome::EscalationDecided { task, revision, by, choice, .. } => {
+            people::Outcome::EscalationDecided { task, revision, by, at: skein_lib::Wall::EPOCH, choice }
+        }
+        other => other,
     }
 }

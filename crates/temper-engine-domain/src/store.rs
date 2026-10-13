@@ -266,7 +266,8 @@ pub enum CoreRange {
 pub enum Range {
     Core(CoreRange),
     /// The ended owners named by the inbox census's durable indexes
-    /// (jig's `protocol/store.md`, 7.2); the store joins each index to its owner.
+    /// (jig's `protocol/store.md`, 7.2): the store joins each admitted index
+    /// row to its owner and pages the owners in key order.
     Census(jig_domain_core::Census),
     Forge,
 }
@@ -283,7 +284,12 @@ impl Range {
         };
         match self {
             Range::Forge => false,
-            Range::Census(census) => census.admits(core),
+            // The store joins the census's admitted index rows to the ended
+            // owners they name, and pages those owners in key order.
+            Range::Census(_) => {
+                let jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(task)) = core else { return false };
+                *task != 0
+            }
             Range::Core(range) => range.contains(core),
         }
     }

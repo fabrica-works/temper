@@ -3,14 +3,15 @@
 //! are driven only through actual boundaries.
 
 use crate::escalation_referee::{QUESTION, REASON, REPORT, Referee, Story};
+use crate::protocol::{self, Protocol};
 use crate::store::Store;
 use crate::walking;
-use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
+use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Record, Write};
@@ -93,6 +94,9 @@ enum ReadPurpose {
     Rejected,
 }
 
+/// A held chat the scripted person waits to see; the root's reads are the
+/// core's, so the world sees it in its durable row (jig's
+/// `client/domain/contract.md`, 6).
 #[derive(Clone, Debug)]
 struct PendingRead {
     to: Token,
@@ -121,7 +125,6 @@ pub struct World {
     ask_rights: BTreeMap<Token, Token>,
     next_ask: u64,
     pending_read: Option<PendingRead>,
-    next_read: u64,
     sign_in_script: SignInScript,
     first_choice: Option<(usize, u64, people::EscalationDecision, u8)>,
     iteration: u32,
@@ -151,6 +154,9 @@ pub struct World {
 
     /// Real paged requests, including named archive IO.
     pub pages: u32,
+
+    protocol: Protocol,
+    period_sent: bool,
 }
 
 // Initial configuration grants acceptance of escalation proposals without the
@@ -220,7 +226,6 @@ impl World {
             ask_rights: BTreeMap::new(),
             next_ask: 400,
             pending_read: None,
-            next_read: 300,
             sign_in_script: SignInScript::Waiting,
             first_choice: None,
             iteration: 0,
@@ -235,6 +240,8 @@ impl World {
             transactions: Vec::new(),
             restarts: 0,
             pages: 0,
+            protocol: Protocol::default(),
+            period_sent: false,
             settings,
         };
         world.queue(engine::Event::Restart, 0);
@@ -247,28 +254,13 @@ impl World {
     }
 
     fn hello(&mut self) {
-        let hosting = if self.worker_answer == WorkerAnswer::Retained {
+        let hosting: Box<[host::Hosting]> = if self.worker_answer == WorkerAnswer::Retained {
             let assignment = self.assignment.as_ref().expect("outside worker retains its answer");
-            Box::new([fleet::Hosted {
-                run: Token::new(assignment.task),
-                attempt: Token::new(assignment.attempt),
-                phase: fleet::Phase::Answered,
-            }]) as Box<[fleet::Hosted]>
+            Box::new([protocol::hosting(assignment.task, assignment.attempt, host::Phase::Answered)])
         } else {
             Box::new([])
         };
-        self.queue(
-            engine::Event::Worker(engine::WorkerInput::Hello {
-                channel: Token::new(7),
-                hello: fleet::Hello {
-                    stop_bound: Duration::from_millis(100),
-                    slots: 1,
-                    workstreams: Box::new([]),
-                    hosting,
-                },
-            }),
-            0,
-        );
+        self.queue(protocol::hello(Token::new(7), hosting), 0);
     }
 
     fn sign_in(&mut self, index: usize) {
@@ -340,31 +332,33 @@ impl World {
         self.read_input(PendingRead { to: Token::new(to), owner, escalation, purpose }, 0);
     }
 
-    fn read_input(&mut self, read: PendingRead, delay: u32) {
+    fn read_input(&mut self, read: PendingRead, _delay: u32) {
         assert!(self.pending_read.is_none(), "at most one current-view script obligation");
         let person = self.people[read.owner].expect("signed-in named reader");
         self.referee.read(read.to, person, read.escalation.clone());
-        self.queue(
-            engine::Event::Party(engine::PartyInput::ReadEscalation {
-                reply_to: ReplyTo::new(read.to),
-                sign_in: self.sessions[read.owner].expect("signed-in named reader"),
-                task: self.task.expect("named chat"),
-            }),
-            delay,
-        );
         self.pending_read = Some(read);
     }
 
-    fn retry_read(&mut self, to: Token, refusal: people::Refusal) {
-        self.referee
-            .read_refused(to, people::Reply::Refused(refusal))
-            .expect("current-view pressure consumes exactly one retryable read right");
-        let mut read = self.pending_read.take().expect("pending outside current-view read");
-        assert_eq!(read.to, to, "pressure terminal consumes its actual read right");
-        assert!(self.next_read < 316, "at most sixteen fresh pressure retries in this finite script");
-        read.to = Token::new(self.next_read);
-        self.next_read += 1;
-        self.read_input(read, 1);
+    /// The scripted person sees the held chat once its durable row shows it.
+    fn held_view(&mut self) {
+        let Some(read) = self.pending_read.as_ref() else { return };
+        let to = read.to;
+        if !self.referee.viewed(&self.store.rows, to).expect("independent durable held view") {
+            return;
+        }
+        let read = self.pending_read.take().expect("pending outside held view");
+        match read.purpose {
+            ReadPurpose::Requester => self.initial_choice(),
+            ReadPurpose::FinalRole => self.ask(
+                211,
+                1,
+                11,
+                2,
+                people::EscalationDecision::Pass,
+                people::Outcome::Refused(people::Refusal::NoFurther),
+            ),
+            ReadPurpose::Rejected => {}
+        }
     }
 
     fn answer(&mut self) {
@@ -380,19 +374,10 @@ impl World {
                 },
             )
         };
+        let (task, attempt) = (assignment.task, assignment.attempt);
         self.worker_answer = WorkerAnswer::Retained;
-        self.queue(
-            engine::Event::Worker(engine::WorkerInput::Answer {
-                pushed: Box::new([]),
-                saved: None,
-                channel: Token::new(7),
-                task: assignment.task,
-                attempt: assignment.attempt,
-                cumulative,
-                end,
-            }),
-            0,
-        );
+        let event = self.protocol.answer(Token::new(7), task, attempt, cumulative, end, engine::Parts::none());
+        self.queue(event, 0);
     }
 
     fn winning_choice(&mut self, owner: usize, revision: u64, decision: people::EscalationDecision, key: u8) {
@@ -405,7 +390,13 @@ impl World {
             people::EscalationDecision::Pass => people::EscalationChoice::Passed,
         };
         let outcome =
-            people::Outcome::EscalationDecided { task: self.task.expect("chat started"), revision, by, choice };
+            people::Outcome::EscalationDecided {
+                task: self.task.expect("chat started"),
+                revision,
+                by,
+                at: Wall::EPOCH,
+                choice,
+            };
         self.ask(if revision == 1 { 210 } else { 220 }, owner, key, revision, decision, outcome);
     }
 
@@ -443,6 +434,7 @@ impl World {
                 task: self.task.expect("chat"),
                 revision: 2,
                 by: self.people[1].expect("winning owner"),
+                at: Wall::EPOCH,
                 choice,
             };
             self.ask(221, 0, 13, 2, loser, outcome);
@@ -522,7 +514,9 @@ impl World {
         if self.events.front().is_some_and(|(due, _)| *due <= self.iteration) {
             let (_, event) = self.events.pop_front().expect("one due scripted event");
             self.trace.push(format!("input {event:?}"));
-            engine::step(&mut self.domain, &self.environment, event);
+            if let Err(event) = engine::try_step(&mut self.domain, &self.environment, event) {
+                self.queue(event, 1);
+            }
             engine::release(&mut self.domain, &self.environment, &mut self.out);
             self.observe();
             if self.frozen_cut.is_some() {
@@ -542,7 +536,17 @@ impl World {
         }
         self.domain.reclaim();
         self.apply_store();
-        if self.domain.ready() && self.sign_in_script == SignInScript::Waiting {
+        self.held_view();
+        // The deployment's first period, at its first start (jig's
+        // `protocol/configuration.md`, 5).
+        if self.domain.ready() && !self.period_sent {
+            self.period_sent = true;
+            self.queue(
+                engine::Event::Party(engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None }),
+                0,
+            );
+        }
+        if self.domain.ready() && self.period_sent && self.sign_in_script == SignInScript::Waiting {
             self.sign_in_script = SignInScript::Sent;
             self.sign_in(0);
         }
@@ -559,10 +563,15 @@ impl World {
         if self.settings.cut != Cut::None
             && self.recovery == Recovery::Sent
             && self.clock_offset == 0
-            && !self
-                .events
-                .iter()
-                .any(|(_, event)| matches!(event, engine::Event::Worker(engine::WorkerInput::Answer { .. })))
+            && !self.events.iter().any(|(_, event)| {
+                matches!(
+                    event,
+                    engine::Event::Worker(engine::WorkerInput::Link {
+                        link: engine::Link::Up { up: host::LinkUp::Answer { .. }, .. },
+                        ..
+                    })
+                )
+            })
         {
             // A decision can commit its new claim before assignment escapes.
             // No worker may invent hosting that claim; let actual fleet grace
@@ -592,7 +601,7 @@ impl World {
                 {
                     self.restart();
                 } else {
-                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number }), 0);
+                    self.queue(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }), 0);
                 }
             }
         }
@@ -602,6 +611,15 @@ impl World {
         assert!(self.out.len() <= engine::max_out(&self.environment.limits), "declared root output room");
         while let Some(request) = self.out.pop() {
             self.trace.push(format!("output {request:?}"));
+            let request = match self.protocol.play(request) {
+                Ok(events) => {
+                    for event in events {
+                        self.queue(event, 0);
+                    }
+                    continue;
+                }
+                Err(request) => request,
+            };
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
@@ -640,41 +658,14 @@ impl World {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
-                engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                    self.queue(
-                        engine::Event::Account(jig_domain_accounts::Event::Refreshed {
-                            account,
-                            generation,
-                            valid: Duration::from_secs(60),
-                        }),
-                        0,
-                    );
-                }
-                engine::Request::Account(
-                    accounts::Request::Keep { .. }
-                    | accounts::Request::Cancel { .. }
-                    | accounts::Request::Granted { .. }
-                    | accounts::Request::Availability { .. }
-                    | accounts::Request::Refused { .. }
-                    | accounts::Request::Closed { .. },
-                ) => {}
-                engine::Request::Worker(engine::WorkerRequest::AnswerBusy { .. }) => self.answer(),
-                engine::Request::Worker(engine::WorkerRequest::TurnBusy { .. }) => {
-                    panic!("outside worker offered no turns")
-                }
-                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
-                    panic!("fixture received an unexpected host request")
-                }
-                engine::Request::Worker(engine::WorkerRequest::CallBusy { .. }) => {
-                    panic!("escalation world sent no calls")
-                }
-                engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. }) => {
-                    panic!("unrequested view output")
-                }
                 engine::Request::Stop => panic!("escalation root stopped: {:?}", self.trace),
-                engine::Request::Forge { .. } => {
-                    panic!("escalation story did not adopt forge")
-                }
+                other @ (engine::Request::Forge { .. }
+                | engine::Request::Worker(_)
+                | engine::Request::Party(_)
+                | engine::Request::Store(_)
+                | engine::Request::Account(_)
+                | engine::Request::Busy(_)
+                | engine::Request::Drained) => panic!("unexpected escalation output {other:?}"),
             }
         }
     }
@@ -687,23 +678,10 @@ impl World {
         match delivery {
             Delivery::WebReply {
                 to,
-                reply:
-                    reply @ (people::Reply::Refused(people::Refusal::Busy)
-                    | people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy))),
-                ..
-            } => {
-                let token = to.into_token();
-                if self.pending_read.as_ref().is_some_and(|read| read.to == token) {
-                    self.retry_read(token, people::Refusal::Busy);
-                } else {
-                    self.retry_ask(token, reply);
-                }
-            }
-
-            Delivery::View(_) => panic!("internal view event reached shell"),
-            Delivery::WebReply { to, sign_in, reply: people::Reply::SignedIn { person, .. } } => {
+                reply: reply @ (people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))),
+            } => self.retry_ask(to.into_token(), reply),
+            Delivery::WebReply { to, reply: people::Reply::SignedIn { person, sign_in: session, .. } } => {
                 let index = usize::try_from(to.into_token().raw() - 101).expect("two named sign-in reply rights");
-                let session = sign_in.expect("fresh authenticated session");
                 self.referee.signed_in(&self.store.rows, index, person, session).expect("durable exact owner sign-in");
                 self.sessions[index] = Some(session);
                 self.people[index] = Some(person);
@@ -751,35 +729,12 @@ impl World {
             }
             Delivery::WebReply { to, reply: people::Reply::Refused(refusal), .. } => {
                 let token = to.into_token();
-                if self.pending_read.as_ref().is_some_and(|read| read.to == token) {
-                    assert_eq!(refusal, people::Refusal::Busy, "retryable current-view refusal for {token:?}");
-                    self.retry_read(token, refusal);
-                } else {
-                    let logical = self.ask_rights.remove(&token).unwrap_or(token);
-                    assert_eq!(logical, Token::new(232), "sole immediate key-conflict right; refusal {refusal:?}");
-                    self.referee
-                        .replied(&self.store.rows, token, people::Reply::Refused(refusal))
-                        .expect("immediate refusal preserves the original saved winner");
-                    self.asks.remove(&token).expect("one pending outside conflict terminal");
-                }
-            }
-            Delivery::EscalationReply { to, person, context } => {
-                let token = to.into_token();
-                self.referee.viewed(&self.store.rows, token, person, &context).expect("independent durable held view");
-                let read = self.pending_read.take().expect("pending outside current-view read");
-                assert_eq!(read.to, token, "view consumes its actual read right");
-                match read.purpose {
-                    ReadPurpose::Requester => self.initial_choice(),
-                    ReadPurpose::FinalRole => self.ask(
-                        211,
-                        1,
-                        11,
-                        2,
-                        people::EscalationDecision::Pass,
-                        people::Outcome::Refused(people::Refusal::NoFurther),
-                    ),
-                    ReadPurpose::Rejected => {}
-                }
+                let logical = self.ask_rights.remove(&token).unwrap_or(token);
+                assert_eq!(logical, Token::new(232), "sole immediate key-conflict right; refusal {refusal:?}");
+                self.referee
+                    .replied(&self.store.rows, token, people::Reply::Refused(refusal))
+                    .expect("immediate refusal preserves the original saved winner");
+                self.asks.remove(&token).expect("one pending outside conflict terminal");
             }
             Delivery::Assigned { channel, assignment } => {
                 assert_eq!(channel, Token::new(7));
@@ -788,8 +743,9 @@ impl World {
                 self.assigned += 1;
                 self.answer();
             }
-            Delivery::Acknowledge { channel, task, attempt } => {
+            Delivery::Link { channel, down: host::LinkDown::Acknowledge { run, attempt } } => {
                 assert_eq!(channel, Token::new(7));
+                let (task, attempt) = (run.raw(), attempt.raw());
                 self.referee.acknowledged(&self.store.rows, task, attempt).expect("independent priced terminal ACK");
                 self.worker_answer = WorkerAnswer::Idle;
                 if self.assigned == 1 {
@@ -809,25 +765,23 @@ impl World {
                 .referee
                 .result(&self.store.rows, person, task, &words)
                 .expect("independent exact final report and funding"),
+            Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
             Delivery::WebReply { .. }
+            | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
-            | Delivery::InboxPage { .. }
-            | Delivery::InboxView { .. }
-            | Delivery::Reply { .. }
+            | Delivery::Read { .. }
+            | Delivery::Document { .. }
+            | Delivery::WatchEnded { .. }
+            | Delivery::Drained
             | Delivery::Refuse { .. }
-            | Delivery::Cancel { .. }
-            | Delivery::AcknowledgeTurn { .. }
-            | Delivery::TurnBusy { .. }
-            | Delivery::ResultReply { .. } => panic!("unexpected escalation delivery {delivery:?}"),
+            | Delivery::TurnBusy { .. } => panic!("unexpected escalation delivery {delivery:?}"),
             Delivery::Fleet(_)
             | Delivery::ForgeCommitted { .. }
-            | Delivery::ReadResult { .. }
-            | Delivery::BeginInboxView { .. }
+            | Delivery::ReadLoad { .. }
             | Delivery::ReadEscalationDecision { .. }
             | Delivery::Relay { .. }
-            | Delivery::Inbound { .. }
             | Delivery::Load { .. } => panic!("internal root callback leaked to world"),
-            Delivery::Host(_) | Delivery::CallAnswer { .. } => panic!("escalation world sent no calls"),
+            Delivery::Host(_) => panic!("escalation world sent no calls"),
             Delivery::Procedure { .. } => panic!("escalation world sent no procedures"),
         }
     }

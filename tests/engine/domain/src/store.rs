@@ -23,6 +23,7 @@ pub const HEADER: Deployment = Deployment {
     runs: 0,
     calls: 0,
     connector_rows: 0,
+    applications: 0,
     commits: 0,
 };
 
@@ -80,6 +81,9 @@ impl Store {
     /// Each page is a separate request and has a cursor only when rows remain.
     #[must_use]
     pub fn page(&self, range: &Range, after: Option<&Key>, most: u32) -> (Box<[Record]>, Option<Key>) {
+        if let Range::Census(_) = range {
+            return self.census(range, after, most);
+        }
         let count = usize::try_from(most).expect("small page");
         let mut selected: Vec<Record> = self
             .rows
@@ -87,6 +91,42 @@ impl Store {
             .filter(|(key, _)| range.contains(key) && after.is_none_or(|old| *key > old))
             .take(count.saturating_add(1))
             .map(|(_, row)| row.clone())
+            .collect();
+        let more = selected.len() > count;
+        if more {
+            selected.pop();
+        }
+        let rows: Box<[Record]> = selected.into_boxed_slice();
+        let next = if more { Some(rows.last().expect("positive page").key()) } else { None };
+        (rows, next)
+    }
+}
+
+impl Store {
+    /// The census's index rows joined to the ended owners they name, paged
+    /// by owner key, as jig's store joins them (jig's `protocol/store.md`, 7.2).
+    fn census(&self, range: &Range, after: Option<&Key>, most: u32) -> (Box<[Record]>, Option<Key>) {
+        let Range::Census(census) = range else { unreachable!("census range") };
+        let mut owners = std::collections::BTreeSet::new();
+        for (key, row) in &self.rows {
+            let Key::Core(core) = key else { continue };
+            if !census.admits(core) {
+                continue;
+            }
+            if let Record::Core(jig_domain_core::Record::Tasks(
+                jig_domain_tasks::Stored::Result(jig_domain_tasks::ResultRow { task, .. })
+                | jig_domain_tasks::Stored::ConversationOldest(jig_domain_tasks::Conversation { task, .. }),
+            )) = row
+            {
+                owners.insert(Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(*task))));
+            }
+        }
+        let count = usize::try_from(most).expect("small page");
+        let mut selected: Vec<Record> = owners
+            .iter()
+            .filter(|key| after.is_none_or(|old| *key > old))
+            .filter_map(|key| self.rows.get(key).cloned())
+            .take(count.saturating_add(1))
             .collect();
         let more = selected.len() > count;
         if more {
