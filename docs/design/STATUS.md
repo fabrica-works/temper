@@ -50,6 +50,26 @@ No plan is active. The designer marks plans active and done in this file
 
 ## 3. Not planned
 
+- **Repin on jig's protocol plan** (skein's `development.md`, section 5.7;
+  checked 2026-10-13T19:31:10Z, ruling 281): temper's jig `2860e63` cannot
+  take jig `c97d524c9003d318f8f025f1ddb9be8767b39164` with its locked
+  smith `dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d` and skein
+  `b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2` as a small repin.
+  After moving the git URLs to GitHub and resolving one source each,
+  the upstream crates compile; the all-target workspace check reports
+  182 errors in `temper-engine-domain` and 106 in `temper-worker-domain`,
+  across 23 production files and 274 distinct primary diagnostic lines.
+  The engine's watch/read-position, account, escalation, settings,
+  run/result and stored-record routes need reconciliation; the worker's
+  assignments, host/Smith messages, delivery and workspace records need
+  it too. Removed routes and changed boundary records exceed the repin's
+  names/paths, required trait items and upstream-behaviour test ports;
+  their migration needs a plan (the unadopted `draft/jig-protocol.md`,
+  section 5, names the broader reconciliation). Tests and remaining
+  downstream crates have not all type-checked, and no patch size is
+  claimed from the diagnostic count. No source adaptation or repin
+  landed; main's pins remain unchanged. Plan the domain reconciliation
+  before the protocol-layer composition.
 - **The protocol and io layers** (`protocol.md`, `channel.md`,
   `credentials.md`, `forge.md`; `domain/engine.md`, section 14): temper
   below the domain, deleted on 2026-10-07 to be planned afresh on
