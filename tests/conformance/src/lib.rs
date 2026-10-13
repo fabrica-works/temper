@@ -2,6 +2,7 @@
 //! The forge observes native API calls, and store snapshots are independent of
 //! root state (jig's domain/testing.md, sections 5–6).
 mod config;
+pub mod link;
 pub mod observations;
 mod scenarios;
 pub mod stories;
@@ -9,7 +10,7 @@ pub mod systems;
 
 use jig_conformance::referee as r;
 use jig_conformance::{Application, Clock, Input, Output};
-use jig_domain_accounts as accounts;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_fake_workers as workers;
@@ -18,6 +19,7 @@ use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use temper_engine_domain as engine;
 use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
+use temper_engine_domain_world::protocol::Protocol;
 
 /// Scenario identity and seed retained across cold starts.
 #[derive(Clone, Copy, Debug)]
@@ -86,12 +88,17 @@ pub struct Domain {
     root: engine::Domain,
     outputs: Queue<engine::Request>,
     probed: bool,
+    /// An input admission handed back; its peer sends it again (jig's
+    /// `domain/root.md`, 3).
+    returned: Option<engine::Event>,
 }
 
 /// Independent worker, party and store evidence; retained across crashes.
 #[expect(clippy::struct_excessive_bools, reason = "each startup request has independent request and reply evidence")]
 pub struct Peers {
     pub policy: r::Policy,
+    /// Advanced at each independently requested policy edit.
+    pub policy_generation: u64,
     pub seed: u64,
     pub scenario: Option<jig_conformance::scenarios::Scenario>,
     pub story: Option<stories::Story>,
@@ -103,8 +110,12 @@ pub struct Peers {
     signed_in: bool,
     adopting: bool,
     chatted: bool,
+    /// The period and the git identity's credential were sent to this start.
+    started: bool,
     applied: u64,
     observed: Vec<r::Observed>,
+    /// The protocol layer this world plays: decodes, renders, outcomes, accounts.
+    protocol: Protocol,
     requests: std::collections::BTreeMap<u64, [u8; 16]>,
     ask_bodies: std::collections::BTreeMap<u64, (u64, [u8; 16], people::Ask)>,
     ask_retries: std::collections::BTreeMap<u64, u64>,
@@ -115,6 +126,7 @@ pub struct Peers {
     pub branches: Vec<Box<[u8]>>,
     pub produced: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
     pub reported: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
+    /// Calls by name, kept by the worker until their answers are relayed.
     calls: std::collections::BTreeMap<u64, (u64, u64, engine::Call)>,
     retries: std::collections::BTreeMap<u64, u64>,
     generation: u64,
@@ -126,9 +138,10 @@ pub struct Peers {
 }
 /// Released outputs, drained without inspecting the root.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "released native requests stay directly visible in the harness trace")]
 pub enum Delivery {
     Root(engine::Request),
+    /// An input admission handed back, for its peer to send again.
+    Returned(engine::Event),
     Resume,
 }
 
@@ -138,6 +151,8 @@ fn env(config: &Config, clock: Clock) -> Env<engine::Limits> {
 
 impl Application for Temper {
     type Domain = Domain;
+    type Store = Store;
+    type Write = jig_fake_store::Write<root::Key, observations::Record>;
     type Config = Config;
     type Systems = systems::FakeForge;
     type Peers = Peers;
@@ -162,7 +177,11 @@ impl Application for Temper {
             root: engine::Domain::new(configuration, &limits),
             outputs: Queue::with_capacity(engine::max_out(&limits)),
             probed: false,
+            returned: None,
         }
+    }
+    fn store(_: &Config) -> Store {
+        Store::new()
     }
     fn systems(config: &Config, _: u64) -> systems::FakeForge {
         let mut system = systems::FakeForge::new_with_ci(
@@ -216,7 +235,8 @@ impl Application for Temper {
             scenario: config.scenario,
             story: config.story,
             policy: observations::policy(config.seed, config.scenario, config.story),
-            worker: workers::Worker::new(7, 2, (0..16).map(|_| script.clone()).collect()),
+            policy_generation: 0,
+            worker: workers::Worker::new(link::CHANNEL, 2, (0..16).map(|_| script.clone()).collect()),
             assignments: Vec::new(),
             answers: Vec::new(),
             sign_in: None,
@@ -224,8 +244,10 @@ impl Application for Temper {
             signed_in: false,
             adopting: false,
             chatted: false,
+            started: false,
             applied: 0,
             observed: Vec::new(),
+            protocol: Protocol::default(),
             requests: std::collections::BTreeMap::new(),
             ask_bodies: std::collections::BTreeMap::new(),
             ask_retries: std::collections::BTreeMap::new(),
@@ -249,6 +271,9 @@ impl Application for Temper {
     fn policy(peers: &Peers) -> &r::Policy {
         &peers.policy
     }
+    fn policy_generation(peers: &Peers) -> u64 {
+        peers.policy_generation
+    }
     fn recovery(_: &Config, connector: u16, kind: u16) -> r::Recovery {
         assert_eq!(connector, 0);
         match kind {
@@ -265,7 +290,7 @@ impl Application for Temper {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
         for record in store.rows.values().map(|record| &record.0) {
             if let root::Record::Forge { row } = record
-                && let forge::Stored::Entry(entry) = row.as_ref()
+                && let forge::Stored::Entry { entry, held: false } = row.as_ref()
                 && entry.attempt.is_some()
             {
                 let key = observations::key(store, entry);
@@ -275,6 +300,7 @@ impl Application for Temper {
         }
         peers.worker.restart_engine();
         peers.generation += 1;
+        peers.started = false;
         peers.retries.extend(peers.calls.keys().map(|call| (*call, 0)));
         peers.ask_retries.extend(peers.ask_bodies.keys().map(|call| (*call, 0)));
         if peers.sign_in.is_none() {
@@ -293,24 +319,18 @@ impl Application for Temper {
     fn step(domain: &mut Domain, config: &Config, clock: Clock, input: Input<Event, observations::Record>) {
         let environment = env(config, clock);
         domain.probed = matches!(input, Input::Event(Event::Fire));
-        match input {
-            Input::Event(Event::Root(event)) => engine::step(&mut domain.root, &environment, event),
-            Input::Event(Event::Fire) => engine::fire(&mut domain.root, &environment),
-            Input::Committed(number) => {
-                engine::step(
-                    &mut domain.root,
-                    &environment,
-                    engine::Event::Store(engine::StoreInput::Committed { number }),
-                );
+        let event = match input {
+            Input::Event(Event::Root(event)) => event,
+            Input::Event(Event::Fire) => {
+                engine::fire(&mut domain.root, &environment);
+                return;
             }
-            Input::Failed(number) => {
-                engine::step(
-                    &mut domain.root,
-                    &environment,
-                    engine::Event::Store(engine::StoreInput::Uncommitted { number }),
-                );
-            }
+            Input::Committed(number) => engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }),
+            Input::Failed(number) => engine::Event::Store(engine::StoreInput::Uncommitted { number }),
             Input::Restore(_) => panic!("temper restores through bounded load terminals"),
+        };
+        if let Err(event) = engine::try_step(&mut domain.root, &environment, event) {
+            assert!(domain.returned.replace(event).is_none(), "one input per iteration");
         }
     }
     #[expect(
@@ -321,7 +341,7 @@ impl Application for Temper {
         domain: &mut Domain,
         config: &Config,
         clock: Clock,
-    ) -> Vec<Output<root::Key, observations::Record, Delivery>> {
+    ) -> Vec<Output<jig_fake_store::Write<root::Key, observations::Record>, Delivery>> {
         let environment = env(config, clock);
         engine::release(&mut domain.root, &environment, &mut domain.outputs);
         if domain.outputs.is_empty() {
@@ -351,6 +371,9 @@ impl Application for Temper {
                 other => Output::Deliver(Delivery::Root(other)),
             });
         }
+        if let Some(event) = domain.returned.take() {
+            outputs.push(Output::Deliver(Delivery::Returned(event)));
+        }
         if outputs.is_empty() && !domain.root.quiescent() && !domain.probed {
             outputs.push(Output::Deliver(Delivery::Resume));
         }
@@ -361,35 +384,36 @@ impl Application for Temper {
     }
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "the peer retains calls and charge evidence without interpreting other inputs"
+        reason = "the peer retains asks and charge evidence without interpreting other inputs"
     )]
-    fn inbound(peers: &mut Peers, _: &Store, clock: Clock, input: &mut Event) {
+    fn inbound(peers: &mut Peers, _: &Store, _: Clock, input: &mut Event) {
         let Event::Root(input) = input else { return };
         match input {
-            engine::Event::Worker(engine::WorkerInput::Call { task, attempt, call, body, .. }) => {
-                peers.calls.insert(call.raw(), (*task, *attempt, copy_call(body)));
-                peers.retries.insert(call.raw(), clock.now + 1_000_000_000);
-            }
             engine::Event::Party(engine::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
                 let call = destination(reply_to);
                 peers.requests.insert(call, *key);
                 peers.ask_bodies.insert(call, (*sign_in, *key, ask.clone()));
             }
-            engine::Event::Worker(engine::WorkerInput::Turn { task, attempt, turn, .. }) => peers
-                .observed
-                .push(r::Observed::Completion { task: *task, attempt: *attempt, cumulative: turn.cumulative }),
-            engine::Event::Worker(engine::WorkerInput::Answer { task, attempt, cumulative, .. }) => {
-                peers.observed.push(r::Observed::Completion {
-                    task: *task,
-                    attempt: *attempt,
-                    cumulative: *cumulative,
-                });
-            }
+            engine::Event::Worker(engine::WorkerInput::Link {
+                link: engine::Link::Up { up: host::LinkUp::Turn { run, attempt, turn }, .. },
+                ..
+            }) => peers.observed.push(r::Observed::Completion {
+                task: run.raw(),
+                attempt: attempt.raw(),
+                cumulative: turn.spent,
+            }),
+            engine::Event::Worker(engine::WorkerInput::Link {
+                link: engine::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, .. },
+                ..
+            }) => peers.observed.push(r::Observed::Completion {
+                task: run.raw(),
+                attempt: attempt.raw(),
+                cumulative: answer.spent,
+            }),
             _ => {}
         }
     }
     #[expect(
-        clippy::too_many_lines,
         clippy::wildcard_enum_match_arm,
         reason = "one boundary adapter acknowledges selected native outputs and retains their receipts"
     )]
@@ -400,11 +424,18 @@ impl Application for Temper {
         clock: Clock,
         delivery: Delivery,
     ) -> Vec<Input<Event, observations::Record>> {
-        let mut events = Vec::new();
-        let Delivery::Root(delivery) = delivery else {
-            return vec![Input::Event(Event::Fire)];
+        let request = match delivery {
+            Delivery::Root(request) => request,
+            Delivery::Returned(event) => return vec![Input::Event(Event::Root(event))],
+            Delivery::Resume => return vec![Input::Event(Event::Fire)],
         };
-        match delivery {
+        // The protocol layer answers at once (testing-strategy.md, 4).
+        let request = match peers.protocol.play(request) {
+            Ok(events) => return events.into_iter().map(|event| Input::Event(Event::Root(event))).collect(),
+            Err(request) => *request,
+        };
+        let mut events = Vec::new();
+        match request {
             engine::Request::ToChild(released) => events.push(engine::Event::Released(released)),
             engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                 let rows: Vec<_> = store
@@ -431,127 +462,48 @@ impl Application for Temper {
             }
             engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
             | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => {
-                let mut requires = Vec::new();
-                match delivery {
-                    root::Delivery::Assigned { channel, assignment } => {
-                        assert_eq!(channel.raw(), 7);
-                        peers.observed.push(r::Observed::Assigned {
-                            task: assignment.task,
-                            attempt: assignment.attempt,
-                            budget: assignment.run.budget,
-                        });
-                        for word in &assignment.inbox {
-                            peers.observed.push(r::Observed::Reached(r::Receipt::Word(assignment.task, word.number)));
-                        }
-                        peers.worker.assign(workers::Assignment {
-                            task: assignment.task,
-                            attempt: assignment.attempt,
-                            budget: assignment.run.budget,
-                            transcript: assignment.transcript.clone(),
-                        });
-                        if !peers
-                            .assignments
-                            .iter()
-                            .any(|a| a.task == assignment.task && a.attempt == assignment.attempt)
-                        {
-                            peers.assignments.push(assignment);
-                        }
-                    }
-                    root::Delivery::AcknowledgeTurn { task, attempt, turn, .. } => {
-                        requires.push(r::Receipt::Turn(task, attempt, turn));
-                        peers.worker.acknowledge_turn(task, attempt, turn);
-                    }
-                    root::Delivery::Acknowledge { task, attempt, .. } => {
-                        requires.push(r::Receipt::Terminal(task, attempt));
-                        peers.worker.acknowledge_answer(task, attempt);
-                    }
-                    root::Delivery::Cancel { task, attempt, .. } => peers.worker.cancel(task, attempt),
-                    root::Delivery::WebReply { to, sign_in, reply } => {
-                        let call = to.into_token().raw();
-                        let busy = matches!(
-                            &reply,
-                            people::Reply::Outcome(people::Outcome::Refused(
-                                people::Refusal::Busy | people::Refusal::NotReady
-                            ))
-                        );
-                        if busy {
-                            peers.ask_retries.insert(call, clock.now + 1_000_000_000);
-                        } else {
-                            peers.ask_bodies.remove(&call);
-                        }
-                        let key = peers.requests.remove(&call);
-                        if matches!(&reply,people::Reply::Outcome(outcome) if !matches!(outcome,people::Outcome::Refused(people::Refusal::Busy|people::Refusal::NotReady)))
-                            && let Some(key) = key
-                        {
-                            requires.push(r::Receipt::Party(1, key));
-                        }
-                        match reply {
-                            people::Reply::SignedIn { .. } => {
-                                peers.sign_in = sign_in;
-                                requires.push(r::Receipt::SignIn(sign_in.expect("signed in")));
-                            }
-                            people::Reply::Outcome(people::Outcome::Adopted { .. }) => peers.adopted = true,
-                            _ => {}
-                        }
-                    }
-                    root::Delivery::CallAnswer { task, attempt, call, answer, .. } => {
-                        if let root::CallAnswer::Proposed { proposal } = &answer {
-                            peers.pending_proposal = Some(*proposal);
-                        }
-                        let (_, _, body) = peers.calls.remove(&call.raw()).expect("named caller retained its request");
-                        peers.retries.remove(&call.raw());
-                        if !matches!(
-                            answer,
-                            root::CallAnswer::ForgeEffectDenied { answer: jig_domain_authority::Answer::Wait, .. }
-                        ) {
-                            requires.push(r::Receipt::Call(task, attempt, body.completion, body.position));
-                        }
-                        peers.answers.push(answer);
-                    }
-                    root::Delivery::Inbound { task, attempt, word, .. } => {
-                        requires.push(r::Receipt::Word(task, word.number));
-                        peers.observed.push(r::Observed::Reached(r::Receipt::Word(task, word.number)));
-                        peers.worker.message(task, attempt, word.number, word.words);
-                    }
-                    root::Delivery::Result { task, person, .. } => {
-                        requires.push(r::Receipt::Ended(task));
-                        peers.observed.push(r::Observed::Result { task, to: r::Source::Person(person) });
-                    }
-                    _ => {}
-                }
-                if !requires.is_empty() {
-                    peers.observed.push(r::Observed::Released { requires });
-                }
+                delivered(peers, clock, delivery);
             }
-            engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                events.push(engine::Event::Account(jig_domain_accounts::Event::Refreshed {
-                    account,
-                    generation,
-                    valid: Duration::from_secs(60),
-                }));
-            }
-            engine::Request::Worker(engine::WorkerRequest::CallBusy { call, .. }) => {
-                peers.retries.insert(call.raw(), clock.now + 1_000_000_000);
-            }
-            engine::Request::Worker(engine::WorkerRequest::Host(_)) => panic!("scripted workers use typed calls"),
+            // A refused sign-in is asked again at the next poll.
+            engine::Request::Party(engine::PartyRequest::SignInRefused { .. }) => peers.signed_in = false,
+            engine::Request::Drained => peers.observed.push(r::Observed::Drained { at: store.applied }),
             _ => {}
         }
         events.into_iter().map(|event| Input::Event(Event::Root(event))).collect()
     }
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one poll drives retained named requests, worker evidence and authenticated startup together"
-    )]
     fn poll(
         peers: &mut Peers,
         systems: &mut systems::FakeForge,
-        _: &mut Store,
+        store: &mut Store,
         clock: Clock,
         ready: bool,
     ) -> Vec<Input<Event, observations::Record>> {
         systems.generation = peers.generation;
         let mut events = systems.poll(clock);
         if ready {
+            if !peers.started {
+                peers.started = true;
+                // The project's first period comes from outside the root, once
+                // (jig's `protocol/configuration.md`, 5); the repository's git
+                // identity is an application credential (domain/engine.md, 12).
+                if !store.rows.keys().any(|key| {
+                    matches!(
+                        key,
+                        root::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(tasks::Funder::Period {
+                            project: 1,
+                            ..
+                        })))
+                    )
+                }) {
+                    events.push(engine::Event::Party(engine::PartyInput::Period {
+                        project: 1,
+                        period: 1,
+                        budget: 1000,
+                        next: None,
+                    }));
+                }
+                events.push(engine::Event::Credential { number: 1, generation: 1, valid: Duration::from_secs(3600) });
+            }
             let asks: Vec<_> =
                 peers.ask_retries.iter().filter_map(|(call, at)| (*at <= clock.now).then_some(*call)).collect();
             for call in asks {
@@ -565,44 +517,10 @@ impl Application for Temper {
                     }));
                 }
             }
-            let due: Vec<_> =
-                peers.retries.iter().filter_map(|(call, at)| (*at <= clock.now).then_some(*call)).collect();
-            for call in due {
-                peers.retries.insert(call, clock.now + 1_000_000_000);
-                if let Some((task, attempt, body)) = peers.calls.get(&call) {
-                    events.push(engine::Event::Worker(engine::WorkerInput::Call {
-                        channel: Token::new(7),
-                        task: *task,
-                        attempt: *attempt,
-                        call: Token::new(call),
-                        body: copy_call(body),
-                    }));
-                }
+            events.extend(link::retried(peers, clock.now));
+            for up in peers.worker.tick(Time::from_nanos(clock.now)) {
+                events.push(link::worker_event(peers, up));
             }
-            events.extend(peers.worker.tick(Time::from_nanos(clock.now)).into_iter().map(|up| {
-                let mut event = worker_event(up);
-                if let engine::Event::Worker(engine::WorkerInput::Answer { task, pushed, .. }) = &mut event
-                    && let Some(commit) = peers.reported.get(task)
-                {
-                    *pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
-                }
-                if let engine::Event::Worker(engine::WorkerInput::Answer { task, end, pushed, .. }) = &mut event
-                    && matches!(end, tasks::End::Finished { .. })
-                    && let Some(commit) = peers.produced.get(task)
-                {
-                    *end = tasks::End::Finished {
-                        result: tasks::TaskResult::Change {
-                            connector: 0,
-                            kind: 2,
-                            resource: u64::from(temper_engine_forge_world::REPO.repository),
-                            words: b"pushed".as_slice().into(),
-                        },
-                        cancel_delegates: false,
-                    };
-                    *pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
-                }
-                event
-            }));
             if !peers.signed_in {
                 peers.signed_in = true;
                 events.push(engine::Event::Party(engine::PartyInput::SignedIn {
@@ -713,60 +631,50 @@ impl Application for Temper {
     }
 }
 
-fn worker_event(up: workers::Up) -> engine::Event {
-    match up {
-        workers::Up::Hello { channel, slots, stop_bound, hosting } => {
-            engine::Event::Worker(engine::WorkerInput::Hello {
-                channel: Token::new(channel),
-                hello: jig_domain_fleet::Hello {
-                    slots,
-                    stop_bound,
-                    workstreams: Box::new([]),
-                    hosting: hosting
-                        .into_vec()
-                        .into_iter()
-                        .map(|(task, attempt, answered)| jig_domain_fleet::Hosted {
-                            run: Token::new(task),
-                            attempt: Token::new(attempt),
-                            phase: if answered {
-                                jig_domain_fleet::Phase::Answered
-                            } else {
-                                jig_domain_fleet::Phase::Active
-                            },
-                        })
-                        .collect(),
-                },
-            })
+/// One delivery to the worker or the person, and the durable receipts its
+/// release requires.
+#[expect(clippy::wildcard_enum_match_arm, reason = "the scripted peers take only the deliveries their stories use")]
+fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
+    let mut requires = Vec::new();
+    match delivery {
+        root::Delivery::Assigned { channel, assignment } => link::assigned(peers, channel, assignment),
+        root::Delivery::Link { down, .. } => requires = link::down(peers, Time::from_nanos(clock.now), down),
+        root::Delivery::WebReply { to, reply } => {
+            let call = to.into_token().raw();
+            // Admission pressure is retried; a refusal saves no answer
+            // (jig b7bdd9e8: refusal facts and `Again`).
+            match &reply {
+                people::Reply::Again(_) => {
+                    peers.ask_retries.insert(call, clock.now + 1_000_000_000);
+                }
+                people::Reply::Outcome(_) | people::Reply::Refused(_) | people::Reply::SignedIn { .. } => {
+                    peers.ask_bodies.remove(&call);
+                }
+                people::Reply::SignedOut => {}
+            }
+            let key = peers.requests.remove(&call);
+            if matches!(reply, people::Reply::Outcome(_))
+                && let Some(key) = key
+            {
+                requires.push(r::Receipt::Party(1, key));
+            }
+            match reply {
+                people::Reply::SignedIn { sign_in, .. } => {
+                    peers.sign_in = Some(sign_in);
+                    requires.push(r::Receipt::SignIn(sign_in));
+                }
+                people::Reply::Outcome(people::Outcome::Adopted { .. }) => peers.adopted = true,
+                _ => {}
+            }
         }
-        workers::Up::Lost { channel } => {
-            engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(channel) })
+        root::Delivery::Result { task, person, .. } => {
+            requires.push(r::Receipt::Ended(task));
+            peers.observed.push(r::Observed::Result { task, to: r::Source::Person(person) });
         }
-        workers::Up::Turn { channel, task, attempt, turn, spent, read, body } => {
-            engine::Event::Worker(engine::WorkerInput::Turn {
-                channel: Token::new(channel),
-                task,
-                attempt,
-                turn: engine::Turn { number: turn, cumulative: spent, read, transcript: body },
-            })
-        }
-        workers::Up::Answer { channel, task, attempt, spent, end } => {
-            engine::Event::Worker(engine::WorkerInput::Answer {
-                channel: Token::new(channel),
-                task,
-                attempt,
-                cumulative: spent,
-                end: match end {
-                    workers::End::Finished(words) => {
-                        tasks::End::Finished { result: tasks::TaskResult::Report { words }, cancel_delegates: false }
-                    }
-                    workers::End::Parked => tasks::End::Parked,
-                    workers::End::Failed(code) => panic!("unbound host failure {code:?}"),
-                },
-                saved: None,
-                pushed: Box::new([]),
-            })
-        }
-        workers::Up::Call { .. } => panic!("scenario sends typed calls"),
+        _ => {}
+    }
+    if !requires.is_empty() {
+        peers.observed.push(r::Observed::Released { requires });
     }
 }
 
@@ -774,36 +682,4 @@ fn destination(to: &mut ReplyTo) -> u64 {
     let token = std::mem::replace(to, ReplyTo::new(Token::new(0))).into_token();
     *to = ReplyTo::new(token);
     token.raw()
-}
-
-#[expect(clippy::wildcard_enum_match_arm, reason = "scenario calls outside the retained vocabulary panic explicitly")]
-fn copy_call(body: &engine::Call) -> engine::Call {
-    let tool = match &body.tool {
-        engine::Tool::EffectForge { repository, resource, write } => {
-            engine::Tool::EffectForge { repository: *repository, resource: resource.clone(), write: write.clone() }
-        }
-        engine::Tool::Delegate { batch } => engine::Tool::Delegate { batch: batch.clone() },
-        engine::Tool::Propose { action: engine::ProposedAction::Batch(batch), reason, as_holder } => {
-            engine::Tool::Propose {
-                action: engine::ProposedAction::Batch(batch.clone()),
-                reason: reason.clone(),
-                as_holder: *as_holder,
-            }
-        }
-        engine::Tool::Propose {
-            action: engine::ProposedAction::Effect { repository, resource, write },
-            reason,
-            as_holder,
-        } => engine::Tool::Propose {
-            action: engine::ProposedAction::Effect {
-                repository: *repository,
-                resource: resource.clone(),
-                write: write.clone(),
-            },
-            reason: reason.clone(),
-            as_holder: *as_holder,
-        },
-        other => panic!("scenario call outside retained vocabulary: {other:?}"),
-    };
-    engine::Call { completion: body.completion, position: body.position, tool }
 }

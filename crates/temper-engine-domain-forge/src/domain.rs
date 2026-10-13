@@ -47,6 +47,8 @@ pub(crate) struct PendingLost {
     attempt: u64,
     name: Name,
     comparison: Option<(client::api::Commit, client::api::Commit)>,
+    /// Its read is with the client; false while it waits for a call slot.
+    asked: bool,
 }
 /// One fresh verdict read for a commit with live CI subscribers.
 #[derive(Debug)]
@@ -91,6 +93,15 @@ struct StepInput {
     queue_repair_active: bool,
 }
 
+/// One committed outbox entry. A held one is out of the client's outbox and
+/// keeps its room until a person makes it again or it is settled not made
+/// (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
+#[derive(Debug)]
+pub(crate) struct Outboxed {
+    entry: client::Entry,
+    held: bool,
+}
+
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
@@ -103,7 +114,7 @@ pub struct Domain {
     pub(crate) heads: Map<Name, BranchHead>,
     pulls: Map<Name, PullState>,
     ci: Map<(client::api::Repository, client::api::Commit), CiState>,
-    entries: Map<u64, client::Entry>,
+    entries: Map<u64, Outboxed>,
     named_calls: Map<crate::NamedCall, crate::CallPayload>,
     proposed_effects: Map<u64, crate::ProposedEffect>,
     pub(crate) landed: Map<client::api::Commit, u64>,
@@ -119,6 +130,9 @@ pub struct Domain {
     namespace: Box<[u8]>,
     adoptions: Map<Token, PendingAdoption>,
     pub(crate) writers: Map<u16, u64>,
+    /// Each forge's git identity, the application credential its runs push
+    /// and fetch with (credentials.md).
+    pub(crate) identities: Map<u16, u32>,
     pub(crate) capabilities: Map<Token, crate::capabilities::Pending>,
     client: client::Domain,
     client_out: Queue<client::Request>,
@@ -274,9 +288,20 @@ impl Domain {
     }
     /// Construct a connector with a configured client writer and deployment
     /// namespace; invalid limits or writer configuration are refused.
-    pub fn new(l: &Limits, seed: u64, config: client::Config) -> Result<Domain, client::api::Error> {
+    pub fn new(
+        l: &Limits,
+        seed: u64,
+        config: client::Config,
+        identities: &[crate::GitIdentity],
+    ) -> Result<Domain, client::api::Error> {
         if crate::worst_case(l).is_none() {
             return Err(client::api::Error::TooLarge);
+        }
+        let mut credentials = Map::with_capacity(l.repositories);
+        for identity in identities {
+            if credentials.insert(identity.forge, identity.credential).is_err() {
+                return Err(client::api::Error::TooLarge);
+            }
         }
         let mut writers = Map::with_capacity(l.repositories);
         for writer in &config.writers {
@@ -311,6 +336,7 @@ impl Domain {
             adoptions: Map::with_capacity(l.adoptions),
             capabilities: Map::with_capacity(l.repositories),
             writers,
+            identities: credentials,
             client: client::Domain::configured(&l.client, seed, config)?,
             client_out: Queue::with_capacity(client::max_out(&l.client)),
             brief_fetches: Map::with_capacity(l.brief_sections),
@@ -399,7 +425,16 @@ impl Domain {
     /// Whether a child call or a newly committed entry may be sent.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        !self.procedure_wakes.is_empty() || self.client.is_ready()
+        !self.procedure_wakes.is_empty() || self.client.is_ready() || (self.lost_waiting() && self.client.has_room())
+    }
+
+    /// Whether a lost writer's read waits to be asked again.
+    fn lost_waiting(&self) -> bool {
+        let mut waiting = false;
+        for (_, pending) in &self.lost {
+            waiting |= !pending.asked;
+        }
+        waiting
     }
 
     /// Whether no brief section is being gathered by the connector.
@@ -715,8 +750,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::KeepProjection { row, entry } => {
             d.issues.insert(row.goal, row.clone()).expect("projection capacity admitted");
             emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Issue(row) });
-            d.entries.insert(entry.number, entry.clone()).expect("outbox capacity admitted");
-            emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry) });
+            keep_entry(d, entry, None, out);
         }
         Event::Project { entry, repository, view } => project(d, env, entry, repository, view, out),
         Event::ProjectDesired { entry, goal } => {
@@ -750,6 +784,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::ContinueRelease { task, entry } => continue_release(d, env, task, entry, out),
         Event::ReleaseProjection { goal } => release_projection(d, goal, out),
         Event::Committed { entry } => committed(d, env, entry, out),
+        Event::Resolve { entry, again } => resolve(d, env, entry, again, out),
         Event::Withdraw { entry } => withdraw(d, env, entry, out),
         Event::VetoChange { task, entry, prior } => veto_change(d, task, entry, prior, out),
         Event::Subscribe { subscription } => subscribe(d, env, subscription, out),
@@ -775,6 +810,9 @@ pub fn resume(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let child_env = child_env(env);
     client::resume(&mut d.client, &child_env, &mut d.client_out);
     drain(d, env, out);
+    if d.client.has_room() {
+        ask_lost_again(d, env, out);
+    }
     if out.room() > 0
         && let Some((task, _)) = d.procedure_wakes.iter().next()
     {
@@ -832,19 +870,24 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Client(record) });
             }
             client::Request::Erase { key } => emit(out, Request::Erase { key: Key::Client(key) }),
-            client::Request::Progress { entry } => {
-                d.entries.insert(entry.number, entry.clone()).expect("progress replaces a known entry");
-                emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry) });
-            }
+            client::Request::Progress { entry } => keep_entry(d, entry, None, out),
             client::Request::Outcome { entry, task, outcome } => {
                 d.named_outcome(entry, outcome);
                 outcome_facts(d, env, entry, task, outcome, out);
                 match outcome {
                     client::Outcome::Uncertain => {}
+                    client::Outcome::Held => {
+                        // It stays in the outbox, keeping its room, until a
+                        // person or its task's close settles it.
+                        if let Some(row) = d.entries.get_mut(&entry) {
+                            row.held = true;
+                            let record = Stored::Entry { entry: row.entry.clone(), held: true };
+                            emit(out, Request::Save { read_afresh: None, release: None, record });
+                        }
+                    }
                     client::Outcome::Made { .. }
                     | client::Outcome::Failed(_)
                     | client::Outcome::Raced { .. }
-                    | client::Outcome::Held
                     | client::Outcome::Withdrawn => {
                         d.entries.remove(&entry);
                         emit(out, Request::Erase { key: Key::Entry(entry) });
@@ -916,7 +959,7 @@ fn outcome_facts(
         | client::Outcome::Withdrawn => false,
     };
     if forbidden && let Some(row) = d.entries.get(&entry) {
-        let repository = row.repository;
+        let repository = row.entry.repository;
         crate::capabilities::refresh(d, env, repository, out);
     }
     projection_outcome(d, entry, outcome, out);
@@ -924,7 +967,7 @@ fn outcome_facts(
     release_outcome(d, entry, outcome, out);
     match outcome {
         client::Outcome::Made { made: client::Made::Branch(commit), .. } => {
-            if let Some(kept) = d.entries.get(&entry) {
+            if let Some(Outboxed { entry: kept, .. }) = d.entries.get(&entry) {
                 let branch = match &kept.effect.write {
                     client::api::Write::CreateBranch { branch, .. } => Some(branch.clone()),
                     client::api::Write::CreateIssue { .. }
@@ -1579,12 +1622,39 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
         };
         d.sequence = sequence;
         let owner = Token::new(sequence | (1_u64 << 62));
-        if d.lost.insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None }).is_err() {
+        if d.lost
+            .insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None, asked: true })
+            .is_err()
+        {
             emit(out, Request::Refused { task });
             return;
         }
         child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
     }
+}
+
+/// Ask one waiting lost writer's read again: its branch, or the comparison
+/// of the head it found with the head the forge last knew.
+fn ask_lost_again(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let mut waiting = None;
+    for (owner, pending) in &d.lost {
+        if !pending.asked && waiting.is_none() {
+            waiting = Some(*owner);
+        }
+    }
+    let Some(owner) = waiting else { return };
+    let pending = d.lost.get_mut(&owner).expect("found above");
+    pending.asked = true;
+    let comparison = pending.comparison;
+    let Some(resource) = to_client(&pending.name, &env.limits) else { return };
+    let read = match (comparison, resource.what) {
+        (Some((before, after)), _) => client::api::Read::Compare { before, after },
+        (None, client::What::Branch(branch)) => client::api::Read::Branch { branch },
+        (None, client::What::Repository | client::What::Pull(_) | client::What::Issue(_)) => {
+            unreachable!("a lost writer holds a branch")
+        }
+    };
+    child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
 }
 
 fn lost_read(
@@ -1595,6 +1665,14 @@ fn lost_read(
     out: &mut Queue<Request>,
 ) {
     let Some(mut pending) = d.lost.remove(&owner) else { return };
+    // The client had no call slot for this read. The writer slot is freed
+    // only once the branch is read afresh (connectors.md, 3.3), so the read
+    // waits and is asked again when a slot frees (`resume`).
+    if result == Err(client::api::Error::Busy) {
+        pending.asked = false;
+        d.lost.insert(owner, pending).expect("the read keeps its own lost slot");
+        return;
+    }
     let Some(resource) = to_client(&pending.name, &env.limits) else { return };
     let baseline = d.branch_head(&pending.name);
     let observed = match (pending.comparison, result) {
@@ -1683,8 +1761,15 @@ fn enqueue(d: &mut Domain, env: &Env<Limits>, entry: client::Entry, out: &mut Qu
         return;
     }
     let release = Some(entry.number);
-    d.entries.insert(entry.number, entry.clone()).expect("preflighted entry capacity");
-    emit(out, Request::Save { read_afresh: None, release, record: Stored::Entry(entry) });
+    keep_entry(d, entry, release, out);
+}
+
+/// Save one entry in the client's hands: newly committed, for the client to
+/// make once the commit is durable, or a known entry's progress.
+fn keep_entry(d: &mut Domain, entry: client::Entry, release: Option<u64>, out: &mut Queue<Request>) {
+    let row = Outboxed { entry: entry.clone(), held: false };
+    d.entries.insert(entry.number, row).expect("entry capacity checked or a known entry replaced");
+    emit(out, Request::Save { read_afresh: None, release, record: Stored::Entry { entry, held: false } });
 }
 
 fn effect_permitted(kinds: Kinds, write: &client::api::Write) -> bool {
@@ -2263,8 +2348,7 @@ fn emit_change_effect(
     row.effect = change::EffectResult::Pending;
     d.changes.insert(row.task, row.clone()).expect("replaces change");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
-    d.entries.insert(entry.number, entry.clone()).expect("entry capacity checked");
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry) });
+    keep_entry(d, entry, None, out);
     emit(
         out,
         Request::ChangeDecision {
@@ -2463,15 +2547,15 @@ fn settle_effects(
     }
     if ending == ReleaseEnding::Cancelled {
         let mut unsent = List::with_capacity(env.limits.entries);
-        for (number, entry) in &d.entries {
-            if entry.task == task && entry.attempt.is_none() {
+        for (number, row) in &d.entries {
+            if row.entry.task == task && !row.held && row.entry.attempt.is_none() {
                 unsent.push(*number).expect("entry table bounded");
             }
         }
         for number in unsent.into_boxed() {
             withdraw(d, env, number, out);
-            if let Some(entry) = d.entries.get(&number)
-                && entry.start.is_none()
+            if let Some(row) = d.entries.get(&number)
+                && row.entry.start.is_none()
             {
                 d.entries.remove(&number);
                 emit(out, Request::Erase { key: Key::Entry(number) });
@@ -2491,10 +2575,8 @@ fn settle_prior_effects(d: &mut Domain, task: u64, out: &mut Queue<Request>) {
     {
         return;
     }
-    for (_, pending) in &d.entries {
-        if pending.task == task {
-            return;
-        }
+    if !settle_held(d, task, out) {
+        return;
     }
     let row = d.releases.get_mut(&task).expect("effect settlement row");
     if !row.effects_settled {
@@ -2571,10 +2653,8 @@ fn continue_release(d: &mut Domain, env: &Env<Limits>, task: u64, entry: u64, ou
         if !row.releasing {
             return;
         }
-        for (_, pending) in &d.entries {
-            if pending.task == task {
-                return;
-            }
+        if !settle_held(d, task, out) {
+            return;
         }
         if let Some(number) = row.close_pull {
             let Some(change) = d.changes.get(&task) else {
@@ -2672,8 +2752,7 @@ fn enqueue_release(
     row.pending = Some((number, resource));
     d.releases.insert(row.task, row.clone()).expect("replaces release");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Release(row.clone()) });
-    d.entries.insert(number, entry.clone()).expect("entry capacity checked");
-    emit(out, Request::Save { read_afresh: None, release: Some(number), record: Stored::Entry(entry) });
+    keep_entry(d, entry, Some(number), out);
 }
 
 fn release_outcome(d: &mut Domain, entry: u64, outcome: client::Outcome, out: &mut Queue<Request>) {
@@ -2921,13 +3000,76 @@ fn release_projection(d: &mut Domain, goal: u64, out: &mut Queue<Request>) {
 }
 
 fn committed(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
-    if let Some(entry) = d.entries.get(&number) {
-        child(d, env, client::Event::Make { entry: entry.clone() }, out);
+    if let Some(row) = d.entries.get(&number)
+        && !row.held
+    {
+        child(d, env, client::Event::Make { entry: row.entry.clone() }, out);
     }
 }
 
+/// A person's choice for a held entry: again hands it back to the client,
+/// which looks for it first and then makes it under a new attempt; the
+/// entry kept its room, so the client has room for it.
+fn resolve(d: &mut Domain, env: &Env<Limits>, number: u64, again: bool, out: &mut Queue<Request>) {
+    let Some(row) = d.entries.get_mut(&number) else { return };
+    if !row.held {
+        return;
+    }
+    if !again {
+        not_made(d, number, out);
+        return;
+    }
+    row.held = false;
+    let entry = row.entry.clone();
+    emit(
+        out,
+        Request::Save { read_afresh: None, release: None, record: Stored::Entry { entry: entry.clone(), held: false } },
+    );
+    child(d, env, client::Event::Remake { entry }, out);
+}
+
+/// Settle one held entry as not made, freeing its room.
+fn not_made(d: &mut Domain, number: u64, out: &mut Queue<Request>) {
+    let row = d.entries.remove(&number).expect("a held entry lives");
+    emit(out, Request::Erase { key: Key::Entry(number) });
+    emit(out, Request::NotMade { entry: number, task: row.entry.task });
+}
+
+/// A closing task's held entries are settled not made, as many as the
+/// output has room for, so its effects settle and their room is freed. True
+/// when none of the task's entries remains; one settled here continues the
+/// close in a later step.
+fn settle_held(d: &mut Domain, task: u64, out: &mut Queue<Request>) -> bool {
+    let mut held = List::with_capacity(d.entries.len());
+    let mut pending = false;
+    for (number, row) in &d.entries {
+        if row.entry.task != task {
+            continue;
+        }
+        if row.held {
+            held.push(*number).expect("held entries are bounded by the outbox");
+        } else {
+            pending = true;
+        }
+    }
+    if held.is_empty() {
+        return !pending;
+    }
+    for number in &held {
+        // Its erase and settlement, and the continuation below.
+        if out.room() < 3 {
+            break;
+        }
+        not_made(d, *number, out);
+    }
+    emit(out, Request::ContinueRelease { task });
+    false
+}
+
 fn withdraw(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
-    if d.entries.contains_key(&number) {
+    if let Some(row) = d.entries.get(&number)
+        && !row.held
+    {
         child(d, env, client::Event::Withdraw { entry: number }, out);
     }
 }
@@ -3365,7 +3507,7 @@ fn updating_entry(d: &Domain, task: u64) -> bool {
         return false;
     }
     let Some(number) = change.pending else { return false };
-    let Some(entry) = d.entries.get(&number) else { return false };
+    let Some(Outboxed { entry, .. }) = d.entries.get(&number) else { return false };
     match entry.effect.write {
         client::api::Write::Update { .. } => true,
         _ => false,
@@ -3414,7 +3556,7 @@ fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &c
     }
     let Some(release) = d.releases.get(&task) else { return false };
     let Some((number, _)) = &release.pending else { return false };
-    let Some(entry) = d.entries.get(number) else { return false };
+    let Some(Outboxed { entry, .. }) = d.entries.get(number) else { return false };
     match &entry.effect.write {
         client::api::Write::DeleteBranch { branch } => match &resource.what {
             client::What::Branch(found) => entry.repository == resource.repository && branch == found,
@@ -3467,8 +3609,8 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
         Stored::ProposedEffect(row) => {
             assert!(d.proposed_effects.insert(row.number, row).is_ok(), "restored proposed effect fits");
         }
-        Stored::Entry(row) => {
-            d.entries.insert(row.number, row).expect("restored entry within limits");
+        Stored::Entry { entry, held } => {
+            d.entries.insert(entry.number, Outboxed { entry, held }).expect("restored entry within limits");
         }
         Stored::Client(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);
@@ -3513,9 +3655,12 @@ fn restored(d: &mut Domain, env: &Env<Limits>, clock: client::RecoveryClock, out
         }
     }
     child(d, env, client::Event::PauseOutbox, out);
+    // A held entry waits for a person, out of the client's outbox.
     let mut entries = List::with_capacity(env.limits.entries);
-    for (_, entry) in &d.entries {
-        entries.push(entry.clone()).expect("entry list capacity");
+    for (_, row) in &d.entries {
+        if !row.held {
+            entries.push(row.entry.clone()).expect("entry list capacity");
+        }
     }
     for entry in &entries {
         child(d, env, client::Event::Make { entry: entry.clone() }, out);

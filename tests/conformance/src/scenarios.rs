@@ -75,15 +75,13 @@ fn effect(world: &mut World, completion: u32, proposal: bool) {
             write: Box::new(write),
         }
     };
-    send(
+    let (task, attempt) = (assignment.task, assignment.attempt);
+    crate::link::call(
         world,
-        engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: assignment.task,
-            attempt: assignment.attempt,
-            call: Token::new(7_000 + u64::from(completion)),
-            body: engine::Call { completion, position: 0, tool },
-        }),
+        task,
+        attempt,
+        7_000 + u64::from(completion),
+        engine::Call { completion, position: 0, tool },
     );
 }
 pub(crate) fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
@@ -204,6 +202,7 @@ impl ScenarioApplication for Temper {
                         judge: 0,
                         freshness: Some(1_000_000_000),
                     });
+                    world.peers.policy_generation += 1;
                 }
             }
             Action::Late => world.systems.late_next = true,
@@ -278,7 +277,7 @@ impl ScenarioApplication for Temper {
                     .map(|record| &record.0)
                     .find_map(|row| match row {
                         root::Record::Forge { row } => match row.as_ref() {
-                            forge::Stored::Entry(entry) => entry.attempt.map(|a| a.expires),
+                            forge::Stored::Entry { entry, held: false } => entry.attempt.map(|a| a.expires),
                             _ => None,
                         },
                         _ => None,
@@ -332,7 +331,7 @@ impl ScenarioApplication for Temper {
                     44,
                     people::Ask::DecideProposal {
                         project: 1,
-                        proposer: world.peers.assignments[0].task,
+                        proposer: people::Proposer::Task(world.peers.assignments[0].task),
                         proposal,
                         decision: people::ProposalDecision::Accept,
                     },
@@ -402,7 +401,15 @@ impl ScenarioApplication for Temper {
                 check(ended(world, task), "standing batch did not end")?;
                 let before = world.peers.assignments.len();
                 for _ in 0..2 {
-                    send(world, engine::Event::Party(engine::PartyInput::Period { project: 1, period, budget: 1000 }));
+                    send(
+                        world,
+                        engine::Event::Party(engine::PartyInput::Period {
+                            project: 1,
+                            period,
+                            budget: 1000,
+                            next: None,
+                        }),
+                    );
                     world.drain()?;
                 }
                 if world.peers.assignments.len() == before {
@@ -498,6 +505,7 @@ impl ScenarioApplication for Temper {
                         judge: 0,
                         freshness: Some(0),
                     });
+                    world.peers.policy_generation += 1;
                 }
             }
             Action::FillPool | Action::ShrinkPool | Action::FinishHolder(_) => {
@@ -602,56 +610,53 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
         note_resources: Box::new([]),
     };
     let before = world.peers.assignments.len();
-    send(
+    crate::link::call(
         world,
-        engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: parent.task,
-            attempt: parent.attempt,
-            call: Token::new(8000 + u64::from(completion)),
-            body: engine::Call {
-                completion: 100 + completion,
-                position: 1,
-                tool: engine::Tool::Delegate {
-                    batch: Box::new([engine::Delegate {
-                        executor: tasks::Executor::Procedure { connector: 0, code: 2 },
-                        spec: tasks::Spec {
-                            words: b"Small fix".as_slice().into(),
-                            parameters: Box::new([
-                                tasks::Parameter::Resource {
-                                    name: 1,
-                                    connector: 0,
-                                    resource: u64::from(temper_engine_forge_world::REPO.repository),
-                                },
-                                tasks::Parameter::Bytes { name: 2, value: b"main".as_slice().into() },
-                                tasks::Parameter::Bytes { name: 6, value: b"file".as_slice().into() },
-                            ]),
-                            inputs: Box::new([]),
-                        },
-                        contract: tasks::Contract::Change { connector: 0, kind: 1, words: 32 },
-                        authority,
-                        symbolic_grants: Box::new([tasks::Grant {
-                            connector: 0,
-                            kind: 2,
-                            pattern: tasks::Pattern {
-                                segments: Box::new([
-                                    b"forge".as_slice().into(),
-                                    b"forge.example".as_slice().into(),
-                                    b"org".as_slice().into(),
-                                    b"repo".as_slice().into(),
-                                    b"branch".as_slice().into(),
-                                    b"temper".as_slice().into(),
-                                    parent.task.to_string().into_bytes().into(),
-                                ]),
-                                last: tasks::Last::Open(b"c".as_slice().into()),
+        parent.task,
+        parent.attempt,
+        8000 + u64::from(completion),
+        engine::Call {
+            completion: 100 + completion,
+            position: 1,
+            tool: engine::Tool::Delegate {
+                batch: Box::new([engine::Delegate {
+                    executor: tasks::Executor::Procedure { connector: 0, code: 2 },
+                    spec: tasks::Spec {
+                        words: b"Small fix".as_slice().into(),
+                        parameters: Box::new([
+                            tasks::Parameter::Resource {
+                                name: 1,
+                                connector: 0,
+                                resource: u64::from(temper_engine_forge_world::REPO.repository),
                             },
-                        }]),
-                        dependencies: Box::new([]),
-                        wake: tasks::WakePolicy::DEFAULT,
+                            tasks::Parameter::Bytes { name: 2, value: b"main".as_slice().into() },
+                            tasks::Parameter::Bytes { name: 6, value: b"file".as_slice().into() },
+                        ]),
+                        inputs: Box::new([]),
+                    },
+                    contract: tasks::Contract::Change { connector: 0, kind: 1, words: 32 },
+                    authority,
+                    symbolic_grants: Box::new([tasks::Grant {
+                        connector: 0,
+                        kind: 2,
+                        pattern: tasks::Pattern {
+                            segments: Box::new([
+                                b"forge".as_slice().into(),
+                                b"forge.example".as_slice().into(),
+                                b"org".as_slice().into(),
+                                b"repo".as_slice().into(),
+                                b"branch".as_slice().into(),
+                                b"temper".as_slice().into(),
+                                parent.task.to_string().into_bytes().into(),
+                            ]),
+                            last: tasks::Last::Open(b"c".as_slice().into()),
+                        },
                     }]),
-                },
+                    dependencies: Box::new([]),
+                    wake: tasks::WakePolicy::DEFAULT,
+                }]),
             },
-        }),
+        },
     );
     world.drain()?;
     for _ in 0..4 {

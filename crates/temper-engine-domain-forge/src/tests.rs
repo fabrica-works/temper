@@ -81,6 +81,7 @@ fn domain() -> Domain {
             namespace: Box::from(&b"test"[..]),
             writers: Box::new([client::Writer { forge: 1, author: 7 }]),
         },
+        &[GitIdentity { forge: 1, credential: 1 }],
     )
     .expect("valid connector")
 }
@@ -132,6 +133,25 @@ fn adopted() -> Repository {
             squash: true,
             rebase: false,
         },
+    }
+}
+/// A commit status write: a set, made without a find.
+fn status(number: u64, task: u64) -> client::Entry {
+    client::Entry {
+        number,
+        task,
+        repository: REPO,
+        effect: client::Effect {
+            write: client::api::Write::Status {
+                commit: [3; 32],
+                context: Box::from(&b"test"[..]),
+                check: client::api::Check::Passed,
+            },
+            condition: client::Condition::None,
+        },
+        start: None,
+        attempt: None,
+        failures: 0,
     }
 }
 fn branch() -> Name {
@@ -204,25 +224,10 @@ fn an_outbox_entry_waits_for_its_commit() {
         &[Request::RestartDone { stage: RestartStage::ReadAfresh }],
     );
     assert_eq!(outputs(&mut d, Event::SettleOutbox).as_ref(), &[Request::RestartDone { stage: RestartStage::Settled }],);
-    let entry = client::Entry {
-        number: 11,
-        task: 7,
-        repository: REPO,
-        effect: client::Effect {
-            write: client::api::Write::Status {
-                commit: [3; 32],
-                context: Box::from(&b"test"[..]),
-                check: client::api::Check::Passed,
-            },
-            condition: client::Condition::None,
-        },
-        start: None,
-        attempt: None,
-        failures: 0,
-    };
+    let entry = status(11, 7);
     assert_eq!(
         outputs(&mut d, Event::Enqueue { entry: entry.clone() }).as_ref(),
-        &[Request::Save { read_afresh: None, release: Some(11), record: Stored::Entry(entry) }]
+        &[Request::Save { read_afresh: None, release: Some(11), record: Stored::Entry { entry, held: false } }]
     );
     assert!(ready(&mut d).is_empty());
     outputs(&mut d, Event::Committed { entry: 11 });
@@ -257,6 +262,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }
@@ -301,6 +307,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }
@@ -345,6 +352,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }
@@ -458,6 +466,24 @@ fn workspace_items_are_sized_context_is_read_only_and_saved_work_starts_the_next
     assert!(d.context_repositories(5, 0).is_none());
 }
 
+// Each repository's git identity is the configured credential of its forge
+// (credentials.md; brief D10).
+#[test]
+fn a_workspace_item_names_its_forges_git_identity() {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    let item = d
+        .workspace_item(items::Seed {
+            task: 7,
+            parent: None,
+            repository: REPO,
+            run_branch: Box::from(&b"temper/7/r7"[..]),
+            saved_branch: None,
+        })
+        .expect("item");
+    assert_eq!(item.credential, Some(1));
+}
+
 #[test]
 fn named_resource_reports_distinguish_private_branches_context_and_shared_landings() {
     let mut d = domain();
@@ -521,4 +547,202 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
         };
         assert_eq!(recovery, expected, "kind {kind}");
     }
+}
+
+/// An issue creation whose lifetime ran out unanswered: unrecoverable, it
+/// is held for a person (domain/forge.md, 6).
+fn held_issue() -> client::Entry {
+    client::Entry {
+        number: 11,
+        task: 7,
+        repository: REPO,
+        effect: client::Effect {
+            write: client::api::Write::CreateIssue {
+                key: Box::from(&b"k"[..]),
+                title: Box::from(&b"Finding"[..]),
+                body: Box::from(&b"Fix"[..]),
+            },
+            condition: client::Condition::None,
+        },
+        start: Some(client::Position { at: Time::from_nanos(1), comment: 0, review: 0, review_page: 1 }),
+        attempt: Some(client::Attempt {
+            sent: Time::from_nanos(1),
+            deadline: Time::from_nanos(2),
+            wall: Wall::from_nanos(1),
+            expires: Wall::from_nanos(2),
+        }),
+        failures: 1,
+    }
+}
+
+/// A forge restored with the held issue creation, before its restart runs.
+fn held_restored() -> Domain {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restore { record: Stored::Entry { entry: held_issue(), held: true } });
+    d
+}
+
+/// A restarted forge whose held issue creation waits for a person.
+fn held_creation() -> Domain {
+    let mut d = held_restored();
+    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    d
+}
+
+#[test]
+fn a_held_effect_survives_a_restart_out_of_the_clients_outbox() {
+    let mut d = held_restored();
+    assert_eq!(
+        outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic }).as_ref(),
+        &[Request::RestartDone { stage: RestartStage::Restored }]
+    );
+    assert_eq!(
+        outputs(&mut d, Event::ReadAfresh).as_ref(),
+        &[Request::RestartDone { stage: RestartStage::ReadAfresh }]
+    );
+    // Nothing is looked for: the client never had the held entry.
+    assert_eq!(outputs(&mut d, Event::SettleOutbox).as_ref(), &[Request::RestartDone { stage: RestartStage::Settled }]);
+    assert!(ready(&mut d).is_empty());
+    assert!(!d.effect_room(&LIMITS, 7), "the held entry keeps its room");
+}
+
+#[test]
+fn a_held_effect_settled_as_not_made_is_erased_and_reported() {
+    let mut d = held_creation();
+    assert_eq!(
+        outputs(&mut d, Event::Resolve { entry: 11, again: false }).as_ref(),
+        &[Request::Erase { key: Key::Entry(11) }, Request::NotMade { entry: 11, task: 7 }]
+    );
+}
+
+#[test]
+fn a_held_effect_asked_again_is_looked_for_first_even_with_an_otherwise_full_outbox() {
+    let mut d = held_creation();
+    for number in 12..19 {
+        outputs(&mut d, Event::Enqueue { entry: status(number, 8) });
+        outputs(&mut d, Event::Committed { entry: number });
+    }
+    assert!(!d.effect_room(&LIMITS, 0), "the outbox is full");
+    assert_eq!(
+        outputs(&mut d, Event::Resolve { entry: 11, again: true }).as_ref(),
+        &[Request::Save {
+            read_afresh: None,
+            release: None,
+            record: Stored::Entry { entry: held_issue(), held: false }
+        }]
+    );
+    assert_eq!(
+        ready(&mut d).as_ref(),
+        &[Request::Call {
+            call: Token::new(1),
+            repository: REPO,
+            op: client::api::Op::Read(client::api::Read::Items {
+                since: Time::from_nanos(1),
+                page: 1,
+                kind: Some(client::api::Kind::Issue),
+            }),
+        }]
+    );
+}
+
+#[test]
+fn closing_a_task_settles_its_held_effect_not_made_and_frees_its_room() {
+    let mut d = held_creation();
+    for number in 12..19 {
+        outputs(&mut d, Event::Enqueue { entry: status(number, 8) });
+    }
+    let row = ReleaseRow {
+        task: 7,
+        root: 7,
+        ending: ReleaseEnding::Done,
+        close_pull: None,
+        pending: None,
+        failed: false,
+        effects_settled: false,
+        releasing: false,
+    };
+    assert_eq!(
+        outputs(&mut d, Event::SettleEffects { task: 7, root: 7, ending: ReleaseEnding::Done }).as_ref(),
+        &[
+            Request::Save { read_afresh: None, release: None, record: Stored::Release(row.clone()) },
+            Request::Erase { key: Key::Entry(11) },
+            Request::NotMade { entry: 11, task: 7 },
+            Request::ContinueRelease { task: 7 },
+        ]
+    );
+    assert_eq!(
+        outputs(&mut d, Event::Enqueue { entry: status(19, 8) }).as_ref(),
+        &[Request::Save {
+            read_afresh: None,
+            release: Some(19),
+            record: Stored::Entry { entry: status(19, 8), held: false }
+        }]
+    );
+    let settled = ReleaseRow { effects_settled: true, ..row };
+    assert_eq!(
+        outputs(&mut d, Event::ContinueRelease { task: 7, entry: 20 }).as_ref(),
+        &[
+            Request::Save { read_afresh: None, release: None, record: Stored::Release(settled) },
+            Request::EffectsSettled { task: 7 },
+        ]
+    );
+}
+
+fn run_branch(task: &[u8]) -> Name {
+    Name { forge: 1, repository: 2, what: What::Branch(Box::new([Box::from(&b"temper"[..]), Box::from(task)])) }
+}
+
+/// A ready forge whose run 9 writes four branches the forge last saw at
+/// commit 2, each held by its own task: their reads fill the client's table.
+fn four_writers() -> Domain {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    for (holder, task) in [(7, b"7".as_slice()), (8, b"8"), (10, b"10"), (11, b"11")] {
+        let name = run_branch(task);
+        let head = BranchHead { name: name.clone(), commit: [2; 32], owned: true };
+        outputs(&mut d, Event::Restore { record: Stored::BranchHead(head) });
+        outputs(&mut d, Event::Hold { task: holder, resource: name.clone(), from: None });
+        outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name]), holders: Box::new([holder]) });
+    }
+    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    d
+}
+
+/// The forge's answer to client call `call`: the branch is at `commit`.
+fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
+    let result = Ok(client::api::Answer::Commit([commit; 32]));
+    let answered = outputs(d, Event::Client(client::Event::Answered { call: Token::new(call), cost: 1, result }));
+    d.reclaim();
+    answered
+}
+
+// A lost writer's slot is freed only once its branch is read afresh
+// (connectors.md, 3.3): a read refused for want of room in the client waits,
+// and is asked again once room frees, rather than given up.
+#[test]
+fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
+    let mut d = four_writers();
+    outputs(&mut d, Event::Lost { task: 9, attempt: 1 });
+    ready(&mut d);
+    ready(&mut d);
+    // The first branch moved; its comparison finds the client's table full.
+    assert!(branch_at(&mut d, 1, 4).is_empty(), "nothing refused");
+    ready(&mut d);
+    ready(&mut d);
+    branch_at(&mut d, 2, 2);
+    ready(&mut d);
+    branch_at(&mut d, 3, 2);
+    assert_eq!(
+        ready(&mut d).as_ref(),
+        &[Request::Call {
+            call: Token::new(5),
+            repository: REPO,
+            op: client::api::Op::Read(client::api::Read::Compare { before: [2; 32], after: [4; 32] }),
+        }]
+    );
 }

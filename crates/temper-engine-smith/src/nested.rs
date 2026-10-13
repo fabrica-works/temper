@@ -69,7 +69,16 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         Some(value) => Some(authority(value)?),
         None => None,
     };
-    Ok(tasks::Amendment { spec, wake, dependencies, authority, reason: value.required(b"reason")?.text()? })
+    Ok(tasks::Amendment {
+        addressed: None,
+        instructions: None,
+        release: None,
+        spec,
+        wake,
+        dependencies,
+        authority,
+        reason: value.required(b"reason")?.text()?,
+    })
 }
 
 fn executor(value: &Value) -> Result<tasks::Executor, Problem> {
@@ -137,6 +146,7 @@ fn contract(value: &Value) -> Result<tasks::Contract, Problem> {
                     code: choice.required(b"code")?.small()?,
                     words: choice.required(b"words")?.small()?,
                     followups: 0,
+                    fields: Box::new([]),
                 }) else {
                     return Err(Problem::TooLarge);
                 };

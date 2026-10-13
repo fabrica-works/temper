@@ -6,29 +6,23 @@ use super::{
 use alloc::boxed::Box;
 use jig_domain_core::{SettledAnswer, SettledCall};
 use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use skein_lib::{ReplyTo, Token};
 
+/// Root to protocol: a relayed call to decode, or one the fleet dropped.
 #[derive(PartialEq, Eq, Debug)]
 pub enum HostRequest {
     Decode { to: ReplyTo, task: u64, attempt: u64, call: fleet::Call },
-    Busy { channel: Token, task: u64, attempt: u64, name: Box<[u8]> },
     Dropped { call: fleet::Call },
-    Undelivered { task: u64, attempt: u64, message: fleet::Message },
 }
 
+/// Root to protocol after the decision commits: render a decided call's
+/// answer, or carry a workspace delivery's settled answer to its host, which
+/// the hub's link names only as text (jig's `domain/hosts.md`, 2).
 #[derive(PartialEq, Eq, Debug)]
 pub enum HostDelivery {
     Render { to: ReplyTo, key: CallKey, name: Box<[u8]>, tool: Box<[u8]>, answer: CallAnswer },
     Answer { channel: Token, task: u64, attempt: u64, name: Box<[u8]>, call: SettledCall },
-    Inbound { channel: Token, task: u64, attempt: u64, message: HostMessage },
-}
-
-/// An opaque protocol label and whole words, owned by the root while fleet routes them.
-#[derive(PartialEq, Eq, Debug)]
-pub struct HostMessage {
-    pub name: u64,
-    pub sender: Box<[u8]>,
-    pub words: Box<[u8]>,
 }
 
 #[derive(Debug)]
@@ -61,23 +55,27 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
     let body = super::checked_call(body, &env.limits);
     let key =
         CallKey { task: flight.task, attempt: flight.attempt, completion: body.completion, position: body.position };
-    if body.completion == 0
-        || !super::current_proof(domain, key.task, key.attempt)
-        || domain.core.pending_calls.contains_key(&key)
+    // A call no retry can make valid is answered as an error; one that waits
+    // for room is answered busy, and its run asks it again after a backoff
+    // (jig's `domain/engine.md`, 5.1).
+    let invalid = body.completion == 0 || !super::current_proof(domain, key.task, key.attempt);
+    let busy = domain.core.pending_calls.contains_key(&key)
         || (!domain.core.call_parts.contains_key(&key)
             && domain.core.call_parts.len().saturating_add(domain.core.pending_calls.len()) >= env.limits.call_records)
-        || (super::call_needs_input(&body.tool) && domain.result_reads.len() >= domain.result_reads.capacity())
-    {
+        || (super::call_needs_input(&body.tool) && domain.archive_reads.len() >= domain.archive_reads.capacity());
+    if invalid || busy {
         let flight = domain.host_calls.remove(&right).expect("current typed flight");
-        let id = domain
-            .payloads
-            .insert(Some(Payload::SettledCall(SettledCall {
+        let answer = if invalid {
+            Payload::SettledCall(SettledCall {
                 serial: 0,
                 name: flight.name,
                 tool: flight.tool,
-                answer: SettledAnswer::Host { error: true, body: Box::from(&b"busy"[..]) },
-            })))
-            .expect("fleet call reserved answer room");
+                answer: SettledAnswer::Host { error: true, body: Box::from(&b"invalid call"[..]) },
+            })
+        } else {
+            Payload::Busy
+        };
+        let id = domain.payloads.insert(Some(answer)).expect("fleet call reserved answer room");
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
         return;
     }
@@ -86,34 +84,28 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
     relay_payload(domain, env, decision, to, Token::new(key.task), Token::new(key.attempt), id.token());
 }
 
-pub(crate) fn render(
-    domain: &mut Domain,
-    limits: &Limits,
-    decision: &mut Decision,
-    to: ReplyTo,
-    answer: CallAnswer,
-) -> Option<(ReplyTo, CallAnswer)> {
+pub(crate) fn render(domain: &mut Domain, limits: &Limits, decision: &mut Decision, to: ReplyTo, answer: CallAnswer) {
     let right = to.into_token();
     let to = ReplyTo::new(right);
-    let Some(flight) = domain.host_calls.get(&right) else { return Some((to, answer)) };
+    // A flight dropped with its call has no host left to answer.
+    let Some(flight) = domain.host_calls.get(&right) else { return };
     let key = flight.key.expect("decoded typed call");
     if let Some(call) = domain.core.call_settled.get(&key).cloned() {
         drop(domain.host_calls.remove(&right));
         settled(domain, limits, decision, to, call);
-        return None;
+        return;
     }
     emit(
         decision,
         limits,
         Delivery::Host(Box::new(HostDelivery::Render {
             to,
-            key: flight.key.expect("decoded typed call"),
+            key,
             name: flight.name.clone(),
             tool: flight.tool.clone(),
             answer,
         })),
     );
-    None
 }
 
 pub(crate) fn rendered(domain: &mut Domain, to: ReplyTo, answer: SettledAnswer) {
@@ -163,45 +155,33 @@ pub(crate) fn relayed(
     name: Box<[u8]>,
     answer: Token,
 ) -> Delivery {
-    match super::take_payload(domain, answer).expect("fleet relays an owned answer") {
-        Payload::SettledCall(call) => Delivery::Host(Box::new(HostDelivery::Answer {
-            channel,
-            task: run.raw(),
-            attempt: attempt.raw(),
-            name,
-            call,
-        })),
-        Payload::CallAnswer(answer) => {
-            let call = Token::new(skein_lib::Reader::new(&name).u64().expect("decoded call name"));
-            Delivery::CallAnswer { channel, task: run.raw(), attempt: attempt.raw(), call, answer }
+    let answer = match super::take_payload(domain, answer) {
+        Some(Payload::Busy) => host::Relayed::Busy,
+        Some(Payload::SettledCall(call)) => match call.answer {
+            SettledAnswer::Host { error, body } => host::Relayed::Answer { error, text: body },
+            SettledAnswer::Delivery { .. } => {
+                let (task, attempt) = (run.raw(), attempt.raw());
+                return Delivery::Host(Box::new(HostDelivery::Answer { channel, task, attempt, name, call }));
+            }
+        },
+        Some(Payload::Call { .. } | Payload::InboxWord(_) | Payload::Turn { .. } | Payload::Answer { .. }) | None => {
+            unreachable!("fleet relays an owned answer")
         }
-        Payload::Call { .. }
-        | Payload::Message(_)
-        | Payload::InboxWord(_)
-        | Payload::Turn { .. }
-        | Payload::Answer { .. } => unreachable!("fleet answer payload"),
-    }
+    };
+    Delivery::Link { channel, down: host::LinkDown::Relayed { run, attempt, call: name, answer } }
 }
 
 /// A read's owned value crosses the journal door before any durable decision.
 pub(crate) fn read(domain: &mut Domain, to: ReplyTo, answer: CallAnswer) {
     let right = to.into_token();
     let to = ReplyTo::new(right);
-    match domain.host_calls.get(&right) {
-        Some(flight) => {
-            let request = crate::boundary::delivery_output(Delivery::Host(Box::new(HostDelivery::Render {
-                to,
-                key: flight.key.expect("decoded read"),
-                name: flight.name.clone(),
-                tool: flight.tool.clone(),
-                answer,
-            })));
-            assert!(super::now(domain, request), "read render door reserved");
-        }
-        None => {
-            let id =
-                domain.payloads.insert(Some(Payload::CallAnswer(answer))).expect("fleet read reserves payload room");
-            domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
-        }
-    }
+    let flight = domain.host_calls.get(&right).expect("a read answers its decoded flight");
+    let request = crate::boundary::delivery_output(Delivery::Host(Box::new(HostDelivery::Render {
+        to,
+        key: flight.key.expect("decoded read"),
+        name: flight.name.clone(),
+        tool: flight.tool.clone(),
+        answer,
+    })));
+    assert!(super::now(domain, request), "read render door reserved");
 }

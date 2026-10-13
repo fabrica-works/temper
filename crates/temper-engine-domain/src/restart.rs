@@ -1,14 +1,17 @@
 //! Store adapters for the core-selected restart script (jig's domain/root.md, 8).
-use crate::boundary::{DependencyRead, Read, Request, ResultPage, Work};
+use crate::archive::{
+    Waiting, dependency_failed, dependency_loaded, input_failed, input_loaded, note_failed, note_loaded,
+    transcript_failed, transcript_loaded, waiting,
+};
+use crate::boundary::{Request, Work};
 use crate::domain::{Domain, close, emit};
-use crate::limits::{Limits, core_limits, route_decision};
-use crate::route::{escalation, inbox, results, route_into};
+use crate::limits::{Limits, core_limits, environment_core, route_decision};
+use crate::route::{escalation, route_core_requests, route_into};
 use crate::{Decision, Delivery, Key, Range, Record, loads};
 use alloc::boxed::Box;
-use jig_domain_notes as notes;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Env, Id, List, Queue, ReplyTo, Token};
+use skein_lib::{Env, Queue, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
 
@@ -53,12 +56,12 @@ pub(crate) fn request_load(
         Range::Core(
             crate::CoreRange::Calls
             | crate::CoreRange::Tasks
-            | crate::CoreRange::EndedResults
             | crate::CoreRange::People
             | crate::CoreRange::RunProofs
             | crate::CoreRange::Turns { .. }
             | crate::CoreRange::TaskTranscript { .. },
         )
+        | Range::Census(_)
         | Range::Forge => domain.limits.loads.rows,
         Range::Core(crate::CoreRange::Notes(jig_domain_notes::Range::Lines { .. })) => {
             domain.limits.loads.rows.min(domain.limits.notes.load_rows)
@@ -76,12 +79,12 @@ pub(crate) fn request_load(
                 | crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
-                | crate::CoreRange::EndedResults
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::People
                 | crate::CoreRange::TaskResult { .. }
                 | crate::CoreRange::Turns { .. },
             )
+            | Range::Census(_)
             | Range::Forge => {}
             Range::Core(crate::CoreRange::Notes(_)) => {
                 note_failed(domain, waiter);
@@ -101,13 +104,13 @@ pub(crate) fn request_load(
                 crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
-                | crate::CoreRange::EndedResults
                 | crate::CoreRange::People
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Turns { .. }
                 | crate::CoreRange::TaskTranscript { .. }
                 | crate::CoreRange::TaskResult { .. },
             )
+            | Range::Census(_)
             | Range::Forge => {
                 unreachable!("startup/result load room reserved")
             }
@@ -122,263 +125,6 @@ pub(crate) fn request_load(
     }
 }
 
-pub(crate) fn transcript_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::Transcript { .. })) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Dependency(_)
-                | Read::InputCheck(_)
-                | Read::Notes { .. },
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn proposal_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::Proposal(_))) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Transcript { .. }
-                | Read::Dependency(_)
-                | Read::InputCheck(_)
-                | Read::Notes { .. },
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn inbox_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::Inbox(_))) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Transcript { .. }
-                | Read::Dependency(_)
-                | Read::InputCheck(_)
-                | Read::Notes { .. },
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn dependency_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::Dependency(_))) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Transcript { .. }
-                | Read::InputCheck(_)
-                | Read::Notes { .. },
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn input_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::InputCheck(_))) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Transcript { .. }
-                | Read::Dependency(_)
-                | Read::Notes { .. },
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn input_failed(domain: &mut Domain, waiter: Token) {
-    let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
-}
-
-pub(crate) fn input_loaded(
-    domain: &mut Domain,
-    waiter: Token,
-    rows: Box<[Record]>,
-    next: Option<Key>,
-    out: &mut Queue<Request>,
-) {
-    let Some(Some(Read::InputCheck(read))) = domain.result_reads.get(Id::from_token(waiter)) else { return };
-    let wanted = *read.ids.get(usize::try_from(read.at).expect("bounded input index")).expect("requested input");
-    let project = read.project;
-    let creator = read.key.task;
-    if next.is_some() || rows.len() != 1 {
-        input_failed(domain, waiter);
-        return;
-    }
-    let row = match rows.into_iter().next().expect("one input result row") {
-        Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
-        Record::Core(
-            jig_domain_core::Record::Core(
-                jig_domain_core::CoreRecord::Call(_)
-                | jig_domain_core::CoreRecord::Deployment(_)
-                | jig_domain_core::CoreRecord::EscalationDecision(_)
-                | jig_domain_core::CoreRecord::ProposalDecision(_)
-                | jig_domain_core::CoreRecord::Turn(_)
-                | jig_domain_core::CoreRecord::RunProof(_)
-                | jig_domain_core::CoreRecord::Terminal(_)
-                | jig_domain_core::CoreRecord::Projection(_),
-            )
-            | jig_domain_core::Record::Tasks(_)
-            | jig_domain_core::Record::People(_)
-            | jig_domain_core::Record::Notes(_),
-        )
-        | Record::Forge { .. } => {
-            input_failed(domain, waiter);
-            return;
-        }
-    };
-    let Some(stub) = domain.core.input_stub(creator, project, wanted, row) else {
-        input_failed(domain, waiter);
-        return;
-    };
-    let Some(Some(Read::InputCheck(read))) = domain.result_reads.get_mut(Id::from_token(waiter)) else {
-        unreachable!("input read survives validation")
-    };
-    read.stubs.push(stub).expect("bounded historical input count");
-    read.at = read.at.checked_add(1).expect("bounded input index");
-    if let Some(&next) = read.ids.get(usize::try_from(read.at).expect("bounded input index")) {
-        request_load(domain, waiter, Range::Core(crate::CoreRange::TaskResult { task: next }), None, out);
-        return;
-    }
-    let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { unreachable!("completed input read") };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::DelegateValidated {
-        to: ReplyTo::new(read.to),
-        key: read.key,
-        batch: read.batch,
-        stubs: read.stubs.into_boxed(),
-    }));
-}
-
-pub(crate) fn note_waiter(domain: &Domain, waiter: Token) -> bool {
-    match domain.result_reads.get(Id::from_token(waiter)) {
-        Some(Some(Read::Notes { .. })) => true,
-        Some(
-            Some(
-                Read::Result(_)
-                | Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Transcript { .. }
-                | Read::Dependency(_)
-                | Read::InputCheck(_),
-            )
-            | None,
-        )
-        | None => false,
-    }
-}
-
-pub(crate) fn take_note_owner(domain: &mut Domain, waiter: Token) -> Option<Token> {
-    match take_read(domain, waiter) {
-        Some(Read::Notes { owner }) => Some(owner),
-        Some(
-            Read::Result(_)
-            | Read::Inbox(_)
-            | Read::Escalation(_)
-            | Read::Proposal(_)
-            | Read::Transcript { .. }
-            | Read::Dependency(_)
-            | Read::InputCheck(_),
-        )
-        | None => None,
-    }
-}
-
-pub(crate) fn note_failed(domain: &mut Domain, waiter: Token) {
-    let Some(owner) = take_note_owner(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::LoadFailed { owner })));
-}
-
-pub(crate) fn note_loaded(
-    domain: &mut Domain,
-    waiter: Token,
-    rows: Box<[Record]>,
-    next: Option<Key>,
-    cut: Option<loads::Cut>,
-) {
-    if cut.is_some() {
-        note_failed(domain, waiter);
-        return;
-    }
-    let mut kept = List::with_capacity(u32::try_from(rows.len()).expect("bounded note page"));
-    for row in rows {
-        match row {
-            Record::Core(jig_domain_core::Record::Notes(record)) => {
-                let valid = match &record {
-                    notes::Record::Entry(entry) => notes::valid_entry(entry, &domain.limits.notes),
-                    notes::Record::Line(line) => notes::valid_line(line, &domain.limits.notes),
-                };
-                if !valid {
-                    note_failed(domain, waiter);
-                    return;
-                }
-                kept.push(record).expect("note page room");
-            }
-            Record::Core(
-                jig_domain_core::Record::Core(
-                    jig_domain_core::CoreRecord::Call(_)
-                    | jig_domain_core::CoreRecord::Deployment(_)
-                    | jig_domain_core::CoreRecord::EscalationDecision(_)
-                    | jig_domain_core::CoreRecord::ProposalDecision(_)
-                    | jig_domain_core::CoreRecord::Turn(_)
-                    | jig_domain_core::CoreRecord::RunProof(_)
-                    | jig_domain_core::CoreRecord::Terminal(_)
-                    | jig_domain_core::CoreRecord::Projection(_),
-                )
-                | jig_domain_core::Record::Tasks(_)
-                | jig_domain_core::Record::People(_),
-            )
-            | Record::Forge { .. } => {
-                note_failed(domain, waiter);
-                return;
-            }
-        }
-    }
-    let Some(owner) = take_note_owner(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::Loaded {
-        owner,
-        rows: jig_domain_notes::Rows { records: kept },
-        more: next.is_some(),
-    })));
-}
-
-#[expect(clippy::too_many_lines, reason = "one store terminal dispatcher covers every live read owner")]
 pub(crate) fn load_outputs(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -389,295 +135,56 @@ pub(crate) fn load_outputs(
     for _ in 0..load_out.len() {
         match load_out.pop().expect("load terminal count") {
             loads::Request::Loaded { waiter, rows, next, cut } => {
-                if note_waiter(domain, waiter) {
-                    note_loaded(domain, waiter, rows, next, cut);
-                    return;
-                }
-                if input_waiter(domain, waiter) {
+                if waiter == Token::new(u64::MAX) {
                     if cut.is_some() {
-                        input_failed(domain, waiter);
-                    } else {
-                        input_loaded(domain, waiter, rows, next, out);
-                    }
-                    return;
-                }
-                if dependency_waiter(domain, waiter) {
-                    if cut.is_some() {
-                        dependency_failed(domain, waiter);
-                    } else {
-                        dependency_loaded(domain, waiter, rows, next, out);
-                    }
-                    return;
-                }
-                if transcript_waiter(domain, waiter) {
-                    transcript_loaded(domain, waiter, rows, next, cut, out);
-                    return;
-                }
-                if inbox_waiter(domain, waiter) {
-                    if cut.is_some() {
-                        inbox::failed(domain, waiter, people::Refusal::Limit, out);
-                    } else {
-                        domain.result_pages.push(ResultPage { waiter, rows, next });
-                    }
-                    return;
-                }
-                if proposal_waiter(domain, waiter) {
-                    if cut.is_some() || next.is_some() {
-                        domain.work.push(Work::ProposalFailed { waiter });
-                    } else {
-                        domain.work.push(Work::ProposalLoaded { waiter, rows });
-                    }
-                    return;
-                }
-                if cut.is_some() {
-                    let archive = match domain.result_reads.get(Id::from_token(waiter)) {
-                        Some(Some(Read::Escalation(_))) => true,
-                        Some(Some(Read::Proposal(_))) => unreachable!("proposal handled above"),
-                        Some(
-                            Some(
-                                Read::Result(_)
-                                | Read::Inbox(_)
-                                | Read::Transcript { .. }
-                                | Read::Dependency(_)
-                                | Read::InputCheck(_)
-                                | Read::Notes { .. },
-                            )
-                            | None,
-                        )
-                        | None => false,
-                    };
-                    if archive {
-                        domain.work.push(Work::EscalationFailed { waiter });
-                    } else if waiter != Token::new(u64::MAX) {
-                        results::failed(domain, waiter, people::Refusal::Limit, out);
-                    } else {
                         let _refused = domain.core.restart_refuse();
                         out.push(Request::Stop);
+                    } else {
+                        startup_page(domain, env, rows, next, decision.take().expect("admitted restore page"), out);
                     }
                     return;
                 }
-                if waiter == Token::new(u64::MAX) {
-                    startup_page(domain, env, rows, next, decision.take().expect("admitted restore page"), out);
-                } else {
-                    let archive = match domain.result_reads.get(Id::from_token(waiter)) {
-                        Some(Some(Read::Escalation(_))) => true,
-                        Some(Some(Read::Proposal(_))) => unreachable!("proposal handled above"),
-                        Some(
-                            Some(
-                                Read::Result(_)
-                                | Read::Inbox(_)
-                                | Read::Transcript { .. }
-                                | Read::Dependency(_)
-                                | Read::InputCheck(_)
-                                | Read::Notes { .. },
-                            )
-                            | None,
-                        )
-                        | None => false,
-                    };
-                    if archive {
-                        domain.work.push(Work::EscalationLoaded { waiter, rows });
-                    } else {
-                        domain.result_pages.push(ResultPage { waiter, rows, next });
+                match waiting(domain, waiter) {
+                    Some(Waiting::Notes) => note_loaded(domain, waiter, rows, next, cut),
+                    Some(Waiting::Input) if cut.is_none() => input_loaded(domain, waiter, rows, next, out),
+                    Some(Waiting::Input) => input_failed(domain, waiter),
+                    Some(Waiting::Dependency) if cut.is_none() => dependency_loaded(domain, waiter, rows, next, out),
+                    Some(Waiting::Dependency) => dependency_failed(domain, waiter),
+                    Some(Waiting::Transcript) => transcript_loaded(domain, waiter, rows, next, cut, out),
+                    Some(Waiting::Ended) if cut.is_none() && next.is_none() => {
+                        domain.work.push(Work::EndedLoaded { waiter, rows });
                     }
+                    Some(Waiting::Ended) => domain.work.push(Work::EndedFailed { waiter }),
+                    Some(Waiting::Proposal) if cut.is_none() && next.is_none() => {
+                        domain.work.push(Work::ProposalLoaded { waiter, rows });
+                    }
+                    Some(Waiting::Proposal) => domain.work.push(Work::ProposalFailed { waiter }),
+                    Some(Waiting::Escalation) if cut.is_none() => {
+                        domain.work.push(Work::EscalationLoaded { waiter, rows });
+                    }
+                    Some(Waiting::Escalation) => domain.work.push(Work::EscalationFailed { waiter }),
+                    None => {}
                 }
             }
             loads::Request::Unloaded { waiter, .. } => {
-                if note_waiter(domain, waiter) {
-                    note_failed(domain, waiter);
-                    return;
-                }
-                if input_waiter(domain, waiter) {
-                    input_failed(domain, waiter);
-                    return;
-                }
-                if dependency_waiter(domain, waiter) {
-                    dependency_failed(domain, waiter);
-                    return;
-                }
-                if transcript_waiter(domain, waiter) {
-                    transcript_failed(domain, waiter);
-                    return;
-                }
-                if inbox_waiter(domain, waiter) {
-                    inbox::failed(domain, waiter, people::Refusal::Busy, out);
-                    return;
-                }
-                if proposal_waiter(domain, waiter) {
-                    domain.work.push(Work::ProposalFailed { waiter });
-                    return;
-                }
                 if waiter == Token::new(u64::MAX) {
                     let _refused = domain.core.restart_refuse();
                     out.push(Request::Stop);
-                } else {
-                    let archive = match domain.result_reads.get(Id::from_token(waiter)) {
-                        Some(Some(Read::Escalation(_))) => true,
-                        Some(Some(Read::Proposal(_))) => unreachable!("proposal handled above"),
-                        Some(
-                            Some(
-                                Read::Result(_)
-                                | Read::Inbox(_)
-                                | Read::Transcript { .. }
-                                | Read::Dependency(_)
-                                | Read::InputCheck(_)
-                                | Read::Notes { .. },
-                            )
-                            | None,
-                        )
-                        | None => false,
-                    };
-                    if archive {
-                        domain.work.push(Work::EscalationFailed { waiter });
-                    } else {
-                        results::failed(domain, waiter, people::Refusal::Busy, out);
-                    }
+                    return;
+                }
+                match waiting(domain, waiter) {
+                    Some(Waiting::Notes) => note_failed(domain, waiter),
+                    Some(Waiting::Input) => input_failed(domain, waiter),
+                    Some(Waiting::Dependency) => dependency_failed(domain, waiter),
+                    Some(Waiting::Transcript) => transcript_failed(domain, waiter),
+                    Some(Waiting::Ended) => domain.work.push(Work::EndedFailed { waiter }),
+                    Some(Waiting::Proposal) => domain.work.push(Work::ProposalFailed { waiter }),
+                    Some(Waiting::Escalation) => domain.work.push(Work::EscalationFailed { waiter }),
+                    None => {}
                 }
             }
             loads::Request::Load { .. } => unreachable!("terminal methods never issue IO"),
         }
-    }
-}
-
-pub(crate) fn transcript_failed(domain: &mut Domain, waiter: Token) {
-    let Some(Read::Transcript { task }) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
-}
-
-pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(Token, u64)> {
-    let ids = domain.core.preparation_ids(task).expect("preparing task context");
-    if ids.is_empty() {
-        domain.work.push(Work::StartBrief { task });
-        return None;
-    }
-    let first = *ids.first().expect("nonempty preparation IDs");
-    let count = ids.len();
-    let read = DependencyRead {
-        task,
-        ids,
-        at: 0,
-        results: List::with_capacity(u32::try_from(count).expect("bounded result count")),
-    };
-    let Ok(waiter) = domain.result_reads.insert(Some(Read::Dependency(read))) else {
-        domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
-        return None;
-    };
-    Some((waiter.token(), first))
-}
-
-pub(crate) fn dependency_failed(domain: &mut Domain, waiter: Token) {
-    let Some(Read::Dependency(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task: read.task }));
-}
-
-pub(crate) fn dependency_loaded(
-    domain: &mut Domain,
-    waiter: Token,
-    rows: Box<[Record]>,
-    next: Option<Key>,
-    out: &mut Queue<Request>,
-) {
-    let Some(Some(Read::Dependency(read))) = domain.result_reads.get(Id::from_token(waiter)) else { return };
-    let wanted = *read.ids.get(usize::try_from(read.at).expect("bounded index")).expect("one requested result");
-    if next.is_some() || rows.len() != 1 {
-        dependency_failed(domain, waiter);
-        return;
-    }
-    let row = match rows.into_iter().next().expect("one dependency result row") {
-        Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
-        Record::Core(
-            jig_domain_core::Record::Core(
-                jig_domain_core::CoreRecord::Call(_)
-                | jig_domain_core::CoreRecord::Deployment(_)
-                | jig_domain_core::CoreRecord::EscalationDecision(_)
-                | jig_domain_core::CoreRecord::ProposalDecision(_)
-                | jig_domain_core::CoreRecord::Turn(_)
-                | jig_domain_core::CoreRecord::RunProof(_)
-                | jig_domain_core::CoreRecord::Terminal(_)
-                | jig_domain_core::CoreRecord::Projection(_),
-            )
-            | jig_domain_core::Record::Tasks(_)
-            | jig_domain_core::Record::People(_)
-            | jig_domain_core::Record::Notes(_),
-        )
-        | Record::Forge { .. } => {
-            dependency_failed(domain, waiter);
-            return;
-        }
-    };
-    let Some(result) = domain.core.dependency_result(read.task, wanted, row) else {
-        dependency_failed(domain, waiter);
-        return;
-    };
-    let Some(Some(Read::Dependency(read))) = domain.result_reads.get_mut(Id::from_token(waiter)) else {
-        unreachable!("read survives validation")
-    };
-    read.results.push(result).expect("one result per bounded ID");
-    read.at = read.at.checked_add(1).expect("bounded result index");
-    if let Some(&next) = read.ids.get(usize::try_from(read.at).expect("bounded index")) {
-        request_load(domain, waiter, Range::Core(crate::CoreRange::TaskResult { task: next }), None, out);
-        return;
-    }
-    let Some(Read::Dependency(read)) = take_read(domain, waiter) else { unreachable!("complete dependency read") };
-    domain.result_reads.retire(Id::from_token(waiter));
-    assert!(
-        domain.core.dependency_results.insert(read.task, read.results.into_boxed()).is_ok(),
-        "one preparation result set"
-    );
-    domain.work.push(Work::StartBrief { task: read.task });
-}
-
-pub(crate) fn transcript_loaded(
-    domain: &mut Domain,
-    waiter: Token,
-    rows: Box<[Record]>,
-    next: Option<Key>,
-    cut: Option<loads::Cut>,
-    out: &mut Queue<Request>,
-) {
-    if cut.is_some() {
-        transcript_failed(domain, waiter);
-        return;
-    }
-    let Some(Some(Read::Transcript { task })) = domain.result_reads.get(Id::from_token(waiter)) else { return };
-    let task = *task;
-    for row in rows {
-        let turn = match row {
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))) => turn,
-            Record::Core(
-                jig_domain_core::Record::Core(
-                    jig_domain_core::CoreRecord::ProposalDecision(_)
-                    | jig_domain_core::CoreRecord::Call(_)
-                    | jig_domain_core::CoreRecord::EscalationDecision(_)
-                    | jig_domain_core::CoreRecord::Deployment(_)
-                    | jig_domain_core::CoreRecord::RunProof(_)
-                    | jig_domain_core::CoreRecord::Terminal(_)
-                    | jig_domain_core::CoreRecord::Projection(_),
-                )
-                | jig_domain_core::Record::Tasks(_)
-                | jig_domain_core::Record::People(_)
-                | jig_domain_core::Record::Notes(_),
-            )
-            | Record::Forge { .. } => {
-                transcript_failed(domain, waiter);
-                return;
-            }
-        };
-        if !domain.core.append_transcript(task, turn) {
-            transcript_failed(domain, waiter);
-            return;
-        }
-    }
-    if let Some(after) = next {
-        request_load(domain, waiter, Range::Core(crate::CoreRange::TaskTranscript { task }), Some(after), out);
-        return;
-    }
-    let Some(Read::Transcript { .. }) = take_read(domain, waiter) else { unreachable!("finished transcript read") };
-    domain.result_reads.retire(Id::from_token(waiter));
-    if let Some((waiter, first)) = begin_dependency_read(domain, task) {
-        request_load(domain, waiter, Range::Core(crate::CoreRange::TaskResult { task: first }), None, out);
     }
 }
 
@@ -690,6 +197,10 @@ pub(crate) fn startup_page(
     out: &mut Queue<Request>,
 ) {
     let Some(range) = domain.startup_range.clone() else { return };
+    if let Range::Census(_) = range {
+        census_page(domain, env, rows, next, decision, out);
+        return;
+    }
     for row in rows {
         restore_page_row(domain, env, row);
     }
@@ -718,26 +229,22 @@ pub(crate) fn startup_page(
         Range::Core(crate::CoreRange::Deployment) => Some(Range::Core(crate::CoreRange::People)),
         Range::Core(crate::CoreRange::People) => Some(Range::Core(crate::CoreRange::Tasks)),
         Range::Core(crate::CoreRange::Tasks) => Some(Range::Core(crate::CoreRange::RunProofs)),
-        Range::Forge | Range::Core(crate::CoreRange::Calls) => None,
+        Range::Forge | Range::Census(_) | Range::Core(crate::CoreRange::Calls) => None,
         Range::Core(crate::CoreRange::RunProofs) => Some(Range::Core(crate::CoreRange::Calls)),
         Range::Core(
             crate::CoreRange::EscalationDecision { .. }
             | crate::CoreRange::ProposalDecision { .. }
             | crate::CoreRange::Turns { .. }
             | crate::CoreRange::TaskTranscript { .. }
-            | crate::CoreRange::TaskResult { .. }
-            | crate::CoreRange::EndedResults,
+            | crate::CoreRange::TaskResult { .. },
         ) => {
             unreachable!("startup range")
         }
         Range::Core(crate::CoreRange::Notes(_)) => unreachable!("notes load is outside startup"),
     };
     if range == Range::Core(crate::CoreRange::Tasks) {
-        for project in &domain.core.projects {
-            if !domain.core.people.has_project(*project) {
-                domain.work.push(Work::People(people::Event::Roles { project: *project, holdings: Box::new([]) }));
-            }
-        }
+        // People's restoration terminal; at a first start the core seeds the
+        // configured projects and owners (jig's `protocol/configuration.md`, 3).
         domain.work.push(Work::People(people::Event::Restored));
         route_into(domain, env, &mut decision);
         if domain.core.restart_failure().is_some() {
@@ -777,6 +284,10 @@ pub(crate) fn restart_request(
         jig_domain_core::RestartRequest::Refused { .. } => domain.stop_pending = true,
         jig_domain_core::RestartRequest::Step(step) => match step {
             jig_domain_core::RestartStep::LoadCore => {
+                // Every configured account is wanted from the restart's first
+                // step (jig's `domain/engine.md`, 12).
+                let routed = jig_domain_core::want_accounts(&mut domain.core, &environment_core(env));
+                route_core_requests(domain, env, decision, routed);
                 domain.startup_range = Some(Range::Core(crate::CoreRange::Deployment));
                 emit(
                     decision,
@@ -787,6 +298,12 @@ pub(crate) fn restart_request(
                         after: None,
                     },
                 );
+            }
+            jig_domain_core::RestartStep::LoadInbox => {
+                let census = domain.core.census(&core_limits(&env.limits));
+                let range = Range::Census(census);
+                domain.startup_range = Some(range.clone());
+                emit(decision, &env.limits, Delivery::Load { waiter: Token::new(u64::MAX), range, after: None });
             }
             jig_domain_core::RestartStep::RestoreConnector { connector } => {
                 assert_eq!(connector, domain.config.forge_connector, "configured forge connector");
@@ -813,8 +330,9 @@ pub(crate) fn restart_request(
             jig_domain_core::RestartStep::Open => {
                 let request = domain.core.restart_done(step);
                 assert_eq!(request, jig_domain_core::RestartRequest::Idle, "decisions open once");
-                for _ in 0..domain.core.due.len() {
-                    domain.work.push(Work::Activate(domain.core.due.pop().expect("restored due tasks")));
+                for _ in 0..domain.limits.tasks.tasks {
+                    let Some(context) = domain.core.take_due() else { break };
+                    domain.work.push(Work::Activate(context));
                 }
             }
         },
@@ -824,7 +342,9 @@ pub(crate) fn restart_request(
 pub(crate) fn connector_restart_done(domain: &mut Domain, stage: jig_domain_core::connector::RestartStage) {
     let connector = domain.config.forge_connector;
     let step = match stage {
-        jig_domain_core::connector::RestartStage::Restored => jig_domain_core::RestartStep::RestoreConnector { connector },
+        jig_domain_core::connector::RestartStage::Restored => {
+            jig_domain_core::RestartStep::RestoreConnector { connector }
+        }
         jig_domain_core::connector::RestartStage::ReadAfresh => jig_domain_core::RestartStep::ReadAfresh { connector },
         jig_domain_core::connector::RestartStage::Settled => jig_domain_core::RestartStep::SettleOutbox { connector },
     };
@@ -839,14 +359,14 @@ pub(crate) fn connector_restarting(domain: &Domain) -> bool {
             | jig_domain_core::RestartStep::ReadAfresh { .. }
             | jig_domain_core::RestartStep::SettleOutbox { .. },
         ) => true,
-        Some(jig_domain_core::RestartStep::LoadCore | jig_domain_core::RestartStep::AdoptRuns | jig_domain_core::RestartStep::Open)
+        Some(
+            jig_domain_core::RestartStep::LoadCore
+            | jig_domain_core::RestartStep::LoadInbox
+            | jig_domain_core::RestartStep::AdoptRuns
+            | jig_domain_core::RestartStep::Open,
+        )
         | None => false,
     }
-}
-
-pub(crate) fn take_read(domain: &mut Domain, waiter: Token) -> Option<Read> {
-    let entry = domain.result_reads.get_mut(Id::from_token(waiter))?;
-    entry.take()
 }
 
 /// Reject unsupported root shapes and identities above durable high-water marks before child
@@ -866,12 +386,17 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
                 let _refused = domain.core.restart_refuse();
                 return;
             }
-            match domain.core.restore_core(jig_domain_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits)) {
+            match domain
+                .core
+                .restore_core(jig_domain_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits))
+            {
                 jig_domain_core::Restored::Deployment { commits } => {
                     domain.core_header_loaded = true;
                     domain.restored_commits = Some(commits);
                 }
-                jig_domain_core::Restored::Live | jig_domain_core::Restored::Archive | jig_domain_core::Restored::Rejected => {
+                jig_domain_core::Restored::Live
+                | jig_domain_core::Restored::Archive
+                | jig_domain_core::Restored::Rejected => {
                     unreachable!("deployment restore result")
                 }
             }
@@ -894,46 +419,34 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
         Record::Forge { row } => {
             domain.work.push(Work::Forge(forge::Event::Restore { record: *row }));
         }
-        Record::Core(jig_domain_core::Record::Tasks(record)) => match record {
-            tasks::Stored::PersonProposal(ref row) => {
-                if !domain.core.restore_task_row(&record) {
-                    let _refused = domain.core.restart_refuse();
-                    return;
-                }
-                domain.work.push(Work::People(people::Event::Waiting {
-                    task: row.goal.number,
-                    entries: inbox::person_proposal_entries(domain, row),
-                }));
-                domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
+        Record::Core(jig_domain_core::Record::Tasks(record)) => {
+            let supported = match &record {
+                tasks::Stored::Live(task) => escalation::supported(domain, task),
+                tasks::Stored::Update(_)
+                | tasks::Stored::Result(_)
+                | tasks::Stored::ConversationNewest(_)
+                | tasks::Stored::ConversationOldest(_)
+                | tasks::Stored::Goal(_)
+                | tasks::Stored::EndedDelegate(_)
+                | tasks::Stored::Delegate(_)
+                | tasks::Stored::Activity(_)
+                | tasks::Stored::Milestone(_)
+                | tasks::Stored::PersonProposal(_)
+                | tasks::Stored::DecidedProposal(_)
+                | tasks::Stored::ClosedLedger(_)
+                | tasks::Stored::History(_)
+                | tasks::Stored::Ended(_)
+                | tasks::Stored::Stub(_)
+                | tasks::Stored::Ledger(_)
+                | tasks::Stored::Writer(_)
+                | tasks::Stored::Pool(_) => true,
+            };
+            if !supported || !domain.core.restore_task_row(&record) {
+                let _refused = domain.core.restart_refuse();
+                return;
             }
-            tasks::Stored::Ended(_) => {
-                unreachable!("historical child rows excluded from startup")
-            }
-            tasks::Stored::Stub(_) => {
-                if !domain.core.restore_task_row(&record) {
-                    let _refused = domain.core.restart_refuse();
-                    return;
-                }
-                domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
-            }
-            tasks::Stored::Milestone(_) | tasks::Stored::History(_) => {
-                unreachable!("history rows excluded from startup")
-            }
-            tasks::Stored::Live(ref task) => {
-                if !escalation::supported(domain, task) || !domain.core.restore_task_row(&record) {
-                    let _refused = domain.core.restart_refuse();
-                    return;
-                }
-                domain.work.push(Work::People(people::Event::Waiting {
-                    task: task.number,
-                    entries: inbox::entries(domain, task),
-                }));
-                domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
-            }
-            tasks::Stored::Ledger(_) | tasks::Stored::Writer(_) | tasks::Stored::Pool(_) => {
-                domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
-            }
-        },
+            domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
+        }
         Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof))) => {
             if domain.core.restore_core(jig_domain_core::CoreRecord::RunProof(proof), &core_limits(&env.limits))
                 != jig_domain_core::Restored::Live
@@ -951,4 +464,45 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
             unreachable!("startup excludes archive families")
         }
     }
+}
+
+/// Rebuild the derived inbox from the census's ended owners, after people's
+/// read positions restored (jig's `protocol/store.md`, 7.2).
+fn census_page(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    rows: Box<[Record]>,
+    next: Option<Key>,
+    mut decision: Decision,
+    out: &mut Queue<Request>,
+) {
+    for row in rows {
+        let restored = match row {
+            Record::Core(jig_domain_core::Record::Tasks(row)) => {
+                domain.core.restore_inbox_row(&core_limits(&env.limits), &row)
+            }
+            Record::Core(
+                jig_domain_core::Record::Core(_)
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
+            )
+            | Record::Forge { .. } => false,
+        };
+        if !restored {
+            let _refused = domain.core.restart_refuse();
+            out.push(Request::Stop);
+            return;
+        }
+    }
+    let range = domain.startup_range.clone().expect("census range in flight");
+    if let Some(after) = next {
+        emit(&mut decision, &env.limits, Delivery::Load { waiter: Token::new(u64::MAX), range, after: Some(after) });
+        close(domain, env, decision, out);
+        return;
+    }
+    domain.startup_range = None;
+    let request = domain.core.restart_done(jig_domain_core::RestartStep::LoadInbox);
+    domain.work.push(Work::Restart(request));
+    route_into(domain, env, &mut decision);
+    close(domain, env, decision, out);
 }

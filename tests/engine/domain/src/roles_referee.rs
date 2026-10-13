@@ -90,14 +90,16 @@ impl Referee {
         let role_rows: Vec<_> = writes
             .iter()
             .filter_map(|write| match write {
-                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project, holdings }))) => {
-                    Some((*project, holdings))
-                }
+                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
+                    project,
+                    holdings,
+                }))) => Some((*project, holdings)),
                 Write::Save(
                     Record::Core(
                         jig_domain_core::Record::People(
                             people::Stored::Person { .. }
-                            | people::Stored::ReadPosition { .. }
+                            | people::Stored::ReadResults { .. }
+                            | people::Stored::ReadChat { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Policy { .. }
                             | people::Stored::Answer { .. },
@@ -139,7 +141,8 @@ impl Referee {
                     Record::Core(
                         jig_domain_core::Record::People(
                             people::Stored::Person { .. }
-                            | people::Stored::ReadPosition { .. }
+                            | people::Stored::ReadResults { .. }
+                            | people::Stored::ReadChat { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Roles { .. }
                             | people::Stored::Policy { .. },
@@ -202,7 +205,17 @@ impl Referee {
                                 | tasks::Stored::History(_)
                                 | tasks::Stored::PersonProposal(_)
                                 | tasks::Stored::Writer(_)
-                                | tasks::Stored::Pool(_),
+                                | tasks::Stored::Pool(_)
+                                | tasks::Stored::Update(_)
+                                | tasks::Stored::Result(_)
+                                | tasks::Stored::ConversationNewest(_)
+                                | tasks::Stored::ConversationOldest(_)
+                                | tasks::Stored::Goal(_)
+                                | tasks::Stored::EndedDelegate(_)
+                                | tasks::Stored::Delegate(_)
+                                | tasks::Stored::Activity(_)
+                                | tasks::Stored::DecidedProposal(_)
+                                | tasks::Stored::ClosedLedger(_),
                             )
                             | jig_domain_core::Record::People(_)
                             | jig_domain_core::Record::Core(
@@ -247,6 +260,10 @@ impl Referee {
                         return Err("reroute timestamp precedes the request");
                     }
                 }
+                if comparable.changed < expected_task.changed {
+                    return Err("reroute timestamp precedes the request");
+                }
+                comparable.changed = expected_task.changed;
                 if &comparable != expected_task {
                     return Err("reroute changed more than expected holder and revision");
                 }
@@ -281,14 +298,15 @@ impl Referee {
                         | jig_domain_core::CoreKey::RunProof(..)
                         | jig_domain_core::CoreKey::Terminal { .. }
                         | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
+                        | jig_domain_core::CoreKey::ProposalDecision { .. }
                         | jig_domain_core::CoreKey::Turn { .. },
                     )
                     | jig_domain_core::Key::Tasks(_)
                     | jig_domain_core::Key::Notes(_),
                 )) => return Err("role administration changed funding or accepted work"),
                 Write::Save(Record::Core(
-                    jig_domain_core::Record::People(_) | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),
+                    jig_domain_core::Record::People(_)
+                    | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),
                 ))
                 | Write::Erase(Key::Core(jig_domain_core::Key::People(_))) => {}
                 Write::Save(Record::Forge { .. }) | Write::Erase(Key::Forge(_)) => {
@@ -336,7 +354,7 @@ impl Referee {
             key: obligation.key,
         })));
         match reply {
-            people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy | people::Refusal::NotReady)) => {
+            people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_)) => {
                 if rows.contains_key(&answer_key) {
                     return Err("retryable role refusal consumed an answered key");
                 }
@@ -347,12 +365,13 @@ impl Referee {
                     return Err("role terminal before exact durable keyed answer");
                 }
             }
-            people::Reply::Refused(_) => {
+            // An expired sign-in is answered signed out, saving nothing (jig b7bdd9e8).
+            people::Reply::Refused(_) | people::Reply::SignedOut => {
                 if rows.get(&answer_key) != self.rows.get(&answer_key) {
                     return Err("role entrance refusal changed durable key");
                 }
             }
-            people::Reply::SignedIn { .. } | people::Reply::SignedOut => return Err("role ask got a session terminal"),
+            people::Reply::SignedIn { .. } => return Err("role ask got a session terminal"),
         }
         self.asks.remove(&to);
         self.terminals.insert(to);

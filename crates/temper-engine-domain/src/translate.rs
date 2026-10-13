@@ -1,131 +1,41 @@
 //! Total vocabulary and configuration translations (jig's domain/root.md, 6).
-use crate::boundary::{Call, EscalationChoice, MessageForm, Payload, ProposalChoice, ProposedAction, Request, Tool};
-use crate::domain::{Domain, emit};
-use crate::limits::{Limits, environment_core};
+use crate::boundary::{Call, EscalationChoice, MessageForm, ProposalChoice, ProposedAction, Tool};
+use crate::domain::Domain;
+use crate::limits::Limits;
 use crate::route::{LandingRule, host_route};
-use crate::{CallAnswer, Decision, Delivery};
+use crate::{CallAnswer, Decision};
 use alloc::boxed::Box;
-use jig_domain_core::RunPolicy;
-use jig_domain_authority as authority;
-use jig_domain_fleet as fleet;
 use jig_domain_notes as notes;
-use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use jig_domain_views as views;
-use skein_lib::{Env, List, Map, Queue, ReplyTo, Token};
+use skein_lib::{Env, Map, ReplyTo};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
 
-/// Startup configuration owned by the root, bounded by the corresponding
-/// child limits; the shell supplies it once (domain/engine.md, 4).
+/// Startup configuration, supplied once by the shell (domain/engine.md, 14):
+/// the core's whole, as jig's applications hold it, and temper's own.
 #[derive(Debug)]
 pub struct Config {
-    /// Identity committed at the first start; ignored when a header exists.
-    pub deployment: [u8; 16],
-    pub seed: u64,
-    /// Bootstrap project/identity owners supplied by deployment configuration, at most people
-    /// `initial_owners`; sign-in authentication matches their identity keys rather than trusting a
-    /// request's role.
-    pub owners: Box<[people::InitialOwner]>,
-    /// Provider number reserved for services made by this deployment; forge sign-in uses 0.
-    pub deployment_provider: u16,
-    /// Validated deployment and project policy; no duplicated policy values.
-    pub authority: authority::Domain,
+    /// The core's rules, charters, owners and projects; its one connector is
+    /// the forge's; whether the workers run in the engine's process is
+    /// configuration too: standalone, they do not (domain/engine.md, 14).
+    pub core: jig_domain_core::Config,
     /// Forge landing requirements and their connector-owned judge parameters.
     pub landing: LandingPolicy,
-    /// Project policy mappings from connector permissions to roles at adoption.
-    pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
-    /// Connector number assigned to this application's forge adapter.
-    pub forge_connector: u16,
-    /// Procedure namespace assigned to the root's recurring goal executor.
-    pub recurring_connector: u16,
-    /// Charter selected for chats; admitted by tasks as the configured executor.
-    pub charter: u32,
-    /// Smith-neutral run policy selected for this charter. The root owns the
-    /// policy; its typed adapter supplies Smith's vocabulary at the boundary.
-    pub run: RunPolicy,
-    /// Maximum committed conversation bytes across a task's attempts that may be resumed whole.
-    /// A longer transcript starts the next run fresh with its bounded tail in the brief.
-    pub resume_bytes: u32,
-    /// Finite period number used to address project/person funding ledgers; restoring an existing
-    /// ledger never resets it.
-    pub period: u64,
-    /// Initial project period budget, checked against current project policy before its first
-    /// opening; restored funding wins.
-    pub period_budget: u64,
-    /// Initial person pool budget, checked against the authenticated role's period ceiling before
-    /// carving; restored funding wins.
-    pub person_budget: u64,
-    /// Exact task authority checked for each authenticated chat.
-    pub chat_authority: authority::Authority,
-    /// One-bit family assignments for the engine tools in this charter.
-    pub tools: jig_domain_core::ToolFamilies,
-    /// Account required by the chat charter, configured through the accounts child.
-    pub account: u32,
-    /// Existing secret-free generation at startup.
-    pub account_generation: u64,
-    /// Startup credential lifetime; a refresh is required when absent.
-    pub account_valid: Option<skein_lib::Duration>,
     /// Forge writer identities and this deployment's branch namespace.
     pub forge: forge_client::Config,
+    /// Each forge's git identity, an application credential (D10;
+    /// credentials.md, "each repository to a git identity").
+    pub identities: Box<[forge::GitIdentity]>,
+    /// The charter the forge's procedures start their agent work under, one
+    /// of the core's charters (domain/engine.md, 14).
+    pub forge_charter: u32,
 }
 
+/// What the root keeps of its configuration once its children hold theirs.
 #[derive(Debug)]
 pub(crate) struct RootConfig {
     pub(crate) forge_connector: u16,
-}
-
-pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_domain_core::Config, RootConfig) {
-    let Config {
-        deployment,
-        seed,
-        owners,
-        deployment_provider,
-        authority,
-        landing: _,
-        permission_roles,
-        forge_connector,
-        recurring_connector,
-        charter,
-        run,
-        resume_bytes,
-        period,
-        period_budget,
-        person_budget,
-        chat_authority,
-        tools,
-        account,
-        account_generation,
-        account_valid,
-        forge: _,
-    } = config;
-    (
-        jig_domain_core::Config {
-            deployment,
-            seed,
-            owners,
-            authority,
-            projects,
-            permission_roles,
-            connectors: Box::new([forge_connector]),
-            settings: jig_domain_core::Settings {
-                deployment_provider,
-                recurring_connector,
-                charter,
-                run,
-                resume_bytes,
-                period,
-                period_budget,
-                person_budget,
-                chat_authority,
-                tools,
-                account,
-                account_generation,
-                account_valid,
-            },
-        },
-        RootConfig { forge_connector },
-    )
+    pub(crate) forge_charter: u32,
 }
 
 /// Typed forge landing policy retained by the application for policy snapshots.
@@ -133,169 +43,6 @@ pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_domain_c
 pub struct LandingPolicy {
     pub deployment: Box<[LandingRule]>,
     pub projects: Map<u32, Box<[LandingRule]>>,
-}
-
-pub(crate) fn view_outputs(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    output: &mut Queue<views::Request>,
-    out: &mut Queue<Request>,
-) {
-    for _ in 0..output.len() {
-        let request = output.pop().expect("view output count");
-        match request {
-            views::Request::Ended { watcher, .. } | views::Request::Refused { watcher, .. } => {
-                domain.core.watch_closed(&environment_core(env), watcher);
-            }
-            views::Request::Watching { .. } | views::Request::Deliver { .. } => {}
-        }
-        out.push(Request::Party(crate::PartyRequest::View(request)));
-    }
-}
-
-pub(crate) fn view_requests(routed: jig_domain_core::Requests, room: u32) -> Queue<views::Request> {
-    let mut child = Queue::with_capacity(room);
-    let jig_domain_core::Requests::Out(mut marked) = routed;
-    for _ in 0..marked.len() {
-        match marked.pop().expect("view mark count") {
-            jig_domain_core::Request::Now(value) => match *value {
-                jig_domain_core::Now::View(request) => child.push(request),
-                jig_domain_core::Now::Account(_) => unreachable!("view route does not own account output"),
-                jig_domain_core::Now::SignInRefused { .. }
-                | jig_domain_core::Now::WatchRefused { .. }
-                | jig_domain_core::Now::NotesIndexed { .. }
-                | jig_domain_core::Now::NotesRecalled { .. }
-                | jig_domain_core::Now::NotesRefused { .. }
-                | jig_domain_core::Now::NoteBusy { .. }
-                | jig_domain_core::Now::Relayed { .. }
-                | jig_domain_core::Now::EffectAnswer { .. }
-                | jig_domain_core::Now::DropPayload { .. }
-                | jig_domain_core::Now::DropAssignment { .. }
-                | jig_domain_core::Now::TurnPayload { .. }
-                | jig_domain_core::Now::AnswerPayload { .. }
-                | jig_domain_core::Now::AcceptedTurn { .. }
-                | jig_domain_core::Now::RefusedPayload { .. }
-                | jig_domain_core::Now::Activate { .. }
-                | jig_domain_core::Now::PrepareAgent { .. }
-                | jig_domain_core::Now::StartPreparation { .. }
-                | jig_domain_core::Now::HistoricalProposal { .. }
-                | jig_domain_core::Now::BriefCorePlanned { .. }
-                | jig_domain_core::Now::WorkspaceRequest { .. }
-                | jig_domain_core::Now::RunPreparationFailed { .. }
-                | jig_domain_core::Now::RunPrepared { .. }
-                | jig_domain_core::Now::CompleteBrief { .. }
-                | jig_domain_core::Now::HistoricalEscalation { .. }
-                | jig_domain_core::Now::EscalationInspection { .. }
-                | jig_domain_core::Now::EscalationReply { .. }
-                | jig_domain_core::Now::EscalationRefused { .. }
-                | jig_domain_core::Now::ProcedureDelegateOutcome { .. }
-                | jig_domain_core::Now::SettledCallRefused { .. }
-                | jig_domain_core::Now::Call { .. }
-                | jig_domain_core::Now::DropCall { .. }
-                | jig_domain_core::Now::Undelivered { .. }
-                | jig_domain_core::Now::RestoreRefused => unreachable!("view route owns its now output"),
-            },
-            jig_domain_core::Request::Decided => {}
-            jig_domain_core::Request::Write(_) | jig_domain_core::Request::Ask { .. } | jig_domain_core::Request::Held(_) => {
-                unreachable!("view route changes no decision")
-            }
-        }
-    }
-    child
-}
-
-pub(crate) fn view_step(domain: &mut Domain, env: &Env<Limits>, event: views::Event, out: &mut Queue<Request>) {
-    let room = skein_lib::JournalRoom { writes: 0, held: 0 };
-    let Some(decision) = domain.journal.decision(&room) else { return };
-    view_into(domain, env, event, out);
-    domain.journal.accept(decision);
-}
-
-/// Route inside an already reserved decision, including a released projection.
-pub(crate) fn view_into(domain: &mut Domain, env: &Env<Limits>, event: views::Event, out: &mut Queue<Request>) {
-    let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::View(event));
-    let mut child = view_requests(routed, views::max_out(&env.limits.views));
-    view_outputs(domain, env, &mut child, out);
-}
-
-pub(crate) fn watch_subject(subject: views::Subject) -> people::WatchSubject {
-    match subject {
-        views::Subject::Run { task, attempt } => people::WatchSubject::Run { task: task.raw(), attempt: attempt.raw() },
-        views::Subject::Tree { task } => people::WatchSubject::Tree { task: task.raw() },
-        views::Subject::Goals { .. } => people::WatchSubject::Goals,
-        views::Subject::Inbox { party } => people::WatchSubject::Inbox { party },
-    }
-}
-
-/// A volatile watch has no durable root decision; the core admits its party and opens its view.
-#[expect(clippy::too_many_arguments, reason = "watch admission carries the signed-in caller, key and subject")]
-pub(crate) fn open_watch(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    watcher: Token,
-    sign_in: u64,
-    key: [u8; 16],
-    project: u32,
-    subject: people::WatchSubject,
-    out: &mut Queue<Request>,
-) {
-    let ready = domain.ready() && domain.core.counters.quiescent(domain.journal.idle()) && domain.work.is_empty();
-    let room = skein_lib::JournalRoom { writes: 0, held: 0 };
-    let Some(decision) = domain.journal.decision(&room) else { return };
-    let routed = jig_domain_core::step(
-        &mut domain.core,
-        &environment_core(env),
-        jig_domain_core::Event::Watch { watcher, sign_in, key, project, subject, ready },
-    );
-    let jig_domain_core::Requests::Out(mut marked) = routed;
-    for _ in 0..marked.len() {
-        match marked.pop().expect("watch output count") {
-            jig_domain_core::Request::Now(value) => match *value {
-                jig_domain_core::Now::View(request) => out.push(Request::Party(crate::PartyRequest::View(request))),
-                jig_domain_core::Now::WatchRefused { watcher, refusal } => {
-                    out.push(Request::Party(crate::PartyRequest::WatchRefused { watcher, refusal }));
-                }
-                jig_domain_core::Now::SignInRefused { .. }
-                | jig_domain_core::Now::Account(_)
-                | jig_domain_core::Now::NotesIndexed { .. }
-                | jig_domain_core::Now::NotesRecalled { .. }
-                | jig_domain_core::Now::NotesRefused { .. }
-                | jig_domain_core::Now::NoteBusy { .. }
-                | jig_domain_core::Now::Relayed { .. }
-                | jig_domain_core::Now::EffectAnswer { .. }
-                | jig_domain_core::Now::DropPayload { .. }
-                | jig_domain_core::Now::DropAssignment { .. }
-                | jig_domain_core::Now::TurnPayload { .. }
-                | jig_domain_core::Now::AnswerPayload { .. }
-                | jig_domain_core::Now::AcceptedTurn { .. }
-                | jig_domain_core::Now::RefusedPayload { .. }
-                | jig_domain_core::Now::Activate { .. }
-                | jig_domain_core::Now::PrepareAgent { .. }
-                | jig_domain_core::Now::StartPreparation { .. }
-                | jig_domain_core::Now::HistoricalProposal { .. }
-                | jig_domain_core::Now::BriefCorePlanned { .. }
-                | jig_domain_core::Now::WorkspaceRequest { .. }
-                | jig_domain_core::Now::RunPreparationFailed { .. }
-                | jig_domain_core::Now::RunPrepared { .. }
-                | jig_domain_core::Now::CompleteBrief { .. }
-                | jig_domain_core::Now::HistoricalEscalation { .. }
-                | jig_domain_core::Now::EscalationInspection { .. }
-                | jig_domain_core::Now::EscalationReply { .. }
-                | jig_domain_core::Now::EscalationRefused { .. }
-                | jig_domain_core::Now::ProcedureDelegateOutcome { .. }
-                | jig_domain_core::Now::SettledCallRefused { .. }
-                | jig_domain_core::Now::Call { .. }
-                | jig_domain_core::Now::DropCall { .. }
-                | jig_domain_core::Now::Undelivered { .. }
-                | jig_domain_core::Now::RestoreRefused => unreachable!("watch route has only volatile view outputs"),
-            },
-            jig_domain_core::Request::Decided => {}
-            jig_domain_core::Request::Write(_) | jig_domain_core::Request::Ask { .. } | jig_domain_core::Request::Held(_) => {
-                unreachable!("watch route changes no store decision")
-            }
-        }
-    }
-    domain.journal.accept(decision);
 }
 
 pub(crate) fn environment_forge(env: &Env<Limits>) -> Env<forge::Limits> {
@@ -364,9 +111,7 @@ pub(crate) fn relay_call(
     to: ReplyTo,
     answer: CallAnswer,
 ) {
-    let Some((to, answer)) = host_route::render(domain, limits, decision, to, answer) else { return };
-    let id = domain.payloads.insert(Some(Payload::CallAnswer(answer))).expect("answer payload room reserved");
-    emit(decision, limits, Delivery::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
+    host_route::render(domain, limits, decision, to, answer);
 }
 
 pub(crate) fn call_needs_input(tool: &Tool) -> bool {
@@ -550,7 +295,9 @@ pub(crate) fn tool_kind(tool: &Tool) -> Option<jig_domain_core::ToolKind> {
         Tool::Message { target, .. } => jig_domain_core::ToolKind::Message { target: *target },
         Tool::Introduce { left, .. } => jig_domain_core::ToolKind::Message { target: *left },
         Tool::Amend { .. } | Tool::Cancel { .. } | Tool::Release { .. } => jig_domain_core::ToolKind::Control,
-        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => jig_domain_core::ToolKind::Decide,
+        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => {
+            jig_domain_core::ToolKind::Decide
+        }
         Tool::Propose { .. } => jig_domain_core::ToolKind::Propose,
         Tool::Subscribe { .. } | Tool::SubscribeForge { .. } | Tool::Unsubscribe { .. } => {
             jig_domain_core::ToolKind::Subscribe
@@ -566,26 +313,6 @@ pub(crate) fn tool_kind(tool: &Tool) -> Option<jig_domain_core::ToolKind> {
         | Tool::RejectedProposal(_)
         | Tool::RejectedNote(_) => return None,
     })
-}
-
-pub(crate) fn result_words(result: tasks::TaskResult) -> Box<[u8]> {
-    match result {
-        tasks::TaskResult::Report { words }
-        | tasks::TaskResult::Verdict { words, .. }
-        | tasks::TaskResult::Change { words, .. } => words,
-        tasks::TaskResult::Failure { reason } => reason,
-    }
-}
-
-pub(crate) fn ending_words(ending: tasks::Ending) -> Box<[u8]> {
-    match ending {
-        tasks::Ending::Done(result) => result_words(result),
-        tasks::Ending::Failed { reason } => reason,
-        tasks::Ending::Cancelled { reason, result } => match result {
-            Some(result) => result_words(result),
-            None => reason,
-        },
-    }
 }
 
 pub(crate) const fn named_call(key: crate::CallKey) -> forge::NamedCall {
@@ -609,6 +336,7 @@ pub(crate) fn call_payload_answer(payload: forge::CallPayload) -> CallAnswer {
     }
 }
 
+#[expect(clippy::result_large_err, reason = "a refused answer returns to its caller whole")]
 pub(crate) fn keep_connector_answer(
     domain: &mut Domain,
     key: crate::CallKey,

@@ -38,6 +38,8 @@ pub struct Item {
     pub start: Start,
     pub push: Option<Box<[u8]>>,
     pub holder: Option<u64>,
+    /// The repository's git identity, which the run's grants carry.
+    pub credential: Option<u32>,
     pub bytes: u64,
 }
 impl Domain {
@@ -120,6 +122,7 @@ impl Domain {
             start,
             push,
             holder,
+            credential: self.identities.get(&repository.provider.forge).copied(),
             bytes,
         })
     }

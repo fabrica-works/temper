@@ -17,7 +17,7 @@ use core::mem::size_of;
 pub use jig_domain_core::{Counters, fresh};
 use jig_domain_people as people;
 use skein_lib::{
-    Decision as SkeinDecision, Journal as SkeinJournal, JournalLimits, JournalRoom, List, Queue, ReplyTo, Token, Wall,
+    Decision as SkeinDecision, Journal as SkeinJournal, JournalLimits, JournalRoom, List, Queue, ReplyTo, Token,
 };
 
 /// Startup capacities supplied by the root, immutable across journal calls
@@ -53,6 +53,8 @@ pub struct Limits {
 pub enum Delivery {
     /// Host protocol handoffs follow their prerequisite commits.
     Host(Box<crate::HostDelivery>),
+    /// One record of the hub's link to a worker channel (jig's `domain/hosts.md`, 2).
+    Link { channel: Token, down: jig_domain_host::LinkDown },
     /// Release a committed connector entry to its client.
     ForgeCommitted { entry: u64 },
     /// One bounded connector call after all preceding progress commits.
@@ -61,75 +63,16 @@ pub enum Delivery {
         repository: temper_engine_domain_forge_client::api::Repository,
         op: temper_engine_domain_forge_client::api::Op,
     },
-    /// Internal committed notice to the expendable live views child.
-    View(Box<jig_domain_views::Event>),
     /// Committed request to the connector that owns a procedure task. The owner steps against
     /// current facts and returns the fenced decision through the root.
     Procedure { task: u64, step: u64, connector: u16, code: u32 },
-    /// One fleet-fenced named tool answer after its decision is durable.
-    CallAnswer { channel: Token, task: u64, attempt: u64, call: Token, answer: crate::CallAnswer },
     /// Committed words presented to fleet only after their task row commits.
     Relay { task: u64, attempt: u64, previous: Option<u64>, word: jig_domain_tasks::Word },
-    /// Fleet-selected live worker receives the whole committed word.
-    Inbound { channel: Token, task: u64, attempt: u64, word: jig_domain_tasks::Word },
-    /// Bounded page of committed unread results, consumed through its last position with this reply.
-    InboxPage { to: ReplyTo, person: u64, entries: Box<[ResultEntry]> },
-    /// One authenticated newest-first page derived from committed task rows.
-    InboxView { to: ReplyTo, person: u64, entries: Box<[InboxViewEntry]>, next: Option<InboxCursor> },
-    /// Root-internal start of the store-backed whole inbox scan after prior commits.
-    BeginInboxView { waiter: Token },
-    /// Root-to-authenticated named reader: one current durable held-chat view,
-    /// derived from tasks without a persistent people inbox.
-    EscalationReply {
-        /// One web-issued reply right.
-        to: ReplyTo,
-        person: u64,
-        /// Bounded semantic view; rejection owns at most `result_bytes`
-        context: Box<jig_domain_tasks::EscalationContext>,
-    },
     /// Root internal historical read, released after preceding commit; consumed
     /// once by root and never exposed to the shell.
     ReadEscalationDecision {
         /// Reserved root read slot, retired after IO terminal.
         waiter: Token,
-    },
-    /// Journal caller to web: one people terminal without an attached session; the walking root
-    /// uses `WebReply` instead.
-    Reply {
-        /// Web-issued right to exactly this terminal; moved once.
-        to: ReplyTo,
-        /// Typed, secret-free reply with no owned unbounded body.
-        reply: people::Reply,
-    },
-    /// Root to worker: accepted turn is durable; release its retained body. This notice has no
-    /// terminal event.
-    AcknowledgeTurn {
-        /// Worker protocol destination echoed through fleet.
-        channel: Token,
-        /// Durable task whose turn was accepted.
-        task: u64,
-        /// Root-issued activation fence for that turn.
-        attempt: u64,
-        /// Positive accepted turn number, represented by `u32`.
-        turn: u32,
-    },
-    /// Root to worker: the attempt terminal is durable; release its answer. This notice has no
-    /// terminal event.
-    Acknowledge {
-        /// Worker protocol destination echoed through fleet.
-        channel: Token,
-        /// Durable task whose attempt answered.
-        task: u64,
-        attempt: u64,
-    },
-    /// Root to worker: stop this attempt. Its answer or lost-channel grace outcome returns through
-    /// fleet; this notice allocates no additional attempt.
-    Cancel {
-        /// Worker protocol destination echoed through fleet.
-        channel: Token,
-        task: u64,
-        /// Root-issued activation to cancel, not a later attempt.
-        attempt: u64,
     },
     /// Root to fleet after durability; the root resumes it internally.
     Fleet(
@@ -146,28 +89,24 @@ pub enum Delivery {
         /// admission.
         assignment: crate::Assignment,
     },
-    /// Root to web: one terminal reply, optionally carrying its sign-in candidate; only a
-    /// successful people reply admits that session.
-    WebReply {
-        to: ReplyTo,
-        /// Root-issued sign-in candidate accompanying a sign-in decision, or none. A refusal can
-        /// leave it unused; clients require a successful `SignedIn` reply before using it.
-        sign_in: Option<u64>,
-        /// Fixed-size secret-free people terminal, held after the decision it names; owns no
-        /// display or credential bytes.
-        reply: people::Reply,
-    },
+    /// Root to web: one terminal people reply, after the decision it names.
+    WebReply { to: ReplyTo, reply: people::Reply },
+    /// One authenticated read's answer, after every preceding commit.
+    Read { reply: ReplyTo, answer: jig_domain_core::reads::Answer },
+    /// A core read's store load, after every preceding commit.
+    ReadLoad { load: Token, range: Box<jig_domain_core::reads::Range> },
+    /// A watched subject's whole current document.
+    Document { watcher: Token, document: Box<jig_domain_core::documents::Document> },
+    /// A watch ended after every outstanding terminal.
+    WatchEnded { watcher: Token, why: jig_domain_views::End },
+    /// Every commit before the drain is durable.
+    Drained,
     /// Root to worker: refuse its hello because of startup, shape or fleet admission; no attempt is
     /// assigned and no terminal is owed for this notice.
     Refuse {
         /// Fixed-size worker protocol destination echoed from its refused hello; no worker slot is
         /// admitted.
         channel: Token,
-    },
-    /// Root resumes authenticated historical result IO only after prior commits.
-    ReadResult {
-        /// Root-owned load waiter identity; internal routing consumes this notice once.
-        waiter: Token,
     },
     /// Root to worker: fleet lacked turn admission room; keep the body and retry after a backoff,
     /// without charging.
@@ -190,20 +129,7 @@ pub enum Delivery {
         /// Exclusive validated page continuation, or range beginning.
         after: Option<Key>,
     },
-    /// Root to authenticated web reader: terminal derived from an ended task.
-    ResultReply {
-        to: ReplyTo,
-        /// Authenticated requester number from people session and ended task.
-        person: u64,
-        /// Durable ended task number naming this result, never a separate inbox record.
-        task: u64,
-        /// Result position committed as read with this reply.
-        position: u64,
-        /// Owned result text bounded by journal `result_bytes`.
-        words: Box<[u8]>,
-    },
     /// Root to the task requester: live notice of its durable ending, with no reply right.
-    /// The unread entry remains derived from the ended task until its read position advances.
     Result {
         /// Durable person requester, checked by the task route.
         person: u64,
@@ -211,57 +137,6 @@ pub enum Delivery {
         /// Owned result text, at most journal `result_bytes`.
         words: Box<[u8]>,
     },
-}
-
-/// One result derived from a stored ended task; no separate person message row exists.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct ResultEntry {
-    pub position: u64,
-    pub task: u64,
-    /// Checked report or failure words from the ended task.
-    pub words: Box<[u8]>,
-}
-
-/// Stable descending page cursor for a task-derived person inbox.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct InboxCursor {
-    pub at: Wall,
-    pub task: u64,
-    pub kind: u8,
-    pub number: u64,
-    /// Highest result or reply position seen on the first page, carried through the scan.
-    pub read_high: u64,
-}
-
-/// One visible task-derived item; historical result words remain bounded by the root.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum InboxViewEntry {
-    /// A current question, decision, person task or reply.
-    Waiting(people::Entry),
-    /// A historical result requested by this person and still unread.
-    Result { at: Wall, result: ResultEntry },
-}
-
-impl InboxViewEntry {
-    /// Cursor used to page this item's committed ordering without retaining history in the root.
-    #[must_use]
-    pub const fn cursor(&self) -> InboxCursor {
-        match self {
-            InboxViewEntry::Waiting(entry) => {
-                let (kind, number) = match entry.kind {
-                    people::EntryKind::Question { message } => (1, message),
-                    people::EntryKind::Proposal { number } => (2, number),
-                    people::EntryKind::Escalation { revision } => (3, revision),
-                    people::EntryKind::PersonTask => (4, 0),
-                    people::EntryKind::Reply { message } => (5, message),
-                };
-                InboxCursor { at: entry.at, task: entry.task, kind, number, read_high: 0 }
-            }
-            InboxViewEntry::Result { at, result } => {
-                InboxCursor { at: *at, task: result.task, kind: 6, number: result.position, read_high: 0 }
-            }
-        }
-    }
 }
 
 /// Journal to its root caller: at most one value per entry point; the caller
@@ -353,7 +228,7 @@ impl Decision {
             | Write::Erase(Key::Core(jig_domain_core::Key::Core(
                 jig_domain_core::CoreKey::Deployment
                 | jig_domain_core::CoreKey::EscalationDecision { .. }
-                | jig_domain_core::CoreKey::ProposalDecision(_),
+                | jig_domain_core::CoreKey::ProposalDecision { .. },
             ))) => false,
             Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row)))) => {
                 row.task != 0
@@ -378,15 +253,16 @@ impl Decision {
                 )
                 | Key::Forge(_),
             ) => true,
-            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::EscalationDecision(row),
+            ))) => {
                 row.task != 0
                     && row.revision != 0
                     && row.by != 0
                     && row.requester != 0
                     && match &row.decision {
-                        jig_domain_people::EscalationDecision::Release | jig_domain_people::EscalationDecision::Pass => {
-                            true
-                        }
+                        jig_domain_people::EscalationDecision::Release
+                        | jig_domain_people::EscalationDecision::Pass => true,
                         jig_domain_people::EscalationDecision::Reject { reason } => {
                             reason.len()
                                 <= usize::try_from(limits.result_bytes.min(limits.transcript_bytes))
@@ -394,9 +270,9 @@ impl Decision {
                         }
                     }
             }
-            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row)))) => {
-                row.project != 0 && row.proposal != 0 && row.by != 0
-            }
+            Write::Save(Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::ProposalDecision(row),
+            ))) => row.project != 0 && row.proposal != 0 && row.by != 0,
             Write::Erase(Key::Core(jig_domain_core::Key::Notes(_)))
             | Write::Save(
                 Record::Core(
@@ -448,118 +324,31 @@ impl Decision {
     /// refusal returns ownership; successful admission ends through journal release after
     /// durability.
     #[expect(clippy::result_large_err, reason = "bounded assignment ownership is returned intact on admission refusal")]
-    #[expect(clippy::too_many_lines, reason = "one exhaustive delivery bound check")]
     pub fn deliver(&mut self, limits: &Limits, delivery: Delivery) -> Result<(), Delivery> {
         assert!(*limits == self.limits, "decision uses its configured limits");
         let within = match &delivery {
-            Delivery::View(event) => match event.as_ref() {
-                jig_domain_views::Event::TaskPhase { trees, .. } => {
-                    trees.len() <= usize::try_from(limits.deliveries).expect("u32 fits usize")
-                }
-                jig_domain_views::Event::Started { .. }
-                | jig_domain_views::Event::Turn { .. }
-                | jig_domain_views::Event::Finished { .. }
-                | jig_domain_views::Event::Inbox { .. } => true,
-                jig_domain_views::Event::Reported { .. }
-                | jig_domain_views::Event::Watch { .. }
-                | jig_domain_views::Event::Unwatch { .. }
-                | jig_domain_views::Event::Delivered { .. } => false,
-            },
-            Delivery::Result { words, .. } | Delivery::ResultReply { words, .. } => {
+            Delivery::Result { words, .. } => {
                 words.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize")
             }
-            Delivery::InboxPage { entries, .. } => {
-                let mut bytes = Some(0_u64);
-                for entry in entries {
-                    if entry.words.len() > usize::try_from(limits.result_bytes).expect("u32 fits usize") {
-                        bytes = None;
-                        break;
-                    }
-                    bytes = match bytes {
-                        Some(total) => match total
-                            .checked_add(u64::try_from(size_of::<ResultEntry>()).expect("usize fits u64"))
-                        {
-                            Some(total) => total.checked_add(u64::try_from(entry.words.len()).expect("usize fits u64")),
-                            None => None,
-                        },
-                        None => None,
-                    };
-                }
-                match bytes {
-                    Some(bytes) => bytes <= u64::from(limits.transcript_bytes),
-                    None => false,
-                }
-            }
-            Delivery::InboxView { entries, .. } => {
-                let mut bytes = 0_u64;
-                let mut valid = true;
-                for entry in entries {
-                    let extra = match entry {
-                        InboxViewEntry::Waiting(_) => 0,
-                        InboxViewEntry::Result { result, .. } => {
-                            if result.words.len() > usize::try_from(limits.result_bytes).expect("u32 fits usize") {
-                                valid = false;
-                            }
-                            u64::try_from(result.words.len()).expect("usize fits u64")
-                        }
-                    };
-                    let Some(total) =
-                        bytes.checked_add(u64::try_from(size_of::<InboxViewEntry>()).expect("usize fits u64"))
-                    else {
-                        valid = false;
-                        break;
-                    };
-                    let Some(next) = total.checked_add(extra) else {
-                        valid = false;
-                        break;
-                    };
-                    bytes = next;
-                }
-                valid && bytes <= u64::from(limits.transcript_bytes)
-            }
-            Delivery::EscalationReply { context, .. } => {
-                context.task != 0
-                    && match &context.escalation {
-                        jig_domain_tasks::Escalation::Rejected { revision, by, reason } => {
-                            *revision != 0
-                                && *by != 0
-                                && reason.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize")
-                        }
-                        jig_domain_tasks::Escalation::Waiting { revision, holder, .. } => {
-                            *revision != 0
-                                && match holder {
-                                    jig_domain_tasks::EscalationHolder::Task(task) => *task != 0,
-                                    jig_domain_tasks::EscalationHolder::Person(person) => {
-                                        *person != 0 && *person == context.requester
-                                    }
-                                    jig_domain_tasks::EscalationHolder::Role { project, .. } => {
-                                        *project == context.project
-                                    }
-                                }
-                        }
-                        jig_domain_tasks::Escalation::Unheld { .. } | jig_domain_tasks::Escalation::Routing { .. } => false,
-                    }
-            }
             Delivery::Fleet(event) => fleet_delivery_within(event),
-            Delivery::Relay { word, .. } | Delivery::Inbound { word, .. } => {
+            Delivery::Relay { word, .. } => {
                 word.number != 0
                     && word.words.len() <= usize::try_from(limits.transcript_bytes).expect("u32 fits usize")
             }
             Delivery::Assigned { assignment, .. } => assignment_within(assignment, limits),
             Delivery::Host(host) => host_within(host, limits),
-            Delivery::CallAnswer { .. }
+            Delivery::Link { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
-            | Delivery::Reply { .. }
-            | Delivery::AcknowledgeTurn { .. }
-            | Delivery::Acknowledge { .. }
-            | Delivery::Cancel { .. }
             | Delivery::WebReply { .. }
+            | Delivery::Read { .. }
+            | Delivery::ReadLoad { .. }
+            | Delivery::Document { .. }
+            | Delivery::WatchEnded { .. }
+            | Delivery::Drained
             | Delivery::Refuse { .. }
             | Delivery::ReadEscalationDecision { .. }
-            | Delivery::ReadResult { .. }
-            | Delivery::BeginInboxView { .. }
             | Delivery::TurnBusy { .. }
             | Delivery::Load { .. } => true,
         };
@@ -642,7 +431,10 @@ pub(crate) fn accept_routed(
                 .expect("overrun follows an admitted root decision"),
         };
         for _ in 0..=limits.writes {
-            if batch.write(Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))).is_err() {
+            if batch
+                .write(Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))))
+                .is_err()
+            {
                 break;
             }
         }
@@ -735,16 +527,17 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
                 out.push(Output::Deliver(Delivery::ForgeCall { call, repository, op }));
             }
             request @ (crate::Output::Worker(
-                crate::WorkerRequest::Host(_)
-                | crate::WorkerRequest::CallBusy { .. }
-                | crate::WorkerRequest::TurnBusy { .. }
-                | crate::WorkerRequest::AnswerBusy { .. },
+                crate::WorkerRequest::Host(_) | crate::WorkerRequest::ReadResult { .. },
             )
             | crate::Output::Party(
-                crate::PartyRequest::View(_) | crate::PartyRequest::WatchRefused { .. },
+                crate::PartyRequest::SignInRefused { .. }
+                | crate::PartyRequest::WatchRefused { .. }
+                | crate::PartyRequest::RunText { .. },
             )
             | crate::Output::Store(_)
             | crate::Output::Account(_)
+            | crate::Output::Busy(_)
+            | crate::Output::Drained
             | crate::Output::Stop) => out.push(Output::Now(request)),
         }
     }
@@ -811,8 +604,7 @@ fn fleet_delivery_within(event: &jig_domain_fleet::Event) -> bool {
         | Event::Answer { .. }
         | Event::Turn { .. }
         | Event::TurnBusy { .. }
-        | Event::Bounced { .. }
-        | Event::Told { .. } => false,
+        | Event::Observe { .. } => false,
     }
 }
 
@@ -840,7 +632,7 @@ fn assignment_within(assignment: &crate::Assignment, limits: &Limits) -> bool {
     }
     let mut owned = 0_u64;
     let mut last = 0_u64;
-    for word in &assignment.inbox {
+    for word in &assignment.messages {
         if word.number == 0 || word.number <= last || word.words.is_empty() {
             return false;
         }
@@ -896,12 +688,9 @@ fn host_within(host: &crate::HostDelivery, limits: &Limits) -> bool {
                 && bytes_within(crate::store::call_answer_bytes(answer), limits.transcript_bytes)
         }
         crate::HostDelivery::Answer { call, .. } => match call.owned_bytes() {
-            Some(bytes) => bytes <= u64::from(limits.transcript_bytes).checked_add(4).expect("bounded busy answer"),
+            Some(bytes) => bytes <= u64::from(limits.transcript_bytes),
             None => false,
         },
-        crate::HostDelivery::Inbound { message, .. } => {
-            length_within(message.sender.len().checked_add(message.words.len()), limits.transcript_bytes)
-        }
     }
 }
 

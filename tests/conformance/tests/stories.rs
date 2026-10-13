@@ -28,23 +28,49 @@ fn a_goal_issue_follows_its_milestone_and_closes() {
 fn lost_issue_creation_answer_recovers_without_a_second_issue() {
     stories::run(Story::IssueCreation, Cut::None, 71).expect("issue creation uncertainty");
 }
-#[test]
-fn native_stories_recover_their_focused_commit_cuts() {
-    // Configured receipt cuts, including writer restoration, an already deleted
-    // branch, a lost milestone comment and a retained live-run word.
-    for (story, cuts) in [
-        (Story::ReviewedChange, [1, 15]),
-        (Story::RepairCi, [1, 21]),
-        (Story::GoalIssue, [19, 23]),
-        (Story::OtherHand, [1, 15]),
-        (Story::LostMerge, [1, 16]),
-        (Story::PersonWords, [1, 8]),
-        (Story::IssueCreation, [1, 6]),
-    ] {
-        for cut in cuts {
-            let outcome = stories::run(story, Cut::AfterCommit(cut), 101)
-                .unwrap_or_else(|error| panic!("{story:?}, cut {cut}: {error:?}"));
-            assert!(outcome.crashes.contains(&cut), "{story:?} cut {cut} did not fire");
-        }
+/// Crash one native story at its configured receipt cuts, including writer
+/// restoration, an already deleted branch, a lost milestone comment and a
+/// retained live-run word; its baseline runs above and in the fuzzy sweep.
+/// Each chosen cut must fire.
+fn crashed_at(story: Story, cuts: [u64; 2]) {
+    for cut in cuts {
+        let outcome = stories::run(story, Cut::AfterCommit(cut), 101)
+            .unwrap_or_else(|error| panic!("{story:?}, cut {cut}: {error:?}"));
+        assert!(outcome.crashes.contains(&cut), "{story:?} cut {cut} did not fire");
     }
+}
+
+#[test]
+fn a_reviewed_change_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::ReviewedChange, [1, 17]);
+}
+
+#[test]
+fn a_ci_repair_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::RepairCi, [1, 23]);
+}
+
+#[test]
+fn a_goal_issue_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::GoalIssue, [21, 23]);
+}
+
+#[test]
+fn another_hand_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::OtherHand, [1, 17]);
+}
+
+#[test]
+fn a_lost_merge_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::LostMerge, [1, 18]);
+}
+
+#[test]
+fn person_words_recover_a_retained_live_run_word() {
+    crashed_at(Story::PersonWords, [1, 9]);
+}
+
+#[test]
+fn an_issue_creation_recovers_its_focused_commit_cuts() {
+    crashed_at(Story::IssueCreation, [1, 7]);
 }

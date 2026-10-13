@@ -139,6 +139,7 @@ impl World {
                 namespace: Box::from(&b"world"[..]),
                 writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
             },
+            &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
         .expect("valid connector configuration");
         let now = Time::from_nanos(100_000_000_000);
@@ -227,6 +228,7 @@ impl World {
                 namespace: Box::from(&b"world"[..]),
                 writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
             },
+            &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
         .expect("same configured connector");
         let mut rows = List::with_capacity(self.stored.len());
@@ -439,6 +441,7 @@ impl World {
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
+                | top::Request::NotMade { .. }
                 | top::Request::ContinueRelease { .. }
                 | top::Request::EffectsSettled { .. }
                 | top::Request::Released { .. }
@@ -523,7 +526,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Ci(row) => top::Key::Ci { repository: row.repository, head: row.head },
         top::Stored::Landed { commit, .. } => top::Key::Landed(*commit),
         top::Stored::ProposedEffect(row) => top::Key::ProposedEffect(row.number),
-        top::Stored::Entry(row) => top::Key::Entry(row.number),
+        top::Stored::Entry { entry, .. } => top::Key::Entry(entry.number),
         top::Stored::Client(row) => top::Key::Client(match row {
             client::Stored::Live(row) => client::Key::Live(row.watch.resource.clone()),
             client::Stored::Repository(row) => client::Key::Repository(row.repository),

@@ -1,15 +1,15 @@
 //! Child limits and checked route and heap sums (jig's domain/root.md, 10).
 use crate::boundary::{
-    Assignment, BriefConnector, BriefSection, Payload, PreparedWorkspace, Read, Request, ResultPage, Work,
+    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Request, Work,
 };
 use crate::domain::{Domain, max_out};
 use crate::route::{LandingRule, forge_route, host_route};
 use crate::{CallKey, Decision, JournalLimits, Output, loads};
 use alloc::boxed::Box;
-use jig_domain_core::{Model, RunCharter, RunPolicy};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_brief as brief;
+use jig_domain_core::{Model, RunCharter, RunPolicy};
 use jig_domain_fleet as fleet;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
@@ -43,8 +43,6 @@ pub struct Limits {
     pub brief: BriefLimits,
     /// Secret-free credential policy.
     pub accounts: accounts::Limits,
-    /// Live watches, backlogs and expendable trace room.
-    pub views: views::Limits,
     /// Bounded notes indexes and pages kept by the core.
     pub notes: notes::Limits,
     /// Forge connector subtree and its bounded outbox.
@@ -86,8 +84,37 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
     Env { now: env.now, wall: env.wall, limits: core_limits(&env.limits) }
 }
 
+/// The store map's bytes at or above which new party work is refused, as
+/// jig's `crates/jig-protocol-config/src/profile/small.rs` sets it until
+/// temper's configuration names its own (domain/engine.md, 13).
+pub const FILL_MARK: u64 = 268_435_456;
+/// The most owned bytes one authenticated store read brings (`small.rs`).
+pub const LOAD_BYTES: u64 = 65_536;
+/// Typed documents' construction bounds and served versions (`small.rs`, documents).
+pub const DOCUMENTS: jig_domain_core::documents::DocumentLimits = jig_domain_core::documents::DocumentLimits {
+    rows: 4,
+    text_bytes: 4_096,
+    chips: 4,
+    lines: 4,
+    versions: jig_domain_core::documents::Versions { minimum: 1, maximum: 1 },
+};
+
+/// Watches and live runs' provisional text, which temper keeps to jig's
+/// smallest profile until its clients watch more (`small.rs`, views).
+pub const VIEWS: views::Limits = views::Limits {
+    runs: 4,
+    watchers: 4,
+    watchers_per_party: 4,
+    subjects_per_change: 32,
+    text_bytes: 65_536,
+    facts: 32,
+};
+
 pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
     jig_domain_core::Limits {
+        fill_mark: FILL_MARK,
+        load_bytes: LOAD_BYTES,
+        documents: DOCUMENTS,
         connectors: 1,
         resume_bytes: limits.journal.transcript_bytes,
         run_bytes: limits.journal.run_bytes,
@@ -115,7 +142,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
         },
         accounts: limits.accounts,
         notes: limits.notes,
-        views: limits.views,
+        views: VIEWS,
     }
 }
 
@@ -126,25 +153,6 @@ pub(crate) fn brief_limits(limits: &BriefLimits) -> brief::Limits {
         read_bytes: limits.read_bytes,
         brief_bytes: limits.brief_bytes,
     }
-}
-
-pub(crate) fn tasks_saved_within(saved: Option<&[u32]>, most: u32) -> bool {
-    let Some(tags) = saved else { return true };
-    if tags.len() > usize::try_from(most).expect("u32 fits usize") {
-        return false;
-    }
-    let mut previous = 0;
-    for tag in tags {
-        if *tag <= previous {
-            return false;
-        }
-        previous = *tag;
-    }
-    true
-}
-
-pub(crate) fn end_bytes(end: &tasks::End) -> u64 {
-    tasks::terminal_bytes(end).expect("bounded terminal bytes")
 }
 
 pub(crate) fn payload_slots(limits: &Limits) -> Option<u32> {
@@ -219,12 +227,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let load_bytes = loads::worst_case(&limits.loads)?;
     let routes = route_bound(limits)?;
     let tool_bytes = u64::from(limits.tasks.batch).checked_mul(row_bound(limits)?)?;
-    let inbox_entry = size_of::<crate::ResultEntry>().max(size_of::<crate::InboxViewEntry>());
-    let inbox_bytes = u64::from(limits.people.inbox_entries)
-        .checked_mul(u64::try_from(inbox_entry).ok()?.checked_add(u64::from(limits.journal.result_bytes))?)?;
     if limits.forge.named_calls < limits.call_records
         || limits.journal.writes < routes
-        || limits.views.report_bytes < 8
         || limits.call_records == 0
         || limits.call_records > limits.journal.writes.checked_sub(routes)?
         || limits.journal.deliveries
@@ -245,7 +249,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.journal.result_bytes < limits.tasks.result_bytes
         || limits.journal.result_bytes < limits.people.words
         || limits.people.inbox_entries == 0
-        || inbox_bytes > u64::from(limits.journal.transcript_bytes)
         || u64::from(limits.journal.transcript_bytes) < row_bound(limits)?
     {
         return None;
@@ -297,14 +300,20 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?,
         )?
         .checked_add(Slab::<Option<Read>>::worst_case(limits.loads.loads)?)?
-        .checked_add(Queue::<ResultPage>::worst_case(limits.loads.loads)?)?
         .checked_add(
-            u64::from(limits.loads.loads).checked_mul(
-                u64::from(limits.loads.reply_bytes)
-                    .checked_add(inbox_bytes)?
-                    .checked_add(u64::from(limits.people.words))?,
-            )?,
+            u64::from(limits.loads.loads)
+                .checked_mul(u64::from(limits.loads.reply_bytes).checked_add(u64::from(limits.people.words))?)?,
         )?
+        // Read answers that waited for journal room.
+        .checked_add(Queue::<Event>::worst_case(limits.loads.loads)?)?
+        .checked_add(
+            u64::from(limits.loads.loads)
+                .checked_mul(jig_domain_core::reads::answer_worst_case(&core_limits(limits))?)?,
+        )?
+        // A forge input the drain hands back waits boxed in the journal's door.
+        .checked_add(u64::from(limits.journal.deliveries).checked_mul(
+            u64::try_from(size_of::<forge::Event>()).ok()?.checked_add(u64::from(limits.forge.client.answer_bytes))?,
+        )?)?
         .checked_add(Queue::<Work>::worst_case(routes)?)?
         .checked_add(u64::from(routes).checked_mul(row_bound(limits)?)?)?;
     let pushed =
@@ -359,76 +368,14 @@ pub(crate) fn role_scratch_bytes(limits: &Limits) -> Option<u64> {
         .checked_add(u64::try_from(size_of::<tasks::EscalationContext>()).ok()?)
 }
 
-pub(crate) fn authority_within(value: &authority::Authority, limits: &Limits) -> bool {
-    if value.grants.len()
-        > usize::try_from(limits.authority.grants.min(limits.tasks.authority_grants)).expect("u32 fits usize")
-        || value.note_resources.len()
-            > usize::try_from(limits.authority.grants.min(limits.tasks.authority_grants)).expect("u32 fits usize")
-        || value.delegation.kinds.len()
-            > usize::try_from(limits.authority.executors.min(limits.tasks.executor_kinds)).expect("u32 fits usize")
-        || value.notes.0 & !7 != 0
-    {
-        return false;
-    }
-    let mut bytes = 0_usize;
-    for grant in &value.grants {
-        if grant.pattern.segments.len()
-            > usize::try_from(limits.authority.segments.min(limits.tasks.authority_segments)).expect("u32 fits usize")
-        {
-            return false;
-        }
-        for segment in &grant.pattern.segments {
-            if segment.len() > usize::try_from(limits.authority.segment_bytes).expect("u32 fits usize") {
-                return false;
-            }
-            let Some(total) = bytes.checked_add(segment.len()) else {
-                return false;
-            };
-            bytes = total;
-        }
-        let terminal = match &grant.pattern.last {
-            authority::Last::Exact(bytes) | authority::Last::Open(bytes) => bytes.len(),
-        };
-        if terminal > usize::try_from(limits.authority.segment_bytes).expect("u32 fits usize") {
-            return false;
-        }
-        let Some(total) = bytes.checked_add(terminal) else {
-            return false;
-        };
-        bytes = total;
-    }
-    for scope in &value.note_resources {
-        if scope.pattern.segments.len()
-            > usize::try_from(limits.authority.segments.min(limits.tasks.authority_segments)).expect("u32 fits usize")
-        {
-            return false;
-        }
-        for segment in &scope.pattern.segments {
-            if segment.len() > usize::try_from(limits.authority.segment_bytes).expect("u32 fits usize") {
-                return false;
-            }
-            let Some(total) = bytes.checked_add(segment.len()) else { return false };
-            bytes = total;
-        }
-        let terminal = match &scope.pattern.last {
-            authority::Last::Exact(bytes) | authority::Last::Open(bytes) => bytes.len(),
-        };
-        if terminal > usize::try_from(limits.authority.segment_bytes).expect("u32 fits usize") {
-            return false;
-        }
-        let Some(total) = bytes.checked_add(terminal) else { return false };
-        bytes = total;
-    }
-    bytes <= usize::try_from(limits.tasks.authority_bytes).expect("u32 fits usize")
-}
-
 pub(crate) fn run_policy_bytes(policy: &RunPolicy) -> Option<u64> {
     if policy.turns == 0
         || policy.waiting == skein_lib::Duration::ZERO
         || policy.time == skein_lib::Duration::ZERO
         || policy.call_timeout == skein_lib::Duration::ZERO
         || policy.model.name.is_empty()
-        || policy.model.max_tokens == 0
+        || policy.model.window == 0
+        || policy.model.output == 0
         || policy.model.price_unit == 0
     {
         return None;
@@ -441,7 +388,7 @@ pub(crate) fn run_policy_bytes(policy: &RunPolicy) -> Option<u64> {
             u64::try_from(policy.alternatives.len()).ok()?.checked_mul(u64::try_from(size_of::<Model>()).ok()?)?,
         )?;
     for model in &policy.alternatives {
-        if model.name.is_empty() || model.max_tokens == 0 || model.price_unit == 0 {
+        if model.name.is_empty() || model.window == 0 || model.output == 0 || model.price_unit == 0 {
             return None;
         }
         bytes = bytes.checked_add(u64::try_from(model.name.len()).ok()?)?;
@@ -480,6 +427,7 @@ pub(crate) fn run_charter_bytes(charter: &RunCharter) -> Option<u64> {
     let mut bytes = run_policy_bytes(&charter.policy)?;
     match &charter.contract {
         tasks::Contract::Report { .. } | tasks::Contract::Change { .. } => {}
+        tasks::Contract::Approval { state, .. } => bytes = bytes.checked_add(u64::try_from(state.len()).ok()?)?,
         tasks::Contract::Verdict { choices } => {
             bytes = bytes.checked_add(
                 u64::try_from(choices.len()).ok()?.checked_mul(u64::try_from(size_of::<tasks::Verdict>()).ok()?)?,
@@ -531,17 +479,6 @@ pub(crate) fn run_charter_bytes(charter: &RunCharter) -> Option<u64> {
         bytes = bytes.checked_add(u64::try_from(terminal).ok()?)?;
     }
     Some(bytes)
-}
-
-pub(crate) fn hello_within(hello: &fleet::Hello, limits: &fleet::Limits) -> bool {
-    let stop_before_grace = hello.stop_bound < limits.grace;
-    if hello.hosting.len() > usize::try_from(limits.slots).expect("u32 fits usize")
-        || hello.workstreams.len() > usize::try_from(limits.workstreams).expect("u32 fits usize")
-        || !stop_before_grace
-    {
-        return false;
-    }
-    true
 }
 
 pub(crate) fn row_bound(limits: &Limits) -> Option<u64> {

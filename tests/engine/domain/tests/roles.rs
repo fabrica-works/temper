@@ -57,10 +57,11 @@ fn owner_policy_roster_and_requester_loss_commit_together_then_old_holder_has_no
     assert_eq!(world.referee.replacements, 1, "two same-key calls share one actual route");
     assert!(matches!(
         world.task_record().escalation,
-        tasks::Escalation::Waiting { revision: 2, holder: tasks::EscalationHolder::Role { project: 1, role: 0 }, .. }
+        tasks::Escalation::Waiting { revision: 1, holder: tasks::EscalationHolder::Role { project: 1, role: 0 }, .. }
     ));
     let mut expected = before;
     expected.escalation = world.task_record().escalation.clone();
+    expected.changed = world.task_record().changed;
     assert_eq!(*world.task_record(), expected, "authority, original funder, expense and tries stay exact");
     assert_eq!(economic_rows(&world), economic, "no accepted work or funding is rewritten");
     world.ask(1, 70, ask, successful(), false);
@@ -74,10 +75,10 @@ fn owner_policy_roster_and_requester_loss_commit_together_then_old_holder_has_no
         people::Ask::DecideEscalation {
             project: 1,
             task: world.task,
-            revision: 2,
+            revision: 1,
             decision: people::EscalationDecision::Release,
         },
-        refused(people::Refusal::Standing),
+        refused(people::Refusal::NotWaiting),
         false,
     );
     world.run();
@@ -114,7 +115,7 @@ fn both_current_owner_race_orders_authorize_only_the_first_committed_roster() {
         let mut world = World::new(Settings { commit_delay: 1, ..Settings::calm(9302, Base::Requester) });
         let loser = 1 - winner;
         world.ask(winner, 73, roster(&world, winner), successful(), winner == 1);
-        world.ask(loser, 74, roster(&world, loser), refused(people::Refusal::Role), false);
+        world.ask(loser, 74, roster(&world, loser), refused(people::Refusal::Role { held: None }), false);
         world.run();
         assert_eq!(world.referee.replacements, 1);
         let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { holdings, .. }))) =
@@ -136,15 +137,19 @@ fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
         (
             75,
             Box::new([people::Holding { person: 0, role: people::Role::Owner }]) as Box<[_]>,
-            refused(people::Refusal::Limit),
+            refused(people::Refusal::Limit { which: people::LimitKind::Roles }),
         ),
-        (76, Box::new([known, known]), refused(people::Refusal::Limit)),
+        (76, Box::new([known, known]), refused(people::Refusal::Limit { which: people::LimitKind::Roles })),
         (
             77,
             Box::new([people::Holding { person: u64::MAX, role: people::Role::Owner }]),
             refused(people::Refusal::Unknown),
         ),
-        (78, Box::new([known, known, known]), people::Reply::Refused(people::Refusal::Limit)),
+        (
+            78,
+            Box::new([known, known, known]),
+            people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Roles }),
+        ),
     ] {
         world.ask(1, key, people::Ask::SetRoles { project: 1, holdings }, reply, false);
         world.run();
@@ -158,19 +163,28 @@ fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
     );
     world.run();
     assert_eq!(*world.task_record(), before);
-    assert_eq!(world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))), original.as_ref());
+    assert_eq!(
+        world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))),
+        original.as_ref()
+    );
     assert_eq!(world.referee.replacements, 0);
     current_owner_policy_and_session_expiry_are_separate_real_checks();
-    exhausted_waiting_revision_and_insufficient_startup_room_refuse_before_mutation();
+    insufficient_startup_room_refuses_before_mutation();
 }
 
 fn current_owner_policy_and_session_expiry_are_separate_real_checks() {
     let mut no_policy = World::new(Settings { policy: false, ..Settings::calm(9304, Base::Requester) });
-    no_policy.ask(1, 80, roster(&no_policy, 1), refused(people::Refusal::Authority), false);
+    no_policy.ask(
+        1,
+        80,
+        roster(&no_policy, 1),
+        refused(people::Refusal::Role { held: Some(people::Role::Owner) }),
+        false,
+    );
     no_policy.run();
     assert_eq!(no_policy.referee.replacements, 0);
     let mut expired = World::new(Settings { expired: true, ..Settings::calm(9304, Base::Requester) });
-    expired.ask(1, 81, roster(&expired, 1), people::Reply::Refused(people::Refusal::SignIn), false);
+    expired.ask(1, 81, roster(&expired, 1), people::Reply::SignedOut, false);
     expired.run();
     assert_eq!(expired.referee.replacements, 0);
     let mut member = World::new(Settings::calm(9304, Base::Requester));
@@ -180,20 +194,14 @@ fn current_owner_policy_and_session_expiry_are_separate_real_checks() {
     ]);
     member.ask(0, 82, people::Ask::SetRoles { project: 1, holdings }, successful(), false);
     member.run();
-    member.ask(1, 83, roster(&member, 1), refused(people::Refusal::Role), false);
+    member.ask(1, 83, roster(&member, 1), refused(people::Refusal::Role { held: Some(people::Role::Member) }), false);
     member.run();
     assert_eq!(member.referee.replacements, 1, "ordinary membership does not grant administration");
 }
 
-fn exhausted_waiting_revision_and_insufficient_startup_room_refuse_before_mutation() {
-    let mut exhausted = World::new(Settings { exhausted: true, ..Settings::calm(9305, Base::Requester) });
-    let before = exhausted.task_record().clone();
-    let roles = exhausted.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))).cloned();
-    exhausted.ask(1, 84, roster(&exhausted, 1), refused(people::Refusal::Limit), false);
-    exhausted.run();
-    assert_eq!(*exhausted.task_record(), before);
-    assert_eq!(exhausted.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))), roles.as_ref());
-    assert_eq!(exhausted.referee.replacements, 0);
+// A reroute keeps the hold's revision (jig 00de0b8c), so no revision can be
+// exhausted by one; only the route's room is checked here.
+fn insufficient_startup_room_refuses_before_mutation() {
     let mut too_small = limits();
     too_small.journal.writes = 3;
     assert!(engine::worst_case(&too_small).is_none(), "counted root proof rejects missing atomic role-route room");
@@ -219,7 +227,10 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         .iter()
         .find(|(_, writes)| {
             writes.iter().any(|write| {
-                matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
+                matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. })))
+                )
             })
         })
         .expect("actual role replacement cohort and pre-transaction outside observer");
@@ -236,17 +247,25 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         let mut altered = writes.clone();
         match corruption {
             0 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))))
+                !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. })))
+                )
             }),
             1 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
+                !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. })))
+                )
             }),
             2 => altered.retain(|write| {
                 !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
             }),
             3 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
+                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) =
+                        write
+                    {
                         record.numbers.spent += 1;
                     }
                 }
@@ -263,7 +282,8 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
             5 => {
                 for write in &mut altered {
                     if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
-                        holdings, ..
+                        holdings,
+                        ..
                     }))) = write
                     {
                         holdings[0].person = world.people[0];

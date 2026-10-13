@@ -87,14 +87,17 @@ pub struct Referee {
     assignments: Vec<u64>,
     claims: BTreeSet<u64>,
     unplaced_claims: BTreeSet<u64>,
+    /// Scripted winners in decision order. Passing keeps the hold's revision
+    /// (jig 00de0b8c), so the order, not the revision, names a decision.
     offers: BTreeMap<u64, (u64, people::EscalationDecision)>,
+    /// Archived decisions in the same order; a later one at the same revision
+    /// replaces the earlier row in the store.
     archives: BTreeMap<u64, EscalationDecisionRecord>,
     terminals: BTreeSet<u64>,
     acknowledgements: BTreeSet<u64>,
     asks: BTreeMap<Token, AskReply>,
     reads: BTreeMap<Token, (u64, tasks::Escalation)>,
     read_terminals: BTreeSet<Token>,
-    busy_reads: BTreeSet<Token>,
     busy_asks: BTreeSet<Token>,
     start_replies: u32,
     results: u32,
@@ -102,8 +105,9 @@ pub struct Referee {
 
 fn task(rows: &BTreeMap<Key, Record>, number: u64) -> Option<&tasks::TaskRecord> {
     for key in [tasks::Key::Live(number), tasks::Key::Ended(number)] {
-        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record) | tasks::Stored::Ended(record)))) =
-            rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(
+            tasks::Stored::Live(record) | tasks::Stored::Ended(record),
+        ))) = rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
         {
             return Some(record.as_ref());
         }
@@ -129,6 +133,7 @@ fn held(record: &tasks::TaskRecord) -> bool {
         == (tasks::Phase::Held {
             why: tasks::Hold::Failures(tasks::Class::Run),
             was: tasks::Was::Active(tasks::Active::Due),
+            source: None,
         })
 }
 
@@ -158,7 +163,6 @@ impl Referee {
             asks: BTreeMap::new(),
             reads: BTreeMap::new(),
             read_terminals: BTreeSet::new(),
-            busy_reads: BTreeSet::new(),
             busy_asks: BTreeSet::new(),
             start_replies: 0,
             results: 0,
@@ -184,7 +188,9 @@ impl Referee {
         key: [u8; 16],
         ask: people::Ask,
     ) {
-        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask: saved_ask, outcome, .. }))) =
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
+            ask: saved_ask, outcome, ..
+        }))) =
             rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey { person, key }))))
         else {
             panic!("key-conflict probe follows its durable winning answer");
@@ -200,10 +206,14 @@ impl Referee {
         assert!(self.reads.insert(to, (person, escalation)).is_none(), "one fresh reply right per named read");
     }
 
-    /// Register the first scripted semantic winner for one revision; race losers
-    /// never become a second expected mutation.
-    pub fn offer(&mut self, revision: u64, by: u64, decision: people::EscalationDecision) {
-        assert!(self.offers.insert(revision, (by, decision)).is_none(), "one scripted winner per semantic revision");
+    /// Register the scripted semantic winner of the decision numbered `stage`;
+    /// race losers never become a second expected mutation.
+    pub fn offer(&mut self, stage: u64, by: u64, decision: people::EscalationDecision) {
+        assert!(self.offers.insert(stage, (by, decision)).is_none(), "one scripted winner per decision");
+    }
+
+    fn next_stage(&self) -> u64 {
+        u64::try_from(self.archives.len()).expect("few decisions") + 1
     }
 
     /// Check one sign-in's durable identity and session before retaining its name.
@@ -292,7 +302,11 @@ impl Referee {
         {
             return Err("assignment without fresh root proof");
         }
-        if assignment.charter != 1 || assignment.grant.account != 1 || assignment.grant.generation != 1 {
+        let granted = match assignment.grants.as_ref() {
+            [grant] => grant.account == 1 && grant.generation == 1,
+            _ => false,
+        };
+        if assignment.charter != 1 || !granted {
             return Err("assignment without configured grant");
         }
         let section = assignment.sections.first().ok_or("missing real task brief")?;
@@ -326,32 +340,36 @@ impl Referee {
             }
         }
         for write in writes {
-            if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome: people::Outcome::EscalationDecided { task, revision, .. }, .. }))) = write
-                && !self.archives.contains_key(revision)
+            if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome: people::Outcome::EscalationDecided { task, revision, by, .. }, .. }))) = write
+                && !self.archives.values().any(|archive| archive.revision == *revision && archive.by == *by)
                 && !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) if archive.task == *task && archive.revision == *revision)) {
                 return Err("keyed decision outcome without same-transaction archive");
             }
-            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(_)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(_)))) =
+                write
+            {
                 return Err("unscripted transcript in terminal-only worker story");
             }
             if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
-                let decided_revision =
+                // The decision this row shows: a final one, or the pass that
+                // moved it to the final role (the first decision).
+                let decided =
                     match &record.escalation {
                         tasks::Escalation::Unheld { revision } | tasks::Escalation::Rejected { revision, .. }
                             if *revision != 0 =>
                         {
-                            Some(*revision)
+                            Some((self.next_stage(), *revision))
                         }
                         tasks::Escalation::Waiting {
                             revision, holder: tasks::EscalationHolder::Role { .. }, ..
-                        } if *revision == 2 => Some(1),
+                        } if self.archives.is_empty() => Some((1, *revision)),
                         tasks::Escalation::Unheld { .. }
                         | tasks::Escalation::Routing { .. }
                         | tasks::Escalation::Waiting { .. }
                         | tasks::Escalation::Rejected { .. } => None,
                     };
-                if let Some(revision) = decided_revision
-                    && self.offers.contains_key(&revision) && !self.archives.contains_key(&revision)
+                if let Some((stage, revision)) = decided
+                    && self.offers.contains_key(&stage) && !self.archives.contains_key(&stage)
                     && !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) if archive.task == record.number && archive.revision == revision)) {
                     return Err("semantic decision without same-transaction archive");
                 }
@@ -362,7 +380,10 @@ impl Referee {
                     self.claims.insert(attempt);
                 }
             }
-            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(
+                terminal,
+            )))) = write
+            {
                 let Some(index) = self.assignments.iter().position(|attempt| *attempt == terminal.attempt) else {
                     self.unplaced_terminal(writes, terminal)?;
                     continue;
@@ -406,9 +427,9 @@ impl Referee {
                         return Err("final attempt was not charged once on lifetime expense");
                     }
                     if !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(pool)))) if pool.funder == record.funder && pool.numbers.spent_below == 5 && pool.numbers.reserved == 0)) { return Err("final expense and funding posting are not atomic"); }
-                    if !writes.contains(&Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(
-                        record.number,
-                    ))))) {
+                    if !writes.contains(&Write::Erase(Key::Core(jig_domain_core::Key::Core(
+                        jig_domain_core::CoreKey::RunProof(record.number),
+                    )))) {
                         return Err("final proof retirement is not atomic");
                     }
                 }
@@ -416,11 +437,15 @@ impl Referee {
                     return Err("worker terminal committed twice");
                 }
             }
-            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(
-                archive,
-            )))) = write
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::EscalationDecision(archive),
+            ))) = write
             {
-                let (by, decision) = self.offers.get(&archive.revision).ok_or("unscripted archive decision")?;
+                if self.archives.values().any(|kept| kept == archive) {
+                    return Err("semantic revision archived twice");
+                }
+                let stage = self.next_stage();
+                let (by, decision) = self.offers.get(&stage).ok_or("unscripted archive decision")?;
                 if Some(archive.task) != self.task
                     || archive.project != 1
                     || Some(archive.requester) != self.people[0]
@@ -450,7 +475,7 @@ impl Referee {
                             && matches!(record.escalation, tasks::Escalation::Waiting {
                                 revision,
                                 holder: tasks::EscalationHolder::Role { project: 1, role: 0 }, ..
-                            } if revision == archive.revision + 1)
+                            } if revision == archive.revision)
                     }
                 };
                 if !semantic || record.numbers.spent != 3 {
@@ -461,8 +486,9 @@ impl Referee {
                         matches!(ask.as_ref(), people::Ask::DecideEscalation { project, task, revision, decision: asked }
                             if key.person == *by && *project == 1 && *task == archive.task
                                 && *revision == archive.revision && *asked == *decision
-                                && *outcome == (people::Outcome::EscalationDecided {
-                                    task: archive.task, revision: archive.revision, by: *by, choice: choice(decision),
+                                && undated(*outcome) == (people::Outcome::EscalationDecided {
+                                    task: archive.task, revision: archive.revision, by: *by,
+                                    at: skein_lib::Wall::EPOCH, choice: choice(decision),
                                 }))
                     }
                     Write::Save(_) | Write::Erase(_) => false,
@@ -470,8 +496,8 @@ impl Referee {
                 if !atomic {
                     return Err("archive semantic change and keyed outcome are not one transaction");
                 }
-                if self.archives.insert(archive.revision, archive.clone()).is_some() {
-                    return Err("semantic revision archived twice");
+                if self.archives.insert(stage, archive.clone()).is_some() {
+                    return Err("semantic decision archived twice");
                 }
             }
         }
@@ -500,10 +526,9 @@ impl Referee {
         if !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) if proof.task == terminal.task && proof.attempt == terminal.attempt && proof.turn.is_none() && proof.terminal.as_ref() == Some(terminal))) {
             return Err("unassigned refusal and canonical proof are not atomic");
         }
-        if writes
-            .iter()
-            .any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(_))))))
-        {
+        if writes.iter().any(|write| {
+            matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(_)))))
+        }) {
             return Err("unassigned refusal changed the authentic funding ledger");
         }
         if !self.unplaced_claims.insert(terminal.attempt) {
@@ -533,8 +558,8 @@ impl Referee {
         reply: people::Reply,
     ) -> Result<(), &'static str> {
         let expected = self.asks.get(&to).ok_or("unsolicited or duplicate keyed terminal")?;
-        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome: saved, .. }))) = rows
-            .get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey {
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome: saved, .. }))) =
+            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey {
                 person: expected.person,
                 key: expected.key,
             }))))
@@ -551,18 +576,21 @@ impl Referee {
                 }
             }
             ExpectedTerminal::Outcome(outcome) => {
-                if reply != people::Reply::Outcome(*outcome) {
+                let people::Reply::Outcome(replied) = reply else {
+                    return Err("keyed terminal differs from independently expected outcome wrapper");
+                };
+                if undated(replied) != undated(*outcome) {
                     return Err("keyed terminal differs from independently expected outcome wrapper");
                 }
-                if ask.as_ref() != &expected.ask || saved != outcome {
+                if ask.as_ref() != &expected.ask || *saved != replied {
                     return Err("keyed terminal and durable answer differ");
                 }
-                if let people::Outcome::EscalationDecided { task, revision, by, choice: answer } = *outcome {
-                    let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) =
-                        rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::EscalationDecision {
-                            task,
-                            revision,
-                        })))
+                if let people::Outcome::EscalationDecided { task, revision, by, choice: answer, .. } = *outcome {
+                    let Some(Record::Core(jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::EscalationDecision(archive),
+                    ))) = rows.get(&Key::Core(jig_domain_core::Key::Core(
+                        jig_domain_core::CoreKey::EscalationDecision { task, revision },
+                    )))
                     else {
                         return Err("decision reply before durable archive");
                     };
@@ -581,10 +609,8 @@ impl Referee {
     /// # Errors
     /// Rejects an unsolicited terminal, a non-busy reply, or a reused reply right.
     pub fn ask_refused(&mut self, to: Token, reply: people::Reply, retry: Token) -> Result<(), &'static str> {
-        if reply != people::Reply::Refused(people::Refusal::Busy)
-            && reply != people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy))
-        {
-            return Err("named query pressure requires Busy");
+        if !matches!(reply, people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_))) {
+            return Err("named query pressure requires an unsaved retry answer");
         }
         if to == retry || self.asks.contains_key(&retry) || self.busy_asks.contains(&retry) {
             return Err("named query retry requires a fresh right");
@@ -595,70 +621,30 @@ impl Referee {
         Ok(())
     }
 
-    /// Consume an immediate `Busy` terminal for an outstanding current-view read.
-    /// The person must retry using a fresh right; no keyed outcome is saved
-    /// (domain/people.md, section 5.1).
-    ///
-    /// # Errors
-    /// Rejects unsolicited/duplicate terminals and a different wrapper or refusal.
-    pub fn read_refused(&mut self, to: Token, reply: people::Reply) -> Result<(), &'static str> {
-        if !self.reads.contains_key(&to) {
-            return Err("unsolicited or duplicate read-pressure terminal");
-        }
-        if reply != people::Reply::Refused(people::Refusal::Busy) {
-            return Err("read pressure requires immediate retryable Busy refusal");
-        }
-        self.reads.remove(&to);
-        self.read_terminals.insert(to);
-        self.busy_reads.insert(to);
-        Ok(())
-    }
-
-    /// Count independently consumed pressure terminals; successful retried views
-    /// remain separate obligations.
-    #[must_use]
-    pub fn busy_reads(&self) -> usize {
-        self.busy_reads.len()
-    }
-
     /// Count the named queries that consumed Busy and retried with a fresh right.
     #[must_use]
     pub fn busy_asks(&self) -> usize {
         self.busy_asks.len()
     }
 
-    /// Check one authenticated held view and its durable semantic record.
+    /// Whether the person's expected held chat is now durable: the core owns
+    /// reading it, so the scripted person sees it in its durable row.
     ///
     /// # Errors
-    /// Rejects duplicate/wrong reader, wrong revision/recipient or premature view
-    pub fn viewed(
-        &mut self,
-        rows: &BTreeMap<Key, Record>,
-        to: Token,
-        person: u64,
-        context: &tasks::EscalationContext,
-    ) -> Result<(), &'static str> {
-        let (expected_person, expected) = self.reads.get(&to).ok_or("unsolicited or duplicate escalation view")?;
-        if person != *expected_person
-            || Some(context.task) != self.task
-            || context.project != 1
-            || Some(context.requester) != self.people[0]
-            || context.why != tasks::Hold::Failures(tasks::Class::Run)
-            || !same_decision(&context.escalation, expected)
-        {
-            return Err("held view differs from scripted authenticated revision");
+    /// Rejects an unsolicited view, or a held chat seen before its charge is durable.
+    pub fn viewed(&mut self, rows: &BTreeMap<Key, Record>, to: Token) -> Result<bool, &'static str> {
+        let (_, expected) = self.reads.get(&to).ok_or("unsolicited or duplicate escalation view")?;
+        let Some(number) = self.task else { return Ok(false) };
+        let Some(record) = task(rows, number) else { return Ok(false) };
+        if !held(record) || !same_decision(&record.escalation, expected) {
+            return Ok(false);
         }
-        let record = task(rows, context.task).ok_or("view without durable held task")?;
-        if !held(record)
-            || record.escalation != context.escalation
-            || record.numbers.spent != 3
-            || record.run_spent != 3
-        {
+        if record.numbers.spent != 3 || record.run_spent != 3 {
             return Err("held view preceded routed priced durability");
         }
         self.reads.remove(&to);
         self.read_terminals.insert(to);
-        Ok(())
+        Ok(true)
     }
 
     /// Check one ACK per scripted worker terminal after durable evidence.
@@ -674,8 +660,10 @@ impl Referee {
     ) -> Result<(), &'static str> {
         if Some(number) != self.task
             || !self.terminals.contains(&attempt)
-            || !rows
-                .contains_key(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal { task: number, attempt })))
+            || !rows.contains_key(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal {
+                task: number,
+                attempt,
+            })))
         {
             return Err("worker ACK before exact durable terminal");
         }
@@ -732,7 +720,8 @@ impl Referee {
         let record = task(rows, number).ok_or("missing final task")?;
         let expected_funder =
             tasks::Funder::Pool { project: 1, person: self.people[0].ok_or("no requester identity")?, period: 1 };
-        if record.funder != expected_funder || record.numbers.budget != 100 {
+        // A chat's budget comes from its role's policy (jig a2616181).
+        if record.funder != expected_funder || record.numbers.budget != 500 {
             return Err("final task changed its authentic funding source or budget");
         }
         let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(pool)))) =
@@ -740,8 +729,11 @@ impl Referee {
         else {
             return Err("missing authentic requester funding pool");
         };
-        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(period)))) = rows
-            .get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(tasks::Funder::Period { project: 1, period: 1 }))))
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(period)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(tasks::Funder::Period {
+                project: 1,
+                period: 1,
+            }))))
         else {
             return Err("missing authentic deployment period");
         };
@@ -754,7 +746,7 @@ impl Referee {
         if record.numbers.spent != if succeeds { 5 } else { 3 }
             || pool.numbers.spent != 0
             || pool.numbers.spent_below != if succeeds { 5 } else { 0 }
-            || pool.numbers.reserved != if succeeds { 0 } else { 100 }
+            || pool.numbers.reserved != if succeeds { 0 } else { 500 }
         {
             return Err("expense lost doubled or posted to wrong funding source");
         }
@@ -791,4 +783,13 @@ impl Referee {
             && self.archives.len() == if self.story.passes() { 2 } else { 1 }
             && self.results == u32::from(self.story.succeeds())
     }
+}
+
+/// An outcome without the wall time its decision kept, which the outside
+/// script cannot predict.
+fn undated(outcome: people::Outcome) -> people::Outcome {
+    if let people::Outcome::EscalationDecided { task, revision, by, choice, .. } = outcome {
+        return people::Outcome::EscalationDecided { task, revision, by, at: skein_lib::Wall::EPOCH, choice };
+    }
+    outcome
 }

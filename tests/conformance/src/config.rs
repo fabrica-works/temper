@@ -87,6 +87,11 @@ pub fn root(
         limits.journal.held = 1024;
     }
 
+    // The core's inbox census and waiting entries cover every live task
+    // (jig's core `worst_case`).
+    limits.people.inbox_tasks = limits.tasks.tasks * 2;
+    limits.people.inbox_recipients = limits.tasks.inbox_messages * 2 + limits.authority.roles + 4;
+
     limits.journal.deliveries = (limits.tasks.tasks * 4 + 8 + limits.people.pending * limits.people.waiters)
         .max(limits.fleet.workers * jig_domain_fleet::max_out(&limits.fleet) + 1)
         .max(limits.brief.sections)
@@ -134,7 +139,7 @@ pub fn root(
     };
     let grants: Box<[authority::Grant]> =
         kinds.iter().map(|&kind| authority::Grant { connector: 0, kind, pattern: pattern.clone() }).collect();
-    let mut rules = config.authority.rules().clone();
+    let mut rules = config.core.authority.rules().clone();
     // Reserve room in the chat's 100-unit allotment for its 20-unit delegate.
     rules.maximum_run_spend = 60;
     rules.ceiling.tools = authority::Tools(1023);
@@ -146,7 +151,7 @@ pub fn root(
     rules.ceiling.delegation.kinds = Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
     rules.ceiling.delegation.tasks = 12;
     rules.ceiling.delegation.depth = 3;
-    let mut policy = config.authority.policy(1).expect("walking project").clone();
+    let mut policy = config.core.authority.policy(1).expect("walking project").clone();
     policy.ceiling.tools = rules.ceiling.tools;
     policy.ceiling.grants.clone_from(&rules.ceiling.grants);
     policy.ceiling.delegation = rules.ceiling.delegation.clone();
@@ -158,6 +163,9 @@ pub fn root(
     policy.roles[0].authority.tools = rules.ceiling.tools;
     policy.roles[0].authority.grants.clone_from(&grants);
     policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
+    // A chat takes its role's spend from the person's pool (jig a2616181):
+    // keep its 100-unit allotment, leaving the pool room for goals and chats.
+    policy.roles[0].authority.budget.spend = 100;
     if matches!(story, Some(super::stories::Story::ReviewedChange | super::stories::Story::RepairCi)) {
         let mut maintainer = policy.roles[0].clone();
         maintainer.number = 1;
@@ -169,13 +177,8 @@ pub fn root(
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.authority = domain;
-    config.chat_authority.tools = authority::Tools(1023);
-    config.chat_authority.grants = grants;
-    config.chat_authority.delegation.kinds =
-        Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
-    config.chat_authority.delegation.tasks = 8;
-    config.chat_authority.delegation.depth = 2;
+    // A chat's authority is its role's, one level shallower (jig a2616181).
+    config.core.authority = domain;
     let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
         connector: 0,
         kind: 4,

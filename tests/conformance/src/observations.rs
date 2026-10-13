@@ -86,8 +86,8 @@ pub fn policy(
     story: Option<super::stories::Story>,
 ) -> r::Policy {
     let (config, _) = super::config::root(seed, scenario, story);
-    let rules = config.authority.rules();
-    let project = config.authority.policy(1).expect("configured project");
+    let rules = config.core.authority.rules();
+    let project = config.core.authority.policy(1).expect("configured project");
     r::Policy {
         deployment: jig_core_world::observations::scope(&rules.ceiling),
         projects: BTreeMap::from([(1, jig_core_world::observations::scope(&project.ceiling))]),
@@ -227,7 +227,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                 decisions.push(*row);
             }
             root::Record::Forge { row } => {
-                let forge::Stored::Entry(row) = row.as_ref() else { continue };
+                let forge::Stored::Entry { entry: row, held: false } = row.as_ref() else { continue };
                 let key = key(store, row);
                 let (kind, resources, condition, target, state) = parts(&row.effect.write);
                 if let Some(attempt) = row.attempt {
@@ -268,7 +268,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
             }
         }
         for decision in &mut snapshot.decisions {
-            if let tasks::Party::Task(task) = accepted.proposer
+            if let people::Proposer::Task(task) = accepted.proposer
                 && decision.key.task == task
             {
                 decision.accepted_by = Some(r::Source::Person(accepted.by));
@@ -302,7 +302,7 @@ pub fn resolved(
     let mut live = BTreeSet::new();
     for record in store.rows.values().map(|record| &record.0) {
         if let root::Record::Forge { row } = record
-            && let forge::Stored::Entry(entry) = row.as_ref()
+            && let forge::Stored::Entry { entry, held: false } = row.as_ref()
         {
             let key = key(store, entry);
             live.insert(key);
@@ -344,8 +344,10 @@ pub fn resolved(
             Some(Some(core::connector::OutboxOutcome::Held { .. })) => {
                 held.insert(key, evidence.kind);
             }
+            // A write past its lifetime found not made is settled too (D14).
             Some(Some(
                 core::connector::OutboxOutcome::Made
+                | core::connector::OutboxOutcome::NotMade
                 | core::connector::OutboxOutcome::Failed
                 | core::connector::OutboxOutcome::Withdrawn,
             )) => {

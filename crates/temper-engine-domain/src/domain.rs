@@ -1,27 +1,25 @@
 //! The admitted step and ordered journal release (jig's domain/root.md, 3).
 use crate::boundary::{
-    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Released, Request, ResultPage,
-    Work,
+    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Released, Request, Work,
 };
 use crate::limits::{
-    Limits, authority_within, core_limits, environment_core, payload_slots, root_journal_limits, route_bound,
-    route_decision, route_takes, run_policy_bound, worst_case,
+    Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound, route_decision,
+    route_takes, run_policy_bound, worst_case,
 };
 use crate::restart::{connector_restarting, request_load};
 use crate::route::{
-    LandingRule, account_fire, escalation, forge_route, host_route, inbox, landing, policy_translate, results,
-    route_core_requests, route_into, step_routed,
+    LandingRule, forge_route, host_route, landing, policy_translate, route_core_requests, route_into, step_routed,
 };
-use crate::translate::{Config, RootConfig, environment_forge, split_config, view_into, view_outputs, view_requests};
+use crate::translate::{Config, RootConfig, environment_forge};
 use crate::{CallKey, Decision, Delivery, Journal, JournalOutput as Output, Range, Write, loads};
 use alloc::boxed::Box;
-use jig_domain_core::{Core, PendingRelay};
 use jig_domain_authority as authority;
+use jig_domain_core::Core;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
+use skein_lib::{Env, Id, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
 use temper_engine_domain_forge_client as forge_client;
@@ -58,8 +56,11 @@ pub struct Domain {
     pub(crate) loads: loads::Loads,
     pub(crate) assignments: Map<u64, Assignment>,
     pub(crate) payloads: Slab<Option<Payload>>,
-    pub(crate) result_reads: Slab<Option<Read>>,
-    pub(crate) result_pages: Queue<ResultPage>,
+    /// Loads of durable rows outside the working set: a run's preparation
+    /// (transcript, dependencies, inputs) and historical queries.
+    pub(crate) archive_reads: Slab<Option<Read>>,
+    /// Read loads' answers that waited for journal room (jig's `domain/root.md`, 3).
+    pub(crate) store_answers: Queue<Event>,
     pub(crate) host_calls: Map<Token, host_route::Flight>,
     pub(crate) work: Queue<Work>,
 }
@@ -72,19 +73,32 @@ impl Domain {
     #[expect(clippy::too_many_lines, reason = "the root allocates every child and bounded handoff table together")]
     pub fn new(mut config: Config, limits: &Limits) -> Domain {
         assert!(worst_case(limits).is_some(), "root limits are valid");
-        assert!(config.deployment_provider != 0, "deployment service provider differs from forge sign-in provider 0");
         assert!(
-            match run_policy_bound(&config.run, limits) {
-                Some(bytes) => bytes <= u64::from(limits.journal.run_bytes),
-                None => false,
-            },
-            "run policy fits assignment bound"
+            config.core.settings.deployment_provider != 0,
+            "deployment service provider differs from forge sign-in provider 0"
         );
+        assert!(config.core.connectors.len() == 1, "the forge is the deployment's one connector");
+        let forge_connector = *config.core.connectors.first().expect("one connector");
+        for charter in &config.core.settings.charters {
+            assert!(
+                match run_policy_bound(&charter.policy, limits) {
+                    Some(bytes) => bytes <= u64::from(limits.journal.run_bytes),
+                    None => false,
+                },
+                "each charter's run policy fits the assignment bound"
+            );
+        }
+        let mut forge_charter = false;
+        for charter in &config.core.settings.charters {
+            forge_charter |= charter.number == config.forge_charter;
+        }
+        assert!(forge_charter, "the forge's agent work runs under a configured charter");
         assert!(
-            config.resume_bytes > 0 && config.resume_bytes <= limits.journal.transcript_bytes,
+            config.core.settings.resume_bytes > 0
+                && config.core.settings.resume_bytes <= limits.journal.transcript_bytes,
             "configured task transcript bound fits the root's owned-byte limit"
         );
-        assert!(*config.authority.limits() == limits.authority, "root prices its exact authority limits");
+        assert!(*config.core.authority.limits() == limits.authority, "root prices its exact authority limits");
         assert!(
             limits.forge.judge_projects >= limits.authority.projects
                 && limits.forge.judge_criteria >= limits.authority.requirements,
@@ -105,8 +119,11 @@ impl Domain {
                 "project landing policy fits owned-byte bound"
             );
         }
-        assert!(config.permission_roles.capacity() == limits.authority.projects, "permission policy project bound");
-        for (_, mappings) in &config.permission_roles {
+        assert!(
+            config.core.permission_roles.capacity() == limits.authority.projects,
+            "permission policy project bound"
+        );
+        for (_, mappings) in &config.core.permission_roles {
             let count = u64::try_from(mappings.len()).expect("usize fits u64");
             let unit = u64::try_from(size_of::<people::PermissionRole>()).expect("type size fits u64");
             assert!(
@@ -117,51 +134,39 @@ impl Domain {
                 "permission policy bound"
             );
         }
-        assert!(authority_within(&config.chat_authority, limits), "chat authority shape bounded before copying");
-        let mut projects = List::with_capacity(limits.people.projects);
-        for owner in &config.owners {
-            assert!(config.authority.policy(owner.project).is_some(), "bootstrap owner names configured policy");
+        for owner in &config.core.owners {
+            assert!(config.core.authority.policy(owner.project).is_some(), "bootstrap owner names configured policy");
             assert!(
-                match config.authority.policy(owner.project).expect("known policy").escalation_role {
+                match config.core.authority.policy(owner.project).expect("known policy").escalation_role {
                     Some(role) => role <= 3,
                     None => false,
                 },
                 "current root requires final escalation role"
             );
-            let mut found = false;
-            for project in &projects {
-                if *project == owner.project {
-                    found = true;
-                }
-            }
-            if !found {
-                projects.push(owner.project).expect("configured projects bounded");
-            }
         }
         let mut forge_config = core::mem::replace(
             &mut config.forge,
             forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
         );
-        forge_config.namespace = Box::from(config.deployment);
-        let mut forge =
-            forge::Domain::new(&limits.forge, config.seed, forge_config).expect("valid forge configuration");
+        forge_config.namespace = Box::from(config.core.deployment);
+        let mut forge = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities)
+            .expect("valid forge configuration");
         let built = policy_translate::build_landing(
             &config.landing.deployment,
             false,
             limits.authority.requirements,
-            config.forge_connector,
+            forge_connector,
         )
         .expect("deployment landing requirements bounded");
         assert!(
-            config.authority.add_configured_requirements(&built.requirements),
+            config.core.authority.add_configured_requirements(&built.requirements),
             "deployment landing requirements fit authority configuration"
         );
         assert!(forge.deployment_judges(built.criteria), "deployment judge table bounded");
         for (&project, rules) in &config.landing.projects {
-            let built =
-                policy_translate::build_landing(rules, true, limits.authority.requirements, config.forge_connector)
-                    .expect("project landing requirements bounded");
-            let mut policy = config.authority.policy(project).expect("landing project has a policy").clone();
+            let built = policy_translate::build_landing(rules, true, limits.authority.requirements, forge_connector)
+                .expect("project landing requirements bounded");
+            let mut policy = config.core.authority.policy(project).expect("landing project has a policy").clone();
             assert!(
                 policy_translate::landing_roles(&policy, &config.landing.deployment),
                 "deployment landing roles configured"
@@ -175,7 +180,7 @@ impl Domain {
             .expect("project landing requirements fit authority policy");
             policy.requirements = combined;
             let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut config.authority, authority::Event::Policy { project, policy }, &mut facts);
+            authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
             assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project }), "landing policy configured");
             assert!(forge.project_judges(project, built.criteria), "project judge table bounded");
         }
@@ -186,8 +191,8 @@ impl Domain {
         )
         .expect("landing gate templates bounded");
         assert!(forge.gate_policy(gate_policy, &limits.forge), "forge owns bounded landing templates");
-        let (core_config, root_config) = split_config(config, projects);
-        let mut core = Core::new(core_config, &core_limits(limits));
+        let root_config = RootConfig { forge_connector, forge_charter: config.forge_charter };
+        let mut core = Core::new(config.core, &core_limits(limits));
         let core_env = Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: core_limits(limits) };
         let configured = jig_domain_core::step(
             &mut core,
@@ -256,8 +261,8 @@ impl Domain {
             loads: loads::Loads::new(&limits.loads),
             assignments: Map::with_capacity(limits.tasks.tasks),
             payloads: Slab::with_capacity(payload_slots(limits).expect("valid payload room")),
-            result_reads: Slab::with_capacity(limits.loads.loads),
-            result_pages: Queue::with_capacity(limits.loads.loads),
+            archive_reads: Slab::with_capacity(limits.loads.loads),
+            store_answers: Queue::with_capacity(limits.loads.loads),
             host_calls: Map::with_capacity(limits.fleet.calls),
             work: Queue::with_capacity(route_bound(limits).expect("valid routes")),
             config: root_config,
@@ -291,8 +296,8 @@ impl Domain {
             && self.work.is_empty()
             && self.assignments.is_empty()
             && self.payloads.is_empty()
-            && self.result_reads.is_empty()
-            && self.result_pages.is_empty()
+            && self.archive_reads.is_empty()
+            && self.store_answers.is_empty()
             && self.adoption_restore.is_empty()
             && self.forge_subscribing.is_empty()
             && self.forge_unsubscribing.is_empty()
@@ -320,7 +325,7 @@ impl Domain {
         self.brief_connectors.reclaim();
         self.forge.reclaim();
         self.payloads.reclaim();
-        self.result_reads.reclaim();
+        self.archive_reads.reclaim();
         loads::reclaim(&mut self.loads);
     }
 
@@ -334,8 +339,9 @@ impl Domain {
 /// Output room for a commit and one delivery, or one bounded immediate cohort.
 /// Reserve before release; step and fire allocate the same bounded scratch room.
 #[must_use]
-pub const fn max_out(limits: &Limits) -> u32 {
-    let viewed = views::max_out(&limits.views).saturating_add(4);
+/// The views' share is fixed by [`crate::limits::VIEWS`].
+pub const fn max_out(_limits: &Limits) -> u32 {
+    let viewed = views::max_out(&crate::limits::VIEWS).saturating_add(4);
     if viewed > 4 { viewed } else { 4 }
 }
 
@@ -429,8 +435,10 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             request @ (Request::Worker(_)
             | Request::Party(_)
             | Request::Forge { .. }
-            | Request::Store(crate::StoreRequest::Load { .. })
+            | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })
             | Request::ToChild(_)
+            | Request::Busy(_)
+            | Request::Drained
             | Request::Account(_)) => {
                 assert!(now(domain, request), "root door reserves one route's immediate outputs");
                 domain.door_count = domain.door_count.checked_add(1).expect("bounded immediate route");
@@ -486,30 +494,9 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
     if domain.journal.stopped() || domain.core.restart_failure().is_some() {
         return;
     }
-    if !domain.result_pages.is_empty() && route_takes(domain, &env.limits) {
-        let mut decision = route_decision(domain, &env.limits).expect("archive page admitted before owner changes");
-        let page = domain.result_pages.pop().expect("pending result page");
-        match domain.result_reads.get(Id::from_token(page.waiter)) {
-            Some(Some(Read::Inbox(_))) => {
-                inbox::page(domain, env, page.waiter, page.rows, page.next, &mut decision, out);
-            }
-            Some(Some(Read::Result(_))) => {
-                results::page(domain, env, page.waiter, page.rows, page.next, &mut decision, out);
-            }
-            Some(
-                Some(
-                    Read::Escalation(_)
-                    | Read::Proposal(_)
-                    | Read::Transcript { .. }
-                    | Read::Dependency(_)
-                    | Read::InputCheck(_)
-                    | Read::Notes { .. },
-                )
-                | None,
-            )
-            | None => unreachable!("queued person page has its live read"),
-        }
-        close(domain, env, decision, out);
+    if !domain.store_answers.is_empty() && admits(domain, &env.limits) {
+        let event = domain.store_answers.pop().expect("queued store answer");
+        step_routed(domain, env, event, out);
         return;
     }
     if !domain.work.is_empty() {
@@ -520,6 +507,12 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
         return;
     }
     if !route_takes(domain, &env.limits) {
+        return;
+    }
+    // From the stop on, nothing that would make a commit is taken: connector
+    // work stays with the connector and no run is placed (jig's
+    // `domain/engine.md`, 6.1).
+    if domain.core.stopping() {
         return;
     }
     if domain.ready() || connector_restarting(domain) {
@@ -536,10 +529,8 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
         if !domain.ready() {
             return;
         }
-        if domain.core.accounts.usable(domain.core.settings.account) && !domain.core.due.is_empty() {
-            for _ in 0..domain.core.due.len() {
-                domain.work.push(Work::Activate(domain.core.due.pop().expect("waiting activation")));
-            }
+        if let Some(context) = domain.core.take_due() {
+            domain.work.push(Work::Activate(context));
             let decision = route(domain, env);
             close(domain, env, decision, out);
             return;
@@ -566,47 +557,33 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
     if domain.journal.stopped() || domain.core.restart_failure().is_some() {
         return;
     }
-    if !admits(domain, &env.limits) || (!domain.ready() && !connector_restarting(domain)) {
-        let room = skein_lib::JournalRoom { writes: 0, held: 0 };
-        let Some(decision) = domain.journal.decision(&room) else { return };
-        readonly_timers(domain, env, out);
-        domain.journal.accept(decision);
+    // A timer that cannot be admitted stays due and fires again next pass.
+    if !admits(domain, &env.limits) {
         return;
     }
     let mut decision = route_decision(domain, &env.limits).expect("timer route admitted before child mutation");
-    readonly_timers(domain, env, out);
-    if connector_restarting(domain) {
+    for timer in [jig_domain_core::Timer::Account, jig_domain_core::Timer::View] {
+        let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), timer);
+        route_core_requests(domain, env, &mut decision, routed);
+    }
+    let restarting = connector_restarting(domain);
+    if (restarting || domain.ready()) && !domain.core.stopping() {
         let mut forge_out = Queue::with_capacity(forge::max_out(&env.limits.forge));
         forge::fire(&mut domain.forge, &environment_forge(env), &mut forge_out);
         forge_route::outputs(domain, env, &mut decision, &mut forge_out);
+    }
+    route_into(domain, env, &mut decision);
+    if domain.ready() {
+        let routed =
+            jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
+        route_core_requests(domain, env, &mut decision, routed);
+        for timer in [jig_domain_core::Timer::Tasks, jig_domain_core::Timer::Fleet, jig_domain_core::Timer::Brief] {
+            let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), timer);
+            route_core_requests(domain, env, &mut decision, routed);
+        }
         route_into(domain, env, &mut decision);
-        close(domain, env, decision, out);
-        return;
     }
-    if !domain.ready() {
-        return;
-    }
-    let mut forge_out = Queue::with_capacity(forge::max_out(&env.limits.forge));
-    forge::fire(&mut domain.forge, &environment_forge(env), &mut forge_out);
-    forge_route::outputs(domain, env, &mut decision, &mut forge_out);
-    route_into(domain, env, &mut decision);
-    let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
-    route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Tasks);
-    route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Fleet);
-    route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Brief);
-    route_core_requests(domain, env, &mut decision, routed);
-    route_into(domain, env, &mut decision);
     close(domain, env, decision, out);
-}
-
-fn readonly_timers(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    account_fire(domain, env, out);
-    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::View);
-    let mut view_out = view_requests(routed, views::max_out(&env.limits.views));
-    view_outputs(domain, env, &mut view_out, out);
 }
 
 pub(crate) fn route(domain: &mut Domain, env: &Env<Limits>) -> Decision {
@@ -625,6 +602,14 @@ pub(crate) fn forge_release_ending(ending: tasks::Ending) -> forge::ReleaseEndin
 /// A released continuation is one newly admitted step, just like an input.
 /// When the route is full the journal returns it to iterate without changing a child.
 pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
+    // A committed forge entry is not made while the engine stops; it stays
+    // durable and the next start's outbox settlement makes it.
+    if let Delivery::ForgeCommitted { .. } = released.0
+        && domain.core.stopping()
+    {
+        out.push(Request::ToChild(released));
+        return;
+    }
     let Some(mut decision) = route_decision(domain, &env.limits) else {
         out.push(Request::ToChild(released));
         return;
@@ -634,23 +619,15 @@ pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Re
     close(domain, env, decision, out);
 }
 
-#[expect(clippy::too_many_lines, reason = "exhaustive released continuation routing")]
-fn released_into(domain: &mut Domain, env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
+fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
     match released.0 {
         Delivery::ForgeCommitted { entry } => {
             domain.work.push(Work::Forge(forge::Event::Committed { entry }));
         }
         Delivery::Fleet(event) => domain.work.push(Work::Fleet(event)),
-        Delivery::View(event) => {
-            view_into(domain, env, *event, out);
-        }
-        Delivery::Relay { task, attempt, previous, word } => {
+        Delivery::Relay { task, attempt, word, .. } => {
             let name = Token::new(word.number);
             let payload = domain.payloads.insert(Some(Payload::InboxWord(word))).expect("relay payload reserved");
-            assert!(
-                domain.core.relaying.replace(PendingRelay { previous, message: name.raw() }).is_none(),
-                "one relay at a time"
-            );
             domain.work.push(Work::Fleet(fleet::Event::Inbound {
                 run: Token::new(task),
                 attempt: Token::new(attempt),
@@ -661,16 +638,14 @@ fn released_into(domain: &mut Domain, env: &Env<Limits>, released: Released, out
             request_load(domain, waiter, range, after, out);
         }
         Delivery::ReadEscalationDecision { waiter } => {
-            let Some(Some(read)) = domain.result_reads.get(Id::from_token(waiter)) else { return };
+            let Some(Some(read)) = domain.archive_reads.get(Id::from_token(waiter)) else { return };
             let (task, revision) = match read {
-                Read::Escalation(escalation::Query::Historical { task, revision, .. }) => (*task, *revision),
-                Read::Result(_)
-                | Read::Inbox(_)
+                Read::Escalation(query) => (query.task, query.revision),
+                Read::Ended(_)
                 | Read::Transcript { .. }
                 | Read::Dependency(_)
                 | Read::InputCheck(_)
                 | Read::Notes { .. }
-                | Read::Escalation(escalation::Query::Read { .. })
                 | Read::Proposal(_) => {
                     unreachable!("decision archive waiter")
                 }
@@ -683,62 +658,19 @@ fn released_into(domain: &mut Domain, env: &Env<Limits>, released: Released, out
                 out,
             );
         }
-        Delivery::ReadResult { waiter } => {
-            let Some(read) = domain.result_reads.get(Id::from_token(waiter)) else {
-                return;
-            };
-            let Some(read) = read else {
-                return;
-            };
-            match read {
-                Read::Result(_) => request_load(domain, waiter, Range::Core(crate::CoreRange::EndedResults), None, out),
-                Read::Inbox(_)
-                | Read::Escalation(_)
-                | Read::Proposal(_)
-                | Read::Transcript { .. }
-                | Read::Dependency(_)
-                | Read::InputCheck(_)
-                | Read::Notes { .. } => {
-                    unreachable!("result waiter")
-                }
-            }
-        }
-        Delivery::BeginInboxView { waiter } => {
-            match domain.result_reads.get(Id::from_token(waiter)) {
-                Some(Some(Read::Inbox(_))) => {}
-                Some(
-                    Some(
-                        Read::Result(_)
-                        | Read::Escalation(_)
-                        | Read::Proposal(_)
-                        | Read::Transcript { .. }
-                        | Read::Dependency(_)
-                        | Read::InputCheck(_)
-                        | Read::Notes { .. },
-                    )
-                    | None,
-                )
-                | None => unreachable!("inbox start has its live waiter"),
-            }
-            request_load(domain, waiter, Range::Core(crate::CoreRange::Tasks), None, out);
-        }
         delivery @ (Delivery::Host(_)
+        | Delivery::Link { .. }
         | Delivery::ForgeCall { .. }
         | Delivery::Procedure { .. }
-        | Delivery::CallAnswer { .. }
-        | Delivery::Inbound { .. }
-        | Delivery::InboxPage { .. }
-        | Delivery::InboxView { .. }
-        | Delivery::EscalationReply { .. }
-        | Delivery::Reply { .. }
-        | Delivery::AcknowledgeTurn { .. }
-        | Delivery::Acknowledge { .. }
-        | Delivery::Cancel { .. }
         | Delivery::Assigned { .. }
         | Delivery::WebReply { .. }
+        | Delivery::Read { .. }
+        | Delivery::ReadLoad { .. }
+        | Delivery::Document { .. }
+        | Delivery::WatchEnded { .. }
+        | Delivery::Drained
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }
-        | Delivery::ResultReply { .. }
         | Delivery::Result { .. }) => out.push(crate::boundary::delivery_output(delivery)),
     }
 }

@@ -41,8 +41,9 @@ pub struct WalkingReferee {
 
 fn task_record(rows: &BTreeMap<Key, Record>, number: u64) -> Option<&tasks::TaskRecord> {
     for key in [tasks::Key::Live(number), tasks::Key::Ended(number)] {
-        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record) | tasks::Stored::Ended(record)))) =
-            rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(
+            tasks::Stored::Live(record) | tasks::Stored::Ended(record),
+        ))) = rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
         {
             return Some(record);
         }
@@ -72,7 +73,9 @@ impl WalkingReferee {
                     return Err("claim and reserved root proof are not one transaction");
                 }
             }
-            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) =
+                write
+            {
                 let expected = TURNS.iter().find(|(number, _, _)| *number == turn.turn).ok_or("unexpected turn")?;
                 if turn.spent != expected.1 || turn.transcript.as_ref() != expected.2 || turn.read.is_some() {
                     return Err("turn differs from worker script");
@@ -139,8 +142,9 @@ impl WalkingReferee {
         {
             return Err("wrong authenticated person");
         }
-        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { person: authenticated, .. }))) =
-            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::SignIn(sign_in))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::SignIn {
+            person: authenticated, ..
+        }))) = rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::SignIn(sign_in))))
         else {
             return Err("sign-in reply before durable session");
         };
@@ -200,7 +204,11 @@ impl WalkingReferee {
         {
             return Err("assignment without committed claim phase");
         }
-        if assignment.charter != 1 || assignment.grant.account != 1 || assignment.grant.generation != 1 {
+        let granted = match assignment.grants.as_ref() {
+            [grant] => grant.account == 1 && grant.generation == 1,
+            _ => false,
+        };
+        if assignment.charter != 1 || !granted {
             return Err("assignment lost configured charter or real account grant");
         }
         let Some(section) = assignment.sections.first() else {
@@ -427,6 +435,27 @@ impl WalkingReferee {
     #[must_use]
     pub fn terminal_replay_done(&self) -> bool {
         self.replayed_answer_acknowledgements == 1
+    }
+
+    /// A story cut after its terminal commit: every effect but the person's
+    /// live result notice, which the cut root never released; reading the
+    /// result afterwards is the core's (jig's `client/domain/contract.md`, 6).
+    #[must_use]
+    pub fn done_after_cut(&self) -> bool {
+        self.sign_in_replies == 1
+            && self.start_replies == 1
+            && self.assignments == 1
+            && self.saved_turns.len() == TURNS.len()
+            && self.acknowledged_turns.len() == TURNS.len()
+            && self.terminal_commits == 1
+            && self.answer_acknowledgements == 1
+            && self.results == 0
+    }
+
+    /// The person signed in by the story, once known.
+    #[must_use]
+    pub const fn person(&self) -> Option<u64> {
+        self.person
     }
 
     /// The story is complete only after all independently expected effects.

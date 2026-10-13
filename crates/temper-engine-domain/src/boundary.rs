@@ -1,27 +1,32 @@
 //! The engine boundary, wrapping its typed peers (jig's domain/root.md, 2).
-use crate::route::{HostMessage, HostRequest, escalation, forge_route, inbox, proposals, results};
-use crate::{CallAnswer, CallKey, Delivery, Key, Range, Record, Write};
+use crate::route::{HostRequest, escalation, forge_route, proposals};
+use crate::{CallKey, Delivery, Key, Range, Record, Write};
 use alloc::boxed::Box;
-use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
+use jig_domain_core as core;
+use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
 use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{List, ReplyTo, Token};
+use skein_lib::{List, ReplyTo, Token, Wall};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
 
 /// A complete claim's assignment, root to worker after durability; its
 /// brief sections are bounded by brief limits (domain/engine.md, 7.1 and 9).
-/// Its attempt ends through the worker answer route; the worker keeps its
-/// terminal body until a durable ACK, with channel loss handled by fleet grace.
+/// The protocol layer encodes it as the hub's assignment, with the forge
+/// workspace beside it as temper's application part (jig's
+/// `protocol/channel.md`, 6.2).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Assignment {
     /// Root-issued durable task number.
     pub task: u64,
     pub attempt: u64,
+    /// The conversation's first attempt, shared by its resumes.
+    pub conversation: u64,
     /// Configured charter, never selected by the worker.
     pub charter: u32,
     /// Root-owned charter policy and task result contract for this activation.
@@ -29,10 +34,12 @@ pub struct Assignment {
     /// Owned task, attempt and transcript-tail sections, at most brief `sections` and
     /// `brief_bytes`. Task/deployment lineage awaits its root route.
     pub sections: Box<[BriefSection]>,
-    /// Whole unread words offered to this attempt, oldest first.
-    pub inbox: Box<[tasks::Word]>,
+    /// Whole unread words offered to this attempt, oldest first, at most the run's inbox.
+    pub messages: Box<[tasks::Word]>,
     /// Writable repository tags whose workspace starts at the task's saved-work branch.
     pub saved: Box<[u32]>,
+    /// The task holding the workspace, whose runs may reuse it: the hub's workstream.
+    pub workstream: u64,
     /// Concrete forge checkouts and their claimed writer branches.
     pub workspace: ForgeWorkspace,
     /// Ordered opaque committed turn bodies of this task, empty for a fresh run.
@@ -41,8 +48,8 @@ pub struct Assignment {
     /// worker gives these to the new attempt before it can decide new calls.
     pub answered: Box<[crate::CallRecord]>,
     pub settled: Box<[jig_domain_core::SettledCall]>,
-    /// Secret-free account grant; token bytes stay in the protocol.
-    pub grant: accounts::Grant,
+    /// Secret-free account and application credential grants; token bytes stay in the protocol.
+    pub grants: Box<[accounts::Grant]>,
 }
 
 /// One root-owned section in a worker assignment (jig's domain/engine.md, section 9).
@@ -96,32 +103,16 @@ pub struct ForgeRepository {
     pub identity: u32,
 }
 
-/// Concrete checkout roots and cache ownership for one assignment.
+/// Concrete checkout roots for one assignment; the workstream that owns
+/// their cache is the hub's (jig's `domain/hosts.md`, 2).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ForgeWorkspace {
-    pub key: Box<[u8]>,
     pub repositories: Box<[ForgeRepository]>,
-}
-
-/// Worker to root: one numbered transcript and cumulative spend, retained
-/// by its sender until the matching ACK (domain/engine.md, 7.2).
-#[derive(PartialEq, Eq, Debug)]
-pub struct Turn {
-    /// Positive consecutive worker turn; fleet fences accepted/pending duplicates before child
-    /// admission using the restored kept turn. Root owns durable latest-turn evidence.
-    pub number: u32,
-    /// Worker-priced cumulative spend for this attempt, not a new delta. Tasks validates
-    /// monotonicity and charges the accepted delta atomically.
-    pub cumulative: u64,
-    /// Last offered inbox message read in this turn; taking joins the transcript and charge commit.
-    pub read: Option<u64>,
-    /// Owned transcript, bounded by journal transcript bytes before fleet admission.
-    pub transcript: Box<[u8]>,
 }
 
 /// One typed engine tool request from the current worker claim
 /// (domain/engine.md, section 7.3). Later routes extend this vocabulary.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Tool {
     /// Write or correct one scoped note by the revision this run recalled.
     Note { entry: jig_domain_notes::New, recalled: Option<u32> },
@@ -211,18 +202,16 @@ pub enum MessageForm {
 
 /// A run-named tool call. The root fills the task and attempt from the
 /// worker envelope before looking up its durable decision.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Call {
     pub completion: u32,
     pub position: u32,
     pub tool: Tool,
 }
 
-/// External inputs to the walking root; store terminals always enter,
-/// worker bodies are bounded before retention (domain/engine.md, 5–7).
-/// Web calls own one terminal reply right. Valid current worker bodies are
-/// acknowledged after durability or refused for retry; stale worker input may
-/// be dropped by fleet. Store and refresh variants are terminals, not new calls.
+/// External inputs to the walking root (domain/engine.md, 5–7). Admission is
+/// `try_step`'s: an input the journal cannot take returns to its owner, and
+/// store answers are always taken (jig's `domain/root.md`, 3).
 /// The input union, with one variant for each typed peer.
 #[derive(Debug)]
 pub enum Event {
@@ -230,11 +219,20 @@ pub enum Event {
     Worker(WorkerInput),
     Party(PartyInput),
     Account(accounts::Event),
+    /// A generation named by temper's own credential source for one numbered
+    /// application credential, a repository's git identity (domain/engine.md, 12).
+    Credential {
+        number: u32,
+        generation: u64,
+        valid: skein_lib::Duration,
+    },
     Forge(Box<forge::Event>),
     Released(Released),
     Restart,
     /// Iterate offers progress requested by ready owners.
     Resume,
+    /// The service begins its drain (jig's `domain/engine.md`, 6.1).
+    Stop,
 }
 #[derive(Debug)]
 pub enum StoreInput {
@@ -242,6 +240,8 @@ pub enum StoreInput {
         /// Store-echoed positive commit number, at most the latest issued commit; older cumulative
         /// answers are inert.
         number: u64,
+        /// The store's map bytes after this commit (jig's `protocol/store.md`, 11.2).
+        fill: u64,
     },
     Uncommitted {
         /// Store-echoed issued commit that failed; failures at/before durable progress or after
@@ -261,104 +261,67 @@ pub enum StoreInput {
         /// Echoed generational load token, fenced after its one terminal and reclaim.
         owner: Token,
     },
+    /// The one terminal of a core read load (jig's `client/domain/contract.md`, 6).
+    ReadLoaded { load: Token, result: core::reads::Loaded },
 }
+
+/// The three inputs of a worker channel, in the hub's vocabulary (jig's
+/// `domain/hosts.md`, 2 and 6.4).
+#[derive(Debug)]
+pub enum Link {
+    Hello(host::Hello),
+    /// One hub record; temper's parts ride beside an answer and are empty otherwise.
+    Up {
+        up: host::LinkUp,
+        parts: Parts,
+    },
+    Lost,
+}
+
+/// Temper's application parts beside a hub answer, named by its work tokens
+/// (jig's `protocol/channel.md`, 6.2).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Parts {
+    /// Full set of repository tags with saved work after this terminal, when the worker made
+    /// a save; absent preserves the previous set.
+    pub saved: Option<Box<[u32]>>,
+    /// Last heads actually pushed by the worker, indexed by deployment repository tag.
+    pub pushed: Box<[forge::Pushed]>,
+}
+
+impl Parts {
+    /// A record that carries no application part.
+    #[must_use]
+    pub fn none() -> Parts {
+        Parts { saved: None, pushed: Box::new([]) }
+    }
+}
+
 #[derive(Debug)]
 pub enum WorkerInput {
-    HostCall {
-        channel: Token,
-        task: u64,
-        attempt: u64,
-        call: fleet::Call,
-    },
-    DecodedHostCall {
-        to: ReplyTo,
-        body: Call,
-    },
-    RenderedHostCall {
-        to: ReplyTo,
-        answer: jig_domain_core::SettledAnswer,
-    },
-    Inbound {
-        task: u64,
-        attempt: u64,
-        message: HostMessage,
-    },
-    Call {
-        channel: Token,
-        task: u64,
-        attempt: u64,
-        call: Token,
-        body: Call,
-    },
-    Hello {
-        /// Protocol-issued opaque channel identity; at most fleet `workers` are retained cold, and
-        /// fleet admits the live channel.
-        channel: Token,
-        /// Worker slot/host/workstream report, bounded by fleet limits before cold retention.
-        hello: fleet::Hello,
-    },
-    Lost {
-        /// Protocol-issued identity of the channel that closed; duplicates/unknown
-        /// channels consume no queued handoff room.
-        channel: Token,
-    },
-    Turn {
-        /// Worker protocol sender; fleet validates it against the current attempt before handing
-        /// the owned body to tasks.
-        channel: Token,
-        /// Positive durable task number owning this turn; fleet treats it as an opaque run
-        /// identity.
-        task: u64,
-        /// Positive root-issued activation number; fleet fences stale worker bodies.
-        attempt: u64,
-        /// Owned numbered transcript and cumulative charge; the root bounds bytes before payload
-        /// retention.
-        turn: Turn,
-    },
-    Answer {
-        /// Worker protocol sender checked by fleet against the hosted attempt.
-        channel: Token,
-        /// Durable task number for the answered attempt; it is not a fresh task allocation.
-        task: u64,
-        /// Positive root-issued activation number; fleet fences stale worker bodies.
-        attempt: u64,
-        /// Whole priced spend for this attempt; tasks checks monotonicity and semantic admission
-        /// atomically, while root/fleet owns transport replay evidence and fencing.
-        cumulative: u64,
-        /// Owned task terminal; root retained payload bytes are at most twice tasks `result_bytes`,
-        /// then tasks checks result/contract admission against its stricter result bound.
-        end: tasks::End,
-        /// Full set of repository tags with saved work after this terminal, when the worker made
-        /// a save; absent preserves the previous set.
-        saved: Option<Box<[u32]>>,
-        /// Last heads actually pushed by the worker, indexed by deployment repository tag.
-        pushed: Box<[forge::Pushed]>,
-    },
+    /// A worker channel's hello, record or loss.
+    Link { channel: Token, link: Link },
+    /// The protocol decoded a relayed call into the engine's tool vocabulary.
+    DecodedHostCall { to: ReplyTo, body: Call },
+    /// The protocol rendered a decided call's answer for its host.
+    RenderedHostCall { to: ReplyTo, answer: jig_domain_core::SettledAnswer },
+    /// The protocol read an ended answer's opaque outcome after the fleet fenced it.
+    ResultRead { payload: Token, end: tasks::End },
 }
 #[derive(Debug)]
 pub enum PartyInput {
-    Watch {
-        watcher: Token,
-        sign_in: u64,
-        key: [u8; 16],
-        subject: views::Subject,
-    },
-    Unwatch {
-        watcher: Token,
-    },
-    ViewDelivered {
-        watcher: Token,
-        done: bool,
-    },
     StartRecurring {
         project: u32,
         authority: tasks::Authority,
         template: tasks::RecurringTemplate,
     },
+    /// A project's period begins, from outside the root (jig's
+    /// `protocol/configuration.md`, 5).
     Period {
         project: u32,
         period: u64,
         budget: u64,
+        next: Option<Wall>,
     },
     ProcedureStep {
         task: u64,
@@ -367,17 +330,8 @@ pub enum PartyInput {
         code: u32,
         action: ProcedureAction,
     },
-    ReadEscalation {
-        /// One web-issued reply right.
-        reply_to: ReplyTo,
-        /// Root-issued session, checked against both clocks.
-        sign_in: u64,
-        /// Positive chat task known from Started.
-        task: u64,
-    },
     SignedIn {
-        /// Web-issued right to this one sign-in reply, returned busy immediately or moved through
-        /// people to a durable terminal.
+        /// Web-issued right to this one sign-in reply, moved through people to a durable terminal.
         reply_to: ReplyTo,
         /// Protocol-authenticated forge/user key and display bytes, bounded by people
         /// `identity_bytes`.
@@ -394,27 +348,37 @@ pub enum PartyInput {
         /// Typed chat request with words bounded by people words before routing.
         ask: people::Ask,
     },
-    ReadResult {
-        /// Web-issued right moved into one bounded result waiter; consumes one terminal
-        /// result/refusal reply.
+    /// One unkeyed read on a live sign-in, answered after every preceding commit.
+    Read {
         reply_to: ReplyTo,
-        /// Root-issued durable secret-free session number; authenticated and expired by people.
         sign_in: u64,
-        /// Positive ended task number selected by the reader; its stored requester must match the
-        /// authenticated person.
+        read: core::reads::Read,
+    },
+    /// Watch one subject's whole document on a live sign-in.
+    Watch {
+        watcher: Token,
+        sign_in: u64,
+        subject: core::documents::Watched,
+        window: core::documents::Window,
+    },
+    /// Follow a task's live run from the client's acknowledged turn and offset.
+    WatchRun {
+        watcher: Token,
+        sign_in: u64,
         task: u64,
+        turn: Option<views::TurnName>,
+        offset: u32,
     },
-    ReadInbox {
-        reply_to: ReplyTo,
-        sign_in: u64,
-        /// Positive maximum entries, capped by the configured per-person inbox limit.
-        most: u32,
+    Unwatch {
+        watcher: Token,
     },
-    ViewInbox {
-        reply_to: ReplyTo,
-        sign_in: u64,
-        most: u32,
-        before: Option<crate::InboxCursor>,
+    /// The protocol took a watch's held document.
+    Delivered {
+        watcher: Token,
+    },
+    /// The protocol took one provisional stream delivery.
+    StreamDelivered {
+        watcher: Token,
     },
 }
 
@@ -437,6 +401,11 @@ pub enum Request {
         accounts::Request,
     ),
     ToChild(Released),
+    /// A forge input the drain does not decide, returned to its owner (jig's
+    /// `domain/engine.md`, 6.1).
+    Busy(Box<forge::Event>),
+    /// Every commit before the drain is durable (jig's `domain/engine.md`, 6.1).
+    Drained,
     Stop,
 }
 #[derive(PartialEq, Eq, Debug)]
@@ -462,44 +431,41 @@ pub enum StoreRequest {
         /// Hard decoded-page byte limit, enforced before and after protocol decoding.
         bytes: u32,
     },
+    /// One core read load after every preceding commit, answered by `ReadLoaded`.
+    Read { load: Token, range: Box<core::reads::Range> },
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum WorkerRequest {
     Host(Box<HostRequest>),
-    CallBusy {
-        channel: Token,
-        task: u64,
-        attempt: u64,
-        call: Token,
-    },
-    TurnBusy {
-        /// Worker protocol destination echoed from its refused turn; a fixed-size identity, without
-        /// admitting another worker.
-        channel: Token,
-        /// Task number echoed from the refused turn; this notice does not validate or allocate the
-        /// task.
-        task: u64,
-        /// Attempt number echoed for the worker to fence the retry; no activation is admitted by
-        /// this notice.
-        attempt: u64,
-        /// Turn number echoed from the refused body, represented by `u32`; worker retains that body
-        /// for retry.
-        turn: u32,
-    },
-    AnswerBusy {
-        /// Worker protocol destination echoed from the refused terminal; no new worker is retained.
-        channel: Token,
-        /// Task number echoed from the refused answer; no task or charge is admitted.
-        task: u64,
-        /// Attempt number echoed for the worker to fence its retained terminal and retry.
-        attempt: u64,
+    /// Read an ended answer's opaque outcome in the protocol routing.
+    ReadResult {
+        payload: Token,
+        outcome: Box<[u8]>,
     },
     Deliver(Delivery),
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum PartyRequest {
-    View(views::Request),
-    WatchRefused { watcher: Token, refusal: people::Refusal },
+    /// A sign-in the core refused before any decision: a counter is
+    /// exhausted, or the store is at its fill mark.
+    SignInRefused {
+        to: ReplyTo,
+    },
+    /// A watch refused before any durable decision.
+    WatchRefused {
+        watcher: Token,
+        why: core::WatchRefusal,
+    },
+    /// A run's provisional suffix for one follower, with no commit.
+    RunText {
+        watcher: Token,
+        turn: views::TurnName,
+        from: u32,
+        to: u32,
+        text: Box<[u8]>,
+        cut: bool,
+        call: Option<views::Call>,
+    },
     Deliver(Delivery),
 }
 
@@ -523,6 +489,8 @@ pub(crate) enum Work {
     EscalationFailed { waiter: Token },
     ProposalLoaded { waiter: Token, rows: Box<[Record]> },
     ProposalFailed { waiter: Token },
+    EndedLoaded { waiter: Token, rows: Box<[Record]> },
+    EndedFailed { waiter: Token },
 }
 
 #[derive(Debug)]
@@ -538,37 +506,51 @@ pub(crate) struct PreparedWorkspace {
     pub(crate) claim_names: Box<[forge::Name]>,
 }
 
+/// Bodies the fleet names by token while it routes them (jig's `domain/hosts.md`, 6.4).
 #[derive(Debug)]
 pub(crate) enum Payload {
+    /// The drain's answer to a relayed call.
+    Busy,
     Call {
         key: CallKey,
         body: Call,
     },
-    CallAnswer(CallAnswer),
     SettledCall(jig_domain_core::SettledCall),
-    Message(HostMessage),
     InboxWord(tasks::Word),
     Turn {
         task: u64,
         attempt: u64,
-        body: Turn,
+        turn: u32,
+        cumulative: u64,
+        read: Option<u64>,
+        transcript: Box<[u8]>,
+        opens_window: bool,
+        refused: Box<[u64]>,
     },
     Answer {
         task: u64,
         attempt: u64,
         cumulative: u64,
-        end: tasks::End,
-        saved: Option<Box<[u32]>>,
-        pushed: Box<[forge::Pushed]>,
+        ending: host::Ending,
+        read: Option<u64>,
+        refused: Box<[u64]>,
+        parts: Parts,
     },
+}
+
+/// An ended owner row the core asked the root to load.
+#[derive(Debug)]
+pub(crate) enum EndedRead {
+    SeenChat { request: Token, task: u64 },
+    Chat { task: u64 },
+    PersonTask { request: Token, person: u64, project: u32, task: u64 },
 }
 
 #[derive(Debug)]
 pub(crate) enum Read {
-    Result(results::Read),
-    Inbox(inbox::Read),
     Escalation(escalation::Query),
     Proposal(proposals::Query),
+    Ended(EndedRead),
     Transcript { task: u64 },
     Dependency(DependencyRead),
     InputCheck(InputCheck),
@@ -594,13 +576,6 @@ pub(crate) struct DependencyRead {
     pub(crate) results: List<HistoricalResult>,
 }
 
-#[derive(Debug)]
-pub(crate) struct ResultPage {
-    pub(crate) waiter: Token,
-    pub(crate) rows: Box<[Record]>,
-    pub(crate) next: Option<Key>,
-}
-
 /// A child continuation that has crossed its journal barrier. Its payload is
 /// private; iterate may only return it as `Event::Released`.
 #[derive(PartialEq, Eq, Debug)]
@@ -611,29 +586,22 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
     match delivery {
         delivery @ (Delivery::ForgeCommitted { .. }
         | Delivery::Fleet(_)
-        | Delivery::View(_)
         | Delivery::Relay { .. }
         | Delivery::Load { .. }
-        | Delivery::ReadEscalationDecision { .. }
-        | Delivery::ReadResult { .. }
-        | Delivery::BeginInboxView { .. }) => Request::ToChild(Released(delivery)),
+        | Delivery::ReadEscalationDecision { .. }) => Request::ToChild(Released(delivery)),
         delivery @ (Delivery::Host(_)
+        | Delivery::Link { .. }
         | Delivery::Procedure { .. }
-        | Delivery::CallAnswer { .. }
-        | Delivery::Inbound { .. }
-        | Delivery::AcknowledgeTurn { .. }
-        | Delivery::Acknowledge { .. }
-        | Delivery::Cancel { .. }
         | Delivery::Assigned { .. }
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
-        delivery @ (Delivery::InboxPage { .. }
-        | Delivery::InboxView { .. }
-        | Delivery::EscalationReply { .. }
-        | Delivery::Reply { .. }
-        | Delivery::WebReply { .. }
-        | Delivery::ResultReply { .. }
+        delivery @ (Delivery::WebReply { .. }
+        | Delivery::Read { .. }
+        | Delivery::Document { .. }
+        | Delivery::WatchEnded { .. }
         | Delivery::Result { .. }) => Request::Party(PartyRequest::Deliver(delivery)),
+        Delivery::ReadLoad { load, range } => Request::Store(StoreRequest::Read { load, range }),
+        Delivery::Drained => Request::Drained,
         Delivery::ForgeCall { call, repository, op } => Request::Forge { call, repository, op },
     }
 }

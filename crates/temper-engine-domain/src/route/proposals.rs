@@ -9,7 +9,7 @@ pub(crate) struct Query {
     request: Token,
     person: u64,
     project: u32,
-    proposer: u64,
+    proposer: jig_domain_people::Proposer,
     proposal: u64,
 }
 
@@ -21,11 +21,11 @@ pub(crate) fn historical_begin(
     request: Token,
     person: u64,
     project: u32,
-    proposer: u64,
+    proposer: jig_domain_people::Proposer,
     proposal: u64,
 ) {
     let read = Query { request, person, project, proposer, proposal };
-    let Ok(id) = domain.result_reads.insert(Some(super::Read::Proposal(read))) else {
+    let Ok(id) = domain.archive_reads.insert(Some(super::Read::Proposal(read))) else {
         domain.work.push(Work::Core(jig_domain_core::Event::HistoricalProposal {
             request,
             person,
@@ -42,7 +42,7 @@ pub(crate) fn historical_begin(
         &env.limits,
         super::Delivery::Load {
             waiter: id.token(),
-            range: super::Range::Core(crate::CoreRange::ProposalDecision { proposal }),
+            range: super::Range::Core(crate::CoreRange::ProposalDecision { proposer, proposal }),
             after: None,
         },
     );
@@ -52,10 +52,12 @@ pub(crate) fn historical_loaded(domain: &mut Domain, waiter: Token, rows: Box<[s
     let Some(super::Read::Proposal(query)) = super::take_read(domain, waiter) else {
         unreachable!("proposal archive owns its read")
     };
-    domain.result_reads.retire(super::Id::from_token(waiter));
+    domain.archive_reads.retire(super::Id::from_token(waiter));
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
-            super::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => Some(row),
+            super::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => {
+                Some(row)
+            }
             super::Record::Core(
                 jig_domain_core::Record::Core(
                     jig_domain_core::CoreRecord::Call(_)
@@ -90,7 +92,7 @@ pub(crate) fn historical_failed(domain: &mut Domain, waiter: Token) {
     let Some(super::Read::Proposal(query)) = super::take_read(domain, waiter) else {
         unreachable!("proposal archive owns its read")
     };
-    domain.result_reads.retire(super::Id::from_token(waiter));
+    domain.archive_reads.retire(super::Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::HistoricalProposal {
         request: query.request,
         person: query.person,

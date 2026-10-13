@@ -93,6 +93,11 @@ impl Domain {
     pub fn is_ready(&self) -> bool {
         self.calls.is_ready() || (!self.calls.is_full() && (self.outbox.is_ready(&self.keep) || self.keep.is_ready()))
     }
+    /// Whether a read asked now finds a call slot.
+    #[must_use]
+    pub fn has_room(&self) -> bool {
+        !self.calls.is_full()
+    }
     #[must_use]
     pub fn cached(&self, resource: &Resource) -> Option<&crate::Cached> {
         self.keep.cached(resource)
@@ -133,7 +138,8 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::Hint { hint } => keep::hint(d, env, hint),
         Event::Writer { resource, taken } => keep::writer(d, env, &resource, taken),
         Event::Pushed { resource, commit } => keep::pushed(d, env, &resource, commit, out),
-        Event::Make { entry } => outbox::make(d, env, entry, out),
+        Event::Make { entry } => outbox::make(d, env, entry, false, out),
+        Event::Remake { entry } => outbox::make(d, env, entry, true, out),
         Event::Withdraw { entry } => outbox::withdraw(d, entry, out),
         Event::Restore { record } => match record {
             Stored::Live(record) => keep::restore_live(d, env, record),

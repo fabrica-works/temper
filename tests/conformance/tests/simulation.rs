@@ -68,26 +68,49 @@ fn remaining_shared_scenarios_use_real_forge_and_people_operations() {
     }
 }
 
-#[test]
-fn shared_scenarios_keep_their_promises_at_focused_crash_cuts() {
-    // Configured entry, middle and closing receipt cuts. Baselines run in the
-    // focused cases above and in the fuzzy sweep; assert each chosen cut fires.
-    use jig_conformance::scenarios::Scenario;
-    for (scenario, cuts) in [
-        (Scenario::LateCopy, [1, 6, 12]),
-        (Scenario::OtherHand, [1, 15, 30]),
-        (Scenario::UncertainRestarts, [1, 7, 15]),
-        (Scenario::ChangedJudge, [1, 22, 45]),
-        (Scenario::NarrowingPolicy, [1, 12, 24]),
-        (Scenario::StandingTask, [1, 12, 24]),
-        (Scenario::RunBudget, [1, 10, 21]),
-    ] {
-        for cut in cuts {
-            let outcome =
-                jig_conformance::scenarios::run::<Temper>(scenario, jig_conformance::Cut::AfterCommit(cut), 91)
-                    .unwrap_or_else(|error| panic!("{scenario:?} at {cut}: {error:?}"))
-                    .expect("applicable");
-            assert!(outcome.crashes.contains(&cut), "{scenario:?} cut {cut} did not fire");
-        }
+/// Crash one shared scenario at its configured entry, middle and closing
+/// receipt cuts; its baseline runs in the focused cases above and in the
+/// fuzzy sweep. Each chosen cut must fire.
+fn crashed_at(scenario: jig_conformance::scenarios::Scenario, cuts: [u64; 3]) {
+    for cut in cuts {
+        let outcome = jig_conformance::scenarios::run::<Temper>(scenario, jig_conformance::Cut::AfterCommit(cut), 91)
+            .unwrap_or_else(|error| panic!("{scenario:?} at {cut}: {error:?}"))
+            .expect("applicable");
+        assert!(outcome.crashes.contains(&cut), "{scenario:?} cut {cut} did not fire");
     }
+}
+
+#[test]
+fn a_late_copy_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::LateCopy, [1, 6, 12]);
+}
+
+#[test]
+fn another_hand_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::OtherHand, [1, 15, 30]);
+}
+
+#[test]
+fn uncertain_restarts_keep_their_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::UncertainRestarts, [1, 7, 15]);
+}
+
+#[test]
+fn a_changed_judge_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::ChangedJudge, [1, 22, 45]);
+}
+
+#[test]
+fn a_narrowing_policy_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::NarrowingPolicy, [1, 12, 24]);
+}
+
+#[test]
+fn a_standing_task_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::StandingTask, [1, 12, 24]);
+}
+
+#[test]
+fn a_run_budget_keeps_its_promises_at_focused_crash_cuts() {
+    crashed_at(jig_conformance::scenarios::Scenario::RunBudget, [1, 10, 21]);
 }

@@ -105,6 +105,14 @@ pub struct Repository {
     pub protection: Protection,
     pub settings: client::api::Settings,
 }
+/// The git identity a forge's repositories are pushed and fetched with: an
+/// application credential numbered by the deployment's configuration
+/// (credentials.md, "each repository to a git identity").
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct GitIdentity {
+    pub forge: u16,
+    pub credential: u32,
+}
 /// Protection as observed by this writer at adoption.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Protection {
@@ -377,8 +385,13 @@ pub enum Stored {
         commit: client::api::Commit,
         task: u64,
     },
-    /// An unsettled outbox entry.
-    Entry(client::Entry),
+    /// An unsettled outbox entry. A held one is out of the client's outbox,
+    /// keeping its room until a person makes it again or it is settled not
+    /// made (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
+    Entry {
+        entry: client::Entry,
+        held: bool,
+    },
     /// A client working-set row.
     Client(client::Stored),
     /// A change procedure's committed state.
@@ -501,6 +514,9 @@ pub enum Event {
     ReleaseProjection { goal: u64 },
     /// The root has durably committed this entry.
     Committed { entry: u64 },
+    /// A person settled a held entry: make it again, or record it not made
+    /// (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
+    Resolve { entry: u64, again: bool },
     /// Withdraw an entry whose write has not gone out.
     Withdraw { entry: u64 },
     /// Root authority vetoed a new, unsent change effect in this decision.
@@ -555,6 +571,8 @@ pub enum Request {
     Refused { task: u64 },
     /// An entry settled or remains uncertain; root routes the task's news.
     Outcome { entry: u64, task: u64, outcome: client::Outcome },
+    /// A held entry settled as not made, by a person or its task's close.
+    NotMade { entry: u64, task: u64 },
     /// A prior effect or release write settled; advance the closing task.
     ContinueRelease { task: u64 },
     /// All effects issued before resource cleanup have settled.
