@@ -3,7 +3,10 @@
 The concrete engine root runs on jig's conformance harness and outside
 referee. Store rows come from `jig-fake-store`; workers retain their
 attempts, charges and unacknowledged calls across engine crashes.
-Restoration uses the engine's real bounded load requests. The adapter's
+Restoration uses the engine's real bounded load requests. The world plays
+the protocol layer with the engine world's stand: the hub's link records,
+tool decodes and renders, ended outcomes and accounts; an input that admission
+hands back is sent again. The adapter's
 timer probes drive the root between external inputs; its bookkeeping adds
 no task or forge decisions. The fixture uses bounded journal cohorts, a
 one-second landing queue window and write lifetime, with restore pages
@@ -30,13 +33,13 @@ native client's classes and `docs/design/domain/forge.md`, section 6.
 
 | Native story | Independent ending and focused cuts |
 |---|---|
-| ReviewedChange | CI and a human approval at the merged head; cuts 1 and 15 |
-| RepairCi | Failed CI, a real repair push and approval at its new head; cuts 1 and 21 |
-| GoalIssue | Owned write-only issue, subtree milestones and closure; cuts 19 and 23 |
-| OtherHand | Another actor's branch movement holds the change without overwriting it; cuts 1 and 15 |
-| LostMerge | Lost successful merge answer found at its head after restart, once; cuts 1 and 16 |
-| PersonWords | Client words delivered live or retained in the next activation's inbox after a lost relay; cuts 1 and 8 |
-| IssueCreation | Lost native creation answer found by its retained marker, once; cuts 1 and 6 |
+| ReviewedChange | CI and a human approval at the merged head; cuts 1 and 17 |
+| RepairCi | Failed CI, a real repair push and approval at its new head; cuts 1 and 23 |
+| GoalIssue | Owned write-only issue, subtree milestones and closure; cuts 21 and 23 |
+| OtherHand | Another actor's branch movement holds the change without overwriting it; cuts 1 and 17 |
+| LostMerge | Lost successful merge answer found at its head after restart, once; cuts 1 and 18 |
+| PersonWords | Client words delivered live or retained in the next activation's inbox after a lost relay; cuts 1 and 9 |
+| IssueCreation | Lost native creation answer found by its retained marker, once; cuts 1 and 7 |
 
 The forge kinds follow each row of that section. In particular,
 creation is kind 8, issue editing/closing/reopening is kind 13, pull opening
@@ -59,13 +62,14 @@ supply delivery obligations as well as durable inbox and actual worker receipts.
 Focused tests run each baseline and the configured cuts above. Shared stories
 keep three selected entry, middle and closing receipt cuts; their baselines run
 separately instead of being repeated to calculate those cut numbers. Each
-focused test asserts its selected cut fired. Two fuzzy tests crash every
-applicable shared and native baseline at every durable commit. Both suites run
+focused test asserts its selected cut fired. The fuzzy tests crash every
+applicable shared and native baseline at every durable commit, one test per
+baseline. Both suites run
 the same outside referee after every harness iteration. The narrow engine-domain
 world retains CI job-log contents/truncation and race/permission checks that
 these stories do not exercise.
 
 The world's allocation, measured serially (`--profile measure -j 1`), is
 2 seconds focused and 20 seconds fuzzy. Both suites keep all fourteen
-applicable stories, all 365 shared and native commit cuts, and the same
+applicable stories, all 392 shared and native commit cuts, and the same
 outside observations and referee.

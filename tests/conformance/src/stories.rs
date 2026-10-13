@@ -8,7 +8,6 @@ use jig_conformance::{
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::Token;
 use temper_engine_domain as engine;
 use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
@@ -215,7 +214,11 @@ fn lost_merge(world: &mut World) -> Result<(), Violation> {
 }
 fn person_words(world: &mut World) -> Result<(), Violation> {
     let task = world.peers.assignments[0].task;
-    scenarios::ask(world, 81, people::Ask::Say { project: 1, task, words: b"Check the edge case".as_slice().into() });
+    scenarios::ask(
+        world,
+        81,
+        people::Ask::Say { project: 1, task, words: b"Check the edge case".as_slice().into(), release: false },
+    );
     world.drain()?;
     if !world
         .peers
@@ -231,7 +234,12 @@ fn person_words(world: &mut World) -> Result<(), Violation> {
         scenarios::ask(
             world,
             83,
-            people::Ask::Say { project: 1, task, words: b"Continue with the edge case".as_slice().into() },
+            people::Ask::Say {
+                project: 1,
+                task,
+                words: b"Continue with the edge case".as_slice().into(),
+                release: false,
+            },
         );
     }
 
@@ -243,7 +251,7 @@ fn person_words(world: &mut World) -> Result<(), Violation> {
             .iter()
             .any(|(to, _, _, words)| *to == task && words.as_ref() == b"Check the edge case")
             || world.peers.assignments.iter().any(|run| {
-                run.task == task && run.inbox.iter().any(|word| word.words.as_ref() == b"Check the edge case")
+                run.task == task && run.messages.iter().any(|word| word.words.as_ref() == b"Check the edge case")
             })
     })?;
     require(world.store.rows.values().map(|record| &record.0).any(|record|matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)|tasks::Stored::Ended(row))) if row.number==task && row.inbox.iter().any(|word|word.from==tasks::Party::Person(1) && word.words.as_ref()==b"Check the edge case"))),"person's words were not durably retained")
@@ -279,9 +287,10 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
         people::Ask::SetGoal {
             project: 1,
             spec: b"Fix the small bug through a milestone".as_slice().into(),
-            charter: 1,
+            executor: people::GoalExecutor::Charter(1),
             budget: 100,
             priority: 3,
+            deadline: None,
         },
     );
     wait(world, |world| issue_row(world).is_some_and(|issue| issue.number.is_some() && issue.pending.is_none()))?;
@@ -329,34 +338,21 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task))) if task.number == goal
         && task.inbox.iter().any(|word| matches!(word.kind,tasks::MessageKind::News {class: tasks::NewsClass::Wakes,..})))),
         "human issue comments woke the projected goal")?;
-    send(
-        world,
-        engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: goal,
-            attempt: run.attempt,
-            call: Token::new(8301),
-            body: engine::Call {
-                completion: 301,
-                position: 0,
-                tool: engine::Tool::Delegate {
-                    batch: Box::new([engine::Delegate {
-                        executor: tasks::Executor::Agent { charter: 1 },
-                        spec: tasks::Spec {
-                            words: b"First milestone".as_slice().into(),
-                            parameters: Box::new([]),
-                            inputs: Box::new([]),
-                        },
-                        contract: tasks::Contract::Report { words: 32 },
-                        authority,
-                        symbolic_grants: Box::new([]),
-                        dependencies: Box::new([]),
-                        wake: tasks::WakePolicy::DEFAULT,
-                    }]),
-                },
-            },
-        }),
-    );
+    let milestone = engine::Delegate {
+        executor: tasks::Executor::Agent { charter: 1 },
+        spec: tasks::Spec {
+            words: b"First milestone".as_slice().into(),
+            parameters: Box::new([]),
+            inputs: Box::new([]),
+        },
+        contract: tasks::Contract::Report { words: 32 },
+        authority,
+        symbolic_grants: Box::new([]),
+        dependencies: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+    };
+    let tool = engine::Tool::Delegate { batch: Box::new([milestone]) };
+    crate::link::call(world, goal, run.attempt, 8301, engine::Call { completion: 301, position: 0, tool });
     wait(world, |world| world.peers.assignments.iter().any(|run| run.task != chat.task && run.task != goal))?;
     let child =
         world.peers.assignments.iter().find(|run| run.task != chat.task && run.task != goal).expect("milestone").task;
@@ -399,28 +395,16 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
 }
 fn issue_creation(world: &mut World) -> Result<(), Violation> {
     let run = world.peers.assignments[0].clone();
-    send(
-        world,
-        engine::Event::Worker(engine::WorkerInput::Call {
-            channel: Token::new(7),
-            task: run.task,
-            attempt: run.attempt,
-            call: Token::new(8401),
-            body: engine::Call {
-                completion: 401,
-                position: 0,
-                tool: engine::Tool::EffectForge {
-                    repository: temper_engine_forge_world::REPO,
-                    resource: forge::What::Repository,
-                    write: Box::new(api::Write::CreateIssue {
-                        title: b"Native uncertainty".as_slice().into(),
-                        body: b"A retained creation marker".as_slice().into(),
-                        key: Box::new([]),
-                    }),
-                },
-            },
+    let tool = engine::Tool::EffectForge {
+        repository: temper_engine_forge_world::REPO,
+        resource: forge::What::Repository,
+        write: Box::new(api::Write::CreateIssue {
+            title: b"Native uncertainty".as_slice().into(),
+            body: b"A retained creation marker".as_slice().into(),
+            key: Box::new([]),
         }),
-    );
+    };
+    crate::link::call(world, run.task, run.attempt, 8401, engine::Call { completion: 401, position: 0, tool });
     wait(world, |world| {
         world.systems.effects.iter().any(|effect| effect.kind == 8 && effect.applied) || creation_held(world)
     })?;
