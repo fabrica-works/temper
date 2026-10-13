@@ -32,10 +32,16 @@ pub fn bounds() -> host::Bounds {
 /// One worker's hello on `channel`, listing the runs it hosts.
 #[must_use]
 pub fn hello(channel: Token, hosting: Box<[host::Hosting]>) -> engine::Event {
+    hello_slots(channel, 1, hosting)
+}
+
+/// One worker's hello on `channel` with `slots` slots, listing the runs it hosts.
+#[must_use]
+pub fn hello_slots(channel: Token, slots: u32, hosting: Box<[host::Hosting]>) -> engine::Event {
     link(
         channel,
         engine::Link::Hello(host::Hello {
-            slots: 1,
+            slots,
             stop_bound: Duration::from_millis(100),
             workstreams: Box::new([]),
             hosting,
@@ -59,7 +65,15 @@ pub fn lost(channel: Token) -> engine::Event {
 /// One numbered turn of a run: its cumulative spend, the last message it
 /// read, and its opaque body. The first turn opens the run's window.
 #[must_use]
-pub fn turn(channel: Token, task: u64, attempt: u64, number: u32, cumulative: u64, read: Option<u64>, body: &[u8]) -> engine::Event {
+pub fn turn(
+    channel: Token,
+    task: u64,
+    attempt: u64,
+    number: u32,
+    cumulative: u64,
+    read: Option<u64>,
+    body: &[u8],
+) -> engine::Event {
     up(
         channel,
         host::LinkUp::Turn {
@@ -156,10 +170,9 @@ impl Protocol {
         match request {
             engine::Request::Worker(engine::WorkerRequest::Host(host_request)) => match *host_request {
                 engine::HostRequest::Decode { to, task, attempt, call } => match self.calls.get(&call.name) {
-                    Some(body) => Ok(vec![engine::Event::Worker(engine::WorkerInput::DecodedHostCall {
-                        to,
-                        body: body.clone(),
-                    })]),
+                    Some(body) => {
+                        Ok(vec![engine::Event::Worker(engine::WorkerInput::DecodedHostCall { to, body: body.clone() })])
+                    }
                     None => Err(engine::Request::Worker(engine::WorkerRequest::Host(Box::new(
                         engine::HostRequest::Decode { to, task, attempt, call },
                     )))),
@@ -197,7 +210,9 @@ impl Protocol {
                     accounts::Request::Component(accounts::ToComponent::Rejected { account, generation }) => {
                         vec![granted(account, generation + 1)]
                     }
-                    accounts::Request::Component(accounts::ToComponent::Release { .. } | accounts::ToComponent::Close)
+                    accounts::Request::Component(
+                        accounts::ToComponent::Release { .. } | accounts::ToComponent::Close,
+                    )
                     | accounts::Request::Granted { .. }
                     | accounts::Request::Closed => Vec::new(),
                 })

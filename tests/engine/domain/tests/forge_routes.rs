@@ -1,7 +1,7 @@
 //! Root forge stories with its durable store and the independent fake Forgejo.
 #![expect(clippy::wildcard_enum_match_arm, reason = "the fixture selects only the forge rows relevant to each story")]
 use jig_domain_authority as authority;
-use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
@@ -10,6 +10,7 @@ use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
 use temper_engine_domain_forge as forge_top;
 use temper_engine_domain_forge_client as client;
+use temper_engine_domain_world::protocol::{self, Protocol};
 use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
@@ -29,6 +30,9 @@ struct World {
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
     answers: Vec<temper_engine_domain::CallAnswer>,
+    protocol: Protocol,
+    immediate: VecDeque<engine::Event>,
+    period_sent: bool,
     fail_job_reads: bool,
     slow_brief_reads: bool,
     owner_gate: bool,
@@ -122,13 +126,17 @@ impl World {
             limits.authority.segment_bytes = 64;
             limits.authority.writes = 2;
             limits.journal.writes += 64;
-            limits.journal.writes = 4096;
+            // The tasks child's whole route grew with jig's task families.
+            limits.journal.writes = 8192;
             limits.journal.deliveries = 256;
             limits.journal.held = 1024;
             limits.journal.result_bytes = 4096;
             limits.journal.transcript_bytes = 32_768;
             limits.fleet.slots = 2;
             limits.fleet.workstreams = 2;
+            // The core's inbox census and waiting entries cover every live task.
+            limits.people.inbox_tasks = 24;
+            limits.people.inbox_recipients = 32;
         }
         if with_read {
             limits.tasks.inbox_bytes = limits.tasks.inbox_bytes.max(256);
@@ -244,15 +252,8 @@ impl World {
             let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
             assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+            // A chat's authority is its role's, one level shallower (jig a2616181).
             config.authority = domain;
-            config.chat_authority.tools = authority::Tools(1023);
-            config.chat_authority.grants = grants;
-            if with_change {
-                config.chat_authority.delegation.kinds =
-                    Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
-                config.chat_authority.delegation.tasks = 8;
-                config.chat_authority.delegation.depth = 2;
-            }
         }
         limits.notes.scopes = 3 + limits.authority.grants;
         let mut fake_config = forge_world::fake_config();
@@ -298,6 +299,9 @@ impl World {
             signed_in: None,
             assigned: Vec::new(),
             answers: Vec::new(),
+            protocol: Protocol::default(),
+            immediate: VecDeque::new(),
+            period_sent: false,
             fail_job_reads: false,
             slow_brief_reads: false,
             owner_gate,
@@ -305,10 +309,21 @@ impl World {
     }
 
     fn send(&mut self, event: engine::Event) {
-        engine::step(&mut self.root, &self.env, event);
-        engine::release(&mut self.root, &self.env, &mut self.out);
-        self.collect();
-        self.root.reclaim();
+        self.immediate.push_back(event);
+        self.flush();
+    }
+
+    /// Step every input waiting at once: the one sent, then what the
+    /// protocol layer answered at once, as the root's door gives them.
+    fn flush(&mut self) {
+        while let Some(event) = self.immediate.pop_front() {
+            if let Err(event) = engine::try_step(&mut self.root, &self.env, event) {
+                self.events.push_back(event);
+            }
+            engine::release(&mut self.root, &self.env, &mut self.out);
+            self.collect();
+            self.root.reclaim();
+        }
     }
 
     /// Lose the process while retaining only the store, external forge and
@@ -327,25 +342,19 @@ impl World {
         self.events.clear();
         self.answers.clear();
         self.adopted.clear();
+        self.period_sent = false;
         self.events.push_back(engine::Event::Restart);
         if !self.assigned.is_empty() {
-            self.events.push_back(engine::Event::Worker(engine::WorkerInput::Hello {
-                channel: Token::new(7),
-                hello: fleet::Hello {
-                    stop_bound: Duration::from_secs(1),
-                    slots: if with_change { 2 } else { 1 },
-                    workstreams: Box::new([]),
-                    hosting: self
-                        .assigned
-                        .iter()
-                        .map(|assignment| fleet::Hosted {
-                            run: Token::new(assignment.task),
-                            attempt: Token::new(assignment.attempt),
-                            phase: fleet::Phase::Active,
-                        })
-                        .collect(),
-                },
-            }));
+            self.events.push_back(protocol::hello_slots(
+                Token::new(7),
+                if with_change { 2 } else { 1 },
+                self.assigned
+                    .iter()
+                    .map(|assignment| {
+                        protocol::hosting(assignment.task, assignment.attempt, jig_domain_host::Phase::Active)
+                    })
+                    .collect(),
+            ));
         }
     }
 
@@ -381,7 +390,15 @@ impl World {
     #[expect(clippy::wildcard_enum_match_arm, reason = "the world records only its scripted root deliveries")]
     fn collect(&mut self) {
         for _ in 0..self.out.len() {
-            match self.out.pop().expect("counted root output") {
+            let request = match self.protocol.play(self.out.pop().expect("counted root output")) {
+                // The protocol layer answers at once (testing-strategy.md, 4).
+                Ok(events) => {
+                    self.immediate.extend(events);
+                    continue;
+                }
+                Err(request) => request,
+            };
+            match request {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
                     self.store.pending.push_back((number, writes));
@@ -435,11 +452,25 @@ impl World {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => match delivery {
-                    Delivery::WebReply { sign_in, reply: people::Reply::SignedIn { .. }, .. } => {
-                        self.signed_in = sign_in;
+                    Delivery::WebReply { reply: people::Reply::SignedIn { sign_in, .. }, .. } => {
+                        self.signed_in = Some(sign_in);
                     }
                     Delivery::Assigned { assignment, .. } => self.assigned.push(assignment),
-                    Delivery::CallAnswer { answer, .. } => self.answers.push(answer),
+                    // The run has its answer once the hub relays it down; the
+                    // world renders an answer as its first call's name, and a
+                    // replayed call carries that same text.
+                    Delivery::Link {
+                        down: host::LinkDown::Relayed { answer: host::Relayed::Answer { text, .. }, .. },
+                        ..
+                    } => {
+                        let (_, answer) = self
+                            .protocol
+                            .answers
+                            .iter()
+                            .find(|(name, _)| *name == text)
+                            .expect("the world rendered every relayed answer");
+                        self.answers.push(answer.clone());
+                    }
                     Delivery::WebReply { reply: people::Reply::Outcome(outcome), .. }
                         if matches!(outcome, people::Outcome::Adopted { .. }) =>
                     {
@@ -448,15 +479,11 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
-                | engine::Request::Party(engine::PartyRequest::View(_) | engine::PartyRequest::WatchRefused { .. })
-                | engine::Request::Worker(
-                    engine::WorkerRequest::CallBusy { .. }
-                    | engine::WorkerRequest::TurnBusy { .. }
-                    | engine::WorkerRequest::AnswerBusy { .. },
-                ) => {}
-                engine::Request::Worker(engine::WorkerRequest::Host(_)) => {
-                    panic!("forge fixture received an unexpected host request")
-                }
+                | engine::Request::Party(_)
+                | engine::Request::Store(_)
+                | engine::Request::Busy(_)
+                | engine::Request::Drained => {}
+                engine::Request::Worker(other) => panic!("forge fixture received an unexpected request {other:?}"),
                 engine::Request::Stop => panic!("root startup or store failure"),
             }
         }
@@ -472,7 +499,15 @@ impl World {
         }
         if !self.store.pending.is_empty() {
             let number = self.store.apply();
-            self.send(engine::Event::Store(engine::StoreInput::Committed { number }));
+            self.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
+        }
+        if !self.period_sent && self.root.ready() {
+            self.period_sent = true;
+            let period = engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None };
+            self.send(engine::Event::Party(period));
+            // The repository's git identity, an application credential from
+            // temper's own source (domain/engine.md, 12).
+            self.send(engine::Event::Credential { number: 1, generation: 1, valid: Duration::from_secs(3600) });
         }
         if self.fake.is_due(self.fake_env.now) {
             fake::fire(&mut self.fake, &self.fake_env, &mut self.fake_out);
@@ -497,9 +532,11 @@ impl World {
         }
         temper_engine_domain_world::poll(&mut self.root, &self.env, &mut self.out);
         self.collect();
+        self.flush();
         engine::fire(&mut self.root, &self.env);
         engine::release(&mut self.root, &self.env, &mut self.out);
         self.collect();
+        self.flush();
         self.root.reclaim();
         self.fake.reclaim();
     }
@@ -685,17 +722,16 @@ fn change_world_with_policy(
         world.restart(true, true);
         world.until(Until::Ready);
     }
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 2,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     let ask = if tracked {
-        people::Ask::SetGoal { project: 1, spec: Box::from(&b"make the fix"[..]), charter: 1, budget: 100, priority: 3 }
+        people::Ask::SetGoal {
+            project: 1,
+            spec: Box::from(&b"make the fix"[..]),
+            executor: people::GoalExecutor::Charter(1),
+            budget: 100,
+            priority: 3,
+            deadline: None,
+        }
     } else {
         people::Ask::StartChat { project: 1, words: Box::from(&b"make the fix"[..]) }
     };
@@ -719,16 +755,18 @@ fn change_world_with_policy(
         tools: tasks::Tools(1023),
         grants: [3, 4, 10, 11, 12].map(|kind| tasks::Grant { kind, ..grant.clone() }).into(),
         delegation: tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 4, depth: 1 },
-        budget: tasks::Budget { spend: 20, deadline: None },
+        // Each run's spend must fund its finishing reserve, six with the
+        // world's charter (jig a020bf1c): room for five attempts of five.
+        budget: tasks::Budget { spend: 40, deadline: None },
         notes: tasks::Scopes(0),
         note_resources: Box::new([]),
     };
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: chat.task,
-        attempt: chat.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        chat.task,
+        chat.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::Delegate {
@@ -770,7 +808,8 @@ fn change_world_with_policy(
                 }]),
             },
         },
-    }));
+    );
+    world.send(event);
     world.until(Until::Delegated);
     world.until(Until::SecondAssignment);
     let producer = world.assigned[1].clone();
@@ -816,13 +855,12 @@ fn a_pushed_change_is_recovered_before_its_worker_reports_the_head() {
         }
     }
     assert!(world.root.ready(), "restored root did not become ready");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -831,8 +869,9 @@ fn a_pushed_change_is_recovered_before_its_worker_reports_the_head() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.store.rows.values().any(|stored| {
@@ -873,13 +912,12 @@ fn a_change_whose_ci_never_reports_is_stalled_and_held() {
     ));
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
         .expect("producer pushed its branch");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -888,8 +926,9 @@ fn a_change_whose_ci_never_reports_is_stalled_and_held() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..450 {
         world.tick();
     }
@@ -934,13 +973,12 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
     ));
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"review this diff", 1)
         .expect("producer pushed review head");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -949,8 +987,9 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -975,18 +1014,18 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
         gate.sections
     );
     assert_eq!(gate.workspace.repositories[0].start, engine::ForgeStart::Branch(branch));
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: gate.task,
-        attempt: gate.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
-            result: tasks::TaskResult::Verdict { code: 1, words: Box::from(&b"approved"[..]) },
+    let event = world.protocol.answer(
+        Token::new(7),
+        gate.task,
+        gate.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Verdict { code: 1, fields: Box::new([]), words: Box::from(&b"approved"[..]) },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.store.rows.values().any(|stored| {
@@ -1025,13 +1064,12 @@ fn check_gate_repair(no_ci: bool) {
     ));
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"first version", 1)
         .expect("first head pushed");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1040,8 +1078,9 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1049,18 +1088,22 @@ fn check_gate_repair(no_ci: bool) {
         }
     }
     let first = world.assigned.get(2).expect("first review assigned").clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: first.task,
-        attempt: first.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
-            result: tasks::TaskResult::Verdict { code: 2, words: Box::from(&b"Please fix the unsafe edge"[..]) },
+    let event = world.protocol.answer(
+        Token::new(7),
+        first.task,
+        first.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Verdict {
+                code: 2,
+                fields: Box::new([]),
+                words: Box::from(&b"Please fix the unsafe edge"[..]),
+            },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 4 {
@@ -1077,13 +1120,12 @@ fn check_gate_repair(no_ci: bool) {
     );
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"safe revision", 1)
         .expect("repair pushed second head");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: repair.task,
-        attempt: repair.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        repair.task,
+        repair.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1092,8 +1134,9 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 5 {
@@ -1102,18 +1145,22 @@ fn check_gate_repair(no_ci: bool) {
     }
     let second = world.assigned.get(4).expect("second review assigned").clone();
     assert_ne!(first.task, second.task);
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: second.task,
-        attempt: second.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
-            result: tasks::TaskResult::Verdict { code: 1, words: Box::from(&b"Approved revision"[..]) },
+    let event = world.protocol.answer(
+        Token::new(7),
+        second.task,
+        second.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Verdict {
+                code: 1,
+                fields: Box::new([]),
+                words: Box::from(&b"Approved revision"[..]),
+            },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.store.rows.values().any(|stored| {
@@ -1151,13 +1198,12 @@ fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
             state: raw::Check::Failed,
         }),
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1166,8 +1212,9 @@ fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1214,13 +1261,12 @@ fn an_unreadable_failed_job_log_is_named_and_repair_still_runs() {
             state: raw::Check::Failed,
         }),
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1229,8 +1275,9 @@ fn an_unreadable_failed_job_log_is_named_and_repair_still_runs() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1266,13 +1313,12 @@ fn failed_ci_with_delayed_brief() -> (World, u64, u64) {
         }),
     );
     world.slow_brief_reads = true;
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1281,8 +1327,9 @@ fn failed_ci_with_delayed_brief() -> (World, u64, u64) {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     (world, chat.task, producer.task)
 }
 
@@ -1370,7 +1417,12 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
         ask: people::Ask::Amend {
             project: 1,
             task: repair,
+            // The person names the specification revision they amend (jig 00de0b8c).
+            revision: spec_revision(&world, repair),
+            release: None,
             amendment: people::Amendment {
+                addressed: None,
+                instructions: None,
                 spec: Some(people::Spec {
                     words: b"revised repair".as_slice().into(),
                     parameters: Box::new([]),
@@ -1419,13 +1471,12 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
         .expect("producer pushed branch");
     let base = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", b"main", b"file", b"base change", 1)
         .expect("another change moved the base");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1434,8 +1485,9 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1474,13 +1526,12 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
         world.external(1, raw::Op::Git(raw::Git::Push { branch: branch.clone(), commit: merge, expected: Some(old) })),
         raw::Answer::Pushed(raw::Pushed::Pushed)
     ));
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: resolver.task,
-        attempt: resolver.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        resolver.task,
+        resolver.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1489,8 +1540,9 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.store.rows.values().any(|stored| {
@@ -1522,13 +1574,12 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
     ));
     let first = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fix", 1)
         .expect("producer pushed branch");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1537,8 +1588,9 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..100 {
         world.tick();
         if world.store.rows.values().any(|stored| matches!(stored,
@@ -1624,13 +1676,12 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             state: raw::Check::Failed,
         }),
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1639,8 +1690,9 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1684,13 +1736,12 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             state: raw::Check::Passed,
         }),
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: repair.task,
-        attempt: repair.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        repair.task,
+        repair.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1699,8 +1750,9 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..100 {
         world.tick();
     }
@@ -1756,16 +1808,8 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
     ));
     let pushed = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"already pushed", 1)
         .expect("worker pushed before freezing");
-    world.send(engine::Event::Worker(engine::WorkerInput::Lost { channel: Token::new(7) }));
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(8),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 2,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::lost(Token::new(7)));
+    world.send(protocol::hello_slots(Token::new(8), 2, Box::new([])));
     for _ in 0..150 {
         world.tick();
         if world.assigned.iter().any(|run| run.task == producer.task && run.attempt != producer.attempt) {
@@ -1787,13 +1831,12 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
         resumed.workspace.repositories[0].start
     );
     assert_eq!(world.fake.branch(b"org/repo", &branch), Some(pushed));
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(8),
-        task: resumed.task,
-        attempt: resumed.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(8),
+        resumed.task,
+        resumed.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1802,8 +1845,9 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
     }
@@ -1855,13 +1899,12 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
     ));
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fix", 1)
         .expect("original change pushed");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1870,8 +1913,9 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..200 {
         world.tick();
         if world.assigned.len() >= 3 {
@@ -1902,13 +1946,12 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
     ));
     fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &repair_branch, b"base", b"fixed", 1)
         .expect("base repair pushed");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: repair.task,
-        attempt: repair.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        repair.task,
+        repair.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -1917,8 +1960,9 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..1000 {
         world.tick();
         if world
@@ -1967,7 +2011,10 @@ fn a_repository_adopted_seeds_its_collaborators_into_roles() {
                     identity.key.subject.as_ref().try_into().expect("forge subject is a user number");
                 people.insert(u64::from_be_bytes(subject), *number);
             }
-            Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Roles { project: 1, holdings })) => {
+            Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Roles {
+                project: 1,
+                holdings,
+            })) => {
                 roles = Some(holdings.clone());
             }
             _ => {}
@@ -2144,15 +2191,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         "second repository adopted: {:?}",
         world.adopted
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 2,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(99)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2161,15 +2200,15 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     }));
     world.until(Until::Assigned);
     let first = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: first.task,
-        attempt: first.attempt,
-        cumulative: 0,
-        end: tasks::End::Parked,
-        saved: Some(Box::new([3])),
-    }));
+    let event = world.protocol.answer(
+        Token::new(7),
+        first.task,
+        first.attempt,
+        0,
+        tasks::End::Parked,
+        engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..30 {
         world.tick();
     }
@@ -2177,7 +2216,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         reply_to: ReplyTo::new(Token::new(100)),
         sign_in: world.signed_in.expect("owner session"),
         key: [100; 16],
-        ask: people::Ask::Say { project: 1, task: first.task, words: Box::from(&b"Continue"[..]) },
+        ask: people::Ask::Say { project: 1, task: first.task, words: Box::from(&b"Continue"[..]), release: false },
     }));
     for _ in 0..150 {
         world.tick();
@@ -2196,15 +2235,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
 fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
     let mut world = World::configured(true, false);
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 2,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(94)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2212,25 +2243,26 @@ fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
         ask: people::Ask::SetGoal {
             project: 1,
             spec: Box::from(&b"Finish the goal"[..]),
-            charter: 1,
+            executor: people::GoalExecutor::Charter(1),
             budget: 50,
             priority: 3,
+            deadline: None,
         },
     }));
     world.until(Until::Assigned);
     let goal = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([]),
-        channel: Token::new(7),
-        task: goal.task,
-        attempt: goal.attempt,
-        cumulative: 1,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        goal.task,
+        goal.attempt,
+        1,
+        tasks::End::Finished {
             result: tasks::TaskResult::Report { words: Box::from(&b"done"[..]) },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts { saved: None, pushed: Box::new([]) },
+    );
+    world.send(event);
     for _ in 0..300 {
         world.tick();
         if world.store.rows.values().any(|stored| matches!(stored,
@@ -2249,15 +2281,7 @@ fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
 fn a_goal_subscription_receives_the_connectors_landing_news() {
     let mut world = World::new();
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2266,12 +2290,12 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::SubscribeForge {
@@ -2280,7 +2304,8 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
                 paths: Box::new([Box::from(&b"file"[..])]),
             },
         },
-    }));
+    );
+    world.send(event);
     world.until(Until::Subscribed);
     for _ in 0..10 {
         world.tick();
@@ -2308,15 +2333,7 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
 }
 
 fn subscribe_chat(world: &mut World, topic: forge_top::Topic, key: u8) -> u64 {
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(u64::from(key))),
         sign_in: world.signed_in.expect("owner session"),
@@ -2325,17 +2342,18 @@ fn subscribe_chat(world: &mut World, topic: forge_top::Topic, key: u8) -> u64 {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(u64::from(key) + 1),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        u64::from(key) + 1,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::SubscribeForge { topic, own_change: None, paths: Box::new([]) },
         },
-    }));
+    );
+    world.send(event);
     world.until(Until::Subscribed);
     assignment.task
 }
@@ -2503,15 +2521,7 @@ fn a_participation_subscription_receives_the_connectors_comment_news() {
 fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
     let mut world = World::configured(true, false);
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2520,17 +2530,19 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::ReadForge { repository: forge_world::REPO, read: client::api::Read::Branches },
         },
-    }));
+    );
+    world.send(event);
+    decoded(&mut world);
     assert!(world.store.pending.is_empty(), "an agent read crosses the door without a commit");
     world.until(Until::Read);
     assert!(
@@ -2539,12 +2551,12 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
     world.answers.clear();
     let file_head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", b"main", b"file", b"contents", 1)
         .expect("file head");
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(94),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        94,
+        engine::Call {
             completion: 2,
             position: 1,
             tool: engine::Tool::ReadForge {
@@ -2556,7 +2568,9 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
                 },
             },
         },
-    }));
+    );
+    world.send(event);
+    decoded(&mut world);
     assert!(world.store.pending.is_empty(), "an agent read crosses the door without a commit");
     world.until(Until::Read);
     assert!(matches!(world.answers.as_slice(), [temper_engine_domain::CallAnswer::ForgeRead(result)]
@@ -2581,15 +2595,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
 fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
     let mut world = World::configured(true, false);
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2598,12 +2604,12 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::EffectForge {
@@ -2616,7 +2622,8 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
                 }),
             },
         },
-    }));
+    );
+    world.send(event);
     world.until(Until::Effect);
     let entry = match world.answers[0] {
         temper_engine_domain::CallAnswer::ForgeEffect {
@@ -2636,12 +2643,12 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
     assert!(
         matches!(world.store.rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Call(key)))), Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(row)))) if matches!(row.part, jig_domain_core::CallPart::Effect { entry: observed, outcome: Some(jig_domain_core::connector::OutboxOutcome::Made), .. } if observed == entry))
     );
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(94),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        94,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::EffectForge {
@@ -2654,7 +2661,8 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
                 }),
             },
         },
-    }));
+    );
+    world.send(event);
     for _ in 0..10 {
         world.tick();
     }
@@ -2667,15 +2675,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
 fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     let mut world = World::configured(true, false);
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2684,12 +2684,12 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+    let event = world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::Propose {
@@ -2706,7 +2706,8 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
                 as_holder: false,
             },
         },
-    }));
+    );
+    world.send(event);
     world.until(Until::Ready);
     let proposal = match world.answers.last().expect("proposal answer") {
         temper_engine_domain::CallAnswer::Proposed { proposal } => *proposal,
@@ -2720,7 +2721,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
         key: [94; 16],
         ask: people::Ask::DecideProposal {
             project: 1,
-            proposer: assignment.task,
+            proposer: people::Proposer::Task(assignment.task),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -2737,7 +2738,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
         key: [94; 16],
         ask: people::Ask::DecideProposal {
             project: 1,
-            proposer: assignment.task,
+            proposer: people::Proposer::Task(assignment.task),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -2749,13 +2750,13 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     assert_eq!(issue_count(&mut world), 1);
 }
 
-fn issue_effect_call(assignment: &engine::Assignment) -> engine::Event {
-    engine::Event::Worker(engine::WorkerInput::Call {
-        channel: Token::new(7),
-        task: assignment.task,
-        attempt: assignment.attempt,
-        call: Token::new(93),
-        body: engine::Call {
+fn issue_effect_call(world: &mut World, assignment: &engine::Assignment) -> engine::Event {
+    world.protocol.call(
+        Token::new(7),
+        assignment.task,
+        assignment.attempt,
+        93,
+        engine::Call {
             completion: 1,
             position: 1,
             tool: engine::Tool::EffectForge {
@@ -2768,21 +2769,13 @@ fn issue_effect_call(assignment: &engine::Assignment) -> engine::Event {
                 }),
             },
         },
-    })
+    )
 }
 
 fn pending_issue_effect() -> (World, engine::Assignment) {
     let mut world = World::configured(true, false);
     world.adopt();
-    world.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    world.send(protocol::hello_slots(Token::new(7), 1, Box::new([])));
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
@@ -2791,9 +2784,25 @@ fn pending_issue_effect() -> (World, engine::Assignment) {
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
-    world.send(issue_effect_call(&assignment));
+    let event = issue_effect_call(&mut world, &assignment);
+    world.send(event);
+    decoded(&mut world);
     assert!(!world.store.pending.is_empty(), "effect decision awaits durability");
     (world, assignment)
+}
+
+/// Step the protocol layer's decode of the call just sent, before any other input.
+fn decoded(world: &mut World) {
+    temper_engine_domain_world::poll(&mut world.root, &world.env, &mut world.out);
+    world.collect();
+    assert!(
+        world
+            .immediate
+            .iter()
+            .any(|event| matches!(event, engine::Event::Worker(engine::WorkerInput::DecodedHostCall { .. }))),
+        "the root asked to decode the call"
+    );
+    world.flush();
 }
 
 fn issue_count(world: &mut World) -> usize {
@@ -2824,7 +2833,7 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
         } else {
             let number = world.store.apply();
             if cut >= 2 {
-                world.send(engine::Event::Store(engine::StoreInput::Committed { number }));
+                world.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
                 for _ in 0..60 {
                     if world.events.iter().any(|event| {
                         matches!(
@@ -2876,7 +2885,8 @@ fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
         for _ in 0..40 {
             world.tick();
         }
-        world.send(issue_effect_call(&assignment));
+        let event = issue_effect_call(&mut world, &assignment);
+        world.send(event);
         for _ in 0..40 {
             world.tick();
         }
@@ -2928,13 +2938,12 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
     world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 }));
     let pushed = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
         .expect("producer pushed");
-    world.send(engine::Event::Worker(engine::WorkerInput::Answer {
-        pushed: Box::new([forge_top::Pushed { tag: forge_world::REPO.repository, commit: translate::commit(pushed) }]),
-        channel: Token::new(7),
-        task: producer.task,
-        attempt: producer.attempt,
-        cumulative: 5,
-        end: tasks::End::Finished {
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
@@ -2943,8 +2952,15 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
             },
             cancel_delegates: false,
         },
-        saved: None,
-    }));
+        engine::Parts {
+            saved: None,
+            pushed: Box::new([forge_top::Pushed {
+                tag: forge_world::REPO.repository,
+                commit: translate::commit(pushed),
+            }]),
+        },
+    );
+    world.send(event);
     for _ in 0..180 {
         world.tick();
         if subscriptions(&world).iter().any(|subscriber| {
@@ -2976,4 +2992,12 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
         1,
         "one durable interest for the whole subtree"
     );
+}
+
+/// The task's current specification revision, as its durable row shows it.
+fn spec_revision(world: &World, task: u64) -> u64 {
+    match world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task)))) {
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) => row.revisions.spec,
+        _ => panic!("live task {task}"),
+    }
 }
