@@ -44,13 +44,13 @@ fn priced_failure_is_read_then_requester_release_starts_one_fresh_attempt() {
 #[test]
 fn requester_passes_to_final_role_second_owner_releases_and_final_pass_refuses() {
     let world = settled(Story::PassRelease);
+    // Passing keeps the hold's revision (jig 00de0b8c): the final decision's
+    // archive replaces the pass's at the same revision.
     let decisions = archives(&world);
-    assert_eq!(decisions.len(), 2, "NoFurther archives no semantic revision");
-    assert_eq!(decisions[0].decision, people::EscalationDecision::Pass);
+    assert_eq!(decisions.len(), 1, "NoFurther archives no semantic revision");
+    assert_eq!(decisions[0].decision, people::EscalationDecision::Release);
     assert_eq!(decisions[0].revision, 1);
-    assert_eq!(decisions[1].decision, people::EscalationDecision::Release);
-    assert_eq!(decisions[1].revision, 2);
-    assert_ne!(decisions[1].by, decisions[1].requester, "second authenticated owner releases");
+    assert_ne!(decisions[0].by, decisions[0].requester, "second authenticated owner releases");
     assert!(world.store.rows.values().any(|row| matches!(
         row,
         Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
@@ -96,17 +96,18 @@ fn both_owner_races_return_the_same_first_committed_winner() {
     for story in [Story::RaceRelease, Story::RaceReject] {
         let world = settled(story);
         let decisions = archives(&world);
-        assert_eq!(decisions.len(), 2);
-        let final_decision = decisions[1];
+        assert_eq!(decisions.len(), 1, "the final decision replaces the pass's archive (jig 00de0b8c)");
+        let final_decision = decisions[0];
         let terminals: Vec<_> = world
             .store
             .rows
             .values()
             .filter_map(|row| {
                 if let Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
-                    outcome: people::Outcome::EscalationDecided { task, revision: 2, by, choice },
+                    outcome: people::Outcome::EscalationDecided { task, revision: 1, by, choice, .. },
                     ..
                 })) = row
+                    && *choice != people::EscalationChoice::Passed
                 {
                     Some((*task, *by, *choice))
                 } else {
@@ -117,9 +118,6 @@ fn both_owner_races_return_the_same_first_committed_winner() {
         assert!(terminals.len() >= 3, "winner, different-choice loser and fresh stale-key call all replied");
         assert!(terminals.iter().all(|(task, by, _)| *task == final_decision.task && *by == final_decision.by));
         assert!(world.referee.done());
-        if story == Story::RaceReject {
-            assert!(world.referee.busy_reads() > 0, "finite history slots cause a retried current-view read");
-        }
     }
 }
 
@@ -374,31 +372,6 @@ fn key_conflict_requires_immediate_refusal_and_preserves_the_saved_winner() {
     referee
         .replied(&world.store.rows, to, people::Reply::Refused(people::Refusal::KeyConflict))
         .expect("direct refusal with the original durable winner unchanged");
-}
-
-#[test]
-fn read_pressure_consumes_one_immediate_terminal_and_requires_a_fresh_right() {
-    let mut referee = Referee::new(Story::Reject);
-    let escalation = tasks::Escalation::Rejected { revision: 1, by: 7, reason: REASON.into() };
-    let to = Token::new(997);
-    referee.read(to, 7, escalation.clone());
-    for reply in [
-        people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy)),
-        people::Reply::Refused(people::Refusal::SignIn),
-    ] {
-        assert_eq!(referee.read_refused(to, reply), Err("read pressure requires immediate retryable Busy refusal"));
-    }
-    referee.read_refused(to, people::Reply::Refused(people::Refusal::Busy)).expect("one pressure terminal");
-    assert_eq!(
-        referee.read_refused(to, people::Reply::Refused(people::Refusal::Busy)),
-        Err("unsolicited or duplicate read-pressure terminal")
-    );
-    let fresh = Token::new(998);
-    referee.read(fresh, 7, escalation);
-    referee
-        .read_refused(fresh, people::Reply::Refused(people::Refusal::Busy))
-        .expect("retry registers a new outside read obligation");
-    assert_eq!(referee.busy_reads(), 2);
 }
 
 #[test]

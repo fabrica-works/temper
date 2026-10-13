@@ -434,6 +434,9 @@ impl Referee {
                 archive,
             )))) = write
             {
+                if self.archives.values().any(|kept| kept == archive) {
+                    return Err("semantic revision archived twice");
+                }
                 let stage = self.next_stage();
                 let (by, decision) = self.offers.get(&stage).ok_or("unscripted archive decision")?;
                 if Some(archive.task) != self.task
