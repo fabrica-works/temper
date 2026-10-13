@@ -1,6 +1,6 @@
 # temper's domain
 
-Provisional, 2026-10-04. The design of temper's domain layer: temper as a
+Provisional, 2026-10-04, revised 2026-10-14. The design of temper's domain layer: temper as a
 generic engine on five primitives, which owns its state in its own store
 and drives the forge as a connector. It replaces the domain documents in
 `docs/design/` (`engine-domain.md`, `worker-domain.md`,
@@ -121,98 +121,43 @@ cites it as `domain/<file>.md`.
 
 ## 5. What the other documents now owe
 
-What this design changes in each:
+The documents below the domain carry what this design asks of them, on
+jig's protocol layer (jig's `protocol/README.md`):
 
-- **smith** (smith's `docs/design/domain/`): the agent's domain, its
-  protocol layer's agent half, its providers and its channel with the
-  worker leave temper for smith's repository (agent.md, section 11);
-  what this list says below of the agent's hop of `channel.md` and of
-  `llm.md` is smith's protocol design's to carry, and temper keeps the
-  engine's protocol layer's half: charters encoded, host tools declared,
-  decoded and answered, messages and the brief rendered.
-
-- **`docs/design/protocol.md`:**
-  - the store becomes a boundary in its own right: commits numbered and
-    answered once durable, loads in pages by key range, temper's sized
-    records with a version per shape, and secret records the protocol
-    layer alone writes (refresh tokens, sign-ins);
-  - the web, listed under "later" in its section 8, comes first: it and
-    the store go before records in comments can go, so section 10's
-    order of building changes;
-  - runs and attempts are named by task, no longer by repository and
-    item;
-  - formats inside forge comments shrink to keys; snapshots give way to
-    transcripts.
-- **`channel.md`:**
-  - up: turns, numbered within their attempt, kept until acknowledged,
-    each with its spend and the last message it read; the answer with
-    its turn count and its whole spend; the worker's graces and push
-    deadline at its hello;
-  - down: acknowledgements of turns; a transcript, with the calls
-    committed after its last turn, in the assignment and in the agent's
-    start, in place of a snapshot; a merge in progress as a starting
-    point, with its conflicted files in the agent's start;
-  - messages for a run, carried whole and named: the kinds of tasks.md,
-    7.1, in place of today's news, finished, held and decided, which
-    carried ids;
-  - relayed calls: the engine's tools (engine.md, 7.3) and the
-    connectors' reads, in place of today's forge reads, notes, comments
-    and escalations, each named so it can be asked again;
-  - the outcome: a change, a verdict, a report or a failure; plans,
-    steps, tasks, replies, finished, releases and escalations go, as
-    tools;
-  - the charter: instructions, tool families from authority, a result
-    contract, a budget in the deployment's unit with its models' prices,
-    waiting time; the brief stays typed sections, rendered by the
-    agent's protocol layer; repair reasons go to the brief;
-  - names: runs by task, repositories no longer a fixed index of the
-    deployment's (the 256-repository packing goes);
-  - the snapshot payload goes; a versioned turn payload takes its place,
-    whose schema is the session vocabulary's (`llm.md`);
-  - its caps and sizes gain unacknowledged turns and transcripts; its
-    section 14 is rewritten. The channel's first version may still
-    change freely, as it has not shipped (`channel.md`, 4.5);
-  - the agent's hop leaves for `smith-channel`: the worker speaks it as
-    smith's host, carrying the charter as bytes, and `channel.md` keeps
-    the engine's hop with workers.
-- **`credentials.md`:** an LLM account's refresh token moves from
-  temper-oauth's file record into the store's secret records, still
-  written by the engine's protocol layer, never by the domain; the web's
-  OAuth client with the forge, for signing people in, is a credential of
-  its own; git identities, webhook secrets and API tokens (one per
-  forge) come with repositories as they are adopted, not from a fixed
-  map at startup.
-- **`llm.md`:** moves to smith's protocol design, but for what the
-  engine's protocol layer keeps of it: schemas, decoding and rendering
-  for every engine tool, each connector's reads and `wait`; `finish` taking the result
-  contract; a session's turns encoded with a version and their names
-  resolved, its providers' opaque blocks kept verbatim with the dialect
-  and endpoint they came from, so a later session can open from them;
-  completions priced as they are made.
-- **`docs/design/forge.md`:** as forge.md, section 17: records, outcome
-  blocks, notes' pages and the wiki, nonces, the person in a key's marker,
-  the wiki's webhook and listings by label go; keys' markers stay,
-  carrying the deployment's id; new calls for a pull request's files and
-  diff, comparisons, updating from a base, commit statuses, editing
-  titles and bodies, branch protection, collaborators, repository
-  settings, creating a branch at a commit, and CI's output; repositories
-  adopted at runtime, on one forge or several.
-- **`docs/design/testing.md`:** the engine's world keeps its fake store and
-  its scripted people, the store gaining ordered commits, paged loads
-  and failing commits, the people acting only on the web; forge-side
-  people's stories go; worlds for the new child domains (tasks, people,
-  the forge's subtree) replace `tests/engine/work` and `tests/engine/plan`;
-  the fake forge grows two-parent merges, updates that conflict,
-  statuses, branches made at a commit, files, comparisons, CI's output,
-  protection, settings and collaborators; the fake checkout grows merges
-  that conflict; runs are named by task; the referee holds core.md,
-  section 10.
-- **`docs/design/performance.md`:** a turn's bytes now also go up the
-  channel and into the store, one more copy per turn of what section 4
-  counts, bounded by a turn's limit; a resumed run's transcript comes
-  down once, at its start, and a worker holds one per slot; turns kept
-  unacknowledged are bounded per run; the engine's working set is of
-  tasks, no longer of forge items (section 2).
+- **smith** (smith's `docs/design/`): the agent's domain, its protocol
+  layer's agent half, its providers and its channel with the worker are
+  smith's (agent.md, section 11); temper keeps the engine's half:
+  charters encoded, host tools declared, decoded and answered, results
+  read, through `temper-engine-smith` (`docs/design/llm.md`).
+- **`docs/design/protocol.md`:** the layer as a whole: the processes and
+  temper's binary, the components jig, smith, skein and temper give it,
+  the engine's and the worker's services, one process, versions, secrets.
+- **`docs/design/configuration.md`:** temper's members of a deployment's
+  configuration, beside jig's part.
+- **`docs/design/channel.md`:** temper's parts on jig's channel: the
+  workspace items, what a run left and saved, a failed preparation, a git
+  identity's value, under temper's payload version. The channel itself,
+  turns, transcripts, acknowledgements, grants and names are jig's.
+- **`docs/design/credentials.md`:** LLM accounts as jig's, on skein's
+  accounts driver; temper's git identities as application credentials;
+  the forges' API tokens, the engine's only.
+- **`docs/design/llm.md`:** the engine makes no LLM call; host tools'
+  schemas, decoding and rendering, and a run's result, in the engine's
+  routing.
+- **`docs/design/git.md`:** the checkout's typed operations as git
+  invocations, credentials per invocation.
+- **`docs/design/forge.md`:** as forge.md, section 17: keys' markers
+  only, carrying the deployment's id; the calls of the forge client's
+  vocabulary on Forgejo; repositories named by the forge's id; polling,
+  webhooks after.
+- **`docs/design/store/README.md`:** temper's families, the forge's
+  records, on jig's store.
+- **`docs/design/client.md`:** temper's client: jig's client domain and
+  view, the forge's words and adoption form, a terminal shell.
+- **`docs/design/testing.md`:** the tiers below the domain: protocol
+  worlds, the one-process world, the process tier and the live tier.
+- **`docs/design/performance.md`:** a turn's copies, counted by jig's
+  components; the engine's working set of tasks.
 
 ## 6. Where today's documents went
 

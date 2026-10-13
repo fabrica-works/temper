@@ -1,6 +1,6 @@
 # The engine
 
-Provisional, 2026-10-04, revised 2026-10-13. What the temper engine is, as a domain layer:
+Provisional, 2026-10-04, revised 2026-10-14. What the temper engine is, as a domain layer:
 its parts and how they fit, how a decision reaches the store before
 anything leaves the engine, how it restarts, how it runs agents, and the
 capabilities it keeps from today (the fleet, briefs, notes, views,
@@ -510,6 +510,12 @@ instead of an item's:
   afterwards (forge.md, 8.2).
 - **Every start and adoption ends once:** answered, lost, withdrawn (the
   engine cancelled it), or refused (busy, a duplicate, or invalid).
+- **A failed preparation names its repository and why** (worker.md,
+  4.3): the worker sends them as temper's part beside the answer
+  (`docs/design/channel.md`, section 5), and the root puts them in words
+  into the attempt's failure detail, which people read on the task's
+  page. Whether the task tries again follows the answer's own class,
+  transient or permanent, as for any failure.
 - **Restarting** (section 6): the fleet adopts the claims the store
   names, then hears that the loading is done; a run a worker lists that
   no claim adopts is cancelled once a grace has passed.
@@ -593,22 +599,20 @@ Nothing the engine decides depends on a fact or a view arriving.
 
 ## 12. Accounts
 
-The accounts child domain is as `credentials.md`, section 5 designs it:
-LLM accounts refreshed by the engine alone, their rotated refresh tokens
-made durable before the access tokens they bought are granted, grants
-pushed to every live attempt that uses an account, and a run whose
-account is unusable not started. Only where the protocol layer keeps a
-refresh token changes: in the store's secret records, which the domain
-never reads, instead of a file of its own.
+The accounts child domain is jig's (jig's `domain/engine.md`, section
+12): the charters' models' accounts, each wanted from the restart's first
+step, held on skein's accounts driver in the protocol layer, which alone
+keeps their records and refreshes them; grants pushed to every live
+attempt that uses an account, and a run whose account is unusable not
+started (`docs/design/credentials.md`, section 3).
 
-On jig (2026-10-13), the accounts are the charters' models' accounts,
-each wanted from the restart's first step (jig's `domain/engine.md`,
-section 12). temper's application credentials are its git identities:
+temper's application credentials are its git identities, one per forge:
 the accounts child hears each one's number and generation from temper's
-own source of credentials, and a run whose workspace names one is
-granted it (jig's `domain/engine.md`, 12.1; worker.md, 4.1). The forge's
-API token and the webhook secret stay the engine's protocol layer's, and
-are never granted.
+own source of credentials, a file read at start, and a run whose
+workspace names one is granted it (jig's `domain/engine.md`, 12.1;
+worker.md, 4.1; `docs/design/credentials.md`, section 4). The forge's API
+token and the webhook secret stay the engine's protocol layer's, and are
+never granted.
 
 ## 13. Limits and working sets
 
@@ -642,35 +646,46 @@ until temper's configuration names its own (jig's
 
 ## 14. Below the domain
 
-What the protocol and io layers owe the domain. The protocol layer is
-designed in `docs/design/protocol.md`, with the channel in `channel.md`,
-credentials in `credentials.md` and the forge in `docs/design/forge.md`;
-README.md, section 5 lists what this design changes in each.
+What the protocol and io layers owe the domain. The engine's protocol
+layer is the engine's service of `docs/design/protocol.md` (section 6),
+composing jig's components with temper's own; each boundary below is
+designed where it says.
 
-- **The store:** commits of typed records, numbered, answered once
-  durable, and loads by key range in pages, over temper's sized binary
-  records with a version per shape. A fake store in the worlds, slow and
-  failing.
-- **Workers:** the channel of worker.md, with what this design adds:
-  turns up and their acknowledgements, spend in each turn, the engine's
-  tools as relayed calls, transcripts in assignments, a merge in
-  progress as a place to start. Snapshots go.
-- **Connectors:** each its own protocol; for the forge, its calls and
-  webhooks (forge.md, section 17).
-- **People:** the web: HTTP, live streams, signing in through the forge
-  (people.md, section 11).
-- **Configuration:** the deployment's rules, connectors and their
-  systems' addresses and credentials (one API token per forge), LLM
-  endpoints, accounts and models' prices, workers' secrets, the charters
-  the deployment offers (instructions, models, tools, result contracts,
-  wake policies, waiting times) and procedures' settings, limits.
-  Projects and their policies are the store's, seeded from
-  configuration on a first start. Charters are numbered (jig's
+- **The store:** jig's store component on skein-kv (jig's
+  `protocol/store.md`): commits numbered and answered once durable,
+  loads by key range in pages, transcripts as files, with temper's
+  families, the forge's records, under temper's store version
+  (`docs/design/store/README.md`).
+- **Workers:** jig's channel (jig's `protocol/channel.md`), with temper's
+  parts beside jig's records under temper's payload version
+  (`docs/design/channel.md`); in one process, the worker joined by an
+  in-process address (`docs/design/protocol.md`, section 8). Host tools'
+  calls are decoded, their answers rendered and a run's result read in
+  the routing, by `temper-engine-smith` (`docs/design/llm.md`, section
+  4).
+- **Connectors:** each its own protocol; for the forge, its calls (forge.md,
+  section 17; `docs/design/forge.md`), polled in standalone, its webhooks
+  after.
+- **People:** jig's client protocol (jig's `protocol/client.md`), with
+  temper's client wire for the forge's application requests; signing in
+  by the deployment's link in standalone, through the forge later
+  (people.md, section 11; `docs/design/client.md`).
+- **Accounts and credentials:** skein's accounts driver through jig's
+  accounts component, and temper's git identities' table
+  (`docs/design/credentials.md`).
+- **Configuration** (`docs/design/configuration.md`): jig's part (the
+  deployment's rules, owners, seeded projects and policies, charters, LLM
+  endpoints, models' prices and accounts, workers' names and secrets'
+  digests, listeners, limits) and temper's members (the forges, their
+  API tokens and git identities, landing rules, the forge's charter,
+  temper's limits). Charters are numbered (jig's
   `protocol/configuration.md`, section 3): one is the chats'; the agent
-  work the forge's procedures start runs under the one the forge's
-  configuration names. Whether the workers run in the engine's process
-  is configuration too: standalone, they do (jig's `domain/engine.md`,
-  section 6).
+  work the forge's procedures start runs under the one temper's
+  configuration names. Projects and their policies are the store's,
+  seeded from configuration on a first start; repositories are adopted
+  by people, never configured (forge.md, section 4). Whether the workers
+  run in the engine's process is configuration too: standalone, they do
+  (jig's `domain/engine.md`, section 6).
 
 ## 15. The world
 
@@ -744,12 +759,10 @@ and referee.
   and roles seed projects and policies in the store; labels go; the
   session's step and templates become charters; the prefixes give way to
   forge.md, section 11's names.
-- **Two boundaries are new below the domain.** No store and no web exist
-  today: the store's requests (snapshots, traces) are served only by the
-  engine world's fake, and people's requests come only from the worlds.
-  The protocol layer's refresh-token record, a file today (temper-oauth's,
-  written by the engine's protocol layer), moves into the store with
-  them.
+- **Two boundaries are new below the domain,** the store and people's
+  clients, both jig's components (section 14). An LLM account's record
+  stays in a private file, kept by skein's accounts driver, never in the
+  store (`docs/design/credentials.md`, section 3).
 - **Runs:** starting from saved work, which the worker supports and the
   engine never asks for, and deleting saved-work branches, are new; so
   are transcripts in place of snapshots, which nothing produces today.

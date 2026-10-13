@@ -1,6 +1,6 @@
 # The agent
 
-Provisional, 2026-10-05, revised 2026-10-13. temper's agent is smith: the kit for flexible
+Provisional, 2026-10-05, revised 2026-10-14. temper's agent is smith: the kit for flexible
 LLM agents, and the standard agent built from it, in smith's repository,
 on skein like temper. What smith is and does is its own design (smith's
 `docs/design/domain/`, cited as smith's `run.md`, `session.md`,
@@ -13,8 +13,10 @@ previous version of this document went, in README.md, 6.4.
 ## 1. In one page
 
 - **temper runs smith's stock agent.** A worker spawns smith's agent for
-  each run, or composes its domain in one process; temper builds no code
-  into it. Policy is data: a run's charter and its host's answers are all
+  each run, as a child process, in one process with the engine as
+  between hosts: temper's own binary run as its `agent` command, smith's
+  agent shell (`docs/design/protocol.md`, section 4). temper builds no
+  code into it. Policy is data: a run's charter and its host's answers are all
   that make it temper's.
 - **The engine writes the charter** (section 4): the task's instructions,
   its brief rendered, the engine's tools and its connectors' reads as host
@@ -33,8 +35,8 @@ previous version of this document went, in README.md, 6.4.
   become the engine's. smith interprets no temper vocabulary, and the
   worker none of either.
 - **temper imports smith at every layer** (section 3): its domains in
-  temper's worlds and in one process, its protocol crates in the engine's
-  and the worker's protocol layers, its binary on workers.
+  temper's worlds, its protocol crates in the engine's and the worker's
+  protocol layers, its agent shell in temper's binary.
 
 ## 2. The agent in the system
 
@@ -66,18 +68,20 @@ agent    smith: LLM work, one run per process, reporting to its worker
 
 | Where in temper | smith's crates | For |
 |---|---|---|
-| the engine's domain | none | transcripts are bytes; the charter is temper's own |
-| the engine's protocol layer | `smith-channel` (charter, calls, answers, messages), `smith-transcript` | encoding charters, decoding host tools' calls, rendering their answers; the web rendering turns |
-| the engine's protocol layer | `temper-oauth` until the shared OAuth machine | refreshing host-owned LLM accounts' tokens (`credentials.md`); Smith receives grants |
+| the engine's domain | none | transcripts and charters are bytes to the core; the charter's policy is the core's (jig's `domain/hosts.md`, section 8) |
+| the engine's protocol layer | `smith-domain`, `smith-domain-run`, `smith-domain-session` through `temper-engine-smith`; smith's codecs (`smith-protocol-channel`, `smith-channel`) | smith's start from an assignment, its charter encoded; host tools' calls decoded and their answers rendered; a run's result read (`docs/design/llm.md`, sections 4 and 5) |
 | the worker's domain | `smith-host-domain` | its agent child: processes, the channel's rules, the watchdog, cancel then kill |
-| the worker's protocol layer | `smith-channel`, the host's half | the channel over an agent's pipes |
-| workers' machines | `smith`, the binary | the agent process |
-| worlds | `smith-domain`, smith's fakes and scripted agent | the worker's and the system worlds (section 9) |
-| one process | `smith-domain` | engine, worker and agents in one process (smith's `host.md`, section 9) |
+| the worker's protocol layer | `smith-host-protocol`, smith's host half; smith's codecs | the channel over an agent's pipes; smith's payloads decoded and encoded by hand-out (jig's `domain/hosts.md`, 6.8) |
+| temper's binary | `smith-agent-shell` | the agent process: temper's own binary run as its `agent` command (`docs/design/protocol.md`, section 4) |
+| worlds | `smith-domain`, smith's fakes and scripted agent, smith's agent process world | the worker's and the system worlds (section 9); the one-process world's agent processes (`docs/design/testing.md`, 2.5) |
 
-What both would otherwise keep goes to skein, as smith's `README.md`,
-section 4, lists: framed channels, an OAuth client (temper's web signs
-people in with the forge's), supervised processes.
+LLM accounts are jig's, on skein's accounts driver, in the engine's
+protocol layer; their tokens reach a run as grants, through its worker
+and smith's host half (`docs/design/credentials.md`, section 3).
+
+What both would otherwise keep is skein's, as smith's `README.md`,
+section 4, lists: framed channels, an OAuth client and its accounts
+driver, supervised processes.
 
 ## 4. temper's charter
 
@@ -163,7 +167,8 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md`.
   prices from its account (engine.md, section 12); turns and wall time.
 - **LLMs:** the endpoints are the deployment's accounts; the charter names
   the main session's and those its sub-agents may use; their credentials
-  come to the agent as grants through the worker (`credentials.md`).
+  come to the agent as grants through the worker
+  (`docs/design/credentials.md`, section 3).
 - **Waiting and resuming:** the waiting time is the charter's; a
   coordinator's is zero. A chat resumes its transcript by default, and a
   coordinator starts fresh from its brief (engine.md, 7.4).
@@ -258,8 +263,8 @@ host:
   children, with their worlds. Smith uses Skein's provider-neutral
   `skein-llm::client::Client`; provider wire codecs and shared wire-peer
   fakes belong in Skein. Smith owns no provider client or OAuth refresh
-  implementation. The host supplies credentials (`credentials.md`);
-  Temper's existing credential owner remains until its planned cutover.
+  implementation. The host supplies credentials
+  (`docs/design/credentials.md`, section 3).
 - **`temper-agent-protocol` splits:** the agent process's half (the
   channel's agent side, the shared LLM client boundary, tools' schemas,
   rendering the prompt)

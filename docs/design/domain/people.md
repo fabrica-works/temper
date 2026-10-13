@@ -1,6 +1,6 @@
 # People
 
-Provisional, 2026-10-04, revised 2026-10-13. How people take part in temper: who they are,
+Provisional, 2026-10-04, revised 2026-10-14. How people take part in temper: who they are,
 what their role in a project lets them do, what they ask of temper and
 what waits for them, the chats they hold with agents, the tasks they
 carry out themselves, and how the web shows it all. People are parties,
@@ -221,16 +221,23 @@ A task whose executor is a person, or a role (core.md, 3.2):
 
 ## 11. Below the domain
 
-What the web's protocol layer owes this domain:
+What the clients' protocol layer owes this domain. It is jig's (jig's
+`protocol/client.md`), composed in the engine's service
+(`docs/design/protocol.md`, section 6), and temper's first client is a
+terminal client over jig's client (`docs/design/client.md`).
 
-- **HTTP** for requests and pages, **live streams** (server-sent events)
-  for views and inbox changes, and JSON both ways, on skein's machines.
-- **Signing in:** OAuth with the forge as the authorisation server; the
-  sign-ins' tokens, held by the protocol layer, named in the domain by a
-  sign-in's number.
-- **Rendering** what the domain carries as bytes: transcripts' turns,
-  results, specs.
-- **Keys** for requests, made by the web page, carried with each request.
+- **HTTP** for requests and reads, **one stream** of server-sent events
+  per client for watches, and records from schemas both ways: jig's, and
+  temper's client wire for the forge's application requests.
+- **Signing in:** in standalone, by the link the engine prints at start,
+  as the deployment's first owner (jig's `protocol/client.md`, section 8);
+  later, with the forge as an OAuth provider, a component of temper's
+  protocol layer to which jig's clients' side routes (open, section 14).
+  Sign-ins' secrets are held by the protocol layer and named in the
+  domain by a sign-in's number.
+- **Rendering** what the domain carries as bytes: turns, decoded in the
+  client's protocol layer (jig's `protocol/client.md`, section 3).
+- **Keys** for requests, made by the client, carried with each request.
 
 ## 12. The world
 
@@ -275,3 +282,8 @@ their task, or the task ends.
 - **People across projects:** a deployment-wide view of every inbox a
   person has, and roles that span projects.
 - **Guests:** someone without a forge account, invited to one chat.
+- **Signing in through the forge:** the forge as an OAuth provider of
+  people's identities, a component of temper's protocol layer (jig's
+  `protocol/client.md`, section 8), for deployments with more than one
+  person. Default: after standalone, where the deployment's link signs
+  in its one owner.

@@ -1,6 +1,6 @@
 # The forge connector
 
-Provisional, 2026-10-04. How temper drives a forge, Forgejo first: the
+Provisional, 2026-10-04, revised 2026-10-14. How temper drives a forge, Forgejo first: the
 forge as a connector (connectors.md), with its resources, effects,
 topics, procedures and tools; adopting repositories; keeping up; a
 change's way to landing; landing queues; updates and conflicts; issues;
@@ -96,9 +96,17 @@ temper-engine-domain-forge              the connector's top: resources, write ho
 - **A repository joins a project with a role** (core.md, 5.1): owned or
   adopted, where temper pushes its branches, opens pull requests and
   lands; a fork of an upstream (section 14); or context, read only. A
-  person whose role allows it adopts it in the web (people.md,
-  section 5). A repository temper writes belongs to one project; others
-  may adopt it as context.
+  person whose role allows it adopts it in the client, through the
+  forge's adoption form, the forge's own request (people.md, section 5;
+  `docs/design/client.md`, section 4). A repository temper writes
+  belongs to one project; others may adopt it as context.
+- **A repository is named by its owner and name, and kept by the forge's
+  id for it.** The adoption names the forge, the repository's owner and
+  its name; the connector first locates it, a read whose answer is the
+  forge's own id for the repository, and names the repository by that id
+  from then on (`Repository { forge, repository }`), so a rename or a
+  transfer on the forge keeps it the same repository. A repository the
+  forge does not have refuses the adoption as unavailable.
 - **What temper may do is read at adoption:** its user's permission on
   the repository; the branch protection that applies to temper's prefix
   and to each landing branch; whether temper may merge there. The
@@ -715,11 +723,13 @@ answered first, the fake forge's protocol layer, the load rules) stands.
   - the repository's settings at adoption: its merge styles, its
     default branch; and its collaborators with their permissions, to seed
     people's roles (people.md, section 4).
-- **Repositories are adopted at runtime,** not read once at startup:
-  what the protocol layer keeps per repository (its object format, merge
-  style, webhook secret) is given as a repository is adopted, and a
-  project's repositories may be on several forges, with one API token
-  each.
+- **Repositories are adopted at runtime,** not read once at startup,
+  and a project's repositories may be on several forges, with one API
+  token each. A repository is named by the forge's id for it (section
+  4); the protocol layer resolves an id to its path when a call needs it
+  and keeps it in a bounded cache (`docs/design/forge.md`, 3.1 and 3.5).
+- **Locate,** new: a repository's id on the forge from its owner and
+  name, the first read of an adoption (section 4).
 
 ## 18. The world
 

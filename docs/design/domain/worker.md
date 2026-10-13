@@ -1,6 +1,6 @@
 # The worker
 
-Provisional, 2026-10-04, revised 2026-10-13. What the temper worker
+Provisional, 2026-10-04, revised 2026-10-14. What the temper worker
 does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. It
 hosts the runs of the engine's agent tasks (engine.md, section 7); the
@@ -147,8 +147,10 @@ What the engine gives the worker for one run:
   cache. And the repositories, each with:
   - its name, the directory it sits in and what the agent calls it, one
     safe path component;
-  - its remote, the forge's address, which the protocol layer maps to a
-    URL;
+  - its remote: the URL git fetches from and pushes to, which the
+    engine's protocol layer makes from its forge's configuration
+    (`docs/design/channel.md`, section 4), so a worker needs no forge
+    configuration;
   - where to start: a base branch, a branch, a commit by its full object
     id, saved work, or **a merge in progress**: a branch, and the commit
     of its base to merge into it (section 5);
@@ -168,7 +170,8 @@ What the engine gives the worker for one run:
   (engine.md, 7.2). The worker carries them opaque, within its
   limits.
 - **Grants.** The credentials the run's LLM accounts and git identities
-  need, as names the protocol layer fills (`credentials.md`, section 7).
+  need, as names the protocol layer fills
+  (`docs/design/credentials.md`, sections 3 and 4).
   The hub hands the agent its LLM accounts' grants only; the worker keeps
   the git identities' for its own git operations.
 
@@ -363,7 +366,8 @@ choices temper makes.
 - **One process per run.** Its process tree is the run's containment
   boundary: stopping a run means that tree is gone, which io proves. Its
   environment holds no credentials: the tokens its LLM calls use come as
-  grants on its channel (`credentials.md`, section 7). It is spawned
+  grants on its channel (`docs/design/credentials.md`, section 3). It is
+  spawned
   within a deadline, and a run whose agent could not be started fails as
   such. It has gone only once its process has exited, its tree is empty
   and its channel has been read to the end, so what it said before it went
@@ -376,7 +380,8 @@ choices temper makes.
   withdrawals; turns, numbered; facts; a long operation, its span bounded
   by the limits, and its end; waiting, with the last message the run has
   read; notices that a credential was rejected or an account exhausted,
-  which go on to the engine (`credentials.md`, section 7); and how the
+  which go on to the engine (`docs/design/credentials.md`, section 3);
+  and how the
   run finishes, its last word. A call name
   reused while in flight, a turn out of order, anything after the last
   word, a payload beyond the limits or a message that does not decode
@@ -431,41 +436,51 @@ acknowledged (section 8).
 
 ## 9. Below the domain
 
-What the protocol and io layers owe the domain. The protocol layer is
-designed in `docs/design/protocol.md`, with the channels in `channel.md`
-and credentials in `credentials.md`; README.md, section 5 lists what this
-design changes in them.
+What the protocol and io layers owe the domain. The worker's protocol
+layer is the worker's service of `docs/design/protocol.md` (section 7):
+jig's link, smith's host half and agent processes, temper's identities'
+table and the git component. temper's parts on jig's channel are
+`docs/design/channel.md`'s, git's invocations `docs/design/git.md`'s,
+and credentials `docs/design/credentials.md`'s.
 
-- **The engine:** one framed channel, dialled by the worker and
-  authenticated, carrying assignments, messages, cancels, tool calls and
-  their answers, turns and their acknowledgements, facts, parks and ends,
-  and the answers' acknowledgements. The run's facts go after what the
-  domain emitted, so none goes before the hello.
-- **Agents:** spawning the agent within a deadline in a contained process
-  tree (a delegated cgroup), with proof that the tree is empty after it
-  stops; smith's channel over its pipes (`smith-channel`, the host's
-  half); an environment without forge credentials. smith's payloads (the
-  charter, the transcript, turns, facts) are handed out to the protocol
-  layer to decode and encode (jig's `domain/hosts.md`, 6.8). The root
-  completes the decoded start with where the repositories sit, as the
-  checkout prepared them, and, for a merge in progress, which files are
-  in conflict.
+- **The engine:** jig's channel (jig's `protocol/channel.md`), dialled by
+  the worker and authenticated, carrying the hub's link vocabulary:
+  assignments, messages, cancels, tool calls and their answers, turns and
+  their acknowledgements, facts, parks and ends, and the answers'
+  acknowledgements. The run's facts go after what the domain emitted, so
+  none goes before the hello. In one process the link joins the engine by
+  an in-process address (`docs/design/protocol.md`, section 8).
+- **Agents:** spawning the agent within a deadline, temper's own binary
+  run as its `agent` command (smith's agent shell), each in a process
+  group of its own, which a stop signals whole, until skein's contained
+  process trees give a delegated cgroup with proof that the tree is
+  empty after it stops (jig's `protocol/README.md`, section 10); smith's
+  channel over its pipes (smith's host half); an environment without
+  forge credentials. smith's payloads (the charter, the transcript,
+  turns, facts) are handed out to the protocol layer to decode and encode
+  (jig's `domain/hosts.md`, 6.8). The root completes the decoded start
+  with where the repositories sit, as the checkout prepared them, and,
+  for a merge in progress, which files are in conflict.
 - **temper's parts on jig's channel:** the workspace's items, what a run
   left on the forge, its saved work, a failed preparation's repository
   and reason, and a push's evidence travel typed beside jig's records in
   the domain, and as temper's bytes on the channel, under temper's
-  payload version (jig's `protocol/channel.md`, 6.2).
-- **Git:** each typed operation is one git invocation in a contained
-  process, its output parsed into a typed outcome, and a commit named by
-  its full object id (a SHA-1 id zero-padded to a SHA-256 id's 32 bytes).
-  New: a merge that leaves its conflicts in the working tree and says
-  which files; a commit with several parents. One that ran out of time or
-  was cancelled ends only once its process tree has exited, so nothing of
-  it touches the workspace afterwards. A repository's remote is mapped to
-  a URL, and its identity to credentials or an author, per invocation;
-  credentials never go in a URL or a file.
-- **Files:** workspace directories. Making one empties it first, so what
-  the cache evicted, or a worker left behind before a restart, cannot fail
+  payload version (`docs/design/channel.md`).
+- **Git:** each typed operation is a fixed sequence of git invocations,
+  each a process of its own, under the operation's one deadline
+  (`docs/design/git.md`, section 4), its output parsed into a typed outcome, and a commit named
+  by its full object id (a SHA-1 id zero-padded to a SHA-256 id's 32
+  bytes). A merge leaves its conflicts in the working tree and says which
+  files; a commit may have several parents. One that ran out of time or
+  was cancelled ends only once its process has exited, so nothing of it
+  touches the workspace afterwards. A repository's remote is the URL in
+  its item, and its identity is mapped to credentials and an author from
+  the identities' table, per invocation, in git's environment only;
+  credentials never go in an argument, a URL or a file
+  (`docs/design/git.md`, section 5).
+- **Files:** workspace directories under the worker's root
+  (`docs/design/configuration.md`, section 4). Making one empties it
+  first, so what the cache evicted, or a worker left behind before a restart, cannot fail
   a prepare.
 
 ## 10. The world
@@ -538,10 +553,10 @@ branch the worker pushes is the head the engine reads.
   and a run's waiting names the last it read; an assignment carries its
   credential grants; the agent's notices of a rejected credential or an
   exhausted account; an LLM account's exhaustion is a failure of its own.
-- **On jig (2026-10-13):** the hub is jig's, with its link vocabulary and
-  smith's payloads by hand-out; git identities are application
-  credentials granted with the assignment, never the worker's
-  configuration; a run with no repository runs with no workspace.
+- **On jig:** the hub is jig's, with its link vocabulary and smith's
+  payloads by hand-out; git identities are application credentials
+  granted with the assignment, never the worker's configuration; a run
+  with no repository runs with no workspace.
 
 ## 12. Open questions
 

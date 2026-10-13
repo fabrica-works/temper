@@ -1,6 +1,6 @@
 # Performance
 
-Provisional, 2026-10-03. Whether the memory strategy of skein's
+Provisional, 2026-10-03, revised 2026-10-14. Whether the memory strategy of skein's
 `docs/foundation/programming-model.md` (section 6: counted entities,
 owned bytes, the worst case checked at startup) costs temper anything
 that matters, where it could, and what to do about each case. Why the
@@ -14,34 +14,38 @@ there when it is made.
 
 - **No significant problem.** temper's time goes to LLM calls, which take
   seconds each, and to forge calls under a rate limit, at modest
-  concurrency. Each agent run is a process of its own (`worker-domain.md`,
-  section 6), so one process holds one run's sessions. What the memory
-  strategy costs is microseconds to milliseconds per turn.
+  concurrency. Each agent run is a process of its own, smith's agent run
+  as temper's `agent` command (`domain/worker.md`, section 6;
+  protocol.md, section 4), so one process holds one run's sessions. What
+  the memory strategy costs is microseconds to milliseconds per turn.
 - **Four things are worth knowing,** each fixable by a contained change
   that touches no step code built so far:
 
   | Concern | What it costs | Fix | Effort | When |
   |---|---|---|---|---|
-  | Bytes of unknown length (3) | quadratic copying, if done naively | two lib containers | small | before the protocol layer |
-  | Copy at emission, every turn (4) | peak memory, up to three copies of a transcript | count the copies; encode in pieces | small | with the protocol layer |
+  | Bytes of unknown length (3) | quadratic copying, if done naively | two containers | small | with the forge and git components (protocol.md, section 12) |
+  | Copy at emission, every turn (4) | peak memory, up to three copies of a transcript | smith's, for its session; in temper, counted by jig's components | none of temper's | done where each copy is made |
   | The general allocator (5) | page faults, fragmentation | glibc tuning, or another allocator, in the shell | small | after measuring |
   | A worst case of maximums (6) | memory headroom, not speed | the byte budget of notes.md | moderate | only if it bites |
 
-- **Only the first needs action before more is built.** The others are
-  accounting to add with the protocol layer, or measurements to take once
-  the shell runs.
+- **Only the first needs action, with the protocol layer's own
+  components.** The others are smith's and jig's accounting, or
+  measurements to take once `temper serve` runs.
 
 ## 2. The workload
 
-- **The agent** runs sessions. Each turn sends the whole transcript to the
-  provider (its API keeps no state between calls) and receives an answer
-  streamed in pieces. Tool calls read files within `read_bytes`, run
-  commands whose output is kept as a head and a tail (`shell_head`,
-  `shell_tail`), and search. A session holds at most `session_bytes`.
-- **The worker** runs agent processes and git, whose output its protocol
-  layer parses.
+- **The agent** is smith's: it runs sessions, each turn sending the whole
+  transcript to the provider and receiving an answer streamed in pieces.
+  Its costs are smith's to account for (smith's design).
+- **The worker** runs agent processes and git, whose output its git
+  component parses (git.md). A resumed run's window comes down once, at
+  its start, and the worker holds at most one per slot; a run's turns
+  kept unacknowledged are bounded per run (`domain/worker.md`, section 8).
 - **The engine** is the long-lived process. It holds a bounded working set
-  of forge items, read a page at a time, not the forge's contents.
+  of tasks and of the forge's live resources, read a page at a time, not
+  the forge's contents. A turn's bytes cross it once per turn: up jig's
+  channel, into jig's store's transcript file, and out to the clients that
+  watch the run, each bounded by a turn's limit.
 
 All three wait far more than they compute. Copying a megabyte takes
 around a tenth of a millisecond; an LLM call takes seconds.
@@ -53,12 +57,14 @@ made, and `Writer::new` wants the final length up front. That suits bytes
 whose length is known before they are made, which is most of them. Some
 arrive in pieces with no total announced:
 
-- a provider streams its answer as deltas: text a few tokens at a time,
-  and a tool call's input as fragments of JSON, which the service's
-  decoder joins into one block before the domain sees it;
-- a command's output arrives as pipe reads, of which the protocol layer
-  keeps the first `shell_head` bytes and the last `shell_tail`;
-- an HTTP body may be chunked.
+- a forge's answer arrives as an HTTP body, which may be chunked, and
+  whose strings the forge component cuts to the domain's limits as they
+  stream (forge.md, 3.3);
+- a git invocation's output arrives as pipe reads, of which the git
+  component keeps what it parses and a bounded tail for diagnostics
+  (git.md, section 6);
+- a provider's streamed answer and a command's output in a run are
+  smith's, with the same need.
 
 Joining by making a new box for each piece copies everything received so
 far each time, which is quadratic: a 10 MB build log in 64 KB pieces
@@ -66,16 +72,18 @@ copies about 800 MB, and a 32 KB answer in 1,000 deltas about 16 MB.
 Making a `List<u8>` at the cap instead allocates the cap for every call in
 flight, however short its answer.
 
-Nothing does either today. Domain code builds bytes in one pass:
-`translate::concat` (`crates/temper-engine-domain/src/translate.rs:339`)
-adds up the lengths, then writes once. The pieces that need joining all
-live in the protocol layer, which is not written yet. Below each machine,
+Domain code builds bytes in one pass: it adds up the lengths, then
+writes once. The pieces that need joining all live in the protocol
+layer's components. Below each machine,
 the carry-over is already safe: skein's lib, which temper uses, has an
 `Intake`, a buffer allocated once at its cap that delivers each demand as
 a box of exactly its length (programming-model.md, 4.3).
 
-**Fix: two more lib containers,** each with its `worst_case`, for what
-happens above the intake:
+**Fix: two containers,** each with its `worst_case`, for what happens
+above the intake. Where skein's lib has them when the forge and git
+components are built, those are used; where it does not, each is a
+module of the component that needs it, and moves to skein's lib with no
+change to its callers when lib gains it (protocol.md, section 11):
 
 - **A capped buffer that grows by doubling.** It starts small. A write
   that does not fit grows it to twice its size, or to what the write
@@ -94,78 +102,40 @@ happens above the intake:
 - **`ByteRing`,** a container lib does not have yet: a buffer of fixed
   size, made once, that keeps the last N bytes written, each write
   overwriting the oldest, where an intake refuses past its cap instead. A
-  command's output fills its head first, a capped buffer of `shell_head`
-  bytes; the rest goes through a ring of `shell_tail` bytes, and what
-  falls out of the ring is counted as dropped. At exit the ring is read
-  out, oldest first, as the tail.
+  git invocation's diagnostic output goes through a ring of its tail's
+  bytes, and what falls out of the ring is counted as dropped. At exit
+  the ring is read out, oldest first, as the tail (git.md, section 6).
 
-Both are small modules, written in skein's lib before the first machine
-that joins pieces, and they change no existing code.
+Both are small modules, and they change no existing code.
 
 ## 4. Copy at emission, every turn
 
-`complete` (`crates/temper-agent-domain-session/src/session.rs:1318`)
-copies the whole transcript on every turn, message by message and block
-by block, as programming-model.md (6.2) says it must: the session keeps
-the transcript, and the protocol layer owns the copy. Over a session the
-copying grows with the square of the number of turns.
+A step function that hands bytes to its protocol layer copies them as
+programming-model.md (6.2) says it must: the domain keeps its state, and
+the protocol layer owns the copy. Where the bytes are a whole transcript
+sent on every turn, the copying grows with the square of the turns, and
+while a call is in flight the bytes are held up to three times: in the
+domain, in the request, and encoded on their way out.
 
-**The time does not matter.** A session of 200 turns whose transcript
-grows to 1 MB copies about 100 MB in a few hundred thousand allocations:
-tens of milliseconds in all, over a session that lasts tens of minutes.
-The protocol layer must encode the same bytes as JSON on every turn
-anyway, so the copy is a constant factor on a cost the workload already
-has.
-
-**The peak memory does.** While a call is in flight a session's bytes are
-held up to three times: the transcript in the session, the prompt in a
-queue or the protocol layer, and the encoded body on its way out through
-io. The session's worst case counts the transcript once
-(`crates/temper-agent-domain-session/src/limits.rs:85`); the copy is its
-receiver's to count. **Fix,** when the protocol layer is written:
-
-- **Count the copies.** Its worst case counts, for each call in flight, a
-  prompt at the session byte limit and an encoded body. JSON escaping can
-  make a body up to six times its raw bytes (a control byte escapes to
-  `\u0000`), though text grows by a few percent, so a limit of its own on
-  the encoded body is better than counting six times. The JSON writer
-  measures before it writes, so a prompt over that limit is refused
-  before anything is allocated for it.
-- **Encode in pieces.** The protocol layer measures the whole prompt for
-  the length it sends in the head, then encodes the next piece each time
-  io grants room, so the encoded body never exists whole. This also
-  keeps a send within io's cap on queued output, which a body of a
-  megabyte sent at once could exceed.
-- Dropping the prompt as soon as it is encoded whole is the lesser
-  option: the bytes are held twice for most of a call, but the worst
-  case still counts the moment they are held three times.
-
-**Removing the copy** is possible, and not worth doing unless measured.
-
-- The protocol layer could keep each session's encoded transcript, and
-  the session send only the messages added since the last call. That
-  makes memory worse, not better: the second copy would live as long as
-  the session, not only while a call is in flight.
-- The session could instead lend its transcript by move, as io lends a
-  buffer to the kernel (programming-model.md, 6.2). `Complete` moves the
-  prompt down, and every terminal event of the call (`Completed`,
-  `Failed`, `Cancelled`) moves it back. The session does not touch its
-  transcript while a call is in flight (the answer is appended, and its
-  tools run, once the call has ended), so the reason for copying at
-  emission does not apply. The bytes are then held once, plus the piece
-  being encoded. The price is a change to the contract between the session
-  and the protocol layer, the fake LLM and their worlds, and a session
-  that cannot be snapshotted while a call is in flight.
-
-| Approach | Held for each call in flight |
-|---|---|
-| Copy; encode the whole body | about three times the transcript |
-| Copy; drop the prompt once encoded | three times briefly, then twice |
-| Copy; encode in pieces | twice, plus a piece |
-| Lend by move; encode in pieces | once, plus a piece |
-
-Counting the copies and encoding in pieces is enough for now; lending is
-the option to take if memory ever matters.
+- **The time does not matter.** A session of 200 turns whose transcript
+  grows to 1 MB copies about 100 MB in all, tens of milliseconds over a
+  session that lasts tens of minutes.
+- **The peak memory does,** and is counted where the copy is made: each
+  receiver's worst case counts, for each request in flight, the bytes it
+  holds and their encoding, and encodes in pieces as io grants room where
+  a body may be large.
+- **The agent's session is smith's.** The whole transcript sent to a
+  provider every turn is smith's session's, and its accounting is
+  smith's design's, not temper's.
+- **In temper's engine, a turn is copied a bounded number of times,** each
+  by a component of jig's that counts it: jig's channel component as it
+  decodes the turn, jig's store as it writes the transcript's frame, and
+  jig's clients' component as it sends the turn to a run's watchers. Each
+  copy is bounded by a turn's limit, and none outlives its request. A
+  resumed run's window is encoded once, into its assignment, within the
+  resume limit (jig's `protocol/channel.md`, 6.1). temper's own routing
+  adds no copy of a turn: temper-engine-smith reads a run's result and a
+  host call's input, not its turns (llm.md, section 4).
 
 ## 5. The general allocator
 
@@ -235,7 +205,10 @@ for a worst case too large to provision.
   crate and their worlds: a few days' work, after a design decision.
 
 It is probably never needed: a process holds one run's sessions, and its
-limits are that run's.
+limits are that run's. Sessions are smith's; in temper, the worst case
+that matters is the engine's, summed over its root and every component of
+its protocol layer and checked whole at start (configuration.md,
+section 7).
 
 ## 7. What does not cost
 
