@@ -9,7 +9,7 @@ pub(crate) struct Query {
     request: Token,
     person: u64,
     project: u32,
-    proposer: u64,
+    proposer: jig_domain_people::Proposer,
     proposal: u64,
 }
 
@@ -21,7 +21,7 @@ pub(crate) fn historical_begin(
     request: Token,
     person: u64,
     project: u32,
-    proposer: u64,
+    proposer: jig_domain_people::Proposer,
     proposal: u64,
 ) {
     let read = Query { request, person, project, proposer, proposal };
@@ -42,7 +42,7 @@ pub(crate) fn historical_begin(
         &env.limits,
         super::Delivery::Load {
             waiter: id.token(),
-            range: super::Range::Core(crate::CoreRange::ProposalDecision { proposal }),
+            range: super::Range::Core(crate::CoreRange::ProposalDecision { proposer, proposal }),
             after: None,
         },
     );

@@ -247,6 +247,9 @@ pub enum Event {
     Pushed { resource: Resource, commit: Commit },
     /// The parent's outbox decision is durable. Numbers are commit order.
     Make { entry: Entry },
+    /// A person chose to make a held entry again: it is looked for first,
+    /// then made under a new attempt (domain/forge.md, 6).
+    Remake { entry: Entry },
     /// Cancel an entry before it reaches the forge.
     Withdraw { entry: u64 },
     /// Restore a durable working-set record.

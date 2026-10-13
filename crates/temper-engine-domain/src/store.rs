@@ -218,7 +218,7 @@ pub enum Key {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CoreRange {
     /// One immutable decision for a later authenticated proposal caller.
-    ProposalDecision { proposal: u64 },
+    ProposalDecision { proposer: jig_domain_people::Proposer, proposal: u64 },
     /// Exactly one root-owned decision archive for a stale authenticated
     /// decision; no unbounded history restore.
     EscalationDecision {
@@ -254,16 +254,20 @@ pub enum CoreRange {
         /// Positive root-issued activation; other attempts cannot match.
         attempt: u64,
     },
-    /// All committed turns of one task, in attempt and turn order, for preparing its next run.
-    TaskTranscript { task: u64 },
+    /// The committed turns of one task's current window, from its first
+    /// (attempt, turn), in key order, for preparing its next run.
+    TaskTranscript { task: u64, from: (u64, u32) },
     /// One bounded notes-child load by name or by scope and cursor.
     Notes(jig_domain_notes::Range),
 }
 
 /// Child-contiguous live or historical store range.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Range {
     Core(CoreRange),
+    /// The ended owners named by the inbox census's durable indexes
+    /// (jig's `protocol/store.md`, 7.2); the store joins each index to its owner.
+    Census(jig_domain_core::Census),
     Forge,
 }
 
@@ -272,281 +276,93 @@ impl Range {
     /// effect or terminal. Turn zero is invalid; continuation ordering is checked by the load
     /// owner. It does not validate a child row's payload or its task links.
     #[must_use]
-    #[expect(clippy::too_many_lines, reason = "all store families are checked exhaustively in one range matcher")]
     pub fn contains(&self, key: &Key) -> bool {
-        match self.clone() {
-            Range::Forge => match key.clone() {
-                Key::Forge(_) => true,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                ) => false,
+        let core = match key {
+            Key::Core(core) => core,
+            Key::Forge(_) => return *self == Range::Forge,
+        };
+        match self {
+            Range::Forge => false,
+            Range::Census(census) => census.admits(core),
+            Range::Core(range) => range.contains(core),
+        }
+    }
+}
+
+impl CoreRange {
+    /// Membership of one core or child key; live families follow jig's own predicates.
+    #[must_use]
+    pub fn contains(&self, key: &jig_domain_core::Key) -> bool {
+        use jig_domain_core::{CoreKey, Key as Core};
+        match self {
+            CoreRange::ProposalDecision { proposer, proposal } => {
+                let Core::Core(CoreKey::ProposalDecision { proposer: found, proposal: number }) = key else {
+                    return false;
+                };
+                *proposal != 0 && found == proposer && number == proposal
+            }
+            CoreRange::Calls => {
+                let Core::Core(CoreKey::Call(call)) = key else { return false };
+                call.task != 0 && call.attempt != 0 && call.completion != 0
+            }
+            CoreRange::EscalationDecision { task, revision } => {
+                let Core::Core(CoreKey::EscalationDecision { task: found, revision: current }) = key else {
+                    return false;
+                };
+                *task != 0 && *revision != 0 && task == found && revision == current
+            }
+            CoreRange::Deployment => {
+                let Core::Core(CoreKey::Deployment) = key else { return false };
+                true
+            }
+            CoreRange::Tasks => match key {
+                Core::Core(CoreKey::Projection(_)) => true,
+                Core::Tasks(child) => child.live(),
+                Core::Core(_) | Core::People(_) | Core::Notes(_) => false,
             },
-            Range::Core(CoreRange::ProposalDecision { proposal }) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::ProposalDecision(number))) => {
-                    proposal != 0 && number == proposal
-                }
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::Calls) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Call(call))) => {
-                    call.task != 0 && call.attempt != 0 && call.completion != 0
-                }
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::EscalationDecision { task, revision }) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::EscalationDecision {
-                    task: found,
-                    revision: current,
-                })) => task != 0 && revision != 0 && task == found && revision == current,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::Deployment) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)) => true,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::Tasks) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Projection(_))) => true,
-                Key::Core(jig_domain_core::Key::Tasks(child)) => match child {
-                    jig_domain_tasks::Key::Live(_)
-                    | jig_domain_tasks::Key::Ledger(_)
-                    | jig_domain_tasks::Key::Stub(_)
-                    | jig_domain_tasks::Key::Writer(_)
-                    | jig_domain_tasks::Key::Pool(_)
-                    | jig_domain_tasks::Key::PersonProposal(_) => true,
-                    jig_domain_tasks::Key::Ended(_)
-                    | jig_domain_tasks::Key::History { .. }
-                    | jig_domain_tasks::Key::Milestone { .. } => false,
-                },
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. },
-                    )
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::EndedResults) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(number))) => number != 0,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::People) => match key.clone() {
-                Key::Core(jig_domain_core::Key::People(_)) => true,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::RunProofs) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task))) => task != 0,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::TaskResult { task }) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(number))) => task == number,
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::Turns { task, attempt }) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: found, attempt: run, turn })) => {
-                    found == task && run == attempt && turn != 0
-                }
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::TaskTranscript { task }) => match key.clone() {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: found, attempt, turn })) => {
-                    task != 0 && found == task && attempt != 0 && turn != 0
-                }
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_)
-                    | jig_domain_core::Key::Notes(_),
-                )
-                | Key::Forge(_) => false,
-            },
-            Range::Core(CoreRange::Notes(range)) => match key {
-                Key::Core(jig_domain_core::Key::Notes(child)) => match range {
+            CoreRange::EndedResults => {
+                let Core::Tasks(jig_domain_tasks::Key::Ended(number)) = key else { return false };
+                *number != 0
+            }
+            CoreRange::People => {
+                let Core::People(child) = key else { return false };
+                child.live()
+            }
+            CoreRange::RunProofs => {
+                let Core::Core(CoreKey::RunProof(task)) = key else { return false };
+                *task != 0
+            }
+            CoreRange::TaskResult { task } => {
+                let Core::Tasks(jig_domain_tasks::Key::Ended(number)) = key else { return false };
+                task == number
+            }
+            CoreRange::Turns { task, attempt } => {
+                let Core::Core(CoreKey::Turn { task: found, attempt: run, turn }) = key else { return false };
+                found == task && run == attempt && *turn != 0
+            }
+            CoreRange::TaskTranscript { task, from } => {
+                let Core::Core(CoreKey::Turn { task: found, attempt, turn }) = key else { return false };
+                *task != 0 && found == task && *attempt != 0 && *turn != 0 && (*attempt, *turn) >= *from
+            }
+            CoreRange::Notes(range) => {
+                let Core::Notes(child) = key else { return false };
+                match range {
                     jig_domain_notes::Range::Entry { name } => match child {
-                        jig_domain_notes::Key::Entry { name: found } => name == *found,
+                        jig_domain_notes::Key::Entry { name: found } => name == found,
                         jig_domain_notes::Key::Line { .. } => false,
                     },
                     jig_domain_notes::Range::Lines { scope, after } => match child {
                         jig_domain_notes::Key::Line { scope: found, name } => {
                             let past_cursor = match after {
-                                Some(cursor) => *name > cursor,
+                                Some(cursor) => name > cursor,
                                 None => true,
                             };
-                            scope == *found && past_cursor
+                            scope == found && past_cursor
                         }
                         jig_domain_notes::Key::Entry { .. } => false,
                     },
-                },
-                Key::Core(
-                    jig_domain_core::Key::Core(
-                        jig_domain_core::CoreKey::Call(_)
-                        | jig_domain_core::CoreKey::EscalationDecision { .. }
-                        | jig_domain_core::CoreKey::ProposalDecision(_)
-                        | jig_domain_core::CoreKey::Deployment
-                        | jig_domain_core::CoreKey::Turn { .. }
-                        | jig_domain_core::CoreKey::RunProof(..)
-                        | jig_domain_core::CoreKey::Terminal { .. }
-                        | jig_domain_core::CoreKey::Projection(_),
-                    )
-                    | jig_domain_core::Key::Tasks(_)
-                    | jig_domain_core::Key::People(_),
-                )
-                | Key::Forge(_) => false,
-            },
+                }
+            }
         }
     }
 }
@@ -555,6 +371,7 @@ impl Range {
 /// a bounded page. The transaction/page, not each row, has the store terminal
 /// (domain/engine.md, 5.1, 5.3 and 5.6).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[expect(clippy::large_enum_variant, reason = "jig's core records move whole through the store's pages")]
 pub enum Record {
     Core(jig_domain_core::Record),
     Forge { row: Box<temper_engine_domain_forge::Stored> },
@@ -566,45 +383,7 @@ impl Record {
     #[must_use]
     pub fn key(&self) -> Key {
         match self {
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Projection(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Projection(row.key())))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::ProposalDecision(row.proposal)))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Call(row.key)))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::EscalationDecision {
-                    task: row.task,
-                    revision: row.revision,
-                }))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
-                    task: row.task,
-                    attempt: row.attempt,
-                    turn: row.turn,
-                }))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(row.task)))
-            }
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(row))) => {
-                Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal { task: row.task, attempt: row.attempt }))
-            }
-            Record::Core(jig_domain_core::Record::Tasks(row)) => Key::Core(jig_domain_core::Key::Tasks(row.key())),
-            Record::Core(jig_domain_core::Record::People(row)) => Key::Core(jig_domain_core::Key::People(row.key())),
-            Record::Core(jig_domain_core::Record::Notes(jig_domain_notes::Record::Entry(row))) => {
-                Key::Core(jig_domain_core::Key::Notes(jig_domain_notes::Key::Entry { name: row.name }))
-            }
-            Record::Core(jig_domain_core::Record::Notes(jig_domain_notes::Record::Line(row))) => {
-                Key::Core(jig_domain_core::Key::Notes(jig_domain_notes::Key::Line { scope: row.scope.clone(), name: row.name }))
-            }
+            Record::Core(row) => Key::Core(row.key()),
             Record::Forge { row } => Key::Forge(temper_engine_domain_forge::stored_key(row)),
         }
     }
@@ -743,7 +522,10 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 jig_domain_people::Ask::Move { reason, .. } | jig_domain_people::Ask::Cancel { reason, .. } => {
                     u64::try_from(reason.len()).ok()
                 }
-                jig_domain_people::Ask::Watch { .. }
+                jig_domain_people::Ask::Close { disposals, .. } => u64::from(disposals.len())
+                    .checked_mul(u64::try_from(size_of::<jig_domain_people::Disposal>()).ok()?),
+                jig_domain_people::Ask::MarkSeen { .. }
+                | jig_domain_people::Ask::Application { .. }
                 | jig_domain_people::Ask::TakePerson { .. }
                 | jig_domain_people::Ask::SetPool { .. }
                 | jig_domain_people::Ask::HandBackPerson { .. }
@@ -753,6 +535,12 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                     jig_domain_people::PersonResult::Report { words }
                     | jig_domain_people::PersonResult::Verdict { words, .. } => u64::try_from(words.len()).ok(),
                     jig_domain_people::PersonResult::Failure { reason } => u64::try_from(reason.len()).ok(),
+                    jig_domain_people::PersonResult::Approved { state, words } => u64::try_from(state.len())
+                        .ok()?
+                        .checked_add(match words {
+                            Some(words) => u64::try_from(words.len()).ok()?,
+                            None => 0,
+                        }),
                 },
                 jig_domain_people::Ask::DecideEscalation { decision, .. } => decision_bytes(decision),
                 jig_domain_people::Ask::DecideProposal { decision, .. } => match decision {
@@ -760,7 +548,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                     jig_domain_people::ProposalDecision::Reject { reason } => u64::try_from(reason.len()).ok(),
                 },
             },
-            jig_domain_people::Stored::SignIn { .. } | jig_domain_people::Stored::ReadPosition { .. } => Some(0),
+            jig_domain_people::Stored::SignIn { .. }
+            | jig_domain_people::Stored::ReadResults { .. }
+            | jig_domain_people::Stored::ReadChat { .. } => Some(0),
             jig_domain_people::Stored::Policy { value, .. } => jig_domain_people::policy_bytes(value),
         },
     }
@@ -806,7 +596,7 @@ pub(crate) fn owned_bytes(write: &Write) -> Option<u64> {
                     jig_domain_core::CoreKey::Deployment
                     | jig_domain_core::CoreKey::Call(_)
                     | jig_domain_core::CoreKey::EscalationDecision { .. }
-                    | jig_domain_core::CoreKey::ProposalDecision(_)
+                    | jig_domain_core::CoreKey::ProposalDecision { .. }
                     | jig_domain_core::CoreKey::Turn { .. }
                     | jig_domain_core::CoreKey::RunProof(..)
                     | jig_domain_core::CoreKey::Terminal { .. }

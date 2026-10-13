@@ -104,6 +104,8 @@ pub struct Domain {
     pulls: Map<Name, PullState>,
     ci: Map<(client::api::Repository, client::api::Commit), CiState>,
     entries: Map<u64, client::Entry>,
+    /// Uncertain entries held for a person's choice, out of the client's outbox.
+    held: Map<u64, client::Entry>,
     named_calls: Map<crate::NamedCall, crate::CallPayload>,
     proposed_effects: Map<u64, crate::ProposedEffect>,
     pub(crate) landed: Map<client::api::Commit, u64>,
@@ -295,6 +297,7 @@ impl Domain {
             pulls: Map::with_capacity(l.client.resources),
             ci: Map::with_capacity(l.subscriptions),
             entries: Map::with_capacity(l.entries),
+            held: Map::with_capacity(l.entries),
             named_calls: Map::with_capacity(l.named_calls),
             proposed_effects: Map::with_capacity(l.tasks),
             landed: Map::with_capacity(l.landings),
@@ -750,6 +753,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::ContinueRelease { task, entry } => continue_release(d, env, task, entry, out),
         Event::ReleaseProjection { goal } => release_projection(d, goal, out),
         Event::Committed { entry } => committed(d, env, entry, out),
+        Event::Resolve { entry, again } => resolve(d, env, entry, again, out),
         Event::Withdraw { entry } => withdraw(d, env, entry, out),
         Event::VetoChange { task, entry, prior } => veto_change(d, task, entry, prior, out),
         Event::Subscribe { subscription } => subscribe(d, env, subscription, out),
@@ -841,10 +845,16 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 outcome_facts(d, env, entry, task, outcome, out);
                 match outcome {
                     client::Outcome::Uncertain => {}
+                    client::Outcome::Held => {
+                        if let Some(row) = d.entries.remove(&entry) {
+                            emit(out, Request::Erase { key: Key::Entry(entry) });
+                            emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Held(row.clone()) });
+                            d.held.insert(entry, row).expect("held entries are bounded by the outbox");
+                        }
+                    }
                     client::Outcome::Made { .. }
                     | client::Outcome::Failed(_)
                     | client::Outcome::Raced { .. }
-                    | client::Outcome::Held
                     | client::Outcome::Withdrawn => {
                         d.entries.remove(&entry);
                         emit(out, Request::Erase { key: Key::Entry(entry) });
@@ -2926,6 +2936,24 @@ fn committed(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Req
     }
 }
 
+/// A person's choice for a held entry: again hands it back to the client,
+/// which looks for it first and then makes it under a new attempt.
+fn resolve(d: &mut Domain, env: &Env<Limits>, number: u64, again: bool, out: &mut Queue<Request>) {
+    let Some(entry) = d.held.remove(&number) else { return };
+    if again && d.entries.insert(number, entry.clone()).is_err() {
+        // A full outbox keeps the entry held; the person may choose again.
+        d.held.insert(number, entry).expect("the held slot just freed");
+        return;
+    }
+    emit(out, Request::Erase { key: Key::Held(number) });
+    if !again {
+        emit(out, Request::NotMade { entry: number, task: entry.task });
+        return;
+    }
+    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry.clone()) });
+    child(d, env, client::Event::Remake { entry }, out);
+}
+
 fn withdraw(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
     if d.entries.contains_key(&number) {
         child(d, env, client::Event::Withdraw { entry: number }, out);
@@ -3469,6 +3497,9 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
         }
         Stored::Entry(row) => {
             d.entries.insert(row.number, row).expect("restored entry within limits");
+        }
+        Stored::Held(row) => {
+            d.held.insert(row.number, row).expect("restored held entry within limits");
         }
         Stored::Client(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);

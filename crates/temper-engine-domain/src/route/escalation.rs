@@ -1,13 +1,18 @@
-//! Root transport and store translation for held-chat reads and archives.
+//! Root store translation for held-chat decisions that left live memory.
+//! Reading a held chat is the core's (jig's `client/domain/contract.md`, 6).
 
-use super::{Decision, Delivery, Domain, Env, Id, Limits, Read, ReplyTo, Request, Token, Work, emit, people, tasks};
+use super::{Decision, Delivery, Domain, Env, Id, Limits, Read, Token, Work, emit, people, tasks};
 use crate::Record;
 use alloc::boxed::Box;
 
+/// One historical held-chat decision being loaded for its keyed request.
 #[derive(Debug)]
-pub(crate) enum Query {
-    Read { to: ReplyTo, person: u64, task: u64 },
-    Historical { request: Token, person: u64, project: u32, task: u64, revision: u64 },
+pub(crate) struct Query {
+    pub(crate) request: Token,
+    pub(crate) person: u64,
+    pub(crate) project: u32,
+    pub(crate) task: u64,
+    pub(crate) revision: u64,
 }
 
 pub(crate) fn role_number(role: people::Role) -> u32 {
@@ -16,47 +21,6 @@ pub(crate) fn role_number(role: people::Role) -> u32 {
 
 pub(crate) fn supported(domain: &Domain, task: &tasks::TaskRecord) -> bool {
     domain.core.escalation_supported(task)
-}
-
-pub(crate) fn read(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    to: ReplyTo,
-    sign_in: u64,
-    task: u64,
-    out: &mut skein_lib::Queue<Request>,
-) {
-    let Some(person) = domain.core.people.person(sign_in, env.now, env.wall) else {
-        refuse_direct(to, people::Refusal::SignIn, out);
-        return;
-    };
-    if !domain.ready() || !super::admits(domain, &env.limits) {
-        refuse_direct(to, people::Refusal::Busy, out);
-        return;
-    }
-    let query = Query::Read { to, person, task };
-    let id = match domain.result_reads.insert(Some(Read::Escalation(query))) {
-        Ok(id) => id,
-        Err(read) => match read.expect("unadmitted query owns reply") {
-            Read::Escalation(Query::Read { to, .. }) => {
-                refuse_direct(to, people::Refusal::Busy, out);
-                return;
-            }
-            Read::Proposal(_)
-            | Read::Result(_)
-            | Read::Inbox(_)
-            | Read::Transcript { .. }
-            | Read::Dependency(_)
-            | Read::InputCheck(_)
-            | Read::Notes { .. }
-            | Read::Escalation(Query::Historical { .. }) => {
-                unreachable!("inserted named read")
-            }
-        },
-    };
-    domain.work.push(Work::Tasks(tasks::Event::InspectEscalation { reply_to: ReplyTo::new(id.token()), task }));
-    let decision = super::route(domain, env);
-    super::close(domain, env, decision, out);
 }
 
 #[expect(
@@ -73,7 +37,7 @@ pub(crate) fn historical_begin(
     task: u64,
     revision: u64,
 ) {
-    let query = Query::Historical { request, person, project, task, revision };
+    let query = Query { request, person, project, task, revision };
     match domain.result_reads.insert(Some(Read::Escalation(query))) {
         Ok(waiter) => emit(barrier, &env.limits, Delivery::ReadEscalationDecision { waiter: waiter.token() }),
         Err(_) => domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
@@ -88,23 +52,10 @@ pub(crate) fn historical_begin(
     }
 }
 
-pub(crate) fn inspected(domain: &mut Domain, waiter: Token, context: Option<Box<tasks::EscalationContext>>) {
-    let Some(Read::Escalation(Query::Read { to, person, task })) = super::take_read(domain, waiter) else {
-        unreachable!("held-chat inspection belongs to an authenticated reader")
-    };
-    domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::EscalationRead { to, person, task, context }));
-}
-
 pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, rows: Box<[Record]>) {
-    let Some(Read::Escalation(query)) = super::take_read(domain, waiter) else {
-        unreachable!("escalation archive owns its read")
-    };
+    let Some(read) = super::take_read(domain, waiter) else { unreachable!("escalation archive owns its read") };
     domain.result_reads.retire(Id::from_token(waiter));
-    let (request, person, project, task, revision) = match query {
-        Query::Historical { request, person, project, task, revision } => (request, person, project, task, revision),
-        Query::Read { .. } => unreachable!("only historical decision queries load history"),
-    };
+    let Query { request, person, project, task, revision } = query(read);
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
             Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row))) => Some(row),
@@ -141,35 +92,26 @@ pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, row
 pub(crate) fn failed(domain: &mut Domain, waiter: Token) {
     let Some(read) = super::take_read(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
+    let Query { request, person, project, task, revision } = query(read);
+    domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
+        request,
+        person,
+        project,
+        task,
+        revision,
+        row: None,
+        busy: true,
+    }));
+}
+
+fn query(read: Read) -> Query {
     match read {
-        Read::Escalation(Query::Historical { request, person, project, task, revision }) => {
-            domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
-                request,
-                person,
-                project,
-                task,
-                revision,
-                row: None,
-                busy: true,
-            }));
-        }
+        Read::Escalation(query) => query,
         Read::Proposal(_)
-        | Read::Result(_)
-        | Read::Inbox(_)
+        | Read::Ended(_)
         | Read::Transcript { .. }
         | Read::Dependency(_)
         | Read::InputCheck(_)
-        | Read::Notes { .. }
-        | Read::Escalation(Query::Read { .. }) => {
-            unreachable!("only decision history loads here")
-        }
+        | Read::Notes { .. } => unreachable!("only decision history loads here"),
     }
-}
-
-fn refusal(to: ReplyTo, why: people::Refusal) -> Delivery {
-    Delivery::WebReply { to, sign_in: None, reply: people::Reply::Refused(why) }
-}
-
-fn refuse_direct(to: ReplyTo, why: people::Refusal, out: &mut skein_lib::Queue<Request>) {
-    out.push(crate::boundary::delivery_output(refusal(to, why)));
 }

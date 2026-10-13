@@ -133,7 +133,8 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::Hint { hint } => keep::hint(d, env, hint),
         Event::Writer { resource, taken } => keep::writer(d, env, &resource, taken),
         Event::Pushed { resource, commit } => keep::pushed(d, env, &resource, commit, out),
-        Event::Make { entry } => outbox::make(d, env, entry, out),
+        Event::Make { entry } => outbox::make(d, env, entry, false, out),
+        Event::Remake { entry } => outbox::make(d, env, entry, true, out),
         Event::Withdraw { entry } => outbox::withdraw(d, entry, out),
         Event::Restore { record } => match record {
             Stored::Live(record) => keep::restore_live(d, env, record),

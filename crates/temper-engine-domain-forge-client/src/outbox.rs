@@ -25,6 +25,7 @@ pub(crate) struct Outbox {
     clock: RecoveryClock,
 }
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent recovery facts of one outbox write")]
 struct Writing {
     entry: Entry,
     lane: Lane,
@@ -33,6 +34,8 @@ struct Writing {
     uncertain: bool,
     restart_checked: bool,
     withdrawn: bool,
+    /// A person asked for it again: not found after its lifetime, it is made anew.
+    again: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 struct Lane {
@@ -150,7 +153,7 @@ fn find(entry: &Entry) -> Phase {
     let position = entry.start.expect("an attempted write has a saved start");
     Phase::Find { page: position.review_page.max(1), after: position.comment }
 }
-pub(crate) fn make(d: &mut Domain, env: &Env<Limits>, entry: Entry, out: &mut Queue<Request>) {
+pub(crate) fn make(d: &mut Domain, env: &Env<Limits>, entry: Entry, again: bool, out: &mut Queue<Request>) {
     let error = if !d.outbox.ready {
         Some(Error::Busy)
     } else if !crate::identity::connected(d, entry.repository) {
@@ -168,7 +171,7 @@ pub(crate) fn make(d: &mut Domain, env: &Env<Limits>, entry: Entry, out: &mut Qu
         return;
     }
     assert!(!d.outbox.entries.contains_key(&entry.number), "an outbox entry is handed off once");
-    if let Some((number, _)) = d.outbox.entries.last() {
+    if !again && let Some((number, _)) = d.outbox.entries.last() {
         assert!(*number < entry.number, "new entries arrive in commit order");
     }
     let number = entry.number;
@@ -187,6 +190,7 @@ pub(crate) fn make(d: &mut Domain, env: &Env<Limits>, entry: Entry, out: &mut Qu
                 uncertain,
                 restart_checked: !uncertain,
                 withdrawn: false,
+                again,
             },
         )
         .expect("outbox admission checked");
@@ -389,7 +393,7 @@ fn not_found(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Req
     let w = d.outbox.entries.get(&number).expect("find owns entry");
     let left = remaining(&w.entry, d.outbox.clock, env);
     if left == Duration::ZERO {
-        if recovery(&w.entry.effect.write) == Recovery::Unrecoverable {
+        if recovery(&w.entry.effect.write) == Recovery::Unrecoverable && !w.again {
             finish(d, number, Outcome::Held, out);
         } else if w.entry.failures >= env.limits.write_attempts {
             finish(d, number, Outcome::Failed(Error::Timeout), out);
