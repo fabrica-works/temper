@@ -4,10 +4,11 @@
 //! pushed resource evidence; this crate does not encode history or inspect git.
 
 use alloc::boxed::Box;
+use jig_domain_host as host;
 use jig_domain_tasks as tasks;
+use skein_lib::List;
 use smith_domain as smith;
 use smith_domain_run as run;
-use temper_engine_domain as engine;
 
 use crate::Problem;
 
@@ -30,24 +31,25 @@ pub struct Terminal {
 /// Translate a Smith turn envelope, keeping its concrete record opaque to
 /// Temper. The protocol adapter supplies the bounded encoded bytes.
 #[expect(clippy::manual_map, reason = "the step subset forbids closure-based Option::map")]
-pub fn turn(request: smith::Request, transcript: Box<[u8]>) -> Result<engine::Turn, Problem> {
+pub fn turn(request: smith::Request, transcript: Box<[u8]>) -> Result<host::Turn, Problem> {
     match request {
-        smith::Request::Turn { number, read, spent, .. } => Ok(engine::Turn {
-            number,
-            cumulative: spent.units,
-            read: match read {
-                Some(name) => Some(name.raw()),
-                None => None,
-            },
-            transcript,
+        smith::Request::Turn { number, read, spent, opens_window, .. } => Ok(host::Turn {
+            opens_window,
+            // The hub attaches the refusals it keeps (jig's `domain/hosts.md`, 6.4).
+            refused: Box::new([]),
+            turn: number,
+            spent: spent.units,
+            read,
+            body: transcript,
         }),
         smith::Request::Waiting { .. }
         | smith::Request::HostCall { .. }
         | smith::Request::WithdrawHost { .. }
         | smith::Request::Admitted { .. }
         | smith::Request::Answer { .. }
-        | smith::Request::Checking { .. }
-        | smith::Request::ChecksEnded { .. }
+        | smith::Request::MessageRefused { .. }
+        | smith::Request::Long { .. }
+        | smith::Request::LongDone { .. }
         | smith::Request::Deliver { .. }
         | smith::Request::Complete { .. }
         | smith::Request::Rejected { .. }
@@ -79,7 +81,7 @@ pub fn result(answer: run::Answer, change: Option<ChangeResource>) -> Result<Ter
         run::Answer::Failed { failure, spent, turns } => {
             let class = match failure {
                 run::Failure::Transcript(_) | run::Failure::Stale => tasks::Class::Transient,
-                run::Failure::Model(_) | run::Failure::Budget(_) | run::Failure::Policy(_) => tasks::Class::Run,
+                run::Failure::Model(_) | run::Failure::Budget { .. } | run::Failure::Policy(_) => tasks::Class::Run,
                 run::Failure::Cancelled => tasks::Class::Agent,
             };
             Ok(Terminal { cumulative: spent.units, turns, end: tasks::End::Failed(class) })
@@ -93,7 +95,14 @@ pub fn result(answer: run::Answer, change: Option<ChangeResource>) -> Result<Ter
                         return Err(Problem::Type);
                     }
                     let Ok(code) = u32::try_from(crate::decimal(&verdict.name)?) else { return Err(Problem::Range) };
-                    tasks::TaskResult::Verdict { code, words: verdict.text }
+                    let Ok(count) = u32::try_from(verdict.fields.len()) else { return Err(Problem::TooLarge) };
+                    let mut fields = List::with_capacity(count);
+                    for field in verdict.fields {
+                        let Ok(()) = fields.push(tasks::ResultField { name: field.name, value: field.value }) else {
+                            return Err(Problem::TooLarge);
+                        };
+                    }
+                    tasks::TaskResult::Verdict { code, fields: fields.into_boxed(), words: verdict.text }
                 }
                 run::outcome::Declared::Change(change_result) => {
                     let resource = change.ok_or(Problem::Missing)?;

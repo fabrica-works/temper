@@ -439,6 +439,7 @@ impl World {
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
+                | top::Request::NotMade { .. }
                 | top::Request::ContinueRelease { .. }
                 | top::Request::EffectsSettled { .. }
                 | top::Request::Released { .. }
@@ -531,6 +532,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Release(row) => top::Key::Release(row.task),
+        top::Stored::Held(row) => top::Key::Held(row.number),
     }
 }
 

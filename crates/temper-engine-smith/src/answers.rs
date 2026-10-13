@@ -253,7 +253,7 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
                 jig_domain_notes::Refusal::Full => b"full",
                 jig_domain_notes::Refusal::Exists => b"already exists",
                 jig_domain_notes::Refusal::Missing => b"missing",
-                jig_domain_notes::Refusal::Moved => b"revision moved",
+                jig_domain_notes::Refusal::Moved { .. } => b"revision moved",
                 jig_domain_notes::Refusal::RevisionExhausted => b"revision exhausted",
             })?;
             true
@@ -380,6 +380,8 @@ fn task_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<
         Refusal::HoldTaken => text.add(b"resource held by"),
         Refusal::ResourceUnavailable => text.add(b"resource unavailable"),
         Refusal::Holds => text.add(b"resource hold limit"),
+        Refusal::Unproposable => text.add(b"no one may accept this proposal"),
+        Refusal::PersonRevision { .. } => text.add(b"older person task revision"),
     }?;
     if let Some(blocked_by) = &problem.blocked_by {
         for task in blocked_by {

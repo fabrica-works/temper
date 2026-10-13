@@ -19,6 +19,7 @@ const DEPLOYMENT: Deployment = Deployment {
     runs: 0,
     calls: 0,
     connector_rows: 0,
+    applications: 0,
     commits: 0,
 };
 
@@ -87,12 +88,14 @@ fn turn(number: u32, len: u32) -> Write {
         spent: u64::from(number),
         read: Some(u64::from(number)),
         at: Wall::from_nanos(17),
+        opens_window: number == 1,
         transcript: bytes(len),
     }))))
 }
 
 fn ack(number: u32) -> Delivery {
-    Delivery::AcknowledgeTurn { channel: Token::new(7), task: 1, attempt: 1, turn: number }
+    let down = jig_domain_host::LinkDown::TurnKept { run: Token::new(1), attempt: Token::new(1), turn: number };
+    Delivery::Link { channel: Token::new(7), down }
 }
 
 fn decision(number: u32) -> Decision {
@@ -110,7 +113,9 @@ fn commit(out: &mut Queue<Output>) -> (u64, Box<[Write]>) {
 }
 
 fn acknowledged(out: &mut Queue<Output>) -> u32 {
-    let Output::Deliver(Delivery::AcknowledgeTurn { turn, .. }) = out.pop().unwrap() else {
+    let Output::Deliver(Delivery::Link { down: jig_domain_host::LinkDown::TurnKept { turn, .. }, .. }) =
+        out.pop().unwrap()
+    else {
         panic!("ack");
     };
     turn
@@ -299,6 +304,17 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
             slots: 1,
             workstreams: Box::new([]),
             hosting: Box::new([]),
+            bounds: fleet::Bounds {
+                models: Box::new([]),
+                turns: 1,
+                spend: 1,
+                time: skein_lib::Duration::from_secs(1),
+                waiting: skein_lib::Duration::from_secs(1),
+                checks: skein_lib::Duration::from_secs(1),
+                message_bytes: 1,
+                inbox: 1,
+                unacknowledged: 1,
+            },
         },
     });
     assert!(
@@ -324,22 +340,27 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
     let assignment = crate::Assignment {
         task: 1,
         attempt: 1,
+        conversation: 1,
         charter: 1,
         run: Box::new(crate::RunCharter {
             policy: crate::RunPolicy {
                 instructions: Box::new([]),
                 waiting: skein_lib::Duration::from_secs(1),
                 resume: true,
-                turns: 1,
-                time: skein_lib::Duration::from_secs(1),
+                turns: 2,
+                time: skein_lib::Duration::from_secs(2),
+                reserve_turns: 1,
+                reserve_time: skein_lib::Duration::from_secs(1),
                 model: crate::Model {
                     dialect: 1,
                     account: 1,
                     endpoint: 1,
                     name: b"m".as_slice().into(),
-                    max_tokens: 1,
+                    window: 1,
+                    output: 1,
                     input_price: 1,
                     cached_price: 1,
+                    cache_write_price: None,
                     output_price: 1,
                     price_unit: 1,
                 },
@@ -365,13 +386,18 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
             kind: crate::BriefKind::Core(brief::Core::Task),
             body: crate::BriefBody::Text(b"12345".as_slice().into()),
         }]),
-        inbox: Box::new([]),
+        messages: Box::new([]),
         saved: Box::new([]),
         workspace: crate::ForgeWorkspace { key: Box::new([]), repositories: Box::new([]) },
         transcript: Box::new([]),
         answered: Box::new([]),
         settled: Box::new([]),
-        grant: accounts::Grant { account: 1, generation: 1, valid: skein_lib::Duration::from_secs(1) },
+        grants: Box::new([accounts::Grant {
+            table: accounts::GrantTable::Accounts,
+            account: 1,
+            generation: 1,
+            valid: skein_lib::Duration::from_secs(1),
+        }]),
     };
     assert!(decision.deliver(&limits, Delivery::Assigned { channel: Token::new(1), assignment }).is_err());
 }

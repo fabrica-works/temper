@@ -67,7 +67,13 @@ pub(crate) fn parse(input: &[u8]) -> Result<Value, Problem> {
                     }
                 };
             }
-            Some(tokenizer::Event::Failed(_) | tokenizer::Event::Closed) => return Err(Problem::Malformed),
+            // Long and Skipped answer requests this parser never makes.
+            Some(
+                tokenizer::Event::Failed(_)
+                | tokenizer::Event::Closed
+                | tokenizer::Event::Long(_)
+                | tokenizer::Event::Skipped(_),
+            ) => return Err(Problem::Malformed),
             None => {}
         }
     }

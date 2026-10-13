@@ -257,6 +257,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }
@@ -301,6 +302,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }
@@ -345,6 +347,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::Taken { .. }
         | Request::Refused { .. }
         | Request::Outcome { .. }
+        | Request::NotMade { .. }
         | Request::ContinueRelease { .. }
         | Request::Released { .. }
         | Request::Retained { .. }

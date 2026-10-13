@@ -19,6 +19,7 @@ fn assignment() -> engine::Assignment {
     engine::Assignment {
         task: 23,
         attempt: 7,
+        conversation: 7,
         charter: 1,
         run: Box::new(engine::RunCharter {
             policy: engine::RunPolicy {
@@ -27,14 +28,18 @@ fn assignment() -> engine::Assignment {
                 resume: true,
                 turns: 8,
                 time: Duration::from_secs(60),
+                reserve_turns: 1,
+                reserve_time: Duration::from_secs(10),
                 model: engine::Model {
                     dialect: 1,
                     account: 1,
                     endpoint: 1,
                     name: b"scripted".as_slice().into(),
-                    max_tokens: 1024,
+                    window: 8192,
+                    output: 1024,
                     input_price: 1,
                     cached_price: 1,
+                    cache_write_price: None,
                     output_price: 1,
                     price_unit: 1000,
                 },
@@ -60,13 +65,18 @@ fn assignment() -> engine::Assignment {
             kind: engine::BriefKind::Core(brief::Core::Task),
             body: engine::BriefBody::Text(b"Say hello".as_slice().into()),
         }]),
-        inbox: Box::new([]),
+        messages: Box::new([]),
         saved: Box::new([]),
         workspace: engine::ForgeWorkspace { key: Box::new([]), repositories: Box::new([]) },
         transcript: Box::new([]),
         answered: Box::new([]),
         settled: Box::new([]),
-        grant: accounts::Grant { account: 1, generation: 2, valid: Duration::from_secs(30) },
+        grants: Box::new([accounts::Grant {
+            table: accounts::GrantTable::Accounts,
+            account: 1,
+            generation: 2,
+            valid: Duration::from_secs(30),
+        }]),
     }
 }
 
@@ -180,7 +190,7 @@ fn an_effect_proposal_decodes_its_connector_payload_and_rejects_an_unknown_resou
 }
 
 fn spend(units: u64) -> run::Spend {
-    run::Spend { turns: 1, input: 2, output: 3, cache_read: 0, cache_write: 0, units }
+    run::Spend { turns: 1, input: Some(2), output: Some(3), cache_read: Some(0), cache_write: Some(0), reasoning: None, units }
 }
 
 fn change_answer() -> run::Answer {

@@ -790,6 +790,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
+                | top::Request::NotMade { .. }
                 | top::Request::ContinueRelease { .. }
                 | top::Request::EffectsSettled { .. }
                 | top::Request::Released { .. }
@@ -1617,6 +1618,7 @@ fn goals_classify_landings_from_their_subtree_heads_and_planned_paths_after_rest
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
+                | top::Request::NotMade { .. }
                 | top::Request::ContinueRelease { .. }
                 | top::Request::EffectsSettled { .. }
                 | top::Request::Released { .. }
