@@ -58,6 +58,8 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         || l.brief_sections == 0
         || l.brief_bytes == 0
         || l.repositories > l.client.repositories
+        // The top's entries, held ones included, are the client's only
+        // makes, so a held entry made again always finds the client's room.
         || l.entries > l.client.entries
         || l.holds > l.client.resources
     {
@@ -102,7 +104,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingCi>::worst_case(l.subscriptions)?)?
         .checked_add(Map::<skein_lib::Token, crate::capabilities::Pending>::worst_case(l.repositories)?)?
         .checked_add(u64::from(l.repositories).checked_mul(u64::from(l.client.answer_bytes))?)?
-        .checked_add(Map::<u64, client::Entry>::worst_case(l.entries)?.checked_mul(2)?)?
+        .checked_add(Map::<u64, crate::domain::Outboxed>::worst_case(l.entries)?)?
         .checked_add(Map::<crate::NamedCall, crate::CallPayload>::worst_case(l.named_calls)?)?
         .checked_add(u64::from(l.named_calls).checked_mul(u64::from(l.client.answer_bytes))?)?
         .checked_add(Map::<u64, crate::ProposedEffect>::worst_case(l.tasks)?)?

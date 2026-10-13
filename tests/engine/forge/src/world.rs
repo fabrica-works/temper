@@ -524,7 +524,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Ci(row) => top::Key::Ci { repository: row.repository, head: row.head },
         top::Stored::Landed { commit, .. } => top::Key::Landed(*commit),
         top::Stored::ProposedEffect(row) => top::Key::ProposedEffect(row.number),
-        top::Stored::Entry(row) => top::Key::Entry(row.number),
+        top::Stored::Entry { entry, .. } => top::Key::Entry(entry.number),
         top::Stored::Client(row) => top::Key::Client(match row {
             client::Stored::Live(row) => client::Key::Live(row.watch.resource.clone()),
             client::Stored::Repository(row) => client::Key::Repository(row.repository),
@@ -532,7 +532,6 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Release(row) => top::Key::Release(row.task),
-        top::Stored::Held(row) => top::Key::Held(row.number),
     }
 }
 

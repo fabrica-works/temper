@@ -277,7 +277,7 @@ impl ScenarioApplication for Temper {
                     .map(|record| &record.0)
                     .find_map(|row| match row {
                         root::Record::Forge { row } => match row.as_ref() {
-                            forge::Stored::Entry(entry) => entry.attempt.map(|a| a.expires),
+                            forge::Stored::Entry { entry, held: false } => entry.attempt.map(|a| a.expires),
                             _ => None,
                         },
                         _ => None,

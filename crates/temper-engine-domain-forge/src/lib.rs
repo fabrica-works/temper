@@ -195,8 +195,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Ci(row) => Key::Ci { repository: row.repository, head: row.head },
         Stored::Landed { commit, .. } => Key::Landed(*commit),
         Stored::ProposedEffect(row) => Key::ProposedEffect(row.number),
-        Stored::Entry(row) => Key::Entry(row.number),
-        Stored::Held(row) => Key::Held(row.number),
+        Stored::Entry { entry, .. } => Key::Entry(entry.number),
         Stored::Client(row) => Key::Client(match row {
             client::Stored::Live(row) => client::Key::Live(row.watch.resource.clone()),
             client::Stored::Repository(row) => client::Key::Repository(row.repository),
@@ -347,7 +346,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             };
             client::effect_bytes(&row.entry.effect)?.checked_add(resource)
         }
-        Stored::Entry(row) | Stored::Held(row) => client::effect_bytes(&row.effect),
+        Stored::Entry { entry, .. } => client::effect_bytes(&entry.effect),
         Stored::Client(row) => client::stored_bytes(row),
         Stored::Change(row) => bytes(&row.branch)?
             .checked_add(bytes(&row.base)?)?

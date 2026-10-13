@@ -1170,10 +1170,10 @@ fn prior_effects_settle_before_cleanup_can_delete_a_held_resource() {
     world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Done, entry: 11 });
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
-        Some(top::Stored::Entry(client::Entry {
-            effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. },
-            ..
-        }))
+        Some(top::Stored::Entry {
+            entry: client::Entry { effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. }, .. },
+            held: false,
+        })
     ));
 }
 
@@ -1297,17 +1297,17 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     world.take_seen();
     world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled, entry: 10 });
     assert!(
-        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry(client::Entry { effect: client::Effect { write: client::api::Write::Close { number }, .. }, .. })) if *number == pull)
+        matches!(world.stored().get(&top::Key::Entry(10)), Some(top::Stored::Entry { entry: client::Entry { effect: client::Effect { write: client::api::Write::Close { number }, .. }, .. }, held: false }) if *number == pull)
     );
     world.event(top::Event::Committed { entry: 10 });
     world.run_for(5);
     world.event(top::Event::ContinueRelease { task: 51, entry: 11 });
     assert!(matches!(
         world.stored().get(&top::Key::Entry(11)),
-        Some(top::Stored::Entry(client::Entry {
-            effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. },
-            ..
-        }))
+        Some(top::Stored::Entry {
+            entry: client::Entry { effect: client::Effect { write: client::api::Write::DeleteBranch { .. }, .. }, .. },
+            held: false,
+        })
     ));
     world.event(top::Event::Committed { entry: 11 });
     world.run_for(5);

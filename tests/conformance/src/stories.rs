@@ -75,7 +75,7 @@ fn wait(world: &mut World, done: impl Fn(&World) -> bool) -> Result<(), Violatio
             &world.trace[world.trace.len().saturating_sub(5)..], issue_row(world),
             world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Core(core::Record::Core(core::CoreRecord::Call(_))))).collect::<Vec<_>>(),
             world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Core(core::Record::Tasks(_)))).collect::<Vec<_>>(),
-            world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Release(_)|forge::Stored::Entry(_)))).collect::<Vec<_>>()
+            world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Release(_)|forge::Stored::Entry { .. }))).collect::<Vec<_>>()
         ),
     })
 }

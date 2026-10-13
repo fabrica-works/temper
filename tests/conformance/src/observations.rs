@@ -227,7 +227,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                 decisions.push(*row);
             }
             root::Record::Forge { row } => {
-                let forge::Stored::Entry(row) = row.as_ref() else { continue };
+                let forge::Stored::Entry { entry: row, held: false } = row.as_ref() else { continue };
                 let key = key(store, row);
                 let (kind, resources, condition, target, state) = parts(&row.effect.write);
                 if let Some(attempt) = row.attempt {
@@ -302,7 +302,7 @@ pub fn resolved(
     let mut live = BTreeSet::new();
     for record in store.rows.values().map(|record| &record.0) {
         if let root::Record::Forge { row } = record
-            && let forge::Stored::Entry(entry) = row.as_ref()
+            && let forge::Stored::Entry { entry, held: false } = row.as_ref()
         {
             let key = key(store, entry);
             live.insert(key);

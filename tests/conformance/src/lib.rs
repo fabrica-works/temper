@@ -290,7 +290,7 @@ impl Application for Temper {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
         for record in store.rows.values().map(|record| &record.0) {
             if let root::Record::Forge { row } = record
-                && let forge::Stored::Entry(entry) = row.as_ref()
+                && let forge::Stored::Entry { entry, held: false } = row.as_ref()
                 && entry.attempt.is_some()
             {
                 let key = observations::key(store, entry);

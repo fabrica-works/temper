@@ -377,10 +377,13 @@ pub enum Stored {
         commit: client::api::Commit,
         task: u64,
     },
-    /// An unsettled outbox entry.
-    Entry(client::Entry),
-    /// An uncertain entry held for a person to make again or settle not made.
-    Held(client::Entry),
+    /// An unsettled outbox entry. A held one is out of the client's outbox,
+    /// keeping its room until a person makes it again or it is settled not
+    /// made (domain/forge.md, 6; jig's `domain/connectors.md`, 4.3).
+    Entry {
+        entry: client::Entry,
+        held: bool,
+    },
     /// A client working-set row.
     Client(client::Stored),
     /// A change procedure's committed state.
@@ -411,7 +414,6 @@ pub enum Key {
     Ci { repository: client::api::Repository, head: client::api::Commit },
     Landed(client::api::Commit),
     Entry(u64),
-    Held(u64),
     Client(client::Key),
     Change(u64),
     Issue(u64),
@@ -561,7 +563,7 @@ pub enum Request {
     Refused { task: u64 },
     /// An entry settled or remains uncertain; root routes the task's news.
     Outcome { entry: u64, task: u64, outcome: client::Outcome },
-    /// A held entry a person settled as not made.
+    /// A held entry settled as not made, by a person or its task's close.
     NotMade { entry: u64, task: u64 },
     /// A prior effect or release write settled; advance the closing task.
     ContinueRelease { task: u64 },

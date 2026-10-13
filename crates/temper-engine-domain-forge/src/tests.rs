@@ -134,6 +134,25 @@ fn adopted() -> Repository {
         },
     }
 }
+/// A commit status write: a set, made without a find.
+fn status(number: u64, task: u64) -> client::Entry {
+    client::Entry {
+        number,
+        task,
+        repository: REPO,
+        effect: client::Effect {
+            write: client::api::Write::Status {
+                commit: [3; 32],
+                context: Box::from(&b"test"[..]),
+                check: client::api::Check::Passed,
+            },
+            condition: client::Condition::None,
+        },
+        start: None,
+        attempt: None,
+        failures: 0,
+    }
+}
 fn branch() -> Name {
     Name { forge: 1, repository: 2, what: What::Branch(Box::new([Box::from(&b"temper"[..]), Box::from(&b"7"[..])])) }
 }
@@ -204,25 +223,10 @@ fn an_outbox_entry_waits_for_its_commit() {
         &[Request::RestartDone { stage: RestartStage::ReadAfresh }],
     );
     assert_eq!(outputs(&mut d, Event::SettleOutbox).as_ref(), &[Request::RestartDone { stage: RestartStage::Settled }],);
-    let entry = client::Entry {
-        number: 11,
-        task: 7,
-        repository: REPO,
-        effect: client::Effect {
-            write: client::api::Write::Status {
-                commit: [3; 32],
-                context: Box::from(&b"test"[..]),
-                check: client::api::Check::Passed,
-            },
-            condition: client::Condition::None,
-        },
-        start: None,
-        attempt: None,
-        failures: 0,
-    };
+    let entry = status(11, 7);
     assert_eq!(
         outputs(&mut d, Event::Enqueue { entry: entry.clone() }).as_ref(),
-        &[Request::Save { read_afresh: None, release: Some(11), record: Stored::Entry(entry) }]
+        &[Request::Save { read_afresh: None, release: Some(11), record: Stored::Entry { entry, held: false } }]
     );
     assert!(ready(&mut d).is_empty());
     outputs(&mut d, Event::Committed { entry: 11 });
@@ -526,11 +530,10 @@ fn native_effect_rows_keep_the_clients_recovery_promises() {
     }
 }
 
-/// A restarted forge with one issue creation held after its lifetime ran out
-/// unanswered (domain/forge.md, 6): the person settles it.
-fn held_creation() -> (Domain, client::Entry) {
-    let mut d = domain();
-    let entry = client::Entry {
+/// An issue creation whose lifetime ran out unanswered: unrecoverable, it
+/// is held for a person (domain/forge.md, 6).
+fn held_issue() -> client::Entry {
+    client::Entry {
         number: 11,
         task: 7,
         repository: REPO,
@@ -550,33 +553,67 @@ fn held_creation() -> (Domain, client::Entry) {
             expires: Wall::from_nanos(2),
         }),
         failures: 1,
-    };
+    }
+}
+
+/// A forge restored with the held issue creation, before its restart runs.
+fn held_restored() -> Domain {
+    let mut d = domain();
     outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
-    outputs(&mut d, Event::Restore { record: Stored::Held(entry.clone()) });
+    outputs(&mut d, Event::Restore { record: Stored::Entry { entry: held_issue(), held: true } });
+    d
+}
+
+/// A restarted forge whose held issue creation waits for a person.
+fn held_creation() -> Domain {
+    let mut d = held_restored();
     outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
     outputs(&mut d, Event::ReadAfresh);
     outputs(&mut d, Event::SettleOutbox);
-    (d, entry)
+    d
+}
+
+#[test]
+fn a_held_effect_survives_a_restart_out_of_the_clients_outbox() {
+    let mut d = held_restored();
+    assert_eq!(
+        outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic }).as_ref(),
+        &[Request::RestartDone { stage: RestartStage::Restored }]
+    );
+    assert_eq!(
+        outputs(&mut d, Event::ReadAfresh).as_ref(),
+        &[Request::RestartDone { stage: RestartStage::ReadAfresh }]
+    );
+    // Nothing is looked for: the client never had the held entry.
+    assert_eq!(outputs(&mut d, Event::SettleOutbox).as_ref(), &[Request::RestartDone { stage: RestartStage::Settled }]);
+    assert!(ready(&mut d).is_empty());
+    assert!(!d.effect_room(&LIMITS, 7), "the held entry keeps its room");
 }
 
 #[test]
 fn a_held_effect_settled_as_not_made_is_erased_and_reported() {
-    let (mut d, _) = held_creation();
+    let mut d = held_creation();
     assert_eq!(
         outputs(&mut d, Event::Resolve { entry: 11, again: false }).as_ref(),
-        &[Request::Erase { key: Key::Held(11) }, Request::NotMade { entry: 11, task: 7 }]
+        &[Request::Erase { key: Key::Entry(11) }, Request::NotMade { entry: 11, task: 7 }]
     );
 }
 
 #[test]
-fn a_held_effect_asked_again_returns_to_the_outbox_and_is_looked_for_first() {
-    let (mut d, entry) = held_creation();
+fn a_held_effect_asked_again_is_looked_for_first_even_with_an_otherwise_full_outbox() {
+    let mut d = held_creation();
+    for number in 12..19 {
+        outputs(&mut d, Event::Enqueue { entry: status(number, 8) });
+        outputs(&mut d, Event::Committed { entry: number });
+    }
+    assert!(!d.effect_room(&LIMITS, 0), "the outbox is full");
     assert_eq!(
         outputs(&mut d, Event::Resolve { entry: 11, again: true }).as_ref(),
-        &[
-            Request::Erase { key: Key::Held(11) },
-            Request::Save { read_afresh: None, release: None, record: Stored::Entry(entry) }
-        ]
+        &[Request::Save {
+            read_afresh: None,
+            release: None,
+            record: Stored::Entry { entry: held_issue(), held: false }
+        }]
     );
     assert_eq!(
         ready(&mut d).as_ref(),
@@ -589,5 +626,48 @@ fn a_held_effect_asked_again_returns_to_the_outbox_and_is_looked_for_first() {
                 kind: Some(client::api::Kind::Issue),
             }),
         }]
+    );
+}
+
+#[test]
+fn closing_a_task_settles_its_held_effect_not_made_and_frees_its_room() {
+    let mut d = held_creation();
+    for number in 12..19 {
+        outputs(&mut d, Event::Enqueue { entry: status(number, 8) });
+    }
+    let row = ReleaseRow {
+        task: 7,
+        root: 7,
+        ending: ReleaseEnding::Done,
+        close_pull: None,
+        pending: None,
+        failed: false,
+        effects_settled: false,
+        releasing: false,
+    };
+    assert_eq!(
+        outputs(&mut d, Event::SettleEffects { task: 7, root: 7, ending: ReleaseEnding::Done }).as_ref(),
+        &[
+            Request::Save { read_afresh: None, release: None, record: Stored::Release(row.clone()) },
+            Request::Erase { key: Key::Entry(11) },
+            Request::NotMade { entry: 11, task: 7 },
+            Request::ContinueRelease { task: 7 },
+        ]
+    );
+    assert_eq!(
+        outputs(&mut d, Event::Enqueue { entry: status(19, 8) }).as_ref(),
+        &[Request::Save {
+            read_afresh: None,
+            release: Some(19),
+            record: Stored::Entry { entry: status(19, 8), held: false }
+        }]
+    );
+    let settled = ReleaseRow { effects_settled: true, ..row };
+    assert_eq!(
+        outputs(&mut d, Event::ContinueRelease { task: 7, entry: 20 }).as_ref(),
+        &[
+            Request::Save { read_afresh: None, release: None, record: Stored::Release(settled) },
+            Request::EffectsSettled { task: 7 },
+        ]
     );
 }
