@@ -1,10 +1,9 @@
 //! Bounded root sweep across durable task endings and the held route.
 
 use jig_domain_authority as authority;
-use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Duration, Queue, ReplyTo, Rng, Token};
+use skein_lib::{Queue, ReplyTo, Rng, Token};
 use std::collections::BTreeSet;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
@@ -18,6 +17,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
     let mut configuration = config(seed);
     if child {
         bounds.tasks.tasks = 4;
+        bounds.people.inbox_tasks = 8;
         bounds.tasks.project_tasks = 4;
         bounds.tasks.tree_tasks = 4;
         bounds.tasks.depth = 1;
@@ -38,9 +38,6 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
         authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
         assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
         configuration.authority = domain;
-        configuration.chat_authority.delegation.kinds = Box::new([authority::Executor::Charter(1)]);
-        configuration.chat_authority.delegation.tasks = 1;
-        configuration.chat_authority.delegation.depth = 1;
     }
     bounds.fleet.attempts = 5;
     bounds.call_records = 4;
@@ -49,15 +46,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
-    driver.send(engine::Event::Worker(engine::WorkerInput::Hello {
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            stop_bound: Duration::from_secs(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    }));
+    driver.hello(Token::new(7));
     driver.settle();
     driver.sign_in();
     driver.settle();
@@ -101,15 +90,8 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 } else {
                     tasks::TaskResult::Failure { reason: b"failed".as_slice().into() }
                 };
-                driver.send(engine::Event::Worker(engine::WorkerInput::Answer {
-                    pushed: Box::new([]),
-                    saved: None,
-                    channel: Token::new(7),
-                    task: assignment.task,
-                    attempt: assignment.attempt,
-                    cumulative: 0,
-                    end: tasks::End::Finished { result, cancel_delegates: false },
-                }));
+                let end = tasks::End::Finished { result, cancel_delegates: false };
+                driver.answer(Token::new(7), assignment.task, assignment.attempt, 0, end, engine::Parts::none());
                 driver.settle();
                 let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))) =
                     driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(assignment.task))))
@@ -147,43 +129,22 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
                 };
-                driver.send(engine::Event::Worker(engine::WorkerInput::Call {
-                    channel: Token::new(7),
-                    task: assignment.task,
-                    attempt: assignment.attempt,
-                    call: Token::new(90),
-                    body: engine::Call {
-                        completion: 1,
-                        position: 1,
-                        tool: engine::Tool::Delegate { batch: Box::new([child]) },
-                    },
-                }));
+                let body =
+                    engine::Call { completion: 1, position: 1, tool: engine::Tool::Delegate { batch: Box::new([child]) } };
+                driver.call(Token::new(7), assignment.task, assignment.attempt, 90, body);
                 for _ in 0..30 {
                     driver.advance(true);
                 }
-                let child = driver
-                    .delivered
-                    .iter()
-                    .find_map(|item| match item {
-                        Delivery::CallAnswer {
-                            call,
-                            answer: temper_engine_domain::CallAnswer::Delegated(numbers),
-                            ..
-                        } if *call == Token::new(90) => numbers.first().copied(),
-                        _ => None,
-                    })
-                    .expect("child was made atomically");
-                driver.send(engine::Event::Worker(engine::WorkerInput::Call {
-                    channel: Token::new(7),
-                    task: assignment.task,
-                    attempt: assignment.attempt,
-                    call: Token::new(91),
-                    body: engine::Call {
-                        completion: 2,
-                        position: 2,
-                        tool: engine::Tool::Cancel { target: child, reason: b"withdrawn".as_slice().into() },
-                    },
-                }));
+                let Some(temper_engine_domain::CallAnswer::Delegated(numbers)) = driver.answered(90) else {
+                    panic!("child was made atomically, seed {seed}");
+                };
+                let child = numbers[0];
+                let body = engine::Call {
+                    completion: 2,
+                    position: 2,
+                    tool: engine::Tool::Cancel { target: child, reason: b"withdrawn".as_slice().into() },
+                };
+                driver.call(Token::new(7), assignment.task, assignment.attempt, 91, body);
                 driver.settle();
                 assert!(
                     matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(child)))),

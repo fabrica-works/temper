@@ -1,6 +1,7 @@
 //! Direct root fixture shared by focused routes and the ending sweep.
 
 use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
 use temper_engine_domain as engine;
@@ -24,10 +25,13 @@ pub struct Driver {
     pub fail_archive_once: bool,
     pub transactions: Vec<Vec<Write>>,
     pub host_requests: Vec<Box<engine::HostRequest>>,
-    /// Inputs `try_step` handed back while the journal was full.
-    pub returned: Vec<engine::Event>,
+    /// How many inputs `try_step` handed back while the journal was full; the
+    /// world offers each again later.
+    pub returned: u32,
     /// Other outputs without a durability dependency.
     pub immediate: Vec<engine::Request>,
+    /// Whether the deployment's first period was sent once the root was ready.
+    pub period_sent: bool,
 }
 
 impl Driver {
@@ -51,8 +55,9 @@ impl Driver {
             fail_archive_once: false,
             transactions: Vec::new(),
             host_requests: Vec::new(),
-            returned: Vec::new(),
+            returned: 0,
             immediate: Vec::new(),
+            period_sent: false,
         }
     }
 
@@ -60,7 +65,8 @@ impl Driver {
     /// is handed back to the world, which keeps it (jig's `domain/root.md`, 3).
     pub fn send(&mut self, event: engine::Event) {
         if let Err(event) = engine::try_step(&mut self.root, &self.env, event) {
-            self.returned.push(event);
+            self.returned += 1;
+            self.events.push_back(event);
         }
         engine::release(&mut self.root, &self.env, &mut self.out);
         self.collect();
@@ -118,6 +124,10 @@ impl Driver {
     }
 
     pub fn advance(&mut self, apply: bool) {
+        if !self.period_sent && self.root.ready() {
+            self.period_sent = true;
+            self.period();
+        }
         if let Some(event) = self.events.pop_front() {
             self.send(event);
         }
@@ -138,6 +148,30 @@ impl Driver {
             }
         }
         panic!("direct root routes did not settle: {:?}", self.root);
+    }
+
+    /// One worker's empty hello on `channel`.
+    pub fn hello(&mut self, channel: Token) {
+        self.send(crate::protocol::hello(channel, Box::new([])));
+    }
+
+    /// A run's call of one engine tool, named by `call`.
+    pub fn call(&mut self, channel: Token, task: u64, attempt: u64, call: u64, body: engine::Call) {
+        let event = self.protocol.call(channel, task, attempt, call, body);
+        self.send(event);
+    }
+
+    /// A run's answer, its outcome read back as `end`, temper's parts beside it.
+    pub fn answer(&mut self, channel: Token, task: u64, attempt: u64, cumulative: u64, end: tasks::End, parts: engine::Parts) {
+        let event = self.protocol.answer(channel, task, attempt, cumulative, end, parts);
+        self.send(event);
+    }
+
+    /// The typed answer the root decided for the call named `call`, once rendered.
+    #[must_use]
+    pub fn answered(&self, call: u64) -> Option<&engine::CallAnswer> {
+        let name = call.to_be_bytes();
+        self.protocol.answers.iter().rev().find_map(|(named, answer)| (named.as_ref() == name).then_some(answer))
     }
 
     /// The deployment's first period for project one, at its first start.
