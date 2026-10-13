@@ -44,8 +44,9 @@ const KEY: u32 = 8;
 /// The most memory the domain holds under `limits`, in bytes (6.3), or `None`
 /// if it does not fit a `u64` or the limits cannot be honoured: the child
 /// domains' own, or limits under which one child domain would refuse what
-/// another passes it within its own. The checkout's repositories, names and
-/// conflicts must fit smith's directories, and a workstream's key its names;
+/// another passes it within its own, or a hello that promises what the hub
+/// refuses. The checkout's repositories, names and conflicts must fit
+/// smith's directories, and a workstream's key its names;
 /// the host's runs must each find a workspace and an agent (no more slots
 /// than workspaces or agent processes); what goes down to a run must be what
 /// an agent takes (an inbound event, rendered, no larger than its messages,
@@ -53,8 +54,9 @@ const KEY: u32 = 8;
 /// than may wait for it in its agent), and smith's turns unacknowledged, each
 /// no larger encoded than the host takes a turn, must fit the host's reserve
 /// for a stopping run, its turns and its bytes; a run's calls must fit the
-/// host's; and a run's push message, as smith bounds a call, and the save's
-/// must fit a commit message.
+/// host's; a run's push message, as smith bounds a call, and the save's
+/// must fit a commit message; and the hello's bounds must be within the
+/// hub's inbox and events and smith's turn window.
 ///
 /// It is the child domains', plus what the root keeps: the agents it bound
 /// and their calls in flight with their names and what they ask, the
@@ -72,7 +74,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         && checkout_limits.conflicts <= agent_limits.conflicts
         && checkout_limits.path_bytes <= agent_limits.path_bytes
         && checkout_limits.name_bytes <= agent_limits.name_bytes
-        && checkout_limits.name_bytes <= agent_limits.path_bytes
         && KEY <= checkout_limits.name_bytes
         && host_limits.accounts <= agent_limits.accounts
         && host_limits.slots <= checkout_limits.workspaces
@@ -84,7 +85,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         && host_limits.held <= agent_limits.messages
         && host_limits.inbox <= agent_limits.messages
         && agent_limits.call_bytes <= u64::from(checkout_limits.message_bytes)
-        && len(SAVED) <= u64::from(checkout_limits.message_bytes);
+        && len(SAVED) <= u64::from(checkout_limits.message_bytes)
+        && limits.bounds.inbox <= host_limits.inbox
+        && u64::from(limits.bounds.message_bytes) <= host_limits.event_bytes
+        && limits.bounds.unacknowledged <= agent_limits.turns;
     if !fits {
         return None;
     }
@@ -142,8 +146,8 @@ fn workspace_memory(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u32, [u8; 32]>::worst_case(checkout_limits.repositories)?)?
         .checked_add(name)?
         .checked_add(agent::Delivered::worst_case())?;
-    let items = Slab::<Items>::worst_case(staged)?
-        .checked_add(Map::<(Token, Token), Id<Items>>::worst_case(staged)?)?
+    let items = Map::<Token, Items>::worst_case(staged)?
+        .checked_add(Map::<(Token, Token), Token>::worst_case(staged)?)?
         .checked_add(u64::from(staged).checked_mul(per)?)?;
     workspaces.checked_add(items)
 }

@@ -18,9 +18,10 @@
 //!   hello. A refusal goes once, and holds no slot.
 //! - The protocol layer's routing, which decodes and encodes smith's
 //!   payloads by hand-out (jig's `domain/hosts.md`, 6.8), keeping no state:
-//!   a [`Request::Decode`] is answered by one [`Event::Decoded`], a
-//!   [`Request::Encode`] by one [`Event::Encoded`], and a [`Request::Fact`]
-//!   by one [`Event::Activity`], each in the order it went out.
+//!   a [`Request::Decode`] is answered by one [`Event::Decoded`] and a
+//!   [`Request::Encode`] by one [`Event::Encoded`], each in the order it went
+//!   out; a [`Request::Fact`] by one [`Event::Activity`], best effort, as
+//!   facts are (`domain/worker.md`, section 7).
 //! - io's agent processes and their channels, as smith's host domain defines
 //!   them (`smith_host_domain::process`), carried whole: each of its requests
 //!   is ended by the terminal its documentation names.
@@ -30,8 +31,12 @@
 //!   race.
 //!
 //! The shell tells the domain to shut down ([`Event::Shutdown`]); the domain
-//! says [`Request::Stop`] once, when it has no run, agent, hand-out or
-//! workspace left.
+//! says [`Request::Stop`] once, when it has no agent, hand-out or workspace
+//! left, and either no run and the engine has every turn and answer, or, the
+//! engine out of reach past the grace, no run left to answer, so that it
+//! gives up the turns and answers it keeps, counted (`domain/worker.md`,
+//! section 2). The facts still out to be decoded do not hold it: they are
+//! counted dropped.
 //!
 //! A request's `owner` is the token of whoever asked, echoed on its terminal
 //! event. Tokens of different families may be equal: the variant routes a

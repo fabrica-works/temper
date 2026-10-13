@@ -57,10 +57,13 @@ pub(crate) fn to_agent(domain: &mut Domain, env: &Env<Limits>, request: host::To
         }
         host::ToAgent::Acknowledge { agent, turn } => smith::parent::Event::Acknowledge { agent, turn },
         host::ToAgent::Cancel { agent } => smith::parent::Event::Stop { agent },
-        host::ToAgent::Grant { agent, grant } => {
-            let Some(grant) = translate::grant(grant) else { return };
-            smith::parent::Event::Grant { agent, grant }
-        }
+        // The hub hands its agent only the LLM accounts' grants, and keeps
+        // the application credentials, the git identities, to itself (jig's
+        // domain/hosts.md, 6.2; jig 7ca3c388): the table needs no reading.
+        host::ToAgent::Grant { agent, grant } => smith::parent::Event::Grant {
+            agent,
+            grant: smith::Grant { account: grant.account, generation: grant.generation, valid: grant.valid },
+        },
         host::ToAgent::Answer { agent, call: name, reply } => {
             let mut found = None;
             for (key, call) in &domain.calls {
@@ -109,7 +112,10 @@ pub(crate) fn up(domain: &mut Domain, env: &Env<Limits>, request: smith::parent:
             domain.pending.push(Pending::Result { owner: client, turns, spent, read, finish: Finish::of(&result) });
             return out.push(Request::Encode { owner: client, value: Encodable::Result(result) });
         }
-        smith::parent::Request::Told { client, body } => return out.push(Request::Fact { owner: client, body }),
+        smith::parent::Request::Told { client, body } => {
+            domain.facts_out = domain.facts_out.saturating_add(1);
+            return out.push(Request::Fact { owner: client, body });
+        }
         smith::parent::Request::Waiting { client, read: _ } => host::Event::Yielded { owner: client },
         smith::parent::Request::Long { client, operation, span } => host::Event::Activity {
             owner: client,
@@ -289,20 +295,19 @@ pub(crate) fn encoded(domain: &mut Domain, env: &Env<Limits>, owner: Token, enco
 }
 
 /// A call's name came back: the call goes to the hub, and its withdrawal
-/// after it if the run withdrew it meanwhile. One that did not encode, or
-/// longer than the hub takes a name, is answered unavailable, and the agent
-/// faulted.
+/// after it if the run withdrew it meanwhile; the hub answers one whose name
+/// is longer than it takes as unavailable. One that did not encode is
+/// answered unavailable, and the agent faulted.
 fn named(domain: &mut Domain, env: &Env<Limits>, owner: Token, call: Token, encoded: Encoded) {
     let name = match encoded {
-        Encoded::CallName(name) if crate::assignment::len(&name) <= env.limits.host.event_bytes => Some(name),
-        Encoded::CallName(_) | Encoded::Undecodable => None,
+        Encoded::CallName(name) => name,
+        Encoded::Undecodable => {
+            let entry = domain.calls.remove(&(owner, call)).expect("a call waits for its name");
+            let answer = smith::parent::Event::Answer { agent: entry.agent, call, reply: smith::Reply::Unavailable };
+            route::agent_step(domain, env, smith::Input::Parent(answer));
+            return route::host_step(domain, env, host::Event::Faulted { owner, fault: host::AgentFailure::Rules });
+        }
         Encoded::Turn(_) | Encoded::Result(_) => unreachable!("a hand-out comes back as it went"),
-    };
-    let Some(name) = name else {
-        let entry = domain.calls.remove(&(owner, call)).expect("a call waits for its name");
-        let answer = smith::parent::Event::Answer { agent: entry.agent, call, reply: smith::Reply::Unavailable };
-        route::agent_step(domain, env, smith::Input::Parent(answer));
-        return route::host_step(domain, env, host::Event::Faulted { owner, fault: host::AgentFailure::Rules });
     };
     let entry = domain.calls.get_mut(&(owner, call)).expect("a call waits for its name");
     entry.name = Some(name.clone());

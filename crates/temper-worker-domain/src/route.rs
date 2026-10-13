@@ -50,6 +50,7 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
         }
         Event::Link(down) => host_step(domain, env, host::Event::Down(down)),
         Event::Ready => {
+            domain.past = false;
             let opened = host::Event::Opened {
                 stop_bound: env.limits.stop_bound,
                 workstreams: workstreams(&domain.checkout),
@@ -59,10 +60,8 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
         }
         Event::Lost => {}
         Event::GracePassed => {
+            domain.past = true;
             host_step(domain, env, host::Event::CancelAll { reason: host::Reason::Contact });
-            if domain.stopping {
-                domain.host.give_up_turns();
-            }
         }
         Event::Shutdown => {
             domain.stopping = true;
@@ -80,6 +79,7 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
         Event::Decoded { agent, start } => agents::decoded(domain, env, agent, start),
         Event::Encoded { owner, encoded } => agents::encoded(domain, env, owner, encoded),
         Event::Activity { owner, activity } => {
+            domain.facts_out = domain.facts_out.saturating_sub(1);
             if let Some(activity) = activity {
                 host_step(domain, env, host::Event::Activity { owner, activity });
             }

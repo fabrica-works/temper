@@ -1,9 +1,9 @@
-//! The unit tests' worker: limits, an assignment and a harness that steps the
-//! root and collects what it emits.
+//! The unit tests' values: the worker's limits, an engine's assignment and
+//! workspace items, and what smith's agent says, typed.
 
-use crate::{Domain, Event, Limits, Request, agent, checkout, host, max_out, step, wire, worst_case};
+use crate::{Limits, Request, agent, checkout, host, wire};
 use alloc::boxed::Box;
-use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
+use skein_lib::{Duration, List, Token};
 
 pub const RUN: Token = Token::new(31);
 pub const ATTEMPT: Token = Token::new(932);
@@ -146,48 +146,6 @@ pub fn refused(why: &[u8]) -> Request {
     }
 }
 
-pub struct Harness {
-    pub domain: Domain,
-    pub env: Env<Limits>,
-    pub out: Queue<Request>,
-}
-
-impl Harness {
-    pub fn new() -> Harness {
-        let limits = limits();
-        assert!(worst_case(&limits).is_some());
-        Harness {
-            domain: Domain::new(&limits),
-            out: Queue::with_capacity(max_out(&limits)),
-            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-        }
-    }
-
-    /// Steps the root with `event`, then reclaims, as the loop would.
-    pub fn step(&mut self, event: Event) -> Box<[Request]> {
-        step(&mut self.domain, &self.env, event, &mut self.out);
-        let mut rows = List::with_capacity(max_out(&self.env.limits));
-        while let Some(row) = self.out.pop() {
-            rows.push(row).expect("reserved outputs");
-        }
-        self.domain.reclaim();
-        rows.into_boxed()
-    }
-
-    /// The hub's start for the run, handed out to be decoded, after an
-    /// assignment with no repository.
-    pub fn decode(&mut self, grants: Box<[host::Grant]>) -> (Token, host::Start) {
-        let rows = self.step(Event::Link(host::LinkDown::Assign { assignment: assignment(false, grants) }));
-        for row in rows {
-            if let Request::Decode { agent, run, start } = row {
-                assert_eq!(run, RUN);
-                return (agent, *start);
-            }
-        }
-        panic!("the start is handed out")
-    }
-}
-
 /// A grant of `account` in `table`.
 pub const fn grant(table: host::GrantTable, account: u32) -> host::Grant {
     host::Grant { table, account, generation: 1, valid: Duration::from_secs(60) }
@@ -202,4 +160,110 @@ pub fn fields(named: &[(&[u8], &[u8])]) -> agent::Fields {
     }
     let change = smith_domain_run::outcome::Change { fields: fields.into_boxed() };
     agent::Fields::new(change, 512).expect("bounded fields")
+}
+
+/// A charter, as the protocol layer decodes one: smith's policy, which its
+/// host domain carries without reading it.
+pub fn charter() -> agent::Charter {
+    use smith_domain_run::charter::{Endpoint, Grants, Llm, Reserve, Tools};
+    let value = smith_domain_run::Charter {
+        resume: false,
+        waiting: Duration::ZERO,
+        instructions: Box::new([]),
+        brief: smith_domain_run::Brief { sections: Box::new([]) },
+        conventions: None,
+        grants: Grants {
+            wait: false,
+            deliver: None,
+            tools: Tools { inspect: false, modify: false, shell: false },
+            agents: false,
+            host_tools: Box::new([]),
+        },
+        outcome: smith_domain_run::outcome::OutcomeSpec {
+            change: None,
+            verdicts: Box::new([]),
+            report: None,
+            failure: None,
+        },
+        budget: smith_domain_run::Budget { turns: 1, spend: 1, time: Duration::from_secs(60) },
+        reserve: Reserve { turns: 0, time: Duration::ZERO },
+        llm: Llm {
+            prices: smith_domain_run::Prices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1 },
+            dialect: 0,
+            account: 0,
+            endpoint: Endpoint(0),
+            model: Box::from(&b"model"[..]),
+            window: 1_000,
+            output: 100,
+        },
+        models: Box::new([]),
+    };
+    agent::Charter::new(value, 8_192).expect("a bounded charter")
+}
+
+/// The hub's start for the run `run`, decoded as the protocol layer would:
+/// its charter, its inbox and its grants, no transcript.
+pub fn start(run: Token, source: &host::Start) -> agent::Start {
+    assert!(source.turns.is_empty() && source.answered.is_empty(), "a fresh conversation");
+    let mut messages = List::with_capacity(u32::try_from(source.messages.len()).expect("a few messages"));
+    for message in &source.messages {
+        let message = agent::Message { name: message.name, label: message.sender.clone(), text: message.words.clone() };
+        messages.push(message).expect("room for each message");
+    }
+    let mut grants = List::with_capacity(u32::try_from(source.grants.len()).expect("a few grants"));
+    for grant in &source.grants {
+        let grant = agent::Grant { account: grant.account, generation: grant.generation, valid: grant.valid };
+        grants.push(grant).expect("room for each grant");
+    }
+    agent::Start {
+        identity: None,
+        messages: messages.into_boxed(),
+        logical_run: run,
+        activation: source.activation,
+        workspace: source.workspace,
+        charter: charter(),
+        transcript: None,
+        answered: Box::new([]),
+        directories: Box::new([]),
+        grants: grants.into_boxed(),
+    }
+}
+
+/// The turn `number` of the run, as smith's agent says it.
+pub fn turn(number: u32) -> agent::Turn {
+    use smith_domain_session::{llm, record};
+    let body = record::Turn {
+        version: record::VERSION,
+        kind: record::Kind::Ordinary,
+        endpoint: llm::Endpoint(0),
+        dialect: 0,
+        sequence: number,
+        usage: llm::Usage::ZERO,
+        spent: u64::from(number),
+        messages: Box::new([]),
+    };
+    let body = agent::TurnValue::new(body, 64).expect("a bounded turn");
+    agent::Turn { opens_window: false, number, spent: u64::from(number), read: None, body }
+}
+
+/// The run's last word: parked, after `turns` turns.
+pub fn parked(turns: u32) -> agent::Up {
+    agent::Up::Answer {
+        answer: agent::Answer { read: None, turns, spent: u64::from(turns), result: agent::RunResult::Parked },
+    }
+}
+
+/// An assignment of the run `run` with the workspace items `names`, and
+/// `messages` messages in its start's inbox.
+pub fn assignment_of(run: u64, names: &[&[u8]], messages: u64) -> crate::Event {
+    let mut assignment = assignment(true, Box::new([]));
+    assignment.assignment.run = Token::new(run);
+    let mut inbox = List::with_capacity(u32::try_from(messages).expect("a few messages"));
+    for name in 1..=messages {
+        let message =
+            host::StartMessage { name: Token::new(name), sender: Box::from(&b"a"[..]), words: Box::from(&b"b"[..]) };
+        inbox.push(message).expect("room for each message");
+    }
+    assignment.messages = inbox.into_boxed();
+    crate::Event::Assign { assignment, items: items(names), save: None }
 }

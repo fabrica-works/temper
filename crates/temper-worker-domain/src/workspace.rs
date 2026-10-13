@@ -79,7 +79,10 @@ pub(crate) struct Items {
 /// and a save only where there is a workspace to save, which did not start
 /// from a merge in progress (`domain/worker.md`, 4.2, step 7). Items come with
 /// a workstream, which the caller checked. Refused as busy, keeping nothing,
-/// when every record is taken.
+/// when every record is taken: one for each of the hub's slots, a run hosted
+/// or its answer kept, and one for an assignment the hub has yet to take or
+/// refuse. Items go as soon as their answer is acknowledged or refused, so
+/// none waits for the reclaim point.
 pub(crate) fn stage(
     domain: &mut Domain,
     mut assignment: host::Assignment,
@@ -120,12 +123,16 @@ pub(crate) fn stage(
         delivery: None,
         preparation: None,
     };
-    let Ok(id) = domain.items.insert(entry) else {
+    if domain.items.len() == domain.items.capacity() {
         return None;
-    };
-    let old = domain.items_by_run.insert((run.run, run.attempt), id).expect("room for each staged run");
+    }
+    let token = Token::new(domain.next_items);
+    domain.next_items = domain.next_items.checked_add(1).expect("a u64 of items outlasts the worker");
+    let old = domain.items.insert(token, entry).expect("checked for room above");
+    assert!(old.is_none(), "each items' token is new");
+    let old = domain.items_by_run.insert((run.run, run.attempt), token).expect("room for each staged run");
     assert!(old.is_none(), "the root dropped an attempt it hosts");
-    run.workspace = Some(host::Workspace { workstream, items: id.token() });
+    run.workspace = Some(host::Workspace { workstream, items: token });
     run.save = saving;
     Some(assignment)
 }
@@ -143,20 +150,20 @@ pub(crate) fn parts(domain: &Domain, answer: &host::Answer) -> (wire::Work, Opti
     let mut saved = None;
     if let Some(work) = work {
         if let Some(left) = work.left {
-            let items = domain.items.get(Id::<Items>::from_token(left)).expect("a run's items live to its answer");
+            let items = domain.items.get(&left).expect("a run's items live to its answer");
             landed = List::with_capacity(items.landed.len());
             for (tag, commit) in &items.landed {
                 landed.push(wire::Landed { tag: *tag, commit: *commit }).expect("room for each landed item");
             }
         }
         if let Some(at) = work.saved {
-            let items = domain.items.get(Id::<Items>::from_token(at)).expect("a run's items live to its answer");
+            let items = domain.items.get(&at).expect("a run's items live to its answer");
             saved.clone_from(&items.saved);
         }
     }
     let preparation = match preparation {
         Some(host::Failure::Unprepared(host::Preparation::Permanent { resource: Some(resource) })) => {
-            let items = domain.items.get(Id::<Items>::from_token(*resource)).expect("a run's items live to its answer");
+            let items = domain.items.get(resource).expect("a run's items live to its answer");
             items.preparation
         }
         Some(host::Failure::Unprepared(
@@ -170,20 +177,20 @@ pub(crate) fn parts(domain: &Domain, answer: &host::Answer) -> (wire::Work, Opti
 /// The engine is done with the answer of the run `run`'s attempt `attempt`,
 /// or the answer was a refusal, which nothing acknowledges: its items go.
 pub(crate) fn forget(domain: &mut Domain, run: Token, attempt: Token) {
-    if let Some(id) = domain.items_by_run.remove(&(run, attempt)) {
-        domain.items.retire(id);
+    if let Some(token) = domain.items_by_run.remove(&(run, attempt)) {
+        domain.items.remove(&token);
     }
 }
 
 pub(crate) fn smith_delivery(domain: &Domain, left: Token) -> agent::Delivery {
-    domain.items.get(Id::from_token(left)).expect("live delivery items").delivery.clone().expect("settled delivery")
+    domain.items.get(&left).expect("live delivery items").delivery.clone().expect("settled delivery")
 }
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
     /// The hosted run it is for: the host's token for the run.
     run: Token,
-    items: Id<Items>,
+    items: Token,
     repositories: u32,
     /// Each repository's directory, what the agent calls it, and whether it
     /// may be written, in the assignment's order.
@@ -230,8 +237,8 @@ impl Then {
 
 /// The host asks for `workspace` to be prepared for its run `owner`.
 pub(crate) fn prepare(domain: &mut Domain, env: &Env<Limits>, owner: Token, workspace: host::Workspace) {
-    let items = Id::<Items>::from_token(workspace.items);
-    let staged = domain.items.get_mut(items).expect("the root staged the workspace items");
+    let items = workspace.items;
+    let staged = domain.items.get_mut(&items).expect("the root staged the workspace items");
     let workstream = staged.workstream;
     let spec = staged.spec.take().expect("prepared once");
     let repositories = u32::try_from(spec.repositories.len()).expect("the root checked the repositories");
@@ -296,7 +303,7 @@ pub(crate) fn write(domain: &mut Domain, env: &Env<Limits>, owner: Token, worksp
 /// Save through the application's checkout using the branch kept with its items.
 pub(crate) fn save(domain: &mut Domain, env: &Env<Limits>, owner: Token, workspace: Token) {
     let record = domain.workspaces.get(Id::<Workspace>::from_token(workspace)).expect("a prepared workspace is live");
-    let items = domain.items.get_mut(record.items).expect("its items remain staged");
+    let items = domain.items.get_mut(&record.items).expect("its items remain staged");
     let branch = items.save.take().expect("the host saves only when requested");
     write(domain, env, owner, workspace, Write::Save { branch });
 }
@@ -349,7 +356,7 @@ pub(crate) fn prepared(domain: &mut Domain, env: &Env<Limits>, client: Token, pr
         checkout::Prepared::Ready { .. } | checkout::Prepared::Aborted => None,
     };
     if let Some(failure) = failure {
-        domain.items.get_mut(items).expect("the assignment lives through prepare").preparation = Some(failure);
+        domain.items.get_mut(&items).expect("the assignment lives through prepare").preparation = Some(failure);
     }
     let owner = record.run;
     let mut then = Then::NOTHING;
@@ -361,7 +368,7 @@ pub(crate) fn prepared(domain: &mut Domain, env: &Env<Limits>, client: Token, pr
                 ended(
                     owner,
                     client,
-                    items.token(),
+                    items,
                     hold,
                     abandoned,
                     checkout::Prepared::Ready { workspace, conflicts: Box::new([]) },
@@ -369,7 +376,7 @@ pub(crate) fn prepared(domain: &mut Domain, env: &Env<Limits>, client: Token, pr
                 )
             }
             checkout::Prepared::Refused { .. } | checkout::Prepared::Failed { .. } | checkout::Prepared::Aborted => {
-                ended(owner, client, items.token(), hold, abandoned, prepared, &mut then)
+                ended(owner, client, items, hold, abandoned, prepared, &mut then)
             }
         },
         State::Ready { .. } | State::Releasing | State::Closed => unreachable!("a prepare ends once"),
@@ -385,7 +392,7 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
     let repositories = record.repositories;
     let items = record.items;
     let landings = translate::landings(outcome, repositories);
-    let next = domain.items.get_mut(items).expect("workspace items live until the answer");
+    let next = domain.items.get_mut(&items).expect("workspace items live until the answer");
     let done = if push {
         let mut changed = false;
         for (index, landing) in landings.iter().enumerate() {
@@ -405,10 +412,10 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
         }
         next.delivery = Some(crate::smith_delivery::landings(&landings));
         let outcome = translate::delivery_outcome(&translate::summarize(landings));
-        Written::Delivered(host::Delivery { outcome, left: items.token(), changed })
+        Written::Delivered(host::Delivery { outcome, left: items, changed })
     } else {
         next.saved = Some(landings);
-        Written::Saved(items.token())
+        Written::Saved(items)
     };
     let mut then = Then::NOTHING;
     let state = mem::replace(&mut record.state, State::Closed);
@@ -539,8 +546,10 @@ fn unprepared(owner: Token, failure: host::Preparation) -> host::Event {
 }
 
 /// Where the run's repositories sit, for smith's start: the directory io
-/// prepared the workspace in, and each repository's, rooted there, as the
-/// checkout prepared it, with the files a merge in progress left in conflict.
+/// prepared the workspace in, the root of each repository's, with the files
+/// a merge in progress left in conflict. A directory's host path is for an
+/// inline agent's workspace aliases (smith's `Directory`): smith's spawned
+/// adapter attaches its own, so it is left empty.
 pub(crate) fn directories(domain: &mut Domain, workspace: Token) -> (Token, Box<[agent::Directory]>) {
     let record = domain.workspaces.get_mut(Id::from_token(workspace)).expect("a workspace lives until released");
     let directory = match record.state {
@@ -553,7 +562,7 @@ pub(crate) fn directories(domain: &mut Domain, workspace: Token) -> (Token, Box<
             .push(agent::Directory {
                 root: directory,
                 name: copy_of(&root.name),
-                host: copy_of(&root.name),
+                host: Box::new([]),
                 writable: root.writable,
                 git: true,
                 conflicts: Box::new([]),

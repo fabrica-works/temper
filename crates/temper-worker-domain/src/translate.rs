@@ -224,17 +224,6 @@ pub(crate) const fn unstarted(end: agent::End) -> Option<&'static [u8]> {
     }
 }
 
-/// A credential grant for smith: an LLM account's. The hub keeps
-/// application credentials, the repositories' git identities, to itself.
-pub(crate) const fn grant(grant: host::Grant) -> Option<agent::Grant> {
-    match grant.table {
-        host::GrantTable::Accounts => {
-            Some(agent::Grant { account: grant.account, generation: grant.generation, valid: grant.valid })
-        }
-        host::GrantTable::Application => None,
-    }
-}
-
 const fn push_reason(fault: git::Fault) -> wire::PushReason {
     match fault {
         git::Fault::Missing { missing: git::Missing::Repository } => wire::PushReason::MissingRepository,

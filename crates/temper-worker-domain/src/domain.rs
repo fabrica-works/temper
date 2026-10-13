@@ -48,9 +48,13 @@ pub struct Domain {
     /// The workspaces the host asked for, until the checkout has released
     /// them.
     pub(crate) workspaces: Slab<Workspace>,
-    /// Each run's workspace items, until the engine has its answer.
-    pub(crate) items: Slab<Items>,
-    pub(crate) items_by_run: Map<(Token, Token), Id<Items>>,
+    /// Each run's workspace items, until the engine has its answer, by the
+    /// token the root names them by to the hub, and by the engine's names
+    /// for the run and the attempt.
+    pub(crate) items: Map<Token, Items>,
+    pub(crate) items_by_run: Map<(Token, Token), Token>,
+    /// The token the next items are named by.
+    pub(crate) next_items: u64,
     /// Workspaces being prepared, by the host's token for their run.
     pub(crate) preparing: Map<Token, Id<Workspace>>,
     /// What each child domain emits in an entry point, until it is routed.
@@ -60,6 +64,15 @@ pub struct Domain {
     pub(crate) agent_out: Queue<agent::Output>,
     /// Told to shut down, and not stopped yet.
     pub(crate) stopping: bool,
+    /// The channel to the engine has stayed down past the grace since it was
+    /// last ready.
+    pub(crate) past: bool,
+    /// smith's facts handed out to be decoded, not back yet.
+    pub(crate) facts_out: u32,
+    /// The runs' facts left undecoded when the worker stopped.
+    activity_dropped: u64,
+    /// Answers given up by a worker shutting down out of reach.
+    answers_abandoned: u64,
     facts: Queue<Fact>,
     lost: u64,
 }
@@ -80,13 +93,18 @@ impl Domain {
             pending: Queue::with_capacity(limits::pending(limits).expect("worst_case accepted the hand-outs")),
             gone: Map::with_capacity(agents),
             workspaces: Slab::with_capacity(slots),
-            items: Slab::with_capacity(slots.saturating_add(1)),
+            items: Map::with_capacity(slots.saturating_add(1)),
             items_by_run: Map::with_capacity(slots.saturating_add(1)),
+            next_items: 1,
             preparing: Map::with_capacity(slots),
             host_out: Queue::with_capacity(counts.host_out),
             checkout_out: Queue::with_capacity(counts.checkout_out),
             agent_out: Queue::with_capacity(counts.agent_out),
             stopping: false,
+            past: false,
+            facts_out: 0,
+            activity_dropped: 0,
+            answers_abandoned: 0,
             facts: Queue::with_capacity(limits::facts(limits).expect("worst_case accepted the limits")),
             lost: 0,
         }
@@ -129,11 +147,11 @@ impl Domain {
         self.host.kept_answers()
     }
 
-    /// Turns given up by a worker shutting down with the engine out of reach
-    /// past the grace, since the domain was made.
+    /// Turns and answers given up by a worker shutting down with the engine
+    /// out of reach past the grace, since the domain was made.
     #[must_use]
     pub const fn abandoned(&self) -> u64 {
-        self.host.turns_abandoned()
+        self.host.turns_abandoned().saturating_add(self.answers_abandoned)
     }
 
     /// When the earliest alarm falls due: an agent's.
@@ -154,19 +172,24 @@ impl Domain {
     /// domain's stage, before its input events, and after the reclaim point.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        self.host.is_ready() || self.stop_ready()
+        self.host.is_ready() || self.delivered() || self.out_of_reach()
     }
 
-    /// Shutting down, with no run, agent, hand-out or workspace left, and
-    /// the engine has every turn and answer, or they were given up (jig's
-    /// `domain/hosts.md`, 6.7).
-    fn stop_ready(&self) -> bool {
-        self.stopping
-            && self.host.hosted() == 0
-            && self.host.retained_turns() == 0
-            && self.agent.agents() == 0
-            && self.pending.is_empty()
-            && self.workspaces.is_empty()
+    /// Shutting down, with no agent, hand-out or workspace left.
+    fn settled(&self) -> bool {
+        self.stopping && self.agent.agents() == 0 && self.pending.is_empty() && self.workspaces.is_empty()
+    }
+
+    /// Settled, with no run left and every turn and answer acknowledged.
+    fn delivered(&self) -> bool {
+        self.settled() && self.host.hosted() == 0 && self.host.retained_turns() == 0
+    }
+
+    /// Settled, with no run left to answer and the engine out of reach past
+    /// the grace (`domain/worker.md`, section 2; jig's `domain/hosts.md`,
+    /// 6.7): what is kept is given up.
+    fn out_of_reach(&self) -> bool {
+        self.settled() && self.past && self.host.unanswered() == 0
     }
 
     /// The oldest fact not drained yet, a child domain's.
@@ -184,10 +207,11 @@ impl Domain {
             .saturating_add(self.agent.facts_lost())
     }
 
-    /// How much of the runs' activity was dropped for want of room.
+    /// How many of the runs' facts were dropped: for want of room, or still
+    /// out to be decoded when the worker stopped.
     #[must_use]
     pub const fn activity_lost(&self) -> u64 {
-        self.host.activity_lost()
+        self.host.activity_lost().saturating_add(self.activity_dropped)
     }
 
     /// The reclaim point: frees what closed in this iteration.
@@ -196,7 +220,6 @@ impl Domain {
         self.checkout.reclaim();
         self.agent.reclaim();
         self.workspaces.reclaim();
-        self.items.reclaim();
     }
 }
 
@@ -249,11 +272,26 @@ fn settle(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         };
         out.push(Request::Link(activity));
     }
-    if domain.stop_ready() {
-        out.push(Request::Stop);
-        domain.stopping = false;
-    }
+    stop(domain, out);
     gather(domain, &env.limits);
+}
+
+/// A worker shutting down stops once the engine has every turn and answer,
+/// or, out of reach past the grace with no run left to answer, gives up what
+/// it keeps, counted. The runs' facts still out are dropped, counted: they
+/// are best effort.
+fn stop(domain: &mut Domain, out: &mut Queue<Request>) {
+    if !domain.delivered() {
+        if !domain.out_of_reach() {
+            return;
+        }
+        domain.host.give_up_turns();
+        domain.answers_abandoned = domain.answers_abandoned.saturating_add(u64::from(domain.host.kept_answers()));
+    }
+    domain.activity_dropped = domain.activity_dropped.saturating_add(u64::from(domain.facts_out));
+    domain.facts_out = 0;
+    domain.stopping = false;
+    out.push(Request::Stop);
 }
 
 /// Drains the child domains' facts into the domain's own queue, counting what

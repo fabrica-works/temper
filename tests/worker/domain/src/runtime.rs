@@ -29,7 +29,23 @@ pub struct Settings {
     pub turns: u32,
     pub byte_slots: u32,
     pub merging: bool,
-    pub abandon: bool,
+    pub close: Close,
+}
+
+/// How the worker shuts down once its run has taken its turns.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Close {
+    /// The engine has every turn and the answer first.
+    Committed,
+    /// The engine has the answer and some turns, then stays out of reach
+    /// past the grace.
+    Abandoned,
+    /// The engine has some turns only, then stays out of reach past the
+    /// grace.
+    Unacknowledged,
+    /// The channel stays down past the grace as the run winds down, and
+    /// opens again before it ends.
+    Reopened,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -91,7 +107,7 @@ pub struct World {
     agent: Option<Token>,
     reading: bool,
     unresolved: bool,
-    stopped: bool,
+    stops: u32,
     bodies: Bodies,
     answer: Option<(u32, u64, u64)>,
     stats: Stats,
@@ -156,7 +172,7 @@ impl World {
             agent: None,
             reading: false,
             unresolved: settings.merging,
-            stopped: false,
+            stops: 0,
             bodies: Bodies::Varied,
             answer: None,
             stats: Stats::default(),
@@ -256,7 +272,7 @@ impl World {
                 assert_eq!((run, attempt, preparation), (RUN, ATTEMPT, None));
                 self.answered(&answer, &work);
             }
-            Request::Stop => self.stopped = true,
+            Request::Stop => self.stops += 1,
             Request::Process(request) => self.process(*request),
             Request::Decode { agent, run, start } => {
                 let start = protocol::decode(run, *start, &self.env.limits.agent);
@@ -509,7 +525,8 @@ impl World {
 
     /// Runs a complete scenario with bounded turns and deterministic losses,
     /// busy replies, duplicate or wrong acknowledgements, and a crossed
-    /// answer acknowledgement.
+    /// answer acknowledgement; then shuts the worker down as the settings
+    /// say.
     pub fn run(&mut self) {
         self.send(Event::Ready);
         self.assign();
@@ -524,23 +541,24 @@ impl World {
         for number in 1..=count {
             committed = self.turn(number, committed);
         }
-        let answer = agent::Answer {
-            read: None,
-            turns: count,
-            spent: u64::from(count) * 17 + 9,
-            result: agent::RunResult::Parked,
-        };
+        match self.settings.close {
+            Close::Reopened => self.reopened(count, committed),
+            Close::Committed | Close::Abandoned | Close::Unacknowledged => self.closed(count, committed),
+        }
+        assert_eq!(self.stops, 1, "the worker stops once");
+        assert_eq!(self.stats.turns, count);
+        assert!(self.stats.copies >= count * 2);
+    }
+
+    /// The run parks after `count` turns, and its agent goes.
+    fn park(&mut self, count: u32) {
+        let spent = u64::from(count) * 17 + 9;
+        let answer = agent::Answer { read: None, turns: count, spent, result: agent::RunResult::Parked };
         self.say(agent::Up::Answer { answer });
         self.gone();
         assert!(self.answer.is_some());
         assert_eq!(self.domain.agent().agents(), 0);
         assert_eq!(self.domain.workspaces(), 0);
-        self.reconnect();
-        self.link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT });
-        assert_eq!(self.domain.kept_answers(), 0, "the answer's acknowledgement frees its slot");
-        self.finish(count, committed);
-        assert_eq!(self.stats.turns, count);
-        assert!(self.stats.copies >= count * 2);
     }
 
     fn gone(&mut self) {
@@ -553,30 +571,58 @@ impl World {
         self.send(Event::Process(Box::new(agent::process::Event::Reaped { owner: agent, detail: Box::new([]) })));
     }
 
-    /// Shuts the worker down: with the engine out of reach past the grace,
-    /// giving up the turns it keeps, or once the engine has them all.
-    fn finish(&mut self, count: u32, committed: u32) {
-        let retained = self.domain.retained_turns();
-        if self.settings.abandon {
-            self.send(Event::Shutdown);
-            self.send(Event::Lost);
-            self.send(Event::GracePassed);
-            self.stats.abandoned = self.domain.abandoned();
-            assert_eq!(self.stats.abandoned, u64::from(retained));
-        } else {
+    /// The run parks; then the worker shuts down once the engine has every
+    /// turn and the answer, or, out of reach past the grace, gives up the
+    /// turns it lacks (all but the `committed` first of `count`) and the
+    /// answer if it lacks that too.
+    fn closed(&mut self, count: u32, committed: u32) {
+        self.park(count);
+        self.reconnect();
+        if self.settings.close != Close::Unacknowledged {
+            self.link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT });
+            assert_eq!(self.domain.kept_answers(), 0, "the answer's acknowledgement frees its slot");
+        }
+        if self.settings.close == Close::Committed {
             for number in committed + 1..=count {
                 self.ack(number);
             }
-            assert_eq!(self.domain.retained_turns(), 0);
             self.send(Event::Shutdown);
+            assert_eq!(self.domain.abandoned(), 0);
+            return;
         }
-        assert!(self.stopped, "a worker with nothing left stops");
+        let lacking = count - committed + u32::from(self.settings.close == Close::Unacknowledged);
+        self.send(Event::Shutdown);
+        assert_eq!(self.stops, u32::from(lacking == 0), "a worker keeps what the engine lacks while it may come back");
+        if lacking > 0 {
+            self.send(Event::Lost);
+            self.send(Event::GracePassed);
+        }
+        self.stats.abandoned = self.domain.abandoned();
+        assert_eq!(self.stats.abandoned, u64::from(lacking));
+    }
+
+    /// The worker shuts down as the run lives; the channel stays down past
+    /// the grace, then opens before the run ends: the hello replays every
+    /// turn the engine lacks, and nothing is given up.
+    fn reopened(&mut self, count: u32, committed: u32) {
+        self.send(Event::Shutdown);
+        self.send(Event::Lost);
+        self.send(Event::GracePassed);
+        let copies = self.stats.copies;
+        self.send(Event::Ready);
+        assert_eq!(self.stats.copies - copies, count - committed, "the hello replays every turn the engine lacks");
+        self.park(count);
+        for number in committed + 1..=count {
+            self.ack(number);
+        }
+        self.link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT });
+        assert_eq!(self.domain.abandoned(), 0);
     }
 }
 
 #[cfg(test)]
 mod referee_tests {
-    use super::{ATTEMPT, RUN, Settings, World, host};
+    use super::{ATTEMPT, Close, RUN, Settings, World, host};
     use temper_worker_domain::Request;
 
     fn turn(body: &[u8]) -> Request {
@@ -597,7 +643,7 @@ mod referee_tests {
     #[test]
     #[should_panic(expected = "replay preserves the full body and spend")]
     fn referee_rejects_a_duplicate_turn_with_changed_opaque_bytes() {
-        let settings = Settings { seed: 0, turns: 1, byte_slots: 1, merging: false, abandon: false };
+        let settings = Settings { seed: 0, turns: 1, byte_slots: 1, merging: false, close: Close::Committed };
         let mut world = World::new(settings);
         world.take(turn(b"original"));
         world.take(turn(b"different"));
@@ -606,7 +652,7 @@ mod referee_tests {
     #[test]
     #[should_panic(expected = "no turn gap")]
     fn referee_rejects_an_unseen_prefix() {
-        let settings = Settings { seed: 0, turns: 1, byte_slots: 1, merging: false, abandon: false };
+        let settings = Settings { seed: 0, turns: 1, byte_slots: 1, merging: false, close: Close::Committed };
         let mut world = World::new(settings);
         let Request::Link(host::LinkUp::Turn { run, attempt, mut turn }) = turn(b"") else { unreachable!() };
         turn.turn = 2;

@@ -1072,6 +1072,7 @@ dependencies = [
  "jig-domain-host",
  "skein-lib",
  "smith-domain-run",
+ "smith-domain-session",
  "smith-host-domain",
  "temper-worker-domain-checkout",
 ]
