@@ -5,9 +5,9 @@ use super::{
     Request, Token, Work, emit, escalation, forge_route, internal, proposals, relay_call,
 };
 use crate::Range;
+use crate::archive::{begin_dependency_read, retire_read};
 use crate::assemble::{brief_outputs, finish_brief_plan, take_payload};
 use crate::boundary::{EndedRead, Payload};
-use crate::restart::{begin_dependency_read, retire_read};
 use alloc::boxed::Box;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
@@ -245,7 +245,7 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: 
                 after: None,
             },
         ),
-        Err(Some(Read::Ended(read))) => crate::restart::ended_answer(domain, read, None, true),
+        Err(Some(Read::Ended(read))) => crate::archive::ended_answer(domain, read, None, true),
         Err(
             Some(
                 Read::Escalation(_)

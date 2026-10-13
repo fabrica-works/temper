@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 mod admission;
+mod archive;
 mod assemble;
 mod boundary;
 mod decision;

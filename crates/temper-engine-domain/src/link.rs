@@ -11,13 +11,30 @@ use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::{Decimal, List, Token, Writer};
 
-/// Translate one channel input into the core's fleet vocabulary.
-pub(crate) fn receive(domain: &mut Domain, channel: Token, link: Link) -> core::Event {
-    core::Event::Fleet(match link {
+/// Translate one channel input into the core's fleet vocabulary; `None`
+/// when the root has no room to keep a record's bytes, which admission
+/// ([`crate::try_step`]) hands back first, and its host sends again.
+pub(crate) fn receive(domain: &mut Domain, channel: Token, link: Link) -> Option<core::Event> {
+    Some(core::Event::Fleet(match link {
         Link::Hello(hello) => fleet::Event::Hello { channel, hello: self::hello(hello) },
-        Link::Up { up, parts } => self::up(domain, channel, up, parts),
+        Link::Up { up, parts } => self::up(domain, channel, up, parts)?,
         Link::Lost => fleet::Event::Lost { channel },
-    })
+    }))
+}
+
+/// Whether the root can keep one more worker record's bytes.
+pub(crate) fn room(domain: &Domain) -> bool {
+    domain.payloads.len() < domain.payloads.capacity()
+}
+
+/// temper's parts within their bounds: the heads a run pushed and the
+/// resources it saved (domain/forge.md). Beyond them the answer is invalid.
+fn parts_within(parts: &Parts, limits: &crate::Limits) -> bool {
+    let saved = match &parts.saved {
+        Some(tags) => tags.len() <= usize::try_from(limits.tasks.saved_resources).expect("u32 fits usize"),
+        None => true,
+    };
+    saved && parts.pushed.len() <= usize::try_from(limits.forge.resources_per_task).expect("u32 fits usize")
 }
 
 fn hello(hello: host::Hello) -> fleet::Hello {
@@ -64,8 +81,8 @@ fn phase(phase: host::Phase) -> fleet::Phase {
 }
 
 /// Retain a worker's bytes and temper's parts; translate only their metadata.
-fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> fleet::Event {
-    match up {
+fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> Option<fleet::Event> {
+    Some(match up {
         host::LinkUp::Turn { run, attempt, turn } => {
             let number = turn.turn;
             let body = payload(
@@ -80,16 +97,22 @@ fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> fl
                     opens_window: turn.opens_window,
                     refused: refusals(&turn.refused),
                 },
-            );
+            )?;
             fleet::Event::Turn { channel, run, attempt, turn: number, body }
         }
         host::LinkUp::Answer { run, attempt, answer } => {
-            let kind = match answer.ending {
-                host::Ending::Ended { .. } => fleet::Answer::Ended,
-                host::Ending::Parked { .. } => fleet::Answer::Parked,
-                host::Ending::Failed { .. } => fleet::Answer::Failed,
-                host::Ending::Refused(host::Refusal::Busy) => fleet::Answer::Busy,
-                host::Ending::Refused(host::Refusal::Invalid(_)) => fleet::Answer::Invalid,
+            // An answer whose parts exceed their bounds is the run's invalid
+            // failure, whatever it says (`answer` below).
+            let kind = if parts_within(&parts, &domain.limits) {
+                match answer.ending {
+                    host::Ending::Ended { .. } => fleet::Answer::Ended,
+                    host::Ending::Parked { .. } => fleet::Answer::Parked,
+                    host::Ending::Failed { .. } => fleet::Answer::Failed,
+                    host::Ending::Refused(host::Refusal::Busy) => fleet::Answer::Busy,
+                    host::Ending::Refused(host::Refusal::Invalid(_)) => fleet::Answer::Invalid,
+                }
+            } else {
+                fleet::Answer::Failed
             };
             let payload = payload(
                 domain,
@@ -102,7 +125,7 @@ fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> fl
                     ending: answer.ending,
                     parts,
                 },
-            );
+            )?;
             fleet::Event::Answer { channel, run, attempt, answer: kind, payload }
         }
         host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline } => fleet::Event::Relay {
@@ -120,11 +143,11 @@ fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> fl
         host::LinkUp::Activity { run, attempt, activity } => {
             fleet::Event::Observe { channel, run, attempt, report: report(activity) }
         }
-    }
+    })
 }
 
-fn payload(domain: &mut Domain, value: Payload) -> Token {
-    domain.payloads.insert(Some(value)).expect("the fleet's turns and attempts bound the root's payloads").token()
+fn payload(domain: &mut Domain, value: Payload) -> Option<Token> {
+    Some(domain.payloads.insert(Some(value)).ok()?.token())
 }
 
 fn read_name(name: Option<Token>) -> Option<u64> {
@@ -143,17 +166,21 @@ fn refusals(values: &[host::Refused]) -> Box<[u64]> {
 /// layer to read; any other ending is translated here.
 pub(crate) fn answer(domain: &mut Domain, run: Token, attempt: Token, payload: Token) {
     let end = match domain.payloads.get(skein_lib::Id::from_token(payload)) {
-        Some(Some(Payload::Answer { task, attempt: retained, ending, .. })) => {
+        Some(Some(Payload::Answer { task, attempt: retained, ending, parts, .. })) => {
             assert!(*task == run.raw() && *retained == attempt.raw(), "fenced answer identity");
-            match ending {
-                host::Ending::Ended { outcome, .. } => {
-                    let request = Request::Worker(WorkerRequest::ReadResult { payload, outcome: outcome.clone() });
-                    assert!(crate::domain::now(domain, request), "result read door reserved");
-                    return;
+            if parts_within(parts, &domain.limits) {
+                match ending {
+                    host::Ending::Ended { outcome, .. } => {
+                        let request = Request::Worker(WorkerRequest::ReadResult { payload, outcome: outcome.clone() });
+                        assert!(crate::domain::now(domain, request), "result read door reserved");
+                        return;
+                    }
+                    other @ (host::Ending::Refused(_) | host::Ending::Parked { .. } | host::Ending::Failed { .. }) => {
+                        end(other)
+                    }
                 }
-                other @ (host::Ending::Refused(_) | host::Ending::Parked { .. } | host::Ending::Failed { .. }) => {
-                    end(other)
-                }
+            } else {
+                tasks::End::Failed(tasks::Class::Invalid)
             }
         }
         Some(
@@ -192,7 +219,7 @@ pub(crate) fn result_event(domain: &mut Domain, payload: Token, end: tasks::End)
             )
             | None => return None,
         };
-    let Parts { saved, pushed } = parts;
+    let Parts { saved, pushed } = if parts_within(&parts, &domain.limits) { parts } else { Parts::none() };
     drop(domain.forge_left.insert((task, attempt), pushed));
     let (saved, invalid_saved) = match saved {
         Some(tags) => match crate::route::forge_route::saved_resources(domain.config.forge_connector, &tags) {

@@ -55,23 +55,27 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
     let body = super::checked_call(body, &env.limits);
     let key =
         CallKey { task: flight.task, attempt: flight.attempt, completion: body.completion, position: body.position };
-    if body.completion == 0
-        || !super::current_proof(domain, key.task, key.attempt)
-        || domain.core.pending_calls.contains_key(&key)
+    // A call no retry can make valid is answered as an error; one that waits
+    // for room is answered busy, and its run asks it again after a backoff
+    // (jig's `domain/engine.md`, 5.1).
+    let invalid = body.completion == 0 || !super::current_proof(domain, key.task, key.attempt);
+    let busy = domain.core.pending_calls.contains_key(&key)
         || (!domain.core.call_parts.contains_key(&key)
             && domain.core.call_parts.len().saturating_add(domain.core.pending_calls.len()) >= env.limits.call_records)
-        || (super::call_needs_input(&body.tool) && domain.archive_reads.len() >= domain.archive_reads.capacity())
-    {
+        || (super::call_needs_input(&body.tool) && domain.archive_reads.len() >= domain.archive_reads.capacity());
+    if invalid || busy {
         let flight = domain.host_calls.remove(&right).expect("current typed flight");
-        let id = domain
-            .payloads
-            .insert(Some(Payload::SettledCall(SettledCall {
+        let answer = if invalid {
+            Payload::SettledCall(SettledCall {
                 serial: 0,
                 name: flight.name,
                 tool: flight.tool,
-                answer: SettledAnswer::Host { error: true, body: Box::from(&b"busy"[..]) },
-            })))
-            .expect("fleet call reserved answer room");
+                answer: SettledAnswer::Host { error: true, body: Box::from(&b"invalid call"[..]) },
+            })
+        } else {
+            Payload::Busy
+        };
+        let id = domain.payloads.insert(Some(answer)).expect("fleet call reserved answer room");
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
         return;
     }

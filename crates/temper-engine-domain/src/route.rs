@@ -10,6 +10,7 @@ mod now;
 pub(crate) mod policy_translate;
 pub(crate) mod proposals;
 mod tools;
+use crate::archive::take_read;
 use crate::assemble::{brief_outputs, take_payload};
 use crate::boundary::{
     Assignment, Call, EscalationChoice, Event, ForgeRepository, ForgeStart, ForgeWorkspace, InputCheck, MessageForm,
@@ -19,7 +20,7 @@ use crate::domain::{
     Domain, close, emit, forge_release_ending, internal, journal_outputs, max_out, now, route, save, step_released,
 };
 use crate::limits::{Limits, core_limits, environment_core, route_bound, route_takes};
-use crate::restart::{accept_load, connector_restart_done, load_decision, load_outputs, restart_request, take_read};
+use crate::restart::{accept_load, connector_restart_done, load_decision, load_outputs, restart_request};
 use crate::translate::{
     call_needs_input, checked_call, connector_answer, core_call, environment_forge, keep_connector_answer, named_call,
     relay_call, tool_kind,
@@ -160,8 +161,11 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             return;
         }
         Event::Worker(crate::WorkerInput::Link { channel, link }) => {
-            let event = crate::link::receive(domain, channel, link);
-            domain.work.push(Work::Core(event));
+            // Admission keeps room for the record's bytes; past it the
+            // record is dropped and its host sends it again after a hello.
+            if let Some(event) = crate::link::receive(domain, channel, link) {
+                domain.work.push(Work::Core(event));
+            }
         }
         Event::Worker(crate::WorkerInput::DecodedHostCall { to, body }) => {
             domain.work.push(Work::Decoded { to, body });
@@ -277,8 +281,8 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
             Work::EscalationFailed { waiter } => escalation::failed(domain, waiter),
             Work::ProposalLoaded { waiter, rows } => proposals::historical_loaded(domain, waiter, rows),
             Work::ProposalFailed { waiter } => proposals::historical_failed(domain, waiter),
-            Work::EndedLoaded { waiter, rows } => crate::restart::ended_loaded(domain, waiter, rows),
-            Work::EndedFailed { waiter } => crate::restart::ended_failed(domain, waiter),
+            Work::EndedLoaded { waiter, rows } => crate::archive::ended_loaded(domain, waiter, rows),
+            Work::EndedFailed { waiter } => crate::archive::ended_failed(domain, waiter),
         }
     }
     assert!(

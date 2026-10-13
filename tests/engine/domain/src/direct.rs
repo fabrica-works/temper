@@ -5,7 +5,7 @@ use jig_domain_tasks as tasks;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
 use temper_engine_domain as engine;
-use temper_engine_domain::{Delivery, Write};
+use temper_engine_domain::{Delivery, Key, Record, Write};
 
 use crate::protocol::Protocol;
 use crate::store::Store;
@@ -25,6 +25,8 @@ pub struct Driver {
     pub fail_archive_once: bool,
     pub transactions: Vec<Vec<Write>>,
     pub host_requests: Vec<Box<engine::HostRequest>>,
+    /// Every store load the root asked for, by its owner, in order.
+    pub loads: Vec<(Token, temper_engine_domain::Range)>,
     /// How many inputs `try_step` handed back while the journal was full; the
     /// world offers each again later.
     pub returned: u32,
@@ -55,6 +57,7 @@ impl Driver {
             fail_archive_once: false,
             transactions: Vec::new(),
             host_requests: Vec::new(),
+            loads: Vec::new(),
             returned: 0,
             immediate: Vec::new(),
             period_sent: false,
@@ -89,6 +92,7 @@ impl Driver {
                     self.store.pending.push_back((number, writes));
                 }
                 engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, bytes }) => {
+                    self.loads.push((owner, range.clone()));
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
                     assert!(rows.len() <= usize::try_from(most).expect("small count"));
                     assert!(bytes >= self.env.limits.loads.bytes);
@@ -199,6 +203,71 @@ impl Driver {
         }));
     }
 
+    /// A signed-in owner's chat, assigned to the one worker on channel 7.
+    #[must_use]
+    pub fn chat() -> (Driver, engine::Assignment) {
+        let mut driver = Driver::new(Store::new());
+        driver.hello(Token::new(7));
+        driver.settle();
+        driver.sign_in();
+        driver.settle();
+        driver.send(engine::Event::Party(engine::PartyInput::Ask {
+            reply_to: ReplyTo::new(Token::new(1001)),
+            sign_in: driver.session(),
+            key: [31; 16],
+            ask: people::Ask::StartChat { project: 1, words: crate::walking_referee::QUESTION.into() },
+        }));
+        driver.settle();
+        let assignment = driver.last_assignment();
+        (driver, assignment)
+    }
+
+    /// `task`'s durable live row, if it is live.
+    #[must_use]
+    pub fn task(&self, task: u64) -> Option<&tasks::TaskRecord> {
+        let key = Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task)));
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) = self.store.rows.get(&key)
+        {
+            Some(row)
+        } else {
+            None
+        }
+    }
+
+    /// The latest durable assignment.
+    #[must_use]
+    pub fn last_assignment(&self) -> engine::Assignment {
+        self.delivered
+            .iter()
+            .rev()
+            .find_map(|delivery| {
+                if let Delivery::Assigned { assignment, .. } = delivery { Some(assignment.clone()) } else { None }
+            })
+            .expect("durable assignment")
+    }
+
+    /// The owner's words `[key]` to `task`, settled; the message's number.
+    pub fn say(&mut self, task: u64, key: u8) -> u64 {
+        self.send(say_ask(self.session(), task, key));
+        self.settle();
+        self.delivered
+            .iter()
+            .rev()
+            .find_map(|delivery| {
+                if let Delivery::WebReply {
+                    reply: people::Reply::Outcome(people::Outcome::Said { task: named, message, .. }),
+                    ..
+                } = delivery
+                    && *named == task
+                {
+                    Some(*message)
+                } else {
+                    None
+                }
+            })
+            .expect("committed keyed word")
+    }
+
     #[must_use]
     pub fn session(&self) -> u64 {
         self.delivered
@@ -229,4 +298,15 @@ impl Driver {
         assert!(!self.root.quiescent(), "owed callback and store terminals prevent completion");
         assert_eq!(self.store.pending.len(), 3, "no callback write entered the full journal");
     }
+}
+
+/// The owner's words `[key]` to `task`.
+#[must_use]
+pub fn say_ask(sign_in: u64, task: u64, key: u8) -> engine::Event {
+    engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
+        sign_in,
+        key: [key; 16],
+        ask: people::Ask::Say { project: 1, task, words: Box::from([key]), release: false },
+    })
 }

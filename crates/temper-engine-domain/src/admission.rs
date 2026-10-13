@@ -1,7 +1,7 @@
 //! Admission at the service boundary: an input the journal cannot take returns
 //! to its owner, and store answers are always taken (jig's `domain/root.md`, 3;
 //! `testing/jig-test-domain/src/admission.rs`).
-use crate::boundary::{Event, StoreInput};
+use crate::boundary::{Event, Link, StoreInput, WorkerInput};
 use crate::domain::{Domain, admits, step};
 use crate::limits::Limits;
 use skein_lib::Env;
@@ -28,6 +28,15 @@ pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<
         )
         | Event::Released(_)
         | Event::Resume) => {
+            step(domain, env, event);
+            Ok(())
+        }
+        event @ Event::Worker(WorkerInput::Link { link: Link::Up { .. }, .. }) => {
+            // A worker's record keeps its bytes here until the fleet is done
+            // with them; without room it is answered busy and sent again.
+            if !admits(domain, &env.limits) || !crate::link::room(domain) {
+                return Err(event);
+            }
             step(domain, env, event);
             Ok(())
         }

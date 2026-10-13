@@ -686,7 +686,7 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
     driver.settle();
     let assigned = driver.delivered.iter().filter(|delivery| matches!(delivery, Delivery::Assigned { .. })).count();
     assert_eq!(assigned, 1);
-    let assignment = assigned_from_last(&driver.delivered);
+    let assignment = driver.last_assignment();
     turn(&mut driver, &assignment, 1, 3);
     until_pending(&mut driver);
     driver.pressure();
@@ -1483,9 +1483,10 @@ fn a_pending_note_reserves_its_named_answer_until_the_store_returns() {
     let unavailable = engine::Call { completion: 1, position: 3121, tool: engine::Tool::Unavailable };
     driver.call(Token::new(7), assignment.task, assignment.attempt, 3121, unavailable);
     driver.settle();
+    // A call waiting for a call record is answered busy, to ask again
+    // (jig's `domain/engine.md`, 5.1).
     assert!(downs(&driver).into_iter().any(|down| matches!(down,
-        host::LinkDown::Relayed { call, answer: host::Relayed::Answer { error: true, text }, .. }
-            if call.as_ref() == 3121_u64.to_be_bytes() && text.as_ref() == b"busy"
+        host::LinkDown::Relayed { call, answer: host::Relayed::Busy, .. } if call.as_ref() == 3121_u64.to_be_bytes()
     )));
     assert_eq!(driver.answered(3121), None);
     // The recall's decision and its settled answer each take a call number (D15).
@@ -1945,7 +1946,7 @@ fn a_narrowing_stops_the_old_run_and_offers_the_amendment_to_the_next() {
     assert!(cancelled(&driver).contains(&(child, first.attempt)));
     driver.answer(Token::new(7), child, first.attempt, 0, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert_eq!(second.task, child);
     assert!(second.attempt > first.attempt);
     assert!(second.messages.iter().any(
@@ -2007,7 +2008,7 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert_eq!(second.task, child);
     driver.answer(
         Token::new(7),
@@ -2354,7 +2355,7 @@ fn a_lost_attempt_is_told_of_the_calls_committed_after_its_last_turn() {
     driver.collect();
     driver.hello(Token::new(8));
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert!(second.attempt > first.attempt);
     let key = temper_engine_domain::CallKey { task: first.task, attempt: first.attempt, completion: 2, position: 0 };
     assert_eq!(second.answered.len(), 1);
@@ -3436,35 +3437,6 @@ fn read_only_role_stages_have_one_not_ready_terminal_and_empty_projects_need_no_
     assert_eq!(out.pop(), Some(empty), "one empty snapshot terminal");
 }
 
-fn chat_driver() -> (Driver, engine::Assignment) {
-    let mut driver = Driver::new(Store::new());
-    driver.hello(Token::new(7));
-    driver.settle();
-    driver.sign_in();
-    driver.settle();
-    driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(1001)),
-        sign_in: driver.session(),
-        key: [31; 16],
-        ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
-    }));
-    driver.settle();
-    let assignment = assigned_from_last(&driver.delivered);
-    (driver, assignment)
-}
-
-fn assigned_from_last(delivered: &[Delivery]) -> engine::Assignment {
-    delivered
-        .iter()
-        .rev()
-        .find_map(
-            |delivery| {
-                if let Delivery::Assigned { assignment, .. } = delivery { Some(assignment.clone()) } else { None }
-            },
-        )
-        .expect("durable assignment")
-}
-
 /// A resumed run's turn, which continues its transcript's window.
 fn resumed_turn(driver: &mut Driver, run: &engine::Assignment, number: u32, cumulative: u64, body: &[u8]) {
     let turn = host::Turn {
@@ -3479,37 +3451,10 @@ fn resumed_turn(driver: &mut Driver, run: &engine::Assignment, number: u32, cumu
     driver.send(protocol::up(Token::new(7), up, engine::Parts::none()));
 }
 
-fn say(driver: &mut Driver, task: u64, key: u8) -> u64 {
-    driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
-        sign_in: driver.session(),
-        key: [key; 16],
-        ask: people::Ask::Say { project: 1, task, words: Box::from([key]), release: false },
-    }));
-    driver.settle();
-    driver
-        .delivered
-        .iter()
-        .rev()
-        .find_map(|delivery| {
-            if let Delivery::WebReply {
-                reply: people::Reply::Outcome(people::Outcome::Said { task: named, message, .. }),
-                ..
-            } = delivery
-                && *named == task
-            {
-                Some(*message)
-            } else {
-                None
-            }
-        })
-        .expect("committed keyed word")
-}
-
 #[test]
 fn words_typed_while_a_run_works_reach_it_once_committed() {
-    let (mut driver, assignment) = chat_driver();
-    let number = say(&mut driver, assignment.task, 41);
+    let (mut driver, assignment) = Driver::chat();
+    let number = driver.say(assignment.task, 41);
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::Link { channel, down: host::LinkDown::Message { run, attempt, name, words, .. } }
             if *channel == Token::new(7) && run.raw() == assignment.task && attempt.raw() == assignment.attempt
@@ -3521,9 +3466,9 @@ fn words_typed_while_a_run_works_reach_it_once_committed() {
 
 #[test]
 fn a_read_fence_takes_only_what_the_run_read() {
-    let (mut driver, assignment) = chat_driver();
-    let first = say(&mut driver, assignment.task, 42);
-    let second = say(&mut driver, assignment.task, 43);
+    let (mut driver, assignment) = Driver::chat();
+    let first = driver.say(assignment.task, 42);
+    let second = driver.say(assignment.task, 43);
     driver.send(protocol::turn(Token::new(7), assignment.task, assignment.attempt, 1, 1, Some(first), b"read one"));
     driver.settle();
     let task = live(&driver, assignment.task);
@@ -3539,11 +3484,11 @@ fn a_read_fence_takes_only_what_the_run_read() {
 // Waiting words travel in the run's start (jig 0f6041cb).
 #[test]
 fn words_to_a_parked_chat_wake_it() {
-    let (mut driver, assignment) = chat_driver();
+    let (mut driver, assignment) = Driver::chat();
     driver.answer(Token::new(7), assignment.task, assignment.attempt, 0, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    let number = say(&mut driver, assignment.task, 44);
-    let next = assigned_from_last(&driver.delivered);
+    let number = driver.say(assignment.task, 44);
+    let next = driver.last_assignment();
     assert!(next.attempt > assignment.attempt);
     assert_eq!(next.messages.len(), 1);
     assert_eq!(next.messages[0].number, number);
@@ -3554,21 +3499,21 @@ fn words_to_a_parked_chat_wake_it() {
 // one (jig c83ab353).
 #[test]
 fn a_chat_parks_and_resumes_from_its_transcript() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     driver.send(protocol::turn(Token::new(7), first.task, first.attempt, 1, 1, None, b"first"));
     driver.settle();
     driver.answer(Token::new(7), first.task, first.attempt, 1, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    say(&mut driver, first.task, 45);
-    let second = assigned_from_last(&driver.delivered);
+    driver.say(first.task, 45);
+    let second = driver.last_assignment();
     assert_eq!(second.transcript.len(), 1);
     assert_eq!(second.transcript[0].as_ref(), b"first");
     resumed_turn(&mut driver, &second, 1, 1, b"second");
     driver.settle();
     driver.answer(Token::new(7), second.task, second.attempt, 1, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    say(&mut driver, second.task, 46);
-    let third = assigned_from_last(&driver.delivered);
+    driver.say(second.task, 46);
+    let third = driver.last_assignment();
     assert_eq!(third.transcript.len(), 2);
     assert_eq!(third.transcript[0].as_ref(), b"first");
     assert_eq!(third.transcript[1].as_ref(), b"second");
@@ -3577,15 +3522,15 @@ fn a_chat_parks_and_resumes_from_its_transcript() {
 
 #[test]
 fn a_chat_past_the_resume_limit_starts_fresh_with_the_tail_in_its_brief() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     let mut body = vec![b'x'; 300];
     body[298..].copy_from_slice(b"yz");
     driver.send(protocol::turn(Token::new(7), first.task, first.attempt, 1, 1, None, &body));
     driver.settle();
     driver.answer(Token::new(7), first.task, first.attempt, 1, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    say(&mut driver, first.task, 47);
-    let next = assigned_from_last(&driver.delivered);
+    driver.say(first.task, 47);
+    let next = driver.last_assignment();
     assert!(next.transcript.is_empty());
     let tail = next
         .sections
@@ -3603,7 +3548,7 @@ fn a_chat_past_the_resume_limit_starts_fresh_with_the_tail_in_its_brief() {
 
 #[test]
 fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     let transient = tasks::End::Failed(tasks::Class::Transient);
     driver.answer(Token::new(7), first.task, first.attempt, 0, transient.clone(), engine::Parts::none());
     driver.settle();
@@ -3616,7 +3561,7 @@ fn a_run_failing_transiently_is_retried_then_held_past_its_tries() {
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert!(second.attempt > first.attempt);
     driver.answer(Token::new(7), second.task, second.attempt, 0, transient, engine::Parts::none());
     driver.settle();
@@ -3657,7 +3602,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert_eq!(second.task, leaf);
     driver.answer(
         Token::new(7),
@@ -3745,7 +3690,7 @@ fn a_delegate_held_past_its_tries_is_escalated_two_levels_to_a_person_released_a
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::EscalationDecided {
             task, choice: people::EscalationChoice::Released, ..
         }), .. } if *task == leaf)));
-    let third = assigned_from_last(&driver.delivered);
+    let third = driver.last_assignment();
     assert_eq!(third.task, leaf);
     assert!(third.attempt > second.attempt);
     driver.answer(
@@ -3909,7 +3854,7 @@ fn moving_a_held_delegate_rechecks_its_escalation_recipient() {
     engine::release(&mut driver.root, &driver.env, &mut driver.out);
     driver.collect();
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     driver.answer(
         Token::new(7),
         child,
@@ -3988,7 +3933,7 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
 
 #[test]
 fn saved_work_reaches_the_next_attempt() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     let parts = engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]) };
     driver.answer(Token::new(7), first.task, first.attempt, 0, tasks::End::Parked, parts);
     driver.settle();
@@ -3996,15 +3941,15 @@ fn saved_work_reaches_the_next_attempt() {
         live(&driver, first.task).saved.as_ref(),
         [tasks::SavedResource { connector: 0, path: Box::new([Box::from(3u32.to_be_bytes())]) }]
     );
-    say(&mut driver, first.task, 49);
-    let second = assigned_from_last(&driver.delivered);
+    driver.say(first.task, 49);
+    let second = driver.last_assignment();
     assert_eq!(second.saved.as_ref(), [3]);
     assert!(second.attempt > first.attempt);
 }
 
 #[test]
 fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     turn(&mut driver, &first, 1, 1);
     driver.settle();
     assert!(driver.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
@@ -4027,7 +3972,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
     driver.collect();
     driver.hello(Token::new(8));
     driver.settle();
-    let second = assigned_from_last(&driver.delivered);
+    let second = driver.last_assignment();
     assert!(second.attempt > first.attempt);
     assert_eq!(second.transcript.len(), 1);
     assert_eq!(second.transcript[0].as_ref(), b"step");
@@ -4035,7 +3980,7 @@ fn a_worker_lost_mid_run_resumes_at_the_last_committed_turn() {
 
 #[test]
 fn a_worker_frozen_past_its_grace_gets_no_next_attempt_until_its_sum_has_passed() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     driver.send(hello_with(Token::new(8), 1, Duration::from_secs(5), Box::new([])));
     driver.settle();
     assert!(
@@ -4125,7 +4070,7 @@ fn typed_unavailable(
 
 #[test]
 fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
-    let (mut driver, first) = chat_driver();
+    let (mut driver, first) = Driver::chat();
     turn(&mut driver, &first, 1, 1);
     driver.settle();
     let settled = typed_unavailable(&mut driver, &first, b"opaque-call");
@@ -4136,8 +4081,8 @@ fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
     );
     driver.answer(Token::new(7), first.task, first.attempt, 1, tasks::End::Parked, engine::Parts::none());
     driver.settle();
-    say(&mut driver, first.task, 93);
-    let resumed = assigned_from_last(&driver.delivered);
+    driver.say(first.task, 93);
+    let resumed = driver.last_assignment();
     assert_eq!(resumed.transcript.as_ref(), [Box::<[u8]>::from(&b"step"[..])]);
     assert_eq!(resumed.settled.as_ref(), std::slice::from_ref(&settled));
     assert_eq!(resumed.answered[0].settled.as_ref(), Some(&settled));
@@ -4145,7 +4090,7 @@ fn typed_calls_keep_their_opaque_answers_for_resumed_assignments() {
 
 #[test]
 fn a_typed_call_replay_uses_the_settled_record_without_rendering_again() {
-    let (mut driver, assignment) = chat_driver();
+    let (mut driver, assignment) = Driver::chat();
     let saved = typed_unavailable(&mut driver, &assignment, b"replay");
     let (before, rows) = (driver.store.applied, driver.store.rows.clone());
     let (delivered, rendered) = (driver.delivered.len(), driver.protocol.answers.len());
