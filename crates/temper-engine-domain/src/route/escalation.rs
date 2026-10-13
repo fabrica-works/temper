@@ -38,7 +38,7 @@ pub(crate) fn historical_begin(
     revision: u64,
 ) {
     let query = Query { request, person, project, task, revision };
-    match domain.result_reads.insert(Some(Read::Escalation(query))) {
+    match domain.archive_reads.insert(Some(Read::Escalation(query))) {
         Ok(waiter) => emit(barrier, &env.limits, Delivery::ReadEscalationDecision { waiter: waiter.token() }),
         Err(_) => domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
             request,
@@ -54,7 +54,7 @@ pub(crate) fn historical_begin(
 
 pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, rows: Box<[Record]>) {
     let Some(read) = super::take_read(domain, waiter) else { unreachable!("escalation archive owns its read") };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     let Query { request, person, project, task, revision } = query(read);
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
@@ -93,7 +93,7 @@ pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, row
 
 pub(crate) fn failed(domain: &mut Domain, waiter: Token) {
     let Some(read) = super::take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     let Query { request, person, project, task, revision } = query(read);
     domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
         request,

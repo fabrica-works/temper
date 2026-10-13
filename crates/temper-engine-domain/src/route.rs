@@ -388,7 +388,7 @@ pub(crate) fn delegate_call(
                 stubs: List::with_capacity(u32::try_from(capacity).expect("bounded input IDs")),
             };
             let waiter =
-                domain.result_reads.insert(Some(Read::InputCheck(read))).expect("preflighted input read slot").token();
+                domain.archive_reads.insert(Some(Read::InputCheck(read))).expect("preflighted input read slot").token();
             assert!(domain.core.reserve_connector_call(key), "reserved call record room");
             emit(
                 decision,

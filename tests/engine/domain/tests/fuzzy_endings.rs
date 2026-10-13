@@ -24,11 +24,11 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
         bounds.tasks.delegates = 2;
         bounds.tasks.batch = 2;
         bounds.authority.batch = 2;
-        let mut rules = configuration.authority.rules().clone();
+        let mut rules = configuration.core.authority.rules().clone();
         rules.maximum_run_spend = 60;
         rules.ceiling.delegation.tasks = 4;
         rules.ceiling.delegation.depth = 2;
-        let mut policy = configuration.authority.policy(1).expect("project policy").clone();
+        let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
         policy.ceiling.delegation.tasks = 4;
         policy.ceiling.delegation.depth = 2;
         policy.roles[0].authority.delegation.tasks = 4;
@@ -37,7 +37,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
         let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
         authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
         assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-        configuration.authority = domain;
+        configuration.core.authority = domain;
     }
     bounds.fleet.attempts = 5;
     bounds.call_records = 4;

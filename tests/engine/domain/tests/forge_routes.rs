@@ -166,7 +166,7 @@ impl World {
                 },
             };
             let effect_grant = authority::Grant { kind: 8, ..grant.clone() };
-            let mut rules = config.authority.rules().clone();
+            let mut rules = config.core.authority.rules().clone();
             if with_change {
                 // The chat's 100-unit allotment must retain room for its 20-unit delegate
                 // after the run reserves its capped allowance at claim.
@@ -232,7 +232,7 @@ impl World {
                 rules.ceiling.delegation.tasks = 12;
                 rules.ceiling.delegation.depth = 3;
             }
-            let mut policy = config.authority.policy(1).expect("walk policy").clone();
+            let mut policy = config.core.authority.policy(1).expect("walk policy").clone();
             policy.ceiling.tools = authority::Tools(1023);
             policy.ceiling.grants.clone_from(&rules.ceiling.grants);
             policy.projections.clone_from(&rules.ceiling.grants);
@@ -254,7 +254,7 @@ impl World {
             authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
             assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
             // A chat's authority is its role's, one level shallower (jig a2616181).
-            config.authority = domain;
+            config.core.authority = domain;
         }
         limits.notes.scopes = 3 + limits.authority.grants;
         let mut fake_config = forge_world::fake_config();

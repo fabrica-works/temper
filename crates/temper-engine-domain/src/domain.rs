@@ -3,14 +3,14 @@ use crate::boundary::{
     Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Released, Request, Work,
 };
 use crate::limits::{
-    HUB_TURNS, Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound, route_decision,
+    Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound, route_decision,
     route_takes, run_policy_bound, worst_case,
 };
 use crate::restart::{connector_restarting, request_load};
 use crate::route::{
     LandingRule, forge_route, host_route, landing, policy_translate, route_core_requests, route_into, step_routed,
 };
-use crate::translate::{Config, RootConfig, environment_forge, split_config};
+use crate::translate::{Config, RootConfig, environment_forge};
 use crate::{CallKey, Decision, Delivery, Journal, JournalOutput as Output, Range, Write, loads};
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
@@ -19,7 +19,7 @@ use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
+use skein_lib::{Env, Id, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
 use temper_engine_domain_forge_client as forge_client;
@@ -56,7 +56,9 @@ pub struct Domain {
     pub(crate) loads: loads::Loads,
     pub(crate) assignments: Map<u64, Assignment>,
     pub(crate) payloads: Slab<Option<Payload>>,
-    pub(crate) result_reads: Slab<Option<Read>>,
+    /// Loads of durable rows outside the working set: a run's preparation
+    /// (transcript, dependencies, inputs) and historical queries.
+    pub(crate) archive_reads: Slab<Option<Read>>,
     /// Read loads' answers that waited for journal room (jig's `domain/root.md`, 3).
     pub(crate) store_answers: Queue<Event>,
     pub(crate) host_calls: Map<Token, host_route::Flight>,
@@ -71,8 +73,13 @@ impl Domain {
     #[expect(clippy::too_many_lines, reason = "the root allocates every child and bounded handoff table together")]
     pub fn new(mut config: Config, limits: &Limits) -> Domain {
         assert!(worst_case(limits).is_some(), "root limits are valid");
-        assert!(config.deployment_provider != 0, "deployment service provider differs from forge sign-in provider 0");
-        for charter in &config.charters {
+        assert!(
+            config.core.settings.deployment_provider != 0,
+            "deployment service provider differs from forge sign-in provider 0"
+        );
+        assert!(config.core.connectors.len() == 1, "the forge is the deployment's one connector");
+        let forge_connector = *config.core.connectors.first().expect("one connector");
+        for charter in &config.core.settings.charters {
             assert!(
                 match run_policy_bound(&charter.policy, limits) {
                     Some(bytes) => bytes <= u64::from(limits.journal.run_bytes),
@@ -82,15 +89,16 @@ impl Domain {
             );
         }
         let mut forge_charter = false;
-        for charter in &config.charters {
+        for charter in &config.core.settings.charters {
             forge_charter |= charter.number == config.forge_charter;
         }
         assert!(forge_charter, "the forge's agent work runs under a configured charter");
         assert!(
-            config.resume_bytes > 0 && config.resume_bytes <= limits.journal.transcript_bytes,
+            config.core.settings.resume_bytes > 0
+                && config.core.settings.resume_bytes <= limits.journal.transcript_bytes,
             "configured task transcript bound fits the root's owned-byte limit"
         );
-        assert!(*config.authority.limits() == limits.authority, "root prices its exact authority limits");
+        assert!(*config.core.authority.limits() == limits.authority, "root prices its exact authority limits");
         assert!(
             limits.forge.judge_projects >= limits.authority.projects
                 && limits.forge.judge_criteria >= limits.authority.requirements,
@@ -111,8 +119,11 @@ impl Domain {
                 "project landing policy fits owned-byte bound"
             );
         }
-        assert!(config.permission_roles.capacity() == limits.authority.projects, "permission policy project bound");
-        for (_, mappings) in &config.permission_roles {
+        assert!(
+            config.core.permission_roles.capacity() == limits.authority.projects,
+            "permission policy project bound"
+        );
+        for (_, mappings) in &config.core.permission_roles {
             let count = u64::try_from(mappings.len()).expect("usize fits u64");
             let unit = u64::try_from(size_of::<people::PermissionRole>()).expect("type size fits u64");
             assert!(
@@ -123,50 +134,39 @@ impl Domain {
                 "permission policy bound"
             );
         }
-        let mut projects = List::with_capacity(limits.people.projects);
-        for owner in &config.owners {
-            assert!(config.authority.policy(owner.project).is_some(), "bootstrap owner names configured policy");
+        for owner in &config.core.owners {
+            assert!(config.core.authority.policy(owner.project).is_some(), "bootstrap owner names configured policy");
             assert!(
-                match config.authority.policy(owner.project).expect("known policy").escalation_role {
+                match config.core.authority.policy(owner.project).expect("known policy").escalation_role {
                     Some(role) => role <= 3,
                     None => false,
                 },
                 "current root requires final escalation role"
             );
-            let mut found = false;
-            for project in &projects {
-                if *project == owner.project {
-                    found = true;
-                }
-            }
-            if !found {
-                projects.push(owner.project).expect("configured projects bounded");
-            }
         }
         let mut forge_config = core::mem::replace(
             &mut config.forge,
             forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
         );
-        forge_config.namespace = Box::from(config.deployment);
+        forge_config.namespace = Box::from(config.core.deployment);
         let mut forge =
-            forge::Domain::new(&limits.forge, config.seed, forge_config).expect("valid forge configuration");
+            forge::Domain::new(&limits.forge, config.core.seed, forge_config).expect("valid forge configuration");
         let built = policy_translate::build_landing(
             &config.landing.deployment,
             false,
             limits.authority.requirements,
-            config.forge_connector,
+            forge_connector,
         )
         .expect("deployment landing requirements bounded");
         assert!(
-            config.authority.add_configured_requirements(&built.requirements),
+            config.core.authority.add_configured_requirements(&built.requirements),
             "deployment landing requirements fit authority configuration"
         );
         assert!(forge.deployment_judges(built.criteria), "deployment judge table bounded");
         for (&project, rules) in &config.landing.projects {
-            let built =
-                policy_translate::build_landing(rules, true, limits.authority.requirements, config.forge_connector)
-                    .expect("project landing requirements bounded");
-            let mut policy = config.authority.policy(project).expect("landing project has a policy").clone();
+            let built = policy_translate::build_landing(rules, true, limits.authority.requirements, forge_connector)
+                .expect("project landing requirements bounded");
+            let mut policy = config.core.authority.policy(project).expect("landing project has a policy").clone();
             assert!(
                 policy_translate::landing_roles(&policy, &config.landing.deployment),
                 "deployment landing roles configured"
@@ -180,7 +180,7 @@ impl Domain {
             .expect("project landing requirements fit authority policy");
             policy.requirements = combined;
             let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut config.authority, authority::Event::Policy { project, policy }, &mut facts);
+            authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
             assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project }), "landing policy configured");
             assert!(forge.project_judges(project, built.criteria), "project judge table bounded");
         }
@@ -191,8 +191,8 @@ impl Domain {
         )
         .expect("landing gate templates bounded");
         assert!(forge.gate_policy(gate_policy, &limits.forge), "forge owns bounded landing templates");
-        let (core_config, root_config) = split_config(config, projects, HUB_TURNS);
-        let mut core = Core::new(core_config, &core_limits(limits));
+        let root_config = RootConfig { forge_connector, forge_charter: config.forge_charter };
+        let mut core = Core::new(config.core, &core_limits(limits));
         let core_env = Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: core_limits(limits) };
         let configured = jig_domain_core::step(
             &mut core,
@@ -261,7 +261,7 @@ impl Domain {
             loads: loads::Loads::new(&limits.loads),
             assignments: Map::with_capacity(limits.tasks.tasks),
             payloads: Slab::with_capacity(payload_slots(limits).expect("valid payload room")),
-            result_reads: Slab::with_capacity(limits.loads.loads),
+            archive_reads: Slab::with_capacity(limits.loads.loads),
             store_answers: Queue::with_capacity(limits.loads.loads),
             host_calls: Map::with_capacity(limits.fleet.calls),
             work: Queue::with_capacity(route_bound(limits).expect("valid routes")),
@@ -296,7 +296,7 @@ impl Domain {
             && self.work.is_empty()
             && self.assignments.is_empty()
             && self.payloads.is_empty()
-            && self.result_reads.is_empty()
+            && self.archive_reads.is_empty()
             && self.store_answers.is_empty()
             && self.adoption_restore.is_empty()
             && self.forge_subscribing.is_empty()
@@ -325,7 +325,7 @@ impl Domain {
         self.brief_connectors.reclaim();
         self.forge.reclaim();
         self.payloads.reclaim();
-        self.result_reads.reclaim();
+        self.archive_reads.reclaim();
         loads::reclaim(&mut self.loads);
     }
 
@@ -339,8 +339,9 @@ impl Domain {
 /// Output room for a commit and one delivery, or one bounded immediate cohort.
 /// Reserve before release; step and fire allocate the same bounded scratch room.
 #[must_use]
-pub const fn max_out(limits: &Limits) -> u32 {
-    let viewed = views::max_out(&limits.views).saturating_add(4);
+/// The views' share is fixed by [`crate::limits::VIEWS`].
+pub const fn max_out(_limits: &Limits) -> u32 {
+    let viewed = views::max_out(&crate::limits::VIEWS).saturating_add(4);
     if viewed > 4 { viewed } else { 4 }
 }
 
@@ -623,7 +624,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
             request_load(domain, waiter, range, after, out);
         }
         Delivery::ReadEscalationDecision { waiter } => {
-            let Some(Some(read)) = domain.result_reads.get(Id::from_token(waiter)) else { return };
+            let Some(Some(read)) = domain.archive_reads.get(Id::from_token(waiter)) else { return };
             let (task, revision) = match read {
                 Read::Escalation(query) => (query.task, query.revision),
                 Read::Ended(_)

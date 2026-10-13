@@ -5,105 +5,34 @@ use crate::limits::Limits;
 use crate::route::{LandingRule, host_route};
 use crate::{CallAnswer, Decision};
 use alloc::boxed::Box;
-use jig_domain_authority as authority;
-use jig_domain_core::Charter;
 use jig_domain_notes as notes;
-use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Env, List, Map, ReplyTo};
+use skein_lib::{Env, Map, ReplyTo};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
 
-/// Startup configuration owned by the root, bounded by the corresponding
-/// child limits; the shell supplies it once (domain/engine.md, 4 and 14).
+/// Startup configuration, supplied once by the shell (domain/engine.md, 14):
+/// the core's whole, as jig's applications hold it, and temper's own.
 #[derive(Debug)]
 pub struct Config {
-    /// Identity committed at the first start; ignored when a header exists.
-    pub deployment: [u8; 16],
-    pub seed: u64,
-    /// Bootstrap project/identity owners supplied by deployment configuration, at most people
-    /// `initial_owners`; sign-in authentication matches their identity keys rather than trusting a
-    /// request's role.
-    pub owners: Box<[people::InitialOwner]>,
-    /// Provider number reserved for services made by this deployment; forge sign-in uses 0.
-    pub deployment_provider: u16,
-    /// Validated deployment and project policy; no duplicated policy values.
-    pub authority: authority::Domain,
+    /// The core's rules, charters, owners and projects; its one connector is
+    /// the forge's; whether the workers run in the engine's process is
+    /// configuration too: standalone, they do not (domain/engine.md, 14).
+    pub core: jig_domain_core::Config,
     /// Forge landing requirements and their connector-owned judge parameters.
     pub landing: LandingPolicy,
-    /// Project policy mappings from connector permissions to roles at adoption.
-    pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
-    /// Connector number assigned to this application's forge adapter.
-    pub forge_connector: u16,
-    /// The deployment's numbered charters (jig's `protocol/configuration.md`, 3).
-    pub charters: Box<[Charter]>,
-    /// The chats' charter, one of `charters`.
-    pub chat: u32,
-    /// Time a chat has to finish after its whole close decision.
-    pub close_grace: skein_lib::Duration,
-    /// Maximum committed conversation bytes across a task's attempts that may be resumed whole.
-    /// A longer transcript starts the next run fresh with its bounded tail in the brief.
-    pub resume_bytes: u32,
-    /// One-bit family assignments for the engine tools in these charters.
-    pub tools: jig_domain_core::ToolFamilies,
     /// Forge writer identities and this deployment's branch namespace.
     pub forge: forge_client::Config,
     /// The charter the forge's procedures start their agent work under, one
-    /// of `charters` (domain/engine.md, 14).
+    /// of the core's charters (domain/engine.md, 14).
     pub forge_charter: u32,
 }
 
+/// What the root keeps of its configuration once its children hold theirs.
 #[derive(Debug)]
 pub(crate) struct RootConfig {
     pub(crate) forge_connector: u16,
     pub(crate) forge_charter: u32,
-}
-
-pub(crate) fn split_config(
-    config: Config,
-    projects: List<u32>,
-    hub_turns: u32,
-) -> (jig_domain_core::Config, RootConfig) {
-    let Config {
-        deployment,
-        seed,
-        owners,
-        deployment_provider,
-        authority,
-        landing: _,
-        permission_roles,
-        forge_connector,
-        charters,
-        chat,
-        close_grace,
-        resume_bytes,
-        tools,
-        forge: _,
-        forge_charter,
-    } = config;
-    (
-        jig_domain_core::Config {
-            deployment,
-            seed,
-            // temper's workers run apart from its engine (domain/engine.md, 14).
-            workers_in_process: false,
-            hub_turns,
-            owners,
-            authority,
-            projects,
-            permission_roles,
-            connectors: Box::new([forge_connector]),
-            settings: jig_domain_core::Settings {
-                close_grace,
-                deployment_provider,
-                charters,
-                chat,
-                resume_bytes,
-                tools,
-            },
-        },
-        RootConfig { forge_connector, forge_charter },
-    )
 }
 
 /// Typed forge landing policy retained by the application for policy snapshots.

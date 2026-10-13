@@ -156,14 +156,6 @@ pub fn limits() -> engine::Limits {
             spent_attention: Duration::from_secs(1),
             facts: 2,
         },
-        views: jig_domain_views::Limits {
-            runs: 2,
-            watchers: 4,
-            watchers_per_party: 4,
-            subjects_per_change: 8,
-            text_bytes: 64,
-            facts: 8,
-        },
         notes: jig_domain_notes::Limits {
             scopes: 4,
             entries_per_scope: 1,
@@ -237,42 +229,60 @@ pub fn config(seed: u64) -> engine::Config {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "real policy admitted");
+    let mut projects = skein_lib::List::with_capacity(authority_limits().projects);
+    projects.push(1).expect("one configured project");
     engine::Config {
-        deployment: [31; 16],
-        seed,
-        owners: Box::new([people::InitialOwner {
-            project: 1,
-            identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-        }]),
-        deployment_provider: 1,
-        authority: domain,
-        landing: engine::LandingPolicy { deployment: Box::new([]), projects: skein_lib::Map::with_capacity(1) },
-        permission_roles: {
-            let mut projects: skein_lib::Map<u32, Box<[people::PermissionRole]>> = skein_lib::Map::with_capacity(1);
-            projects
-                .insert(
-                    1,
-                    Box::new([
-                        people::PermissionRole { connector: 0, permission: 3, role: 1 },
-                        people::PermissionRole { connector: 0, permission: 2, role: 2 },
-                        people::PermissionRole { connector: 0, permission: 1, role: 3 },
-                    ]),
-                )
-                .expect("one configured permission policy");
-            projects
+        core: jig_domain_core::Config {
+            deployment: [31; 16],
+            seed,
+            // The worlds' workers run apart from the engine (domain/engine.md, 14).
+            workers_in_process: false,
+            hub_turns: HUB_TURNS,
+            owners: Box::new([people::InitialOwner {
+                project: 1,
+                identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
+            }]),
+            authority: domain,
+            settings: jig_domain_core::Settings {
+                close_grace: Duration::from_secs(5),
+                deployment_provider: 1,
+                charters: Box::new([charter()]),
+                chat: 1,
+                resume_bytes: 256,
+                tools: jig_domain_core::ToolFamilies::JIG,
+            },
+            projects,
+            permission_roles: permission_roles(),
+            // The forge is the deployment's one connector.
+            connectors: Box::new([0]),
         },
-        forge_connector: 0,
-        charters: Box::new([charter()]),
-        chat: 1,
-        close_grace: Duration::from_secs(5),
-        resume_bytes: 256,
-        tools: jig_domain_core::ToolFamilies::JIG,
+        landing: engine::LandingPolicy { deployment: Box::new([]), projects: skein_lib::Map::with_capacity(1) },
         forge: temper_engine_domain_forge_client::Config {
             namespace: Box::from(&b"root"[..]),
             writers: Box::new([temper_engine_domain_forge_client::Writer { forge: 1, author: 1 }]),
         },
         forge_charter: 1,
     }
+}
+
+/// Retained turns per attempt in the workers' hub, as jig's smallest
+/// profile sets them (`jig-protocol-config`'s `small.rs`, hub `turns`).
+pub const HUB_TURNS: u32 = 8;
+
+/// Project one's forge permissions mapped to its seeded roles.
+fn permission_roles() -> skein_lib::Map<u32, Box<[people::PermissionRole]>> {
+    let mut projects: skein_lib::Map<u32, Box<[people::PermissionRole]>> = skein_lib::Map::with_capacity(1);
+    projects
+        .insert(
+            1,
+            Box::new([
+                people::PermissionRole { connector: 0, permission: 3, role: 1 },
+                people::PermissionRole { connector: 0, permission: 2, role: 2 },
+                people::PermissionRole { connector: 0, permission: 1, role: 3 },
+            ]),
+        )
+        .expect("one configured permission policy");
+    projects
 }
 
 /// The deployment's one charter: the chats' and the forge's agent work's.

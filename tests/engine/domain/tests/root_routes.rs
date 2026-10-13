@@ -196,14 +196,14 @@ fn goals(driver: &Driver) -> Vec<u64> {
 
 /// Rebuild the configuration's authority with project one's policy changed.
 fn with_policy(configuration: &mut engine::Config, change: impl FnOnce(&mut authority::Policy)) {
-    let mut policy = configuration.authority.policy(1).expect("configured project").clone();
+    let mut policy = configuration.core.authority.policy(1).expect("configured project").clone();
     change(&mut policy);
-    let rules = configuration.authority.rules().clone();
-    let mut domain = authority::Domain::new(rules, *configuration.authority.limits()).expect("valid authority");
+    let rules = configuration.core.authority.rules().clone();
+    let mut domain = authority::Domain::new(rules, *configuration.core.authority.limits()).expect("valid authority");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.authority = domain;
+    configuration.core.authority = domain;
 }
 
 /// The walking configuration with its role's chats at 100 each: a chat takes
@@ -247,8 +247,8 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     limits.journal.held = 120;
     let mut config = config(seed);
     let mut authority =
-        authority::Domain::new(config.authority.rules().clone(), limits.authority).expect("larger policy room");
-    let mut policy = config.authority.policy(1).expect("configured project").clone();
+        authority::Domain::new(config.core.authority.rules().clone(), limits.authority).expect("larger policy room");
+    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
     let owner = policy.roles[0].clone();
     let mut maintainer = owner.clone();
     maintainer.number = 1;
@@ -265,7 +265,7 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.authority = authority;
+    config.core.authority = authority;
     (config, limits)
 }
 
@@ -478,14 +478,14 @@ fn a_person_amends_their_live_task_and_the_change_reaches_its_run() {
 fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     let bounds = limits();
     let mut configuration = config(2045);
-    let mut policy = configuration.authority.policy(1).expect("project policy").clone();
+    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
     policy.roles[0].requests = authority::Requests(1 | 4);
-    let mut authority =
-        authority::Domain::new(configuration.authority.rules().clone(), bounds.authority).expect("valid authority");
+    let mut authority = authority::Domain::new(configuration.core.authority.rules().clone(), bounds.authority)
+        .expect("valid authority");
     let mut output = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut authority, authority::Event::Policy { project: 1, policy }, &mut output);
     assert_eq!(output.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.authority = authority;
+    configuration.core.authority = authority;
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
     driver.settle();
     driver.sign_in();
@@ -1095,13 +1095,13 @@ fn unavailable_call(driver: &mut Driver, assignment: &engine::Assignment, call: 
 // A chat's delegation comes from its role's, one level shallower (jig a2616181).
 fn delegate_fixture() -> (Driver, engine::Assignment) {
     let mut configuration = config(91);
-    let mut rules = configuration.authority.rules().clone();
+    let mut rules = configuration.core.authority.rules().clone();
     rules.maximum_run_spend = 60;
     rules.ceiling.delegation.depth = 2;
-    let mut policy = configuration.authority.policy(1).expect("fixture project").clone();
+    let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
     policy.ceiling.delegation.depth = 2;
     policy.roles[0].authority.delegation.depth = 2;
-    let mut authority = jig_domain_authority::Domain::new(rules, *configuration.authority.limits())
+    let mut authority = jig_domain_authority::Domain::new(rules, *configuration.core.authority.limits())
         .expect("expanded fixture authority");
     let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     jig_domain_authority::step(
@@ -1110,7 +1110,7 @@ fn delegate_fixture() -> (Driver, engine::Assignment) {
         &mut policy_out,
     );
     assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.authority = authority;
+    configuration.core.authority = authority;
     let mut driver = Driver::configured(Store::new(), configuration, &limits());
     hello(&mut driver);
     driver.settle();
@@ -1185,7 +1185,7 @@ fn batch_fixture_custom(
     bounds.journal.held = 300;
     let mut configuration = config(92);
     if second_owner {
-        configuration.owners = Box::new([
+        configuration.core.owners = Box::new([
             people::InitialOwner {
                 project: 1,
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
@@ -1200,8 +1200,8 @@ fn batch_fixture_custom(
     // fixtures do, the charter's price unit keeps a run budget of 5 fundable.
     let mut cheaper = charter();
     cheaper.policy.model.price_unit = 2000;
-    configuration.charters = Box::new([cheaper]);
-    let mut rules = configuration.authority.rules().clone();
+    configuration.core.settings.charters = Box::new([cheaper]);
+    let mut rules = configuration.core.authority.rules().clone();
     // Each claimed run leaves room in its task allotment for delegates made during the run.
     rules.maximum_run_spend = 5;
     if procedure || person {
@@ -1216,7 +1216,7 @@ fn batch_fixture_custom(
     }
     rules.ceiling.delegation.tasks = 4;
     rules.ceiling.delegation.depth = depth + 1;
-    let mut policy = configuration.authority.policy(1).expect("fixture project").clone();
+    let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
     if procedure || person {
         policy.ceiling.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
         policy.roles[0].authority.delegation.kinds.clone_from(&rules.ceiling.delegation.kinds);
@@ -1235,7 +1235,7 @@ fn batch_fixture_custom(
         &mut policy_out,
     );
     assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.authority = authority;
+    configuration.core.authority = authority;
     let mut driver = Driver::configured(Store::new(), configuration, &bounds);
     driver.send(hello_with(Token::new(7), slots, Duration::from_secs(1), Box::new([])));
     driver.settle();
@@ -1250,16 +1250,16 @@ fn batch_fixture_custom(
 // A chat's note scopes are its role's (jig a2616181).
 fn note_config() -> engine::Config {
     let mut configuration = config(3100);
-    let mut rules = configuration.authority.rules().clone();
+    let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.notes = authority::Scopes(7);
-    let mut policy = configuration.authority.policy(1).expect("project policy").clone();
+    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
     policy.ceiling.notes = authority::Scopes(7);
     policy.roles[0].authority.notes = authority::Scopes(7);
-    let mut checked = authority::Domain::new(rules, *configuration.authority.limits()).expect("note policy");
+    let mut checked = authority::Domain::new(rules, *configuration.core.authority.limits()).expect("note policy");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut checked, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.authority = checked;
+    configuration.core.authority = checked;
     configuration
 }
 
@@ -3003,10 +3003,10 @@ fn restored_unreported_claim_spends_no_try_without_committed_work() {
 fn administration_config(seed: u64) -> engine::Config {
     use jig_domain_authority as authority;
     let mut config = config(seed);
-    let mut policy = config.authority.policy(1).expect("actual project").clone();
+    let mut policy = config.core.authority.policy(1).expect("actual project").clone();
     policy.roles[0].requests = authority::Requests(1 | 4 | 256);
     let mut findings = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.authority, authority::Event::Policy { project: 1, policy }, &mut findings);
+    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut findings);
     assert_eq!(findings.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
     config
 }

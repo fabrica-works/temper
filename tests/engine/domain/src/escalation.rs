@@ -163,7 +163,7 @@ pub struct World {
 // separate direct Release permission. Restart reconstructs this same policy.
 fn config(seed: u64) -> engine::Config {
     let mut config = walking::config(seed);
-    config.owners = Box::new([
+    config.core.owners = Box::new([
         people::InitialOwner {
             project: 1,
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
@@ -173,14 +173,14 @@ fn config(seed: u64) -> engine::Config {
             identity: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         },
     ]);
-    let mut policy = config.authority.policy(1).expect("configured project").clone();
+    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
     policy.roles[0].requests = authority::Requests(1 | 4);
     assert!(policy.roles[0].requests.allows(authority::RequestKind::Create));
     assert!(policy.roles[0].requests.allows(authority::RequestKind::Accept));
     assert!(!policy.roles[0].requests.allows(authority::RequestKind::Release));
     assert!(policy.roles[0].decides.allows(authority::ProposalKind::Escalation));
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
     config
 }

@@ -43,8 +43,6 @@ pub struct Limits {
     pub brief: BriefLimits,
     /// Secret-free credential policy.
     pub accounts: accounts::Limits,
-    /// Live watches, backlogs and expendable trace room.
-    pub views: views::Limits,
     /// Bounded notes indexes and pages kept by the core.
     pub notes: notes::Limits,
     /// Forge connector subtree and its bounded outbox.
@@ -92,8 +90,6 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
 pub const FILL_MARK: u64 = 268_435_456;
 /// The most owned bytes one authenticated store read brings (`small.rs`).
 pub const LOAD_BYTES: u64 = 65_536;
-/// Normal retained turns per attempt in the workers' hub (`small.rs`, hub `turns`).
-pub const HUB_TURNS: u32 = 8;
 /// Typed documents' construction bounds and served versions (`small.rs`, documents).
 pub const DOCUMENTS: jig_domain_core::documents::DocumentLimits = jig_domain_core::documents::DocumentLimits {
     rows: 4,
@@ -101,6 +97,17 @@ pub const DOCUMENTS: jig_domain_core::documents::DocumentLimits = jig_domain_cor
     chips: 4,
     lines: 4,
     versions: jig_domain_core::documents::Versions { minimum: 1, maximum: 1 },
+};
+
+/// Watches and live runs' provisional text, which temper keeps to jig's
+/// smallest profile until its clients watch more (`small.rs`, views).
+pub const VIEWS: views::Limits = views::Limits {
+    runs: 4,
+    watchers: 4,
+    watchers_per_party: 4,
+    subjects_per_change: 32,
+    text_bytes: 65_536,
+    facts: 32,
 };
 
 pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
@@ -135,7 +142,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
         },
         accounts: limits.accounts,
         notes: limits.notes,
-        views: limits.views,
+        views: VIEWS,
     }
 }
 
@@ -297,14 +304,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::from(limits.loads.loads)
                 .checked_mul(u64::from(limits.loads.reply_bytes).checked_add(u64::from(limits.people.words))?)?,
         )?
-        // Read answers that waited for journal room, and forge inputs the drain returns.
+        // Read answers that waited for journal room.
         .checked_add(Queue::<Event>::worst_case(limits.loads.loads)?)?
         .checked_add(
             u64::from(limits.loads.loads)
                 .checked_mul(jig_domain_core::reads::answer_worst_case(&core_limits(limits))?)?,
         )?
-        .checked_add(Queue::<Box<forge::Event>>::worst_case(routes)?)?
-        .checked_add(u64::from(routes).checked_mul(u64::try_from(size_of::<forge::Event>()).ok()?)?)?
+        // A forge input the drain hands back waits boxed in the journal's door.
+        .checked_add(u64::from(limits.journal.deliveries).checked_mul(
+            u64::try_from(size_of::<forge::Event>()).ok()?.checked_add(u64::from(limits.forge.client.answer_bytes))?,
+        )?)?
         .checked_add(Queue::<Work>::worst_case(routes)?)?
         .checked_add(u64::from(routes).checked_mul(row_bound(limits)?)?)?;
     let pushed =

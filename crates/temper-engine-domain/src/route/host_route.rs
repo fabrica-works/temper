@@ -60,7 +60,7 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
         || domain.core.pending_calls.contains_key(&key)
         || (!domain.core.call_parts.contains_key(&key)
             && domain.core.call_parts.len().saturating_add(domain.core.pending_calls.len()) >= env.limits.call_records)
-        || (super::call_needs_input(&body.tool) && domain.result_reads.len() >= domain.result_reads.capacity())
+        || (super::call_needs_input(&body.tool) && domain.archive_reads.len() >= domain.archive_reads.capacity())
     {
         let flight = domain.host_calls.remove(&right).expect("current typed flight");
         let id = domain

@@ -240,8 +240,6 @@ pub enum CoreRange {
     /// Root startup pages only child Live/Ledger state; historical Ended rows stay outside this
     /// range. Actual root-supported task shapes validate before child restoration.
     Tasks,
-    /// Historical ended tasks, ordered by task key for bounded scans; each row carries its result position.
-    EndedResults,
     /// Root pages current claims only, at most tasks `tasks` rows; every proof must correlate with
     /// its loaded live row before tasks Restored or fleet adoption. Historical
     /// transcripts/terminals are excluded.
@@ -332,10 +330,6 @@ impl CoreRange {
                 Core::Tasks(child) => child.live(),
                 Core::Core(_) | Core::People(_) | Core::Notes(_) => false,
             },
-            CoreRange::EndedResults => {
-                let Core::Tasks(jig_domain_tasks::Key::Ended(number)) = key else { return false };
-                *number != 0
-            }
             CoreRange::People => {
                 let Core::People(child) = key else { return false };
                 child.live()

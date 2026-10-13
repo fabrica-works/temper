@@ -313,7 +313,6 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
                 crate::CoreRange::Turns { .. }
                 | crate::CoreRange::TaskTranscript { .. }
                 | crate::CoreRange::Tasks
-                | crate::CoreRange::EndedResults
                 | crate::CoreRange::People
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Calls
@@ -339,7 +338,6 @@ fn valid_range(range: &Range) -> bool {
         Range::Core(
             crate::CoreRange::Deployment
             | crate::CoreRange::Tasks
-            | crate::CoreRange::EndedResults
             | crate::CoreRange::People
             | crate::CoreRange::RunProofs
             | crate::CoreRange::Calls

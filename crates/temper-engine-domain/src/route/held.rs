@@ -105,7 +105,7 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         core::Held::StopRun { task, attempt } => {
             emit(decision, &env.limits, Delivery::Fleet(core::Core::stop_run(task, attempt)));
         }
-        core::Held::NotesLoad { owner, range } => match domain.result_reads.insert(Some(Read::Notes { owner })) {
+        core::Held::NotesLoad { owner, range } => match domain.archive_reads.insert(Some(Read::Notes { owner })) {
             Ok(id) => emit(
                 decision,
                 &env.limits,

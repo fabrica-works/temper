@@ -126,7 +126,7 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         }
         core::Now::PrepareAgent { context } => {
             let (transcript_waiter, busy) = if context.ever_turned {
-                match domain.result_reads.insert(Some(Read::Transcript { task: context.task })) {
+                match domain.archive_reads.insert(Some(Read::Transcript { task: context.task })) {
                     Ok(waiter) => (Some(waiter.token()), false),
                     Err(_) => (None, true),
                 }
@@ -235,7 +235,7 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: 
     let task = match &read {
         EndedRead::SeenChat { task, .. } | EndedRead::Chat { task } | EndedRead::PersonTask { task, .. } => *task,
     };
-    match domain.result_reads.insert(Some(Read::Ended(read))) {
+    match domain.archive_reads.insert(Some(Read::Ended(read))) {
         Ok(waiter) => emit(
             decision,
             &env.limits,

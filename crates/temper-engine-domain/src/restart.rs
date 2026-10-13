@@ -53,7 +53,6 @@ pub(crate) fn request_load(
         Range::Core(
             crate::CoreRange::Calls
             | crate::CoreRange::Tasks
-            | crate::CoreRange::EndedResults
             | crate::CoreRange::People
             | crate::CoreRange::RunProofs
             | crate::CoreRange::Turns { .. }
@@ -77,7 +76,6 @@ pub(crate) fn request_load(
                 | crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
-                | crate::CoreRange::EndedResults
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::People
                 | crate::CoreRange::TaskResult { .. }
@@ -103,7 +101,6 @@ pub(crate) fn request_load(
                 crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
                 | crate::CoreRange::Tasks
-                | crate::CoreRange::EndedResults
                 | crate::CoreRange::People
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Turns { .. }
@@ -138,7 +135,7 @@ enum Waiting {
 }
 
 fn waiting(domain: &Domain, waiter: Token) -> Option<Waiting> {
-    match domain.result_reads.get(Id::from_token(waiter))? {
+    match domain.archive_reads.get(Id::from_token(waiter))? {
         Some(Read::Escalation(_)) => Some(Waiting::Escalation),
         Some(Read::Proposal(_)) => Some(Waiting::Proposal),
         Some(Read::Ended(_)) => Some(Waiting::Ended),
@@ -153,13 +150,13 @@ fn waiting(domain: &Domain, waiter: Token) -> Option<Waiting> {
 /// Free a reserved read slot the core no longer needs.
 pub(crate) fn retire_read(domain: &mut Domain, waiter: Token) {
     if take_read(domain, waiter).is_some() {
-        domain.result_reads.retire(Id::from_token(waiter));
+        domain.archive_reads.retire(Id::from_token(waiter));
     }
 }
 
 pub(crate) fn input_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain
         .work
         .push(Work::Core(jig_domain_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
@@ -172,7 +169,7 @@ pub(crate) fn input_loaded(
     next: Option<Key>,
     out: &mut Queue<Request>,
 ) {
-    let Some(Some(Read::InputCheck(read))) = domain.result_reads.get(Id::from_token(waiter)) else { return };
+    let Some(Some(Read::InputCheck(read))) = domain.archive_reads.get(Id::from_token(waiter)) else { return };
     let wanted = *read.ids.get(usize::try_from(read.at).expect("bounded input index")).expect("requested input");
     let project = read.project;
     let creator = read.key.task;
@@ -206,7 +203,7 @@ pub(crate) fn input_loaded(
         input_failed(domain, waiter);
         return;
     };
-    let Some(Some(Read::InputCheck(read))) = domain.result_reads.get_mut(Id::from_token(waiter)) else {
+    let Some(Some(Read::InputCheck(read))) = domain.archive_reads.get_mut(Id::from_token(waiter)) else {
         unreachable!("input read survives validation")
     };
     read.stubs.push(stub).expect("bounded historical input count");
@@ -216,7 +213,7 @@ pub(crate) fn input_loaded(
         return;
     }
     let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { unreachable!("completed input read") };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::DelegateValidated {
         to: ReplyTo::new(read.to),
         key: read.key,
@@ -242,7 +239,7 @@ pub(crate) fn take_note_owner(domain: &mut Domain, waiter: Token) -> Option<Toke
 
 pub(crate) fn note_failed(domain: &mut Domain, waiter: Token) {
     let Some(owner) = take_note_owner(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::LoadFailed { owner })));
 }
 
@@ -292,7 +289,7 @@ pub(crate) fn note_loaded(
         }
     }
     let Some(owner) = take_note_owner(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::Loaded {
         owner,
         rows: jig_domain_notes::Rows { records: kept },
@@ -366,7 +363,7 @@ pub(crate) fn load_outputs(
 /// One ended owner row the core asked for, or none when the store has none.
 pub(crate) fn ended_loaded(domain: &mut Domain, waiter: Token, rows: Box<[Record]>) {
     let Some(Read::Ended(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     let mut row = None;
     if rows.len() == 1
         && let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(ended)))) = rows.into_iter().next()
@@ -378,7 +375,7 @@ pub(crate) fn ended_loaded(domain: &mut Domain, waiter: Token, rows: Box<[Record
 
 pub(crate) fn ended_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::Ended(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     ended_answer(domain, read, None, true);
 }
 
@@ -399,7 +396,7 @@ pub(crate) fn ended_answer(domain: &mut Domain, read: EndedRead, row: Option<Box
 
 pub(crate) fn transcript_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::Transcript { task }) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
 }
 
@@ -417,7 +414,7 @@ pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(T
         at: 0,
         results: List::with_capacity(u32::try_from(count).expect("bounded result count")),
     };
-    let Ok(waiter) = domain.result_reads.insert(Some(Read::Dependency(read))) else {
+    let Ok(waiter) = domain.archive_reads.insert(Some(Read::Dependency(read))) else {
         domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
         return None;
     };
@@ -426,7 +423,7 @@ pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(T
 
 pub(crate) fn dependency_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::Dependency(read)) = take_read(domain, waiter) else { return };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task: read.task }));
 }
 
@@ -437,7 +434,7 @@ pub(crate) fn dependency_loaded(
     next: Option<Key>,
     out: &mut Queue<Request>,
 ) {
-    let Some(Some(Read::Dependency(read))) = domain.result_reads.get(Id::from_token(waiter)) else { return };
+    let Some(Some(Read::Dependency(read))) = domain.archive_reads.get(Id::from_token(waiter)) else { return };
     let wanted = *read.ids.get(usize::try_from(read.at).expect("bounded index")).expect("one requested result");
     if next.is_some() || rows.len() != 1 {
         dependency_failed(domain, waiter);
@@ -469,7 +466,7 @@ pub(crate) fn dependency_loaded(
         dependency_failed(domain, waiter);
         return;
     };
-    let Some(Some(Read::Dependency(read))) = domain.result_reads.get_mut(Id::from_token(waiter)) else {
+    let Some(Some(Read::Dependency(read))) = domain.archive_reads.get_mut(Id::from_token(waiter)) else {
         unreachable!("read survives validation")
     };
     read.results.push(result).expect("one result per bounded ID");
@@ -479,7 +476,7 @@ pub(crate) fn dependency_loaded(
         return;
     }
     let Some(Read::Dependency(read)) = take_read(domain, waiter) else { unreachable!("complete dependency read") };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     assert!(
         domain.core.dependency_results.insert(read.task, read.results.into_boxed()).is_ok(),
         "one preparation result set"
@@ -499,7 +496,7 @@ pub(crate) fn transcript_loaded(
         transcript_failed(domain, waiter);
         return;
     }
-    let Some(Some(Read::Transcript { task })) = domain.result_reads.get(Id::from_token(waiter)) else { return };
+    let Some(Some(Read::Transcript { task })) = domain.archive_reads.get(Id::from_token(waiter)) else { return };
     let task = *task;
     for row in rows {
         let turn = match row {
@@ -529,7 +526,7 @@ pub(crate) fn transcript_loaded(
         }
     }
     if let Some(after) = next {
-        let Some(Some(Read::Transcript { .. })) = domain.result_reads.get(Id::from_token(waiter)) else {
+        let Some(Some(Read::Transcript { .. })) = domain.archive_reads.get(Id::from_token(waiter)) else {
             unreachable!("transcript read survives its page")
         };
         let from = match &after {
@@ -542,7 +539,7 @@ pub(crate) fn transcript_loaded(
         return;
     }
     let Some(Read::Transcript { .. }) = take_read(domain, waiter) else { unreachable!("finished transcript read") };
-    domain.result_reads.retire(Id::from_token(waiter));
+    domain.archive_reads.retire(Id::from_token(waiter));
     // A window the store could not read whole is the core's to settle
     // (jig's `domain/engine.md`, 7.2).
     if !domain.core.transcript_readable(task) {
@@ -602,8 +599,7 @@ pub(crate) fn startup_page(
             | crate::CoreRange::ProposalDecision { .. }
             | crate::CoreRange::Turns { .. }
             | crate::CoreRange::TaskTranscript { .. }
-            | crate::CoreRange::TaskResult { .. }
-            | crate::CoreRange::EndedResults,
+            | crate::CoreRange::TaskResult { .. },
         ) => {
             unreachable!("startup range")
         }
@@ -737,7 +733,7 @@ pub(crate) fn connector_restarting(domain: &Domain) -> bool {
 }
 
 pub(crate) fn take_read(domain: &mut Domain, waiter: Token) -> Option<Read> {
-    let entry = domain.result_reads.get_mut(Id::from_token(waiter))?;
+    let entry = domain.archive_reads.get_mut(Id::from_token(waiter))?;
     entry.take()
 }
 
