@@ -1,6 +1,6 @@
 # The agent
 
-Provisional, 2026-10-05. temper's agent is smith: the kit for flexible
+Provisional, 2026-10-05, revised 2026-10-13. temper's agent is smith: the kit for flexible
 LLM agents, and the standard agent built from it, in smith's repository,
 on skein like temper. What smith is and does is its own design (smith's
 `docs/design/domain/`, cited as smith's `run.md`, `session.md`,
@@ -108,7 +108,8 @@ written and the branch a change goes to (engine.md, 7.1); the worker
 prepares them and gives smith the workspace: each repository's directory
 and name, whether it may be written, and for a merge in progress the
 files in conflict (worker.md, section 5). Every temper workspace is git
-repositories.
+repositories. A run with no repository, such as a chat that names none,
+runs with no workspace (worker.md, 4.1).
 
 ### 4.3 Tools
 
@@ -246,9 +247,6 @@ host:
 - **Which engine tools each charter offers** by default, beyond what its
   task's authority allows; and how a brief teaches an LLM when to delegate
   a task rather than a sub-agent.
-- **Runs with no repository:** smith allows a run without a workspace,
-  which a coordinator or a chat may want; the worker refuses an empty
-  workspace today.
 - **A code graph** for a workspace (worker.md, section 12), as an MCP
   tool source once smith has one.
 - **Moving with smith:** which revision of smith temper pins, and how a

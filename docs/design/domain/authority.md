@@ -1,6 +1,6 @@
 # Authority
 
-Provisional, 2026-10-04. What a task may do, and how temper holds it
+Provisional, 2026-10-04, revised 2026-10-13. What a task may do, and how temper holds it
 there: authority as a value, its order and how delegation narrows it,
 where it comes from, budgets and what runs spend, the checks every
 action passes, what a proposal needs and what accepting it funds, and
@@ -226,7 +226,10 @@ deployment's rules       the most any project may have; requirements on effects
   A reservation counts in the period that funded it, and what it returns
   goes back to that period, so a reset frees nothing reserved. A
   recurring task's budget is carved again each period (tasks.md,
-  section 9).
+  section 9). Periods come from temper's root (jig's
+  `protocol/configuration.md`, section 5). Until a calendar is built,
+  temper has jig's smallest source: each project's first period at the
+  deployment's first start, with its configured spend, and no next.
 - **Spend is priced as it is spent.** A charter carries the prices of
   its models, in the deployment's unit. A run prices each completion it
   makes, its sub-agents' included, and reports what it spent with each

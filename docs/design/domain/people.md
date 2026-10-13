@@ -1,6 +1,6 @@
 # People
 
-Provisional, 2026-10-04. How people take part in temper: who they are,
+Provisional, 2026-10-04, revised 2026-10-13. How people take part in temper: who they are,
 what their role in a project lets them do, what they ask of temper and
 what waits for them, the chats they hold with agents, the tasks they
 carry out themselves, and how the web shows it all. People are parties,
@@ -148,8 +148,9 @@ task or proposal it is:
 - **Derived from the tasks,** not kept apart: an entry is there while its
   proposal is pending, its person task is active, its question is
   unanswered, or its result unread. The only state of the inbox's own is
-  each person's read position over results and replies, committed when
-  they read.
+  each person's read position over results and replies, moved only by
+  their request to mark what they have seen, never by a page being read
+  (jig's `domain/people.md`, section 6).
 - **What is addressed to a role** is in the inbox of every person holding
   it, until one of them acts, when it leaves every one.
 - **Bounded:** the people child domain holds each person's entries up to a

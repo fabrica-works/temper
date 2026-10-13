@@ -1,6 +1,6 @@
 # The engine
 
-Provisional, 2026-10-04. What the temper engine is, as a domain layer:
+Provisional, 2026-10-04, revised 2026-10-13. What the temper engine is, as a domain layer:
 its parts and how they fit, how a decision reaches the store before
 anything leaves the engine, how it restarts, how it runs agents, and the
 capabilities it keeps from today (the fleet, briefs, notes, views,
@@ -601,6 +601,15 @@ account is unusable not started. Only where the protocol layer keeps a
 refresh token changes: in the store's secret records, which the domain
 never reads, instead of a file of its own.
 
+On jig (2026-10-13), the accounts are the charters' models' accounts,
+each wanted from the restart's first step (jig's `domain/engine.md`,
+section 12). temper's application credentials are its git identities:
+the accounts child hears each one's number and generation from temper's
+own source of credentials, and a run whose workspace names one is
+granted it (jig's `domain/engine.md`, 12.1; worker.md, 4.1). The forge's
+API token and the webhook secret stay the engine's protocol layer's, and
+are never granted.
+
 ## 13. Limits and working sets
 
 What the engine holds, each bounded by its limits and summed into its
@@ -625,6 +634,11 @@ worst case (programming-model.md, 6.3):
 None of it grows with the store's history. A new task, a person, a run
 or a watch past its limit is refused at its entrance, and the asker
 told why.
+
+The numbers jig's core added (the store's fill mark, a load's bytes,
+documents' limits, the hub's turns) take jig's small profile's values
+until temper's configuration names its own (jig's
+`protocol/configuration.md`, section 6).
 
 ## 14. Below the domain
 
@@ -651,7 +665,12 @@ README.md, section 5 lists what this design changes in each.
   the deployment offers (instructions, models, tools, result contracts,
   wake policies, waiting times) and procedures' settings, limits.
   Projects and their policies are the store's, seeded from
-  configuration on a first start.
+  configuration on a first start. Charters are numbered (jig's
+  `protocol/configuration.md`, section 3): one is the chats'; the agent
+  work the forge's procedures start runs under the one the forge's
+  configuration names. Whether the workers run in the engine's process
+  is configuration too: standalone, they do (jig's `domain/engine.md`,
+  section 6).
 
 ## 15. The world
 

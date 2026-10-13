@@ -1,6 +1,7 @@
 # The worker
 
-Provisional, 2026-10-04. What the temper worker does, as a domain layer:
+Provisional, 2026-10-04, revised 2026-10-13. What the temper worker
+does, as a domain layer:
 its parts, what each is responsible for, and how they fit together. It
 hosts the runs of the engine's agent tasks (engine.md, section 7); the
 agent it starts is smith, as agent.md says, and the worker is its host
@@ -54,16 +55,21 @@ agent    LLM work: one run per agent process, reporting to the worker
   credential grants, and the acknowledgements of the worker's turns and
   answers come down; tool calls, turns, facts, parks and ends go up. The
   engine never connects to a worker, so a worker can run wherever it can
-  reach the engine. It dials at once, and redials with a jittered backoff
-  that doubles up to a ceiling, starting over once a channel has proved
-  itself.
-- **Hello first.** On every channel the worker first says its slots (none
-  once it is shutting down), how long it may take to stop a run it lost
-  contact for (its grace, then the longer of its cancel's grace and a
-  push's deadline, then a save's commit and push), the
-  workstreams its checkouts hold, the runs it hosts with where each is
-  (4.2), and those whose turns or answers the engine has yet to
-  acknowledge. Facts go only after it.
+  reach the engine. The link is jig's: temper's protocol layer composes
+  jig's worker link, which dials, redials, keeps the grace and the relays
+  across channels, and tells the domain what it notices (jig's
+  `protocol/channel.md`, section 10; jig's `domain/hosts.md`, 6.6).
+- **Hello first.** On every channel the hub first says the hello (jig's
+  `domain/hosts.md`, section 2): its slots, its stop bound, its agent's
+  bounds, the workstreams its checkouts hold, the runs it hosts with
+  where each is (4.2), and those whose turns or answers the engine has
+  yet to acknowledge. Facts go only after it. The stop bound is jig's
+  (jig's `domain/hosts.md`, 6.6): the time the link takes to notice the
+  loss, then the grace, then the longer of the time smith's agent may
+  take to be gone after a stop and a push's deadline, then a save. The
+  worker's configuration derives it; the domain takes it whole. A worker
+  shutting down still says its slots, and refuses every assignment as
+  busy.
 - **The engine never reads a repository.** It works from what its
   connectors read, and what a checkout holds (a repository's checks, its
   `AGENTS.md`) is for the run to find (agent.md, section 2).
@@ -95,9 +101,8 @@ agent    LLM work: one run per agent process, reporting to the worker
   itself, saving their work first, and keeps their turns and answers for
   the next channel. The engine keeps a lost worker's runs for a grace
   of its own, strictly longer than the stop bound the worker declares at
-  its hello: its grace, then the longer of its cancel's grace and a push's
-  deadline, then a save's commit and push (engine.md, section 8), so no
-  next attempt starts while this one may still push.
+  its hello (engine.md, section 8), so no next attempt starts while this
+  one may still push.
 - **Shutting down** cancels every run and admits no more. The worker is
   done once the engine has every turn and answer. It gives up what it
   keeps, counted, only once no run is left and the engine is still out of
@@ -107,8 +112,8 @@ agent    LLM work: one run per agent process, reporting to the worker
 ## 3. Structure
 
 ```
-temper-worker-domain                 the worker loop's entry point: the engine link, routing
-├── temper-worker-domain-host        hosted runs: admit, prepare, start, relay, park or end
+temper-worker-domain                 the worker loop's entry point: the hub's link, routing
+├── jig-domain-host                  jig's hub: hosted runs, admit, prepare, start, relay, park or end
 ├── temper-worker-domain-checkout    workspaces: prepare, merge, commit, push, save; the cache
 └── smith-host-domain                agent processes: spawn, channel, watchdog, cancel then kill
 ```
@@ -136,9 +141,10 @@ What the engine gives the worker for one run:
 - **Run and attempt.** The engine's names for the run (its task's number
   and the run's) and for this attempt at it; every message about the run
   carries both.
-- **Workspace.** A workstream key, which names the checkout so later runs
-  of the same work find it cached (the number of the task that holds what
-  is written, engine.md, 7.1), and the repositories, each with:
+- **Workspace.** A workstream, which names the checkout so later runs of
+  the same work find it cached: the number of the task that holds what is
+  written (jig's `domain/engine.md`, 7.1), by which the checkout keys its
+  cache. And the repositories, each with:
   - its name, the directory it sits in and what the agent calls it, one
     safe path component;
   - its remote, the forge's address, which the protocol layer maps to a
@@ -148,8 +154,10 @@ What the engine gives the worker for one run:
     of its base to merge into it (section 5);
   - whether it may be written, and if so the branch a change is pushed
     to;
-  - the identity for every git operation on it (a name the protocol layer
-    maps to credentials and a commit author).
+  - the identity for every git operation on it: one of temper's
+    application credentials (jig's `domain/engine.md`, 12.1), granted
+    with the assignment, which the protocol layer maps to a token and a
+    commit author.
 - **Saving.** Whether to save unfinished work, and to which branch.
 - **Charter.** smith's, as the engine wrote it (agent.md, section 4),
   carried as bytes. The worker gives it to the agent with the workspace
@@ -161,9 +169,15 @@ What the engine gives the worker for one run:
   limits.
 - **Grants.** The credentials the run's LLM accounts and git identities
   need, as names the protocol layer fills (`credentials.md`, section 7).
+  The hub hands the agent its LLM accounts' grants only; the worker keeps
+  the git identities' for its own git operations.
 
 Its sizes and names are checked at the entrance against the worker's
-limits, and so is a workspace with no repository or with a name twice.
+limits, and so is a repository named twice: what is beyond them is
+refused as an invalid start that names it (jig's `domain/hosts.md`, 6.3).
+A run with no repository needs no workspace: the worker prepares nothing
+and starts smith with none (jig's `domain/hosts.md`, section 7). A chat
+that names no repository runs so.
 
 ### 4.2 Lifecycle
 
@@ -184,10 +198,11 @@ cancel, from any state ──────────────► stop ─►
 3. **Start** an agent process with the charter, and the transcript if
    there is one (section 6).
 4. **Relay** while the run is live:
-   - **Messages** go down to the run as they arrive, each named, a
-     bounded few held until it is live; what does not fit, or comes as it
-     ends, is bounced to the engine by name, which keeps it in the task's
-     inbox.
+   - **Messages** go down to the run as they arrive, each named; those
+     waiting when it starts come with its start. What does not fit, or
+     comes as it ends, is refused by name with the run's next turn or its
+     answer, and stays in the task's inbox (jig's `domain/hosts.md`,
+     section 9).
    - **Turns** come up as the run ends each, numbered; each is kept until
      acknowledged, and a run with as many unacknowledged turns as its
      limit allows is not read from until one is (section 8).
@@ -249,7 +264,9 @@ then kill.
 Typed, so the engine can act on them without reading prose:
 
 - **Refused** at the entrance: busy, or invalid, saying what is beyond
-  the limits.
+  the limits or which item the workspace cannot take. A start smith
+  refuses, or whose smith payloads do not decode, is refused as invalid
+  too, once prepared (jig's `domain/hosts.md`, 6.3).
 - **Preparation failed:** transient (the forge could not be reached, the
   worker's side failed or ran out of time, or another run of the
   workstream holds its checkout), or permanent until something changes on
@@ -427,10 +444,17 @@ design changes in them.
 - **Agents:** spawning the agent within a deadline in a contained process
   tree (a delegated cgroup), with proof that the tree is empty after it
   stops; smith's channel over its pipes (`smith-channel`, the host's
-  half), whose start message the
-  protocol layer completes with where the repositories sit and, for a
-  merge in progress, which files are in conflict; an environment without
-  forge credentials.
+  half); an environment without forge credentials. smith's payloads (the
+  charter, the transcript, turns, facts) are handed out to the protocol
+  layer to decode and encode (jig's `domain/hosts.md`, 6.8). The root
+  completes the decoded start with where the repositories sit, as the
+  checkout prepared them, and, for a merge in progress, which files are
+  in conflict.
+- **temper's parts on jig's channel:** the workspace's items, what a run
+  left on the forge, its saved work, a failed preparation's repository
+  and reason, and a push's evidence travel typed beside jig's records in
+  the domain, and as temper's bytes on the channel, under temper's
+  payload version (jig's `protocol/channel.md`, 6.2).
 - **Git:** each typed operation is one git invocation in a contained
   process, its output parsed into a typed outcome, and a commit named by
   its full object id (a SHA-1 id zero-padded to a SHA-256 id's 32 bytes).
@@ -510,11 +534,14 @@ branch the worker pushes is the head the engine reads.
     agent joins them and the worker commits the whole as the title.
 - **Goes:** creating a missing base branch on the forge from the default
   branch, which today's prepare does for a writable repository.
-- **Already true, and now said:** a bounced message names the message,
+- **Already true, and now said:** a refused message names the message,
   and a run's waiting names the last it read; an assignment carries its
   credential grants; the agent's notices of a rejected credential or an
-  exhausted account; an LLM account's exhaustion is a failure of its own;
-  static git identities (commit authors) are the worker's configuration.
+  exhausted account; an LLM account's exhaustion is a failure of its own.
+- **On jig (2026-10-13):** the hub is jig's, with its link vocabulary and
+  smith's payloads by hand-out; git identities are application
+  credentials granted with the assignment, never the worker's
+  configuration; a run with no repository runs with no workspace.
 
 ## 12. Open questions
 
