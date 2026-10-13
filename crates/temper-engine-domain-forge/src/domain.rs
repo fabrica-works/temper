@@ -47,6 +47,8 @@ pub(crate) struct PendingLost {
     attempt: u64,
     name: Name,
     comparison: Option<(client::api::Commit, client::api::Commit)>,
+    /// Its read is with the client; false while it waits for a call slot.
+    asked: bool,
 }
 /// One fresh verdict read for a commit with live CI subscribers.
 #[derive(Debug)]
@@ -423,7 +425,16 @@ impl Domain {
     /// Whether a child call or a newly committed entry may be sent.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        !self.procedure_wakes.is_empty() || self.client.is_ready()
+        !self.procedure_wakes.is_empty() || self.client.is_ready() || (self.lost_waiting() && self.client.has_room())
+    }
+
+    /// Whether a lost writer's read waits to be asked again.
+    fn lost_waiting(&self) -> bool {
+        let mut waiting = false;
+        for (_, pending) in &self.lost {
+            waiting |= !pending.asked;
+        }
+        waiting
     }
 
     /// Whether no brief section is being gathered by the connector.
@@ -799,6 +810,9 @@ pub fn resume(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let child_env = child_env(env);
     client::resume(&mut d.client, &child_env, &mut d.client_out);
     drain(d, env, out);
+    if d.client.has_room() {
+        ask_lost_again(d, env, out);
+    }
     if out.room() > 0
         && let Some((task, _)) = d.procedure_wakes.iter().next()
     {
@@ -1608,12 +1622,39 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
         };
         d.sequence = sequence;
         let owner = Token::new(sequence | (1_u64 << 62));
-        if d.lost.insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None }).is_err() {
+        if d.lost
+            .insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None, asked: true })
+            .is_err()
+        {
             emit(out, Request::Refused { task });
             return;
         }
         child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
     }
+}
+
+/// Ask one waiting lost writer's read again: its branch, or the comparison
+/// of the head it found with the head the forge last knew.
+fn ask_lost_again(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let mut waiting = None;
+    for (owner, pending) in &d.lost {
+        if !pending.asked && waiting.is_none() {
+            waiting = Some(*owner);
+        }
+    }
+    let Some(owner) = waiting else { return };
+    let pending = d.lost.get_mut(&owner).expect("found above");
+    pending.asked = true;
+    let comparison = pending.comparison;
+    let Some(resource) = to_client(&pending.name, &env.limits) else { return };
+    let read = match (comparison, resource.what) {
+        (Some((before, after)), _) => client::api::Read::Compare { before, after },
+        (None, client::What::Branch(branch)) => client::api::Read::Branch { branch },
+        (None, client::What::Repository | client::What::Pull(_) | client::What::Issue(_)) => {
+            unreachable!("a lost writer holds a branch")
+        }
+    };
+    child(d, env, client::Event::Read { owner, repository: resource.repository, read }, out);
 }
 
 fn lost_read(
@@ -1624,6 +1665,14 @@ fn lost_read(
     out: &mut Queue<Request>,
 ) {
     let Some(mut pending) = d.lost.remove(&owner) else { return };
+    // The client had no call slot for this read. The writer slot is freed
+    // only once the branch is read afresh (connectors.md, 3.3), so the read
+    // waits and is asked again when a slot frees (`resume`).
+    if result == Err(client::api::Error::Busy) {
+        pending.asked = false;
+        d.lost.insert(owner, pending).expect("the read keeps its own lost slot");
+        return;
+    }
     let Some(resource) = to_client(&pending.name, &env.limits) else { return };
     let baseline = d.branch_head(&pending.name);
     let observed = match (pending.comparison, result) {

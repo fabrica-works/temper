@@ -93,6 +93,11 @@ impl Domain {
     pub fn is_ready(&self) -> bool {
         self.calls.is_ready() || (!self.calls.is_full() && (self.outbox.is_ready(&self.keep) || self.keep.is_ready()))
     }
+    /// Whether a read asked now finds a call slot.
+    #[must_use]
+    pub fn has_room(&self) -> bool {
+        !self.calls.is_full()
+    }
     #[must_use]
     pub fn cached(&self, resource: &Resource) -> Option<&crate::Cached> {
         self.keep.cached(resource)

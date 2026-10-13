@@ -690,3 +690,59 @@ fn closing_a_task_settles_its_held_effect_not_made_and_frees_its_room() {
         ]
     );
 }
+
+fn run_branch(task: &[u8]) -> Name {
+    Name { forge: 1, repository: 2, what: What::Branch(Box::new([Box::from(&b"temper"[..]), Box::from(task)])) }
+}
+
+/// A ready forge whose run 9 writes four branches the forge last saw at
+/// commit 2, each held by its own task: their reads fill the client's table.
+fn four_writers() -> Domain {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    for (holder, task) in [(7, b"7".as_slice()), (8, b"8"), (10, b"10"), (11, b"11")] {
+        let name = run_branch(task);
+        let head = BranchHead { name: name.clone(), commit: [2; 32], owned: true };
+        outputs(&mut d, Event::Restore { record: Stored::BranchHead(head) });
+        outputs(&mut d, Event::Hold { task: holder, resource: name.clone(), from: None });
+        outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name]), holders: Box::new([holder]) });
+    }
+    outputs(&mut d, Event::Restored { clock: client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    d
+}
+
+/// The forge's answer to client call `call`: the branch is at `commit`.
+fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
+    let result = Ok(client::api::Answer::Commit([commit; 32]));
+    let answered = outputs(d, Event::Client(client::Event::Answered { call: Token::new(call), cost: 1, result }));
+    d.reclaim();
+    answered
+}
+
+// A lost writer's slot is freed only once its branch is read afresh
+// (connectors.md, 3.3): a read refused for want of room in the client waits,
+// and is asked again once room frees, rather than given up.
+#[test]
+fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
+    let mut d = four_writers();
+    outputs(&mut d, Event::Lost { task: 9, attempt: 1 });
+    ready(&mut d);
+    ready(&mut d);
+    // The first branch moved; its comparison finds the client's table full.
+    assert!(branch_at(&mut d, 1, 4).is_empty(), "nothing refused");
+    ready(&mut d);
+    ready(&mut d);
+    branch_at(&mut d, 2, 2);
+    ready(&mut d);
+    branch_at(&mut d, 3, 2);
+    assert_eq!(
+        ready(&mut d).as_ref(),
+        &[Request::Call {
+            call: Token::new(5),
+            repository: REPO,
+            op: client::api::Op::Read(client::api::Read::Compare { before: [2; 32], after: [4; 32] }),
+        }]
+    );
+}
