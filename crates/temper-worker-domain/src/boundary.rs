@@ -3,43 +3,35 @@
 //!
 //! Four peers are behind it, and each record names which by its variant:
 //!
-//! - The engine link. A [`Request::Dial`] opens the one channel to the engine,
-//!   and is ended by exactly one [`Event::Lost`], after an
-//!   [`Event::Connected`] if the channel opened: a dial that fails is lost at
-//!   once. The domain dials again on its own, and never more than one dial is
-//!   in flight.
-//! - The engine, over that channel: the host child domain's face
-//!   (worker-domain.md, section 2). [`Request::Hello`] goes first on every
-//!   channel. An [`Event::Assign`] is a call, answered under the run's and the
-//!   attempt's names by a [`Request::Answer`] that the engine acknowledges
-//!   ([`Event::Acknowledged`]). Until it does, the worker keeps the answer, and
-//!   sends it again right after every hello, which lists its run as
-//!   [`Phase::Answered`]; the engine drops one it has already, acknowledging it
-//!   again. A refusal goes once, and holds no slot. The attempt hosted, or
-//!   answered and not acknowledged, assigned again, is dropped: its one answer
-//!   is the hosted run's. Everything else the engine sends names the run and
-//!   the attempt, and is dropped unless that attempt is hosted (attempts are
-//!   fenced). A [`Request::Relay`] is answered by exactly one
-//!   [`Event::Relayed`] or [`Event::RelayCancelled`]; [`Request::Bounced`] is
-//!   a notice. Either may still
-//!   come after its attempt's answer, as may the run's facts ([`Told`]): the
-//!   engine drops them.
-//! - io's agent processes and their channels, as the agent child domain defines
-//!   them (`smith_host_domain`): a [`Request::Spawn`] is ended by one
-//!   [`Event::Spawned`] or [`Event::Unspawned`]; a [`Request::Send`] by one
-//!   [`Event::Sent`] or [`Event::Unsent`]; a [`Request::Read`] by one
-//!   [`Event::Received`], [`Event::Malformed`] or [`Event::Hangup`]; a
-//!   [`Request::Signal`] by one [`Event::Signalled`]; a [`Request::Wait`] by
-//!   one [`Event::Exited`]; a [`Request::Reap`] by one [`Event::Reaped`].
+//! - The engine, over jig's worker link (jig's `domain/hosts.md`, 6.1;
+//!   `protocol/channel.md`, section 10), which dials, redials, keeps the
+//!   grace and the relays across channels, and tells the domain what it
+//!   notices: a channel [`Event::Ready`], [`Event::Lost`], the grace passed
+//!   ([`Event::GracePassed`]), a turn to send again ([`Event::Resend`]), a
+//!   relay cancelled ([`Event::RelayCancelled`]). What the engine sends is
+//!   jig's link vocabulary, the hub's ([`Event::Link`]), but an assignment,
+//!   which comes with temper's workspace items beside it ([`Event::Assign`]);
+//!   what goes up is the hub's ([`Request::Hello`], [`Request::Link`]), but
+//!   a run's answer, which goes with temper's parts beside it
+//!   ([`Request::Answer`]). The hub keeps every turn and answer until the
+//!   engine acknowledges it, and the root sends them again right after every
+//!   hello. A refusal goes once, and holds no slot.
+//! - The protocol layer's routing, which decodes and encodes smith's
+//!   payloads by hand-out (jig's `domain/hosts.md`, 6.8), keeping no state:
+//!   a [`Request::Decode`] is answered by one [`Event::Decoded`], a
+//!   [`Request::Encode`] by one [`Event::Encoded`], and a [`Request::Fact`]
+//!   by one [`Event::Activity`], each in the order it went out.
+//! - io's agent processes and their channels, as smith's host domain defines
+//!   them (`smith_host_domain::process`), carried whole: each of its requests
+//!   is ended by the terminal its documentation names.
 //! - io's git and file operations, as the checkout defines them
 //!   (`temper_worker_domain_checkout::git`): a [`Request::Io`] is ended by one
 //!   [`Event::Done`], with `Cancelled` if a [`Request::CancelIo`] won its
 //!   race.
 //!
-//! The shell tells the domain to shut down ([`Event::Shutdown`]); the domain is
-//! done once every run has answered and every answer has been delivered or,
-//! with the engine out of reach past the grace, given up
-//! ([`crate::Domain::is_done`]).
+//! The shell tells the domain to shut down ([`Event::Shutdown`]); the domain
+//! says [`Request::Stop`] once, when it has no run, agent, hand-out or
+//! workspace left.
 //!
 //! A request's `owner` is the token of whoever asked, echoed on its terminal
 //! event. Tokens of different families may be equal: the variant routes a
@@ -48,275 +40,110 @@
 use alloc::boxed::Box;
 
 use crate::wire;
-use skein_lib::{Duration, Time, Token};
-use smith_host_domain::{self as agent, channel};
+use jig_domain_host as host;
+use skein_lib::{Time, Token};
+use smith_host_domain as agent;
 use temper_worker_domain_checkout::git;
 
 /// protocol -> domain
 #[derive(PartialEq, Eq, Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "fixed diagnostic tails keep boundary records bounded without allocation"
-)]
+#[expect(clippy::large_enum_variant, reason = "an assignment crosses whole, as jig's reference root takes it")]
 pub enum Event {
-    /// The engine's typed conversation state for an attempt.
-    Assign {
-        assignment: wire::Assignment,
-    },
-    /// A named message with its sender label and words.
-    Inbound {
-        run: Token,
-        attempt: Token,
-        name: Token,
-        sender: Box<[u8]>,
-        words: Box<[u8]>,
-    },
-    /// A typed call's answer, under its opaque name and local delivery token.
-    Relayed {
-        run: Token,
-        attempt: Token,
-        call: Box<[u8]>,
-        delivery: Token,
-        answer: Box<[u8]>,
-    },
-    Connected,
-    AcknowledgeTurn {
-        run: Token,
-        attempt: Token,
-        turn: u32,
-    },
-    TurnBusy {
-        run: Token,
-        attempt: Token,
-        turn: u32,
-    },
-    /// Terminal for `Dial`: the channel to the engine closed, or never opened.
+    /// From the engine: an assignment, jig's record, with temper's workspace
+    /// items and the saved-work branch beside it (jig's `protocol/channel.md`,
+    /// 6.2). The record's workspace, if it has one, names the workstream the
+    /// checkout is keyed by; the root names the items to the hub itself.
+    Assign { assignment: host::Assignment, items: wire::Workspace, save: Option<Box<[u8]>> },
+    /// From the engine: any other record of jig's link. An assignment here
+    /// has no workspace items.
+    Link(host::LinkDown),
+    /// A channel to the engine opened: the hub says its hello.
+    Ready,
+    /// The channel to the engine closed. Runs go on.
     Lost,
-    /// From the engine: cancel the run `run`'s attempt `attempt`.
-    Cancel {
-        run: Token,
-        attempt: Token,
-    },
-    Grant {
-        run: Token,
-        attempt: Token,
-        grant: wire::Grant,
-    },
-    /// Terminal for a cancelled relay delivery and wait.
-    RelayCancelled {
-        call: Token,
-    },
-    /// From the engine: it has the answer for the run `run`'s attempt
-    /// `attempt`, which the worker forgets. One it has forgotten already, or
-    /// a refusal's, changes nothing.
-    Acknowledged {
-        run: Token,
-        attempt: Token,
-    },
-    /// From the shell: cancel every run, admit no more, and be done once every
-    /// answer is delivered.
-    Shutdown,
-    /// Terminal for `Spawn`: the agent's process runs as `process`.
-    Spawned {
-        owner: Token,
-        process: Token,
-    },
-    /// Terminal for `Spawn`: the process could not be spawned by its deadline.
-    Unspawned {
-        owner: Token,
-        detail: Box<[u8]>,
-    },
-    /// Terminal for `Send`: the message went down.
-    Sent {
-        owner: Token,
-    },
-    /// Terminal for `Send`: the agent no longer reads its channel.
-    Unsent {
-        owner: Token,
-    },
-    /// Terminal for `Read`: the next message up.
-    Received {
-        owner: Token,
-        message: channel::Up,
-    },
-    /// Terminal for `Read`: what came up is not a message.
-    Malformed {
-        owner: Token,
-    },
-    /// Terminal for `Read`: the agent's end of the channel closed.
-    Hangup {
-        owner: Token,
-    },
-    /// Terminal for `Signal`.
-    Signalled {
-        owner: Token,
-    },
-    /// Terminal for `Wait`: the agent's process exited.
-    Exited {
-        owner: Token,
-    },
-    /// Terminal for `Reap`: the process's tree is empty.
-    Reaped {
-        owner: Token,
-        detail: Box<[u8]>,
-    },
+    /// The channel stayed down past the grace: every run is cancelled.
+    GracePassed,
+    /// The engine answered a turn busy, and its backoff passed: send it again.
+    Resend { run: Token, attempt: Token, turn: u32 },
+    /// Terminal for `CancelRelay`.
+    RelayCancelled { run: Token, attempt: Token, call: Box<[u8]> },
+    /// A terminal of one of smith's process requests.
+    Process(Box<agent::process::Event>),
+    /// Terminal for `Decode`: smith's start, typed, or what did not decode.
+    Decoded { agent: Token, start: Result<Box<agent::Start>, Invalid> },
+    /// Terminal for `Encode`.
+    Encoded { owner: Token, encoded: Encoded },
+    /// Terminal for `Fact`: the fact as jig's activity, if it decoded.
+    Activity { owner: Token, activity: Option<host::Activity> },
     /// Terminal for `Io`.
-    Done {
-        owner: Token,
-        done: git::Done,
-    },
+    Done { owner: Token, done: git::Done },
+    /// From the shell: cancel every run, admit no more, and stop once nothing
+    /// is left.
+    Shutdown,
 }
 
 /// domain -> protocol
 #[derive(PartialEq, Eq, Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "fixed diagnostic tails keep boundary records bounded without allocation"
-)]
 pub enum Request {
-    /// A named host call with the tool, write flag, input and time left.
-    Relay {
-        run: Token,
-        attempt: Token,
-        call: Box<[u8]>,
-        delivery: Token,
-        tool: Box<[u8]>,
-        writes: bool,
-        input: Box<[u8]>,
-        deadline: Duration,
-    },
-    Hello {
-        hello: Hello,
-        graces: Duration,
-        push_deadline: Duration,
-    },
-    Turn {
-        run: Token,
-        attempt: Token,
-        turn: wire::Turn,
-    },
+    /// What the worker says first on every channel to the engine.
+    Hello(host::Hello),
+    /// Anything else up the link, but an answer.
+    Link(host::LinkUp),
+    /// A run's one answer, jig's record, with temper's parts beside it: what
+    /// the run left on the forge and saved, which the answer's work names,
+    /// and, for a workspace that could not be prepared, which repository and
+    /// why. A refusal's parts are empty.
     Answer {
         run: Token,
         attempt: Token,
-        answer: wire::Answer,
+        answer: host::Answer,
+        work: wire::Work,
+        preparation: Option<wire::Preparation>,
     },
-    /// Open the channel to the engine. Ended by one `Lost`, after a
-    /// `Connected` if it opened.
-    Dial,
-    /// Cancel a relay delivery and wait. Its original request still ends
+    /// Cancel the local delivery and wait of a relay. Its call still ends
     /// exactly once with `Relayed` or `RelayCancelled`; remote effects remain.
-    CancelRelay {
-        call: Token,
-    },
-    Rejected {
-        run: Token,
-        attempt: Token,
-        account: u32,
-        generation: u64,
-    },
-    Exhausted {
-        run: Token,
-        attempt: Token,
-        account: u32,
-        retry_after: Duration,
-    },
-    /// To the engine: an inbound event for the run `run`'s attempt `attempt`
-    /// was not passed on, for `bounce`.
-    Bounced {
-        run: Token,
-        attempt: Token,
-        name: Token,
-        bounce: wire::Bounce,
-    },
-    /// Spawn an agent in a contained process tree, in `workspace` when it has
-    /// items, giving up at `deadline`.
-    Spawn {
-        owner: Token,
-        workspace: Option<Token>,
-        deadline: Time,
-    },
-    /// Send `message` down the channel of `process`.
-    Send {
-        owner: Token,
-        process: Token,
-        message: channel::Down,
-    },
-    /// Read the next message up the channel of `process`.
-    Read {
-        owner: Token,
-        process: Token,
-    },
-    /// Send `signal` to every member of the tree of `process`.
-    Signal {
-        owner: Token,
-        process: Token,
-        signal: agent::Signal,
-    },
-    /// Wait for `process` to exit.
-    Wait {
-        owner: Token,
-        process: Token,
-    },
-    /// Wait for the tree of `process` to be empty.
-    Reap {
-        owner: Token,
-        process: Token,
-    },
+    CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
+    /// Nothing is left: the shell stops.
+    Stop,
+    /// One of smith's process requests.
+    Process(Box<agent::process::Request>),
+    /// Decode the hub's start into smith's, for the hosted run `run`.
+    Decode { agent: Token, run: Token, start: Box<host::Start> },
+    /// Encode one of smith's payloads for the hub.
+    Encode { owner: Token, value: Encodable },
+    /// Decode one of smith's channel facts into jig's activity.
+    Fact { owner: Token, body: Box<[u8]> },
     /// Ask io for the git or file operation `op`, giving up at `deadline`.
-    Io {
-        owner: Token,
-        op: git::Op,
-        deadline: Time,
-    },
+    Io { owner: Token, op: git::Op, deadline: Time },
     /// Abandon the `Io` in flight for `owner`. Its terminal event still comes:
     /// `Done` with `Cancelled`, or whichever outcome won the race.
-    CancelIo {
-        owner: Token,
-    },
+    CancelIo { owner: Token },
 }
 
-/// What the worker says first on every channel to the engine (engine-domain.md,
-/// section 8), for the engine to place work and to keep or cancel each run it
-/// hosts.
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct Hello {
-    /// How many runs it hosts at once.
-    pub slots: u32,
-    /// The workstreams it holds checkouts for, in byte order.
-    pub workstreams: Box<[Box<[u8]>]>,
-    /// The runs it hosts, in the order of the engine's names for them, then
-    /// those whose answers it holds: none when it first dials in.
-    pub hosting: Box<[Hosted]>,
+/// One of smith's payloads, handed out to be encoded.
+#[derive(PartialEq, Eq, Debug)]
+pub enum Encodable {
+    Turn(agent::Turn),
+    CallName(agent::CallName),
+    Result(agent::RunResult),
 }
 
-/// A run the worker hosts, or whose answer it holds.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Hosted {
-    pub run: Token,
-    pub attempt: Token,
-    pub phase: Phase,
+/// One of smith's payloads, encoded, or what could not be.
+#[derive(PartialEq, Eq, Debug)]
+pub enum Encoded {
+    Turn(host::Turn),
+    CallName(Box<[u8]>),
+    Result(Box<[u8]>),
+    Undecodable,
 }
 
-/// Where a run is in its lifecycle (worker-domain.md, 4.2), as the hello says.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Phase {
-    Preparing,
-    Starting,
-    /// Its agent is at work.
-    Active,
-    /// It yielded, and waits for its next inbound event.
-    Waiting,
-    /// How it ends is decided, and it answers next.
-    Ending,
-    /// It answered while there was no channel: the answer follows the hello.
-    Answered,
-}
-
-/// A fact the run told, for the engine, as it is: forwarded best effort, for
-/// liveness, operators and live views (worker-domain.md, section 7).
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct Told {
-    pub run: Token,
-    pub attempt: Token,
-    pub fact: Box<[u8]>,
+/// What of the hub's start did not decode.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Invalid {
+    Charter,
+    Transcript,
+    CallName,
+    /// A resumed delivery's evidence, which must decode and agree with its
+    /// outcome.
+    Evidence,
 }

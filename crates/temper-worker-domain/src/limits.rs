@@ -1,216 +1,154 @@
+//! The worker's limits and its worst case (programming-model.md, section 6).
+
 use alloc::boxed::Box;
 use core::mem::size_of;
 
 use crate::wire;
 use jig_domain_host as host;
-use skein_lib::{Deadlines, Duration, Id, Map, Queue, Slab, Token};
+use skein_lib::{Duration, Id, Map, Queue, Slab, Token};
 use smith_host_domain as agent;
 use temper_worker_domain_checkout as checkout;
 
+use crate::agents::{Bound, Call};
 use crate::facts::Fact;
-use crate::link::{ALARMS, Alarm, Bounced, Relay};
+use crate::hand_out::Pending;
 use crate::translate::SAVED;
 use crate::workspace::{Items, Workspace};
 
 /// The worker domain's limits (section 7), handed to every step read-only: its
-/// child domains', each handed down to the one it bounds, and the engine
-/// link's.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// child domains', each handed down to the one it bounds, and what the hub's
+/// hello says (jig's `domain/hosts.md`, section 2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub host: host::Limits,
     pub checkout: checkout::Limits,
     pub agent: agent::Limits,
-    /// How long runs go on once the channel to the engine is lost. Past it,
-    /// the worker cancels them itself.
-    pub grace: Duration,
-    /// The wait before dialling the engine again after the channel is lost or
-    /// a dial fails, doubling with each dial that fails, up to `redial_max`,
-    /// each drawn between half of it and all of it.
-    pub redial: Duration,
-    pub redial_max: Duration,
-    /// Relays kept while the channel to the engine is down: at least as many
-    /// as may wait for the engine at once (the host's slots times the calls a
-    /// run may have in flight), so that none is dropped.
-    pub stalled: u32,
-    pub turn_backoff: Duration,
+    /// The bounds of what a run on this worker may be given: its agent's
+    /// models and its runs' turns, spend, time and inbox, for the engine to
+    /// place only what fits.
+    pub bounds: host::Bounds,
+    /// The longest the worker may take to stop a run it lost contact for
+    /// (`domain/worker.md`, section 2; jig's `domain/hosts.md`, 6.6), which
+    /// its configuration derives and the hello states. The engine's grace is
+    /// strictly longer.
+    pub stop_bound: Duration,
 }
 
+/// The bytes a message's sender and words take beyond themselves once smith
+/// renders them, its separator (smith's `smith-domain-run`, `rendered_bytes`).
+const SEPARATOR: u64 = 2;
+
+/// The bytes of a workstream key: the holding task's number, big-endian.
+const KEY: u32 = 8;
+
 /// The most memory the domain holds under `limits`, in bytes (6.3), or `None`
-/// if it does not fit a `u64` or the limits cannot be honoured: the
-/// child domains' own, or limits under which one child domain would refuse what
-/// another passes it within its own. The host's repositories must fit the
-/// checkout's, and its names the checkout's names; its runs must each find a
-/// workspace and an agent (no more slots than workspaces or agent
-/// processes); what it admits must be what an agent is spawned with (a
-/// charter and ordered conversation no larger than Smith takes), and the
-/// two must agree on what a run hands back (its outcome and turns) and
-/// on what goes down to it (an inbound event no larger than an agent takes,
-/// and no more held for a run until it is live than may wait for it in its
-/// agent, so that those delivered as it starts never bounce); and a run's
-/// push message, as the agent child domain bounds a call, and the
-/// save's must fit a commit message. The relays kept while the engine is out
-/// of reach must have room for all those that may wait for it. A backoff must
-/// be a wait, and no longer than its ceiling.
+/// if it does not fit a `u64` or the limits cannot be honoured: the child
+/// domains' own, or limits under which one child domain would refuse what
+/// another passes it within its own. The checkout's repositories, names and
+/// conflicts must fit smith's directories, and a workstream's key its names;
+/// the host's runs must each find a workspace and an agent (no more slots
+/// than workspaces or agent processes); what goes down to a run must be what
+/// an agent takes (an inbound event, rendered, no larger than its messages,
+/// and no more held for a run until it is live, nor carried in its start,
+/// than may wait for it in its agent), and smith's turns unacknowledged must
+/// fit the host's reserve for a stopping run; a run's calls must fit the
+/// host's; and a run's push message, as smith bounds a call, and the save's
+/// must fit a commit message.
 ///
-/// It is the child domains', plus what the top level keeps: a record of each
-/// workspace and the map that finds those being prepared, the link's
-/// alarms, the answers it keeps until the engine acknowledges them, one for
-/// each slot at most, and the relays and bounces it keeps while the engine
-/// is out of reach, the run's facts for the engine, the queues
-/// that hold what each child domain emits in a step until it is routed, and the
-/// facts. Retained turns add one link retry deadline per entry;
-/// the host counts their bodies and map. Retained answers still hold slots.
-/// Owned preparation conflicts belong to the workspace until moved into the
-/// agent start. What the queued requests own is counted where they end up,
-/// and what the hello holds goes out in the step that makes it.
+/// It is the child domains', plus what the root keeps: the agents it bound
+/// and their calls in flight with their names and what they ask, the
+/// hand-outs waiting and the ends waiting behind them, a record of each
+/// workspace and the map that finds those being prepared, each run's
+/// workspace items until the engine has its answer, the queues that hold what
+/// each child domain emits in an entry point until it is routed, and the
+/// facts. What the queued requests own is counted where they end up.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let Limits { host: host_limits, checkout: checkout_limits, agent: agent_limits, .. } = limits;
-    let next_fits = checkout_limits.repositories <= agent::MAX_DIRECTORIES
+    let fits = agent::check(agent_limits).is_ok()
+        && checkout_limits.repositories <= agent::MAX_DIRECTORIES
+        && checkout_limits.repositories <= agent_limits.directories
         && checkout_limits.conflicts <= agent_limits.conflicts
         && checkout_limits.path_bytes <= agent_limits.path_bytes
-        && host_limits.transcript_bytes <= agent_limits.transcript_bytes
-        && host_limits.turn_bytes <= agent_limits.turn_bytes
-        && host_limits.fact_bytes <= agent_limits.fact_bytes
-        && (host_limits.turns == 0
-            || (host_limits.turn_bytes > 0
-                && host_limits.turn_bytes <= host_limits.turn_queue_bytes
-                && limits.turn_backoff > Duration::ZERO));
-    let fits = next_fits
-        && checkout_limits.repositories <= agent_limits.directories
         && checkout_limits.name_bytes <= agent_limits.name_bytes
+        && checkout_limits.name_bytes <= agent_limits.path_bytes
+        && KEY <= checkout_limits.name_bytes
         && host_limits.accounts <= agent_limits.accounts
         && host_limits.slots <= checkout_limits.workspaces
         && host_limits.slots <= agent_limits.agents
-        && host_limits.charter_bytes <= agent_limits.charter_bytes
         && agent_limits.turns <= host_limits.turns
         && agent_limits.unacknowledged_bytes <= host_limits.turn_queue_bytes
-        && host_limits.run_calls >= agent_limits.calls
-        && host_limits.outcome_bytes == agent_limits.outcome_bytes
-        && host_limits.event_bytes <= agent_limits.message_bytes
+        && agent_limits.calls <= host_limits.run_calls
+        && host_limits.event_bytes.checked_add(SEPARATOR)? <= agent_limits.message_bytes
         && host_limits.held <= agent_limits.messages
-        && u64::from(host_limits.slots).checked_mul(u64::from(host_limits.run_calls))? <= u64::from(limits.stalled)
+        && host_limits.inbox <= agent_limits.messages
         && agent_limits.call_bytes <= u64::from(checkout_limits.message_bytes)
-        && len(SAVED) <= u64::from(checkout_limits.message_bytes)
-        && Duration::ZERO < limits.redial
-        && limits.redial <= limits.redial_max;
+        && len(SAVED) <= u64::from(checkout_limits.message_bytes);
     if !fits {
         return None;
     }
-    declared_graces(limits)?;
-    agent_limits.agents.checked_mul(agent_limits.calls)?;
-    let bindings =
-        Map::<Token, Token>::worst_case(agent_limits.agents)?.checked_add(
-            Map::<crate::agents::Callback, [u8; 16]>::worst_case(agent_limits.agents.checked_mul(agent_limits.calls)?)?,
-        )?;
+    let counts = counts(limits)?;
     let children = host::worst_case(host_limits)?
         .checked_add(checkout::worst_case(checkout_limits)?)?
         .checked_add(agent::worst_case(agent_limits)?)?;
-    let slots = host_limits.slots;
-    let workspaces = workspace_memory(limits)?;
-    let capacity = host_limits.slots.checked_mul(host_limits.turns)?.checked_mul(2)?;
-    routed(limits)
-        .checked_add(host_limits.slots)?
-        .checked_add(limits.stalled)?
-        .checked_add(bounces(limits)?)?
-        .checked_add(capacity)?;
-    let retained = Deadlines::<crate::turns::TurnName>::worst_case(capacity)?;
-    let alarms = Deadlines::<Alarm>::worst_case(ALARMS)?;
-    // An answer holds the outcome or the detail of a failure,
-    // and the run's work: the repositories it landed in, and its save.
-    let answer = host_limits.outcome_bytes.max(u64::from(host_limits.detail_bytes)).checked_add(
-        u64::from(checkout_limits.repositories).checked_mul(work()?.checked_add(
-            u64::from(checkout_limits.conflicts).checked_mul(
-                u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_add(u64::from(checkout_limits.path_bytes))?,
-            )?,
-        )?)?,
-    )?;
-    let next_answers = Map::<crate::turns::Name, crate::turns::Answer>::worst_case(slots)?
-        .checked_add(u64::from(slots).checked_mul(answer)?)?;
-    // A typed relay retains its opaque name alongside tool and input while
-    // contact is down; each group is bounded by the host's event byte limit.
-    let relay_bytes = agent_limits.call_bytes.max(host_limits.event_bytes.checked_mul(2)?);
-    let relays =
-        Queue::<Relay>::worst_case(limits.stalled)?.checked_add(u64::from(limits.stalled).checked_mul(relay_bytes)?)?;
-    let bounces = Queue::<Bounced>::worst_case(bounces(limits)?)?;
-    let host_out = Queue::<host::Request>::worst_case(host_out(limits))?;
-    let checkout_out = Queue::<checkout::Request>::worst_case(checkout_out(limits))?;
-    let agent_out = Queue::<agent::Request>::worst_case(agent_out(limits))?;
+    let calls = agent_limits.agents.checked_mul(agent_limits.calls)?;
+    let call = host_limits
+        .event_bytes
+        .checked_add(agent_limits.call_bytes)?
+        .checked_add(u64::from(agent_limits.name_bytes))?;
+    let bindings = Map::<Token, Bound>::worst_case(agent_limits.agents)?
+        .checked_add(Map::<(Token, Token), Call>::worst_case(calls)?)?
+        .checked_add(u64::from(calls).checked_mul(call)?)?
+        .checked_add(Queue::<Pending>::worst_case(pending(limits)?)?)?
+        .checked_add(Map::<Token, Box<[u8]>>::worst_case(agent_limits.agents)?)?
+        .checked_add(u64::from(agent_limits.agents).checked_mul(u64::from(agent_limits.detail_bytes))?)?;
+    let host_out = Queue::<host::Request>::worst_case(counts.host_out)?;
+    let checkout_out = Queue::<checkout::Request>::worst_case(counts.checkout_out)?;
+    let agent_out = Queue::<agent::Output>::worst_case(counts.agent_out)?;
     let facts = Queue::<Fact>::worst_case(facts(limits)?)?;
     children
         .checked_add(bindings)?
-        .checked_add(workspaces)?
-        .checked_add(alarms)?
-        .checked_add(next_answers)?
-        .checked_add(retained)?
-        .checked_add(relays)?
-        .checked_add(bounces)?
+        .checked_add(workspace_memory(limits)?)?
         .checked_add(host_out)?
         .checked_add(checkout_out)?
         .checked_add(agent_out)?
         .checked_add(facts)
 }
 
+/// The root's records of workspaces, and each run's workspace items until
+/// the engine has its answer: a slot's, and one more for an assignment the
+/// hub refuses in the step it comes in.
 fn workspace_memory(limits: &Limits) -> Option<u64> {
     let host_limits = &limits.host;
     let checkout_limits = &limits.checkout;
     let slots = host_limits.slots;
+    let name = u64::from(checkout_limits.name_bytes);
+    let conflicts = u64::from(checkout_limits.conflicts)
+        .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_add(u64::from(checkout_limits.path_bytes))?)?;
+    let root = u64::try_from(size_of::<Box<[u8]>>().checked_add(size_of::<bool>())?)
+        .ok()?
+        .checked_add(name)?
+        .checked_add(u64::try_from(size_of::<checkout::Conflicts>()).ok()?)?
+        .checked_add(conflicts)?;
     let workspaces = Slab::<Workspace>::worst_case(slots)?
         .checked_add(Map::<Token, Id<Workspace>>::worst_case(slots)?)?
-        .checked_add(
-            u64::from(slots).checked_mul(
-                u64::from(checkout_limits.repositories).checked_mul(
-                    u64::try_from(size_of::<agent::Directory>())
-                        .ok()?
-                        .checked_add(4)?
-                        .checked_add(u64::from(checkout_limits.name_bytes))?
-                        .checked_add(u64::try_from(size_of::<checkout::Conflicts>()).ok()?)?
-                        .checked_add(
-                            u64::from(checkout_limits.conflicts).checked_mul(
-                                u64::try_from(size_of::<Box<[u8]>>())
-                                    .ok()?
-                                    .checked_add(u64::from(checkout_limits.path_bytes))?,
-                            )?,
-                        )?,
-                )?,
-            )?,
-        )?;
+        .checked_add(u64::from(slots).checked_mul(u64::from(checkout_limits.repositories).checked_mul(root)?)?)?;
     let staged = slots.checked_add(1)?;
-    let bytes = u64::from(checkout_limits.name_bytes);
-    let item = u64::try_from(size_of::<wire::Repository>()).ok()?.checked_add(bytes.checked_mul(4)?)?;
-    let feedback = u64::try_from(size_of::<wire::Landing>()).ok()?.checked_add(
-        u64::from(checkout_limits.conflicts).checked_mul(
-            u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_add(u64::from(checkout_limits.path_bytes))?,
-        )?,
-    )?;
+    let item = u64::try_from(size_of::<wire::Repository>()).ok()?.checked_add(name.checked_mul(4)?)?;
+    let feedback = u64::try_from(size_of::<wire::Landing>()).ok()?.checked_add(conflicts)?;
     let per = u64::from(checkout_limits.repositories)
         .checked_mul(item.checked_add(feedback)?.checked_add(4)?)?
         .checked_add(Map::<u32, [u8; 32]>::worst_case(checkout_limits.repositories)?)?
-        .checked_add(bytes.checked_mul(2)?)?
-        .checked_add(feedback)?
+        .checked_add(name)?
         .checked_add(agent::Delivered::worst_case())?;
     let items = Slab::<Items>::worst_case(staged)?
-        .checked_add(Map::<Token, Id<Items>>::worst_case(staged)?)?
+        .checked_add(Map::<(Token, Token), Id<Items>>::worst_case(staged)?)?
         .checked_add(u64::from(staged).checked_mul(per)?)?;
     workspaces.checked_add(items)
 }
 
-/// What an answer's work holds for each repository: its place among those
-/// landed in, with the last commit landed there, and its landing in the save.
-fn work() -> Option<u64> {
-    u64::try_from(size_of::<wire::Landed>().checked_add(size_of::<wire::Landing>())?).ok()
-}
-
 fn len(bytes: &[u8]) -> u64 {
     u64::try_from(bytes.len()).expect("a length fits in a u64")
-}
-
-/// Bounces kept while the engine is out of reach: as many as the events that
-/// may bounce then, those that were already with the worker. No more come
-/// without a channel, and the events of a run are held until it is live, or
-/// wait for it in its agent.
-pub(crate) fn bounces(limits: &Limits) -> Option<u32> {
-    limits.host.slots.checked_mul(limits.host.held.checked_add(limits.agent.messages)?)
 }
 
 /// Facts kept until the loop drains them: as many as the child domains keep.
@@ -218,77 +156,68 @@ pub(crate) fn facts(limits: &Limits) -> Option<u32> {
     limits.host.facts.checked_add(limits.checkout.facts)?.checked_add(limits.agent.facts)
 }
 
-/// The most an agent child domain's step tells its client, as its boundary
-/// says: one thing for what it took, then that the agent has gone. A step for
-/// one of the client's own records tells it at most one, which is never that
-/// the agent has gone, but for a spawn refused at the entrance.
-const TOLD: u32 = 2;
-
-/// The most a checkout's step tells its client that leads anywhere, as its
-/// boundary says: one prepare, push or save ended.
-const ENDED: u32 = 1;
-
-/// The most host steps an entry point takes that do not answer one of the
-/// host's own requests: the step for the event, if the event is for the
-/// host, or one for each thing the capability the event is for tells it.
-const fn first_steps() -> u32 {
-    if TOLD > ENDED { TOLD } else { ENDED }
+/// Hand-outs waiting at once: for each agent, its turns not yet taken, its
+/// calls, and its last word.
+pub(crate) fn pending(limits: &Limits) -> Option<u32> {
+    limits.agent.agents.checked_mul(limits.agent.turns.checked_add(limits.agent.calls)?.checked_add(1)?)
 }
 
-/// The most host steps an entry point takes: the first ones, and one more for
-/// each request each of those makes, whose capability may answer it at once
-/// (a delivery bounced, a prepare refused, a push or a save with nothing to
-/// do, a spawn refused, which the limits rule out). What the host makes of
-/// such an answer leads back to it no more: an answer to the engine, a reply
-/// to the run, a release.
-pub(crate) const fn host_steps(limits: &Limits) -> u32 {
-    first_steps().saturating_mul(host::max_out(&limits.host).saturating_add(1))
+/// The hub steps in one entry point that emit requests, at most. An entry
+/// point concerns one hosted run, its agent and its workspace (or, the
+/// hello, none). It steps the hub itself at most three times (an encoded call
+/// name: called, then withdrawn; an encoded last word: finished; and an end
+/// that waited behind them). The run's agent tells the hub at most three
+/// things that lead to requests, its steps together: what it took (a turn
+/// or a call goes out by hand-out first), a fault and that it has gone; the
+/// names it left unread and the messages it refused lead to none. Its
+/// workspace tells the hub at most two: a prepare, push or save ended, and
+/// one refused at once.
+const EMITTING: u32 = 8;
+
+/// What an entry point emits and routes, at most, under `limits`.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Counts {
+    /// Room for what the hub emits in an entry point: the emitting steps'
+    /// requests, and room for one more step.
+    pub(crate) host_out: u32,
+    /// Room for what smith emits: one step's, and one more taken as one of
+    /// its notices is routed (a delivery refused at once).
+    pub(crate) agent_out: u32,
+    /// Room for what the checkout emits: one step's, and the release of a
+    /// workspace whose prepare failed.
+    pub(crate) checkout_out: u32,
+    /// The child domains' requests routed in an entry point.
+    pub(crate) routed: u32,
+    /// The requests an entry point emits.
+    pub(crate) out: u32,
 }
 
-/// The most steps an entry point takes of each capability: the one it is for,
-/// one for each request of each first host step, and two for each of the host
-/// steps that follow (a release and an answer, at most).
-const fn capability_steps(limits: &Limits) -> u32 {
-    first_steps().saturating_mul(host::max_out(&limits.host)).saturating_mul(3).saturating_add(1)
+/// The counts of an entry point, or `None` if they do not fit a `u32`. Each
+/// of the hub's requests leads to at most one capability step, and so does
+/// the entry; a failed prepare's release is one more.
+pub(crate) fn counts(limits: &Limits) -> Option<Counts> {
+    let hub = host::max_out(&limits.host);
+    let smith = agent::max_out(&limits.agent);
+    let git = checkout::MAX_OUT;
+    let requests = EMITTING.checked_mul(hub)?;
+    let capabilities = requests.checked_add(2)?;
+    let routed = capabilities.checked_mul(smith.checked_add(git)?)?.checked_add(requests)?;
+    let replays = limits.host.slots.checked_mul(limits.host.turns.checked_mul(2)?.checked_add(1)?)?;
+    Some(Counts {
+        host_out: requests.checked_add(hub)?,
+        agent_out: smith.checked_mul(2)?,
+        checkout_out: git.checked_mul(2)?,
+        routed,
+        // What is routed out, the hello's replays, the activity drained, the
+        // root's own refusal and its stop.
+        out: routed.checked_add(replays)?.checked_add(limits.host.told)?.checked_add(2)?,
+    })
 }
 
-/// Room for what the host emits in an entry point.
-pub(crate) const fn host_out(limits: &Limits) -> u32 {
-    host_steps(limits).saturating_mul(host::max_out(&limits.host))
-}
-
-/// Room for what the checkout emits in an entry point: its steps, and the
-/// release of a workspace whose prepare failed.
-pub(crate) const fn checkout_out(limits: &Limits) -> u32 {
-    capability_steps(limits).saturating_add(1).saturating_mul(checkout::MAX_OUT)
-}
-
-/// Room for what the agent child domain emits in an entry point.
-pub(crate) fn agent_out(limits: &Limits) -> u32 {
-    capability_steps(limits).saturating_mul(agent::max_out(&limits.agent))
-}
-
-/// The most requests the child domains emit in an entry point, each routed
-/// once.
-pub(crate) fn routed(limits: &Limits) -> u32 {
-    host_out(limits).saturating_add(checkout_out(limits)).saturating_add(agent_out(limits))
-}
-
-/// Complete serial workspace commit, push, and ambiguous-push verification.
+/// The most requests an entry point emits per call under `limits`, which
+/// [`worst_case`] accepts. The loop reserves this much room in `out` before
+/// calling it.
 #[must_use]
-pub fn push_deadline(limits: &Limits) -> Option<Duration> {
-    let each = limits
-        .checkout
-        .local_timeout
-        .as_nanos()
-        .checked_add(limits.checkout.remote_timeout.as_nanos().checked_mul(2)?)?;
-    Some(Duration::from_nanos(each.checked_mul(u64::from(limits.checkout.repositories))?))
-}
-
-/// Contact, cancel/terminate or in-flight push, then saved commit/push/verify.
-#[must_use]
-pub fn declared_graces(limits: &Limits) -> Option<Duration> {
-    let push = push_deadline(limits)?.as_nanos();
-    let cancel = limits.agent.grace.as_nanos().checked_add(limits.agent.kill_after.as_nanos())?;
-    Some(Duration::from_nanos(limits.grace.as_nanos().checked_add(cancel.max(push))?.checked_add(push)?))
+pub fn max_out(limits: &Limits) -> u32 {
+    counts(limits).expect("worst_case accepted the limits").out
 }

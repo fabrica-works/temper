@@ -1,8 +1,9 @@
 //! The translations between the host's vocabulary and its siblings' (4.5):
 //! siblings share no types, so the host's workspaces meet the checkout's
-//! specs and outcomes here, and its agents the agent child domain's channel,
-//! through small total functions, each an exhaustive match, so that a variant
-//! added on either side breaks the build in one place.
+//! specs and outcomes here, and its agents smith's parent face, through small
+//! total functions, each an exhaustive match, so that a variant added on
+//! either side breaks the build in one place. No payload codec: smith's
+//! payloads are the protocol layer's (jig's `domain/hosts.md`, 6.8).
 
 use alloc::boxed::Box;
 
@@ -13,21 +14,26 @@ use skein_lib::{List, Token};
 use smith_host_domain as agent;
 use temper_worker_domain_checkout::{self as checkout, git};
 
-use crate::boundary::Phase;
-
 /// The title of the commit that saves a run's unfinished work.
 pub(crate) const SAVED: &[u8] = b"Save unfinished work";
 
-/// The checkout's spec for the host's workspace: the same repositories, in
+/// The checkout's spec for a run's workspace: keyed by the workstream, the
+/// holding task's number in eight big-endian bytes; the same repositories, in
 /// the same order, each reached as its identity.
-pub(crate) fn spec(workspace: wire::Workspace) -> checkout::Spec {
-    let wire::Workspace { key, repositories } = workspace;
-    let count = u32::try_from(repositories.len()).expect("the host checked the repositories against its limits");
+pub(crate) fn spec(workstream: u64, workspace: wire::Workspace) -> checkout::Spec {
+    let wire::Workspace { repositories } = workspace;
+    let count = u32::try_from(repositories.len()).expect("the root checked the repositories against its limits");
     let mut specs = List::with_capacity(count);
     for repository in repositories {
         specs.push(self::repository(repository)).expect("room for every repository");
     }
-    checkout::Spec { key, repositories: specs.into_boxed() }
+    checkout::Spec { key: Box::new(workstream.to_be_bytes()), repositories: specs.into_boxed() }
+}
+
+/// The workstream a checkout's key names: the inverse of [`spec`]'s, for the
+/// keys the root made.
+pub(crate) fn workstream(key: &[u8]) -> u64 {
+    u64::from_be_bytes(key.try_into().expect("the root keys every checkout by eight bytes"))
 }
 
 #[expect(clippy::manual_map, reason = "explicit option match follows the step subset, without function pointers")]
@@ -80,7 +86,7 @@ const fn missing(missing: git::Missing) -> wire::Missing {
 /// engine: a workstream whose workspace another run holds, or a disk with
 /// every workspace held, may have room later. The host admits no workspace
 /// the checkout cannot take, as `worst_case` checks their limits agree.
-pub(crate) fn refusal(refusal: checkout::Refusal) -> wire::Preparation {
+pub(crate) fn checkout_refusal(refusal: checkout::Refusal) -> wire::Preparation {
     match refusal {
         checkout::Refusal::Busy | checkout::Refusal::Full => wire::Preparation::Transient,
         checkout::Refusal::Invalid => unreachable!("the host admits only workspaces the checkout takes"),
@@ -150,41 +156,6 @@ pub(crate) const fn delivery_outcome(result: &wire::Push) -> host::DeliveryOutco
     }
 }
 
-pub(crate) fn answer(answer: host::Answer, work: wire::Work, preparation: Option<wire::Preparation>) -> wire::Answer {
-    let ending = match answer.ending {
-        host::Ending::Refused(refusal) => wire::Ending::Refused(host_refusal(refusal)),
-        host::Ending::Ended { outcome, work: _ } => wire::Ending::Ended { outcome, work },
-        host::Ending::Parked { work: _ } => wire::Ending::Parked { work },
-        host::Ending::Failed { failure, detail, work: _ } => {
-            wire::Ending::Failed { failure: host_failure(failure, preparation), detail, work }
-        }
-    };
-    wire::Answer { turns: answer.turns, spent: answer.spent, ending }
-}
-
-const fn host_refusal(refusal: host::Refusal) -> wire::Refusal {
-    match refusal {
-        host::Refusal::Busy => wire::Refusal::Busy,
-        host::Refusal::Invalid(invalid) => wire::Refusal::Invalid(match invalid {
-            host::Invalid::Charter => wire::Invalid::Charter,
-            host::Invalid::Transcript => wire::Invalid::Transcript,
-            host::Invalid::Grants => wire::Invalid::Grants,
-        }),
-    }
-}
-
-const fn host_failure(failure: host::Failure, preparation: Option<wire::Preparation>) -> wire::Failure {
-    match failure {
-        host::Failure::Unprepared(_) => wire::Failure::Unprepared(match preparation {
-            Some(failure) => failure,
-            None => wire::Preparation::Transient,
-        }),
-        host::Failure::Run(failure) => wire::Failure::Run(failure),
-        host::Failure::Agent(failure) => wire::Failure::Agent(failure),
-        host::Failure::Cancelled(reason) => wire::Failure::Cancelled(reason),
-    }
-}
-
 pub(crate) const fn fault(fault: agent::Fault) -> host::AgentFailure {
     match fault {
         agent::Fault::Exited => host::AgentFailure::Exited,
@@ -194,21 +165,73 @@ pub(crate) const fn fault(fault: agent::Fault) -> host::AgentFailure {
     }
 }
 
-pub(crate) const fn bounce(bounce: agent::Bounce) -> wire::Bounce {
-    match bounce {
-        agent::Bounce::TooLarge => wire::Bounce::TooLarge,
-        agent::Bounce::Full => wire::Bounce::Full,
-        agent::Bounce::ReusedName | agent::Bounce::Ending => wire::Bounce::Ending,
+/// Why smith refused a message, as the hub keeps it: one to one.
+pub(crate) const fn refusal(refusal: agent::MessageRefusal) -> host::MessageRefusal {
+    match refusal {
+        agent::MessageRefusal::TooLarge => host::MessageRefusal::TooLarge,
+        agent::MessageRefusal::Full => host::MessageRefusal::Full,
+        agent::MessageRefusal::Ending => host::MessageRefusal::Ending,
+        agent::MessageRefusal::NameInUse => host::MessageRefusal::NameInUse,
     }
 }
 
-pub(crate) const fn phase(phase: wire::Phase) -> Phase {
-    match phase {
-        wire::Phase::Preparing => Phase::Preparing,
-        wire::Phase::Starting => Phase::Starting,
-        wire::Phase::Active => Phase::Active,
-        wire::Phase::Waiting => Phase::Waiting,
-        wire::Phase::Ending => Phase::Ending,
+/// A long operation smith reports, as jig's activity names it.
+pub(crate) const fn operation(operation: agent::Operation) -> host::Operation {
+    match operation {
+        agent::Operation::Checks => host::Operation::Checks,
+        agent::Operation::Completion => host::Operation::Completion,
+        agent::Operation::Command => host::Operation::Command,
+    }
+}
+
+/// Why a run failed, as it reports it. An exhausted account stays a failure
+/// of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3), for the
+/// engine to retry the run once the account has room.
+pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure {
+    match failure {
+        agent::RunFailure::Model(agent::ModelFault::Exhausted { .. }) => host::RunFailure::Exhausted,
+        agent::RunFailure::Transcript(_)
+        | agent::RunFailure::Model(
+            agent::ModelFault::Completion { .. }
+            | agent::ModelFault::Provider
+            | agent::ModelFault::Refused
+            | agent::ModelFault::Truncated
+            | agent::ModelFault::Malformed,
+        ) => host::RunFailure::Model,
+        agent::RunFailure::Budget { .. } => host::RunFailure::Budget,
+        agent::RunFailure::Policy(_) => host::RunFailure::Policy,
+        agent::RunFailure::Cancelled => host::RunFailure::Cancelled,
+        agent::RunFailure::Stale => host::RunFailure::Stale,
+    }
+}
+
+/// What smith refused of a start before any process ran, in words for
+/// operators; nothing for an agent that started.
+pub(crate) const fn unstarted(end: agent::End) -> Option<&'static [u8]> {
+    match end {
+        agent::End::Busy => Some(b"busy"),
+        agent::End::Invalid(invalid) => Some(match invalid {
+            agent::Invalid::Messages => b"messages",
+            agent::Invalid::Activation => b"activation",
+            agent::Invalid::Charter => b"charter",
+            agent::Invalid::Transcript => b"transcript",
+            agent::Invalid::Answered => b"answered calls",
+            agent::Invalid::Directories => b"directories",
+            agent::Invalid::Grants => b"grants",
+            agent::Invalid::Limits => b"limits",
+        }),
+        agent::End::Unspawned | agent::End::Exited { .. } | agent::End::Settled => None,
+    }
+}
+
+/// A credential grant for smith: an LLM account's. The hub keeps
+/// application credentials, the repositories' git identities, to itself.
+pub(crate) const fn grant(grant: host::Grant) -> Option<agent::Grant> {
+    match grant.table {
+        host::GrantTable::Accounts => {
+            Some(agent::Grant { account: grant.account, generation: grant.generation, valid: grant.valid })
+        }
+        host::GrantTable::Application => None,
     }
 }
 
@@ -278,21 +301,4 @@ pub(crate) fn summarize(push: Box<[wire::Landing]>) -> wire::Push {
     } else {
         wire::Push::Nothing
     }
-}
-
-/// The specified opaque name: activation, completion, position, all big endian.
-pub(crate) fn call_name(name: agent::CallName) -> [u8; 16] {
-    let mut writer = skein_lib::Writer::new(16);
-    writer.put(&name.activation.to_be_bytes()).expect("sized call name");
-    writer.put(&name.completion.to_be_bytes()).expect("sized call name");
-    writer.put(&name.position.to_be_bytes()).expect("sized call name");
-    writer.finish().as_ref().try_into().expect("sixteen call-name bytes")
-}
-
-pub(crate) fn named(bytes: &[u8]) -> Option<agent::CallName> {
-    if bytes.len() != 16 {
-        return None;
-    }
-    let mut reader = skein_lib::Reader::new(bytes);
-    Some(agent::CallName { activation: reader.u64()?, completion: reader.u32()?, position: reader.u32()? })
 }

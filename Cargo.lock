@@ -1047,7 +1047,6 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-host",
  "skein-lib",
- "smith-channel",
  "smith-host-domain",
  "temper-worker-domain-checkout",
 ]
