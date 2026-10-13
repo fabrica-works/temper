@@ -149,8 +149,8 @@ impl Domain {
             forge_client::Config { namespace: Box::new([]), writers: Box::new([]) },
         );
         forge_config.namespace = Box::from(config.core.deployment);
-        let mut forge =
-            forge::Domain::new(&limits.forge, config.core.seed, forge_config).expect("valid forge configuration");
+        let mut forge = forge::Domain::new(&limits.forge, config.core.seed, forge_config, &config.identities)
+            .expect("valid forge configuration");
         let built = policy_translate::build_landing(
             &config.landing.deployment,
             false,

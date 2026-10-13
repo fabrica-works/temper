@@ -23,6 +23,9 @@ pub struct Config {
     pub landing: LandingPolicy,
     /// Forge writer identities and this deployment's branch namespace.
     pub forge: forge_client::Config,
+    /// Each forge's git identity, an application credential (D10;
+    /// credentials.md, "each repository to a git identity").
+    pub identities: Box<[forge::GitIdentity]>,
     /// The charter the forge's procedures start their agent work under, one
     /// of the core's charters (domain/engine.md, 14).
     pub forge_charter: u32,

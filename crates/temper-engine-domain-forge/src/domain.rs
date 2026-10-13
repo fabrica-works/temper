@@ -128,6 +128,9 @@ pub struct Domain {
     namespace: Box<[u8]>,
     adoptions: Map<Token, PendingAdoption>,
     pub(crate) writers: Map<u16, u64>,
+    /// Each forge's git identity, the application credential its runs push
+    /// and fetch with (credentials.md).
+    pub(crate) identities: Map<u16, u32>,
     pub(crate) capabilities: Map<Token, crate::capabilities::Pending>,
     client: client::Domain,
     client_out: Queue<client::Request>,
@@ -283,9 +286,20 @@ impl Domain {
     }
     /// Construct a connector with a configured client writer and deployment
     /// namespace; invalid limits or writer configuration are refused.
-    pub fn new(l: &Limits, seed: u64, config: client::Config) -> Result<Domain, client::api::Error> {
+    pub fn new(
+        l: &Limits,
+        seed: u64,
+        config: client::Config,
+        identities: &[crate::GitIdentity],
+    ) -> Result<Domain, client::api::Error> {
         if crate::worst_case(l).is_none() {
             return Err(client::api::Error::TooLarge);
+        }
+        let mut credentials = Map::with_capacity(l.repositories);
+        for identity in identities {
+            if credentials.insert(identity.forge, identity.credential).is_err() {
+                return Err(client::api::Error::TooLarge);
+            }
         }
         let mut writers = Map::with_capacity(l.repositories);
         for writer in &config.writers {
@@ -320,6 +334,7 @@ impl Domain {
             adoptions: Map::with_capacity(l.adoptions),
             capabilities: Map::with_capacity(l.repositories),
             writers,
+            identities: credentials,
             client: client::Domain::configured(&l.client, seed, config)?,
             client_out: Queue::with_capacity(client::max_out(&l.client)),
             brief_fetches: Map::with_capacity(l.brief_sections),

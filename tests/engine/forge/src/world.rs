@@ -139,6 +139,7 @@ impl World {
                 namespace: Box::from(&b"world"[..]),
                 writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
             },
+            &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
         .expect("valid connector configuration");
         let now = Time::from_nanos(100_000_000_000);
@@ -227,6 +228,7 @@ impl World {
                 namespace: Box::from(&b"world"[..]),
                 writers: Box::new([client::Writer { forge: REPO.forge, author: 1 }]),
             },
+            &[top::GitIdentity { forge: REPO.forge, credential: 1 }],
         )
         .expect("same configured connector");
         let mut rows = List::with_capacity(self.stored.len());

@@ -85,6 +85,9 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     client::worst_case(&l.client)?
         .checked_add(Map::<client::api::Repository, Repository>::worst_case(l.repositories)?)?
+        // Each forge's writer and git identity.
+        .checked_add(Map::<u16, u64>::worst_case(l.repositories)?)?
+        .checked_add(Map::<u16, u32>::worst_case(l.repositories)?)?
         .checked_add(
             u64::from(l.repositories)
                 .checked_mul(u64::from(l.change_policy.gates))?

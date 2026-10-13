@@ -81,6 +81,7 @@ fn domain() -> Domain {
             namespace: Box::from(&b"test"[..]),
             writers: Box::new([client::Writer { forge: 1, author: 7 }]),
         },
+        &[GitIdentity { forge: 1, credential: 1 }],
     )
     .expect("valid connector")
 }
@@ -463,6 +464,24 @@ fn workspace_items_are_sized_context_is_read_only_and_saved_work_starts_the_next
     assert!(item.bytes > 0);
     assert_eq!(d.context_repositories(5, 1).expect("bounded context").len(), 1);
     assert!(d.context_repositories(5, 0).is_none());
+}
+
+// Each repository's git identity is the configured credential of its forge
+// (credentials.md; brief D10).
+#[test]
+fn a_workspace_item_names_its_forges_git_identity() {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    let item = d
+        .workspace_item(items::Seed {
+            task: 7,
+            parent: None,
+            repository: REPO,
+            run_branch: Box::from(&b"temper/7/r7"[..]),
+            saved_branch: None,
+        })
+        .expect("item");
+    assert_eq!(item.credential, Some(1));
 }
 
 #[test]

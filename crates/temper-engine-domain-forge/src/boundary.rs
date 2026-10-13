@@ -105,6 +105,14 @@ pub struct Repository {
     pub protection: Protection,
     pub settings: client::api::Settings,
 }
+/// The git identity a forge's repositories are pushed and fetched with: an
+/// application credential numbered by the deployment's configuration
+/// (credentials.md, "each repository to a git identity").
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct GitIdentity {
+    pub forge: u16,
+    pub credential: u32,
+}
 /// Protection as observed by this writer at adoption.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Protection {

@@ -1345,7 +1345,8 @@ pub(crate) fn run_workspace(
                 owner: item.owner,
                 start,
                 push,
-                identity: u32::from(provider.forge),
+                // The repository's git identity, from configuration (D10).
+                identity: item.credential?,
             })
             .ok()?;
     }

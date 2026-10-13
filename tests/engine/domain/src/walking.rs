@@ -261,6 +261,9 @@ pub fn config(seed: u64) -> engine::Config {
             namespace: Box::from(&b"root"[..]),
             writers: Box::new([temper_engine_domain_forge_client::Writer { forge: 1, author: 1 }]),
         },
+        // The forge's git identity is application credential 1, which the
+        // worlds name at start (D10).
+        identities: Box::new([temper_engine_domain_forge::GitIdentity { forge: 1, credential: 1 }]),
         forge_charter: 1,
     }
 }
