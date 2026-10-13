@@ -59,7 +59,9 @@ struct World {
     hold_push: bool,
     held: Option<(Token, Op)>,
     deliveries: u32,
-    answer: Option<(host::Answer, wire::Work)>,
+    answer: Option<(host::Answer, wire::Work, Option<wire::Preparation>)>,
+    /// The workstreams the last hello named.
+    workstreams: Box<[u64]>,
     stops: u32,
     report: Report,
 }
@@ -92,6 +94,7 @@ impl World {
             held: None,
             deliveries: 0,
             answer: None,
+            workstreams: Box::new([]),
             stops: 0,
             report: Report {
                 tree: Tree::new(),
@@ -143,13 +146,14 @@ impl World {
             Request::Hello(hello) => {
                 assert!(hello.hosting.len() <= 1);
                 self.report.stop_bound = hello.stop_bound;
+                self.workstreams = hello.workstreams;
             }
             Request::Link(up) => Self::link(&up),
-            Request::Answer { run, attempt, answer, work, .. } => {
+            Request::Answer { run, attempt, answer, work, preparation } => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
                 assert!(self.held.is_none(), "delivery settles before the final answer");
                 if self.up {
-                    assert!(self.answer.replace((answer, work)).is_none());
+                    assert!(self.answer.replace((answer, work, preparation)).is_none());
                 }
             }
             Request::Stop => self.stops += 1,
@@ -266,12 +270,23 @@ impl World {
 
     fn start(&mut self) {
         self.connect();
+        self.assign(wire::Start::Base { branch: Box::from(&b"main"[..]) });
+        self.say(agent::Up::Admitted);
+        let place = temper_worker_domain::checkout::git::Place {
+            workspace: self.workspace.expect("prepared"),
+            repository: Box::from(&b"app"[..]),
+        };
+        self.disk.write(&[translate::path(&place).as_slice(), b"/code"].concat(), b"edited\n");
+    }
+
+    /// The engine assigns the run, its one repository starting at `start`.
+    fn assign(&mut self, start: wire::Start) {
         let repository = wire::Repository {
             tag: 1,
             name: Box::from(&b"app"[..]),
             remote: Box::from(REMOTE),
             identity: 0,
-            start: wire::Start::Base { branch: Box::from(&b"main"[..]) },
+            start,
             access: wire::Access::Writable {
                 push: Box::from(&b"topic"[..]),
                 expected: Some(translate::commit(self.first).raw()),
@@ -293,12 +308,6 @@ impl World {
         };
         let items = wire::Workspace { repositories: Box::new([repository]) };
         self.event(Event::Assign { assignment, items, save: Some(Box::from(&b"saved"[..])) });
-        self.say(agent::Up::Admitted);
-        let place = temper_worker_domain::checkout::git::Place {
-            workspace: self.workspace.expect("prepared"),
-            repository: Box::from(&b"app"[..]),
-        };
-        self.disk.write(&[translate::path(&place).as_slice(), b"/code"].concat(), b"edited\n");
     }
 
     fn deliver(&mut self) {
@@ -377,7 +386,8 @@ impl World {
         self.story(case);
         assert_eq!(self.domain.agent().agents(), 0);
         assert_eq!(self.domain.workspaces(), 0);
-        let (answer, work) = self.answer.take().expect("a terminal answer");
+        let (answer, work, preparation) = self.answer.take().expect("a terminal answer");
+        assert_eq!(preparation, None);
         let branch = if case == Case::ContactPast { b"saved".as_slice() } else { b"topic".as_slice() };
         let commit = self.forge.branch(REMOTE, branch).expect("worker pushed");
         let expected = match case {
@@ -416,4 +426,28 @@ impl World {
 #[must_use]
 pub fn run(seed: u64, case: Case) -> Report {
     World::new(seed).run(case)
+}
+
+/// A run whose repository starts from a branch the forge does not have: how
+/// its answer ends, and the preparation's detail beside it.
+#[must_use]
+pub fn unprepared(seed: u64) -> (host::Ending, Option<wire::Preparation>) {
+    let mut world = World::new(seed);
+    world.connect();
+    world.assign(wire::Start::Branch { branch: Box::from(&b"gone"[..]) });
+    let (answer, _, preparation) = world.answer.take().expect("an answer");
+    (answer.ending, preparation)
+}
+
+/// The workstreams a worker's hello names once a run delivered and went.
+#[must_use]
+pub fn workstreams(seed: u64) -> Box<[u64]> {
+    let mut world = World::new(seed);
+    world.start();
+    world.story(Case::Delivered);
+    world.event(Event::Link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT }));
+    world.up = false;
+    world.event(Event::Lost);
+    world.connect();
+    world.workstreams
 }
