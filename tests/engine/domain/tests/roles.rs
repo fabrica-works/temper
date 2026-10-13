@@ -163,7 +163,10 @@ fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
     );
     world.run();
     assert_eq!(*world.task_record(), before);
-    assert_eq!(world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))), original.as_ref());
+    assert_eq!(
+        world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))),
+        original.as_ref()
+    );
     assert_eq!(world.referee.replacements, 0);
     current_owner_policy_and_session_expiry_are_separate_real_checks();
     insufficient_startup_room_refuses_before_mutation();
@@ -171,7 +174,13 @@ fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
 
 fn current_owner_policy_and_session_expiry_are_separate_real_checks() {
     let mut no_policy = World::new(Settings { policy: false, ..Settings::calm(9304, Base::Requester) });
-    no_policy.ask(1, 80, roster(&no_policy, 1), refused(people::Refusal::Role { held: Some(people::Role::Owner) }), false);
+    no_policy.ask(
+        1,
+        80,
+        roster(&no_policy, 1),
+        refused(people::Refusal::Role { held: Some(people::Role::Owner) }),
+        false,
+    );
     no_policy.run();
     assert_eq!(no_policy.referee.replacements, 0);
     let mut expired = World::new(Settings { expired: true, ..Settings::calm(9304, Base::Requester) });
@@ -218,7 +227,10 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         .iter()
         .find(|(_, writes)| {
             writes.iter().any(|write| {
-                matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
+                matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. })))
+                )
             })
         })
         .expect("actual role replacement cohort and pre-transaction outside observer");
@@ -235,17 +247,25 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         let mut altered = writes.clone();
         match corruption {
             0 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))))
+                !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. })))
+                )
             }),
             1 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
+                !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. })))
+                )
             }),
             2 => altered.retain(|write| {
                 !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
             }),
             3 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
+                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) =
+                        write
+                    {
                         record.numbers.spent += 1;
                     }
                 }
@@ -262,7 +282,8 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
             5 => {
                 for write in &mut altered {
                     if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
-                        holdings, ..
+                        holdings,
+                        ..
                     }))) = write
                     {
                         holdings[0].person = world.people[0];

@@ -129,8 +129,11 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
                 };
-                let body =
-                    engine::Call { completion: 1, position: 1, tool: engine::Tool::Delegate { batch: Box::new([child]) } };
+                let body = engine::Call {
+                    completion: 1,
+                    position: 1,
+                    tool: engine::Tool::Delegate { batch: Box::new([child]) },
+                };
                 driver.call(Token::new(7), assignment.task, assignment.attempt, 90, body);
                 for _ in 0..30 {
                     driver.advance(true);

@@ -80,7 +80,7 @@ impl Driver {
                     self.events.extend(events);
                     continue;
                 }
-                Err(request) => request,
+                Err(request) => *request,
             };
             match request {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
@@ -162,7 +162,15 @@ impl Driver {
     }
 
     /// A run's answer, its outcome read back as `end`, temper's parts beside it.
-    pub fn answer(&mut self, channel: Token, task: u64, attempt: u64, cumulative: u64, end: tasks::End, parts: engine::Parts) {
+    pub fn answer(
+        &mut self,
+        channel: Token,
+        task: u64,
+        attempt: u64,
+        cumulative: u64,
+        end: tasks::End,
+        parts: engine::Parts,
+    ) {
         let event = self.protocol.answer(channel, task, attempt, cumulative, end, parts);
         self.send(event);
     }

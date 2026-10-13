@@ -67,16 +67,7 @@ impl Settings {
     /// Calm authenticated requester-held role story
     #[must_use]
     pub const fn calm(seed: u64, base: Base) -> Settings {
-        Settings {
-            seed,
-            base,
-            cut: false,
-            commit_delay: 0,
-            page_delay: 0,
-            facts: true,
-            policy: true,
-            expired: false,
-        }
+        Settings { seed, base, cut: false, commit_delay: 0, page_delay: 0, facts: true, policy: true, expired: false }
     }
 }
 
@@ -192,21 +183,25 @@ fn snapshot(settings: Settings) -> Store {
     panic!("actual prior held-chat process never reached {:?}", settings.base);
 }
 
+/// The first start saved the earlier process's policy, and a durable policy
+/// outlives configuration: give it this story's request bits.
+fn story_policy(store: &mut Store, settings: Settings) {
+    let policy_key = Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)));
+    let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) =
+        store.rows.get_mut(&policy_key)
+    else {
+        panic!("the first start saved project one's policy");
+    };
+    value.roles[0].requests = 1 | 4 | if settings.policy { 256 } else { 0 };
+}
+
 impl World {
     /// Restore genuine held-chat rows and saved sessions through actual root
     /// startup pages; no direct child inputs are used
     #[must_use]
     pub fn new(settings: Settings) -> World {
         let mut store = snapshot(settings);
-        // The first start saved the earlier process's policy, and a durable
-        // policy outlives configuration: give it this story's request bits.
-        let policy_key = Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)));
-        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) =
-            store.rows.get_mut(&policy_key)
-        else {
-            panic!("the first start saved project one's policy");
-        };
-        value.roles[0].requests = 1 | 4 | if settings.policy { 256 } else { 0 };
+        story_policy(&mut store, settings);
         let mut people = [0; 2];
         let mut sessions = [0; 2];
         let mut task = 0;
@@ -479,7 +474,7 @@ impl World {
                     }
                     continue;
                 }
-                Err(request) => request,
+                Err(request) => *request,
             };
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),

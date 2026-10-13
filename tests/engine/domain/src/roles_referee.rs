@@ -90,9 +90,10 @@ impl Referee {
         let role_rows: Vec<_> = writes
             .iter()
             .filter_map(|write| match write {
-                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project, holdings }))) => {
-                    Some((*project, holdings))
-                }
+                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
+                    project,
+                    holdings,
+                }))) => Some((*project, holdings)),
                 Write::Save(
                     Record::Core(
                         jig_domain_core::Record::People(
@@ -304,7 +305,8 @@ impl Referee {
                     | jig_domain_core::Key::Notes(_),
                 )) => return Err("role administration changed funding or accepted work"),
                 Write::Save(Record::Core(
-                    jig_domain_core::Record::People(_) | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),
+                    jig_domain_core::Record::People(_)
+                    | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),
                 ))
                 | Write::Erase(Key::Core(jig_domain_core::Key::People(_))) => {}
                 Write::Save(Record::Forge { .. }) | Write::Erase(Key::Forge(_)) => {

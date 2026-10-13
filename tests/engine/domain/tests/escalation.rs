@@ -19,7 +19,10 @@ fn archives(world: &World) -> Vec<&EscalationDecisionRecord> {
         .rows
         .values()
         .filter_map(|row| {
-            if let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive))) = row {
+            if let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(
+                archive,
+            ))) = row
+            {
                 Some(archive)
             } else {
                 None
@@ -159,19 +162,24 @@ fn held_and_decision_commit_cuts_restore_paged_real_children_and_exact_scripts()
         let mut altered = writes.clone();
         match corruption {
             0 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(_)))))
+                !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(_))))
+                )
             }),
             1 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = write {
+                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = write
+                    {
                         task.tries.lost = 1;
                     }
                 }
             }
             2 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) =
-                        write
+                    if let Write::Save(Record::Core(jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Terminal(terminal),
+                    ))) = write
                     {
                         terminal.end = tasks::End::Failed(tasks::Class::Lost);
                     }
@@ -247,7 +255,9 @@ fn referee_rejects_split_or_missing_decision_cohorts_and_duplicate_revision_effe
             writes.iter().any(|write| {
                 matches!(
                     write,
-                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(_))))
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::EscalationDecision(_)
+                    )))
                 )
             })
         })
@@ -258,12 +268,17 @@ fn referee_rejects_split_or_missing_decision_cohorts_and_duplicate_revision_effe
             .filter(|write| match omission {
                 0 => !matches!(
                     write,
-                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(_))))
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::EscalationDecision(_)
+                    )))
                 ),
-                1 => !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_))))),
-                2 => {
-                    !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))))
+                1 => {
+                    !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
                 }
+                2 => !matches!(
+                    write,
+                    Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. })))
+                ),
                 _ => unreachable!("three cohort families"),
             })
             .cloned()
@@ -278,8 +293,9 @@ fn referee_rejects_split_or_missing_decision_cohorts_and_duplicate_revision_effe
     assert_eq!(referee.commit(writes), Err("semantic revision archived twice"));
     let mut altered = writes.clone();
     for write in &mut altered {
-        if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) =
-            write
+        if let Write::Save(Record::Core(jig_domain_core::Record::Core(
+            jig_domain_core::CoreRecord::EscalationDecision(archive),
+        ))) = write
         {
             archive.by += 1;
         }

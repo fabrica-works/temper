@@ -41,8 +41,9 @@ pub struct WalkingReferee {
 
 fn task_record(rows: &BTreeMap<Key, Record>, number: u64) -> Option<&tasks::TaskRecord> {
     for key in [tasks::Key::Live(number), tasks::Key::Ended(number)] {
-        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record) | tasks::Stored::Ended(record)))) =
-            rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(
+            tasks::Stored::Live(record) | tasks::Stored::Ended(record),
+        ))) = rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
         {
             return Some(record);
         }
@@ -72,7 +73,9 @@ impl WalkingReferee {
                     return Err("claim and reserved root proof are not one transaction");
                 }
             }
-            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) =
+                write
+            {
                 let expected = TURNS.iter().find(|(number, _, _)| *number == turn.turn).ok_or("unexpected turn")?;
                 if turn.spent != expected.1 || turn.transcript.as_ref() != expected.2 || turn.read.is_some() {
                     return Err("turn differs from worker script");
@@ -139,8 +142,9 @@ impl WalkingReferee {
         {
             return Err("wrong authenticated person");
         }
-        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { person: authenticated, .. }))) =
-            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::SignIn(sign_in))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::SignIn {
+            person: authenticated, ..
+        }))) = rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::SignIn(sign_in))))
         else {
             return Err("sign-in reply before durable session");
         };

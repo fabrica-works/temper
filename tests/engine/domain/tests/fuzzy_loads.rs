@@ -75,7 +75,11 @@ fn run(seed: u64) -> (String, &'static str) {
             } else {
                 assert_eq!(
                     next,
-                    Some(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: 1, attempt: 1, turn: keep })))
+                    Some(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
+                        task: 1,
+                        attempt: 1,
+                        turn: keep
+                    })))
                 );
                 assert_eq!(cut, Some(loads::Cut { rows: 4 - keep, bytes: u64::from((4 - keep) * (slot + 4)) }));
                 ending = "cut";

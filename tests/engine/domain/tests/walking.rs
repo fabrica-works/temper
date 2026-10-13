@@ -86,17 +86,19 @@ fn walking_referee_rejects_duplicate_transaction_keys_and_transcripts() {
     let charged = Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(Box::new(charged))));
     let writes = [Write::Save(charged.clone()), Write::Save(row.clone()), Write::Save(row.clone())];
     assert_eq!(WalkingReferee::default().commit(&writes), Err("same key written twice in one decision"));
-    let proof = Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(temper_engine_domain::RunProof {
-        conversation: task.attempt,
-        credentials: Box::new([]),
-        window: None,
-        host: fleet::HostKind::Worker,
-        task: task.number,
-        attempt: task.attempt,
-        offered: None,
-        turn: Some(temper_engine_domain::TurnProof { turn: 1, cumulative: 3, read: None }),
-        terminal: None,
-    })));
+    let proof = Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(
+        temper_engine_domain::RunProof {
+            conversation: task.attempt,
+            credentials: Box::new([]),
+            window: None,
+            host: fleet::HostKind::Worker,
+            task: task.number,
+            attempt: task.attempt,
+            offered: None,
+            turn: Some(temper_engine_domain::TurnProof { turn: 1, cumulative: 3, read: None }),
+            terminal: None,
+        },
+    )));
     let writes = [Write::Save(charged), Write::Save(row), Write::Save(proof)];
     let mut referee = WalkingReferee::default();
     referee.commit(&writes).expect("first transcript");
@@ -148,7 +150,10 @@ fn walking_referee_rejects_web_replies_without_their_atomic_records() {
     let mut referee = WalkingReferee::default();
     referee.signed_in(&world.store.rows, person, sign_in).expect("authenticated person");
     rows = world.store.rows.clone();
-    rows.remove(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey { person, key: [5; 16] }))));
+    rows.remove(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey {
+        person,
+        key: [5; 16],
+    }))));
     assert_eq!(referee.started(&rows, task.number), Err("chat reply before keyed answer commit"));
 }
 
@@ -312,8 +317,8 @@ fn walking_referee_rejects_missing_or_split_current_claim_turn_and_terminal_proo
     live.phase = tasks::Phase::Active(tasks::Active::Claimed { attempt: task.attempt });
     live.turn = 0;
     live.run_spent = 0;
-    let initial =
-        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(temper_engine_domain::RunProof {
+    let initial = Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(
+        temper_engine_domain::RunProof {
             conversation: task.attempt,
             credentials: Box::new([]),
             window: None,
@@ -323,7 +328,8 @@ fn walking_referee_rejects_missing_or_split_current_claim_turn_and_terminal_proo
             offered: None,
             turn: None,
             terminal: None,
-        })));
+        },
+    )));
     let claim = Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(Box::new(live.clone())))));
     assert_eq!(
         WalkingReferee::default().commit(std::slice::from_ref(&claim)),
@@ -349,14 +355,25 @@ fn walking_referee_rejects_missing_or_split_current_claim_turn_and_terminal_proo
         WalkingReferee::default().commit(&[charged, Write::Save(turn)]),
         Err("turn and root proof are not one transaction")
     );
-    let ended =
-        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task.number)))).expect("ended").clone();
-    let posted =
-        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(task.funder)))).expect("pool").clone();
+    let ended = world
+        .store
+        .rows
+        .get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task.number))))
+        .expect("ended")
+        .clone();
+    let posted = world
+        .store
+        .rows
+        .get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(task.funder))))
+        .expect("pool")
+        .clone();
     let terminal = world
         .store
         .rows
-        .get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal { task: task.number, attempt: task.attempt })))
+        .get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal {
+            task: task.number,
+            attempt: task.attempt,
+        })))
         .expect("typed terminal")
         .clone();
     assert_eq!(
@@ -443,12 +460,16 @@ fn terminal_cut() -> World {
 fn independent_terminal_cut_referee_rejects_missing_or_altered_evidence() {
     let world = terminal_cut();
     let task = ended(&world);
-    let key = Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal { task: task.number, attempt: task.attempt }));
+    let key = Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal {
+        task: task.number,
+        attempt: task.attempt,
+    }));
     let mut rows = world.store.rows.clone();
     rows.remove(&key);
     assert_eq!(world.referee.terminal_cut(&rows), Err("durable terminal evidence missing"));
     rows = world.store.rows.clone();
-    let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) = rows.get_mut(&key)
+    let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) =
+        rows.get_mut(&key)
     else {
         panic!("terminal evidence")
     };
@@ -457,17 +478,19 @@ fn independent_terminal_cut_referee_rejects_missing_or_altered_evidence() {
     rows = world.store.rows.clone();
     rows.insert(
         Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task.number))),
-        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(temper_engine_domain::RunProof {
-            conversation: task.attempt,
-            credentials: Box::new([]),
-            window: None,
-            host: fleet::HostKind::Worker,
-            task: task.number,
-            attempt: task.attempt,
-            offered: None,
-            turn: None,
-            terminal: None,
-        }))),
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(
+            temper_engine_domain::RunProof {
+                conversation: task.attempt,
+                credentials: Box::new([]),
+                window: None,
+                host: fleet::HostKind::Worker,
+                task: task.number,
+                attempt: task.attempt,
+                offered: None,
+                turn: None,
+                terminal: None,
+            },
+        ))),
     );
     assert_eq!(world.referee.terminal_cut(&rows), Err("ended task retained a live task or proof"));
     rows = world.store.rows.clone();

@@ -32,7 +32,8 @@ struct World {
     answers: Vec<temper_engine_domain::CallAnswer>,
     protocol: Protocol,
     immediate: VecDeque<engine::Event>,
-    period_sent: bool,
+    /// The funding period sent to this process's root, once it is ready.
+    period: Option<u64>,
     fail_job_reads: bool,
     slow_brief_reads: bool,
     owner_gate: bool,
@@ -301,7 +302,7 @@ impl World {
             answers: Vec::new(),
             protocol: Protocol::default(),
             immediate: VecDeque::new(),
-            period_sent: false,
+            period: None,
             fail_job_reads: false,
             slow_brief_reads: false,
             owner_gate,
@@ -342,7 +343,7 @@ impl World {
         self.events.clear();
         self.answers.clear();
         self.adopted.clear();
-        self.period_sent = false;
+        self.period = None;
         self.events.push_back(engine::Event::Restart);
         if !self.assigned.is_empty() {
             self.events.push_back(protocol::hello_slots(
@@ -396,7 +397,7 @@ impl World {
                     self.immediate.extend(events);
                     continue;
                 }
-                Err(request) => request,
+                Err(request) => *request,
             };
             match request {
                 engine::Request::ToChild(released) => self.events.push_back(engine::Event::Released(released)),
@@ -501,8 +502,8 @@ impl World {
             let number = self.store.apply();
             self.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
         }
-        if !self.period_sent && self.root.ready() {
-            self.period_sent = true;
+        if self.period.is_none() && self.root.ready() {
+            self.period = Some(1);
             let period = engine::PartyInput::Period { project: 1, period: 1, budget: 1000, next: None };
             self.send(engine::Event::Party(period));
             // The repository's git identity, an application credential from
@@ -2132,7 +2133,6 @@ fn an_adoption_sent_twice_across_a_restart_is_made_once() {
 }
 
 #[test]
-#[expect(clippy::too_many_lines, reason = "saved-work checkout story includes a second adopted repository")]
 fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     let mut world = World::configured(true, false);
     world.adopt();

@@ -392,14 +392,13 @@ impl World {
             people::EscalationDecision::Reject { .. } => people::EscalationChoice::Rejected,
             people::EscalationDecision::Pass => people::EscalationChoice::Passed,
         };
-        let outcome =
-            people::Outcome::EscalationDecided {
-                task: self.task.expect("chat started"),
-                revision,
-                by,
-                at: Wall::EPOCH,
-                choice,
-            };
+        let outcome = people::Outcome::EscalationDecided {
+            task: self.task.expect("chat started"),
+            revision,
+            by,
+            at: Wall::EPOCH,
+            choice,
+        };
         self.ask(if stage == 1 { 210 } else { 220 }, owner, key, revision, decision, outcome);
     }
 
@@ -593,7 +592,9 @@ impl World {
                 let decided = writes.iter().any(|write| {
                     matches!(
                         write,
-                        Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(_))))
+                        Write::Save(Record::Core(jig_domain_core::Record::Core(
+                            jig_domain_core::CoreRecord::EscalationDecision(_)
+                        )))
                     )
                 });
                 let number = self.store.apply();
@@ -621,7 +622,7 @@ impl World {
                     }
                     continue;
                 }
-                Err(request) => request,
+                Err(request) => *request,
             };
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),

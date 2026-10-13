@@ -503,9 +503,9 @@ impl World {
                 let terminal = self.store.pending.front().expect("pending commit").1.iter().any(|write| {
                     matches!(
                         write,
-                        temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(
-                            _
-                        ))))
+                        temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::Tasks(
+                            tasks::Stored::Ended(_)
+                        )))
                     )
                 });
                 let number = self.store.apply();
@@ -524,8 +524,10 @@ impl World {
         }
         if let Some(snapshot) = &self.terminal_snapshot {
             for (key, row) in snapshot {
-                if !matches!(key, temper_engine_domain::Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))
-                {
+                if !matches!(
+                    key,
+                    temper_engine_domain::Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))
+                ) {
                     assert_eq!(
                         self.store.rows.get(key),
                         Some(row),
@@ -622,14 +624,12 @@ impl World {
                     }
                     continue;
                 }
-                Err(request) => request,
+                Err(request) => *request,
             };
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
-                    if self.terminal_snapshot.is_some() {
-                        panic!("terminal recovery commits nothing: {writes:?}");
-                    }
+                    assert!(self.terminal_snapshot.is_none(), "terminal recovery commits nothing: {writes:?}");
                     self.referee.commit(&writes).expect("independent transaction referee");
                     if self.store.pending.is_empty() {
                         self.commit_wait = self.settings.commit_delay;

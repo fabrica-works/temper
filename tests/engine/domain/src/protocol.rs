@@ -166,16 +166,16 @@ impl Protocol {
     ///
     /// # Errors
     /// Returns the request when it is not the protocol layer's to answer.
-    pub fn play(&mut self, request: engine::Request) -> Result<Vec<engine::Event>, engine::Request> {
+    pub fn play(&mut self, request: engine::Request) -> Result<Vec<engine::Event>, Box<engine::Request>> {
         match request {
             engine::Request::Worker(engine::WorkerRequest::Host(host_request)) => match *host_request {
                 engine::HostRequest::Decode { to, task, attempt, call } => match self.calls.get(&call.name) {
                     Some(body) => {
                         Ok(vec![engine::Event::Worker(engine::WorkerInput::DecodedHostCall { to, body: body.clone() })])
                     }
-                    None => Err(engine::Request::Worker(engine::WorkerRequest::Host(Box::new(
+                    None => Err(Box::new(engine::Request::Worker(engine::WorkerRequest::Host(Box::new(
                         engine::HostRequest::Decode { to, task, attempt, call },
-                    )))),
+                    ))))),
                 },
                 engine::HostRequest::Dropped { .. } => Ok(Vec::new()),
             },
@@ -185,9 +185,9 @@ impl Protocol {
                         self.answers.push((name.clone(), answer));
                         Ok(vec![rendered(to, name)])
                     }
-                    other @ engine::HostDelivery::Answer { .. } => Err(engine::Request::Worker(
+                    other @ engine::HostDelivery::Answer { .. } => Err(Box::new(engine::Request::Worker(
                         engine::WorkerRequest::Deliver(engine::Delivery::Host(Box::new(other))),
-                    )),
+                    ))),
                 }
             }
             engine::Request::Worker(engine::WorkerRequest::ReadResult { payload, outcome }) => {
@@ -217,7 +217,14 @@ impl Protocol {
                     | accounts::Request::Closed => Vec::new(),
                 })
             }
-            other => Err(other),
+            other @ (engine::Request::Store(_)
+            | engine::Request::Worker(_)
+            | engine::Request::Party(_)
+            | engine::Request::Forge { .. }
+            | engine::Request::ToChild(_)
+            | engine::Request::Busy(_)
+            | engine::Request::Drained
+            | engine::Request::Stop) => Err(Box::new(other)),
         }
     }
 }
