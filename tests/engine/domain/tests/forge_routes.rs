@@ -2823,6 +2823,24 @@ fn issue_count(world: &mut World) -> usize {
     items.len()
 }
 
+// From the stop on, the engine takes nothing that would make a commit, and a
+// committed forge effect stays with the connector (jig's `domain/engine.md`, 6.1).
+#[test]
+fn a_stop_with_a_committed_forge_effect_makes_no_commit_and_no_write() {
+    let (mut world, _) = pending_issue_effect();
+    let calls = world.forge_calls;
+    world.send(engine::Event::Stop);
+    let number = world.store.apply();
+    world.send(engine::Event::Store(engine::StoreInput::Committed { number, fill: 0 }));
+    let commits = world.store.header().commits;
+    for _ in 0..30 {
+        world.tick();
+    }
+    assert_eq!(world.store.header().commits, commits);
+    assert!(world.store.pending.is_empty());
+    assert_eq!(world.forge_calls, calls, "no forge call after the stop");
+}
+
 #[test]
 fn effect_survives_each_commit_and_outbox_cut_without_a_second_issue() {
     for cut in 0..4 {
