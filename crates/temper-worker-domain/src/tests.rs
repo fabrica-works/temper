@@ -14,7 +14,7 @@ fn host_and_smith_turn_windows_must_fit_the_declared_reserve() {
     let fixture = limits();
     let turns = Limits { agent: agent::Limits { turns: 3, ..fixture.agent }, ..limits() };
     assert!(worst_case(&turns).is_none());
-    let bytes = Limits { agent: agent::Limits { unacknowledged_bytes: 129, ..fixture.agent }, ..limits() };
+    let bytes = Limits { host: host::Limits { turn_bytes: 65, ..fixture.host }, ..limits() };
     assert!(worst_case(&bytes).is_none());
 }
 

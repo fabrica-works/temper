@@ -17,7 +17,11 @@ fn contact_lost_past_the_grace_saves_before_the_cancellation_answer() {
     assert_eq!(run(4, Case::ContactPast).saves, 1);
 }
 #[test]
-fn the_hello_carries_the_complete_stop_bound_and_stories_replay() {
+fn the_hello_carries_the_configured_stop_bound_whole() {
+    assert_eq!(run(71, Case::Delivered).stop_bound, temper_worker_domain_world::STOP_BOUND);
+}
+#[test]
+fn stories_replay() {
     for case in [Case::Delivered, Case::CancelledDelivery, Case::ContactWithin, Case::ContactPast] {
         assert_eq!(run(71, case), run(71, case));
     }

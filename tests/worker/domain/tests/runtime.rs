@@ -26,7 +26,7 @@ fn merge_paths_and_expected_heads_cross_the_worker_and_park_has_no_saved_merge()
 }
 
 #[test]
-fn contact_grace_abandons_retained_turns_and_the_slot_together() {
+fn a_worker_shutting_down_past_the_grace_abandons_the_turns_it_keeps() {
     let world = run(Settings { seed: 7, turns: 3, byte_slots: 3, merging: false, abandon: true });
     assert!(world.stats().abandoned > 0);
 }

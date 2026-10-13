@@ -157,10 +157,13 @@ impl Domain {
         self.host.is_ready() || self.stop_ready()
     }
 
-    /// Shutting down, with no run, agent, hand-out or workspace left.
+    /// Shutting down, with no run, agent, hand-out or workspace left, and
+    /// the engine has every turn and answer, or they were given up (jig's
+    /// `domain/hosts.md`, 6.7).
     fn stop_ready(&self) -> bool {
         self.stopping
             && self.host.hosted() == 0
+            && self.host.retained_turns() == 0
             && self.agent.agents() == 0
             && self.pending.is_empty()
             && self.workspaces.is_empty()

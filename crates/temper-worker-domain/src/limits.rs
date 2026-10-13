@@ -50,8 +50,9 @@ const KEY: u32 = 8;
 /// than workspaces or agent processes); what goes down to a run must be what
 /// an agent takes (an inbound event, rendered, no larger than its messages,
 /// and no more held for a run until it is live, nor carried in its start,
-/// than may wait for it in its agent), and smith's turns unacknowledged must
-/// fit the host's reserve for a stopping run; a run's calls must fit the
+/// than may wait for it in its agent), and smith's turns unacknowledged, each
+/// no larger encoded than the host takes a turn, must fit the host's reserve
+/// for a stopping run, its turns and its bytes; a run's calls must fit the
 /// host's; and a run's push message, as smith bounds a call, and the save's
 /// must fit a commit message.
 ///
@@ -77,7 +78,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         && host_limits.slots <= checkout_limits.workspaces
         && host_limits.slots <= agent_limits.agents
         && agent_limits.turns <= host_limits.turns
-        && agent_limits.unacknowledged_bytes <= host_limits.turn_queue_bytes
+        && u64::from(agent_limits.turns).checked_mul(host_limits.turn_bytes)? <= host_limits.turn_queue_bytes
         && agent_limits.calls <= host_limits.run_calls
         && host_limits.event_bytes.checked_add(SEPARATOR)? <= agent_limits.message_bytes
         && host_limits.held <= agent_limits.messages

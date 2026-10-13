@@ -728,6 +728,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-protocol-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-lib",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-domain-session",
+ "smith-domain-tools",
+ "smith-transcript",
+]
+
+[[package]]
 name = "smith-protocol-llm"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
@@ -781,6 +796,15 @@ dependencies = [
  "skein-world",
  "smith-domain-tools",
  "smith-protocol-machine",
+]
+
+[[package]]
+name = "smith-transcript"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]
@@ -1066,6 +1090,11 @@ dependencies = [
  "skein-lib",
  "skein-world",
  "smith-channel",
+ "smith-charter",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-protocol-channel",
+ "smith-transcript",
  "temper-fake-checkout",
  "temper-worker-checkout-world",
  "temper-worker-domain",
