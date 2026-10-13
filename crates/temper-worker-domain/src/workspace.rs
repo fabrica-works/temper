@@ -193,7 +193,7 @@ pub(crate) struct Workspace {
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
-struct Root {
+pub(crate) struct Root {
     name: Box<[u8]>,
     writable: bool,
 }

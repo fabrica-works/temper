@@ -13,7 +13,7 @@ use crate::agents::{Bound, Call};
 use crate::facts::Fact;
 use crate::hand_out::Pending;
 use crate::translate::SAVED;
-use crate::workspace::{Items, Workspace};
+use crate::workspace::{Items, Root, Workspace};
 
 /// The worker domain's limits (section 7), handed to every step read-only: its
 /// child domains', each handed down to the one it bounds, and what the hub's
@@ -126,7 +126,7 @@ fn workspace_memory(limits: &Limits) -> Option<u64> {
     let name = u64::from(checkout_limits.name_bytes);
     let conflicts = u64::from(checkout_limits.conflicts)
         .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_add(u64::from(checkout_limits.path_bytes))?)?;
-    let root = u64::try_from(size_of::<Box<[u8]>>().checked_add(size_of::<bool>())?)
+    let root = u64::try_from(size_of::<Root>())
         .ok()?
         .checked_add(name)?
         .checked_add(u64::try_from(size_of::<checkout::Conflicts>()).ok()?)?
