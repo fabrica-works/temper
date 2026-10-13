@@ -9,9 +9,9 @@ pub mod systems;
 
 use jig_conformance::referee as r;
 use jig_conformance::{Application, Clock, Input, Output};
-use jig_core_accounts as accounts;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_workers as workers;
 use observations::Store;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -502,7 +502,7 @@ impl Application for Temper {
                         peers.retries.remove(&call.raw());
                         if !matches!(
                             answer,
-                            root::CallAnswer::ForgeEffectDenied { answer: jig_core_authority::Answer::Wait, .. }
+                            root::CallAnswer::ForgeEffectDenied { answer: jig_domain_authority::Answer::Wait, .. }
                         ) {
                             requires.push(r::Receipt::Call(task, attempt, body.completion, body.position));
                         }
@@ -524,7 +524,7 @@ impl Application for Temper {
                 }
             }
             engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
-                events.push(engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                events.push(engine::Event::Account(jig_domain_accounts::Event::Refreshed {
                     account,
                     generation,
                     valid: Duration::from_secs(60),
@@ -660,7 +660,7 @@ impl Application for Temper {
             let mut snapshot = observations::snapshot(store);
             observations::resolved(store, &mut snapshot, &mut peers.effects, &mut peers.held, &mut peers.settled);
             for record in store.rows.values().map(|record| &record.0) {
-                if let root::Record::Core(jig_core::Record::Tasks(
+                if let root::Record::Core(jig_domain_core::Record::Tasks(
                     tasks::Stored::Live(task) | tasks::Stored::Ended(task),
                 )) = record
                 {
@@ -718,20 +718,20 @@ fn worker_event(up: workers::Up) -> engine::Event {
         workers::Up::Hello { channel, slots, stop_bound, hosting } => {
             engine::Event::Worker(engine::WorkerInput::Hello {
                 channel: Token::new(channel),
-                hello: jig_core_fleet::Hello {
+                hello: jig_domain_fleet::Hello {
                     slots,
                     stop_bound,
                     workstreams: Box::new([]),
                     hosting: hosting
                         .into_vec()
                         .into_iter()
-                        .map(|(task, attempt, answered)| jig_core_fleet::Hosted {
+                        .map(|(task, attempt, answered)| jig_domain_fleet::Hosted {
                             run: Token::new(task),
                             attempt: Token::new(attempt),
                             phase: if answered {
-                                jig_core_fleet::Phase::Answered
+                                jig_domain_fleet::Phase::Answered
                             } else {
-                                jig_core_fleet::Phase::Active
+                                jig_domain_fleet::Phase::Active
                             },
                         })
                         .collect(),

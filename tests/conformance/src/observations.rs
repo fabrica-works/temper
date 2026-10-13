@@ -1,8 +1,8 @@
 //! Store and forge translations for jig's outside referee.
 use jig_conformance::referee as r;
-use jig_core as core;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_system::SystemKey;
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain as root;
@@ -131,10 +131,10 @@ pub fn policy(
     }
 }
 #[must_use]
-pub fn pattern(p: &jig_core_authority::Pattern) -> r::Pattern {
+pub fn pattern(p: &jig_domain_authority::Pattern) -> r::Pattern {
     let (terminal, open) = match &p.last {
-        jig_core_authority::Last::Exact(x) => (x.to_vec(), false),
-        jig_core_authority::Last::Open(x) => (x.to_vec(), true),
+        jig_domain_authority::Last::Exact(x) => (x.to_vec(), false),
+        jig_domain_authority::Last::Open(x) => (x.to_vec(), true),
     };
     r::Pattern { base: p.segments.iter().map(|x| x.to_vec()).collect(), terminal, open }
 }

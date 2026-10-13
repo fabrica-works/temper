@@ -1,8 +1,8 @@
 //! Typed boundary tests through the public conversions.
 
-use jig_core_accounts as accounts;
-use jig_core_brief as brief;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_brief as brief;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, ReplyTo, Token};
 use smith_domain as smith;
 use smith_domain_run as run;

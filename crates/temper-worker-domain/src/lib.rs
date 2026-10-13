@@ -78,6 +78,6 @@ pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;
 pub use limits::{Limits, declared_graces, push_deadline, worst_case};
 // The payloads are the children's: a parent may use its children's types.
-pub use jig_host as host;
+pub use jig_domain_host as host;
 pub use smith_host_domain as agent;
 pub use temper_worker_domain_checkout as checkout;

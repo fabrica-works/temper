@@ -308,7 +308,7 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
             ) => {
                 return Err(Failure::Cursor);
             }
-            Range::Core(crate::CoreRange::Notes(jig_core_notes::Range::Entry { .. })) => return Err(Failure::Cursor),
+            Range::Core(crate::CoreRange::Notes(jig_domain_notes::Range::Entry { .. })) => return Err(Failure::Cursor),
             Range::Core(
                 crate::CoreRange::Turns { .. }
                 | crate::CoreRange::TaskTranscript { .. }
@@ -317,7 +317,7 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
                 | crate::CoreRange::People
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Calls
-                | crate::CoreRange::Notes(jig_core_notes::Range::Lines { .. }),
+                | crate::CoreRange::Notes(jig_domain_notes::Range::Lines { .. }),
             )
             | Range::Forge => {}
         }
@@ -342,14 +342,14 @@ fn valid_range(range: &Range) -> bool {
             | crate::CoreRange::People
             | crate::CoreRange::RunProofs
             | crate::CoreRange::Calls
-            | crate::CoreRange::Notes(jig_core_notes::Range::Lines { .. }),
+            | crate::CoreRange::Notes(jig_domain_notes::Range::Lines { .. }),
         )
         | Range::Forge => true,
         Range::Core(crate::CoreRange::TaskResult { task } | crate::CoreRange::TaskTranscript { task }) => *task != 0,
         Range::Core(crate::CoreRange::EscalationDecision { task, revision }) => *task != 0 && *revision != 0,
         Range::Core(crate::CoreRange::ProposalDecision { proposal }) => *proposal != 0,
         Range::Core(crate::CoreRange::Turns { task, attempt }) => *task != 0 && *attempt != 0,
-        Range::Core(crate::CoreRange::Notes(jig_core_notes::Range::Entry { name })) => *name != 0,
+        Range::Core(crate::CoreRange::Notes(jig_domain_notes::Range::Entry { name })) => *name != 0,
     }
 }
 

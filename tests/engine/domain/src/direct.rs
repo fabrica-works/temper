@@ -1,8 +1,8 @@
 //! Direct root fixture shared by focused routes and the ending sweep.
 
-use jig_core_accounts as accounts;
-use jig_core_people as people;
-use jig_core_views as views;
+use jig_domain_accounts as accounts;
+use jig_domain_people as people;
+use jig_domain_views as views;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
 use temper_engine_domain as engine;

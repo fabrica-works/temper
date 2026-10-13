@@ -5,9 +5,9 @@ use jig_conformance::{
     Harness,
     referee::{Promise, Violation},
 };
-use jig_core as core;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{ReplyTo, Token};
 use temper_engine_domain as engine;
 use temper_engine_domain::{self as root};

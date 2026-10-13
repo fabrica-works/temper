@@ -80,7 +80,7 @@ fn bytes(len: u32) -> Box<[u8]> {
 }
 
 fn turn(number: u32, len: u32) -> Write {
-    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
         task: 1,
         attempt: 1,
         turn: number,
@@ -127,7 +127,7 @@ fn a_first_start_commits_its_deployment_before_releasing_a_delivery() {
     assert_eq!(number, 1);
     assert_eq!(
         writes.as_ref(),
-        &[Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(Deployment {
+        &[Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(Deployment {
             id: [37; 16],
             commits: 1,
             ..DEPLOYMENT
@@ -150,7 +150,7 @@ fn a_store_answer_makes_outputs_ready_without_draining_them() {
     assert_eq!(writes.len(), 2);
     assert_eq!(
         writes[0],
-        Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(Deployment {
+        Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(Deployment {
             commits: 1,
             ..DEPLOYMENT
         }))))
@@ -176,7 +176,7 @@ fn fresh_numbers_and_unused_gaps_are_durable_in_the_decisions_header() {
     accept(&mut j, &LIMITS, Decision::new(&LIMITS), &mut out).unwrap();
     let (number, writes) = commit(&mut out);
     assert_eq!(number, 1);
-    let Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(header)))) = writes[0] else {
+    let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))) = writes[0] else {
         panic!("header");
     };
     assert_eq!(header.tasks, 2);
@@ -194,7 +194,7 @@ fn same_key_saves_and_erases_collapse_to_the_last_write_before_commit() {
     d.write(&LIMITS, turn(2, 3)).unwrap();
     d.write(
         &LIMITS,
-        Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Turn { task: 1, attempt: 1, turn: 1 }))),
+        Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: 1, attempt: 1, turn: 1 }))),
     )
     .unwrap();
     d.write(&LIMITS, turn(1, 4)).unwrap();
@@ -216,7 +216,7 @@ fn rejected_payloads_are_returned_without_replacing_admitted_ownership() {
         panic!("result");
     };
     assert_eq!(words.len(), 33);
-    assert!(d.write(&LIMITS, Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)))).is_err());
+    assert!(d.write(&LIMITS, Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))).is_err());
     let mut j = Journal::new(DEPLOYMENT, &LIMITS);
     let mut out = Queue::with_capacity(1);
     accept(&mut j, &LIMITS, d, &mut out).unwrap();
@@ -253,8 +253,8 @@ fn counter_and_commit_overflow_cannot_reuse_names() {
 
 #[test]
 fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention() {
-    use jig_core_fleet as fleet;
-    use jig_core_people as people;
+    use jig_domain_fleet as fleet;
+    use jig_domain_people as people;
     let limits = crate::JournalLimits {
         commits: 1,
         held: 2,
@@ -265,7 +265,7 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
         run_bytes: 1,
     };
     let mut decision = Decision::new(&limits);
-    let row = Record::Core(jig_core::Record::People(people::Stored::Person {
+    let row = Record::Core(jig_domain_core::Record::People(people::Stored::Person {
         number: 1,
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 1_u64.to_be_bytes().into() },
@@ -275,7 +275,7 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
     }));
     assert_eq!(crate::record_bytes(&row), Some(13));
     assert!(decision.write(&limits, Write::Save(row)).is_err());
-    let roster_answer = Record::Core(jig_core::Record::People(people::Stored::Answer {
+    let roster_answer = Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
         key: people::RequestKey { person: 1, key: [1; 16] },
         ask: Box::new(people::Ask::SetRoles {
             project: 1,
@@ -309,8 +309,8 @@ fn deep_child_rows_and_arbitrary_internal_payloads_are_refused_before_retention(
 
 #[test]
 fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
-    use jig_core_accounts as accounts;
-    use jig_core_brief as brief;
+    use jig_domain_accounts as accounts;
+    use jig_domain_brief as brief;
     let limits = crate::JournalLimits {
         commits: 1,
         held: 1,
@@ -350,13 +350,13 @@ fn held_assignment_checks_owned_bytes_and_section_backing_before_acceptance() {
                 agents: false,
                 call_timeout: skein_lib::Duration::from_secs(1),
             },
-            contract: jig_core_tasks::Contract::Report { words: 1 },
-            authority: jig_core_tasks::Authority {
-                tools: jig_core_tasks::Tools(0),
+            contract: jig_domain_tasks::Contract::Report { words: 1 },
+            authority: jig_domain_tasks::Authority {
+                tools: jig_domain_tasks::Tools(0),
                 grants: Box::new([]),
-                delegation: jig_core_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
-                budget: jig_core_tasks::Budget { spend: 1, deadline: None },
-                notes: jig_core_tasks::Scopes(0),
+                delegation: jig_domain_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+                budget: jig_domain_tasks::Budget { spend: 1, deadline: None },
+                notes: jig_domain_tasks::Scopes(0),
                 note_resources: Box::new([]),
             },
             budget: 1,

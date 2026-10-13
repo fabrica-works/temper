@@ -1,8 +1,8 @@
 //! Faults injected into independent boundary referees for each promise in
 //! domain/core.md, section 10. The same referees observe the passing worlds.
 
-use jig_core_people::Role;
-use jig_core_tasks::Party;
+use jig_domain_people::Role;
+use jig_domain_tasks::Party;
 use jig_people_world::referee::{People, RouteKind, Seen as PersonSeen};
 use jig_tasks_world::referee::{Seen as TaskSeen, Tasks};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -47,7 +47,7 @@ fn once_referee_rejects_a_second_result_from_the_same_durable_task() {
         .rows
         .values()
         .find_map(|row| {
-            let Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(record))) = row else { return None };
+            let Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(record))) = row else { return None };
             let Party::Person(person) = record.requester else { return None };
             Some((person, record.number))
         })
@@ -63,11 +63,11 @@ fn commit_referee_rejects_an_ack_if_its_transcript_was_lost() {
     let task = rows
         .values()
         .find_map(|row| {
-            let Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(record))) = row else { return None };
+            let Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(record))) = row else { return None };
             Some((record.number, record.attempt))
         })
         .expect("ended task");
-    rows.remove(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Turn { task: task.0, attempt: task.1, turn: 1 })));
+    rows.remove(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: task.0, attempt: task.1, turn: 1 })));
     assert_eq!(world.referee.clone().turn_ack(&rows, task.0, task.1, 1), Err("turn ACK before durable transcript"));
 }
 

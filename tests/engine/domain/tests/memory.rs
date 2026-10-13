@@ -19,7 +19,7 @@ fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clone
     let mut domain = loads::Loads::new(&limits);
     let incoming: Box<[Record]> = (1..=4)
         .map(|turn| {
-            Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
                 task: 1,
                 attempt: 1,
                 turn,
@@ -32,7 +32,7 @@ fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clone
         .collect();
     let mut addresses = [core::ptr::null(); 4];
     for (address, row) in addresses.iter_mut().zip(incoming.iter()) {
-        let Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(row))) = row else {
+        let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row))) = row else {
             panic!("turn");
         };
         *address = row.transcript.as_ptr();
@@ -67,7 +67,7 @@ fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clone
     assert_eq!(rows.len(), 2);
     assert_eq!(cut.expect("cut").rows, 2);
     for (row, original) in rows.iter().zip(addresses) {
-        let Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(row))) = row else {
+        let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row))) = row else {
             panic!("turn");
         };
         assert_eq!(row.transcript.as_ptr(), original, "owned bytes moved directly");
@@ -152,7 +152,7 @@ fn partial_write_transfer_moves_values_without_shrinking_the_source() {
         decision
             .write(
                 &limits,
-                Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+                Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
                     task: 1,
                     attempt: 1,
                     turn,
@@ -189,7 +189,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
             decision
                 .write(
                     &LIMITS,
-                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
                         task: commit,
                         attempt: 1,
                         turn,
@@ -207,7 +207,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
         decision
             .write(
                 &LIMITS,
-                Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+                Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
                     task: commit,
                     attempt: 1,
                     turn: 1,

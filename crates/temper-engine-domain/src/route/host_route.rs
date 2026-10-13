@@ -4,8 +4,8 @@ use super::{
     Call, CallAnswer, CallKey, Decision, Delivery, Domain, Env, Limits, Payload, Request, Work, emit, relay_payload,
 };
 use alloc::boxed::Box;
-use jig_core::{SettledAnswer, SettledCall};
-use jig_core_fleet as fleet;
+use jig_domain_core::{SettledAnswer, SettledCall};
+use jig_domain_fleet as fleet;
 use skein_lib::{ReplyTo, Token};
 
 #[derive(PartialEq, Eq, Debug)]
@@ -142,7 +142,7 @@ pub(crate) fn rendered(domain: &mut Domain, to: ReplyTo, answer: SettledAnswer) 
         call.answer = SettledAnswer::Host { error: true, body: Box::from(&b"busy"[..]) };
     }
     if fits && recorded {
-        domain.work.push(Work::Core(jig_core::Event::SettledCall { to, key, call }));
+        domain.work.push(Work::Core(jig_domain_core::Event::SettledCall { to, key, call }));
     } else {
         let id = domain.payloads.insert(Some(Payload::SettledCall(call))).expect("fleet call reserved answer room");
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));

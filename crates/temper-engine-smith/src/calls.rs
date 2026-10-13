@@ -2,7 +2,7 @@
 //! is feedback to Smith's LLM, never a root decision (domain/agent.md, 4.3).
 
 use alloc::boxed::Box;
-use jig_core_tasks as tasks;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, List, Wall, bytes};
 use smith_domain_run as run;
 use temper_engine_domain as engine;

@@ -193,7 +193,7 @@ pub(crate) fn page(
     for row in rows {
         match read.stage {
             Stage::Live => match row {
-                Record::Core(jig_core::Record::Tasks(tasks::Stored::PersonProposal(row))) => {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::PersonProposal(row))) => {
                     for entry in person_proposal_entries(domain, &row) {
                         if !visible(domain, read.person, entry) {
                             continue;
@@ -219,7 +219,7 @@ pub(crate) fn page(
                         }
                     }
                 }
-                Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(task))) => {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) => {
                     for entry in entries(domain, &task) {
                         if visible(domain, read.person, entry) {
                             match entry.kind {
@@ -244,27 +244,27 @@ pub(crate) fn page(
                         }
                     }
                 }
-                Record::Core(jig_core::Record::Tasks(
+                Record::Core(jig_domain_core::Record::Tasks(
                     tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::Stub(_),
                 )) => {}
                 Record::Core(
-                    jig_core::Record::Tasks(
+                    jig_domain_core::Record::Tasks(
                         tasks::Stored::Ended(_) | tasks::Stored::History(_) | tasks::Stored::Milestone(_),
                     )
-                    | jig_core::Record::People(_)
-                    | jig_core::Record::Notes(_)
-                    | jig_core::Record::Core(
-                        jig_core::CoreRecord::Projection(_)
-                        | jig_core::CoreRecord::Deployment(_)
-                        | jig_core::CoreRecord::Call(_)
-                        | jig_core::CoreRecord::Turn(_)
-                        | jig_core::CoreRecord::RunProof(_)
-                        | jig_core::CoreRecord::Terminal(_)
-                        | jig_core::CoreRecord::EscalationDecision(_)
-                        | jig_core::CoreRecord::ProposalDecision(_),
+                    | jig_domain_core::Record::People(_)
+                    | jig_domain_core::Record::Notes(_)
+                    | jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Projection(_)
+                        | jig_domain_core::CoreRecord::Deployment(_)
+                        | jig_domain_core::CoreRecord::Call(_)
+                        | jig_domain_core::CoreRecord::Turn(_)
+                        | jig_domain_core::CoreRecord::RunProof(_)
+                        | jig_domain_core::CoreRecord::Terminal(_)
+                        | jig_domain_core::CoreRecord::EscalationDecision(_)
+                        | jig_domain_core::CoreRecord::ProposalDecision(_),
                     ),
                 )
                 | Record::Forge { .. } => {
@@ -272,10 +272,10 @@ pub(crate) fn page(
                 }
             },
             Stage::Ended => match row {
-                Record::Core(jig_core::Record::Tasks(tasks::Stored::PersonProposal(_))) => {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::PersonProposal(_))) => {
                     unreachable!("ended result range has no proposal")
                 }
-                Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(task))) => {
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(task))) => {
                     if task.requester == tasks::Party::Person(read.person)
                         && task.result_position > read.position
                         && (!read.frozen_high || task.result_position <= read.high)
@@ -307,7 +307,7 @@ pub(crate) fn page(
                     }
                 }
                 Record::Core(
-                    jig_core::Record::Tasks(
+                    jig_domain_core::Record::Tasks(
                         tasks::Stored::Live(_)
                         | tasks::Stored::Ledger(_)
                         | tasks::Stored::History(_)
@@ -316,17 +316,17 @@ pub(crate) fn page(
                         | tasks::Stored::Writer(_)
                         | tasks::Stored::Pool(_),
                     )
-                    | jig_core::Record::People(_)
-                    | jig_core::Record::Notes(_)
-                    | jig_core::Record::Core(
-                        jig_core::CoreRecord::Projection(_)
-                        | jig_core::CoreRecord::Deployment(_)
-                        | jig_core::CoreRecord::Call(_)
-                        | jig_core::CoreRecord::Turn(_)
-                        | jig_core::CoreRecord::RunProof(_)
-                        | jig_core::CoreRecord::Terminal(_)
-                        | jig_core::CoreRecord::EscalationDecision(_)
-                        | jig_core::CoreRecord::ProposalDecision(_),
+                    | jig_domain_core::Record::People(_)
+                    | jig_domain_core::Record::Notes(_)
+                    | jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Projection(_)
+                        | jig_domain_core::CoreRecord::Deployment(_)
+                        | jig_domain_core::CoreRecord::Call(_)
+                        | jig_domain_core::CoreRecord::Turn(_)
+                        | jig_domain_core::CoreRecord::RunProof(_)
+                        | jig_domain_core::CoreRecord::Terminal(_)
+                        | jig_domain_core::CoreRecord::EscalationDecision(_)
+                        | jig_domain_core::CoreRecord::ProposalDecision(_),
                     ),
                 )
                 | Record::Forge { .. } => {
@@ -370,7 +370,7 @@ pub(crate) fn page(
                     .core
                     .advance_inbox_read(read.person, read.high)
                     .expect("newest read position advances after the last page");
-                save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::People(row))));
+                save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::People(row))));
             }
             emit(
                 decision,

@@ -18,6 +18,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6651c9ed80effdc7db0ff72512157f901af5e3549e341e24b1dd4887d836d838"
+dependencies = [
+ "find-msvc-tools",
+ "shlex",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -53,6 +63,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "find-msvc-tools"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -60,6 +76,17 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "getrandom"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "wasi",
 ]
 
 [[package]]
@@ -74,136 +101,138 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-charter"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
- "smith-charter",
- "smith-domain-run",
-]
-
-[[package]]
 name = "jig-conformance"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "jig-fake-store",
  "jig-test-system",
  "skein-lib",
  "skein-world",
-]
-
-[[package]]
-name = "jig-core"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-accounts"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-authority"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-brief"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-fleet"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-notes"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-people"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-tasks"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-views"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
 ]
 
 [[package]]
 name = "jig-core-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-fake-parties",
- "jig-fake-store",
  "jig-fake-workers",
+ "jig-protocol-charter",
+ "jig-protocol-tools",
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
+ "jig-test-store",
+ "jig-test-store-files",
  "jig-test-system",
  "skein-lib",
  "skein-world",
+ "smith-channel",
+]
+
+[[package]]
+name = "jig-domain-accounts"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-authority"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-brief"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-core"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-fleet"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-host"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-notes"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-people"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-tasks"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-views"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
 ]
 
 [[package]]
 name = "jig-fake-parties"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "skein-lib",
 ]
@@ -211,20 +240,12 @@ dependencies = [
 [[package]]
 name = "jig-fake-store"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 
 [[package]]
 name = "jig-fake-workers"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-host"
-version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "skein-lib",
 ]
@@ -232,19 +253,62 @@ dependencies = [
 [[package]]
 name = "jig-people-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
- "jig-core-people",
+ "jig-domain-people",
+ "sha2",
  "skein-lib",
  "skein-world",
 ]
 
 [[package]]
+name = "jig-protocol-charter"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "sha2",
+ "skein-lib",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain-run",
+]
+
+[[package]]
+name = "jig-protocol-store"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "skein-codec",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-protocol-tools"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-tasks",
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-tasks-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
- "jig-core-tasks",
+ "jig-domain-tasks",
  "skein-lib",
  "skein-world",
 ]
@@ -252,7 +316,7 @@ dependencies = [
 [[package]]
 name = "jig-test-connector"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "skein-lib",
 ]
@@ -260,33 +324,70 @@ dependencies = [
 [[package]]
 name = "jig-test-connector-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "jig-test-connector",
  "jig-test-system",
+ "sha2",
  "skein-lib",
 ]
 
 [[package]]
 name = "jig-test-domain"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-test-connector",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-store"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-protocol-store",
+ "jig-test-connector",
+ "jig-test-domain",
+ "skein-codec",
+ "skein-kv",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-store-files"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-conformance",
+ "jig-domain-core",
+ "jig-protocol-store",
+ "jig-test-connector",
+ "jig-test-domain",
+ "jig-test-store",
+ "skein-fake-machine",
+ "skein-io",
+ "skein-kv",
  "skein-lib",
 ]
 
 [[package]]
 name = "jig-test-system"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/jig.git#2860e63c5ac9680eebc03d87295c9d0028ddbdea"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "jig-test-connector",
 ]
@@ -296,6 +397,60 @@ name = "libc"
 version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
+
+[[package]]
+name = "once_cell"
+version = "1.21.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "ring"
+version = "0.17.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "getrandom",
+ "libc",
+ "untrusted",
+ "windows-sys",
+]
+
+[[package]]
+name = "rustls"
+version = "0.23.41"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b92b125634d9b795e7beca796cc790df15a7fb38323bf3196fda83292d06b1f"
+dependencies = [
+ "once_cell",
+ "ring",
+ "rustls-pki-types",
+ "rustls-webpki",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "rustls-pki-types"
+version = "1.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f4925028c7eb5d1fcdaf196971378ed9d2c1c4efc7dc5d011256f76c99c0a96"
+dependencies = [
+ "zeroize",
+]
+
+[[package]]
+name = "rustls-webpki"
+version = "0.103.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+dependencies = [
+ "ring",
+ "rustls-pki-types",
+ "untrusted",
+]
 
 [[package]]
 name = "sha2"
@@ -309,9 +464,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shlex"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
 name = "skein-channel"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-lib",
 ]
@@ -319,7 +480,7 @@ dependencies = [
 [[package]]
 name = "skein-codec"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-lib",
 ]
@@ -327,25 +488,55 @@ dependencies = [
 [[package]]
 name = "skein-fake-checkout"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 
 [[package]]
 name = "skein-fake-llm-domain"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-lib",
 ]
 
 [[package]]
+name = "skein-fake-llm-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-fake-llm-domain",
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+]
+
+[[package]]
+name = "skein-fake-machine"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-sim",
+]
+
+[[package]]
 name = "skein-heap"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+
+[[package]]
+name = "skein-http"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-lib",
+]
 
 [[package]]
 name = "skein-io"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-lib",
 ]
@@ -353,20 +544,63 @@ dependencies = [
 [[package]]
 name = "skein-json"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#e1152507c94c0fb6d4fd9ed190d392ec5d21da9b"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-kv"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-io",
  "skein-lib",
 ]
 
 [[package]]
 name = "skein-lib"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+
+[[package]]
+name = "skein-llm"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-llm-connection"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-tls",
+]
+
+[[package]]
+name = "skein-llm-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+]
 
 [[package]]
 name = "skein-shell"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "io-uring",
  "libc",
@@ -377,16 +611,25 @@ dependencies = [
 [[package]]
 name = "skein-sim"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-io",
  "skein-lib",
 ]
 
 [[package]]
+name = "skein-tls"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "rustls",
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/skein.git#17b221b8423352d5c1d30128837ccbf5cd8025c2"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 dependencies = [
  "skein-heap",
  "skein-io",
@@ -398,7 +641,7 @@ dependencies = [
 [[package]]
 name = "smith-agent-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-fake-checkout",
  "skein-fake-llm-domain",
@@ -407,7 +650,6 @@ dependencies = [
  "smith-domain",
  "smith-domain-tools",
  "smith-host-domain",
- "smith-host-world",
  "smith-session-world",
  "smith-tools-world",
 ]
@@ -415,7 +657,7 @@ dependencies = [
 [[package]]
 name = "smith-channel"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-channel",
  "skein-codec",
@@ -425,7 +667,7 @@ dependencies = [
 [[package]]
 name = "smith-charter"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-codec",
  "skein-lib",
@@ -434,7 +676,7 @@ dependencies = [
 [[package]]
 name = "smith-domain"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-lib",
  "smith-domain-run",
@@ -445,7 +687,7 @@ dependencies = [
 [[package]]
 name = "smith-domain-run"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-lib",
 ]
@@ -453,7 +695,7 @@ dependencies = [
 [[package]]
 name = "smith-domain-session"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-lib",
  "smith-domain-tools",
@@ -462,66 +704,103 @@ dependencies = [
 [[package]]
 name = "smith-domain-tools"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "smith-events"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-json",
  "skein-lib",
 ]
 
 [[package]]
 name = "smith-host-domain"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-lib",
+ "smith-domain",
 ]
 
 [[package]]
-name = "smith-host-world"
+name = "smith-protocol-llm"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
+ "skein-io",
+ "skein-json",
  "skein-lib",
- "skein-world",
- "smith-host-domain",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-tls",
+ "smith-domain",
+ "smith-events",
+]
+
+[[package]]
+name = "smith-protocol-machine"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "smith-domain",
 ]
 
 [[package]]
 name = "smith-session-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-fake-checkout",
  "skein-fake-llm-domain",
  "skein-lib",
+ "skein-llm-world",
  "skein-world",
+ "smith-domain",
  "smith-domain-session",
  "smith-domain-tools",
+ "smith-protocol-llm",
  "smith-tools-world",
 ]
 
 [[package]]
 name = "smith-tools-world"
 version = "0.0.0"
-source = "git+https://git.ekanayaka.io/ai/smith.git#a54fe558421ed07ce376ac1ebf2ce09345c8d496"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
 dependencies = [
  "skein-fake-checkout",
+ "skein-io",
  "skein-lib",
  "skein-world",
  "smith-domain-tools",
+ "smith-protocol-machine",
 ]
+
+[[package]]
+name = "subtle"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "temper-conformance-world"
 version = "0.0.0"
 dependencies = [
  "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-people",
- "jig-core-tasks",
  "jig-core-world",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-people",
+ "jig-domain-tasks",
  "jig-fake-store",
  "jig-fake-workers",
  "jig-test-system",
@@ -539,15 +818,15 @@ dependencies = [
 name = "temper-engine-domain"
 version = "0.0.0"
 dependencies = [
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "skein-lib",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
@@ -591,15 +870,15 @@ dependencies = [
 name = "temper-engine-domain-world"
 version = "0.0.0"
 dependencies = [
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-fake-store",
  "jig-people-world",
  "jig-tasks-world",
@@ -644,12 +923,12 @@ dependencies = [
 name = "temper-engine-smith"
 version = "0.0.0"
 dependencies = [
- "jig-charter",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-notes",
- "jig-core-tasks",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-notes",
+ "jig-domain-tasks",
+ "jig-protocol-charter",
  "skein-json",
  "skein-lib",
  "smith-domain",
@@ -696,12 +975,12 @@ dependencies = [
 name = "temper-system-world"
 version = "0.0.0"
 dependencies = [
- "jig-core",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-people",
- "jig-core-tasks",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-people",
+ "jig-domain-tasks",
  "jig-fake-parties",
  "jig-fake-store",
  "skein-fake-checkout",
@@ -766,7 +1045,7 @@ dependencies = [
 name = "temper-worker-domain"
 version = "0.0.0"
 dependencies = [
- "jig-host",
+ "jig-domain-host",
  "skein-lib",
  "smith-channel",
  "smith-host-domain",
@@ -799,7 +1078,98 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
+name = "untrusted"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "wasi"
+version = "0.11.1+wasi-snapshot-preview1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
+
+[[package]]
+name = "windows-sys"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
+dependencies = [
+ "windows-targets",
+]
+
+[[package]]
+name = "windows-targets"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973"
+dependencies = [
+ "windows_aarch64_gnullvm",
+ "windows_aarch64_msvc",
+ "windows_i686_gnu",
+ "windows_i686_gnullvm",
+ "windows_i686_msvc",
+ "windows_x86_64_gnu",
+ "windows_x86_64_gnullvm",
+ "windows_x86_64_msvc",
+]
+
+[[package]]
+name = "windows_aarch64_gnullvm"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
+
+[[package]]
+name = "windows_aarch64_msvc"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ec2a7bb152e2252b53fa7803150007879548bc709c039df7627cabbd05d469"
+
+[[package]]
+name = "windows_i686_gnu"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e9b5ad5ab802e97eb8e295ac6720e509ee4c243f69d781394014ebfe8bbfa0b"
+
+[[package]]
+name = "windows_i686_gnullvm"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eee52d38c090b3caa76c563b86c3a4bd71ef1a819287c19d586d7334ae8ed66"
+
+[[package]]
+name = "windows_i686_msvc"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "240948bc05c5e7c6dabba28bf89d89ffce3e303022809e73deaefe4f6ec56c66"
+
+[[package]]
+name = "windows_x86_64_gnu"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "147a5c80aabfbf0c7d901cb5895d1de30ef2907eb21fbbab29ca94c5b08b1a78"
+
+[[package]]
+name = "windows_x86_64_gnullvm"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
+
+[[package]]
+name = "windows_x86_64_msvc"
+version = "0.52.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "zeroize"
+version = "1.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"

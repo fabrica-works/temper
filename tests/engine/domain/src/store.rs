@@ -39,8 +39,8 @@ impl Store {
     pub fn new() -> Store {
         let mut inner = jig_fake_store::Store::new();
         inner.rows = BTreeMap::from([(
-            Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)),
-            Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(HEADER))),
+            Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)),
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(HEADER))),
         )]);
         Store { inner, pending: VecDeque::new() }
     }
@@ -57,8 +57,8 @@ impl Store {
             .collect();
         self.inner.submit(number, writes, 0);
         assert_eq!(self.inner.tick(false), Ok(Some(number)), "one ordered transaction applied");
-        let Some(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(header)))) =
-            self.rows.get(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)))
+        let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))) =
+            self.rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))
         else {
             panic!("durable deployment");
         };
@@ -68,8 +68,8 @@ impl Store {
 
     #[must_use]
     pub fn header(&self) -> Deployment {
-        let Some(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(header)))) =
-            self.rows.get(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)))
+        let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))) =
+            self.rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))
         else {
             panic!("deployment");
         };

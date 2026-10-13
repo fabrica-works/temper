@@ -5,11 +5,11 @@
 use crate::escalation_referee::{QUESTION, REASON, REPORT, Referee, Story};
 use crate::store::Store;
 use crate::walking;
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
@@ -577,11 +577,11 @@ impl World {
                 self.commit_wait -= 1;
             } else {
                 let writes = &self.store.pending.front().expect("pending commit").1;
-                let held = writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Failed(tasks::Class::Run)));
+                let held = writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Failed(tasks::Class::Run)));
                 let decided = writes.iter().any(|write| {
                     matches!(
                         write,
-                        Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::EscalationDecision(_))))
+                        Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(_))))
                     )
                 });
                 let number = self.store.apply();
@@ -605,7 +605,7 @@ impl World {
             match request {
                 engine::Request::ToChild(released) => self.queue(engine::Event::Released(released), 0),
                 engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
-                    if writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Refused)) {
+                    if writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Refused)) {
                         assert!(self.unplaced_referee.is_none(), "one unassigned-claim terminal in this script");
                         self.unplaced_referee = Some(self.referee.clone());
                     }
@@ -614,13 +614,13 @@ impl World {
                     if self.store.pending.is_empty() {
                         self.commit_wait = self.settings.commit_delay;
                     }
-                    let held_cut = self.settings.cut == Cut::Held && writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Failed(tasks::Class::Run)));
+                    let held_cut = self.settings.cut == Cut::Held && writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) if terminal.end == tasks::End::Failed(tasks::Class::Run)));
                     let decision_cut = self.settings.cut == Cut::Decision
                         && writes.iter().any(|write| {
                             matches!(
                                 write,
-                                Write::Save(Record::Core(jig_core::Record::Core(
-                                    jig_core::CoreRecord::EscalationDecision(_)
+                                Write::Save(Record::Core(jig_domain_core::Record::Core(
+                                    jig_domain_core::CoreRecord::EscalationDecision(_)
                                 )))
                             )
                         });
@@ -642,7 +642,7 @@ impl World {
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
                     self.queue(
-                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                        engine::Event::Account(jig_domain_accounts::Event::Refreshed {
                             account,
                             generation,
                             valid: Duration::from_secs(60),

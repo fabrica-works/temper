@@ -3,7 +3,7 @@ use crate::Decision;
 use crate::boundary::{BriefBody, BriefConnector, BriefKind, BriefSection, ForgeBriefKind, Payload, Work};
 use crate::domain::Domain;
 use crate::limits::{BriefBudgets, Limits};
-use jig_core_brief as brief;
+use jig_domain_brief as brief;
 use skein_lib::{Env, Id, List, Queue, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
@@ -82,11 +82,11 @@ pub(crate) fn brief_outputs(
                     sections.push(section).expect("bounded brief sections");
                 }
                 if missing_owner {
-                    domain.work.push(Work::Core(jig_core::Event::BriefAssembled { task, ready: false }));
+                    domain.work.push(Work::Core(jig_domain_core::Event::BriefAssembled { task, ready: false }));
                     continue;
                 }
                 assert!(domain.brief_sections.insert(task, sections.into_boxed()) == Ok(None), "one brief assembly");
-                domain.work.push(Work::Core(jig_core::Event::BriefAssembled { task, ready: true }));
+                domain.work.push(Work::Core(jig_domain_core::Event::BriefAssembled { task, ready: true }));
             }
             brief::GatherRequest::Failed { .. } | brief::GatherRequest::Refused { .. } => {
                 unreachable!("the core abandons refused brief preparation")

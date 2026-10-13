@@ -2,7 +2,7 @@
 
 pub use crate::push::{PushDiagnostic, PushFailure, PushReason};
 use alloc::boxed::Box;
-pub use jig_host::{AgentFailure, AnsweredCall, Bounce, Finish, Grant, Hosting, Phase, Reason, RunFailure, Turn};
+pub use jig_domain_host::{AgentFailure, AnsweredCall, Bounce, Finish, Grant, Hosting, Phase, Reason, RunFailure, Turn};
 use skein_lib::Token;
 
 /// What the engine gives the worker for one run (worker-domain.md, 4.1).

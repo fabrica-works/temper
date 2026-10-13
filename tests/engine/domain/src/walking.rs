@@ -4,11 +4,11 @@
 
 use crate::store::Store;
 use crate::walking_referee::{FINAL_SPEND, QUESTION, REPORT, TURNS, WalkingReferee};
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
@@ -144,7 +144,7 @@ pub fn limits() -> engine::Limits {
             spent_attention: Duration::from_secs(1),
             facts: 2,
         },
-        views: jig_core_views::Limits {
+        views: jig_domain_views::Limits {
             runs: 2,
             watchers: 4,
             backlog: 2,
@@ -152,7 +152,7 @@ pub fn limits() -> engine::Limits {
             snapshot_bytes: 128,
             facts: 8,
         },
-        notes: jig_core_notes::Limits {
+        notes: jig_domain_notes::Limits {
             scopes: 4,
             entries_per_scope: 1,
             pattern_bytes: 64,
@@ -284,7 +284,7 @@ pub fn config(seed: u64) -> engine::Config {
         period_budget: 1000,
         person_budget: 500,
         chat_authority,
-        tools: jig_core::ToolFamilies::standard(),
+        tools: jig_domain_core::ToolFamilies::standard(),
         account: 1,
         account_generation: 1,
         account_valid: Some(Duration::from_secs(60)),
@@ -493,12 +493,12 @@ impl World {
                 self.commit_wait -= 1;
             } else {
                 let first_turn = self.store.pending.front().expect("pending commit").1.iter().any(
-                    |write| matches!(write, temper_engine_domain::Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(turn)))) if turn.turn == 1),
+                    |write| matches!(write, temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) if turn.turn == 1),
                 );
                 let terminal = self.store.pending.front().expect("pending commit").1.iter().any(|write| {
                     matches!(
                         write,
-                        temper_engine_domain::Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(
+                        temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(
                             _
                         ))))
                     )
@@ -522,8 +522,8 @@ impl World {
                 if !matches!(
                     key,
                     temper_engine_domain::Key::Core(
-                        jig_core::Key::Core(jig_core::CoreKey::Deployment)
-                            | jig_core::Key::People(people::Key::ReadPosition(_))
+                        jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)
+                            | jig_domain_core::Key::People(people::Key::ReadPosition(_))
                     )
                 ) {
                     assert_eq!(
@@ -620,7 +620,7 @@ impl World {
                         assert!(
                             writes.iter().any(|write| matches!(
                                 write,
-                                temper_engine_domain::Write::Save(Record::Core(jig_core::Record::People(
+                                temper_engine_domain::Write::Save(Record::Core(jig_domain_core::Record::People(
                                     people::Stored::ReadPosition { .. }
                                 )))
                             )),
@@ -645,7 +645,7 @@ impl World {
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
                     self.queue(
-                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                        engine::Event::Account(jig_domain_accounts::Event::Refreshed {
                             account,
                             generation,
                             valid: Duration::from_secs(60),

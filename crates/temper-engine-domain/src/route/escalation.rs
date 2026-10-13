@@ -76,7 +76,7 @@ pub(crate) fn historical_begin(
     let query = Query::Historical { request, person, project, task, revision };
     match domain.result_reads.insert(Some(Read::Escalation(query))) {
         Ok(waiter) => emit(barrier, &env.limits, Delivery::ReadEscalationDecision { waiter: waiter.token() }),
-        Err(_) => domain.work.push(Work::Core(jig_core::Event::HistoricalEscalation {
+        Err(_) => domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
             request,
             person,
             project,
@@ -93,7 +93,7 @@ pub(crate) fn inspected(domain: &mut Domain, waiter: Token, context: Option<Box<
         unreachable!("held-chat inspection belongs to an authenticated reader")
     };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::EscalationRead { to, person, task, context }));
+    domain.work.push(Work::Core(jig_domain_core::Event::EscalationRead { to, person, task, context }));
 }
 
 pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, rows: Box<[Record]>) {
@@ -107,27 +107,27 @@ pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, row
     };
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
-            Record::Core(jig_core::Record::Core(jig_core::CoreRecord::EscalationDecision(row))) => Some(row),
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row))) => Some(row),
             Record::Core(
-                jig_core::Record::Core(
-                    jig_core::CoreRecord::Call(_)
-                    | jig_core::CoreRecord::Deployment(_)
-                    | jig_core::CoreRecord::Turn(_)
-                    | jig_core::CoreRecord::RunProof(_)
-                    | jig_core::CoreRecord::Terminal(_)
-                    | jig_core::CoreRecord::Projection(_)
-                    | jig_core::CoreRecord::ProposalDecision(_),
+                jig_domain_core::Record::Core(
+                    jig_domain_core::CoreRecord::Call(_)
+                    | jig_domain_core::CoreRecord::Deployment(_)
+                    | jig_domain_core::CoreRecord::Turn(_)
+                    | jig_domain_core::CoreRecord::RunProof(_)
+                    | jig_domain_core::CoreRecord::Terminal(_)
+                    | jig_domain_core::CoreRecord::Projection(_)
+                    | jig_domain_core::CoreRecord::ProposalDecision(_),
                 )
-                | jig_core::Record::Tasks(_)
-                | jig_core::Record::People(_)
-                | jig_core::Record::Notes(_),
+                | jig_domain_core::Record::Tasks(_)
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
             )
             | Record::Forge { .. } => None,
         }
     } else {
         None
     };
-    domain.work.push(Work::Core(jig_core::Event::HistoricalEscalation {
+    domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
         request,
         person,
         project,
@@ -143,7 +143,7 @@ pub(crate) fn failed(domain: &mut Domain, waiter: Token) {
     domain.result_reads.retire(Id::from_token(waiter));
     match read {
         Read::Escalation(Query::Historical { request, person, project, task, revision }) => {
-            domain.work.push(Work::Core(jig_core::Event::HistoricalEscalation {
+            domain.work.push(Work::Core(jig_domain_core::Event::HistoricalEscalation {
                 request,
                 person,
                 project,

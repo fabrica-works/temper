@@ -4,7 +4,7 @@
 //! pushed resource evidence; this crate does not encode history or inspect git.
 
 use alloc::boxed::Box;
-use jig_core_tasks as tasks;
+use jig_domain_tasks as tasks;
 use smith_domain as smith;
 use smith_domain_run as run;
 use temper_engine_domain as engine;

@@ -2,8 +2,8 @@
 //! durable replies. The observer owns the outside roster/holder expectations;
 //! it never reads root or child state (domain/people.md, section 5.1).
 
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::Token;
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain::{Key, Record, Write};
@@ -90,30 +90,30 @@ impl Referee {
         let role_rows: Vec<_> = writes
             .iter()
             .filter_map(|write| match write {
-                Write::Save(Record::Core(jig_core::Record::People(people::Stored::Roles { project, holdings }))) => {
+                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project, holdings }))) => {
                     Some((*project, holdings))
                 }
                 Write::Save(
                     Record::Core(
-                        jig_core::Record::People(
+                        jig_domain_core::Record::People(
                             people::Stored::Person { .. }
                             | people::Stored::ReadPosition { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Policy { .. }
                             | people::Stored::Answer { .. },
                         )
-                        | jig_core::Record::Tasks(_)
-                        | jig_core::Record::Core(
-                            jig_core::CoreRecord::Projection(_)
-                            | jig_core::CoreRecord::Call(_)
-                            | jig_core::CoreRecord::Deployment(_)
-                            | jig_core::CoreRecord::Turn(_)
-                            | jig_core::CoreRecord::RunProof(_)
-                            | jig_core::CoreRecord::Terminal(_)
-                            | jig_core::CoreRecord::EscalationDecision(_)
-                            | jig_core::CoreRecord::ProposalDecision(_),
+                        | jig_domain_core::Record::Tasks(_)
+                        | jig_domain_core::Record::Core(
+                            jig_domain_core::CoreRecord::Projection(_)
+                            | jig_domain_core::CoreRecord::Call(_)
+                            | jig_domain_core::CoreRecord::Deployment(_)
+                            | jig_domain_core::CoreRecord::Turn(_)
+                            | jig_domain_core::CoreRecord::RunProof(_)
+                            | jig_domain_core::CoreRecord::Terminal(_)
+                            | jig_domain_core::CoreRecord::EscalationDecision(_)
+                            | jig_domain_core::CoreRecord::ProposalDecision(_),
                         )
-                        | jig_core::Record::Notes(_),
+                        | jig_domain_core::Record::Notes(_),
                     )
                     | Record::Forge { .. },
                 )
@@ -123,7 +123,7 @@ impl Referee {
         let answers: Vec<_> = writes
             .iter()
             .filter_map(|write| match write {
-                Write::Save(Record::Core(jig_core::Record::People(people::Stored::Answer {
+                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                     key,
                     ask,
                     outcome,
@@ -137,25 +137,25 @@ impl Referee {
                 }
                 Write::Save(
                     Record::Core(
-                        jig_core::Record::People(
+                        jig_domain_core::Record::People(
                             people::Stored::Person { .. }
                             | people::Stored::ReadPosition { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Roles { .. }
                             | people::Stored::Policy { .. },
                         )
-                        | jig_core::Record::Tasks(_)
-                        | jig_core::Record::Core(
-                            jig_core::CoreRecord::Projection(_)
-                            | jig_core::CoreRecord::Call(_)
-                            | jig_core::CoreRecord::Deployment(_)
-                            | jig_core::CoreRecord::Turn(_)
-                            | jig_core::CoreRecord::RunProof(_)
-                            | jig_core::CoreRecord::Terminal(_)
-                            | jig_core::CoreRecord::EscalationDecision(_)
-                            | jig_core::CoreRecord::ProposalDecision(_),
+                        | jig_domain_core::Record::Tasks(_)
+                        | jig_domain_core::Record::Core(
+                            jig_domain_core::CoreRecord::Projection(_)
+                            | jig_domain_core::CoreRecord::Call(_)
+                            | jig_domain_core::CoreRecord::Deployment(_)
+                            | jig_domain_core::CoreRecord::Turn(_)
+                            | jig_domain_core::CoreRecord::RunProof(_)
+                            | jig_domain_core::CoreRecord::Terminal(_)
+                            | jig_domain_core::CoreRecord::EscalationDecision(_)
+                            | jig_domain_core::CoreRecord::ProposalDecision(_),
                         )
-                        | jig_core::Record::Notes(_),
+                        | jig_domain_core::Record::Notes(_),
                     )
                     | Record::Forge { .. },
                 )
@@ -186,14 +186,14 @@ impl Referee {
             }
             for (number, expected_task) in &replacement.tasks {
                 let found = writes.iter().find_map(|write| match write {
-                    Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record))))
+                    Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record))))
                         if record.number == *number =>
                     {
                         Some(record.as_ref())
                     }
                     Write::Save(
                         Record::Core(
-                            jig_core::Record::Tasks(
+                            jig_domain_core::Record::Tasks(
                                 tasks::Stored::Live(_)
                                 | tasks::Stored::Ended(_)
                                 | tasks::Stored::Stub(_)
@@ -204,18 +204,18 @@ impl Referee {
                                 | tasks::Stored::Writer(_)
                                 | tasks::Stored::Pool(_),
                             )
-                            | jig_core::Record::People(_)
-                            | jig_core::Record::Core(
-                                jig_core::CoreRecord::Projection(_)
-                                | jig_core::CoreRecord::Call(_)
-                                | jig_core::CoreRecord::Deployment(_)
-                                | jig_core::CoreRecord::Turn(_)
-                                | jig_core::CoreRecord::RunProof(_)
-                                | jig_core::CoreRecord::Terminal(_)
-                                | jig_core::CoreRecord::EscalationDecision(_)
-                                | jig_core::CoreRecord::ProposalDecision(_),
+                            | jig_domain_core::Record::People(_)
+                            | jig_domain_core::Record::Core(
+                                jig_domain_core::CoreRecord::Projection(_)
+                                | jig_domain_core::CoreRecord::Call(_)
+                                | jig_domain_core::CoreRecord::Deployment(_)
+                                | jig_domain_core::CoreRecord::Turn(_)
+                                | jig_domain_core::CoreRecord::RunProof(_)
+                                | jig_domain_core::CoreRecord::Terminal(_)
+                                | jig_domain_core::CoreRecord::EscalationDecision(_)
+                                | jig_domain_core::CoreRecord::ProposalDecision(_),
                             )
-                            | jig_core::Record::Notes(_),
+                            | jig_domain_core::Record::Notes(_),
                         )
                         | Record::Forge { .. },
                     )
@@ -256,45 +256,45 @@ impl Referee {
         }
         for write in writes {
             match write {
-                Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) => {
+                Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) => {
                     if replacement.is_none_or(|replacement| !replacement.tasks.contains_key(&record.number)) {
                         return Err("unchanged or rejected task was rewritten");
                     }
                 }
                 Write::Save(Record::Core(
-                    jig_core::Record::Tasks(_)
-                    | jig_core::Record::Core(
-                        jig_core::CoreRecord::Projection(_)
-                        | jig_core::CoreRecord::Call(_)
-                        | jig_core::CoreRecord::RunProof(_)
-                        | jig_core::CoreRecord::Terminal(_)
-                        | jig_core::CoreRecord::EscalationDecision(_)
-                        | jig_core::CoreRecord::ProposalDecision(_)
-                        | jig_core::CoreRecord::Turn(_),
+                    jig_domain_core::Record::Tasks(_)
+                    | jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Projection(_)
+                        | jig_domain_core::CoreRecord::Call(_)
+                        | jig_domain_core::CoreRecord::RunProof(_)
+                        | jig_domain_core::CoreRecord::Terminal(_)
+                        | jig_domain_core::CoreRecord::EscalationDecision(_)
+                        | jig_domain_core::CoreRecord::ProposalDecision(_)
+                        | jig_domain_core::CoreRecord::Turn(_),
                     )
-                    | jig_core::Record::Notes(_),
+                    | jig_domain_core::Record::Notes(_),
                 ))
                 | Write::Erase(Key::Core(
-                    jig_core::Key::Core(
-                        jig_core::CoreKey::Projection(_)
-                        | jig_core::CoreKey::Call(_)
-                        | jig_core::CoreKey::RunProof(..)
-                        | jig_core::CoreKey::Terminal { .. }
-                        | jig_core::CoreKey::EscalationDecision { .. }
-                        | jig_core::CoreKey::ProposalDecision(_)
-                        | jig_core::CoreKey::Turn { .. },
+                    jig_domain_core::Key::Core(
+                        jig_domain_core::CoreKey::Projection(_)
+                        | jig_domain_core::CoreKey::Call(_)
+                        | jig_domain_core::CoreKey::RunProof(..)
+                        | jig_domain_core::CoreKey::Terminal { .. }
+                        | jig_domain_core::CoreKey::EscalationDecision { .. }
+                        | jig_domain_core::CoreKey::ProposalDecision(_)
+                        | jig_domain_core::CoreKey::Turn { .. },
                     )
-                    | jig_core::Key::Tasks(_)
-                    | jig_core::Key::Notes(_),
+                    | jig_domain_core::Key::Tasks(_)
+                    | jig_domain_core::Key::Notes(_),
                 )) => return Err("role administration changed funding or accepted work"),
                 Write::Save(Record::Core(
-                    jig_core::Record::People(_) | jig_core::Record::Core(jig_core::CoreRecord::Deployment(_)),
+                    jig_domain_core::Record::People(_) | jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_)),
                 ))
-                | Write::Erase(Key::Core(jig_core::Key::People(_))) => {}
+                | Write::Erase(Key::Core(jig_domain_core::Key::People(_))) => {}
                 Write::Save(Record::Forge { .. }) | Write::Erase(Key::Forge(_)) => {
                     return Err("role administration changed forge state");
                 }
-                Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment))) => {
+                Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))) => {
                     return Err("role administration erased deployment");
                 }
             }
@@ -331,7 +331,7 @@ impl Referee {
         if reply != obligation.reply {
             return Err("role terminal differs from outside expectation");
         }
-        let answer_key = Key::Core(jig_core::Key::People(people::Key::Answer(people::RequestKey {
+        let answer_key = Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey {
             person: obligation.person,
             key: obligation.key,
         })));
@@ -342,7 +342,7 @@ impl Referee {
                 }
             }
             people::Reply::Outcome(outcome) => {
-                if !matches!(rows.get(&answer_key), Some(Record::Core(jig_core::Record::People(people::Stored::Answer { ask, outcome: saved, .. }))) if ask.as_ref() == &obligation.ask && *saved == outcome)
+                if !matches!(rows.get(&answer_key), Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome: saved, .. }))) if ask.as_ref() == &obligation.ask && *saved == outcome)
                 {
                     return Err("role terminal before exact durable keyed answer");
                 }

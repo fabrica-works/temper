@@ -5,13 +5,13 @@ use crate::limits::{Limits, environment_core};
 use crate::route::{LandingRule, host_route};
 use crate::{CallAnswer, Decision, Delivery};
 use alloc::boxed::Box;
-use jig_core::RunPolicy;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::RunPolicy;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use skein_lib::{Env, List, Map, Queue, ReplyTo, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
@@ -59,7 +59,7 @@ pub struct Config {
     /// Exact task authority checked for each authenticated chat.
     pub chat_authority: authority::Authority,
     /// One-bit family assignments for the engine tools in this charter.
-    pub tools: jig_core::ToolFamilies,
+    pub tools: jig_domain_core::ToolFamilies,
     /// Account required by the chat charter, configured through the accounts child.
     pub account: u32,
     /// Existing secret-free generation at startup.
@@ -75,7 +75,7 @@ pub(crate) struct RootConfig {
     pub(crate) forge_connector: u16,
 }
 
-pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_core::Config, RootConfig) {
+pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_domain_core::Config, RootConfig) {
     let Config {
         deployment,
         seed,
@@ -100,7 +100,7 @@ pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_core::Co
         forge: _,
     } = config;
     (
-        jig_core::Config {
+        jig_domain_core::Config {
             deployment,
             seed,
             owners,
@@ -108,7 +108,7 @@ pub(crate) fn split_config(config: Config, projects: List<u32>) -> (jig_core::Co
             projects,
             permission_roles,
             connectors: Box::new([forge_connector]),
-            settings: jig_core::Settings {
+            settings: jig_domain_core::Settings {
                 deployment_provider,
                 recurring_connector,
                 charter,
@@ -153,50 +153,50 @@ pub(crate) fn view_outputs(
     }
 }
 
-pub(crate) fn view_requests(routed: jig_core::Requests, room: u32) -> Queue<views::Request> {
+pub(crate) fn view_requests(routed: jig_domain_core::Requests, room: u32) -> Queue<views::Request> {
     let mut child = Queue::with_capacity(room);
-    let jig_core::Requests::Out(mut marked) = routed;
+    let jig_domain_core::Requests::Out(mut marked) = routed;
     for _ in 0..marked.len() {
         match marked.pop().expect("view mark count") {
-            jig_core::Request::Now(value) => match *value {
-                jig_core::Now::View(request) => child.push(request),
-                jig_core::Now::Account(_) => unreachable!("view route does not own account output"),
-                jig_core::Now::SignInRefused { .. }
-                | jig_core::Now::WatchRefused { .. }
-                | jig_core::Now::NotesIndexed { .. }
-                | jig_core::Now::NotesRecalled { .. }
-                | jig_core::Now::NotesRefused { .. }
-                | jig_core::Now::NoteBusy { .. }
-                | jig_core::Now::Relayed { .. }
-                | jig_core::Now::EffectAnswer { .. }
-                | jig_core::Now::DropPayload { .. }
-                | jig_core::Now::DropAssignment { .. }
-                | jig_core::Now::TurnPayload { .. }
-                | jig_core::Now::AnswerPayload { .. }
-                | jig_core::Now::AcceptedTurn { .. }
-                | jig_core::Now::RefusedPayload { .. }
-                | jig_core::Now::Activate { .. }
-                | jig_core::Now::PrepareAgent { .. }
-                | jig_core::Now::StartPreparation { .. }
-                | jig_core::Now::HistoricalProposal { .. }
-                | jig_core::Now::BriefCorePlanned { .. }
-                | jig_core::Now::WorkspaceRequest { .. }
-                | jig_core::Now::RunPreparationFailed { .. }
-                | jig_core::Now::RunPrepared { .. }
-                | jig_core::Now::CompleteBrief { .. }
-                | jig_core::Now::HistoricalEscalation { .. }
-                | jig_core::Now::EscalationInspection { .. }
-                | jig_core::Now::EscalationReply { .. }
-                | jig_core::Now::EscalationRefused { .. }
-                | jig_core::Now::ProcedureDelegateOutcome { .. }
-                | jig_core::Now::SettledCallRefused { .. }
-                | jig_core::Now::Call { .. }
-                | jig_core::Now::DropCall { .. }
-                | jig_core::Now::Undelivered { .. }
-                | jig_core::Now::RestoreRefused => unreachable!("view route owns its now output"),
+            jig_domain_core::Request::Now(value) => match *value {
+                jig_domain_core::Now::View(request) => child.push(request),
+                jig_domain_core::Now::Account(_) => unreachable!("view route does not own account output"),
+                jig_domain_core::Now::SignInRefused { .. }
+                | jig_domain_core::Now::WatchRefused { .. }
+                | jig_domain_core::Now::NotesIndexed { .. }
+                | jig_domain_core::Now::NotesRecalled { .. }
+                | jig_domain_core::Now::NotesRefused { .. }
+                | jig_domain_core::Now::NoteBusy { .. }
+                | jig_domain_core::Now::Relayed { .. }
+                | jig_domain_core::Now::EffectAnswer { .. }
+                | jig_domain_core::Now::DropPayload { .. }
+                | jig_domain_core::Now::DropAssignment { .. }
+                | jig_domain_core::Now::TurnPayload { .. }
+                | jig_domain_core::Now::AnswerPayload { .. }
+                | jig_domain_core::Now::AcceptedTurn { .. }
+                | jig_domain_core::Now::RefusedPayload { .. }
+                | jig_domain_core::Now::Activate { .. }
+                | jig_domain_core::Now::PrepareAgent { .. }
+                | jig_domain_core::Now::StartPreparation { .. }
+                | jig_domain_core::Now::HistoricalProposal { .. }
+                | jig_domain_core::Now::BriefCorePlanned { .. }
+                | jig_domain_core::Now::WorkspaceRequest { .. }
+                | jig_domain_core::Now::RunPreparationFailed { .. }
+                | jig_domain_core::Now::RunPrepared { .. }
+                | jig_domain_core::Now::CompleteBrief { .. }
+                | jig_domain_core::Now::HistoricalEscalation { .. }
+                | jig_domain_core::Now::EscalationInspection { .. }
+                | jig_domain_core::Now::EscalationReply { .. }
+                | jig_domain_core::Now::EscalationRefused { .. }
+                | jig_domain_core::Now::ProcedureDelegateOutcome { .. }
+                | jig_domain_core::Now::SettledCallRefused { .. }
+                | jig_domain_core::Now::Call { .. }
+                | jig_domain_core::Now::DropCall { .. }
+                | jig_domain_core::Now::Undelivered { .. }
+                | jig_domain_core::Now::RestoreRefused => unreachable!("view route owns its now output"),
             },
-            jig_core::Request::Decided => {}
-            jig_core::Request::Write(_) | jig_core::Request::Ask { .. } | jig_core::Request::Held(_) => {
+            jig_domain_core::Request::Decided => {}
+            jig_domain_core::Request::Write(_) | jig_domain_core::Request::Ask { .. } | jig_domain_core::Request::Held(_) => {
                 unreachable!("view route changes no decision")
             }
         }
@@ -213,7 +213,7 @@ pub(crate) fn view_step(domain: &mut Domain, env: &Env<Limits>, event: views::Ev
 
 /// Route inside an already reserved decision, including a released projection.
 pub(crate) fn view_into(domain: &mut Domain, env: &Env<Limits>, event: views::Event, out: &mut Queue<Request>) {
-    let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::View(event));
+    let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::View(event));
     let mut child = view_requests(routed, views::max_out(&env.limits.views));
     view_outputs(domain, env, &mut child, out);
 }
@@ -242,55 +242,55 @@ pub(crate) fn open_watch(
     let ready = domain.ready() && domain.core.counters.quiescent(domain.journal.idle()) && domain.work.is_empty();
     let room = skein_lib::JournalRoom { writes: 0, held: 0 };
     let Some(decision) = domain.journal.decision(&room) else { return };
-    let routed = jig_core::step(
+    let routed = jig_domain_core::step(
         &mut domain.core,
         &environment_core(env),
-        jig_core::Event::Watch { watcher, sign_in, key, project, subject, ready },
+        jig_domain_core::Event::Watch { watcher, sign_in, key, project, subject, ready },
     );
-    let jig_core::Requests::Out(mut marked) = routed;
+    let jig_domain_core::Requests::Out(mut marked) = routed;
     for _ in 0..marked.len() {
         match marked.pop().expect("watch output count") {
-            jig_core::Request::Now(value) => match *value {
-                jig_core::Now::View(request) => out.push(Request::Party(crate::PartyRequest::View(request))),
-                jig_core::Now::WatchRefused { watcher, refusal } => {
+            jig_domain_core::Request::Now(value) => match *value {
+                jig_domain_core::Now::View(request) => out.push(Request::Party(crate::PartyRequest::View(request))),
+                jig_domain_core::Now::WatchRefused { watcher, refusal } => {
                     out.push(Request::Party(crate::PartyRequest::WatchRefused { watcher, refusal }));
                 }
-                jig_core::Now::SignInRefused { .. }
-                | jig_core::Now::Account(_)
-                | jig_core::Now::NotesIndexed { .. }
-                | jig_core::Now::NotesRecalled { .. }
-                | jig_core::Now::NotesRefused { .. }
-                | jig_core::Now::NoteBusy { .. }
-                | jig_core::Now::Relayed { .. }
-                | jig_core::Now::EffectAnswer { .. }
-                | jig_core::Now::DropPayload { .. }
-                | jig_core::Now::DropAssignment { .. }
-                | jig_core::Now::TurnPayload { .. }
-                | jig_core::Now::AnswerPayload { .. }
-                | jig_core::Now::AcceptedTurn { .. }
-                | jig_core::Now::RefusedPayload { .. }
-                | jig_core::Now::Activate { .. }
-                | jig_core::Now::PrepareAgent { .. }
-                | jig_core::Now::StartPreparation { .. }
-                | jig_core::Now::HistoricalProposal { .. }
-                | jig_core::Now::BriefCorePlanned { .. }
-                | jig_core::Now::WorkspaceRequest { .. }
-                | jig_core::Now::RunPreparationFailed { .. }
-                | jig_core::Now::RunPrepared { .. }
-                | jig_core::Now::CompleteBrief { .. }
-                | jig_core::Now::HistoricalEscalation { .. }
-                | jig_core::Now::EscalationInspection { .. }
-                | jig_core::Now::EscalationReply { .. }
-                | jig_core::Now::EscalationRefused { .. }
-                | jig_core::Now::ProcedureDelegateOutcome { .. }
-                | jig_core::Now::SettledCallRefused { .. }
-                | jig_core::Now::Call { .. }
-                | jig_core::Now::DropCall { .. }
-                | jig_core::Now::Undelivered { .. }
-                | jig_core::Now::RestoreRefused => unreachable!("watch route has only volatile view outputs"),
+                jig_domain_core::Now::SignInRefused { .. }
+                | jig_domain_core::Now::Account(_)
+                | jig_domain_core::Now::NotesIndexed { .. }
+                | jig_domain_core::Now::NotesRecalled { .. }
+                | jig_domain_core::Now::NotesRefused { .. }
+                | jig_domain_core::Now::NoteBusy { .. }
+                | jig_domain_core::Now::Relayed { .. }
+                | jig_domain_core::Now::EffectAnswer { .. }
+                | jig_domain_core::Now::DropPayload { .. }
+                | jig_domain_core::Now::DropAssignment { .. }
+                | jig_domain_core::Now::TurnPayload { .. }
+                | jig_domain_core::Now::AnswerPayload { .. }
+                | jig_domain_core::Now::AcceptedTurn { .. }
+                | jig_domain_core::Now::RefusedPayload { .. }
+                | jig_domain_core::Now::Activate { .. }
+                | jig_domain_core::Now::PrepareAgent { .. }
+                | jig_domain_core::Now::StartPreparation { .. }
+                | jig_domain_core::Now::HistoricalProposal { .. }
+                | jig_domain_core::Now::BriefCorePlanned { .. }
+                | jig_domain_core::Now::WorkspaceRequest { .. }
+                | jig_domain_core::Now::RunPreparationFailed { .. }
+                | jig_domain_core::Now::RunPrepared { .. }
+                | jig_domain_core::Now::CompleteBrief { .. }
+                | jig_domain_core::Now::HistoricalEscalation { .. }
+                | jig_domain_core::Now::EscalationInspection { .. }
+                | jig_domain_core::Now::EscalationReply { .. }
+                | jig_domain_core::Now::EscalationRefused { .. }
+                | jig_domain_core::Now::ProcedureDelegateOutcome { .. }
+                | jig_domain_core::Now::SettledCallRefused { .. }
+                | jig_domain_core::Now::Call { .. }
+                | jig_domain_core::Now::DropCall { .. }
+                | jig_domain_core::Now::Undelivered { .. }
+                | jig_domain_core::Now::RestoreRefused => unreachable!("watch route has only volatile view outputs"),
             },
-            jig_core::Request::Decided => {}
-            jig_core::Request::Write(_) | jig_core::Request::Ask { .. } | jig_core::Request::Held(_) => {
+            jig_domain_core::Request::Decided => {}
+            jig_domain_core::Request::Write(_) | jig_domain_core::Request::Ask { .. } | jig_domain_core::Request::Held(_) => {
                 unreachable!("watch route changes no store decision")
             }
         }
@@ -338,7 +338,7 @@ pub(crate) fn checked_call(mut body: Call, limits: &Limits) -> Call {
                 Tool::RejectedControl(why)
             }
             Tool::Propose { .. } | Tool::Decide { .. } | Tool::Withdraw { .. } => Tool::RejectedProposal(why),
-            Tool::Note { .. } | Tool::Recall { .. } => Tool::RejectedNote(jig_core_notes::Refusal::Oversized),
+            Tool::Note { .. } | Tool::Recall { .. } => Tool::RejectedNote(jig_domain_notes::Refusal::Oversized),
             Tool::Delegate { .. }
             | Tool::Introduce { .. }
             | Tool::Subscribe { .. }
@@ -544,21 +544,21 @@ pub(crate) fn call_shape(tool: &Tool, limits: &tasks::Limits) -> Option<tasks::R
     }
 }
 
-pub(crate) fn tool_kind(tool: &Tool) -> Option<jig_core::ToolKind> {
+pub(crate) fn tool_kind(tool: &Tool) -> Option<jig_domain_core::ToolKind> {
     Some(match tool {
-        Tool::Delegate { .. } => jig_core::ToolKind::Delegate,
-        Tool::Message { target, .. } => jig_core::ToolKind::Message { target: *target },
-        Tool::Introduce { left, .. } => jig_core::ToolKind::Message { target: *left },
-        Tool::Amend { .. } | Tool::Cancel { .. } | Tool::Release { .. } => jig_core::ToolKind::Control,
-        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => jig_core::ToolKind::Decide,
-        Tool::Propose { .. } => jig_core::ToolKind::Propose,
+        Tool::Delegate { .. } => jig_domain_core::ToolKind::Delegate,
+        Tool::Message { target, .. } => jig_domain_core::ToolKind::Message { target: *target },
+        Tool::Introduce { left, .. } => jig_domain_core::ToolKind::Message { target: *left },
+        Tool::Amend { .. } | Tool::Cancel { .. } | Tool::Release { .. } => jig_domain_core::ToolKind::Control,
+        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => jig_domain_core::ToolKind::Decide,
+        Tool::Propose { .. } => jig_domain_core::ToolKind::Propose,
         Tool::Subscribe { .. } | Tool::SubscribeForge { .. } | Tool::Unsubscribe { .. } => {
-            jig_core::ToolKind::Subscribe
+            jig_domain_core::ToolKind::Subscribe
         }
-        Tool::EffectForge { .. } => jig_core::ToolKind::Effect,
-        Tool::Note { entry, .. } => jig_core::ToolKind::Note { scope: entry.scope.clone() },
-        Tool::Recall { by, .. } => jig_core::ToolKind::Recall { by: by.clone() },
-        Tool::ReadForge { .. } => jig_core::ToolKind::Read,
+        Tool::EffectForge { .. } => jig_domain_core::ToolKind::Effect,
+        Tool::Note { entry, .. } => jig_domain_core::ToolKind::Note { scope: entry.scope.clone() },
+        Tool::Recall { by, .. } => jig_domain_core::ToolKind::Recall { by: by.clone() },
+        Tool::ReadForge { .. } => jig_domain_core::ToolKind::Read,
         Tool::Unavailable
         | Tool::Rejected(_)
         | Tool::RejectedMessage(_)

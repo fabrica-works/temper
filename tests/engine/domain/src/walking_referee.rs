@@ -2,9 +2,9 @@
 //! checked against durable fake-store rows, never the root's private state
 //! (domain/engine.md, section 15).
 
-use jig_core_brief as brief;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_brief as brief;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain::{Assignment, Key, Record, Write};
 use temper_engine_domain::{BriefBody as Body, BriefKind as Kind};
@@ -41,8 +41,8 @@ pub struct WalkingReferee {
 
 fn task_record(rows: &BTreeMap<Key, Record>, number: u64) -> Option<&tasks::TaskRecord> {
     for key in [tasks::Key::Live(number), tasks::Key::Ended(number)] {
-        if let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record) | tasks::Stored::Ended(record)))) =
-            rows.get(&Key::Core(jig_core::Key::Tasks(key)))
+        if let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record) | tasks::Stored::Ended(record)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Tasks(key)))
         {
             return Some(record);
         }
@@ -63,28 +63,28 @@ impl WalkingReferee {
             }
         }
         for write in writes {
-            if let Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) = write
+            if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write
                 && matches!(record.phase, tasks::Phase::Active(tasks::Active::Claimed { .. }))
             {
                 let claimed = writes.iter().any(|write| matches!(write,
-                        Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::RunProof(proof)))) if proof.task == record.number && proof.attempt == record.attempt && proof.turn.is_none() && proof.terminal.is_none()));
+                        Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) if proof.task == record.number && proof.attempt == record.attempt && proof.turn.is_none() && proof.terminal.is_none()));
                 if !claimed {
                     return Err("claim and reserved root proof are not one transaction");
                 }
             }
-            if let Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(turn)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))) = write {
                 let expected = TURNS.iter().find(|(number, _, _)| *number == turn.turn).ok_or("unexpected turn")?;
                 if turn.spent != expected.1 || turn.transcript.as_ref() != expected.2 || turn.read.is_some() {
                     return Err("turn differs from worker script");
                 }
                 let charged = writes.iter().any(|write| {
                     matches!(write,
-                    Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) if record.number == turn.task
+                    Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) if record.number == turn.task
                         && record.attempt == turn.attempt && record.turn == turn.turn
                         && record.run_spent == expected.1 && record.numbers.spent == expected.1)
                 });
                 let proven = writes.iter().any(|write| matches!(write,
-                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::RunProof(proof)))) if proof.task == turn.task && proof.attempt == turn.attempt
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) if proof.task == turn.task && proof.attempt == turn.attempt
                         && proof.turn == Some(temper_engine_domain::TurnProof { turn: turn.turn, cumulative: turn.spent, read: turn.read })));
                 if !charged {
                     return Err("transcript and accepted charge are not one transaction");
@@ -96,18 +96,18 @@ impl WalkingReferee {
                     return Err("transcript committed twice");
                 }
             }
-            if let Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(record)))) = write {
+            if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(record)))) = write {
                 let posted = writes.iter().any(|write| {
                     matches!(write,
-                    Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ledger(ledger))))
+                    Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(ledger))))
                     if ledger.funder == record.funder && ledger.numbers.spent_below == FINAL_SPEND
                         && ledger.numbers.reserved == 0)
                 });
-                let retired = writes.contains(&Write::Erase(Key::Core(jig_core::Key::Core(
-                    jig_core::CoreKey::RunProof(record.number),
+                let retired = writes.contains(&Write::Erase(Key::Core(jig_domain_core::Key::Core(
+                    jig_domain_core::CoreKey::RunProof(record.number),
                 ))));
                 let terminal = writes.iter().any(|write| matches!(write,
-                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(proof)))) if proof.task == record.number && proof.attempt == record.attempt && proof.cumulative == FINAL_SPEND
+                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(proof)))) if proof.task == record.number && proof.attempt == record.attempt && proof.cumulative == FINAL_SPEND
                         && proof.end == (tasks::End::Finished { result: tasks::TaskResult::Report { words: REPORT.into() }, cancel_delegates: false })));
                 if record.numbers.spent != FINAL_SPEND || !posted {
                     return Err("terminal and funding posting are not one transaction");
@@ -129,8 +129,8 @@ impl WalkingReferee {
     /// # Errors
     /// Names a reply without its durable authenticated person/session records.
     pub fn signed_in(&mut self, rows: &BTreeMap<Key, Record>, person: u64, sign_in: u64) -> Result<(), &'static str> {
-        let Some(Record::Core(jig_core::Record::People(people::Stored::Person { number, identity }))) =
-            rows.get(&Key::Core(jig_core::Key::People(people::Key::Person(person))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Person { number, identity }))) =
+            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Person(person))))
         else {
             return Err("sign-in reply before durable identity");
         };
@@ -139,8 +139,8 @@ impl WalkingReferee {
         {
             return Err("wrong authenticated person");
         }
-        let Some(Record::Core(jig_core::Record::People(people::Stored::SignIn { person: authenticated, .. }))) =
-            rows.get(&Key::Core(jig_core::Key::People(people::Key::SignIn(sign_in))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { person: authenticated, .. }))) =
+            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::SignIn(sign_in))))
         else {
             return Err("sign-in reply before durable session");
         };
@@ -162,8 +162,8 @@ impl WalkingReferee {
     pub fn started(&mut self, rows: &BTreeMap<Key, Record>, task: u64) -> Result<(), &'static str> {
         let person = self.person.ok_or("chat before sign-in")?;
         let key = people::RequestKey { person, key: [5; 16] };
-        let Some(Record::Core(jig_core::Record::People(people::Stored::Answer { ask, outcome, .. }))) =
-            rows.get(&Key::Core(jig_core::Key::People(people::Key::Answer(key))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome, .. }))) =
+            rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(key))))
         else {
             return Err("chat reply before keyed answer commit");
         };
@@ -245,8 +245,8 @@ impl WalkingReferee {
             return Err("turn ACK has wrong claim fence");
         }
         let expected = TURNS.iter().find(|(number, _, _)| *number == turn).ok_or("unexpected turn ACK")?;
-        let Some(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(record)))) =
-            rows.get(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Turn { task, attempt, turn })))
+        let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(record)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task, attempt, turn })))
         else {
             return Err("turn ACK before durable transcript");
         };
@@ -300,8 +300,8 @@ impl WalkingReferee {
         if self.person != Some(person) || self.task != Some(task) || words != REPORT {
             return Err("wrong person result");
         }
-        let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(record)))) =
-            rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(task))))
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(record)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task))))
         else {
             return Err("result before durable ended record");
         };
@@ -317,13 +317,13 @@ impl WalkingReferee {
         }
         let pool = tasks::Funder::Pool { project: 1, person, period: 1 };
         let period = tasks::Funder::Period { project: 1, period: 1 };
-        let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ledger(pool_row)))) =
-            rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(pool))))
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(pool_row)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(pool))))
         else {
             return Err("result without durable person funding");
         };
-        let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ledger(period_row)))) =
-            rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ledger(period))))
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(period_row)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ledger(period))))
         else {
             return Err("result without durable project funding");
         };
@@ -374,8 +374,8 @@ impl WalkingReferee {
     fn terminal_evidence(&self, rows: &BTreeMap<Key, Record>) -> Result<(), &'static str> {
         let task = self.task.ok_or("terminal without task")?;
         let attempt = self.attempt.ok_or("terminal without attempt")?;
-        let Some(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)))) =
-            rows.get(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::Terminal { task, attempt })))
+        let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)))) =
+            rows.get(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Terminal { task, attempt })))
         else {
             return Err("durable terminal evidence missing");
         };
@@ -391,8 +391,8 @@ impl WalkingReferee {
             return Err("durable terminal evidence differs from worker offer");
         }
         let _record = task_record(rows, task).ok_or("terminal without ended task")?;
-        if rows.contains_key(&Key::Core(jig_core::Key::Core(jig_core::CoreKey::RunProof(task))))
-            || rows.contains_key(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(task))))
+        if rows.contains_key(&Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task))))
+            || rows.contains_key(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task))))
         {
             return Err("ended task retained a live task or proof");
         }

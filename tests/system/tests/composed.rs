@@ -1,5 +1,5 @@
 //! Both roots and Smith's domain share every durable and process crossing.
-use jig_core_tasks as tasks;
+use jig_domain_tasks as tasks;
 use temper_engine_domain::{Key, Record};
 use temper_system_world::composed::{World, report_script};
 
@@ -15,8 +15,8 @@ fn a_committed_chat_runs_through_the_worker_and_smith_and_returns_a_report() {
     assert_eq!(observed.turns, observed.turn_acks);
     assert!(observed.turns > 0);
     let task = world.assignment().task;
-    assert!(matches!(world.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(task)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))))
+    assert!(matches!(world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))))
         if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { .. })))));
 }
 

@@ -1,10 +1,10 @@
 //! A proposed person goal crosses its approval, task, and Smith planning cuts.
 
 use crate::world;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
 use skein_lib::{Duration, Queue, ReplyTo, Token};
 use smith_agent_world::Job;
@@ -190,7 +190,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
             .store
             .rows
             .values()
-            .any(|row| matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(_)))))
+            .any(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
     );
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(306)),
@@ -205,8 +205,8 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
     }));
     driver.settle();
     assert!(
-        matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::PersonProposal(proposal)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::PersonProposal(row))))
+        matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::PersonProposal(proposal)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::PersonProposal(row))))
             if row.state == tasks::PersonProposalState::Accepted { by: tasks::Party::Person(maintainer) }),
         "{:?}",
         driver.delivered.iter().rev().take(3).collect::<Vec<_>>()
@@ -264,12 +264,12 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         planner.answer()
     );
     assert!(
-        matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(goal.task)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row)))) if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(_)))),
+        matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(goal.task)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))) if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(_)))),
         "goal live={:?} ended={:?} child={:?}",
-        driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(goal.task)))),
-        driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(goal.task)))),
-        driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(child.task))))
+        driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(goal.task)))),
+        driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(goal.task)))),
+        driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(child.task))))
     );
 }
 
@@ -426,12 +426,12 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
     }));
     driver.settle();
     assert!(
-        matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(coordinator)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row))))
+        matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(coordinator)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row))))
             if row.wake.words == tasks::WakeRule::Batch { count: 3, age: Duration::from_secs(100) }),
         "amend replies={:?} task={:?}",
         driver.delivered.iter().rev().take(4).collect::<Vec<_>>(),
-        driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(coordinator))))
+        driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(coordinator))))
     );
     let amended = driver
         .delivered
@@ -472,7 +472,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             .store
             .rows
             .iter()
-            .filter(|(key, _)| matches!(key, Key::Core(jig_core::Key::Tasks(tasks::Key::Live(_)))))
+            .filter(|(key, _)| matches!(key, Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(_)))))
             .collect::<Vec<_>>(),
         driver.delivered.iter().filter(|item| matches!(item, Delivery::CallAnswer { .. })).collect::<Vec<_>>(),
         driver.delivered.iter().filter(|item| matches!(item, Delivery::Assigned { .. })).collect::<Vec<_>>()
@@ -525,6 +525,6 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
         })
         .count();
     assert_eq!(wakes, 2);
-    assert!(matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(coordinator)))),
-        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) if row.inbox.iter().filter(|entry| entry.kind == tasks::MessageKind::Words).count() == 3));
+    assert!(matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(coordinator)))),
+        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) if row.inbox.iter().filter(|entry| entry.kind == tasks::MessageKind::Words).count() == 3));
 }

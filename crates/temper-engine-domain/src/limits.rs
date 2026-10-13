@@ -6,15 +6,15 @@ use crate::domain::{Domain, max_out};
 use crate::route::{LandingRule, forge_route, host_route};
 use crate::{CallKey, Decision, JournalLimits, Output, loads};
 use alloc::boxed::Box;
-use jig_core::{Model, RunCharter, RunPolicy};
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_brief as brief;
-use jig_core_fleet as fleet;
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::{Model, RunCharter, RunPolicy};
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_brief as brief;
+use jig_domain_fleet as fleet;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use skein_lib::{Env, List, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
@@ -82,12 +82,12 @@ pub(crate) fn root_journal_limits(limits: &Limits) -> skein_lib::JournalLimits {
     journal
 }
 
-pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_core::Limits> {
+pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits> {
     Env { now: env.now, wall: env.wall, limits: core_limits(&env.limits) }
 }
 
-pub(crate) fn core_limits(limits: &Limits) -> jig_core::Limits {
-    jig_core::Limits {
+pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
+    jig_domain_core::Limits {
         connectors: 1,
         resume_bytes: limits.journal.transcript_bytes,
         run_bytes: limits.journal.run_bytes,
@@ -106,7 +106,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_core::Limits {
         fleet: limits.fleet,
         brief: brief_limits(&limits.brief),
         brief_parts: limits.brief.parts,
-        brief_core_budgets: jig_core::CoreBriefBudgets {
+        brief_core_budgets: jig_domain_core::CoreBriefBudgets {
             task: limits.brief.budgets.task,
             dependencies: limits.brief.budgets.dependencies,
             attempts: limits.brief.budgets.attempts,
@@ -209,7 +209,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.forge.brief_sections < brief_fetches || limits.forge.brief_bytes < limits.brief.read_bytes {
         return None;
     }
-    let core_bytes = jig_core::worst_case(&core_limits(limits))?;
+    let core_bytes = jig_domain_core::worst_case(&core_limits(limits))?;
     let forge_bytes = forge::worst_case(&limits.forge)?;
     let landing_bytes = Map::<u32, Box<[LandingRule]>>::worst_case(limits.authority.projects)?.checked_add(
         u64::from(limits.authority.projects).checked_add(1)?.checked_mul(u64::from(limits.journal.transcript_bytes))?,

@@ -1,5 +1,5 @@
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
 use skein_lib::{ReplyTo, Token};
 use smith_agent_world::Job;
@@ -13,13 +13,13 @@ use temper_system_world::world;
 fn a_chat_answers_through_a_smith_run_and_a_committed_root_result() {
     let mut world = world::chat(b"@report", Job::Reporting);
     world.run();
-    let result = world.root.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(world.assignment.task))));
+    let result = world.root.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(world.assignment.task))));
     assert!(
         matches!(world.agent.answer(), run::Answer::Accepted { outcome: run::outcome::Declared::Report(_), .. }),
         "{:?}",
         world.agent.answer()
     );
-    assert!(matches!(result, Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))))
+    assert!(matches!(result, Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))))
         if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { .. })))));
 }
 

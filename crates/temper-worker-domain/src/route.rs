@@ -6,7 +6,7 @@
 //! breaks the build here.
 
 use crate::wire;
-use jig_host as host;
+use jig_domain_host as host;
 use skein_lib::{Env, Queue, ReplyTo};
 use smith_host_domain as agent;
 use temper_worker_domain_checkout as checkout;

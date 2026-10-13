@@ -1,9 +1,9 @@
 //! Bounded root sweep across durable task endings and the held route.
 
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Queue, ReplyTo, Rng, Token};
 use std::collections::BTreeSet;
 use temper_engine_domain as engine;
@@ -111,8 +111,8 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     end: tasks::End::Finished { result, cancel_delegates: false },
                 }));
                 driver.settle();
-                let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row)))) =
-                    driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(assignment.task))))
+                let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))) =
+                    driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(assignment.task))))
                 else {
                     panic!("durable chat ending, seed {seed}")
                 };
@@ -186,8 +186,8 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 }));
                 driver.settle();
                 assert!(
-                    matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(child)))),
-                        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))))
+                    matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(child)))),
+                        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))))
                         if matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Cancelled { .. }))
                     ),
                     "cancelled child durable, seed {seed}"
@@ -203,8 +203,8 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 }));
                 driver.settle();
                 assert!(
-                    matches!(driver.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))),
-                        Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row))))
+                    matches!(driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(assignment.task)))),
+                        Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row))))
                         if matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::StoppedBy { party: 1 }, .. })
                     ),
                     "stopped chat held durably, seed {seed}"

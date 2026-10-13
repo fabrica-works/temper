@@ -7,7 +7,7 @@ use temper_engine_domain_world::store::Store;
 const LIMITS: Limits = Limits { loads: 2, rows: 4, bytes: 1024, reply_bytes: 2048, transcript_bytes: 128 };
 
 fn row(turn: u32, bytes: usize) -> Record {
-    Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+    Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
         task: 1,
         attempt: 1,
         turn,
@@ -19,7 +19,7 @@ fn row(turn: u32, bytes: usize) -> Record {
 }
 
 fn key(turn: u32) -> Key {
-    Key::Core(jig_core::Key::Core(jig_core::CoreKey::Turn { task: 1, attempt: 1, turn }))
+    Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: 1, attempt: 1, turn }))
 }
 
 fn begin(loads: &mut Loads, after: Option<Key>, most: u32, out: &mut Queue<Request>) -> Token {
@@ -72,7 +72,7 @@ fn each_page_has_one_terminal_and_reads_the_answered_commit() {
         assert_eq!(
             rows.iter()
                 .map(|r| {
-                    let Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(r))) = r else {
+                    let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(r))) = r else {
                         panic!("turn");
                     };
                     r.turn
@@ -142,7 +142,7 @@ fn malformed_pages_are_refused_whole_before_any_row_is_delivered() {
         (vec![row(1, 0), row(1, 0)], None, Failure::Order),
         (vec![row(2, 0), row(1, 0)], None, Failure::Order),
         (
-            vec![Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(
+            vec![Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
                 temper_engine_domain_world::store::HEADER,
             )))],
             None,

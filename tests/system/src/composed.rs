@@ -8,10 +8,10 @@
 //! its domain once, so durable turn ACKs and relayed answers traverse both roots.
 use std::collections::{BTreeMap, VecDeque};
 
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_parties as parties;
 use jig_fake_store as store;
 use skein_fake_checkout::Checkout;
@@ -202,8 +202,8 @@ impl World {
                 let mut store = store::Store::new();
                 let header = temper_engine_domain_world::store::HEADER;
                 store.rows.insert(
-                    Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)),
-                    Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(header))),
+                    Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)),
+                    Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header))),
                 );
                 store
             },
@@ -591,7 +591,7 @@ impl World {
             }
             Delivery::Assigned { assignment, .. } => {
                 assert!(
-                    self.store.rows.contains_key(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))),
+                    self.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(assignment.task)))),
                     "assignment follows durable task"
                 );
                 self.observed.assignments += 1;
@@ -907,7 +907,7 @@ impl World {
                 // committed engine callback, and the worker forwards its bytes.
                 assert!(
                     self.store.rows.values().any(|record| matches!(record,
-                    Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(record)))
+                    Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(record)))
                         if record.key.task == self.assignment().task
                         && record.key.completion == submission.name.completion
                         && record.key.position == submission.name.position)),

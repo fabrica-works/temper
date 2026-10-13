@@ -26,7 +26,7 @@ pub(crate) fn historical_begin(
 ) {
     let read = Query { request, person, project, proposer, proposal };
     let Ok(id) = domain.result_reads.insert(Some(super::Read::Proposal(read))) else {
-        domain.work.push(Work::Core(jig_core::Event::HistoricalProposal {
+        domain.work.push(Work::Core(jig_domain_core::Event::HistoricalProposal {
             request,
             person,
             project,
@@ -55,27 +55,27 @@ pub(crate) fn historical_loaded(domain: &mut Domain, waiter: Token, rows: Box<[s
     domain.result_reads.retire(super::Id::from_token(waiter));
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
-            super::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::ProposalDecision(row))) => Some(row),
+            super::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => Some(row),
             super::Record::Core(
-                jig_core::Record::Core(
-                    jig_core::CoreRecord::Call(_)
-                    | jig_core::CoreRecord::Deployment(_)
-                    | jig_core::CoreRecord::Turn(_)
-                    | jig_core::CoreRecord::RunProof(_)
-                    | jig_core::CoreRecord::Terminal(_)
-                    | jig_core::CoreRecord::Projection(_)
-                    | jig_core::CoreRecord::EscalationDecision(_),
+                jig_domain_core::Record::Core(
+                    jig_domain_core::CoreRecord::Call(_)
+                    | jig_domain_core::CoreRecord::Deployment(_)
+                    | jig_domain_core::CoreRecord::Turn(_)
+                    | jig_domain_core::CoreRecord::RunProof(_)
+                    | jig_domain_core::CoreRecord::Terminal(_)
+                    | jig_domain_core::CoreRecord::Projection(_)
+                    | jig_domain_core::CoreRecord::EscalationDecision(_),
                 )
-                | jig_core::Record::Tasks(_)
-                | jig_core::Record::People(_)
-                | jig_core::Record::Notes(_),
+                | jig_domain_core::Record::Tasks(_)
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
             )
             | super::Record::Forge { .. } => None,
         }
     } else {
         None
     };
-    domain.work.push(Work::Core(jig_core::Event::HistoricalProposal {
+    domain.work.push(Work::Core(jig_domain_core::Event::HistoricalProposal {
         request: query.request,
         person: query.person,
         project: query.project,
@@ -91,7 +91,7 @@ pub(crate) fn historical_failed(domain: &mut Domain, waiter: Token) {
         unreachable!("proposal archive owns its read")
     };
     domain.result_reads.retire(super::Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::HistoricalProposal {
+    domain.work.push(Work::Core(jig_domain_core::Event::HistoricalProposal {
         request: query.request,
         person: query.person,
         project: query.project,
@@ -113,10 +113,10 @@ pub(crate) fn propose_call(
     let action = match action {
         ProposedAction::Effect { .. } => unreachable!("connector effect proposals retain their own payload"),
         ProposedAction::Batch(batch) => {
-            domain.work.push(Work::Core(jig_core::Event::NamedAction {
+            domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                 to,
                 key,
-                action: jig_core::NamedAction::ProposeBatch { batch, reason, as_holder },
+                action: jig_domain_core::NamedAction::ProposeBatch { batch, reason, as_holder },
             }));
             return;
         }
@@ -124,9 +124,9 @@ pub(crate) fn propose_call(
         ProposedAction::Widen { task, authority } => tasks::ProposalAction::Widen { task, authority },
         ProposedAction::Release { task } => tasks::ProposalAction::Release { task },
     };
-    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
         to,
         key,
-        action: jig_core::NamedAction::Propose { action, reason, as_holder },
+        action: jig_domain_core::NamedAction::Propose { action, reason, as_holder },
     }));
 }

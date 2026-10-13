@@ -10,7 +10,7 @@
 //! What the run itself tells is not among them: it is the engine's, and goes
 //! to it as it is ([`crate::Told`]).
 
-use jig_host as host;
+use jig_domain_host as host;
 use smith_host_domain as agent;
 use temper_worker_domain_checkout as checkout;
 

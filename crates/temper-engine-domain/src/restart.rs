@@ -5,9 +5,9 @@ use crate::limits::{Limits, core_limits, route_decision};
 use crate::route::{escalation, inbox, results, route_into};
 use crate::{Decision, Delivery, Key, Range, Record, loads};
 use alloc::boxed::Box;
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
@@ -48,7 +48,7 @@ pub(crate) fn request_load(
             | crate::CoreRange::TaskResult { .. }
             | crate::CoreRange::EscalationDecision { .. }
             | crate::CoreRange::ProposalDecision { .. }
-            | crate::CoreRange::Notes(jig_core_notes::Range::Entry { .. }),
+            | crate::CoreRange::Notes(jig_domain_notes::Range::Entry { .. }),
         ) => 1,
         Range::Core(
             crate::CoreRange::Calls
@@ -60,7 +60,7 @@ pub(crate) fn request_load(
             | crate::CoreRange::TaskTranscript { .. },
         )
         | Range::Forge => domain.limits.loads.rows,
-        Range::Core(crate::CoreRange::Notes(jig_core_notes::Range::Lines { .. })) => {
+        Range::Core(crate::CoreRange::Notes(jig_domain_notes::Range::Lines { .. })) => {
             domain.limits.loads.rows.min(domain.limits.notes.load_rows)
         }
     };
@@ -220,7 +220,7 @@ pub(crate) fn input_waiter(domain: &Domain, waiter: Token) -> bool {
 pub(crate) fn input_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
+    domain.work.push(Work::Core(jig_domain_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
 }
 
 pub(crate) fn input_loaded(
@@ -239,21 +239,21 @@ pub(crate) fn input_loaded(
         return;
     }
     let row = match rows.into_iter().next().expect("one input result row") {
-        Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
+        Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
         Record::Core(
-            jig_core::Record::Core(
-                jig_core::CoreRecord::Call(_)
-                | jig_core::CoreRecord::Deployment(_)
-                | jig_core::CoreRecord::EscalationDecision(_)
-                | jig_core::CoreRecord::ProposalDecision(_)
-                | jig_core::CoreRecord::Turn(_)
-                | jig_core::CoreRecord::RunProof(_)
-                | jig_core::CoreRecord::Terminal(_)
-                | jig_core::CoreRecord::Projection(_),
+            jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::Call(_)
+                | jig_domain_core::CoreRecord::Deployment(_)
+                | jig_domain_core::CoreRecord::EscalationDecision(_)
+                | jig_domain_core::CoreRecord::ProposalDecision(_)
+                | jig_domain_core::CoreRecord::Turn(_)
+                | jig_domain_core::CoreRecord::RunProof(_)
+                | jig_domain_core::CoreRecord::Terminal(_)
+                | jig_domain_core::CoreRecord::Projection(_),
             )
-            | jig_core::Record::Tasks(_)
-            | jig_core::Record::People(_)
-            | jig_core::Record::Notes(_),
+            | jig_domain_core::Record::Tasks(_)
+            | jig_domain_core::Record::People(_)
+            | jig_domain_core::Record::Notes(_),
         )
         | Record::Forge { .. } => {
             input_failed(domain, waiter);
@@ -275,7 +275,7 @@ pub(crate) fn input_loaded(
     }
     let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { unreachable!("completed input read") };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::DelegateValidated {
+    domain.work.push(Work::Core(jig_domain_core::Event::DelegateValidated {
         to: ReplyTo::new(read.to),
         key: read.key,
         batch: read.batch,
@@ -321,7 +321,7 @@ pub(crate) fn take_note_owner(domain: &mut Domain, waiter: Token) -> Option<Toke
 pub(crate) fn note_failed(domain: &mut Domain, waiter: Token) {
     let Some(owner) = take_note_owner(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::Notes(jig_core_notes::Event::LoadFailed { owner })));
+    domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::LoadFailed { owner })));
 }
 
 pub(crate) fn note_loaded(
@@ -338,7 +338,7 @@ pub(crate) fn note_loaded(
     let mut kept = List::with_capacity(u32::try_from(rows.len()).expect("bounded note page"));
     for row in rows {
         match row {
-            Record::Core(jig_core::Record::Notes(record)) => {
+            Record::Core(jig_domain_core::Record::Notes(record)) => {
                 let valid = match &record {
                     notes::Record::Entry(entry) => notes::valid_entry(entry, &domain.limits.notes),
                     notes::Record::Line(line) => notes::valid_line(line, &domain.limits.notes),
@@ -350,18 +350,18 @@ pub(crate) fn note_loaded(
                 kept.push(record).expect("note page room");
             }
             Record::Core(
-                jig_core::Record::Core(
-                    jig_core::CoreRecord::Call(_)
-                    | jig_core::CoreRecord::Deployment(_)
-                    | jig_core::CoreRecord::EscalationDecision(_)
-                    | jig_core::CoreRecord::ProposalDecision(_)
-                    | jig_core::CoreRecord::Turn(_)
-                    | jig_core::CoreRecord::RunProof(_)
-                    | jig_core::CoreRecord::Terminal(_)
-                    | jig_core::CoreRecord::Projection(_),
+                jig_domain_core::Record::Core(
+                    jig_domain_core::CoreRecord::Call(_)
+                    | jig_domain_core::CoreRecord::Deployment(_)
+                    | jig_domain_core::CoreRecord::EscalationDecision(_)
+                    | jig_domain_core::CoreRecord::ProposalDecision(_)
+                    | jig_domain_core::CoreRecord::Turn(_)
+                    | jig_domain_core::CoreRecord::RunProof(_)
+                    | jig_domain_core::CoreRecord::Terminal(_)
+                    | jig_domain_core::CoreRecord::Projection(_),
                 )
-                | jig_core::Record::Tasks(_)
-                | jig_core::Record::People(_),
+                | jig_domain_core::Record::Tasks(_)
+                | jig_domain_core::Record::People(_),
             )
             | Record::Forge { .. } => {
                 note_failed(domain, waiter);
@@ -371,9 +371,9 @@ pub(crate) fn note_loaded(
     }
     let Some(owner) = take_note_owner(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::Notes(jig_core_notes::Event::Loaded {
+    domain.work.push(Work::Core(jig_domain_core::Event::Notes(jig_domain_notes::Event::Loaded {
         owner,
-        rows: jig_core_notes::Rows { records: kept },
+        rows: jig_domain_notes::Rows { records: kept },
         more: next.is_some(),
     })));
 }
@@ -542,7 +542,7 @@ pub(crate) fn load_outputs(
 pub(crate) fn transcript_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::Transcript { task }) = take_read(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::PreparationFailed { task }));
+    domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
 }
 
 pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(Token, u64)> {
@@ -560,7 +560,7 @@ pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(T
         results: List::with_capacity(u32::try_from(count).expect("bounded result count")),
     };
     let Ok(waiter) = domain.result_reads.insert(Some(Read::Dependency(read))) else {
-        domain.work.push(Work::Core(jig_core::Event::PreparationFailed { task }));
+        domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task }));
         return None;
     };
     Some((waiter.token(), first))
@@ -569,7 +569,7 @@ pub(crate) fn begin_dependency_read(domain: &mut Domain, task: u64) -> Option<(T
 pub(crate) fn dependency_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::Dependency(read)) = take_read(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_core::Event::PreparationFailed { task: read.task }));
+    domain.work.push(Work::Core(jig_domain_core::Event::PreparationFailed { task: read.task }));
 }
 
 pub(crate) fn dependency_loaded(
@@ -586,21 +586,21 @@ pub(crate) fn dependency_loaded(
         return;
     }
     let row = match rows.into_iter().next().expect("one dependency result row") {
-        Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
+        Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))) => row,
         Record::Core(
-            jig_core::Record::Core(
-                jig_core::CoreRecord::Call(_)
-                | jig_core::CoreRecord::Deployment(_)
-                | jig_core::CoreRecord::EscalationDecision(_)
-                | jig_core::CoreRecord::ProposalDecision(_)
-                | jig_core::CoreRecord::Turn(_)
-                | jig_core::CoreRecord::RunProof(_)
-                | jig_core::CoreRecord::Terminal(_)
-                | jig_core::CoreRecord::Projection(_),
+            jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::Call(_)
+                | jig_domain_core::CoreRecord::Deployment(_)
+                | jig_domain_core::CoreRecord::EscalationDecision(_)
+                | jig_domain_core::CoreRecord::ProposalDecision(_)
+                | jig_domain_core::CoreRecord::Turn(_)
+                | jig_domain_core::CoreRecord::RunProof(_)
+                | jig_domain_core::CoreRecord::Terminal(_)
+                | jig_domain_core::CoreRecord::Projection(_),
             )
-            | jig_core::Record::Tasks(_)
-            | jig_core::Record::People(_)
-            | jig_core::Record::Notes(_),
+            | jig_domain_core::Record::Tasks(_)
+            | jig_domain_core::Record::People(_)
+            | jig_domain_core::Record::Notes(_),
         )
         | Record::Forge { .. } => {
             dependency_failed(domain, waiter);
@@ -645,20 +645,20 @@ pub(crate) fn transcript_loaded(
     let task = *task;
     for row in rows {
         let turn = match row {
-            Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(turn))) => turn,
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))) => turn,
             Record::Core(
-                jig_core::Record::Core(
-                    jig_core::CoreRecord::ProposalDecision(_)
-                    | jig_core::CoreRecord::Call(_)
-                    | jig_core::CoreRecord::EscalationDecision(_)
-                    | jig_core::CoreRecord::Deployment(_)
-                    | jig_core::CoreRecord::RunProof(_)
-                    | jig_core::CoreRecord::Terminal(_)
-                    | jig_core::CoreRecord::Projection(_),
+                jig_domain_core::Record::Core(
+                    jig_domain_core::CoreRecord::ProposalDecision(_)
+                    | jig_domain_core::CoreRecord::Call(_)
+                    | jig_domain_core::CoreRecord::EscalationDecision(_)
+                    | jig_domain_core::CoreRecord::Deployment(_)
+                    | jig_domain_core::CoreRecord::RunProof(_)
+                    | jig_domain_core::CoreRecord::Terminal(_)
+                    | jig_domain_core::CoreRecord::Projection(_),
                 )
-                | jig_core::Record::Tasks(_)
-                | jig_core::Record::People(_)
-                | jig_core::Record::Notes(_),
+                | jig_domain_core::Record::Tasks(_)
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
             )
             | Record::Forge { .. } => {
                 transcript_failed(domain, waiter);
@@ -755,9 +755,9 @@ pub(crate) fn startup_page(
     let request = if range == Range::Forge {
         // The connector confirms that its restored rows have been reconciled.
         domain.work.push(Work::Forge(forge::Event::Restored { clock: forge_client::RecoveryClock::Wall }));
-        jig_core::RestartRequest::Idle
+        jig_domain_core::RestartRequest::Idle
     } else {
-        domain.core.restart_done(jig_core::RestartStep::LoadCore)
+        domain.core.restart_done(jig_domain_core::RestartStep::LoadCore)
     };
     domain.work.push(Work::Restart(request));
     route_into(domain, env, &mut decision);
@@ -770,13 +770,13 @@ pub(crate) fn restart_request(
     domain: &mut Domain,
     env: &Env<Limits>,
     decision: &mut Decision,
-    request: jig_core::RestartRequest,
+    request: jig_domain_core::RestartRequest,
 ) {
     match request {
-        jig_core::RestartRequest::Idle => {}
-        jig_core::RestartRequest::Refused { .. } => domain.stop_pending = true,
-        jig_core::RestartRequest::Step(step) => match step {
-            jig_core::RestartStep::LoadCore => {
+        jig_domain_core::RestartRequest::Idle => {}
+        jig_domain_core::RestartRequest::Refused { .. } => domain.stop_pending = true,
+        jig_domain_core::RestartRequest::Step(step) => match step {
+            jig_domain_core::RestartStep::LoadCore => {
                 domain.startup_range = Some(Range::Core(crate::CoreRange::Deployment));
                 emit(
                     decision,
@@ -788,7 +788,7 @@ pub(crate) fn restart_request(
                     },
                 );
             }
-            jig_core::RestartStep::RestoreConnector { connector } => {
+            jig_domain_core::RestartStep::RestoreConnector { connector } => {
                 assert_eq!(connector, domain.config.forge_connector, "configured forge connector");
                 domain.startup_range = Some(Range::Forge);
                 emit(
@@ -797,22 +797,22 @@ pub(crate) fn restart_request(
                     Delivery::Load { waiter: Token::new(u64::MAX), range: Range::Forge, after: None },
                 );
             }
-            jig_core::RestartStep::AdoptRuns => {
+            jig_domain_core::RestartStep::AdoptRuns => {
                 domain.work.push(Work::Tasks(tasks::Event::Restored));
                 // Finish task restoration before draining every emitted claim.
                 domain.work.push(Work::AdoptRestored);
             }
-            jig_core::RestartStep::ReadAfresh { connector } => {
+            jig_domain_core::RestartStep::ReadAfresh { connector } => {
                 assert_eq!(connector, domain.config.forge_connector, "configured forge connector");
                 domain.work.push(Work::Forge(forge::Event::ReadAfresh));
             }
-            jig_core::RestartStep::SettleOutbox { connector } => {
+            jig_domain_core::RestartStep::SettleOutbox { connector } => {
                 assert_eq!(connector, domain.config.forge_connector, "configured forge connector");
                 domain.work.push(Work::Forge(forge::Event::SettleOutbox));
             }
-            jig_core::RestartStep::Open => {
+            jig_domain_core::RestartStep::Open => {
                 let request = domain.core.restart_done(step);
-                assert_eq!(request, jig_core::RestartRequest::Idle, "decisions open once");
+                assert_eq!(request, jig_domain_core::RestartRequest::Idle, "decisions open once");
                 for _ in 0..domain.core.due.len() {
                     domain.work.push(Work::Activate(domain.core.due.pop().expect("restored due tasks")));
                 }
@@ -821,12 +821,12 @@ pub(crate) fn restart_request(
     }
 }
 
-pub(crate) fn connector_restart_done(domain: &mut Domain, stage: jig_core::connector::RestartStage) {
+pub(crate) fn connector_restart_done(domain: &mut Domain, stage: jig_domain_core::connector::RestartStage) {
     let connector = domain.config.forge_connector;
     let step = match stage {
-        jig_core::connector::RestartStage::Restored => jig_core::RestartStep::RestoreConnector { connector },
-        jig_core::connector::RestartStage::ReadAfresh => jig_core::RestartStep::ReadAfresh { connector },
-        jig_core::connector::RestartStage::Settled => jig_core::RestartStep::SettleOutbox { connector },
+        jig_domain_core::connector::RestartStage::Restored => jig_domain_core::RestartStep::RestoreConnector { connector },
+        jig_domain_core::connector::RestartStage::ReadAfresh => jig_domain_core::RestartStep::ReadAfresh { connector },
+        jig_domain_core::connector::RestartStage::Settled => jig_domain_core::RestartStep::SettleOutbox { connector },
     };
     let request = domain.core.restart_done(step);
     domain.work.push(Work::Restart(request));
@@ -835,11 +835,11 @@ pub(crate) fn connector_restart_done(domain: &mut Domain, stage: jig_core::conne
 pub(crate) fn connector_restarting(domain: &Domain) -> bool {
     match domain.core.restart_step() {
         Some(
-            jig_core::RestartStep::RestoreConnector { .. }
-            | jig_core::RestartStep::ReadAfresh { .. }
-            | jig_core::RestartStep::SettleOutbox { .. },
+            jig_domain_core::RestartStep::RestoreConnector { .. }
+            | jig_domain_core::RestartStep::ReadAfresh { .. }
+            | jig_domain_core::RestartStep::SettleOutbox { .. },
         ) => true,
-        Some(jig_core::RestartStep::LoadCore | jig_core::RestartStep::AdoptRuns | jig_core::RestartStep::Open)
+        Some(jig_domain_core::RestartStep::LoadCore | jig_domain_core::RestartStep::AdoptRuns | jig_domain_core::RestartStep::Open)
         | None => false,
     }
 }
@@ -854,47 +854,47 @@ pub(crate) fn take_read(domain: &mut Domain, waiter: Token) -> Option<Read> {
 /// history into the live map.
 pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Record) {
     match row {
-        Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(record))) => {
-            if domain.core.restore_core(jig_core::CoreRecord::Call(record), &core_limits(&env.limits))
-                != jig_core::Restored::Live
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(record))) => {
+            if domain.core.restore_core(jig_domain_core::CoreRecord::Call(record), &core_limits(&env.limits))
+                != jig_domain_core::Restored::Live
             {
                 let _refused = domain.core.restart_refuse();
             }
         }
-        Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(deployment))) => {
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(deployment))) => {
             if !domain.forge.bind_deployment(deployment.id, &env.limits.forge) {
                 let _refused = domain.core.restart_refuse();
                 return;
             }
-            match domain.core.restore_core(jig_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits)) {
-                jig_core::Restored::Deployment { commits } => {
+            match domain.core.restore_core(jig_domain_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits)) {
+                jig_domain_core::Restored::Deployment { commits } => {
                     domain.core_header_loaded = true;
                     domain.restored_commits = Some(commits);
                 }
-                jig_core::Restored::Live | jig_core::Restored::Archive | jig_core::Restored::Rejected => {
+                jig_domain_core::Restored::Live | jig_domain_core::Restored::Archive | jig_domain_core::Restored::Rejected => {
                     unreachable!("deployment restore result")
                 }
             }
         }
-        Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Projection(row))) => {
-            if domain.core.restore_core(jig_core::CoreRecord::Projection(row), &core_limits(&env.limits))
-                == jig_core::Restored::Rejected
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Projection(row))) => {
+            if domain.core.restore_core(jig_domain_core::CoreRecord::Projection(row), &core_limits(&env.limits))
+                == jig_domain_core::Restored::Rejected
             {
                 let _refused = domain.core.restart_refuse();
             }
         }
-        Record::Core(jig_core::Record::People(people::Stored::Policy { project, value })) => {
+        Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project, value })) => {
             if !domain.core.restore_policy(&core_limits(&domain.limits), project, value) {
                 let _refused = domain.core.restart_refuse();
             }
         }
-        Record::Core(jig_core::Record::People(record)) => {
+        Record::Core(jig_domain_core::Record::People(record)) => {
             domain.work.push(Work::People(people::Event::Restore { record }));
         }
         Record::Forge { row } => {
             domain.work.push(Work::Forge(forge::Event::Restore { record: *row }));
         }
-        Record::Core(jig_core::Record::Tasks(record)) => match record {
+        Record::Core(jig_domain_core::Record::Tasks(record)) => match record {
             tasks::Stored::PersonProposal(ref row) => {
                 if !domain.core.restore_task_row(&record) {
                     let _refused = domain.core.restart_refuse();
@@ -934,19 +934,19 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
                 domain.work.push(Work::Tasks(tasks::Event::Restore { record }));
             }
         },
-        Record::Core(jig_core::Record::Core(jig_core::CoreRecord::RunProof(proof))) => {
-            if domain.core.restore_core(jig_core::CoreRecord::RunProof(proof), &core_limits(&env.limits))
-                != jig_core::Restored::Live
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof))) => {
+            if domain.core.restore_core(jig_domain_core::CoreRecord::RunProof(proof), &core_limits(&env.limits))
+                != jig_domain_core::Restored::Live
             {
                 let _refused = domain.core.restart_refuse();
             }
         }
-        Record::Core(jig_core::Record::Notes(_)) => unreachable!("notes are loaded on demand, outside startup"),
-        Record::Core(jig_core::Record::Core(
-            jig_core::CoreRecord::Turn(_)
-            | jig_core::CoreRecord::Terminal(_)
-            | jig_core::CoreRecord::EscalationDecision(_)
-            | jig_core::CoreRecord::ProposalDecision(_),
+        Record::Core(jig_domain_core::Record::Notes(_)) => unreachable!("notes are loaded on demand, outside startup"),
+        Record::Core(jig_domain_core::Record::Core(
+            jig_domain_core::CoreRecord::Turn(_)
+            | jig_domain_core::CoreRecord::Terminal(_)
+            | jig_domain_core::CoreRecord::EscalationDecision(_)
+            | jig_domain_core::CoreRecord::ProposalDecision(_),
         )) => {
             unreachable!("startup excludes archive families")
         }

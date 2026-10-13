@@ -1,7 +1,7 @@
 //! Smith's JSON shapes for jig's scoped note and recall tools.
 //! The root checks bounds and authority before any value becomes durable.
 
-use jig_core_notes as notes;
+use jig_domain_notes as notes;
 use skein_lib::List;
 
 use crate::{Problem, json::Value};

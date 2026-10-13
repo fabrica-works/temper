@@ -14,8 +14,8 @@ use crate::{Key, Record, Write};
 use JournalOutput as Output;
 use alloc::boxed::Box;
 use core::mem::size_of;
-pub use jig_core::{Counters, fresh};
-use jig_core_people as people;
+pub use jig_domain_core::{Counters, fresh};
+use jig_domain_people as people;
 use skein_lib::{
     Decision as SkeinDecision, Journal as SkeinJournal, JournalLimits, JournalRoom, List, Queue, ReplyTo, Token, Wall,
 };
@@ -62,16 +62,16 @@ pub enum Delivery {
         op: temper_engine_domain_forge_client::api::Op,
     },
     /// Internal committed notice to the expendable live views child.
-    View(Box<jig_core_views::Event>),
+    View(Box<jig_domain_views::Event>),
     /// Committed request to the connector that owns a procedure task. The owner steps against
     /// current facts and returns the fenced decision through the root.
     Procedure { task: u64, step: u64, connector: u16, code: u32 },
     /// One fleet-fenced named tool answer after its decision is durable.
     CallAnswer { channel: Token, task: u64, attempt: u64, call: Token, answer: crate::CallAnswer },
     /// Committed words presented to fleet only after their task row commits.
-    Relay { task: u64, attempt: u64, previous: Option<u64>, word: jig_core_tasks::Word },
+    Relay { task: u64, attempt: u64, previous: Option<u64>, word: jig_domain_tasks::Word },
     /// Fleet-selected live worker receives the whole committed word.
-    Inbound { channel: Token, task: u64, attempt: u64, word: jig_core_tasks::Word },
+    Inbound { channel: Token, task: u64, attempt: u64, word: jig_domain_tasks::Word },
     /// Bounded page of committed unread results, consumed through its last position with this reply.
     InboxPage { to: ReplyTo, person: u64, entries: Box<[ResultEntry]> },
     /// One authenticated newest-first page derived from committed task rows.
@@ -85,7 +85,7 @@ pub enum Delivery {
         to: ReplyTo,
         person: u64,
         /// Bounded semantic view; rejection owns at most `result_bytes`
-        context: Box<jig_core_tasks::EscalationContext>,
+        context: Box<jig_domain_tasks::EscalationContext>,
     },
     /// Root internal historical read, released after preceding commit; consumed
     /// once by root and never exposed to the shell.
@@ -136,7 +136,7 @@ pub enum Delivery {
         /// Root-issued `Start`, `TurnKept`, `Acknowledge` or `Cancel` callback. `Start` workstream
         /// bytes are at most journal `transcript_bytes`; other payloads are fixed-size. Fleet
         /// start/cancel consequences route back inside the root.
-        jig_core_fleet::Event,
+        jig_domain_fleet::Event,
     ),
     /// Root to worker: complete bounded assignment after its claim commit.
     Assigned {
@@ -349,65 +349,65 @@ impl Decision {
     pub fn write(&mut self, limits: &Limits, write: Write) -> Result<(), Write> {
         assert!(*limits == self.limits, "decision uses its configured limits");
         let within = match &write {
-            Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(_))))
-            | Write::Erase(Key::Core(jig_core::Key::Core(
-                jig_core::CoreKey::Deployment
-                | jig_core::CoreKey::EscalationDecision { .. }
-                | jig_core::CoreKey::ProposalDecision(_),
+            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(_))))
+            | Write::Erase(Key::Core(jig_domain_core::Key::Core(
+                jig_domain_core::CoreKey::Deployment
+                | jig_domain_core::CoreKey::EscalationDecision { .. }
+                | jig_domain_core::CoreKey::ProposalDecision(_),
             ))) => false,
-            Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row)))) => {
                 row.task != 0
                     && row.attempt != 0
                     && row.turn != 0
                     && row.transcript.len() <= usize::try_from(limits.transcript_bytes).expect("u32 fits usize")
             }
-            Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(row)))) => {
                 row.key.task != 0 && row.key.attempt != 0 && row.key.completion != 0
             }
             Write::Erase(
                 Key::Core(
-                    jig_core::Key::Core(
-                        jig_core::CoreKey::Call(_)
-                        | jig_core::CoreKey::Turn { .. }
-                        | jig_core::CoreKey::RunProof(..)
-                        | jig_core::CoreKey::Terminal { .. }
-                        | jig_core::CoreKey::Projection(_),
+                    jig_domain_core::Key::Core(
+                        jig_domain_core::CoreKey::Call(_)
+                        | jig_domain_core::CoreKey::Turn { .. }
+                        | jig_domain_core::CoreKey::RunProof(..)
+                        | jig_domain_core::CoreKey::Terminal { .. }
+                        | jig_domain_core::CoreKey::Projection(_),
                     )
-                    | jig_core::Key::Tasks(_)
-                    | jig_core::Key::People(_),
+                    | jig_domain_core::Key::Tasks(_)
+                    | jig_domain_core::Key::People(_),
                 )
                 | Key::Forge(_),
             ) => true,
-            Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::EscalationDecision(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row)))) => {
                 row.task != 0
                     && row.revision != 0
                     && row.by != 0
                     && row.requester != 0
                     && match &row.decision {
-                        jig_core_people::EscalationDecision::Release | jig_core_people::EscalationDecision::Pass => {
+                        jig_domain_people::EscalationDecision::Release | jig_domain_people::EscalationDecision::Pass => {
                             true
                         }
-                        jig_core_people::EscalationDecision::Reject { reason } => {
+                        jig_domain_people::EscalationDecision::Reject { reason } => {
                             reason.len()
                                 <= usize::try_from(limits.result_bytes.min(limits.transcript_bytes))
                                     .expect("u32 fits usize")
                         }
                     }
             }
-            Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::ProposalDecision(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row)))) => {
                 row.project != 0 && row.proposal != 0 && row.by != 0
             }
-            Write::Erase(Key::Core(jig_core::Key::Notes(_)))
+            Write::Erase(Key::Core(jig_domain_core::Key::Notes(_)))
             | Write::Save(
                 Record::Core(
-                    jig_core::Record::Tasks(_)
-                    | jig_core::Record::Core(
-                        jig_core::CoreRecord::Projection(_)
-                        | jig_core::CoreRecord::RunProof(_)
-                        | jig_core::CoreRecord::Terminal(_),
+                    jig_domain_core::Record::Tasks(_)
+                    | jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Projection(_)
+                        | jig_domain_core::CoreRecord::RunProof(_)
+                        | jig_domain_core::CoreRecord::Terminal(_),
                     )
-                    | jig_core::Record::People(_)
-                    | jig_core::Record::Notes(_),
+                    | jig_domain_core::Record::People(_)
+                    | jig_domain_core::Record::Notes(_),
                 )
                 | Record::Forge { .. },
             ) => match crate::store::owned_bytes(&write) {
@@ -453,17 +453,17 @@ impl Decision {
         assert!(*limits == self.limits, "decision uses its configured limits");
         let within = match &delivery {
             Delivery::View(event) => match event.as_ref() {
-                jig_core_views::Event::TaskPhase { trees, .. } => {
+                jig_domain_views::Event::TaskPhase { trees, .. } => {
                     trees.len() <= usize::try_from(limits.deliveries).expect("u32 fits usize")
                 }
-                jig_core_views::Event::Started { .. }
-                | jig_core_views::Event::Turn { .. }
-                | jig_core_views::Event::Finished { .. }
-                | jig_core_views::Event::Inbox { .. } => true,
-                jig_core_views::Event::Reported { .. }
-                | jig_core_views::Event::Watch { .. }
-                | jig_core_views::Event::Unwatch { .. }
-                | jig_core_views::Event::Delivered { .. } => false,
+                jig_domain_views::Event::Started { .. }
+                | jig_domain_views::Event::Turn { .. }
+                | jig_domain_views::Event::Finished { .. }
+                | jig_domain_views::Event::Inbox { .. } => true,
+                jig_domain_views::Event::Reported { .. }
+                | jig_domain_views::Event::Watch { .. }
+                | jig_domain_views::Event::Unwatch { .. }
+                | jig_domain_views::Event::Delivered { .. } => false,
             },
             Delivery::Result { words, .. } | Delivery::ResultReply { words, .. } => {
                 words.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize")
@@ -520,24 +520,24 @@ impl Decision {
             Delivery::EscalationReply { context, .. } => {
                 context.task != 0
                     && match &context.escalation {
-                        jig_core_tasks::Escalation::Rejected { revision, by, reason } => {
+                        jig_domain_tasks::Escalation::Rejected { revision, by, reason } => {
                             *revision != 0
                                 && *by != 0
                                 && reason.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize")
                         }
-                        jig_core_tasks::Escalation::Waiting { revision, holder, .. } => {
+                        jig_domain_tasks::Escalation::Waiting { revision, holder, .. } => {
                             *revision != 0
                                 && match holder {
-                                    jig_core_tasks::EscalationHolder::Task(task) => *task != 0,
-                                    jig_core_tasks::EscalationHolder::Person(person) => {
+                                    jig_domain_tasks::EscalationHolder::Task(task) => *task != 0,
+                                    jig_domain_tasks::EscalationHolder::Person(person) => {
                                         *person != 0 && *person == context.requester
                                     }
-                                    jig_core_tasks::EscalationHolder::Role { project, .. } => {
+                                    jig_domain_tasks::EscalationHolder::Role { project, .. } => {
                                         *project == context.project
                                     }
                                 }
                         }
-                        jig_core_tasks::Escalation::Unheld { .. } | jig_core_tasks::Escalation::Routing { .. } => false,
+                        jig_domain_tasks::Escalation::Unheld { .. } | jig_domain_tasks::Escalation::Routing { .. } => false,
                     }
             }
             Delivery::Fleet(event) => fleet_delivery_within(event),
@@ -642,7 +642,7 @@ pub(crate) fn accept_routed(
                 .expect("overrun follows an admitted root decision"),
         };
         for _ in 0..=limits.writes {
-            if batch.write(Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Deployment)))).is_err() {
+            if batch.write(Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))).is_err() {
                 break;
             }
         }
@@ -663,7 +663,7 @@ pub(crate) fn accept_routed(
     };
     if writing {
         batch
-            .write(Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Deployment(
+            .write(Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
                 counters.next_commit(),
             )))))
             .expect("header slot reserved");
@@ -785,14 +785,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(u64::from(limits.run_bytes))?
                     .checked_add(
                         List::<crate::BriefSection>::worst_case(limits.deliveries)?
-                            .max(u64::try_from(size_of::<jig_core_tasks::EscalationContext>()).ok()?),
+                            .max(u64::try_from(size_of::<jig_domain_tasks::EscalationContext>()).ok()?),
                     )?,
             )?,
         )
 }
 
-fn fleet_delivery_within(event: &jig_core_fleet::Event) -> bool {
-    use jig_core_fleet::Event;
+fn fleet_delivery_within(event: &jig_domain_fleet::Event) -> bool {
+    use jig_domain_fleet::Event;
     match event {
         Event::Start { .. }
         | Event::TurnKept { .. }

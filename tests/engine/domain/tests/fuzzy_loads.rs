@@ -41,7 +41,7 @@ fn run(seed: u64) -> (String, &'static str) {
         2 | 3 => {
             let rows: Box<[Record]> = (1..=4)
                 .map(|turn| {
-                    Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(TurnRecord {
+                    Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {
                         task: 1,
                         attempt: 1,
                         turn,
@@ -61,7 +61,7 @@ fn run(seed: u64) -> (String, &'static str) {
             assert_eq!(waiter, Token::new(17));
             assert_eq!(rows.len(), usize::try_from(keep).expect("small count"));
             for (at, row) in rows.iter().enumerate() {
-                let Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(row))) = row else {
+                let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(row))) = row else {
                     panic!("turn");
                 };
                 assert_eq!(row.turn, u32::try_from(at + 1).expect("small turn"));
@@ -74,7 +74,7 @@ fn run(seed: u64) -> (String, &'static str) {
             } else {
                 assert_eq!(
                     next,
-                    Some(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Turn { task: 1, attempt: 1, turn: keep })))
+                    Some(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: 1, attempt: 1, turn: keep })))
                 );
                 assert_eq!(cut, Some(loads::Cut { rows: 4 - keep, bytes: u64::from((4 - keep) * (slot + 4)) }));
                 ending = "cut";

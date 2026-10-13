@@ -15,12 +15,12 @@ use crate::route::{
 use crate::translate::{Config, RootConfig, environment_forge, split_config, view_into, view_outputs, view_requests};
 use crate::{CallKey, Decision, Delivery, Journal, JournalOutput as Output, Range, Write, loads};
 use alloc::boxed::Box;
-use jig_core::{Core, PendingRelay};
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::{Core, PendingRelay};
+use jig_domain_authority as authority;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
@@ -189,10 +189,10 @@ impl Domain {
         let (core_config, root_config) = split_config(config, projects);
         let mut core = Core::new(core_config, &core_limits(limits));
         let core_env = Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: core_limits(limits) };
-        let configured = jig_core::step(
+        let configured = jig_domain_core::step(
             &mut core,
             &core_env,
-            jig_core::Event::Tasks(tasks::Event::Kinds {
+            jig_domain_core::Event::Tasks(tasks::Event::Kinds {
                 connector: root_config.forge_connector,
                 kinds: Box::new([tasks::Kind {
                     connector: root_config.forge_connector,
@@ -207,14 +207,14 @@ impl Domain {
             }),
         );
         match configured {
-            jig_core::Requests::Out(mut output) => {
+            jig_domain_core::Requests::Out(mut output) => {
                 match output.pop() {
-                    Some(jig_core::Request::Decided) => {}
+                    Some(jig_domain_core::Request::Decided) => {}
                     Some(
-                        jig_core::Request::Write(_)
-                        | jig_core::Request::Ask { .. }
-                        | jig_core::Request::Held(_)
-                        | jig_core::Request::Now(_),
+                        jig_domain_core::Request::Write(_)
+                        | jig_domain_core::Request::Ask { .. }
+                        | jig_domain_core::Request::Held(_)
+                        | jig_domain_core::Request::Now(_),
                     )
                     | None => unreachable!("configuration decides nothing"),
                 }
@@ -268,7 +268,7 @@ impl Domain {
     /// Identify the core's refused restart step, including a live range that
     /// no longer fits the configured limits.
     #[must_use]
-    pub fn restart_failure(&self) -> Option<jig_core::RestartStep> {
+    pub fn restart_failure(&self) -> Option<jig_domain_core::RestartStep> {
         self.core.restart_failure()
     }
 
@@ -378,11 +378,11 @@ pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decisi
         out.push(Request::Stop);
         return;
     }
-    let requests = jig_core::finish_decision(&mut domain.core, &environment_core(env));
+    let requests = jig_domain_core::finish_decision(&mut domain.core, &environment_core(env));
     route_core_requests(domain, env, &mut decision, requests);
     route_into(domain, env, &mut decision);
     let persist_header =
-        domain.core_header_loaded && domain.core.restart_step() != Some(jig_core::RestartStep::LoadCore);
+        domain.core_header_loaded && domain.core.restart_step() != Some(jig_domain_core::RestartStep::LoadCore);
     crate::decision::accept_routed(
         &mut domain.journal,
         &mut domain.core.counters,
@@ -545,7 +545,7 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
             return;
         }
         let mut decision = route_decision(domain, &env.limits).expect("journal room checked before fleet continuation");
-        let routed = jig_core::resume_fleet(&mut domain.core, &environment_core(env));
+        let routed = jig_domain_core::resume_fleet(&mut domain.core, &environment_core(env));
         route_core_requests(domain, env, &mut decision, routed);
         route_into(domain, env, &mut decision);
         close(domain, env, decision, out);
@@ -590,13 +590,13 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
     forge::fire(&mut domain.forge, &environment_forge(env), &mut forge_out);
     forge_route::outputs(domain, env, &mut decision, &mut forge_out);
     route_into(domain, env, &mut decision);
-    let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::EffectDeadline);
+    let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
     route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_core::fire(&mut domain.core, &environment_core(env), jig_core::Timer::Tasks);
+    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Tasks);
     route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_core::fire(&mut domain.core, &environment_core(env), jig_core::Timer::Fleet);
+    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Fleet);
     route_core_requests(domain, env, &mut decision, routed);
-    let routed = jig_core::fire(&mut domain.core, &environment_core(env), jig_core::Timer::Brief);
+    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Brief);
     route_core_requests(domain, env, &mut decision, routed);
     route_into(domain, env, &mut decision);
     close(domain, env, decision, out);
@@ -604,7 +604,7 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
 
 fn readonly_timers(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     account_fire(domain, env, out);
-    let routed = jig_core::fire(&mut domain.core, &environment_core(env), jig_core::Timer::View);
+    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::View);
     let mut view_out = view_requests(routed, views::max_out(&env.limits.views));
     view_outputs(domain, env, &mut view_out, out);
 }

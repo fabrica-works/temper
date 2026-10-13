@@ -2,8 +2,8 @@
 //! races and specific independent-evidence negatives
 //! (domain/people.md, section 5.1).
 
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Key, Record, Write};
 use temper_engine_domain_world::roles::{Base, Settings, World, limits, reroute_replayed};
@@ -32,11 +32,11 @@ fn economic_rows(world: &World) -> Vec<(Key, Record)> {
             matches!(
                 key,
                 Key::Core(
-                    jig_core::Key::Tasks(tasks::Key::Ledger(_))
-                        | jig_core::Key::Core(
-                            jig_core::CoreKey::RunProof(..)
-                                | jig_core::CoreKey::Terminal { .. }
-                                | jig_core::CoreKey::Turn { .. }
+                    jig_domain_core::Key::Tasks(tasks::Key::Ledger(_))
+                        | jig_domain_core::Key::Core(
+                            jig_domain_core::CoreKey::RunProof(..)
+                                | jig_domain_core::CoreKey::Terminal { .. }
+                                | jig_domain_core::CoreKey::Turn { .. }
                         )
                 )
             )
@@ -86,7 +86,7 @@ fn owner_policy_roster_and_requester_loss_commit_together_then_old_holder_has_no
     assert!(
         !world.store.rows.values().any(|row| matches!(
             row,
-            Record::Core(jig_core::Record::Core(jig_core::CoreRecord::EscalationDecision(_)))
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(_)))
         )),
         "rerouting is no accepted decision of the obsolete revision"
     );
@@ -117,8 +117,8 @@ fn both_current_owner_race_orders_authorize_only_the_first_committed_roster() {
         world.ask(loser, 74, roster(&world, loser), refused(people::Refusal::Role), false);
         world.run();
         assert_eq!(world.referee.replacements, 1);
-        let Some(Record::Core(jig_core::Record::People(people::Stored::Roles { holdings, .. }))) =
-            world.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Roles(1))))
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { holdings, .. }))) =
+            world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1))))
         else {
             panic!("actual durable role replacement");
         };
@@ -130,7 +130,7 @@ fn both_current_owner_race_orders_authorize_only_the_first_committed_roster() {
 fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
     let mut world = World::new(Settings::calm(9303, Base::Requester));
     let before = world.task_record().clone();
-    let original = world.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Roles(1)))).cloned();
+    let original = world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))).cloned();
     let known = people::Holding { person: world.people[0], role: people::Role::Owner };
     for (key, holdings, reply) in [
         (
@@ -158,7 +158,7 @@ fn role_admission_checks_current_authority_payload_bounds_and_revision_room() {
     );
     world.run();
     assert_eq!(*world.task_record(), before);
-    assert_eq!(world.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Roles(1)))), original.as_ref());
+    assert_eq!(world.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))), original.as_ref());
     assert_eq!(world.referee.replacements, 0);
     current_owner_policy_and_session_expiry_are_separate_real_checks();
     exhausted_waiting_revision_and_insufficient_startup_room_refuse_before_mutation();
@@ -188,11 +188,11 @@ fn current_owner_policy_and_session_expiry_are_separate_real_checks() {
 fn exhausted_waiting_revision_and_insufficient_startup_room_refuse_before_mutation() {
     let mut exhausted = World::new(Settings { exhausted: true, ..Settings::calm(9305, Base::Requester) });
     let before = exhausted.task_record().clone();
-    let roles = exhausted.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Roles(1)))).cloned();
+    let roles = exhausted.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))).cloned();
     exhausted.ask(1, 84, roster(&exhausted, 1), refused(people::Refusal::Limit), false);
     exhausted.run();
     assert_eq!(*exhausted.task_record(), before);
-    assert_eq!(exhausted.store.rows.get(&Key::Core(jig_core::Key::People(people::Key::Roles(1)))), roles.as_ref());
+    assert_eq!(exhausted.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Roles(1)))), roles.as_ref());
     assert_eq!(exhausted.referee.replacements, 0);
     let mut too_small = limits();
     too_small.journal.writes = 3;
@@ -219,7 +219,7 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         .iter()
         .find(|(_, writes)| {
             writes.iter().any(|write| {
-                matches!(write, Write::Save(Record::Core(jig_core::Record::People(people::Stored::Roles { .. }))))
+                matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
             })
         })
         .expect("actual role replacement cohort and pre-transaction outside observer");
@@ -236,17 +236,17 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
         let mut altered = writes.clone();
         match corruption {
             0 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))))
+                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))))
             }),
             1 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_core::Record::People(people::Stored::Roles { .. }))))
+                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles { .. }))))
             }),
             2 => altered.retain(|write| {
-                !matches!(write, Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(_)))))
+                !matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(_)))))
             }),
             3 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
+                    if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
                         record.numbers.spent += 1;
                     }
                 }
@@ -255,14 +255,14 @@ fn each_role_cohort_corruption_fails_its_specific_contract_after_positive_contro
                 let ledger = world
                     .initial_rows
                     .values()
-                    .find(|row| matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Ledger(_)))))
+                    .find(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(_)))))
                     .expect("actual original funding source")
                     .clone();
                 altered.push(Write::Save(ledger));
             }
             5 => {
                 for write in &mut altered {
-                    if let Write::Save(Record::Core(jig_core::Record::People(people::Stored::Roles {
+                    if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
                         holdings, ..
                     }))) = write
                     {

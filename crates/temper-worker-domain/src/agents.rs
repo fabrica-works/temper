@@ -3,7 +3,7 @@
 //! the hub owns run policy and Smith owns process supervision.
 
 use alloc::boxed::Box;
-use jig_host as host;
+use jig_domain_host as host;
 use skein_lib::{Env, List, Map, Queue, Token};
 use smith_host_domain as smith;
 

@@ -2,9 +2,9 @@
 //! already decoded history and mounts; no encoding or file access occurs here.
 
 use alloc::boxed::Box;
-use jig_charter as shared;
-use jig_core_brief as brief;
-use jig_core_tasks as tasks;
+use jig_protocol_charter as shared;
+use jig_domain_brief as brief;
+use jig_domain_tasks as tasks;
 use skein_lib::{Decimal, List, ReplyTo, Token, bytes};
 use smith_domain as smith;
 use smith_domain_run as run;

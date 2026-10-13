@@ -2,8 +2,8 @@
 //! scripted Smith agent; its concrete turns and terminal return to the root.
 //! The fake store and person remain outside both domains.
 
-use jig_core_fleet as fleet;
-use jig_core_people as people;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
 use skein_fake_checkout::{Checkout, Exit, Program};
 use skein_fake_llm_domain::api::Script;
 use skein_lib::{Duration, ReplyTo, Time, Token};

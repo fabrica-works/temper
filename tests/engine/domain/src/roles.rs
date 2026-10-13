@@ -8,10 +8,10 @@ use crate::escalation_referee::Story;
 use crate::roles_referee::{Referee, Replacement};
 use crate::store::Store;
 use crate::walking;
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
 use temper_engine_domain as engine;
@@ -180,7 +180,7 @@ fn snapshot(settings: Settings) -> Store {
     for _ in 0..300 {
         previous.iterate();
         let waiting = previous.store.rows.values().any(|row| {
-            matches!(row, Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record))) if matches!(record.escalation,
+            matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record))) if matches!(record.escalation,
                 tasks::Escalation::Waiting { revision: 1, holder: tasks::EscalationHolder::Person(_), .. }
                     if settings.base == Base::Requester)
                 || matches!(record.escalation,
@@ -206,23 +206,23 @@ impl World {
         let mut task = 0;
         for row in store.rows.values() {
             match row {
-                Record::Core(jig_core::Record::People(people::Stored::Person { number, identity })) => {
+                Record::Core(jig_domain_core::Record::People(people::Stored::Person { number, identity })) => {
                     if identity.key.provider == 0 && identity.key.subject.as_ref() == 7_u64.to_be_bytes() {
                         people[0] = *number;
                     } else if identity.key.provider == 0 && identity.key.subject.as_ref() == 8_u64.to_be_bytes() {
                         people[1] = *number;
                     }
                 }
-                Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record))) => task = record.number,
+                Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record))) => task = record.number,
                 Record::Core(
-                    jig_core::Record::People(
+                    jig_domain_core::Record::People(
                         people::Stored::SignIn { .. }
                         | people::Stored::ReadPosition { .. }
                         | people::Stored::Roles { .. }
                         | people::Stored::Policy { .. }
                         | people::Stored::Answer { .. },
                     )
-                    | jig_core::Record::Tasks(
+                    | jig_domain_core::Record::Tasks(
                         tasks::Stored::Ended(_)
                         | tasks::Stored::Stub(_)
                         | tasks::Stored::Ledger(_)
@@ -232,23 +232,23 @@ impl World {
                         | tasks::Stored::History(_)
                         | tasks::Stored::PersonProposal(_),
                     )
-                    | jig_core::Record::Core(
-                        jig_core::CoreRecord::Projection(_)
-                        | jig_core::CoreRecord::Call(_)
-                        | jig_core::CoreRecord::Deployment(_)
-                        | jig_core::CoreRecord::Turn(_)
-                        | jig_core::CoreRecord::RunProof(_)
-                        | jig_core::CoreRecord::Terminal(_)
-                        | jig_core::CoreRecord::EscalationDecision(_)
-                        | jig_core::CoreRecord::ProposalDecision(_),
+                    | jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Projection(_)
+                        | jig_domain_core::CoreRecord::Call(_)
+                        | jig_domain_core::CoreRecord::Deployment(_)
+                        | jig_domain_core::CoreRecord::Turn(_)
+                        | jig_domain_core::CoreRecord::RunProof(_)
+                        | jig_domain_core::CoreRecord::Terminal(_)
+                        | jig_domain_core::CoreRecord::EscalationDecision(_)
+                        | jig_domain_core::CoreRecord::ProposalDecision(_),
                     )
-                    | jig_core::Record::Notes(_),
+                    | jig_domain_core::Record::Notes(_),
                 )
                 | Record::Forge { .. } => {}
             }
         }
         for row in store.rows.values() {
-            if let Record::Core(jig_core::Record::People(people::Stored::SignIn { number, person, .. })) = row {
+            if let Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, person, .. })) = row {
                 for index in 0..2 {
                     if *person == people[index] {
                         sessions[index] = *number;
@@ -258,8 +258,8 @@ impl World {
         }
         assert!(task != 0 && people.iter().all(|person| *person != 0) && sessions.iter().all(|session| *session != 0));
         if settings.exhausted {
-            let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) =
-                store.rows.get_mut(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(task))))
+            let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) =
+                store.rows.get_mut(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task))))
             else {
                 panic!("actual durable held task");
             };
@@ -365,8 +365,8 @@ impl World {
     /// child's private state.
     #[must_use]
     pub fn task_record(&self) -> &tasks::TaskRecord {
-        let Some(Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(record)))) =
-            self.store.rows.get(&Key::Core(jig_core::Key::Tasks(tasks::Key::Live(self.task))))
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) =
+            self.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(self.task))))
         else {
             panic!("role story retains one actual held task");
         };
@@ -433,7 +433,7 @@ impl World {
         let roles = self.store.pending.front().expect("actual pending commit").1.iter().any(|write| {
             matches!(
                 write,
-                Write::Save(Record::Core(jig_core::Record::People(people::Stored::Answer {
+                Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                     outcome: people::Outcome::RolesSet { .. },
                     ..
                 })))
@@ -469,7 +469,7 @@ impl World {
                     let roles = writes.iter().any(|write| {
                         matches!(
                             write,
-                            Write::Save(Record::Core(jig_core::Record::People(people::Stored::Answer {
+                            Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                                 outcome: people::Outcome::RolesSet { .. },
                                 ..
                             })))
@@ -508,7 +508,7 @@ impl World {
                 }
                 engine::Request::Account(accounts::Request::Refresh { account, generation }) => {
                     self.queue(
-                        engine::Event::Account(jig_core_accounts::Event::Refreshed {
+                        engine::Event::Account(jig_domain_accounts::Event::Refreshed {
                             account,
                             generation,
                             valid: Duration::from_secs(60),

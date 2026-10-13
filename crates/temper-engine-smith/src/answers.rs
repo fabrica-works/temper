@@ -248,13 +248,13 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
         CallAnswer::NoteRefused(why) => {
             text.add(b"Note refused: ")?;
             text.add(match why {
-                jig_core_notes::Refusal::Busy => b"busy",
-                jig_core_notes::Refusal::Oversized => b"oversized",
-                jig_core_notes::Refusal::Full => b"full",
-                jig_core_notes::Refusal::Exists => b"already exists",
-                jig_core_notes::Refusal::Missing => b"missing",
-                jig_core_notes::Refusal::Moved => b"revision moved",
-                jig_core_notes::Refusal::RevisionExhausted => b"revision exhausted",
+                jig_domain_notes::Refusal::Busy => b"busy",
+                jig_domain_notes::Refusal::Oversized => b"oversized",
+                jig_domain_notes::Refusal::Full => b"full",
+                jig_domain_notes::Refusal::Exists => b"already exists",
+                jig_domain_notes::Refusal::Missing => b"missing",
+                jig_domain_notes::Refusal::Moved => b"revision moved",
+                jig_domain_notes::Refusal::RevisionExhausted => b"revision exhausted",
             })?;
             true
         }
@@ -300,17 +300,17 @@ fn made_text(text: &mut Text, made: temper_engine_domain_forge_client::Made) -> 
     }
 }
 
-fn authority(text: &mut Text, answer: jig_core_authority::Answer) -> Result<(), Problem> {
+fn authority(text: &mut Text, answer: jig_domain_authority::Answer) -> Result<(), Problem> {
     match answer {
-        jig_core_authority::Answer::Allow => text.add(b"allowed"),
-        jig_core_authority::Answer::Wait => text.add(b"waiting"),
-        jig_core_authority::Answer::Propose => text.add(b"needs proposal"),
-        jig_core_authority::Answer::Refuse => text.add(b"refused"),
+        jig_domain_authority::Answer::Allow => text.add(b"allowed"),
+        jig_domain_authority::Answer::Wait => text.add(b"waiting"),
+        jig_domain_authority::Answer::Propose => text.add(b"needs proposal"),
+        jig_domain_authority::Answer::Refuse => text.add(b"refused"),
     }
 }
 
-fn finding_text(text: &mut Text, finding: jig_core_authority::Finding) -> Result<(), Problem> {
-    use jig_core_authority::Finding;
+fn finding_text(text: &mut Text, finding: jig_domain_authority::Finding) -> Result<(), Problem> {
+    use jig_domain_authority::Finding;
     match finding {
         Finding::Oversized => text.add(b"too large"),
         Finding::UnknownProject => text.add(b"unknown project"),
@@ -341,8 +341,8 @@ fn finding_text(text: &mut Text, finding: jig_core_authority::Finding) -> Result
     }
 }
 
-fn task_problem(text: &mut Text, problem: &jig_core_tasks::Problem) -> Result<(), Problem> {
-    use jig_core_tasks::Refusal;
+fn task_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<(), Problem> {
+    use jig_domain_tasks::Refusal;
     if let Some(task) = problem.task {
         text.add(b"task ")?;
         text.number(task)?;

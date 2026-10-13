@@ -2,13 +2,13 @@
 use crate::route::{HostMessage, HostRequest, escalation, forge_route, inbox, proposals, results};
 use crate::{CallAnswer, CallKey, Delivery, Key, Range, Record, Write};
 use alloc::boxed::Box;
-use jig_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
-use jig_core_accounts as accounts;
-use jig_core_brief as brief;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
+use jig_domain_accounts as accounts;
+use jig_domain_brief as brief;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use skein_lib::{List, ReplyTo, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
@@ -40,7 +40,7 @@ pub struct Assignment {
     /// Named answers committed after the task's last accepted turn. The
     /// worker gives these to the new attempt before it can decide new calls.
     pub answered: Box<[crate::CallRecord]>,
-    pub settled: Box<[jig_core::SettledCall]>,
+    pub settled: Box<[jig_domain_core::SettledCall]>,
     /// Secret-free account grant; token bytes stay in the protocol.
     pub grant: accounts::Grant,
 }
@@ -124,9 +124,9 @@ pub struct Turn {
 #[derive(PartialEq, Eq, Debug)]
 pub enum Tool {
     /// Write or correct one scoped note by the revision this run recalled.
-    Note { entry: jig_core_notes::New, recalled: Option<u32> },
+    Note { entry: jig_domain_notes::New, recalled: Option<u32> },
     /// Read one bounded page of notes by name or description.
-    Recall { by: jig_core_notes::Recall, page: u32 },
+    Recall { by: jig_domain_notes::Recall, page: u32 },
     /// Queue one checked forge write with a root-derived idempotency key.
     EffectForge {
         repository: forge_client::api::Repository,
@@ -170,7 +170,7 @@ pub enum Tool {
     /// Root-normalized proposal shape refusal before retaining its action.
     RejectedProposal(tasks::Refusal),
     /// A note or recall failed bounded ingress.
-    RejectedNote(jig_core_notes::Refusal),
+    RejectedNote(jig_domain_notes::Refusal),
     /// The engine records an unavailable answer for a route not yet installed.
     Unavailable,
 }
@@ -276,7 +276,7 @@ pub enum WorkerInput {
     },
     RenderedHostCall {
         to: ReplyTo,
-        answer: jig_core::SettledAnswer,
+        answer: jig_domain_core::SettledAnswer,
     },
     Inbound {
         task: u64,
@@ -507,16 +507,16 @@ pub enum PartyRequest {
 pub(crate) enum Work {
     AdoptRestored,
     AdoptDone,
-    Restart(jig_core::RestartRequest),
+    Restart(jig_domain_core::RestartRequest),
     Decoded { to: ReplyTo, body: Call },
-    Core(jig_core::Event),
+    Core(jig_domain_core::Event),
     Tasks(tasks::Event),
     People(people::Event),
     Fleet(fleet::Event),
     Brief(brief::GatherEvent),
     StartBrief { task: u64 },
     Forge(forge::Event),
-    ProjectGoal(Box<jig_core::ProjectionFeed>),
+    ProjectGoal(Box<jig_domain_core::ProjectionFeed>),
     GoalSubscribe(forge::Subscriber),
     Activate(Box<tasks::RunContext>),
     EscalationLoaded { waiter: Token, rows: Box<[Record]> },
@@ -545,7 +545,7 @@ pub(crate) enum Payload {
         body: Call,
     },
     CallAnswer(CallAnswer),
-    SettledCall(jig_core::SettledCall),
+    SettledCall(jig_domain_core::SettledCall),
     Message(HostMessage),
     InboxWord(tasks::Word),
     Turn {

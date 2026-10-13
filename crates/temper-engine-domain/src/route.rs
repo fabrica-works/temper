@@ -32,14 +32,14 @@ use crate::translate::{
 use crate::{CallAnswer, CallKey, Decision, Delivery, Family, Key, Range, Record, Write, loads};
 use alloc::boxed::Box;
 pub use forge_route::adopt_repository_ask;
-use jig_core::{Core, Delegate, ProcedureAction};
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_brief as brief;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::{Core, Delegate, ProcedureAction};
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_brief as brief;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 pub use landing::{Approval, Freshness, Gate, LandingRule};
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Token};
 use temper_engine_domain_forge as forge;
@@ -76,7 +76,7 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             domain.work.push(Work::Forge(*event));
         }
         Event::Party(crate::PartyInput::Watch { watcher, sign_in, key, subject }) => {
-            let project = jig_core::watch_project(&domain.core, subject);
+            let project = jig_domain_core::watch_project(&domain.core, subject);
             open_watch(domain, env, watcher, sign_in, key, project, watch_subject(subject), out);
             return;
         }
@@ -92,19 +92,19 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         }
         Event::Party(crate::PartyInput::StartRecurring { project, authority, template }) => {
             if domain.ready() && admits(domain, &env.limits) {
-                domain.work.push(Work::Core(jig_core::Event::StartRecurring { project, authority, template }));
+                domain.work.push(Work::Core(jig_domain_core::Event::StartRecurring { project, authority, template }));
             }
         }
         Event::Party(crate::PartyInput::Period { project, period, budget }) => {
             if domain.ready() && admits(domain, &env.limits) {
-                domain.work.push(Work::Core(jig_core::Event::Period { project, period, budget }));
+                domain.work.push(Work::Core(jig_domain_core::Event::Period { project, period, budget }));
             }
         }
         Event::Party(crate::PartyInput::ProcedureStep { task, step, connector, code, action }) => {
             if !domain.ready() || !admits(domain, &env.limits) {
                 return;
             }
-            domain.work.push(Work::Core(jig_core::Event::ProcedureStep { task, step, connector, code, action }));
+            domain.work.push(Work::Core(jig_domain_core::Event::ProcedureStep { task, step, connector, code, action }));
         }
         Event::Store(crate::StoreInput::Committed { number }) => {
             crate::committed(&mut domain.journal, number);
@@ -141,14 +141,14 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         Event::Restart => {
             let Some(mut decision) = route_decision(domain, &env.limits) else { return };
             let request = domain.core.restart_begin();
-            if request != jig_core::RestartRequest::Idle {
+            if request != jig_domain_core::RestartRequest::Idle {
                 restart_request(domain, env, &mut decision, request);
-                let account = jig_core::Event::Account(accounts::Event::Add {
+                let account = jig_domain_core::Event::Account(accounts::Event::Add {
                     account: domain.core.settings.account,
                     generation: domain.core.settings.account_generation,
                     valid: domain.core.settings.account_valid,
                 });
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), account);
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), account);
                 route_core_requests(domain, env, &mut decision, routed);
             }
             route_into(domain, env, &mut decision);
@@ -183,7 +183,7 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
                 }));
                 return;
             }
-            domain.work.push(Work::Core(jig_core::Event::SignIn { reply_to, identity }));
+            domain.work.push(Work::Core(jig_domain_core::Event::SignIn { reply_to, identity }));
         }
         Event::Party(crate::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
             if let people::Ask::Watch { project, subject } = &ask {
@@ -376,26 +376,26 @@ pub(crate) fn route_core_requests(
     domain: &mut Domain,
     env: &Env<Limits>,
     decision: &mut Decision,
-    requests: jig_core::Requests,
+    requests: jig_domain_core::Requests,
 ) {
     match requests {
-        jig_core::Requests::Out(mut output) => {
+        jig_domain_core::Requests::Out(mut output) => {
             for _ in 0..output.len() {
                 match output.pop().expect("core output count") {
-                    jig_core::Request::Write(write) => match write {
-                        jig_core::Write::Save(record) => match record {
-                            jig_core::Record::Core(jig_core::CoreRecord::Projection(row)) => {
+                    jig_domain_core::Request::Write(write) => match write {
+                        jig_domain_core::Write::Save(record) => match record {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Projection(row)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(
-                                        jig_core::CoreRecord::Projection(row),
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(
+                                        jig_domain_core::CoreRecord::Projection(row),
                                     ))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::Call(row)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(row)) => {
                                 let answer = forge_route::effect_answer(domain, row.key, &row.part);
-                                if let jig_core::CallPart::Effect { .. } = row.part {
+                                if let jig_domain_core::CallPart::Effect { .. } = row.part {
                                     keep_connector_answer(domain, row.key, answer.clone())
                                         .expect("admitted effect call payload");
                                 }
@@ -403,80 +403,80 @@ pub(crate) fn route_core_requests(
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(row)))),
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(row)))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::RunProof(proof)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::RunProof(
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(
                                         proof,
                                     )))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::Terminal(terminal)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(terminal)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Terminal(
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(
                                         terminal,
                                     )))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::Turn(turn)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(turn)))),
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn)))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::ProposalDecision(archive)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(archive)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(
-                                        jig_core::CoreRecord::ProposalDecision(archive),
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(
+                                        jig_domain_core::CoreRecord::ProposalDecision(archive),
                                     ))),
                                 );
                             }
-                            jig_core::Record::Core(jig_core::CoreRecord::EscalationDecision(archive)) => {
+                            jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Save(Record::Core(jig_core::Record::Core(
-                                        jig_core::CoreRecord::EscalationDecision(archive),
+                                    Write::Save(Record::Core(jig_domain_core::Record::Core(
+                                        jig_domain_core::CoreRecord::EscalationDecision(archive),
                                     ))),
                                 );
                             }
-                            jig_core::Record::People(row) => {
-                                save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::People(row))));
+                            jig_domain_core::Record::People(row) => {
+                                save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::People(row))));
                             }
-                            jig_core::Record::Tasks(row) => {
-                                save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::Tasks(row))));
+                            jig_domain_core::Record::Tasks(row) => {
+                                save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::Tasks(row))));
                             }
-                            jig_core::Record::Notes(row) => {
-                                save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::Notes(row))));
+                            jig_domain_core::Record::Notes(row) => {
+                                save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::Notes(row))));
                             }
-                            jig_core::Record::Core(_) => {
+                            jig_domain_core::Record::Core(_) => {
                                 unreachable!("the core route owns its write family")
                             }
                         },
-                        jig_core::Write::Erase(key) => match key {
-                            jig_core::Key::Core(jig_core::CoreKey::Projection(key)) => {
+                        jig_domain_core::Write::Erase(key) => match key {
+                            jig_domain_core::Key::Core(jig_domain_core::CoreKey::Projection(key)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Projection(key)))),
+                                    Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Projection(key)))),
                                 );
                             }
-                            jig_core::Key::People(key) => {
-                                save(decision, &env.limits, Write::Erase(Key::Core(jig_core::Key::People(key))));
+                            jig_domain_core::Key::People(key) => {
+                                save(decision, &env.limits, Write::Erase(Key::Core(jig_domain_core::Key::People(key))));
                             }
-                            jig_core::Key::Tasks(key) => {
-                                save(decision, &env.limits, Write::Erase(Key::Core(jig_core::Key::Tasks(key))));
+                            jig_domain_core::Key::Tasks(key) => {
+                                save(decision, &env.limits, Write::Erase(Key::Core(jig_domain_core::Key::Tasks(key))));
                             }
-                            jig_core::Key::Core(jig_core::CoreKey::Call(key)) => {
+                            jig_domain_core::Key::Core(jig_domain_core::CoreKey::Call(key)) => {
                                 if domain.forge.forget_named_answer(named_call(key)).is_some() {
                                     save(
                                         decision,
@@ -487,44 +487,44 @@ pub(crate) fn route_core_requests(
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::Call(key)))),
+                                    Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Call(key)))),
                                 );
                             }
-                            jig_core::Key::Core(jig_core::CoreKey::RunProof(task)) => {
+                            jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task)) => {
                                 save(
                                     decision,
                                     &env.limits,
-                                    Write::Erase(Key::Core(jig_core::Key::Core(jig_core::CoreKey::RunProof(task)))),
+                                    Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task)))),
                                 );
                             }
-                            jig_core::Key::Core(
-                                jig_core::CoreKey::Deployment
-                                | jig_core::CoreKey::Turn { .. }
-                                | jig_core::CoreKey::Terminal { .. }
-                                | jig_core::CoreKey::ProposalDecision(_)
-                                | jig_core::CoreKey::EscalationDecision { .. },
+                            jig_domain_core::Key::Core(
+                                jig_domain_core::CoreKey::Deployment
+                                | jig_domain_core::CoreKey::Turn { .. }
+                                | jig_domain_core::CoreKey::Terminal { .. }
+                                | jig_domain_core::CoreKey::ProposalDecision(_)
+                                | jig_domain_core::CoreKey::EscalationDecision { .. },
                             ) => {
                                 unreachable!("the core route owns its erase family")
                             }
-                            jig_core::Key::Notes(key) => {
-                                save(decision, &env.limits, Write::Erase(Key::Core(jig_core::Key::Notes(key))));
+                            jig_domain_core::Key::Notes(key) => {
+                                save(decision, &env.limits, Write::Erase(Key::Core(jig_domain_core::Key::Notes(key))));
                             }
                         },
                     },
-                    jig_core::Request::Ask { connector, ask } => {
+                    jig_domain_core::Request::Ask { connector, ask } => {
                         let request = match ask {
-                            jig_core::Ask::Effect(ask) => {
+                            jig_domain_core::Ask::Effect(ask) => {
                                 forge_route::effect_ask(domain, env, connector, ask);
                                 None
                             }
-                            jig_core::Ask::Gather { section, budget } => {
+                            jig_domain_core::Ask::Gather { section, budget } => {
                                 Some(brief::GatherRequest::Gather { connector, section, budget })
                             }
-                            jig_core::Ask::CutTo { section, size } => {
+                            jig_domain_core::Ask::CutTo { section, size } => {
                                 Some(brief::GatherRequest::CutTo { connector, section, size })
                             }
-                            jig_core::Ask::Drop { section } => Some(brief::GatherRequest::Drop { connector, section }),
-                            jig_core::Ask::Hold { task, resource } => {
+                            jig_domain_core::Ask::Drop { section } => Some(brief::GatherRequest::Drop { connector, section }),
+                            jig_domain_core::Ask::Hold { task, resource } => {
                                 if connector == domain.config.forge_connector
                                     && let Some(name) = forge_route::forge_name(
                                         domain.config.forge_connector,
@@ -540,7 +540,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::EndTopic { task, subscription } => {
+                            jig_domain_core::Ask::EndTopic { task, subscription } => {
                                 if connector == domain.config.forge_connector
                                     && let Some(topic) = domain.forge.subscription(task, subscription)
                                 {
@@ -548,7 +548,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::Adopt { request, project, adoption } => {
+                            jig_domain_core::Ask::Adopt { request, project, adoption } => {
                                 let parsed = if connector == domain.config.forge_connector {
                                     forge_route::parse_adoption(project, adoption, connector)
                                 } else {
@@ -576,7 +576,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::Close { task, root, ending } => {
+                            jig_domain_core::Ask::Close { task, root, ending } => {
                                 if connector == domain.config.forge_connector {
                                     domain.work.push(Work::Forge(forge::Event::SettleEffects {
                                         task,
@@ -586,7 +586,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::Release { task, root, ending, entry } => {
+                            jig_domain_core::Ask::Release { task, root, ending, entry } => {
                                 if connector == domain.config.forge_connector {
                                     domain.work.push(Work::Forge(forge::Event::Release {
                                         task,
@@ -597,7 +597,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::Lost { task, attempt } => {
+                            jig_domain_core::Ask::Lost { task, attempt } => {
                                 if connector == domain.config.forge_connector {
                                     match domain.forge_left.remove(&(task, attempt)) {
                                         Some(pushed) if !pushed.is_empty() => {
@@ -610,7 +610,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::TaskHoldings { request, project, root, number, executor, spec } => {
+                            jig_domain_core::Ask::TaskHoldings { request, project, root, number, executor, spec } => {
                                 let holdings = if connector == domain.config.forge_connector {
                                     forge_route::task_holdings(
                                         domain, env, project, root, number, executor, &spec, None,
@@ -618,14 +618,14 @@ pub(crate) fn route_core_requests(
                                 } else {
                                     None
                                 };
-                                domain.work.push(Work::Core(jig_core::Event::Holdings {
+                                domain.work.push(Work::Core(jig_domain_core::Event::Holdings {
                                     request,
                                     connector,
                                     holdings,
                                 }));
                                 None
                             }
-                            jig_core::Ask::DelegateHoldings { request, from, members } => {
+                            jig_domain_core::Ask::DelegateHoldings { request, from, members } => {
                                 let holdings = if connector == domain.config.forge_connector {
                                     let mut collected = List::with_capacity(
                                         u32::try_from(members.len()).expect("bounded delegate batch"),
@@ -650,14 +650,14 @@ pub(crate) fn route_core_requests(
                                 } else {
                                     None
                                 };
-                                domain.work.push(Work::Core(jig_core::Event::DelegateHoldings {
+                                domain.work.push(Work::Core(jig_domain_core::Event::DelegateHoldings {
                                     request,
                                     connector,
                                     holdings,
                                 }));
                                 None
                             }
-                            jig_core::Ask::ProcedureHoldings { task, step, members } => {
+                            jig_domain_core::Ask::ProcedureHoldings { task, step, members } => {
                                 let holdings = if connector == domain.config.forge_connector {
                                     let mut collected = List::with_capacity(
                                         u32::try_from(members.len()).expect("bounded procedure batch"),
@@ -682,7 +682,7 @@ pub(crate) fn route_core_requests(
                                 } else {
                                     None
                                 };
-                                domain.work.push(Work::Core(jig_core::Event::ProcedureHoldings {
+                                domain.work.push(Work::Core(jig_domain_core::Event::ProcedureHoldings {
                                     task,
                                     step,
                                     connector,
@@ -690,24 +690,24 @@ pub(crate) fn route_core_requests(
                                 }));
                                 None
                             }
-                            jig_core::Ask::ProjectGoal { feed } => {
+                            jig_domain_core::Ask::ProjectGoal { feed } => {
                                 if connector == domain.config.forge_connector {
                                     domain.work.push(Work::ProjectGoal(feed));
                                 } else if feed.closing {
-                                    domain.work.push(Work::Core(jig_core::Event::ProjectionSettled {
+                                    domain.work.push(Work::Core(jig_domain_core::Event::ProjectionSettled {
                                         goal: feed.goal.number,
                                         connector,
                                     }));
                                 }
                                 None
                             }
-                            jig_core::Ask::ForgetProjection { goal } => {
+                            jig_domain_core::Ask::ForgetProjection { goal } => {
                                 if connector == domain.config.forge_connector {
                                     domain.work.push(Work::Forge(forge::Event::ForgetProjection { goal }));
                                 }
                                 None
                             }
-                            jig_core::Ask::SubscriptionDone { request, key, subscription } => {
+                            jig_domain_core::Ask::SubscriptionDone { request, key, subscription } => {
                                 if connector == domain.config.forge_connector {
                                     if let Some(pending) = domain.forge_subscribing.remove(&request) {
                                         let names = forge_route::watch_names(domain, &env.limits, &pending)
@@ -731,7 +731,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::UnsubscriptionDone { request, key } => {
+                            jig_domain_core::Ask::UnsubscriptionDone { request, key } => {
                                 if connector == domain.config.forge_connector {
                                     if let Some((owner, topic)) = domain.forge_unsubscribing.remove(&request) {
                                         domain.work.push(Work::Forge(forge::Event::Unsubscribe { task: owner, topic }));
@@ -747,7 +747,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::ClaimDone { task, attempt } => {
+                            jig_domain_core::Ask::ClaimDone { task, attempt } => {
                                 if connector == domain.config.forge_connector {
                                     let (writes, holders) = forge_route::claimed_writes(domain, env, task)
                                         .expect("the admitted assignment retains its bounded held forge writes");
@@ -780,14 +780,14 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::DropSubscription { request } => {
+                            jig_domain_core::Ask::DropSubscription { request } => {
                                 if connector == domain.config.forge_connector {
                                     drop(domain.forge_subscribing.remove(&request));
                                     drop(domain.forge_unsubscribing.remove(&request));
                                 }
                                 None
                             }
-                            jig_core::Ask::RepairRefused { repair } => {
+                            jig_domain_core::Ask::RepairRefused { repair } => {
                                 if connector == domain.config.forge_connector
                                     && let Some(repair) = repair
                                     && let Some(owner) = domain.forge.queue_repair_owner(repair)
@@ -799,7 +799,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::DelegateRefused { task } => {
+                            jig_domain_core::Ask::DelegateRefused { task } => {
                                 if connector == domain.config.forge_connector
                                     && let Some(task) = task
                                     && let Some(row) = domain.forge.change(task)
@@ -812,7 +812,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None
                             }
-                            jig_core::Ask::StartProcedure { context, step } => {
+                            jig_domain_core::Ask::StartProcedure { context, step } => {
                                 let task = context.task;
                                 let code = match context.executor {
                                     tasks::Executor::Procedure { code, .. } => code,
@@ -838,15 +838,15 @@ pub(crate) fn route_core_requests(
                             brief_outputs(domain, env, decision, &mut child);
                         }
                     }
-                    jig_core::Request::Held(held) => match *held {
-                        jig_core::Held::SettledCall { to, call, .. } => {
+                    jig_domain_core::Request::Held(held) => match *held {
+                        jig_domain_core::Held::SettledCall { to, call, .. } => {
                             host_route::settled(domain, &env.limits, decision, to, call);
                         }
-                        jig_core::Held::Relayed { channel, run, attempt, call: name, answer } => {
+                        jig_domain_core::Held::Relayed { channel, run, attempt, call: name, answer } => {
                             let delivery = host_route::relayed(domain, channel, run, attempt, name, answer);
                             emit(decision, &env.limits, delivery);
                         }
-                        jig_core::Held::Inbound { channel, run, attempt, message } => {
+                        jig_domain_core::Held::Inbound { channel, run, attempt, message } => {
                             match take_payload(domain, message.words).expect("fleet message payload") {
                                 Payload::Message(message) => emit(
                                     decision,
@@ -870,35 +870,35 @@ pub(crate) fn route_core_requests(
                                 | Payload::Answer { .. } => unreachable!("fleet message payload"),
                             }
                         }
-                        jig_core::Held::MakeEffect { connector, entry } => {
+                        jig_domain_core::Held::MakeEffect { connector, entry } => {
                             assert!(connector == domain.config.forge_connector, "numbered forge make");
                             emit(decision, &env.limits, Delivery::ForgeCommitted { entry });
                         }
-                        jig_core::Held::Relay { task, attempt, previous, word } => {
+                        jig_domain_core::Held::Relay { task, attempt, previous, word } => {
                             emit(decision, &env.limits, Delivery::Relay { task, attempt, previous, word });
                         }
-                        jig_core::Held::PeopleReply { to, sign_in, reply } => {
+                        jig_domain_core::Held::PeopleReply { to, sign_in, reply } => {
                             emit(decision, &env.limits, Delivery::WebReply { to, sign_in, reply });
                         }
-                        jig_core::Held::CallAnswer { to, key, part } => {
+                        jig_domain_core::Held::CallAnswer { to, key, part } => {
                             let answer = forge_route::effect_answer(domain, key, &part);
                             relay_call(domain, &env.limits, decision, to, answer);
                         }
-                        jig_core::Held::ViewStart { run, attempt } => {
+                        jig_domain_core::Held::ViewStart { run, attempt } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::View(Box::new(views::Event::Started { task: run, attempt })),
                             );
                         }
-                        jig_core::Held::ViewFinished { task } => {
+                        jig_domain_core::Held::ViewFinished { task } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::View(Box::new(views::Event::Finished { task: Token::new(task) })),
                             );
                         }
-                        jig_core::Held::ViewTaskPhase { task, trees, project, phase, priority } => {
+                        jig_domain_core::Held::ViewTaskPhase { task, trees, project, phase, priority } => {
                             emit(
                                 decision,
                                 &env.limits,
@@ -911,23 +911,23 @@ pub(crate) fn route_core_requests(
                                 })),
                             );
                         }
-                        jig_core::Held::Result { person, task, words } => {
+                        jig_domain_core::Held::Result { person, task, words } => {
                             emit(decision, &env.limits, Delivery::Result { person, task, words });
                         }
-                        jig_core::Held::Assign { channel, run, attempt, .. } => {
+                        jig_domain_core::Held::Assign { channel, run, attempt, .. } => {
                             let assignment =
                                 domain.assignments.remove(&run.raw()).expect("durable claim has prepared assignment");
                             assert!(assignment.attempt == attempt.raw(), "assignment names current attempt");
                             emit(decision, &env.limits, Delivery::Assigned { channel, assignment });
                         }
-                        jig_core::Held::Acknowledge { channel, run, attempt } => {
+                        jig_domain_core::Held::Acknowledge { channel, run, attempt } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::Acknowledge { channel, task: run.raw(), attempt: attempt.raw() },
                             );
                         }
-                        jig_core::Held::TaskTerminalAcknowledged { task, attempt } => {
+                        jig_domain_core::Held::TaskTerminalAcknowledged { task, attempt } => {
                             emit(
                                 decision,
                                 &env.limits,
@@ -937,7 +937,7 @@ pub(crate) fn route_core_requests(
                                 }),
                             );
                         }
-                        jig_core::Held::TaskTurnKept { task, attempt, turn } => {
+                        jig_domain_core::Held::TaskTurnKept { task, attempt, turn } => {
                             emit(
                                 decision,
                                 &env.limits,
@@ -948,7 +948,7 @@ pub(crate) fn route_core_requests(
                                 }),
                             );
                         }
-                        jig_core::Held::ViewTurn { task, attempt, turn } => {
+                        jig_domain_core::Held::ViewTurn { task, attempt, turn } => {
                             emit(
                                 decision,
                                 &env.limits,
@@ -959,32 +959,32 @@ pub(crate) fn route_core_requests(
                                 })),
                             );
                         }
-                        jig_core::Held::AcknowledgeTurn { channel, run, attempt, turn } => {
+                        jig_domain_core::Held::AcknowledgeTurn { channel, run, attempt, turn } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::AcknowledgeTurn { channel, task: run.raw(), attempt: attempt.raw(), turn },
                             );
                         }
-                        jig_core::Held::Cancel { channel, run, attempt } => {
+                        jig_domain_core::Held::Cancel { channel, run, attempt } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::Cancel { channel, task: run.raw(), attempt: attempt.raw() },
                             );
                         }
-                        jig_core::Held::Refuse { channel } => emit(decision, &env.limits, Delivery::Refuse { channel }),
-                        jig_core::Held::TurnBusy { channel, run, attempt, turn } => {
+                        jig_domain_core::Held::Refuse { channel } => emit(decision, &env.limits, Delivery::Refuse { channel }),
+                        jig_domain_core::Held::TurnBusy { channel, run, attempt, turn } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::TurnBusy { channel, task: run.raw(), attempt: attempt.raw(), turn },
                             );
                         }
-                        jig_core::Held::StopRun { task, attempt } => {
+                        jig_domain_core::Held::StopRun { task, attempt } => {
                             emit(decision, &env.limits, Delivery::Fleet(Core::stop_run(task, attempt)));
                         }
-                        jig_core::Held::NotesLoad { owner, range } => {
+                        jig_domain_core::Held::NotesLoad { owner, range } => {
                             match domain.result_reads.insert(Some(Read::Notes { owner })) {
                                 Ok(id) => emit(
                                     decision,
@@ -995,24 +995,24 @@ pub(crate) fn route_core_requests(
                                         after: None,
                                     },
                                 ),
-                                Err(_) => domain.work.push(Work::Core(jig_core::Event::Notes(
-                                    jig_core_notes::Event::LoadFailed { owner },
+                                Err(_) => domain.work.push(Work::Core(jig_domain_core::Event::Notes(
+                                    jig_domain_notes::Event::LoadFailed { owner },
                                 ))),
                             }
                         }
-                        jig_core::Held::NotesWritten { .. } | jig_core::Held::NotesDeleted { .. } => {
+                        jig_domain_core::Held::NotesWritten { .. } | jig_domain_core::Held::NotesDeleted { .. } => {
                             unreachable!("the current application has no note caller")
                         }
                     },
-                    jig_core::Request::Now(now) => match *now {
-                        jig_core::Now::Relayed { channel, run, attempt, call: name, answer } => {
+                    jig_domain_core::Request::Now(now) => match *now {
+                        jig_domain_core::Now::Relayed { channel, run, attempt, call: name, answer } => {
                             let delivery = host_route::relayed(domain, channel, run, attempt, name, answer);
                             assert!(
                                 self::now(domain, crate::boundary::delivery_output(delivery)),
                                 "read answer door reserved"
                             );
                         }
-                        jig_core::Now::Call { to, run, attempt, call } => {
+                        jig_domain_core::Now::Call { to, run, attempt, call } => {
                             if call.tool.is_empty() {
                                 let body = Token::new(
                                     skein_lib::Reader::new(&call.input).u64().expect("decoded call payload"),
@@ -1022,7 +1022,7 @@ pub(crate) fn route_core_requests(
                                 host_route::decode(domain, to, run.raw(), attempt.raw(), call);
                             }
                         }
-                        jig_core::Now::DropCall { call } => {
+                        jig_domain_core::Now::DropCall { call } => {
                             if call.tool.is_empty() {
                                 let body = Token::new(
                                     skein_lib::Reader::new(&call.input).u64().expect("decoded call payload"),
@@ -1037,7 +1037,7 @@ pub(crate) fn route_core_requests(
                                 );
                             }
                         }
-                        jig_core::Now::Undelivered { run, attempt, message } => {
+                        jig_domain_core::Now::Undelivered { run, attempt, message } => {
                             match take_payload(domain, message.words).expect("undelivered message payload") {
                                 Payload::Message(_) => {
                                     let _sent = self::now(
@@ -1059,19 +1059,19 @@ pub(crate) fn route_core_requests(
                                 | Payload::Answer { .. } => unreachable!("message payload family"),
                             }
                         }
-                        jig_core::Now::SettledCallRefused { to, key: _, name, tool } => host_route::settled(
+                        jig_domain_core::Now::SettledCallRefused { to, key: _, name, tool } => host_route::settled(
                             domain,
                             &env.limits,
                             decision,
                             to,
-                            jig_core::SettledCall {
+                            jig_domain_core::SettledCall {
                                 serial: 0,
                                 name,
                                 tool,
-                                answer: jig_core::SettledAnswer::Host { error: true, body: Box::from(&b"busy"[..]) },
+                                answer: jig_domain_core::SettledAnswer::Host { error: true, body: Box::from(&b"busy"[..]) },
                             },
                         ),
-                        jig_core::Now::SignInRefused { to } => {
+                        jig_domain_core::Now::SignInRefused { to } => {
                             emit(
                                 decision,
                                 &env.limits,
@@ -1082,11 +1082,11 @@ pub(crate) fn route_core_requests(
                                 },
                             );
                         }
-                        jig_core::Now::WatchRefused { .. } => {
+                        jig_domain_core::Now::WatchRefused { .. } => {
                             unreachable!("volatile watch route handles its own refusal")
                         }
-                        jig_core::Now::DropPayload { payload } => drop(take_payload(domain, payload)),
-                        jig_core::Now::TurnPayload { run, attempt, turn, body } => {
+                        jig_domain_core::Now::DropPayload { payload } => drop(take_payload(domain, payload)),
+                        jig_domain_core::Now::TurnPayload { run, attempt, turn, body } => {
                             let payload = domain.payloads.get(Id::from_token(body)).expect("fleet returns owned token");
                             let payload = match payload.as_ref().expect("fleet returns owned payload") {
                                 Payload::Turn { body: payload, .. } => payload,
@@ -1099,7 +1099,7 @@ pub(crate) fn route_core_requests(
                                     unreachable!("fleet returns turn family")
                                 }
                             };
-                            domain.work.push(Work::Core(jig_core::Event::TurnPayload {
+                            domain.work.push(Work::Core(jig_domain_core::Event::TurnPayload {
                                 run,
                                 attempt,
                                 turn,
@@ -1108,7 +1108,7 @@ pub(crate) fn route_core_requests(
                                 cumulative: payload.cumulative,
                             }));
                         }
-                        jig_core::Now::AnswerPayload { run, attempt, payload } => {
+                        jig_domain_core::Now::AnswerPayload { run, attempt, payload } => {
                             let body = domain.payloads.get(Id::from_token(payload)).expect("fleet returns owned token");
                             let (cumulative, end, saved, pushed) =
                                 match body.as_ref().expect("fleet returns owned payload") {
@@ -1137,7 +1137,7 @@ pub(crate) fn route_core_requests(
                                 }
                                 None => (None, false),
                             };
-                            domain.work.push(Work::Core(jig_core::Event::AnswerPayload {
+                            domain.work.push(Work::Core(jig_domain_core::Event::AnswerPayload {
                                 run,
                                 attempt,
                                 payload,
@@ -1147,7 +1147,7 @@ pub(crate) fn route_core_requests(
                                 invalid_saved,
                             }));
                         }
-                        jig_core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
+                        jig_domain_core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
                             let payload = take_payload(domain, payload).expect("charged turn owns payload");
                             let body = match payload {
                                 Payload::Turn { body, .. } => body,
@@ -1160,7 +1160,7 @@ pub(crate) fn route_core_requests(
                                     unreachable!("turn family")
                                 }
                             };
-                            domain.work.push(Work::Core(jig_core::Event::AcceptedTurn {
+                            domain.work.push(Work::Core(jig_domain_core::Event::AcceptedTurn {
                                 task,
                                 attempt,
                                 turn,
@@ -1170,14 +1170,14 @@ pub(crate) fn route_core_requests(
                                 transcript: body.transcript,
                             }));
                         }
-                        jig_core::Now::RefusedPayload { request, problem } => {
+                        jig_domain_core::Now::RefusedPayload { request, problem } => {
                             let payload = match take_payload(domain, request) {
                                 Some(Payload::Turn { task, attempt, body }) => {
-                                    Some(jig_core::PayloadRefusal::Turn { task, attempt, turn: body.number })
+                                    Some(jig_domain_core::PayloadRefusal::Turn { task, attempt, turn: body.number })
                                 }
                                 Some(Payload::Answer { task, attempt, .. }) => {
                                     domain.forge_left.remove(&(task, attempt));
-                                    Some(jig_core::PayloadRefusal::Answer { task, attempt })
+                                    Some(jig_domain_core::PayloadRefusal::Answer { task, attempt })
                                 }
                                 Some(
                                     Payload::Call { .. }
@@ -1190,13 +1190,13 @@ pub(crate) fn route_core_requests(
                                 }
                                 None => None,
                             };
-                            domain.work.push(Work::Core(jig_core::Event::RefusedPayload { request, problem, payload }));
+                            domain.work.push(Work::Core(jig_domain_core::Event::RefusedPayload { request, problem, payload }));
                         }
-                        jig_core::Now::Activate { context } => {
+                        jig_domain_core::Now::Activate { context } => {
                             let ready = domain.ready();
-                            domain.work.push(Work::Core(jig_core::Event::Activate { context, ready }));
+                            domain.work.push(Work::Core(jig_domain_core::Event::Activate { context, ready }));
                         }
-                        jig_core::Now::PrepareAgent { context } => {
+                        jig_domain_core::Now::PrepareAgent { context } => {
                             let (transcript_waiter, busy) = if context.ever_turned {
                                 match domain.result_reads.insert(Some(Read::Transcript { task: context.task })) {
                                     Ok(waiter) => (Some(waiter.token()), false),
@@ -1205,13 +1205,13 @@ pub(crate) fn route_core_requests(
                             } else {
                                 (None, false)
                             };
-                            domain.work.push(Work::Core(jig_core::Event::PreparedAgent {
+                            domain.work.push(Work::Core(jig_domain_core::Event::PreparedAgent {
                                 context,
                                 transcript_waiter,
                                 busy,
                             }));
                         }
-                        jig_core::Now::StartPreparation { task, transcript_waiter } => {
+                        jig_domain_core::Now::StartPreparation { task, transcript_waiter } => {
                             domain.work.push(Work::Tasks(tasks::Event::Prepare { reply_to: internal(task), task }));
                             match transcript_waiter {
                                 Some(waiter) => emit(
@@ -1238,15 +1238,15 @@ pub(crate) fn route_core_requests(
                                 }
                             }
                         }
-                        jig_core::Now::HistoricalProposal { request, person, project, proposer, proposal } => {
+                        jig_domain_core::Now::HistoricalProposal { request, person, project, proposer, proposal } => {
                             proposals::historical_begin(
                                 domain, env, decision, request, person, project, proposer, proposal,
                             );
                         }
-                        jig_core::Now::BriefCorePlanned { task, parent, sections } => {
+                        jig_domain_core::Now::BriefCorePlanned { task, parent, sections } => {
                             finish_brief_plan(domain, env, task, parent, sections);
                         }
-                        jig_core::Now::WorkspaceRequest { task, attempt, context } => {
+                        jig_domain_core::Now::WorkspaceRequest { task, attempt, context } => {
                             let workspace = forge_route::run_workspace(domain, env, &context, attempt);
                             let writes = match workspace {
                                 Some(workspace) => {
@@ -1268,13 +1268,13 @@ pub(crate) fn route_core_requests(
                                 }
                                 None => None,
                             };
-                            domain.work.push(Work::Core(jig_core::Event::WorkspacePrepared { task, attempt, writes }));
+                            domain.work.push(Work::Core(jig_domain_core::Event::WorkspacePrepared { task, attempt, writes }));
                         }
-                        jig_core::Now::RunPreparationFailed { task } => {
+                        jig_domain_core::Now::RunPreparationFailed { task } => {
                             drop(domain.brief_sections.remove(&task));
                             drop(domain.run_workspaces.remove(&task));
                         }
-                        jig_core::Now::RunPrepared {
+                        jig_domain_core::Now::RunPrepared {
                             task,
                             attempt,
                             charter,
@@ -1320,7 +1320,7 @@ pub(crate) fn route_core_requests(
                                 "assignment fits live task room"
                             );
                             if workspace.names.is_empty() {
-                                domain.work.push(Work::Core(jig_core::Event::ClaimPrepared {
+                                domain.work.push(Work::Core(jig_domain_core::Event::ClaimPrepared {
                                     task,
                                     attempt,
                                     budget,
@@ -1342,7 +1342,7 @@ pub(crate) fn route_core_requests(
                                         from: None,
                                     }));
                                 }
-                                domain.work.push(Work::Core(jig_core::Event::ClaimPrepared {
+                                domain.work.push(Work::Core(jig_domain_core::Event::ClaimPrepared {
                                     task,
                                     attempt,
                                     budget,
@@ -1350,70 +1350,70 @@ pub(crate) fn route_core_requests(
                                 }));
                             }
                         }
-                        jig_core::Now::CompleteBrief { brief, order } => {
+                        jig_domain_core::Now::CompleteBrief { brief, order } => {
                             let mut child = Queue::with_capacity(1);
                             child.push(brief::GatherRequest::Complete { brief, order });
                             brief_outputs(domain, env, decision, &mut child);
                         }
-                        jig_core::Now::ProcedureDelegateOutcome { task, step, child } => {
+                        jig_domain_core::Now::ProcedureDelegateOutcome { task, step, child } => {
                             if let Some(kind) = domain.forge_delegating.remove(&(task, step))
                                 && let Some(child) = child
                             {
                                 domain.work.push(Work::Forge(forge::Event::Delegated { task, child, kind }));
                             }
                         }
-                        jig_core::Now::HistoricalEscalation { request, person, project, task, revision } => {
+                        jig_domain_core::Now::HistoricalEscalation { request, person, project, task, revision } => {
                             escalation::historical_begin(
                                 domain, env, decision, request, person, project, task, revision,
                             );
                         }
-                        jig_core::Now::EscalationInspection { waiter, context } => {
+                        jig_domain_core::Now::EscalationInspection { waiter, context } => {
                             escalation::inspected(domain, waiter, context);
                         }
-                        jig_core::Now::EscalationReply { to, person, context } => {
+                        jig_domain_core::Now::EscalationReply { to, person, context } => {
                             emit(decision, &env.limits, Delivery::EscalationReply { to, person, context });
                         }
-                        jig_core::Now::EscalationRefused { to, why } => {
+                        jig_domain_core::Now::EscalationRefused { to, why } => {
                             emit(
                                 decision,
                                 &env.limits,
                                 Delivery::WebReply { to, sign_in: None, reply: people::Reply::Refused(why) },
                             );
                         }
-                        jig_core::Now::DropAssignment { task } => {
+                        jig_domain_core::Now::DropAssignment { task } => {
                             drop(domain.assignments.remove(&task));
                         }
-                        jig_core::Now::EffectAnswer { to, key: _, part } => {
+                        jig_domain_core::Now::EffectAnswer { to, key: _, part } => {
                             let answer = CallAnswer::from_core(&part).expect("effect wait answer");
                             relay_call(domain, &env.limits, decision, to, answer);
                         }
-                        jig_core::Now::NoteBusy { to, key: _ } => {
+                        jig_domain_core::Now::NoteBusy { to, key: _ } => {
                             relay_call(
                                 domain,
                                 &env.limits,
                                 decision,
                                 to,
-                                CallAnswer::NoteRefused(jig_core_notes::Refusal::Busy),
+                                CallAnswer::NoteRefused(jig_domain_notes::Refusal::Busy),
                             );
                         }
-                        jig_core::Now::RestoreRefused => {
+                        jig_domain_core::Now::RestoreRefused => {
                             let _refused = domain.core.restart_refuse();
                             domain.stop_pending = true;
                         }
-                        jig_core::Now::Account(request) => {
+                        jig_domain_core::Now::Account(request) => {
                             assert!(
                                 self::now(domain, Request::Account(request)),
                                 "admitted account output fits the door"
                             );
                         }
-                        jig_core::Now::View(_)
-                        | jig_core::Now::NotesIndexed { .. }
-                        | jig_core::Now::NotesRecalled { .. }
-                        | jig_core::Now::NotesRefused { .. } => {
+                        jig_domain_core::Now::View(_)
+                        | jig_domain_core::Now::NotesIndexed { .. }
+                        | jig_domain_core::Now::NotesRecalled { .. }
+                        | jig_domain_core::Now::NotesRefused { .. } => {
                             unreachable!("the current application has no immediate core route")
                         }
                     },
-                    jig_core::Request::Decided => {}
+                    jig_domain_core::Request::Decided => {}
                 }
             }
         }
@@ -1436,32 +1436,32 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
                 }
             }
             Work::AdoptDone => {
-                let request = domain.core.restart_done(jig_core::RestartStep::AdoptRuns);
+                let request = domain.core.restart_done(jig_domain_core::RestartStep::AdoptRuns);
                 domain.work.push(Work::Restart(request));
             }
             Work::Restart(request) => restart_request(domain, env, decision, request),
             Work::Decoded { to, body } => host_route::decoded(domain, env, decision, to, body),
             Work::Core(event) => {
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), event);
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), event);
                 route_core_requests(domain, env, decision, routed);
             }
             Work::Tasks(event) => {
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::Tasks(event));
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::Tasks(event));
                 route_core_requests(domain, env, decision, routed);
             }
             Work::People(event) => {
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::People(event));
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::People(event));
                 route_core_requests(domain, env, decision, routed);
             }
             Work::Fleet(event) => {
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::Fleet(event));
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::Fleet(event));
                 route_core_requests(domain, env, decision, routed);
             }
             Work::Brief(event) => {
-                let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::Brief(event));
+                let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::Brief(event));
                 route_core_requests(domain, env, decision, routed);
             }
-            Work::StartBrief { task } => domain.work.push(Work::Core(jig_core::Event::StartBrief { task })),
+            Work::StartBrief { task } => domain.work.push(Work::Core(jig_domain_core::Event::StartBrief { task })),
             Work::Forge(event) => {
                 let mut out = Queue::with_capacity(forge::max_out(&env.limits.forge));
                 forge::step(&mut domain.forge, &environment_forge(env), event, &mut out);
@@ -1471,10 +1471,10 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
             Work::GoalSubscribe(subscriber) => forge_route::goal_subscribed(domain, env, subscriber),
             Work::Activate(context) => {
                 let ready = domain.ready();
-                let routed = jig_core::step(
+                let routed = jig_domain_core::step(
                     &mut domain.core,
                     &environment_core(env),
-                    jig_core::Event::Activate { context, ready },
+                    jig_domain_core::Event::Activate { context, ready },
                 );
                 route_core_requests(domain, env, decision, routed);
             }
@@ -1493,8 +1493,8 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
 
 pub(crate) fn call_answer(domain: &Domain, key: CallKey) -> Option<CallAnswer> {
     match domain.core.replay_call(key) {
-        Some(jig_core::CallReplay::Core(part)) => Some(forge_route::effect_answer(domain, key, &part)),
-        Some(jig_core::CallReplay::Connector { .. }) => connector_answer(domain, key),
+        Some(jig_domain_core::CallReplay::Core(part)) => Some(forge_route::effect_answer(domain, key, &part)),
+        Some(jig_domain_core::CallReplay::Connector { .. }) => connector_answer(domain, key),
         None => None,
     }
 }
@@ -1509,30 +1509,30 @@ pub(crate) fn decide_call(
 ) {
     let part = answer.core_part(domain.config.forge_connector);
     let connector_owned = match &part {
-        jig_core::CallPart::Connector { .. } | jig_core::CallPart::Effect { .. } => true,
-        jig_core::CallPart::EffectDenied { .. }
-        | jig_core::CallPart::ToolDenied { .. }
-        | jig_core::CallPart::EscalationDecided { .. }
-        | jig_core::CallPart::EscalationRefused(_)
-        | jig_core::CallPart::Proposed { .. }
-        | jig_core::CallPart::ProposalDecided { .. }
-        | jig_core::CallPart::ProposalRefused(_)
-        | jig_core::CallPart::Controlled
-        | jig_core::CallPart::ControlRefused(_)
-        | jig_core::CallPart::ControlDenied { .. }
-        | jig_core::CallPart::Sent { .. }
-        | jig_core::CallPart::Introduced
-        | jig_core::CallPart::MessageRefused(_)
-        | jig_core::CallPart::Subscribed { .. }
-        | jig_core::CallPart::Unsubscribed
-        | jig_core::CallPart::SubscriptionRefused(_)
-        | jig_core::CallPart::Delegated(_)
-        | jig_core::CallPart::DelegationDenied { .. }
-        | jig_core::CallPart::DelegationRefused(_)
-        | jig_core::CallPart::NoteWritten { .. }
-        | jig_core::CallPart::NoteRecalled { .. }
-        | jig_core::CallPart::NoteRefused(_)
-        | jig_core::CallPart::Unavailable => false,
+        jig_domain_core::CallPart::Connector { .. } | jig_domain_core::CallPart::Effect { .. } => true,
+        jig_domain_core::CallPart::EffectDenied { .. }
+        | jig_domain_core::CallPart::ToolDenied { .. }
+        | jig_domain_core::CallPart::EscalationDecided { .. }
+        | jig_domain_core::CallPart::EscalationRefused(_)
+        | jig_domain_core::CallPart::Proposed { .. }
+        | jig_domain_core::CallPart::ProposalDecided { .. }
+        | jig_domain_core::CallPart::ProposalRefused(_)
+        | jig_domain_core::CallPart::Controlled
+        | jig_domain_core::CallPart::ControlRefused(_)
+        | jig_domain_core::CallPart::ControlDenied { .. }
+        | jig_domain_core::CallPart::Sent { .. }
+        | jig_domain_core::CallPart::Introduced
+        | jig_domain_core::CallPart::MessageRefused(_)
+        | jig_domain_core::CallPart::Subscribed { .. }
+        | jig_domain_core::CallPart::Unsubscribed
+        | jig_domain_core::CallPart::SubscriptionRefused(_)
+        | jig_domain_core::CallPart::Delegated(_)
+        | jig_domain_core::CallPart::DelegationDenied { .. }
+        | jig_domain_core::CallPart::DelegationRefused(_)
+        | jig_domain_core::CallPart::NoteWritten { .. }
+        | jig_domain_core::CallPart::NoteRecalled { .. }
+        | jig_domain_core::CallPart::NoteRefused(_)
+        | jig_domain_core::CallPart::Unavailable => false,
     };
     if !domain.core.decide_named_call(key, part) {
         relay_call(domain, limits, decision, to, answer);
@@ -1545,7 +1545,7 @@ pub(crate) fn decide_call(
     save(
         decision,
         limits,
-        Write::Save(Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Call(
+        Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(
             domain.core.call_record(key).expect("admitted core call"),
         )))),
     );
@@ -1564,14 +1564,14 @@ pub(crate) fn delegate_call(
     stubs: Box<[tasks::Stub]>,
 ) {
     if let Err(part) = domain.core.delegate_preflight(&env.limits.tasks, key, &batch) {
-        domain.work.push(Work::Core(jig_core::Event::NamedAnswer { to, key, part }));
+        domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer { to, key, part }));
         return;
     }
     if !validated {
         let (project, ids) = match domain.core.delegate_inputs(&env.limits.tasks, key, &batch) {
             Ok(value) => value,
             Err(part) => {
-                domain.work.push(Work::Core(jig_core::Event::NamedAnswer { to, key, part }));
+                domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer { to, key, part }));
                 return;
             }
         };
@@ -1605,7 +1605,7 @@ pub(crate) fn delegate_call(
             return;
         }
     }
-    domain.work.push(Work::Core(jig_core::Event::DelegateValidated { to, key, batch, stubs }));
+    domain.work.push(Work::Core(jig_domain_core::Event::DelegateValidated { to, key, batch, stubs }));
 }
 
 #[expect(
@@ -1626,19 +1626,19 @@ pub(crate) fn relay_payload(
     };
     assert!(key.task == run.raw() && key.attempt == attempt.raw(), "fleet call envelope is unchanged");
     assert!(current_proof(domain, key.task, key.attempt), "fleet only relays a current claim");
-    if let Some(jig_core::CallPart::Effect {
+    if let Some(jig_domain_core::CallPart::Effect {
         deadline,
         outcome:
-            None | Some(jig_core::connector::OutboxOutcome::Uncertain | jig_core::connector::OutboxOutcome::Held { .. }),
+            None | Some(jig_domain_core::connector::OutboxOutcome::Uncertain | jig_domain_core::connector::OutboxOutcome::Held { .. }),
         ..
     }) = domain.core.call_parts.get(&key)
         && env.wall < *deadline
     {
         let deadline = *deadline;
-        domain.work.push(Work::Core(jig_core::Event::EffectStart {
+        domain.work.push(Work::Core(jig_domain_core::Event::EffectStart {
             owner: Token::new(domain.next_effect_owner),
             connector: domain.config.forge_connector,
-            origin: jig_core::EffectOrigin::Call { to: reply_to, key, deadline },
+            origin: jig_domain_core::EffectOrigin::Call { to: reply_to, key, deadline },
         }));
         domain.next_effect_owner = domain.next_effect_owner.checked_add(1).expect("transient effect owner");
         return;
@@ -1649,51 +1649,51 @@ pub(crate) fn relay_payload(
             if let Some(kind) = tool_kind(&body.tool)
                 && let Some(part) = domain.core.authorize_tool(key, kind)
             {
-                domain.work.push(Work::Core(jig_core::Event::NamedAnswer { to: reply_to, key, part }));
+                domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer { to: reply_to, key, part }));
                 return;
             }
             match body.tool {
                 Tool::Unavailable => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                         to: reply_to,
                         key,
-                        part: jig_core::CallPart::Unavailable,
+                        part: jig_domain_core::CallPart::Unavailable,
                     }));
                 }
-                Tool::RejectedNote(why) => domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                Tool::RejectedNote(why) => domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                     to: reply_to,
                     key,
-                    part: jig_core::CallPart::NoteRefused(why),
+                    part: jig_domain_core::CallPart::NoteRefused(why),
                 })),
-                Tool::Note { entry, recalled } => domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                Tool::Note { entry, recalled } => domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                     to: reply_to,
                     key,
-                    action: jig_core::NamedAction::Note { entry, recalled },
+                    action: jig_domain_core::NamedAction::Note { entry, recalled },
                 })),
-                Tool::Recall { by, page } => domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                Tool::Recall { by, page } => domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                     to: reply_to,
                     key,
-                    action: jig_core::NamedAction::Recall { by, page },
+                    action: jig_domain_core::NamedAction::Recall { by, page },
                 })),
-                Tool::Rejected(why) => domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                Tool::Rejected(why) => domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                     to: reply_to,
                     key,
-                    part: jig_core::CallPart::DelegationRefused(tasks::Problem { task: None, why, blocked_by: None }),
+                    part: jig_domain_core::CallPart::DelegationRefused(tasks::Problem { task: None, why, blocked_by: None }),
                 })),
-                Tool::RejectedMessage(why) => domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                Tool::RejectedMessage(why) => domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                     to: reply_to,
                     key,
-                    part: jig_core::CallPart::MessageRefused(tasks::Problem { task: None, why, blocked_by: None }),
+                    part: jig_domain_core::CallPart::MessageRefused(tasks::Problem { task: None, why, blocked_by: None }),
                 })),
-                Tool::RejectedControl(why) => domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                Tool::RejectedControl(why) => domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                     to: reply_to,
                     key,
-                    part: jig_core::CallPart::ControlRefused(tasks::Problem { task: None, why, blocked_by: None }),
+                    part: jig_domain_core::CallPart::ControlRefused(tasks::Problem { task: None, why, blocked_by: None }),
                 })),
-                Tool::RejectedProposal(why) => domain.work.push(Work::Core(jig_core::Event::NamedAnswer {
+                Tool::RejectedProposal(why) => domain.work.push(Work::Core(jig_domain_core::Event::NamedAnswer {
                     to: reply_to,
                     key,
-                    part: jig_core::CallPart::ProposalRefused(tasks::Problem { task: None, why, blocked_by: None }),
+                    part: jig_domain_core::CallPart::ProposalRefused(tasks::Problem { task: None, why, blocked_by: None }),
                 })),
                 Tool::Delegate { batch } => {
                     delegate_call(domain, env, decision, reply_to, key, batch, false, Box::new([]));
@@ -1718,61 +1718,61 @@ pub(crate) fn relay_payload(
                     }
                 },
                 Tool::Decide { proposer, proposal, decision: choice } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::DecideProposal {
+                        action: jig_domain_core::NamedAction::DecideProposal {
                             proposer,
                             proposal,
                             choice: match choice {
-                                ProposalChoice::Accept => jig_core::ProposalChoice::Accept,
-                                ProposalChoice::Reject { reason } => jig_core::ProposalChoice::Reject { reason },
-                                ProposalChoice::Pass => jig_core::ProposalChoice::Pass,
+                                ProposalChoice::Accept => jig_domain_core::ProposalChoice::Accept,
+                                ProposalChoice::Reject { reason } => jig_domain_core::ProposalChoice::Reject { reason },
+                                ProposalChoice::Pass => jig_domain_core::ProposalChoice::Pass,
                             },
                         },
                     }));
                 }
                 Tool::Withdraw { proposal } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::WithdrawProposal { proposal },
+                        action: jig_domain_core::NamedAction::WithdrawProposal { proposal },
                     }));
                 }
                 Tool::DecideEscalation { task, revision, decision: choice } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::DecideEscalation {
+                        action: jig_domain_core::NamedAction::DecideEscalation {
                             task,
                             revision,
                             choice: match choice {
-                                EscalationChoice::Release => jig_core::EscalationChoice::Release,
-                                EscalationChoice::Reject { reason } => jig_core::EscalationChoice::Reject { reason },
-                                EscalationChoice::Pass => jig_core::EscalationChoice::Pass,
+                                EscalationChoice::Release => jig_domain_core::EscalationChoice::Release,
+                                EscalationChoice::Reject { reason } => jig_domain_core::EscalationChoice::Reject { reason },
+                                EscalationChoice::Pass => jig_domain_core::EscalationChoice::Pass,
                             },
                         },
                     }));
                 }
                 Tool::Amend { target, amendment } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::Amend { target, amendment },
+                        action: jig_domain_core::NamedAction::Amend { target, amendment },
                     }));
                 }
                 Tool::Cancel { target, reason } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::Control { target, control: tasks::Control::Cancel { reason } },
+                        action: jig_domain_core::NamedAction::Control { target, control: tasks::Control::Cancel { reason } },
                     }));
                 }
                 Tool::Release { target } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::Control { target, control: tasks::Control::Release },
+                        action: jig_domain_core::NamedAction::Control { target, control: tasks::Control::Release },
                     }));
                 }
                 Tool::Message { target, form, words } => {
@@ -1781,23 +1781,23 @@ pub(crate) fn relay_payload(
                         MessageForm::Question => tasks::MessageKind::Question,
                         MessageForm::Answer { question } => tasks::MessageKind::Answer { question },
                     };
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::Message { target, kind, words },
+                        action: jig_domain_core::NamedAction::Message { target, kind, words },
                     }));
                 }
                 Tool::Introduce { left, right } => {
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: jig_core::NamedAction::Introduce { left, right },
+                        action: jig_domain_core::NamedAction::Introduce { left, right },
                     }));
                 }
-                Tool::Subscribe { kind } => domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                Tool::Subscribe { kind } => domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                     to: reply_to,
                     key,
-                    action: jig_core::NamedAction::Subscribe { kind },
+                    action: jig_domain_core::NamedAction::Subscribe { kind },
                 })),
                 Tool::SubscribeForge { topic, own_change, paths } => {
                     forge_route::subscribe_call(domain, env, decision, reply_to, key, topic, own_change, paths);
@@ -1816,10 +1816,10 @@ pub(crate) fn relay_payload(
                             "one connector unsubscribe"
                         );
                     }
-                    domain.work.push(Work::Core(jig_core::Event::NamedAction {
+                    domain.work.push(Work::Core(jig_domain_core::Event::NamedAction {
                         to: ReplyTo::new(token),
                         key,
-                        action: jig_core::NamedAction::Unsubscribe { subscription },
+                        action: jig_domain_core::NamedAction::Unsubscribe { subscription },
                     }));
                 }
             }
@@ -1830,54 +1830,54 @@ pub(crate) fn relay_payload(
 pub(crate) fn account_event(domain: &mut Domain, env: &Env<Limits>, event: accounts::Event, out: &mut Queue<Request>) {
     let room = skein_lib::JournalRoom { writes: 0, held: 0 };
     let Some(decision) = domain.journal.decision(&room) else { return };
-    let routed = jig_core::step(&mut domain.core, &environment_core(env), jig_core::Event::Account(event));
+    let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::Account(event));
     account_outputs(routed, out);
     domain.journal.accept(decision);
 }
 
-pub(crate) fn account_outputs(routed: jig_core::Requests, out: &mut Queue<Request>) {
-    let jig_core::Requests::Out(mut marked) = routed;
+pub(crate) fn account_outputs(routed: jig_domain_core::Requests, out: &mut Queue<Request>) {
+    let jig_domain_core::Requests::Out(mut marked) = routed;
     for _ in 0..marked.len() {
         match marked.pop().expect("account mark count") {
-            jig_core::Request::Now(value) => match *value {
-                jig_core::Now::Account(request) => out.push(Request::Account(request)),
-                jig_core::Now::View(_)
-                | jig_core::Now::SignInRefused { .. }
-                | jig_core::Now::WatchRefused { .. }
-                | jig_core::Now::NotesIndexed { .. }
-                | jig_core::Now::NotesRecalled { .. }
-                | jig_core::Now::NotesRefused { .. }
-                | jig_core::Now::NoteBusy { .. }
-                | jig_core::Now::Relayed { .. }
-                | jig_core::Now::EffectAnswer { .. }
-                | jig_core::Now::DropPayload { .. }
-                | jig_core::Now::DropAssignment { .. }
-                | jig_core::Now::TurnPayload { .. }
-                | jig_core::Now::AnswerPayload { .. }
-                | jig_core::Now::AcceptedTurn { .. }
-                | jig_core::Now::RefusedPayload { .. }
-                | jig_core::Now::Activate { .. }
-                | jig_core::Now::PrepareAgent { .. }
-                | jig_core::Now::StartPreparation { .. }
-                | jig_core::Now::HistoricalProposal { .. }
-                | jig_core::Now::BriefCorePlanned { .. }
-                | jig_core::Now::WorkspaceRequest { .. }
-                | jig_core::Now::RunPreparationFailed { .. }
-                | jig_core::Now::RunPrepared { .. }
-                | jig_core::Now::CompleteBrief { .. }
-                | jig_core::Now::HistoricalEscalation { .. }
-                | jig_core::Now::EscalationInspection { .. }
-                | jig_core::Now::EscalationReply { .. }
-                | jig_core::Now::EscalationRefused { .. }
-                | jig_core::Now::ProcedureDelegateOutcome { .. }
-                | jig_core::Now::SettledCallRefused { .. }
-                | jig_core::Now::Call { .. }
-                | jig_core::Now::DropCall { .. }
-                | jig_core::Now::Undelivered { .. }
-                | jig_core::Now::RestoreRefused => unreachable!("account route owns its now output"),
+            jig_domain_core::Request::Now(value) => match *value {
+                jig_domain_core::Now::Account(request) => out.push(Request::Account(request)),
+                jig_domain_core::Now::View(_)
+                | jig_domain_core::Now::SignInRefused { .. }
+                | jig_domain_core::Now::WatchRefused { .. }
+                | jig_domain_core::Now::NotesIndexed { .. }
+                | jig_domain_core::Now::NotesRecalled { .. }
+                | jig_domain_core::Now::NotesRefused { .. }
+                | jig_domain_core::Now::NoteBusy { .. }
+                | jig_domain_core::Now::Relayed { .. }
+                | jig_domain_core::Now::EffectAnswer { .. }
+                | jig_domain_core::Now::DropPayload { .. }
+                | jig_domain_core::Now::DropAssignment { .. }
+                | jig_domain_core::Now::TurnPayload { .. }
+                | jig_domain_core::Now::AnswerPayload { .. }
+                | jig_domain_core::Now::AcceptedTurn { .. }
+                | jig_domain_core::Now::RefusedPayload { .. }
+                | jig_domain_core::Now::Activate { .. }
+                | jig_domain_core::Now::PrepareAgent { .. }
+                | jig_domain_core::Now::StartPreparation { .. }
+                | jig_domain_core::Now::HistoricalProposal { .. }
+                | jig_domain_core::Now::BriefCorePlanned { .. }
+                | jig_domain_core::Now::WorkspaceRequest { .. }
+                | jig_domain_core::Now::RunPreparationFailed { .. }
+                | jig_domain_core::Now::RunPrepared { .. }
+                | jig_domain_core::Now::CompleteBrief { .. }
+                | jig_domain_core::Now::HistoricalEscalation { .. }
+                | jig_domain_core::Now::EscalationInspection { .. }
+                | jig_domain_core::Now::EscalationReply { .. }
+                | jig_domain_core::Now::EscalationRefused { .. }
+                | jig_domain_core::Now::ProcedureDelegateOutcome { .. }
+                | jig_domain_core::Now::SettledCallRefused { .. }
+                | jig_domain_core::Now::Call { .. }
+                | jig_domain_core::Now::DropCall { .. }
+                | jig_domain_core::Now::Undelivered { .. }
+                | jig_domain_core::Now::RestoreRefused => unreachable!("account route owns its now output"),
             },
-            jig_core::Request::Decided => {}
-            jig_core::Request::Write(_) | jig_core::Request::Ask { .. } | jig_core::Request::Held(_) => {
+            jig_domain_core::Request::Decided => {}
+            jig_domain_core::Request::Write(_) | jig_domain_core::Request::Ask { .. } | jig_domain_core::Request::Held(_) => {
                 unreachable!("account route changes no store decision")
             }
         }
@@ -1885,7 +1885,7 @@ pub(crate) fn account_outputs(routed: jig_core::Requests, out: &mut Queue<Reques
 }
 
 pub(crate) fn account_fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    let routed = jig_core::fire(&mut domain.core, &environment_core(env), jig_core::Timer::Account);
+    let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), jig_domain_core::Timer::Account);
     account_outputs(routed, out);
 }
 

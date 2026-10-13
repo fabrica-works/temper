@@ -15,15 +15,15 @@ smith-domain-run.workspace = true
 smith-agent-world.workspace = true
 temper-engine-domain.workspace = true
 temper-engine-domain-world = { path = "../engine/domain" }
-jig-core-people.workspace = true
-jig-core.workspace = true
-jig-core-authority.workspace = true
-jig-core-brief.workspace = true
-jig-core-fleet.workspace = true
+jig-domain-people.workspace = true
+jig-domain-core.workspace = true
+jig-domain-authority.workspace = true
+jig-domain-brief.workspace = true
+jig-domain-fleet.workspace = true
 temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-client.workspace = true
-jig-core-tasks.workspace = true
+jig-domain-tasks.workspace = true
 temper-engine-smith.workspace = true
 temper-engine-forge-world = { path = "../engine/forge" }
 temper-fake-forge-domain.workspace = true

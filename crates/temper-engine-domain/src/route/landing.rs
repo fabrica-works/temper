@@ -4,7 +4,7 @@
 
 use alloc::boxed::Box;
 use core::mem::size_of;
-use jig_core_authority::Pattern;
+use jig_domain_authority::Pattern;
 
 /// Validity of a forge gate or review verdict at a later landing head.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -57,7 +57,7 @@ pub fn landing_rules_bytes(rules: &[LandingRule]) -> Option<u64> {
             total = total.checked_add(u64::try_from(segment.len()).ok()?)?;
         }
         total = total.checked_add(match &rule.pattern.last {
-            jig_core_authority::Last::Exact(word) | jig_core_authority::Last::Open(word) => {
+            jig_domain_authority::Last::Exact(word) | jig_domain_authority::Last::Open(word) => {
                 u64::try_from(word.len()).ok()?
             }
         })?;

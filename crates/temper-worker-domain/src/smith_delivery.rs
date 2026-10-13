@@ -3,7 +3,7 @@
 //! this translation keeps commit heads as receipts and operator tails as data.
 
 use alloc::boxed::Box;
-use jig_host as host;
+use jig_domain_host as host;
 use skein_lib::{List, Reader};
 use smith_host_domain as smith;
 

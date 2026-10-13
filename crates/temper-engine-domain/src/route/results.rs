@@ -4,8 +4,8 @@
 use super::{Domain, Read as RootRead, Request, admits, close, emit, ending_words, request_load, save, take_read};
 use crate::{Delivery, Key, Range, Record, ResultEntry, Write};
 use alloc::boxed::Box;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Token};
 
 #[derive(Debug)]
@@ -113,9 +113,9 @@ pub(crate) fn page(
     let Some(Some(RootRead::Result(read))) = domain.result_reads.get_mut(Id::from_token(waiter)) else { return };
     for row in rows {
         let task = match row {
-            Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(task))) => task,
+            Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(task))) => task,
             Record::Core(
-                jig_core::Record::Tasks(
+                jig_domain_core::Record::Tasks(
                     tasks::Stored::PersonProposal(_)
                     | tasks::Stored::History(_)
                     | tasks::Stored::Milestone(_)
@@ -125,18 +125,18 @@ pub(crate) fn page(
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Pool(_),
                 )
-                | jig_core::Record::Core(
-                    jig_core::CoreRecord::ProposalDecision(_)
-                    | jig_core::CoreRecord::Call(_)
-                    | jig_core::CoreRecord::EscalationDecision(_)
-                    | jig_core::CoreRecord::Deployment(_)
-                    | jig_core::CoreRecord::Turn(_)
-                    | jig_core::CoreRecord::RunProof(_)
-                    | jig_core::CoreRecord::Terminal(_)
-                    | jig_core::CoreRecord::Projection(_),
+                | jig_domain_core::Record::Core(
+                    jig_domain_core::CoreRecord::ProposalDecision(_)
+                    | jig_domain_core::CoreRecord::Call(_)
+                    | jig_domain_core::CoreRecord::EscalationDecision(_)
+                    | jig_domain_core::CoreRecord::Deployment(_)
+                    | jig_domain_core::CoreRecord::Turn(_)
+                    | jig_domain_core::CoreRecord::RunProof(_)
+                    | jig_domain_core::CoreRecord::Terminal(_)
+                    | jig_domain_core::CoreRecord::Projection(_),
                 )
-                | jig_core::Record::People(_)
-                | jig_core::Record::Notes(_),
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
             )
             | Record::Forge { .. } => unreachable!("ended-result range contains only ended tasks"),
         };
@@ -219,7 +219,7 @@ pub(crate) fn page(
             }
             let row =
                 domain.core.people.advance_read_position(read.person, entry.position).expect("new earliest result");
-            save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::People(row))));
+            save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::People(row))));
             emit(
                 decision,
                 &env.limits,
@@ -238,7 +238,7 @@ pub(crate) fn page(
             if let Some(last) = entries.last() {
                 let row =
                     domain.core.people.advance_read_position(read.person, last.position).expect("new page position");
-                save(decision, &env.limits, Write::Save(Record::Core(jig_core::Record::People(row))));
+                save(decision, &env.limits, Write::Save(Record::Core(jig_domain_core::Record::People(row))));
             }
             emit(decision, &env.limits, Delivery::InboxPage { to: read.to, person: read.person, entries });
         }

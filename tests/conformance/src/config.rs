@@ -1,6 +1,6 @@
 //! Tiny forge policies and limits reconstructed for each cold start.
 use jig_conformance::scenarios::Scenario;
-use jig_core_authority as authority;
+use jig_domain_authority as authority;
 use skein_lib::{Duration, Queue};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::walking;
@@ -88,7 +88,7 @@ pub fn root(
     }
 
     limits.journal.deliveries = (limits.tasks.tasks * 4 + 8 + limits.people.pending * limits.people.waiters)
-        .max(limits.fleet.workers * jig_core_fleet::max_out(&limits.fleet) + 1)
+        .max(limits.fleet.workers * jig_domain_fleet::max_out(&limits.fleet) + 1)
         .max(limits.brief.sections)
         .max(limits.tasks.saved_resources);
     // Admission reserves three cohorts before routing; retain three more
@@ -97,10 +97,10 @@ pub fn root(
 
     // Match the root's declared whole-route reserve instead of allocating
     // arbitrary extra record slots for every input (root limits.rs).
-    limits.journal.writes = jig_core_tasks::max_out(&limits.tasks) * 8
-        + jig_core_people::max_out(&limits.people) * 4
+    limits.journal.writes = jig_domain_tasks::max_out(&limits.tasks) * 8
+        + jig_domain_people::max_out(&limits.people) * 4
         + limits.people.pending * 2
-        + jig_core_fleet::max_out(&limits.fleet) * 4
+        + jig_domain_fleet::max_out(&limits.fleet) * 4
         + temper_engine_domain_forge::max_out(&limits.forge)
         + limits.tasks.tasks
         + 4
