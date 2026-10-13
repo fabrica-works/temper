@@ -12,5 +12,8 @@ temper-worker-domain-checkout.workspace = true
 jig-domain-host.workspace = true
 smith-host-domain.workspace = true
 
+[dev-dependencies]
+smith-domain-run.workspace = true
+
 [lints]
 workspace = true
