@@ -105,9 +105,12 @@ fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> fl
             );
             fleet::Event::Answer { channel, run, attempt, answer: kind, payload }
         }
-        host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline } => {
-            fleet::Event::Relay { channel, run, attempt, call: fleet::Call { name: call, tool, writes, input, deadline } }
-        }
+        host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline } => fleet::Event::Relay {
+            channel,
+            run,
+            attempt,
+            call: fleet::Call { name: call, tool, writes, input, deadline },
+        },
         host::LinkUp::Rejected { run, attempt, account, generation } => {
             fleet::Event::Rejected { channel, run, attempt, account, generation }
         }
@@ -172,23 +175,23 @@ pub(crate) fn answer(domain: &mut Domain, run: Token, attempt: Token, payload: T
 /// The answer's task terminal, with temper's saved work translated and what
 /// it left on the forge kept for a lost run (domain/forge.md).
 pub(crate) fn result_event(domain: &mut Domain, payload: Token, end: tasks::End) -> Option<core::Event> {
-    let (task, attempt, cumulative, read, refused, parts) = match domain.payloads.get(skein_lib::Id::from_token(payload))
-    {
-        Some(Some(Payload::Answer { task, attempt, cumulative, read, refused, parts, .. })) => {
-            (*task, *attempt, *cumulative, *read, refused.clone(), parts.clone())
-        }
-        Some(
+    let (task, attempt, cumulative, read, refused, parts) =
+        match domain.payloads.get(skein_lib::Id::from_token(payload)) {
+            Some(Some(Payload::Answer { task, attempt, cumulative, read, refused, parts, .. })) => {
+                (*task, *attempt, *cumulative, *read, refused.clone(), parts.clone())
+            }
             Some(
-                Payload::Busy
-                | Payload::Call { .. }
-                | Payload::SettledCall(_)
-                | Payload::InboxWord(_)
-                | Payload::Turn { .. },
+                Some(
+                    Payload::Busy
+                    | Payload::Call { .. }
+                    | Payload::SettledCall(_)
+                    | Payload::InboxWord(_)
+                    | Payload::Turn { .. },
+                )
+                | None,
             )
-            | None,
-        )
-        | None => return None,
-    };
+            | None => return None,
+        };
     let Parts { saved, pushed } = parts;
     drop(domain.forge_left.insert((task, attempt), pushed));
     let (saved, invalid_saved) = match saved {

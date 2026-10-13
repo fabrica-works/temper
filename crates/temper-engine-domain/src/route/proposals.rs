@@ -55,7 +55,9 @@ pub(crate) fn historical_loaded(domain: &mut Domain, waiter: Token, rows: Box<[s
     domain.result_reads.retire(super::Id::from_token(waiter));
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
-            super::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => Some(row),
+            super::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row))) => {
+                Some(row)
+            }
             super::Record::Core(
                 jig_domain_core::Record::Core(
                     jig_domain_core::CoreRecord::Call(_)

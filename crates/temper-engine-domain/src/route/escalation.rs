@@ -58,7 +58,9 @@ pub(crate) fn loaded(domain: &mut Domain, _env: &Env<Limits>, waiter: Token, row
     let Query { request, person, project, task, revision } = query(read);
     let row = if rows.len() == 1 {
         match rows.into_iter().next().expect("one loaded row") {
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row))) => Some(row),
+            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row))) => {
+                Some(row)
+            }
             Record::Core(
                 jig_domain_core::Record::Core(
                     jig_domain_core::CoreRecord::Call(_)

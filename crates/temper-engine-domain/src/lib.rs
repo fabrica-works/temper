@@ -7,15 +7,15 @@
 extern crate alloc;
 mod admission;
 mod assemble;
-mod link;
-mod stopping;
 mod boundary;
 mod decision;
 mod domain;
 mod limits;
+mod link;
 pub mod loads;
 mod restart;
 mod route;
+mod stopping;
 mod store;
 #[cfg(test)]
 mod tests;
@@ -29,9 +29,9 @@ pub use store::{
     ProposalDecisionRecord, Range, Record, RunProof, TerminalRecord, TurnProof, TurnRecord, Write, record_bytes,
 };
 
+pub use admission::try_step;
 pub use boundary::Request as Output;
 pub use boundary::*;
-pub use admission::try_step;
 pub use domain::{Domain, fire, max_out, release, step};
 pub use jig_domain_core::{Charter, Delegate, Dependency, Model, ProcedureAction, RunCharter, RunPolicy};
 pub use limits::{BriefBudgets, BriefLimits, Limits, worst_case};

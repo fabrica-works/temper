@@ -101,7 +101,9 @@ impl CallAnswer {
                 };
                 jig_domain_core::CallPart::Effect { connector, entry: *entry, deadline: *deadline, outcome }
             }
-            CallAnswer::ForgeEffectRefused(_) | CallAnswer::ForgeRead(_) => jig_domain_core::CallPart::Connector { connector },
+            CallAnswer::ForgeEffectRefused(_) | CallAnswer::ForgeRead(_) => {
+                jig_domain_core::CallPart::Connector { connector }
+            }
             CallAnswer::ForgeEffectDenied { answer, findings } => {
                 jig_domain_core::CallPart::EffectDenied { answer: *answer, findings: findings.clone() }
             }
@@ -123,7 +125,9 @@ impl CallAnswer {
             CallAnswer::Sent { message } => jig_domain_core::CallPart::Sent { message: *message },
             CallAnswer::Introduced => jig_domain_core::CallPart::Introduced,
             CallAnswer::MessageRefused(problem) => jig_domain_core::CallPart::MessageRefused(problem.clone()),
-            CallAnswer::Subscribed { subscription } => jig_domain_core::CallPart::Subscribed { subscription: *subscription },
+            CallAnswer::Subscribed { subscription } => {
+                jig_domain_core::CallPart::Subscribed { subscription: *subscription }
+            }
             CallAnswer::Unsubscribed => jig_domain_core::CallPart::Unsubscribed,
             CallAnswer::SubscriptionRefused(problem) => jig_domain_core::CallPart::SubscriptionRefused(problem.clone()),
             CallAnswer::Delegated(tasks) => jig_domain_core::CallPart::Delegated(tasks.clone()),
@@ -172,7 +176,9 @@ impl CallAnswer {
             jig_domain_core::CallPart::Sent { message } => CallAnswer::Sent { message: *message },
             jig_domain_core::CallPart::Introduced => CallAnswer::Introduced,
             jig_domain_core::CallPart::MessageRefused(problem) => CallAnswer::MessageRefused(problem.clone()),
-            jig_domain_core::CallPart::Subscribed { subscription } => CallAnswer::Subscribed { subscription: *subscription },
+            jig_domain_core::CallPart::Subscribed { subscription } => {
+                CallAnswer::Subscribed { subscription: *subscription }
+            }
             jig_domain_core::CallPart::Unsubscribed => CallAnswer::Unsubscribed,
             jig_domain_core::CallPart::SubscriptionRefused(problem) => CallAnswer::SubscriptionRefused(problem.clone()),
             jig_domain_core::CallPart::Delegated(tasks) => CallAnswer::Delegated(tasks.clone()),
@@ -449,10 +455,12 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
         Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))) => {
             u64::try_from(turn.transcript.len()).ok()
         }
-        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(row))) => match &row.terminal {
-            Some(terminal) => terminal_bytes(terminal),
-            None => Some(0),
-        },
+        Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(row))) => {
+            match &row.terminal {
+                Some(terminal) => terminal_bytes(terminal),
+                None => Some(0),
+            }
+        }
         Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Terminal(row))) => terminal_bytes(row),
         Record::Core(jig_domain_core::Record::Tasks(row)) => jig_domain_tasks::stored_bytes(row),
         Record::Core(jig_domain_core::Record::Notes(row)) => match row {
@@ -484,7 +492,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                                 bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
                             }
                             let last = match &pattern.last {
-                                jig_domain_people::Last::Exact(bytes) | jig_domain_people::Last::Open(bytes) => bytes.len(),
+                                jig_domain_people::Last::Exact(bytes) | jig_domain_people::Last::Open(bytes) => {
+                                    bytes.len()
+                                }
                             };
                             bytes.checked_add(u64::try_from(last).ok()?)?
                         }
@@ -541,12 +551,12 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                     jig_domain_people::PersonResult::Report { words }
                     | jig_domain_people::PersonResult::Verdict { words, .. } => u64::try_from(words.len()).ok(),
                     jig_domain_people::PersonResult::Failure { reason } => u64::try_from(reason.len()).ok(),
-                    jig_domain_people::PersonResult::Approved { state, words } => u64::try_from(state.len())
-                        .ok()?
-                        .checked_add(match words {
+                    jig_domain_people::PersonResult::Approved { state, words } => {
+                        u64::try_from(state.len()).ok()?.checked_add(match words {
                             Some(words) => u64::try_from(words.len()).ok()?,
                             None => 0,
-                        }),
+                        })
+                    }
                 },
                 jig_domain_people::Ask::DecideEscalation { decision, .. } => decision_bytes(decision),
                 jig_domain_people::Ask::DecideProposal { decision, .. } => match decision {

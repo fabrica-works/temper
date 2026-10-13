@@ -2,10 +2,10 @@
 use crate::route::{HostRequest, escalation, forge_route, proposals};
 use crate::{CallKey, Delivery, Key, Range, Record, Write};
 use alloc::boxed::Box;
-use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
+use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_people as people;
@@ -221,7 +221,11 @@ pub enum Event {
     Account(accounts::Event),
     /// A generation named by temper's own credential source for one numbered
     /// application credential, a repository's git identity (domain/engine.md, 12).
-    Credential { number: u32, generation: u64, valid: skein_lib::Duration },
+    Credential {
+        number: u32,
+        generation: u64,
+        valid: skein_lib::Duration,
+    },
     Forge(Box<forge::Event>),
     Released(Released),
     Restart,
@@ -267,7 +271,10 @@ pub enum StoreInput {
 pub enum Link {
     Hello(host::Hello),
     /// One hub record; temper's parts ride beside an answer and are empty otherwise.
-    Up { up: host::LinkUp, parts: Parts },
+    Up {
+        up: host::LinkUp,
+        parts: Parts,
+    },
     Lost,
 }
 
@@ -342,16 +349,37 @@ pub enum PartyInput {
         ask: people::Ask,
     },
     /// One unkeyed read on a live sign-in, answered after every preceding commit.
-    Read { reply_to: ReplyTo, sign_in: u64, read: core::reads::Read },
+    Read {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        read: core::reads::Read,
+    },
     /// Watch one subject's whole document on a live sign-in.
-    Watch { watcher: Token, sign_in: u64, subject: core::documents::Watched, window: core::documents::Window },
+    Watch {
+        watcher: Token,
+        sign_in: u64,
+        subject: core::documents::Watched,
+        window: core::documents::Window,
+    },
     /// Follow a task's live run from the client's acknowledged turn and offset.
-    WatchRun { watcher: Token, sign_in: u64, task: u64, turn: Option<views::TurnName>, offset: u32 },
-    Unwatch { watcher: Token },
+    WatchRun {
+        watcher: Token,
+        sign_in: u64,
+        task: u64,
+        turn: Option<views::TurnName>,
+        offset: u32,
+    },
+    Unwatch {
+        watcher: Token,
+    },
     /// The protocol took a watch's held document.
-    Delivered { watcher: Token },
+    Delivered {
+        watcher: Token,
+    },
     /// The protocol took one provisional stream delivery.
-    StreamDelivered { watcher: Token },
+    StreamDelivered {
+        watcher: Token,
+    },
 }
 
 /// Root to shell/worker/web. Commit and load requests each have one store
@@ -410,16 +438,24 @@ pub enum StoreRequest {
 pub enum WorkerRequest {
     Host(Box<HostRequest>),
     /// Read an ended answer's opaque outcome in the protocol routing.
-    ReadResult { payload: Token, outcome: Box<[u8]> },
+    ReadResult {
+        payload: Token,
+        outcome: Box<[u8]>,
+    },
     Deliver(Delivery),
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum PartyRequest {
     /// A sign-in the core refused before any decision: a counter is
     /// exhausted, or the store is at its fill mark.
-    SignInRefused { to: ReplyTo },
+    SignInRefused {
+        to: ReplyTo,
+    },
     /// A watch refused before any durable decision.
-    WatchRefused { watcher: Token, why: core::WatchRefusal },
+    WatchRefused {
+        watcher: Token,
+        why: core::WatchRefusal,
+    },
     /// A run's provisional suffix for one follower, with no commit.
     RunText {
         watcher: Token,

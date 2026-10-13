@@ -3,19 +3,18 @@ use crate::boundary::{
     Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Released, Request, Work,
 };
 use crate::limits::{
-    HUB_TURNS, Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound,
-    route_decision, route_takes, run_policy_bound, worst_case,
+    HUB_TURNS, Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound, route_decision,
+    route_takes, run_policy_bound, worst_case,
 };
 use crate::restart::{connector_restarting, request_load};
 use crate::route::{
-    LandingRule, forge_route, host_route, landing, policy_translate, route_core_requests, route_into,
-    step_routed,
+    LandingRule, forge_route, host_route, landing, policy_translate, route_core_requests, route_into, step_routed,
 };
 use crate::translate::{Config, RootConfig, environment_forge, split_config};
 use crate::{CallKey, Decision, Delivery, Journal, JournalOutput as Output, Range, Write, loads};
 use alloc::boxed::Box;
-use jig_domain_core::Core;
 use jig_domain_authority as authority;
+use jig_domain_core::Core;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -568,7 +567,8 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
     }
     route_into(domain, env, &mut decision);
     if domain.ready() {
-        let routed = jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
+        let routed =
+            jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
         route_core_requests(domain, env, &mut decision, routed);
         for timer in [jig_domain_core::Timer::Tasks, jig_domain_core::Timer::Fleet, jig_domain_core::Timer::Brief] {
             let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), timer);

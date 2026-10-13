@@ -7,8 +7,8 @@ use super::{
     save_connector_answer, tasks,
 };
 use alloc::boxed::Box;
-use jig_domain_core::connector::{EffectDescription, EffectForm, Recovery};
 use jig_domain_brief as brief;
+use jig_domain_core::connector::{EffectDescription, EffectForm, Recovery};
 
 /// Translate the worker's connector-specific saved tags at the root boundary.
 pub(crate) fn saved_resources(connector: u16, tags: &[u32]) -> Option<Box<[tasks::SavedResource]>> {
@@ -1786,8 +1786,18 @@ fn change_delegate(
                 Box::from(&b"Review this change at the named head"[..]),
                 tasks::Contract::Verdict {
                     choices: Box::new([
-                        tasks::Verdict { code: 1, words: env.limits.tasks.result_bytes, followups: 0, fields: Box::new([]) },
-                        tasks::Verdict { code: 2, words: env.limits.tasks.result_bytes, followups: 0, fields: Box::new([]) },
+                        tasks::Verdict {
+                            code: 1,
+                            words: env.limits.tasks.result_bytes,
+                            followups: 0,
+                            fields: Box::new([]),
+                        },
+                        tasks::Verdict {
+                            code: 2,
+                            words: env.limits.tasks.result_bytes,
+                            followups: 0,
+                            fields: Box::new([]),
+                        },
                     ]),
                 },
             )
@@ -2062,7 +2072,9 @@ pub(crate) fn outputs(
                                     repository: adopted.repository.provider,
                                     restore: previous,
                                 }));
-                                domain.work.push(Work::People(people::Event::Decided { request: reply_to, outcome: why }));
+                                domain
+                                    .work
+                                    .push(Work::People(people::Event::Decided { request: reply_to, outcome: why }));
                             }
                         }
                     }
@@ -2072,16 +2084,20 @@ pub(crate) fn outputs(
                             forge_client::api::Error::Busy
                             | forge_client::api::Error::Unavailable
                             | forge_client::api::Error::Timeout
-                            | forge_client::api::Error::RateLimited { .. } => people::Outcome::Again(people::Again::Busy),
+                            | forge_client::api::Error::RateLimited { .. } => {
+                                people::Outcome::Again(people::Again::Busy)
+                            }
                             forge_client::api::Error::TooLarge | forge_client::api::Error::Full => {
                                 people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Resource })
                             }
                             forge_client::api::Error::Forbidden
                             | forge_client::api::Error::Protected
-                            | forge_client::api::Error::Refused => people::Outcome::Refused(people::Refusal::Authority {
-                                lacking: people::Lack::ResourceAccess,
-                                proposable: None,
-                            }),
+                            | forge_client::api::Error::Refused => {
+                                people::Outcome::Refused(people::Refusal::Authority {
+                                    lacking: people::Lack::ResourceAccess,
+                                    proposable: None,
+                                })
+                            }
                             forge_client::api::Error::Missing => people::Outcome::Refused(people::Refusal::Authority {
                                 lacking: people::Lack::ResourceUnavailable,
                                 proposable: None,
@@ -2093,7 +2109,9 @@ pub(crate) fn outputs(
                             | forge_client::api::Error::Closed
                             | forge_client::api::Error::Stale
                             | forge_client::api::Error::Conflict
-                            | forge_client::api::Error::InvalidAnswer => people::Outcome::Refused(people::Refusal::Unknown),
+                            | forge_client::api::Error::InvalidAnswer => {
+                                people::Outcome::Refused(people::Refusal::Unknown)
+                            }
                         };
                         domain.work.push(Work::People(people::Event::Decided { request: reply_to, outcome }));
                     }
@@ -2142,12 +2160,14 @@ pub(crate) fn outputs(
                 domain.work.push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Effects }));
             }
             forge::Request::NotMade { entry, task } => {
-                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Outbox {
-                    connector: domain.config.forge_connector,
-                    entry,
-                    task,
-                    outcome: jig_domain_core::connector::OutboxOutcome::NotMade,
-                })));
+                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+                    jig_domain_core::connector::Event::Outbox {
+                        connector: domain.config.forge_connector,
+                        entry,
+                        task,
+                        outcome: jig_domain_core::connector::OutboxOutcome::NotMade,
+                    },
+                )));
             }
             forge::Request::Outcome { entry, task, outcome } => {
                 if let Some(named) = domain.forge.named_effect(entry) {
@@ -2162,12 +2182,14 @@ pub(crate) fn outputs(
                     forge_client::Outcome::Uncertain => jig_domain_core::connector::OutboxOutcome::Uncertain,
                     forge_client::Outcome::Held => jig_domain_core::connector::OutboxOutcome::Held { entry },
                 };
-                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Outbox {
-                    connector: domain.config.forge_connector,
-                    entry,
-                    task,
-                    outcome: result,
-                })));
+                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+                    jig_domain_core::connector::Event::Outbox {
+                        connector: domain.config.forge_connector,
+                        entry,
+                        task,
+                        outcome: result,
+                    },
+                )));
             }
             forge::Request::ContinueRelease { task } => {
                 if let Some(entry) = crate::fresh(&mut domain.core.counters, Family::ConnectorRow) {
@@ -2187,10 +2209,9 @@ pub(crate) fn outputs(
                 }
             }
             forge::Request::EffectsSettled { task } => {
-                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Closed {
-                    task,
-                    connector: domain.config.forge_connector,
-                })));
+                domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+                    jig_domain_core::connector::Event::Closed { task, connector: domain.config.forge_connector },
+                )));
             }
             forge::Request::ReleaseFailed { task } => {
                 domain.work.push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::EffectFailed }));
@@ -2416,10 +2437,9 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                 ) => description.clone(),
                 None => return,
             };
-            domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Described {
-                owner,
-                description,
-            })));
+            domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+                jig_domain_core::connector::Event::Described { owner, description },
+            )));
         }
         jig_domain_core::connector::Ask::DescribeProposal { owner, proposal } => {
             let flight = match domain.forge.proposed_effect(proposal) {
@@ -2462,28 +2482,30 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
                 ))),
             }
         }
-        jig_domain_core::connector::Ask::KeepProposal { owner, proposal, task, project: _ } => match domain.forge_effects.remove(&owner) {
-            Some(EffectFlight::Call { repository, effect, resource, .. }) => {
-                domain.work.push(Work::Forge(forge::Event::KeepProposedEffect {
-                    row: forge::ProposedEffect {
-                        number: proposal,
-                        resource,
-                        entry: forge_client::Entry {
-                            number: 0,
-                            task,
-                            repository,
-                            effect,
-                            start: None,
-                            attempt: None,
-                            failures: 0,
+        jig_domain_core::connector::Ask::KeepProposal { owner, proposal, task, project: _ } => {
+            match domain.forge_effects.remove(&owner) {
+                Some(EffectFlight::Call { repository, effect, resource, .. }) => {
+                    domain.work.push(Work::Forge(forge::Event::KeepProposedEffect {
+                        row: forge::ProposedEffect {
+                            number: proposal,
+                            resource,
+                            entry: forge_client::Entry {
+                                number: 0,
+                                task,
+                                repository,
+                                effect,
+                                start: None,
+                                attempt: None,
+                                failures: 0,
+                            },
                         },
-                    },
-                }));
+                    }));
+                }
+                Some(EffectFlight::Procedure { .. } | EffectFlight::Projection { .. }) | None => {
+                    unreachable!("agent effect proposal was described")
+                }
             }
-            Some(EffectFlight::Procedure { .. } | EffectFlight::Projection { .. }) | None => {
-                unreachable!("agent effect proposal was described")
-            }
-        },
+        }
         jig_domain_core::connector::Ask::DropProposal { proposal } => {
             domain.work.push(Work::Forge(forge::Event::DropProposedEffect { number: proposal }));
         }
@@ -2543,14 +2565,9 @@ pub(crate) fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, as
         },
         jig_domain_core::connector::Ask::Judge { owner, judge, state, resources: _ } => {
             let (verdict, guarded) = judge_effect(domain, env, owner, number, judge, state);
-            domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Verdict {
-                owner,
-                judge,
-                verdict,
-                at: env.wall,
-                guarded,
-                state,
-            })));
+            domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+                jig_domain_core::connector::Event::Verdict { owner, judge, verdict, at: env.wall, guarded, state },
+            )));
         }
         jig_domain_core::connector::Ask::Names { .. }
         | jig_domain_core::connector::Ask::Unname { .. }
@@ -2653,10 +2670,7 @@ fn route_resource(
         forge::resources::HoldKind::Shared => jig_domain_core::connector::HoldKind::Shared,
         forge::resources::HoldKind::Exclusive { wait } => jig_domain_core::connector::HoldKind::Exclusive { wait },
     };
-    domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(jig_domain_core::connector::Event::Resource {
-        project,
-        name,
-        role,
-        hold,
-    })));
+    domain.work.push(Work::Core(jig_domain_core::Event::EffectConnector(
+        jig_domain_core::connector::Event::Resource { project, name, role, hold },
+    )));
 }

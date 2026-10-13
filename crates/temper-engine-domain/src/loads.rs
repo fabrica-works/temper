@@ -347,7 +347,9 @@ fn valid_range(range: &Range) -> bool {
         )
         | Range::Census(_)
         | Range::Forge => true,
-        Range::Core(crate::CoreRange::TaskResult { task } | crate::CoreRange::TaskTranscript { task, .. }) => *task != 0,
+        Range::Core(crate::CoreRange::TaskResult { task } | crate::CoreRange::TaskTranscript { task, .. }) => {
+            *task != 0
+        }
         Range::Core(crate::CoreRange::EscalationDecision { task, revision }) => *task != 0 && *revision != 0,
         Range::Core(crate::CoreRange::ProposalDecision { proposal, .. }) => *proposal != 0,
         Range::Core(crate::CoreRange::Turns { task, attempt }) => *task != 0 && *attempt != 0,

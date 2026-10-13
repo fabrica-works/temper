@@ -160,7 +160,9 @@ pub(crate) fn retire_read(domain: &mut Domain, waiter: Token) {
 pub(crate) fn input_failed(domain: &mut Domain, waiter: Token) {
     let Some(Read::InputCheck(read)) = take_read(domain, waiter) else { return };
     domain.result_reads.retire(Id::from_token(waiter));
-    domain.work.push(Work::Core(jig_domain_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
+    domain
+        .work
+        .push(Work::Core(jig_domain_core::Event::DelegateInputFailed { to: ReplyTo::new(read.to), key: read.key }));
 }
 
 pub(crate) fn input_loaded(
@@ -531,7 +533,9 @@ pub(crate) fn transcript_loaded(
             unreachable!("transcript read survives its page")
         };
         let from = match &after {
-            Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { attempt, turn, .. })) => (*attempt, *turn),
+            Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { attempt, turn, .. })) => {
+                (*attempt, *turn)
+            }
             Key::Core(_) | Key::Forge(_) => unreachable!("transcript pages end at a turn"),
         };
         request_load(domain, waiter, Range::Core(crate::CoreRange::TaskTranscript { task, from }), Some(after), out);
@@ -705,7 +709,9 @@ pub(crate) fn restart_request(
 pub(crate) fn connector_restart_done(domain: &mut Domain, stage: jig_domain_core::connector::RestartStage) {
     let connector = domain.config.forge_connector;
     let step = match stage {
-        jig_domain_core::connector::RestartStage::Restored => jig_domain_core::RestartStep::RestoreConnector { connector },
+        jig_domain_core::connector::RestartStage::Restored => {
+            jig_domain_core::RestartStep::RestoreConnector { connector }
+        }
         jig_domain_core::connector::RestartStage::ReadAfresh => jig_domain_core::RestartStep::ReadAfresh { connector },
         jig_domain_core::connector::RestartStage::Settled => jig_domain_core::RestartStep::SettleOutbox { connector },
     };
@@ -752,12 +758,17 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
                 let _refused = domain.core.restart_refuse();
                 return;
             }
-            match domain.core.restore_core(jig_domain_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits)) {
+            match domain
+                .core
+                .restore_core(jig_domain_core::CoreRecord::Deployment(deployment), &core_limits(&env.limits))
+            {
                 jig_domain_core::Restored::Deployment { commits } => {
                     domain.core_header_loaded = true;
                     domain.restored_commits = Some(commits);
                 }
-                jig_domain_core::Restored::Live | jig_domain_core::Restored::Archive | jig_domain_core::Restored::Rejected => {
+                jig_domain_core::Restored::Live
+                | jig_domain_core::Restored::Archive
+                | jig_domain_core::Restored::Rejected => {
                     unreachable!("deployment restore result")
                 }
             }
@@ -843,7 +854,9 @@ fn census_page(
                 domain.core.restore_inbox_row(&core_limits(&env.limits), &row)
             }
             Record::Core(
-                jig_domain_core::Record::Core(_) | jig_domain_core::Record::People(_) | jig_domain_core::Record::Notes(_),
+                jig_domain_core::Record::Core(_)
+                | jig_domain_core::Record::People(_)
+                | jig_domain_core::Record::Notes(_),
             )
             | Record::Forge { .. } => false,
         };

@@ -848,7 +848,10 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     client::Outcome::Held => {
                         if let Some(row) = d.entries.remove(&entry) {
                             emit(out, Request::Erase { key: Key::Entry(entry) });
-                            emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Held(row.clone()) });
+                            emit(
+                                out,
+                                Request::Save { read_afresh: None, release: None, record: Stored::Held(row.clone()) },
+                            );
                             d.held.insert(entry, row).expect("held entries are bounded by the outbox");
                         }
                     }

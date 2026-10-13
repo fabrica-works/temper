@@ -30,7 +30,6 @@ pub struct Terminal {
 
 /// Translate a Smith turn envelope, keeping its concrete record opaque to
 /// Temper. The protocol adapter supplies the bounded encoded bytes.
-#[expect(clippy::manual_map, reason = "the step subset forbids closure-based Option::map")]
 pub fn turn(request: smith::Request, transcript: Box<[u8]>) -> Result<host::Turn, Problem> {
     match request {
         smith::Request::Turn { number, read, spent, opens_window, .. } => Ok(host::Turn {

@@ -1,9 +1,9 @@
 //! The decoded engine tools, translated into core or connector vocabulary
 //! (domain/engine.md, 7.3; jig's `domain/engine.md`, 7.3).
 use super::{
-    Decision, Domain, Env, EscalationChoice, Limits, MessageForm, Payload, ProposalChoice, ProposedAction,
-    ReplyTo, Token, Tool, Work, call_answer, current_proof, delegate_call, forge_route, proposals, relay_call,
-    take_payload, tool_kind,
+    Decision, Domain, Env, EscalationChoice, Limits, MessageForm, Payload, ProposalChoice, ProposedAction, ReplyTo,
+    Token, Tool, Work, call_answer, current_proof, delegate_call, forge_route, proposals, relay_call, take_payload,
+    tool_kind,
 };
 use alloc::boxed::Box;
 use jig_domain_core as core;
@@ -29,8 +29,7 @@ pub(crate) fn relay_payload(
     assert!(current_proof(domain, key.task, key.attempt), "fleet only relays a current claim");
     if let Some(core::CallPart::Effect {
         deadline,
-        outcome:
-            None | Some(core::connector::OutboxOutcome::Uncertain | core::connector::OutboxOutcome::Held { .. }),
+        outcome: None | Some(core::connector::OutboxOutcome::Uncertain | core::connector::OutboxOutcome::Held { .. }),
         ..
     }) = domain.core.call_parts.get(&key)
         && env.wall < *deadline
@@ -173,7 +172,10 @@ pub(crate) fn relay_payload(
                     domain.work.push(Work::Core(core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: core::NamedAction::Control { target, control: tasks::Control::Release { again: None, message: None } },
+                        action: core::NamedAction::Control {
+                            target,
+                            control: tasks::Control::Release { again: None, message: None },
+                        },
                     }));
                 }
                 Tool::Message { target, form, words } => {

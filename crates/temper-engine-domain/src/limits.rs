@@ -1,13 +1,15 @@
 //! Child limits and checked route and heap sums (jig's domain/root.md, 10).
-use crate::boundary::{Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Request, Work};
+use crate::boundary::{
+    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Request, Work,
+};
 use crate::domain::{Domain, max_out};
 use crate::route::{LandingRule, forge_route, host_route};
 use crate::{CallKey, Decision, JournalLimits, Output, loads};
 use alloc::boxed::Box;
-use jig_domain_core::{Model, RunCharter, RunPolicy};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_brief as brief;
+use jig_domain_core::{Model, RunCharter, RunPolicy};
 use jig_domain_fleet as fleet;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
@@ -298,7 +300,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // Read answers that waited for journal room, and forge inputs the drain returns.
         .checked_add(Queue::<Event>::worst_case(limits.loads.loads)?)?
         .checked_add(
-            u64::from(limits.loads.loads).checked_mul(jig_domain_core::reads::answer_worst_case(&core_limits(limits))?)?,
+            u64::from(limits.loads.loads)
+                .checked_mul(jig_domain_core::reads::answer_worst_case(&core_limits(limits))?)?,
         )?
         .checked_add(Queue::<Box<forge::Event>>::worst_case(routes)?)?
         .checked_add(u64::from(routes).checked_mul(u64::try_from(size_of::<forge::Event>()).ok()?)?)?

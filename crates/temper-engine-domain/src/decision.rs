@@ -253,15 +253,16 @@ impl Decision {
                 )
                 | Key::Forge(_),
             ) => true,
-            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(row)))) => {
+            Write::Save(Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::EscalationDecision(row),
+            ))) => {
                 row.task != 0
                     && row.revision != 0
                     && row.by != 0
                     && row.requester != 0
                     && match &row.decision {
-                        jig_domain_people::EscalationDecision::Release | jig_domain_people::EscalationDecision::Pass => {
-                            true
-                        }
+                        jig_domain_people::EscalationDecision::Release
+                        | jig_domain_people::EscalationDecision::Pass => true,
                         jig_domain_people::EscalationDecision::Reject { reason } => {
                             reason.len()
                                 <= usize::try_from(limits.result_bytes.min(limits.transcript_bytes))
@@ -269,9 +270,9 @@ impl Decision {
                         }
                     }
             }
-            Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(row)))) => {
-                row.project != 0 && row.proposal != 0 && row.by != 0
-            }
+            Write::Save(Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::ProposalDecision(row),
+            ))) => row.project != 0 && row.proposal != 0 && row.by != 0,
             Write::Erase(Key::Core(jig_domain_core::Key::Notes(_)))
             | Write::Save(
                 Record::Core(
@@ -430,7 +431,10 @@ pub(crate) fn accept_routed(
                 .expect("overrun follows an admitted root decision"),
         };
         for _ in 0..=limits.writes {
-            if batch.write(Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))).is_err() {
+            if batch
+                .write(Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))))
+                .is_err()
+            {
                 break;
             }
         }

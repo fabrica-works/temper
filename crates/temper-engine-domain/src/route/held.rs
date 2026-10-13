@@ -65,7 +65,11 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
                 generation: grant.generation,
                 valid: grant.valid,
             };
-            emit(decision, &env.limits, Delivery::Link { channel, down: host::LinkDown::Grant { run, attempt, grant } });
+            emit(
+                decision,
+                &env.limits,
+                Delivery::Link { channel, down: host::LinkDown::Grant { run, attempt, grant } },
+            );
         }
         core::Held::Acknowledge { channel, run, attempt } => {
             emit(decision, &env.limits, Delivery::Link { channel, down: host::LinkDown::Acknowledge { run, attempt } });
@@ -85,7 +89,11 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
             );
         }
         core::Held::AcknowledgeTurn { channel, run, attempt, turn } => {
-            emit(decision, &env.limits, Delivery::Link { channel, down: host::LinkDown::TurnKept { run, attempt, turn } });
+            emit(
+                decision,
+                &env.limits,
+                Delivery::Link { channel, down: host::LinkDown::TurnKept { run, attempt, turn } },
+            );
         }
         core::Held::Cancel { channel, run, attempt } => {
             emit(decision, &env.limits, Delivery::Link { channel, down: host::LinkDown::Cancel { run, attempt } });
@@ -103,9 +111,7 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
                 &env.limits,
                 Delivery::Load { waiter: id.token(), range: Range::Core(crate::CoreRange::Notes(range)), after: None },
             ),
-            Err(_) => domain
-                .work
-                .push(Work::Core(core::Event::Notes(jig_domain_notes::Event::LoadFailed { owner }))),
+            Err(_) => domain.work.push(Work::Core(core::Event::Notes(jig_domain_notes::Event::LoadFailed { owner }))),
         },
         core::Held::ReadLoad { load, range } => emit(decision, &env.limits, Delivery::ReadLoad { load, range }),
         core::Held::Read { reply, answer } => emit(decision, &env.limits, Delivery::Read { reply, answer }),

@@ -16,16 +16,13 @@ use crate::boundary::{
     Payload, PreparedWorkspace, ProposalChoice, ProposedAction, Read, Request, Tool, Work,
 };
 use crate::domain::{
-    Domain, close, emit, forge_release_ending, internal, journal_outputs, max_out, now, route, save,
-    step_released,
+    Domain, close, emit, forge_release_ending, internal, journal_outputs, max_out, now, route, save, step_released,
 };
 use crate::limits::{Limits, core_limits, environment_core, route_bound, route_takes};
-use crate::restart::{
-    accept_load, connector_restart_done, load_decision, load_outputs, restart_request, take_read,
-};
+use crate::restart::{accept_load, connector_restart_done, load_decision, load_outputs, restart_request, take_read};
 use crate::translate::{
-    call_needs_input, checked_call, connector_answer, core_call, environment_forge, keep_connector_answer,
-    named_call, relay_call, tool_kind,
+    call_needs_input, checked_call, connector_answer, core_call, environment_forge, keep_connector_answer, named_call,
+    relay_call, tool_kind,
 };
 use crate::{CallAnswer, CallKey, Decision, Delivery, Family, Key, Range, Record, Write, loads};
 use alloc::boxed::Box;
@@ -47,7 +44,10 @@ pub(crate) use tools::relay_payload;
 /// Route one admitted input and its synchronous continuations in one decision.
 /// Admission is `try_step`'s; the root never answers busy itself (jig's
 /// `testing/jig-test-domain/src/admission.rs`).
-#[expect(clippy::too_many_lines, reason = "one exhaustive input match keeps every input before a single decision close")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one exhaustive input match keeps every input before a single decision close"
+)]
 pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(domain.limits == env.limits, "root uses configured limits");
     assert!(out.room() >= max_out(&env.limits), "root output room reserved");
@@ -80,9 +80,13 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             domain.work.push(Work::Forge(*event));
         }
         Event::Stop => domain.work.push(Work::Core(core::Event::Stopping)),
-        Event::Credential { number, generation, valid } => domain.work.push(Work::Core(core::Event::Account(
-            jig_domain_accounts::Event::Credential { number, generation, valid },
-        ))),
+        Event::Credential { number, generation, valid } => {
+            domain.work.push(Work::Core(core::Event::Account(jig_domain_accounts::Event::Credential {
+                number,
+                generation,
+                valid,
+            })));
+        }
         Event::Account(event) => domain.work.push(Work::Core(core::Event::Account(event))),
         Event::Party(crate::PartyInput::StartRecurring { project, authority, template }) => {
             domain.work.push(Work::Core(core::Event::StartRecurring { project, authority, template }));
@@ -265,11 +269,8 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
             Work::GoalSubscribe(subscriber) => forge_route::goal_subscribed(domain, env, subscriber),
             Work::Activate(context) => {
                 let ready = domain.ready();
-                let routed = core::step(
-                    &mut domain.core,
-                    &environment_core(env),
-                    core::Event::Activate { context, ready },
-                );
+                let routed =
+                    core::step(&mut domain.core, &environment_core(env), core::Event::Activate { context, ready });
                 route_core_requests(domain, env, decision, routed);
             }
             Work::EscalationLoaded { waiter, rows } => escalation::loaded(domain, env, waiter, rows),
@@ -403,7 +404,6 @@ pub(crate) fn delegate_call(
     }
     domain.work.push(Work::Core(core::Event::DelegateValidated { to, key, batch, stubs }));
 }
-
 
 pub(crate) fn discard_after_stop(domain: &mut Domain, event: Event) {
     match event {

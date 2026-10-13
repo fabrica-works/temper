@@ -4,10 +4,10 @@ use super::{
     Assignment, CallAnswer, Decision, Delivery, Domain, Env, HostRequest, Limits, List, PreparedWorkspace, Read,
     Request, Token, Work, emit, escalation, forge_route, internal, proposals, relay_call,
 };
+use crate::Range;
 use crate::assemble::{brief_outputs, finish_brief_plan, take_payload};
 use crate::boundary::{EndedRead, Payload};
 use crate::restart::{begin_dependency_read, retire_read};
-use crate::Range;
 use alloc::boxed::Box;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
@@ -68,7 +68,15 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 )
                 | None => unreachable!("fleet returns its owned turn body"),
             };
-            domain.work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, read, cumulative, refused }));
+            domain.work.push(Work::Core(core::Event::TurnPayload {
+                run,
+                attempt,
+                turn,
+                body,
+                read,
+                cumulative,
+                refused,
+            }));
         }
         core::Now::AnswerPayload { run, attempt, payload } => crate::link::answer(domain, run, attempt, payload),
         core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
@@ -98,7 +106,9 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         }
         core::Now::RefusedPayload { request, problem } => {
             let payload = match take_payload(domain, request) {
-                Some(Payload::Turn { task, attempt, turn, .. }) => Some(core::PayloadRefusal::Turn { task, attempt, turn }),
+                Some(Payload::Turn { task, attempt, turn, .. }) => {
+                    Some(core::PayloadRefusal::Turn { task, attempt, turn })
+                }
                 Some(Payload::Answer { task, attempt, .. }) => {
                     domain.forge_left.remove(&(task, attempt));
                     Some(core::PayloadRefusal::Answer { task, attempt })
@@ -139,7 +149,9 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         core::Now::HistoricalEscalation { request, person, project, task, revision } => {
             escalation::historical_begin(domain, env, decision, request, person, project, task, revision);
         }
-        core::Now::BriefCorePlanned { task, parent, sections } => finish_brief_plan(domain, env, task, parent, sections),
+        core::Now::BriefCorePlanned { task, parent, sections } => {
+            finish_brief_plan(domain, env, task, parent, sections);
+        }
         core::Now::CompleteBrief { brief, order } => {
             let mut child = Queue::with_capacity(1);
             child.push(brief::GatherRequest::Complete { brief, order });
@@ -150,8 +162,20 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             drop(domain.brief_sections.remove(&task));
             drop(domain.run_workspaces.remove(&task));
         }
-        core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants } => {
-            let prepared = Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants };
+        core::Now::RunPrepared {
+            task,
+            attempt,
+            conversation,
+            charter,
+            run,
+            messages,
+            saved,
+            transcript,
+            answered,
+            grants,
+        } => {
+            let prepared =
+                Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants };
             run_prepared(domain, env, prepared);
         }
         core::Now::ProcedureDelegateOutcome { task, step, child } => {
@@ -215,7 +239,11 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: 
         Ok(waiter) => emit(
             decision,
             &env.limits,
-            Delivery::Load { waiter: waiter.token(), range: Range::Core(crate::CoreRange::TaskResult { task }), after: None },
+            Delivery::Load {
+                waiter: waiter.token(),
+                range: Range::Core(crate::CoreRange::TaskResult { task }),
+                after: None,
+            },
         ),
         Err(Some(Read::Ended(read))) => crate::restart::ended_answer(domain, read, None, true),
         Err(
@@ -246,11 +274,10 @@ fn workspace(domain: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, co
                     }
                 }
                 let writes = workspace.writes.clone();
-                let inserted =
-                    match domain.run_workspaces.insert(task, PreparedWorkspace { workspace, claim_names }) {
-                        Ok(None) => true,
-                        Ok(Some(_)) | Err(_) => false,
-                    };
+                let inserted = match domain.run_workspaces.insert(task, PreparedWorkspace { workspace, claim_names }) {
+                    Ok(None) => true,
+                    Ok(Some(_)) | Err(_) => false,
+                };
                 assert!(inserted, "one workspace flight per task");
                 Some(writes)
             }
@@ -279,7 +306,8 @@ struct Prepared {
 }
 
 fn run_prepared(domain: &mut Domain, env: &Env<Limits>, prepared: Prepared) {
-    let Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants } = prepared;
+    let Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants } =
+        prepared;
     let sections = domain.brief_sections.remove(&task).expect("prepared brief sections");
     let PreparedWorkspace { workspace, claim_names } =
         domain.run_workspaces.remove(&task).expect("prepared connector workspace");

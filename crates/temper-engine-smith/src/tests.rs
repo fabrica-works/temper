@@ -191,7 +191,15 @@ fn an_effect_proposal_decodes_its_connector_payload_and_rejects_an_unknown_resou
 }
 
 fn spend(units: u64) -> run::Spend {
-    run::Spend { turns: 1, input: Some(2), output: Some(3), cache_read: Some(0), cache_write: Some(0), reasoning: None, units }
+    run::Spend {
+        turns: 1,
+        input: Some(2),
+        output: Some(3),
+        cache_read: Some(0),
+        cache_write: Some(0),
+        reasoning: None,
+        units,
+    }
 }
 
 fn change_answer() -> run::Answer {

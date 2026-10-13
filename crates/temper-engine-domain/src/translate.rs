@@ -5,8 +5,8 @@ use crate::limits::Limits;
 use crate::route::{LandingRule, host_route};
 use crate::{CallAnswer, Decision};
 use alloc::boxed::Box;
-use jig_domain_core::Charter;
 use jig_domain_authority as authority;
+use jig_domain_core::Charter;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -59,7 +59,11 @@ pub(crate) struct RootConfig {
     pub(crate) forge_charter: u32,
 }
 
-pub(crate) fn split_config(config: Config, projects: List<u32>, hub_turns: u32) -> (jig_domain_core::Config, RootConfig) {
+pub(crate) fn split_config(
+    config: Config,
+    projects: List<u32>,
+    hub_turns: u32,
+) -> (jig_domain_core::Config, RootConfig) {
     let Config {
         deployment,
         seed,
@@ -359,7 +363,9 @@ pub(crate) fn tool_kind(tool: &Tool) -> Option<jig_domain_core::ToolKind> {
         Tool::Message { target, .. } => jig_domain_core::ToolKind::Message { target: *target },
         Tool::Introduce { left, .. } => jig_domain_core::ToolKind::Message { target: *left },
         Tool::Amend { .. } | Tool::Cancel { .. } | Tool::Release { .. } => jig_domain_core::ToolKind::Control,
-        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => jig_domain_core::ToolKind::Decide,
+        Tool::Decide { .. } | Tool::Withdraw { .. } | Tool::DecideEscalation { .. } => {
+            jig_domain_core::ToolKind::Decide
+        }
         Tool::Propose { .. } => jig_domain_core::ToolKind::Propose,
         Tool::Subscribe { .. } | Tool::SubscribeForge { .. } | Tool::Unsubscribe { .. } => {
             jig_domain_core::ToolKind::Subscribe

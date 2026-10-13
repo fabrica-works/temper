@@ -132,11 +132,9 @@ fn a_first_start_commits_its_deployment_before_releasing_a_delivery() {
     assert_eq!(number, 1);
     assert_eq!(
         writes.as_ref(),
-        &[Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(Deployment {
-            id: [37; 16],
-            commits: 1,
-            ..DEPLOYMENT
-        }))))]
+        &[Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
+            Deployment { id: [37; 16], commits: 1, ..DEPLOYMENT }
+        ))))]
     );
     resume(&mut j, &mut out);
     assert!(out.is_empty());
@@ -181,7 +179,9 @@ fn fresh_numbers_and_unused_gaps_are_durable_in_the_decisions_header() {
     accept(&mut j, &LIMITS, Decision::new(&LIMITS), &mut out).unwrap();
     let (number, writes) = commit(&mut out);
     assert_eq!(number, 1);
-    let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))) = writes[0] else {
+    let Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(header)))) =
+        writes[0]
+    else {
         panic!("header");
     };
     assert_eq!(header.tasks, 2);
@@ -199,7 +199,11 @@ fn same_key_saves_and_erases_collapse_to_the_last_write_before_commit() {
     d.write(&LIMITS, turn(2, 3)).unwrap();
     d.write(
         &LIMITS,
-        Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { task: 1, attempt: 1, turn: 1 }))),
+        Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn {
+            task: 1,
+            attempt: 1,
+            turn: 1,
+        }))),
     )
     .unwrap();
     d.write(&LIMITS, turn(1, 4)).unwrap();
@@ -221,7 +225,10 @@ fn rejected_payloads_are_returned_without_replacing_admitted_ownership() {
         panic!("result");
     };
     assert_eq!(words.len(), 33);
-    assert!(d.write(&LIMITS, Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)))).is_err());
+    assert!(
+        d.write(&LIMITS, Write::Erase(Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment))))
+            .is_err()
+    );
     let mut j = Journal::new(DEPLOYMENT, &LIMITS);
     let mut out = Queue::with_capacity(1);
     accept(&mut j, &LIMITS, d, &mut out).unwrap();

@@ -42,20 +42,13 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             forge_route::effect_ask(domain, env, connector, ask);
             None
         }
-        core::Ask::Gather { section, budget } => {
-            Some(brief::GatherRequest::Gather { connector, section, budget })
-        }
-        core::Ask::CutTo { section, size } => {
-            Some(brief::GatherRequest::CutTo { connector, section, size })
-        }
+        core::Ask::Gather { section, budget } => Some(brief::GatherRequest::Gather { connector, section, budget }),
+        core::Ask::CutTo { section, size } => Some(brief::GatherRequest::CutTo { connector, section, size }),
         core::Ask::Drop { section } => Some(brief::GatherRequest::Drop { connector, section }),
         core::Ask::Hold { task, resource } => {
             if connector == domain.config.forge_connector
-                && let Some(name) = forge_route::forge_name(
-                    domain.config.forge_connector,
-                    &resource,
-                    env.limits.forge.name_bytes,
-                )
+                && let Some(name) =
+                    forge_route::forge_name(domain.config.forge_connector, &resource, env.limits.forge.name_bytes)
             {
                 let from = match domain.forge.hold(&name) {
                     Some(row) if row.task != task => Some(row.task),
@@ -82,13 +75,8 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             match parsed {
                 Some(adoption) if domain.adoption_restore.len() < env.limits.forge.adoptions => {
                     let previous = domain.forge.repository(adoption.provider).cloned();
-                    assert!(
-                        domain.adoption_restore.insert(request, previous) == Ok(None),
-                        "one keyed adoption flight"
-                    );
-                    domain
-                        .work
-                        .push(Work::Forge(forge::Event::Adopt { reply_to: request, adoption }));
+                    assert!(domain.adoption_restore.insert(request, previous) == Ok(None), "one keyed adoption flight");
+                    domain.work.push(Work::Forge(forge::Event::Adopt { reply_to: request, adoption }));
                 }
                 Some(_) => domain.work.push(Work::People(people::Event::Decided {
                     request,
@@ -137,24 +125,16 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         }
         core::Ask::TaskHoldings { request, project, root, number, executor, spec } => {
             let holdings = if connector == domain.config.forge_connector {
-                forge_route::task_holdings(
-                    domain, env, project, root, number, executor, &spec, None,
-                )
+                forge_route::task_holdings(domain, env, project, root, number, executor, &spec, None)
             } else {
                 None
             };
-            domain.work.push(Work::Core(core::Event::Holdings {
-                request,
-                connector,
-                holdings,
-            }));
+            domain.work.push(Work::Core(core::Event::Holdings { request, connector, holdings }));
             None
         }
         core::Ask::DelegateHoldings { request, from, members } => {
             let holdings = if connector == domain.config.forge_connector {
-                let mut collected = List::with_capacity(
-                    u32::try_from(members.len()).expect("bounded delegate batch"),
-                );
+                let mut collected = List::with_capacity(u32::try_from(members.len()).expect("bounded delegate batch"));
                 let mut failed = false;
                 for member in members {
                     match forge_route::task_holdings(
@@ -175,18 +155,12 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             } else {
                 None
             };
-            domain.work.push(Work::Core(core::Event::DelegateHoldings {
-                request,
-                connector,
-                holdings,
-            }));
+            domain.work.push(Work::Core(core::Event::DelegateHoldings { request, connector, holdings }));
             None
         }
         core::Ask::ProcedureHoldings { task, step, members } => {
             let holdings = if connector == domain.config.forge_connector {
-                let mut collected = List::with_capacity(
-                    u32::try_from(members.len()).expect("bounded procedure batch"),
-                );
+                let mut collected = List::with_capacity(u32::try_from(members.len()).expect("bounded procedure batch"));
                 let mut failed = false;
                 for member in members {
                     match forge_route::task_holdings(
@@ -207,22 +181,14 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             } else {
                 None
             };
-            domain.work.push(Work::Core(core::Event::ProcedureHoldings {
-                task,
-                step,
-                connector,
-                holdings,
-            }));
+            domain.work.push(Work::Core(core::Event::ProcedureHoldings { task, step, connector, holdings }));
             None
         }
         core::Ask::ProjectGoal { feed } => {
             if connector == domain.config.forge_connector {
                 domain.work.push(Work::ProjectGoal(feed));
             } else if feed.closing {
-                domain.work.push(Work::Core(core::Event::ProjectionSettled {
-                    goal: feed.goal.number,
-                    connector,
-                }));
+                domain.work.push(Work::Core(core::Event::ProjectionSettled { goal: feed.goal.number, connector }));
             }
             None
         }
@@ -238,12 +204,8 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                     let names = forge_route::watch_names(domain, &env.limits, &pending)
                         .expect("connector names preflighted at subscription");
                     let owner = pending.task;
-                    domain
-                        .work
-                        .push(Work::Forge(forge::Event::Subscribe { subscription: pending }));
-                    domain
-                        .work
-                        .push(Work::Forge(forge::Event::Names { task: owner, resources: names }));
+                    domain.work.push(Work::Forge(forge::Event::Subscribe { subscription: pending }));
+                    domain.work.push(Work::Forge(forge::Event::Names { task: owner, resources: names }));
                 }
                 decide_call(
                     domain,
@@ -261,14 +223,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 if let Some((owner, topic)) = domain.forge_unsubscribing.remove(&request) {
                     domain.work.push(Work::Forge(forge::Event::Unsubscribe { task: owner, topic }));
                 }
-                decide_call(
-                    domain,
-                    &env.limits,
-                    decision,
-                    ReplyTo::new(request),
-                    key,
-                    CallAnswer::Unsubscribed,
-                );
+                decide_call(domain, &env.limits, decision, ReplyTo::new(request), key, CallAnswer::Unsubscribed);
             }
             None
         }
@@ -277,12 +232,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 let (writes, holders) = forge_route::claimed_writes(domain, env, task)
                     .expect("the admitted assignment retains its bounded held forge writes");
                 if !writes.is_empty() {
-                    domain.work.push(Work::Forge(forge::Event::Claim {
-                        task,
-                        attempt,
-                        writes,
-                        holders,
-                    }));
+                    domain.work.push(Work::Forge(forge::Event::Claim { task, attempt, writes, holders }));
                 }
                 let assignment = domain.assignments.get(&task).expect("claimed assignment");
                 let workstream = assignment.workstream;
@@ -297,10 +247,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                         run: Token::new(task),
                         attempt: Token::new(attempt),
                         workstream,
-                        assignment: fleet::Assignment {
-                            turns: Token::new(task),
-                            answered: Token::new(task),
-                        },
+                        assignment: fleet::Assignment { turns: Token::new(task), answered: Token::new(task) },
                     }),
                 );
             }
@@ -318,10 +265,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 && let Some(repair) = repair
                 && let Some(owner) = domain.forge.queue_repair_owner(repair)
             {
-                domain.work.push(Work::Tasks(tasks::Event::Hold {
-                    task: owner,
-                    why: tasks::Hold::Effects,
-                }));
+                domain.work.push(Work::Tasks(tasks::Event::Hold { task: owner, why: tasks::Hold::Effects }));
             }
             None
         }
@@ -332,9 +276,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 && let Some((child, _)) = row.delegate
             {
                 domain.work.push(Work::Forge(forge::Event::DelegateRefused { task, child }));
-                domain
-                    .work
-                    .push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Procedure }));
+                domain.work.push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Procedure }));
             }
             None
         }
@@ -348,9 +290,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             };
             if connector == domain.config.forge_connector && code == 2 {
                 if !forge_route::start_change(domain, env, &context) {
-                    domain
-                        .work
-                        .push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Effects }));
+                    domain.work.push(Work::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Effects }));
                 }
             } else {
                 emit(decision, &env.limits, Delivery::Procedure { task, step, connector, code });
