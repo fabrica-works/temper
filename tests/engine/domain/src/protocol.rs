@@ -21,10 +21,11 @@ pub fn bounds() -> host::Bounds {
         spend: 1000,
         time: Duration::from_secs(60),
         waiting: Duration::from_secs(60),
-        checks: Duration::from_secs(60),
+        // Checks finish within a changing charter's reserved time.
+        checks: Duration::from_secs(10),
         message_bytes: 64,
         inbox: 4,
-        unacknowledged: 4,
+        unacknowledged: 8,
     }
 }
 

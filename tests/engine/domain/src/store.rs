@@ -1,7 +1,7 @@
 //! Temper record translation over jig's ordered store fake.
 //! Root writes wait in the caller-owned protocol queue; durability belongs to
 //! jig-fake-store. Paging selects the application's store-key families.
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use temper_engine_domain::{Deployment, JournalLimits, Key, Range, Record, Write};
 
 pub const LIMITS: JournalLimits = JournalLimits {
@@ -37,13 +37,9 @@ pub struct Store {
 
 impl Store {
     #[must_use]
+    /// An empty store: the root's first start writes its deployment header.
     pub fn new() -> Store {
-        let mut inner = jig_fake_store::Store::new();
-        inner.rows = BTreeMap::from([(
-            Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment)),
-            Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(HEADER))),
-        )]);
-        Store { inner, pending: VecDeque::new() }
+        Store { inner: jig_fake_store::Store::new(), pending: VecDeque::new() }
     }
 
     pub fn apply(&mut self) -> u64 {

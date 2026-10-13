@@ -38,6 +38,8 @@ pub struct Assignment {
     pub messages: Box<[tasks::Word]>,
     /// Writable repository tags whose workspace starts at the task's saved-work branch.
     pub saved: Box<[u32]>,
+    /// The task holding the workspace, whose runs may reuse it: the hub's workstream.
+    pub workstream: u64,
     /// Concrete forge checkouts and their claimed writer branches.
     pub workspace: ForgeWorkspace,
     /// Ordered opaque committed turn bodies of this task, empty for a fresh run.
@@ -101,10 +103,10 @@ pub struct ForgeRepository {
     pub identity: u32,
 }
 
-/// Concrete checkout roots and cache ownership for one assignment.
+/// Concrete checkout roots for one assignment; the workstream that owns
+/// their cache is the hub's (jig's `domain/hosts.md`, 2).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ForgeWorkspace {
-    pub key: Box<[u8]>,
     pub repositories: Box<[ForgeRepository]>,
 }
 

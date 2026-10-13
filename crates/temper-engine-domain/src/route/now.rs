@@ -301,6 +301,7 @@ fn run_prepared(domain: &mut Domain, env: &Env<Limits>, prepared: Prepared) {
         saved: forge_route::saved_tags(&saved, domain.config.forge_connector)
             .expect("task saved names were admitted by the root"),
         workspace: workspace.workspace.clone(),
+        workstream: workspace.workstream,
         transcript,
         answered: records.into_boxed(),
         settled: domain.core.settled_calls(task, attempt),

@@ -606,11 +606,8 @@ pub(crate) fn startup_page(
         Range::Core(crate::CoreRange::Notes(_)) => unreachable!("notes load is outside startup"),
     };
     if range == Range::Core(crate::CoreRange::Tasks) {
-        for project in &domain.core.projects {
-            if !domain.core.people.has_project(*project) {
-                domain.work.push(Work::People(people::Event::Roles { project: *project, holdings: Box::new([]) }));
-            }
-        }
+        // People's restoration terminal; at a first start the core seeds the
+        // configured projects and owners (jig's `protocol/configuration.md`, 3).
         domain.work.push(Work::People(people::Event::Restored));
         route_into(domain, env, &mut decision);
         if domain.core.restart_failure().is_some() {

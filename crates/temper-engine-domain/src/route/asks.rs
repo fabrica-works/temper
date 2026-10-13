@@ -285,8 +285,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                     }));
                 }
                 let assignment = domain.assignments.get(&task).expect("claimed assignment");
-                let workstream =
-                    u64::from_be_bytes(assignment.workspace.key.as_ref().try_into().expect("task-number workstream"));
+                let workstream = assignment.workstream;
                 let grants = fleet_grants(&assignment.grants);
                 emit(
                     decision,

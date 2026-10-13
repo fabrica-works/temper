@@ -794,6 +794,8 @@ pub(crate) fn task_holdings(
 #[derive(Debug)]
 pub(crate) struct RunWorkspace {
     pub workspace: ForgeWorkspace,
+    /// The task holding the workspace: this one, or the change whose branch it inherits.
+    pub workstream: u64,
     pub writes: Box<[authority::Write]>,
     pub names: Box<[forge::Name]>,
     pub own_holds: Box<[forge::Name]>,
@@ -1348,7 +1350,8 @@ pub(crate) fn run_workspace(
             .ok()?;
     }
     Some(RunWorkspace {
-        workspace: ForgeWorkspace { key: Box::from(key.to_be_bytes()), repositories: repositories.into_boxed() },
+        workspace: ForgeWorkspace { repositories: repositories.into_boxed() },
+        workstream: key,
         writes: writes.into_boxed(),
         names: names.into_boxed(),
         own_holds: own_holds.into_boxed(),

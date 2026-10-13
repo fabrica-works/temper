@@ -448,6 +448,12 @@ impl WalkingReferee {
             && self.results == 0
     }
 
+    /// The person signed in by the story, once known.
+    #[must_use]
+    pub const fn person(&self) -> Option<u64> {
+        self.person
+    }
+
     /// The story is complete only after all independently expected effects.
     #[must_use]
     pub fn done(&self) -> bool {

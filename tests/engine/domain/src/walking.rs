@@ -73,7 +73,7 @@ pub fn limits() -> engine::Limits {
         people: 2,
         inbox_entries: 2,
         inbox_tasks: 4,
-        inbox_recipients: 4,
+        inbox_recipients: 16,
         sign_ins: 2,
         projects: 1,
         holdings: 2,
@@ -149,7 +149,7 @@ pub fn limits() -> engine::Limits {
         },
         accounts: accounts::Limits {
             accounts: 1,
-            credentials: 2,
+            credentials: 1,
             backoff_base: Duration::from_millis(10),
             backoff_max: Duration::from_secs(1),
             retry: Duration::from_millis(10),
@@ -191,7 +191,7 @@ fn authority_limits() -> authority::Limits {
         segment_bytes: 32,
         implications: 0,
         batch: 1,
-        accounts: 1,
+        accounts: 2,
         writes: 1,
     }
 }
@@ -808,7 +808,7 @@ mod tests {
     fn a_queued_late_result_prevents_settlement_and_reaches_the_referee() {
         let mut world = World::new(Settings::calm(66));
         world.run();
-        let person = world.store.header().people;
+        let person = world.referee.person().expect("story's person");
         let task = world.assignment.as_ref().expect("script retained assignment").task;
         world.out = Queue::with_capacity(engine::max_out(&world.environment.limits) + 1);
         world.out.push(Request::Party(PartyRequest::Deliver(Delivery::Result { person, task, words: REPORT.into() })));
