@@ -34,7 +34,7 @@ fn fuzzy_terminal_commit_cut_preserves_complete_replay_and_funding() {
             ..Settings::terminal(seed)
         };
         let world = run_replayed(settings);
-        assert!(world.referee.done() && world.referee.terminal_replay_done(), "seed {seed}");
+        assert!(world.referee.done_after_cut() && world.referee.terminal_replay_done(), "seed {seed}");
         assert_eq!(world.restarts, 1, "seed {seed}");
     }
 }
