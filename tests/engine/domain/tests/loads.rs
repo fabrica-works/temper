@@ -14,6 +14,7 @@ fn row(turn: u32, bytes: usize) -> Record {
         spent: u64::from(turn),
         read: None,
         at: Wall::EPOCH,
+        opens_window: false,
         transcript: vec![b'x'; bytes].into_boxed_slice(),
     })))
 }

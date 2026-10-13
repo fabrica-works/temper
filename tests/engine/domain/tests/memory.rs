@@ -26,6 +26,7 @@ fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clone
                 spent: 0,
                 read: None,
                 at: Wall::EPOCH,
+                opens_window: false,
                 transcript: vec![b'x'; 4].into_boxed_slice(),
             })))
         })
@@ -121,7 +122,10 @@ fn partial_delivery_transfer_never_allocates_a_second_shrinking_container() {
     let mut decision = Decision::new(&limits);
     for task in 1_u64..1000 {
         decision
-            .deliver(&limits, Delivery::Acknowledge { channel: Token::new(7), task, attempt: 1 })
+            .deliver(&limits, Delivery::Link {
+                channel: Token::new(7),
+                down: jig_domain_host::LinkDown::Acknowledge { run: Token::new(task), attempt: Token::new(1) },
+            })
             .expect("partial delivery bound");
     }
     meter.start();
@@ -159,6 +163,7 @@ fn partial_write_transfer_moves_values_without_shrinking_the_source() {
                     spent: 0,
                     read: None,
                     at: Wall::EPOCH,
+                    opens_window: false,
                     transcript: Box::new([]),
                 })))),
             )
@@ -196,6 +201,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
                         spent: 0,
                         read: None,
                         at: Wall::EPOCH,
+                        opens_window: false,
                         transcript: vec![b'x'; usize::try_from(LIMITS.transcript_bytes).expect("small transcript")]
                             .into_boxed_slice(),
                     })))),
@@ -214,6 +220,7 @@ fn full_decisions_and_maximum_held_results_fit_the_declared_root_journal_bound()
                     spent: 1,
                     read: None,
                     at: Wall::EPOCH,
+                    opens_window: false,
                     transcript: vec![b'y'; usize::try_from(LIMITS.transcript_bytes).expect("small transcript")]
                         .into_boxed_slice(),
                 })))),

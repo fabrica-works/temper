@@ -259,6 +259,10 @@ impl Referee {
                         return Err("reroute timestamp precedes the request");
                     }
                 }
+                if comparable.changed < expected_task.changed {
+                    return Err("reroute timestamp precedes the request");
+                }
+                comparable.changed = expected_task.changed;
                 if &comparable != expected_task {
                     return Err("reroute changed more than expected holder and revision");
                 }
@@ -359,12 +363,13 @@ impl Referee {
                     return Err("role terminal before exact durable keyed answer");
                 }
             }
-            people::Reply::Refused(_) => {
+            // An expired sign-in is answered signed out, saving nothing (jig b7bdd9e8).
+            people::Reply::Refused(_) | people::Reply::SignedOut => {
                 if rows.get(&answer_key) != self.rows.get(&answer_key) {
                     return Err("role entrance refusal changed durable key");
                 }
             }
-            people::Reply::SignedIn { .. } | people::Reply::SignedOut => return Err("role ask got a session terminal"),
+            people::Reply::SignedIn { .. } => return Err("role ask got a session terminal"),
         }
         self.asks.remove(&to);
         self.terminals.insert(to);

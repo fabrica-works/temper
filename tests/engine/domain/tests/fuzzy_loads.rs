@@ -48,6 +48,7 @@ fn run(seed: u64) -> (String, &'static str) {
                         spent: u64::from(turn),
                         read: None,
                         at: Wall::EPOCH,
+                        opens_window: false,
                         transcript: vec![b'x'; 4].into_boxed_slice(),
                     })))
                 })

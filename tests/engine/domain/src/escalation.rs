@@ -353,7 +353,7 @@ impl World {
                 211,
                 1,
                 11,
-                2,
+                1,
                 people::EscalationDecision::Pass,
                 people::Outcome::Refused(people::Refusal::NoFurther),
             ),
@@ -380,9 +380,12 @@ impl World {
         self.queue(event, 0);
     }
 
-    fn winning_choice(&mut self, owner: usize, revision: u64, decision: people::EscalationDecision, key: u8) {
+    /// The winner of decision `stage`: passing keeps the hold's revision
+    /// (jig 00de0b8c), so the first and final decisions share revision one.
+    fn winning_choice(&mut self, stage: u64, owner: usize, decision: people::EscalationDecision, key: u8) {
+        let revision = 1;
         let by = self.people[owner].expect("authenticated winning actor");
-        self.referee.offer(revision, by, decision.clone());
+        self.referee.offer(stage, by, decision.clone());
         self.first_choice = Some((owner, revision, decision.clone(), key));
         let choice = match decision {
             people::EscalationDecision::Release => people::EscalationChoice::Released,
@@ -397,17 +400,17 @@ impl World {
                 at: Wall::EPOCH,
                 choice,
             };
-        self.ask(if revision == 1 { 210 } else { 220 }, owner, key, revision, decision, outcome);
+        self.ask(if stage == 1 { 210 } else { 220 }, owner, key, revision, decision, outcome);
     }
 
     fn initial_choice(&mut self) {
         match self.settings.story {
-            Story::Release => self.winning_choice(0, 1, people::EscalationDecision::Release, 10),
+            Story::Release => self.winning_choice(1, 0, people::EscalationDecision::Release, 10),
             Story::Reject => {
-                self.winning_choice(0, 1, people::EscalationDecision::Reject { reason: REASON.into() }, 10);
+                self.winning_choice(1, 0, people::EscalationDecision::Reject { reason: REASON.into() }, 10);
             }
             Story::PassRelease | Story::RaceRelease | Story::RaceReject => {
-                self.winning_choice(0, 1, people::EscalationDecision::Pass, 10);
+                self.winning_choice(1, 0, people::EscalationDecision::Pass, 10);
             }
         }
     }
@@ -418,7 +421,7 @@ impl World {
         } else {
             people::EscalationDecision::Release
         };
-        self.winning_choice(1, 2, decision, 12);
+        self.winning_choice(2, 1, decision, 12);
         if matches!(self.settings.story, Story::RaceRelease | Story::RaceReject) {
             let loser = if self.settings.story == Story::RaceReject {
                 people::EscalationDecision::Release
@@ -432,12 +435,12 @@ impl World {
             };
             let outcome = people::Outcome::EscalationDecided {
                 task: self.task.expect("chat"),
-                revision: 2,
+                revision: 1,
                 by: self.people[1].expect("winning owner"),
                 at: Wall::EPOCH,
                 choice,
             };
-            self.ask(221, 0, 13, 2, loser, outcome);
+            self.ask(221, 0, 13, 1, loser, outcome);
         }
     }
 
@@ -715,7 +718,7 @@ impl World {
                         202,
                         1,
                         tasks::Escalation::Waiting {
-                            revision: 2,
+                            revision: 1,
                             holder: tasks::EscalationHolder::Role { project: 1, role: 0 },
                             entry: 1,
                             since: self.environment.wall,

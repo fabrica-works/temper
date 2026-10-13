@@ -58,10 +58,6 @@ pub struct Settings {
     /// (domain/people.md, section 5.2).
     pub policy: bool,
 
-    /// Actual durable Waiting row reaches checked revision exhaustion before
-    /// this fresh process starts.
-    pub exhausted: bool,
-
     /// Start beyond both saved session expiry clocks
     /// (domain/people.md, section 3).
     pub expired: bool,
@@ -79,7 +75,6 @@ impl Settings {
             page_delay: 0,
             facts: true,
             policy: true,
-            exhausted: false,
             expired: false,
         }
     }
@@ -186,7 +181,7 @@ fn snapshot(settings: Settings) -> Store {
                 tasks::Escalation::Waiting { revision: 1, holder: tasks::EscalationHolder::Person(_), .. }
                     if settings.base == Base::Requester)
                 || matches!(record.escalation,
-                    tasks::Escalation::Waiting { revision: 2, holder: tasks::EscalationHolder::Role { .. }, .. }
+                    tasks::Escalation::Waiting { revision: 1, holder: tasks::EscalationHolder::Role { .. }, .. }
                     if settings.base == Base::FinalRole))
         });
         let acknowledged = previous.trace.iter().any(|entry| entry.contains("down: Acknowledge {"));
@@ -203,6 +198,15 @@ impl World {
     #[must_use]
     pub fn new(settings: Settings) -> World {
         let mut store = snapshot(settings);
+        // The first start saved the earlier process's policy, and a durable
+        // policy outlives configuration: give it this story's request bits.
+        let policy_key = Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)));
+        let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) =
+            store.rows.get_mut(&policy_key)
+        else {
+            panic!("the first start saved project one's policy");
+        };
+        value.roles[0].requests = 1 | 4 | if settings.policy { 256 } else { 0 };
         let mut people = [0; 2];
         let mut sessions = [0; 2];
         let mut task = 0;
@@ -270,17 +274,6 @@ impl World {
             }
         }
         assert!(task != 0 && people.iter().all(|person| *person != 0) && sessions.iter().all(|session| *session != 0));
-        if settings.exhausted {
-            let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) =
-                store.rows.get_mut(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(task))))
-            else {
-                panic!("actual durable held task");
-            };
-            let tasks::Escalation::Waiting { revision, .. } = &mut record.escalation else {
-                panic!("revision exhaustion belongs only to Waiting");
-            };
-            *revision = u64::MAX;
-        }
         let initial_rows = store.rows.clone();
         let limits = limits();
         let mut world = World {
@@ -355,12 +348,14 @@ impl World {
                 else {
                     panic!("scripted reroute starts at actual requester Waiting");
                 };
+                // Rerouting keeps the hold's revision (jig 00de0b8c; people.md, 5.1).
                 record.escalation = tasks::Escalation::Waiting {
-                    revision: revision.checked_add(1).expect("successful script is not exhausted"),
+                    revision,
                     holder: tasks::EscalationHolder::Role { project: 1, role: 0 },
                     entry: self.store.header().messages.checked_add(1).expect("next durable message"),
                     since: self.environment.wall,
                 };
+                record.changed = self.environment.wall;
                 changed.insert(record.number, record);
             }
             Some(Replacement { holdings: holdings.clone(), tasks: changed })

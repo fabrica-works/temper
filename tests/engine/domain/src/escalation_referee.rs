@@ -87,7 +87,11 @@ pub struct Referee {
     assignments: Vec<u64>,
     claims: BTreeSet<u64>,
     unplaced_claims: BTreeSet<u64>,
+    /// Scripted winners in decision order. Passing keeps the hold's revision
+    /// (jig 00de0b8c), so the order, not the revision, names a decision.
     offers: BTreeMap<u64, (u64, people::EscalationDecision)>,
+    /// Archived decisions in the same order; a later one at the same revision
+    /// replaces the earlier row in the store.
     archives: BTreeMap<u64, EscalationDecisionRecord>,
     terminals: BTreeSet<u64>,
     acknowledgements: BTreeSet<u64>,
@@ -199,10 +203,14 @@ impl Referee {
         assert!(self.reads.insert(to, (person, escalation)).is_none(), "one fresh reply right per named read");
     }
 
-    /// Register the first scripted semantic winner for one revision; race losers
-    /// never become a second expected mutation.
-    pub fn offer(&mut self, revision: u64, by: u64, decision: people::EscalationDecision) {
-        assert!(self.offers.insert(revision, (by, decision)).is_none(), "one scripted winner per semantic revision");
+    /// Register the scripted semantic winner of the decision numbered `stage`;
+    /// race losers never become a second expected mutation.
+    pub fn offer(&mut self, stage: u64, by: u64, decision: people::EscalationDecision) {
+        assert!(self.offers.insert(stage, (by, decision)).is_none(), "one scripted winner per decision");
+    }
+
+    fn next_stage(&self) -> u64 {
+        u64::try_from(self.archives.len()).expect("few decisions") + 1
     }
 
     /// Check one sign-in's durable identity and session before retaining its name.
@@ -329,8 +337,8 @@ impl Referee {
             }
         }
         for write in writes {
-            if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome: people::Outcome::EscalationDecided { task, revision, .. }, .. }))) = write
-                && !self.archives.contains_key(revision)
+            if let Write::Save(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome: people::Outcome::EscalationDecided { task, revision, by, .. }, .. }))) = write
+                && !self.archives.values().any(|archive| archive.revision == *revision && archive.by == *by)
                 && !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) if archive.task == *task && archive.revision == *revision)) {
                 return Err("keyed decision outcome without same-transaction archive");
             }
@@ -338,23 +346,26 @@ impl Referee {
                 return Err("unscripted transcript in terminal-only worker story");
             }
             if let Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(record)))) = write {
-                let decided_revision =
-                    match &record.escalation {
-                        tasks::Escalation::Unheld { revision } | tasks::Escalation::Rejected { revision, .. }
-                            if *revision != 0 =>
-                        {
-                            Some(*revision)
-                        }
-                        tasks::Escalation::Waiting {
-                            revision, holder: tasks::EscalationHolder::Role { .. }, ..
-                        } if *revision == 2 => Some(1),
-                        tasks::Escalation::Unheld { .. }
-                        | tasks::Escalation::Routing { .. }
-                        | tasks::Escalation::Waiting { .. }
-                        | tasks::Escalation::Rejected { .. } => None,
-                    };
-                if let Some(revision) = decided_revision
-                    && self.offers.contains_key(&revision) && !self.archives.contains_key(&revision)
+                // The decision this row shows: a final one, or the pass that
+                // moved it to the final role (the first decision).
+                let decided = match &record.escalation {
+                    tasks::Escalation::Unheld { revision } | tasks::Escalation::Rejected { revision, .. }
+                        if *revision != 0 =>
+                    {
+                        Some((self.next_stage(), *revision))
+                    }
+                    tasks::Escalation::Waiting { revision, holder: tasks::EscalationHolder::Role { .. }, .. }
+                        if self.archives.is_empty() =>
+                    {
+                        Some((1, *revision))
+                    }
+                    tasks::Escalation::Unheld { .. }
+                    | tasks::Escalation::Routing { .. }
+                    | tasks::Escalation::Waiting { .. }
+                    | tasks::Escalation::Rejected { .. } => None,
+                };
+                if let Some((stage, revision)) = decided
+                    && self.offers.contains_key(&stage) && !self.archives.contains_key(&stage)
                     && !writes.iter().any(|write| matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::EscalationDecision(archive)))) if archive.task == record.number && archive.revision == revision)) {
                     return Err("semantic decision without same-transaction archive");
                 }
@@ -423,7 +434,8 @@ impl Referee {
                 archive,
             )))) = write
             {
-                let (by, decision) = self.offers.get(&archive.revision).ok_or("unscripted archive decision")?;
+                let stage = self.next_stage();
+                let (by, decision) = self.offers.get(&stage).ok_or("unscripted archive decision")?;
                 if Some(archive.task) != self.task
                     || archive.project != 1
                     || Some(archive.requester) != self.people[0]
@@ -453,7 +465,7 @@ impl Referee {
                             && matches!(record.escalation, tasks::Escalation::Waiting {
                                 revision,
                                 holder: tasks::EscalationHolder::Role { project: 1, role: 0 }, ..
-                            } if revision == archive.revision + 1)
+                            } if revision == archive.revision)
                     }
                 };
                 if !semantic || record.numbers.spent != 3 {
@@ -474,8 +486,8 @@ impl Referee {
                 if !atomic {
                     return Err("archive semantic change and keyed outcome are not one transaction");
                 }
-                if self.archives.insert(archive.revision, archive.clone()).is_some() {
-                    return Err("semantic revision archived twice");
+                if self.archives.insert(stage, archive.clone()).is_some() {
+                    return Err("semantic decision archived twice");
                 }
             }
         }
@@ -697,7 +709,8 @@ impl Referee {
         let record = task(rows, number).ok_or("missing final task")?;
         let expected_funder =
             tasks::Funder::Pool { project: 1, person: self.people[0].ok_or("no requester identity")?, period: 1 };
-        if record.funder != expected_funder || record.numbers.budget != 100 {
+        // A chat's budget comes from its role's policy (jig a2616181).
+        if record.funder != expected_funder || record.numbers.budget != 500 {
             return Err("final task changed its authentic funding source or budget");
         }
         let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ledger(pool)))) =
@@ -719,7 +732,7 @@ impl Referee {
         if record.numbers.spent != if succeeds { 5 } else { 3 }
             || pool.numbers.spent != 0
             || pool.numbers.spent_below != if succeeds { 5 } else { 0 }
-            || pool.numbers.reserved != if succeeds { 0 } else { 100 }
+            || pool.numbers.reserved != if succeeds { 0 } else { 500 }
         {
             return Err("expense lost doubled or posted to wrong funding source");
         }
