@@ -100,6 +100,9 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         Event::Party(crate::PartyInput::ProcedureStep { task, step, connector, code, action }) => {
             domain.work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, action }));
         }
+        Event::Party(crate::PartyInput::SignOut { reply_to, sign_in }) => {
+            domain.work.push(Work::People(people::Event::SignOut { reply_to, sign_in }));
+        }
         Event::Party(crate::PartyInput::SignedIn { reply_to, identity }) => {
             domain.work.push(Work::Core(core::Event::SignIn { reply_to, identity }));
         }

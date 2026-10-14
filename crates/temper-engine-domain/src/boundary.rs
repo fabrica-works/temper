@@ -336,6 +336,11 @@ pub enum WorkerInput {
 }
 #[derive(Debug)]
 pub enum PartyInput {
+    /// End one authenticated sign-in through the people child (ruling 116).
+    SignOut {
+        reply_to: ReplyTo,
+        sign_in: u64,
+    },
     Application {
         reply_to: ReplyTo,
         sign_in: u64,

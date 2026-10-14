@@ -4163,3 +4163,29 @@ fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_the
         assert!(restarted.delivered.is_empty());
     }
 }
+
+#[test]
+fn signing_out_routes_to_people_and_expires_the_session() {
+    let mut driver = Driver::new(Store::new());
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    let session = driver.session();
+    let reply = Token::new(1103);
+    driver.send(engine::Event::Party(engine::PartyInput::SignOut { reply_to: ReplyTo::new(reply), sign_in: session }));
+    assert!(!driver.delivered.iter().any(|delivery| matches!(delivery,
+        Delivery::WebReply { to, reply: people::Reply::SignedOut } if to == &ReplyTo::new(reply))));
+    driver.settle();
+    assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
+        Delivery::WebReply { to, reply: people::Reply::SignedOut } if to == &ReplyTo::new(reply))));
+    driver.send(engine::Event::Party(engine::PartyInput::Read {
+        reply_to: ReplyTo::new(Token::new(1104)),
+        sign_in: session,
+        read: jig_domain_core::reads::Read::Frame,
+    }));
+    driver.settle();
+    assert!(driver.delivered.iter().any(|delivery| matches!(
+        delivery,
+        Delivery::Read { answer: jig_domain_core::reads::Answer::None(jig_domain_core::reads::Why::SignedOut), .. }
+    )));
+}
