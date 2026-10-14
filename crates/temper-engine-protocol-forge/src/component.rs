@@ -257,10 +257,10 @@ impl Component {
         }
         if !self.closed {
             for state in &self.starts {
-                if let Start::Waiting { until, .. } = state
-                    && (earliest.is_none() || Some(*until) < earliest)
+                if let Some((until, _)) = backoff(*state)
+                    && (earliest.is_none() || Some(until) < earliest)
                 {
-                    earliest = Some(*until);
+                    earliest = Some(until);
                 }
             }
         }
@@ -277,7 +277,7 @@ impl Component {
         let state = self.starts.get_mut(at).expect("configured start");
         let previous = *state;
         *state = start::heard(previous, heard, forge.user, env.now, &env.limits);
-        if let Start::Settings { .. } = *state
+        if start_request(*state) == Some(temper_forge_forgejo::request::Request::ApiSettings)
             && *state != previous
             && let Some(Some(token)) = self.start_tokens.get(at)
             && let Some(id) = self.connections.get(token)
@@ -285,7 +285,7 @@ impl Component {
         {
             c.deadline = Some(env.now.saturating_add(env.limits.deadline));
         }
-        if let Start::Stopped(reason) = *state
+        if let Some(reason) = stopped(*state)
             && *state != previous
         {
             up.push(Event::Stopped { forge: forge.number, why: reason });
@@ -301,7 +301,7 @@ impl Component {
                 break;
             }
             let state = self.starts.get_mut(at).expect("configured start");
-            if let Start::Waiting { until, next } = *state
+            if let Some((until, next)) = backoff(*state)
                 && until <= env.now
                 && !self.closed
             {
@@ -335,9 +335,7 @@ impl Component {
                 if let Some(deadline) = c.deadline
                     && deadline <= env.now
                 {
-                    if c.phase == Phase::Idle
-                        && let Start::Ready { .. } = state
-                    {
+                    if c.phase == Phase::Idle && ready(state) {
                         c.close(false, io);
                         break;
                     }
@@ -371,7 +369,9 @@ impl Component {
                         .connection_slab
                         .get_mut(*self.connections.get(&token).expect("indexed token"))
                         .expect("indexed connection");
-                    if let Some(Start::Waiting { .. } | Start::Stopped(_)) = self.starts.get(at) {
+                    if backoff(*self.starts.get(at).expect("configured start")).is_some()
+                        || stopped(*self.starts.get(at).expect("configured start")).is_some()
+                    {
                         c.close(true, io);
                     }
                     continue;
@@ -434,5 +434,23 @@ fn start_request(state: Start) -> Option<temper_forge_forgejo::request::Request>
         Start::Checking { .. } => Some(temper_forge_forgejo::request::Request::User),
         Start::Settings { .. } => Some(temper_forge_forgejo::request::Request::ApiSettings),
         Start::Waiting { .. } | Start::Ready { .. } | Start::Stopped(_) => None,
+    }
+}
+fn backoff(state: Start) -> Option<(Time, skein_lib::Duration)> {
+    match state {
+        Start::Waiting { until, next } => Some((until, next)),
+        Start::Checking { .. } | Start::Settings { .. } | Start::Ready { .. } | Start::Stopped(_) => None,
+    }
+}
+fn stopped(state: Start) -> Option<crate::Stopped> {
+    match state {
+        Start::Stopped(reason) => Some(reason),
+        Start::Checking { .. } | Start::Settings { .. } | Start::Waiting { .. } | Start::Ready { .. } => None,
+    }
+}
+fn ready(state: Start) -> bool {
+    match state {
+        Start::Ready { .. } => true,
+        Start::Checking { .. } | Start::Settings { .. } | Start::Waiting { .. } | Start::Stopped(_) => false,
     }
 }

@@ -63,7 +63,7 @@ pub enum Read {
     Item { number: u64, after: u64 },
     /// Read pull.
     Pull { number: u64 },
-    /// Newest matching pull, open or closed.
+    /// The open matching pull, else the oldest.
     PullFor { head: Box<[u8]>, base: Box<[u8]> },
     /// Read reviews.
     Reviews { number: u64, page: u32 },
@@ -363,7 +363,6 @@ pub struct Remark {
 /// A check context with a description, link and optional job attempt.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Status {
-    pub author: u64,
     pub at: Time,
     pub context: Box<[u8]>,
     pub check: Check,

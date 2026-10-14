@@ -311,9 +311,7 @@ impl Connection {
         }
     }
     fn send(&mut self, down: Down, io: &mut Queue<skein_io::Request>) {
-        if let Down::Send(_) = &down
-            && self.request.is_some()
-        {
+        if sending(&down) && self.request.is_some() {
             self.written = true;
             self.phase = if self.upload.is_some() { Phase::Sending { written: true } } else { Phase::Reading };
         }
@@ -354,9 +352,9 @@ impl Connection {
                         }
                         let more = grow.write(&piece).is_err() || grow.len() > *max;
                         if more {
-                            let Receiving::Raw { grow, .. } = core::mem::replace(&mut self.receive, Receiving::Empty)
-                            else {
-                                unreachable!("raw body")
+                            let grow = match core::mem::replace(&mut self.receive, Receiving::Empty) {
+                                Receiving::Raw { grow, .. } => grow,
+                                Receiving::Json(_) | Receiving::Empty => unreachable!("raw body"),
                             };
                             self.heard.push(Heard::Done(Body::Raw { more: true, bytes: grow.finish() }));
                             self.phase = Phase::Closed;
@@ -450,7 +448,7 @@ impl Connection {
                 self.json_down(env, tokenizer::Request::Next);
             }
             None => {
-                if let request::Request::Raw { .. } | request::Request::JobLog { .. } = request {
+                if raw_request(request) {
                     let cap = self.raw_max.saturating_add(1).min(self.raw_cap);
                     self.receive = Receiving::Raw {
                         grow: Grow::new(env.limits.chunk, cap),
@@ -470,12 +468,12 @@ impl Connection {
         }
     }
     fn raw_demand(&mut self, env: &Env<Limits>) {
-        let Receiving::Raw { grow, remaining, .. } = &self.receive else {
-            return;
-        };
-        let count = match remaining {
-            Some(left) => grow.room().min(env.limits.chunk).min(u32::try_from(*left).unwrap_or(u32::MAX)).max(1),
-            None => 1,
+        let count = match &self.receive {
+            Receiving::Raw { grow, remaining, .. } => match remaining {
+                Some(left) => grow.room().min(env.limits.chunk).min(u32::try_from(*left).unwrap_or(u32::MAX)).max(1),
+                None => 1,
+            },
+            Receiving::Json(_) | Receiving::Empty => return,
         };
         self.http_down(env, http::Request::Body(Down::Demand { read: Read::Fill(count), room: 0 }));
     }
@@ -514,7 +512,7 @@ impl Connection {
         }
     }
     fn json_event(&mut self, env: &Env<Limits>, event: tokenizer::Event) {
-        let Receiving::Json(decoder) = &mut self.receive else {
+        let Some(decoder) = self.decoder() else {
             return;
         };
         let step = documents::step(decoder, &limits::documents(&env.limits), &event);
@@ -586,7 +584,7 @@ impl Connection {
     #[expect(dead_code, reason = "13.3 supplies listing cursors")]
     pub fn keep_after(&mut self, after: u64) {
         self.after = after;
-        if let Receiving::Json(decoder) = &mut self.receive {
+        if let Some(decoder) = self.decoder() {
             documents::keep_after(decoder, after);
         }
     }
@@ -597,7 +595,7 @@ impl Connection {
     }
     #[expect(dead_code, reason = "13.3 cuts bounded listings")]
     pub fn cut(&mut self, env: &Env<Limits>) {
-        if let Receiving::Json(decoder) = &mut self.receive {
+        if let Some(decoder) = self.decoder() {
             let request = documents::cut(decoder);
             self.json_down(env, request);
         }
@@ -624,4 +622,60 @@ pub(crate) fn routing_bytes() -> Option<u64> {
         .checked_add(Queue::<skein_tls::client::Event>::worst_case(8)?)?
         .checked_add(Queue::<tokenizer::Event>::worst_case(8)?)?
         .checked_add(Queue::<Heard>::worst_case(16)?)
+}
+impl Connection {
+    fn decoder(&mut self) -> Option<&mut documents::Decoder> {
+        match &mut self.receive {
+            Receiving::Json(decoder) => Some(decoder),
+            Receiving::Raw { .. } | Receiving::Empty => None,
+        }
+    }
+}
+fn sending(down: &Down) -> bool {
+    match down {
+        Down::Send(_) => true,
+        Down::Demand { .. } | Down::Finish => false,
+    }
+}
+fn raw_request(request: &request::Request) -> bool {
+    match request {
+        request::Request::Raw { .. } | request::Request::JobLog { .. } => true,
+        request::Request::User
+        | request::Request::ApiSettings
+        | request::Request::RepositoryById { .. }
+        | request::Request::Repository { .. }
+        | request::Request::UserSearch { .. }
+        | request::Request::Issues { .. }
+        | request::Request::Issue { .. }
+        | request::Request::Comments { .. }
+        | request::Request::Pull { .. }
+        | request::Request::PullFor { .. }
+        | request::Request::CombinedStatus { .. }
+        | request::Request::Reviews { .. }
+        | request::Request::ReviewComments { .. }
+        | request::Request::Branch { .. }
+        | request::Request::Branches { .. }
+        | request::Request::Protection { .. }
+        | request::Request::Protections { .. }
+        | request::Request::Collaborators { .. }
+        | request::Request::Permission { .. }
+        | request::Request::Pulls { .. }
+        | request::Request::PullFiles { .. }
+        | request::Request::Compare { .. }
+        | request::Request::Runs { .. }
+        | request::Request::Run { .. }
+        | request::Request::Jobs { .. }
+        | request::Request::CreateIssue { .. }
+        | request::Request::OpenPull { .. }
+        | request::Request::PostComment { .. }
+        | request::Request::PostReview { .. }
+        | request::Request::EditIssue { .. }
+        | request::Request::RequestReviewers { .. }
+        | request::Request::RemoveReviewers { .. }
+        | request::Request::Merge { .. }
+        | request::Request::Update { .. }
+        | request::Request::PostStatus { .. }
+        | request::Request::CreateBranch { .. }
+        | request::Request::DeleteBranch { .. } => false,
+    }
 }

@@ -562,7 +562,6 @@ pub fn item_piece_row(items: Box<[u8]>) -> crate::v1::Row {
 
 pub fn status() -> client::api::Status {
     client::api::Status {
-        author: 1,
         at: skein_lib::Time::from_nanos(2),
         context: Box::new([3]),
         check: client::api::Check::Passed,

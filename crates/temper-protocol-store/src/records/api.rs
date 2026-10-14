@@ -406,11 +406,10 @@ pub(super) fn decode_review(value: w::Review) -> d::Review {
 
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
 pub(super) fn encode_status(value: &d::Status) -> w::Status {
-    let d::Status { author, at, context, check, description, url, job } = value;
+    let d::Status { at, context, check, description, url, job } = value;
     w::Status::new(
         &w::CEILINGS,
         w::StatusParts {
-            author: *author,
             at: at.as_nanos(),
             context: context.clone(),
             verdict: encode_check(*check),
@@ -426,9 +425,8 @@ pub(super) fn encode_status(value: &d::Status) -> w::Status {
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
 pub(super) fn decode_status(value: w::Status) -> d::Status {
-    let w::StatusParts { author, at, context, verdict, description, url, job } = value.into_parts();
+    let w::StatusParts { at, context, verdict, description, url, job } = value.into_parts();
     d::Status {
-        author,
         at: skein_lib::Time::from_nanos(at),
         context,
         check: decode_check(verdict),

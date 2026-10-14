@@ -458,7 +458,6 @@ fn check_out(s: client::Check) -> forge::Check {
 }
 fn status(s: &forge::Status) -> client::Status {
     client::Status {
-        author: s.author,
         at: s.at,
         context: s.context.clone(),
         check: check(s.state),

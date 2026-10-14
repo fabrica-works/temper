@@ -100,7 +100,7 @@ record ItemAnswer { item: Summary comments: bytes 2097152 more: bool }
 record ReviewsAnswer { reviews: bytes 2097152 more: bool }
 
 # 04.3cb: the rest of the forge's answer items and families.
-record Status { author: u64 at: u64 context: bytes 1048576 verdict: Check description: bytes 1048576 url: bytes 1048576 job: option JobAttempt }
+record Status { at: u64 context: bytes 1048576 verdict: Check description: bytes 1048576 url: bytes 1048576 job: option JobAttempt }
 record Remark { id: u64 author: u64 path: bytes 1048576 line: u32 body: bytes 1048576 }
 record File { path: bytes 1048576 before: option bytes 1048576 after: option bytes 1048576 }
 record Collaborator { user: u64 permission: Permission }

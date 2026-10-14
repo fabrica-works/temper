@@ -521,7 +521,6 @@ fn protection_nested_contexts_and_checks_provider_details_are_bounded() {
     assert!(!crate::bounds::answer(&protection, &Limits { rows: 1, ..LIMITS }));
     assert!(!crate::bounds::answer(&protection, &Limits { answer_bytes: 41, ..LIMITS }));
     let status = api::Status {
-        author: 1,
         at: Time::ZERO,
         context: Box::from(&b"ci"[..]),
         check: api::Check::Failed,
