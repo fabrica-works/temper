@@ -2,14 +2,14 @@
 
 Provisional, 2026-10-05, revised 2026-10-14. What stays true of
 temper's browser client: a later shell of temper's client
-(`../client.md`), which waits for jig's browser shell. What the web
+(client.md), which waits for jig's browser shell. What the web
 does is `ux/`, which this document takes as given; how jig's client
 runs in a browser is jig's. What is still open is section 5.
 
 ## 1. In one page
 
 - **The browser is a later shell of the same client.** temper's client
-  root, view root and the forge's family (`../client.md`, sections 3
+  root, view root and the forge's family (client.md, sections 3
   to 5), compiled to WebAssembly under jig's browser shell,
   `jig-shell-web` (jig's `protocol/client.md`, section 12; jig's
   `client/domain/view.md`, 11 to 13), once jig builds it. temper writes
@@ -45,16 +45,16 @@ runs in a browser is jig's. What is still open is section 5.
 - **Signing in:** in standalone, the browser opens the link the engine
   prints (jig's `protocol/client.md`, section 8); the forge as people's
   sign-in provider is a provider component of temper's, later
-  (`../client.md`, section 11).
+  (client.md, section 11).
 - **The toolchain:** the standard library for `wasm32-unknown-unknown`,
   the glue generator jig's browser shell names, and Chromium for the
   browser tier.
 
 ## 3. Why no framework
 
-The candidate was Dioxus: of Rust's frameworks, its native DOM made it
-the strongest for testing without a browser; Leptos and Yew share the
-first two objections.
+The strongest candidate is Dioxus, whose native DOM makes it the best of
+Rust's frameworks for testing without a browser; Leptos and Yew share
+the first two objections.
 
 - **Its model is the opposite of skein's `programming-model.md`:**
   closures, signals with interior mutability, hooks, async tasks and
@@ -82,12 +82,12 @@ and the domain, its worlds and its stories would not change.
   is jig's shell's to test; temper's tier checks its own bundle, its
   forge's pages and signing in.
 - **A suite of its own,** outside the focused and fuzzy suites: it needs
-  Chromium and does not replay (`../testing.md`, section 2).
+  Chromium and does not replay (testing.md, section 9).
 
 ## 5. Open questions
 
 - **When jig builds `jig-shell-web`.** Default: temper's only client is
-  the terminal (`../client.md`).
+  the terminal (client.md).
 - **The browser tier's budget,** set with jig's when its first tests are
   built (jig's `client/domain/testing.md`, section 10). Default: a
   suite of its own, run by the gate.

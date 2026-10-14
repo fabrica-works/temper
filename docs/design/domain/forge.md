@@ -106,16 +106,18 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   forge's own id for the repository, and names the repository by that id
   from then on (`Repository { forge, repository }`), so a rename or a
   transfer on the forge keeps it the same repository. A repository the
-  forge does not have refuses the adoption as unavailable.
+  forge does not have refuses the adoption as not found.
 - **The adoption request is the forge's own,** keyed as any person's
   request (`docs/design/client.md`, section 4): the root takes it from
   the protocol layer typed, and the connector refuses a forge the
   deployment does not configure; then locates the repository
   (`Read::Locate { owner, name }`, answered `Answer::Located {
-  repository }`); then reads what temper may do there (below); and only
-  then makes jig's adoption request on the person's behalf (people.md,
-  5.1). Its outcome is the adoption's: adopted, refused by the core with
-  jig's reasons, or refused by the forge with the connector's.
+  repository }`); then the root makes jig's adoption request on the
+  person's behalf (people.md, 5.1), in which the connector reads what
+  temper may do there (below) before the core commits the adoption
+  (jig's `domain/connectors.md`, section 12). Its outcome is the
+  adoption's: adopted, refused by the core with jig's reasons, or
+  refused by the forge with the connector's.
 - **The forge's host** in a repository's resource path, and in what a
   person reads of it, is the forge's as configured: the host of its `git`
   base, with `:port` when it names one (`docs/design/configuration.md`,
@@ -127,8 +129,10 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   enough for context; write access lets temper push its branches and open
   pull requests; protection that keeps temper from merging makes landing
   a wait for someone else's merge (section 13).
-  Forgejo 15 refuses protection reads to a write collaborator (section
-  20): adoption records protection as unknown, never as absent. A refused
+  Forgejo 15 was observed to refuse protection reads to a write
+  collaborator, still to confirm on v16.0.5 (section 20;
+  `docs/design/forge.md`, section 13): adoption records protection as
+  unknown, never as absent. A refused
   merge narrows what temper may do, as connectors.md, section 11 says.
 - **The project names, per repository:** its landing branches; temper's
   branch prefix, `temper/` by default, which protection can reserve to

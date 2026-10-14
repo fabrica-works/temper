@@ -58,8 +58,8 @@ whose length is known before they are made, which is most of them. Some
 arrive in pieces with no total announced:
 
 - a forge's answer arrives as an HTTP body, which may be chunked, and
-  whose strings the forge component cuts to the domain's limits as they
-  stream (forge.md, 3.3);
+  whose strings the forge component keeps whole within the domain's
+  limits, or not at all, as they stream (forge.md, 3.3);
 - a git invocation's output arrives as pipe reads, of which the git
   component keeps what it parses and a bounded tail for diagnostics
   (git.md, section 6);
@@ -135,7 +135,7 @@ domain, in the request, and encoded on their way out.
   resumed run's window is encoded once, into its assignment, within the
   resume limit (jig's `protocol/channel.md`, 6.1). temper's own routing
   adds no copy of a turn: temper-engine-smith reads a run's result and a
-  host call's input, not its turns (llm.md, section 4).
+  host call's input, not its turns (llm.md, sections 4 and 5).
 
 ## 5. The general allocator
 

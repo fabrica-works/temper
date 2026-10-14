@@ -59,7 +59,7 @@ them is listed in section 14.
 - **Tested at every tier:** codecs and parsers against golden bytes and
   transcripts of real peers; the forge component and the git component in
   worlds of their own; temper's client joined to the engine's root; the
-  one-process world on skein's simulator; the real binary with a
+  one-process world on skein's simulator; the real binary with the
   throwaway Forgejo and real git; a live tier with a real model (section
   13; testing.md).
 
@@ -127,7 +127,7 @@ temper sign-in CONFIG.json ACCOUNT
 - **`temper serve CONFIG.json`:** reads the configuration (configuration.md,
   section 2), opens the store in the deployment's directory, and runs
   the engine's and the worker's services in one process on skein's
-  `Host` and `drive` (jig's `protocol/service.md`, section 10).
+  `Host` and `drive` (jig's `protocol/service.md`, sections 4 and 10).
   - Its stdout carries only the sign-in links the engine prints (jig's
     `protocol/client.md`, section 8), one per line; its stderr carries
     startup notes and the reason of a failure.
@@ -212,14 +212,14 @@ terminal shell's loop:
 | Crate | Kind | Holds | Depends on |
 |---|---|---|---|
 | `crates/temper-service` | services | the engine's and the worker's services and their one-process composition, in an engine, a worker and a system module, as jig's reference service is: each `iterate`, the routing, startup from configuration's bytes, start and end; temper's profile `small` | the roots, `temper-engine-smith`, jig's components, smith's host half and codecs, temper's codec crates and components, `skein-io`, `skein-json` |
-| `crates/temper` | binary | the four commands of section 4, copied from jig's reference binary | `temper-service`, `skein-shell`, `smith-agent-shell`, `skein-oauth-accounts`, `jig-shell-native`, the client crates |
+| `crates/temper` | binary | the four commands of section 4, copied from jig's reference binary | `temper-service`, `skein-shell`, `smith-agent-shell`, `smith-local-service`'s profile, `skein-oauth-accounts`, `jig-shell-native`, the client crates |
 | `crates/temper-forge-forgejo` | documents | Forgejo's documents, both sides: each request's method, path, query and JSON body as a sized encoder; each answer's decoder over skein-json's tokens; error bodies; later, webhook payloads and their signature check. No temper domain type | `skein-lib`, `skein-json` |
 | `crates/temper-engine-protocol-forge` | component | the forge component: one per deployment, serving every configured forge; calls in flight, connections, each `Read` and `Write` as a plan of one or a few exchanges, costs, failures, the caches of repository paths and users; later, the webhooks' listener (forge.md) | `skein-lib`, `skein-io`, `skein-http`, `skein-tls`, `skein-json`, `temper-forge-forgejo`, the forge client's vocabulary |
 | `crates/temper-worker-protocol-git` | component | the git component: each `git::Op` of `temper-worker-domain-checkout` as a fixed sequence of git invocations, their arguments, environment, output and failures; the operations in flight, their processes, pipes and deadlines; `Make` as file operations (git.md) | `skein-lib`, `skein-io`, the checkout's vocabulary |
 | `crates/temper-protocol-worker-wire` | codecs | temper's parts on jig's channel, and a git identity's value, from a schema; `PAYLOAD_VERSION` (channel.md) | `skein-lib`, `skein-codec` |
 | `crates/temper-protocol-store` | codecs, keys | temper's families: key encoders, codecs from a schema, `STORE_VERSION`, the restart's interval (store/README.md) | `skein-lib`, `skein-codec`, `skein-kv`, `jig-protocol-store`, the forge's records |
-| `crates/temper-protocol-client-wire` | codecs | the forge's client family's records: the adoption request and its outcome, the small store's record of a pending one; `CLIENT_VERSION` (client.md, section 4) | `skein-lib`, `skein-codec` |
-| `crates/temper-engine-smith` | translation | kept: smith's start from an assignment, host calls decoded into the root's `Tool` vocabulary, answers rendered, results and turns read; now called by the engine's routing (llm.md) | as it is |
+| `crates/temper-protocol-client-wire` | codecs | the forge's client family's records: the adoption request and its outcome, the small store's record of a pending one; `FORGE`, the forge connector's number, 1; `CLIENT_VERSION` (client.md, 4.6) | `skein-lib`, `skein-codec` |
+| `crates/temper-engine-smith` | translation | kept: smith's start from an assignment, host calls decoded into the root's `Tool` vocabulary, answers rendered, results and turns read; called by the engine's routing (llm.md) | as it is |
 | `crates/temper-client-domain` | client root | the client root over `jig-domain-client`, the forge's client side as one child (client.md, section 3) | client.md, section 2 |
 | `crates/temper-client-view` | view root | the view root over `jig-view`, with the forge's view (client.md, section 5) | client.md, section 2 |
 | `crates/temper-shell-terminal` | shell | the terminal shell: its loop ordinary Rust; its page renderer and command reader step code (client.md, section 6) | client.md, section 2 |
@@ -233,19 +233,34 @@ skein's HTTP server, counting requests by route (forge.md, section 9);
 process and live tiers in `crates/temper/tests/process.rs` and
 `crates/temper/tests/live.rs`, under nextest's `process` and `live`
 profiles, run by `scripts/proof-one-process.sh` and
-`scripts/proof-live.sh`; and `tools/forgejo-conformance`, which captures
-Forgejo's transcripts from a throwaway Forgejo.
+`scripts/proof-live.sh`; `tools/forgejo-conformance`, which captures
+Forgejo's transcripts from the throwaway Forgejo (forge.md, section 10);
+and `tools/git-transcripts`, which captures git's from real git against
+the throwaway Forgejo (git.md, section 9).
 
 **Kept:** the domains' crates (`temper-engine-domain` and its forge
 children, `temper-worker-domain`, `temper-worker-domain-checkout`), the
-fake forge's domain, and the domains' worlds, with three changes this
-design owns: the forge client's locate (forge.md, 3.2;
-`domain/forge.md`, section 4); the root's `Parts` gaining a failed
-preparation (channel.md, section 5; `domain/engine.md`, section 8); and
-the root relaying, uncommitted, the error answer to a host call that did
-not decode (llm.md, section 4). **Retired,** in the plan
-that lands `temper-client-domain` and its world: `temper-web-domain`,
-`temper-web-view`, `testing/temper-fake-person`, `tests/web/domain`.
+fake forge's domain, and the domains' worlds, with the changes this
+design owns:
+
+- the forge client's locate (forge.md, 3.2; `domain/forge.md`,
+  section 4);
+- the adoption as the forge's own keyed request, which the root takes
+  typed from the routing, locates, then makes as jig's adoption request
+  (client.md, section 8; `domain/forge.md`, section 4);
+- the root's `Parts` carrying a failed preparation (channel.md,
+  section 5; `domain/engine.md`, section 8);
+- the worker's parts going up naming each repository by its tag, each
+  saved repository saying whether it started from saved work, and a
+  failed preparation naming its repository's tag (channel.md, section 5;
+  `domain/worker.md`, section 9);
+- the root relaying, with no commit and no record, the error answer to
+  a host call that did not decode (llm.md, section 4; `domain/engine.md`,
+  7.3).
+
+**Retired,** in the plan that lands `temper-client-domain` and its
+world: `temper-web-domain`, `temper-web-view`,
+`testing/temper-fake-person`, `tests/web/domain` (client.md, section 9).
 
 **What temper's components share,** as every component of jig's does
 (jig's `protocol/README.md`, section 5):
@@ -331,8 +346,11 @@ Starting, ending, `iterate`'s passes, room and timers are jig's
   requests are decoded by `temper-protocol-client-wire` in the routing
   and answered by the root; every other part of the forge's is answered
   as unknown (client.md, sections 4 and 8). An adoption names a forge, an
-  owner and a name; the routing completes it with the forge's host,
-  which configuration gives (configuration.md, section 3).
+  owner and a name; the routing completes it with the forge's host, the
+  host of its configured `git` base with `:port` when it names one
+  (configuration.md, section 3), and hands the root the party's keyed
+  request; the root locates the repository, then makes jig's adoption
+  request on the party's behalf (`domain/forge.md`, section 4).
 - **Periods,** from the smallest source, as jig's reference service gives
   them (configuration.md, section 8).
 
@@ -364,7 +382,9 @@ No store; starting, ending and smith's payloads are jig's (jig's
 - **Credentials.** `jig-protocol-worker-link` takes grants' values out:
   LLM accounts' go to smith's host half in its form (jig's
   `protocol/llm.md`, 5.3); git identities' go into the identities' table,
-  which the git component reads per invocation (git.md, section 5).
+  from which the routing hands the git component an identity's value
+  with each operation that names it; the component never reads the table
+  (git.md, sections 2 and 5).
 - **The checkout's io.** Each `git::Op` the root asks for goes to the git
   component, which answers it with exactly one terminal; `Make` is file
   operations under the worker's root directory (git.md, section 4).
@@ -409,18 +429,19 @@ versions sit beside jig's:
 | Version | Owner | Covers | Checked |
 |---|---|---|---|
 | jig's channel version | jig | jig's records on the channel | at the link's opening (jig's `protocol/channel.md`, 4.1) |
-| `PAYLOAD_VERSION` | `temper-protocol-worker-wire` | temper's parts: the workspace items, the saved-work branch, the work, the preparation; and a git identity's value | the worker's credential at the link's opening: another is refused as *application* (channel.md, section 3) |
+| `PAYLOAD_VERSION` | `temper-protocol-worker-wire` | temper's parts: the workspace items, the saved-work branch, the work, the preparation; a git identity's value; and a delivery's evidence, smith's record as temper's pinned smith encodes it | the worker's credential at the link's opening: another is refused as *application* (channel.md, section 3) |
 | smith's charter, transcript and result versions | smith | smith's payloads | by smith's codecs (smith's `protocol/README.md`, section 8) |
 | jig's store format and families' versions | jig | jig's records | at the store's opening (jig's `protocol/store.md`, 5.3) |
 | `STORE_VERSION` | `temper-protocol-store` | temper's families | at the store's opening: a store written by another refuses to open (store/README.md, section 4) |
 | jig's client versions | jig | jig's documents and requests | per owner, a range served (jig's `protocol/client.md`, section 9) |
-| `CLIENT_VERSION` | `temper-protocol-client-wire` | the forge's client family's records | per owner, as jig's: the engine serves exactly its own, and `temper open`, from the same binary, speaks it (client.md, section 4) |
+| `CLIENT_VERSION` | `temper-protocol-client-wire` | the forge's client family's records | per owner, as jig's: the engine serves exactly its own, and `temper open`, from the same binary, speaks it (client.md, 4.6) |
 | keys' markers | the forge connector | the keys temper writes into forge bodies | the key's version, its first byte; the marker has none of its own (forge.md, section 4) |
 | configuration | none | — | unknown members refuse the start (configuration.md, section 2) |
 
 - **Each of temper's three is 1 at first** and moves at most once per
   plan, at the first landing in that plan that changes one of the
-  encodings it covers.
+  encodings it covers; for `PAYLOAD_VERSION`, a repin of smith that
+  changes a delivery's record counts (channel.md, section 3).
 - **Both channel components are given `PAYLOAD_VERSION`** when they are
   made; neither knows what it covers.
 
@@ -480,23 +501,28 @@ binary.
 
 1. **Codec crates:** `temper-protocol-worker-wire`,
    `temper-protocol-store`, `temper-protocol-client-wire`, and
-   `temper-forge-forgejo`'s documents with Forgejo's decoders fed
-   transcripts from `tools/forgejo-conformance`. Proved by step tests:
+   `temper-forge-forgejo`'s documents, with Forgejo's decoders fed the
+   transcripts `tools/forgejo-conformance` records by plain requests to
+   the throwaway Forgejo (forge.md, section 10). Proved by step tests:
    golden bytes, bounds, fuzz targets (testing.md, section 2).
 2. **`temper-service` on jig's reference:** the engine (the store with
    temper's families, accounts, the workers' and clients' sides, the
    identities' table, host tools through `temper-engine-smith`); the
    worker (the link, smith's host half, the git component); one process.
    Until step 6 the routing answers every forge call unavailable, since
-   it provably never left. Proved by the routing's step tests and the
-   git component's machine world, `tests/worker/protocol-git`.
+   it provably never left. Proved by the routing's step tests, git's
+   builders and parsers against the transcripts of
+   `tools/git-transcripts`, and the git component's machine world,
+   `tests/worker/protocol-git` (git.md, section 9).
 3. **The binary's `serve` and `agent`,** copied from jig's reference
    binary, with configuration's startup (configuration.md).
 4. **The client root and the view root,** `temper-client-domain` and
    `temper-client-view`: jig's pages and the forge's words, joined to the
    engine's root in `tests/client` from their first types (client.md,
-   section 10; testing.md, 6.3). The native fake person of the process
-   tier reads their tree.
+   section 10; testing.md, 6.3); and temper's native client,
+   `temper-shell-terminal`'s `client` and `route` modules (client.md,
+   section 2), through which the process tier's native fake person reads
+   their tree.
 5. **A chat answered end to end, in the process tier:** the real binary
    on a scratch directory, skein's fake LLM peer on loopback, jig's
    native fake person through temper's client, signing in by the printed
@@ -504,18 +530,23 @@ binary.
    repository has no workspace (`domain/worker.md`, 4.1), so it needs no
    git and no forge; the configuration names one forge, which no call
    reaches.
-6. **The forge component:** against the fake forge's protocol layer in
-   `tests/engine/protocol-forge`, with locate; then against the
-   throwaway Forgejo, by `tools/forgejo-conformance` (forge.md, sections
-   9, 10 and 13).
-7. **The adoption form,** the forge's client family on both sides, and
-   the root's adoption request (client.md, section 4; `domain/forge.md`,
-   section 4), in `tests/client`.
+6. **The forge component:** its machine world against a scripted HTTP
+   peer; then against the fake forge's protocol layer in
+   `tests/engine/protocol-forge`, with locate and the cost checks by
+   HTTP request; then against the throwaway Forgejo, driven by
+   `tools/forgejo-conformance` (forge.md, sections 9, 10 and 13).
+7. **The adoption form,** a forge page under jig's frame, linked from
+   the frame's navigation slot; the forge's client family on both sides;
+   and the root's adoption request (client.md, 4.3 and section 8;
+   `domain/forge.md`, section 4), in `tests/client`.
 8. **A change landed, in the process tier:** a repository adopted through
    temper's client, a goal whose change lands on the throwaway Forgejo
    with real git, the binary killed and restarted, the work found
    (testing.md, 2.6).
-9. **The terminal shell** and `temper open` (client.md, section 6).
+9. **The terminal shell** and `temper open` (client.md, section 6):
+   its renderer and command reader, proved by step tests; its loop, by
+   its machine world; and `temper open` itself, stdin and stdout piped,
+   in the process tier (client.md, section 10; testing.md, 2.6).
 10. **`temper sign-in`,** against skein's fake issuer (credentials.md,
     section 3).
 11. **The one-process world,** `tests/one-process`, with the fake git
@@ -530,8 +561,8 @@ what its document names: the forge's webhooks (forge.md, section 5);
 hosts apart: TLS for the engine's listeners, contained process trees, a
 process with a worker only (jig's `protocol/README.md`, section 10); the
 forge as people's sign-in provider (credentials.md, section 6); the
-forge's client documents and panels (client.md, section 4); and the
-browser (web/architecture.md).
+forge's client documents and panels (client.md, 4.2 and section 11);
+and the browser (web/architecture.md).
 
 ## 13. Testing
 
@@ -539,31 +570,40 @@ As testing.md applies skein's strategy (testing-strategy.md):
 
 - **Step tests:** every codec (golden bytes, bounds, fuzz targets), each
   translation both ways, git's argument and environment builders, git's
-  output parsers against transcripts of real git, Forgejo's decoders
-  against transcripts of a throwaway Forgejo (testing.md, section 2).
+  output parsers against transcripts of real git (recorded by
+  `tools/git-transcripts`), Forgejo's decoders against transcripts of
+  the throwaway Forgejo (recorded by `tools/forgejo-conformance`), the
+  terminal shell's renderer and command reader (testing.md, section 2;
+  client.md, 6.8).
 - **Machine worlds:** the forge component against a scripted HTTP peer;
   the git component against scripted process ends and outputs; the
-  terminal shell's renderer and commands (testing.md, section 2).
+  terminal shell's loop against a scripted stdin and stdout (testing.md,
+  sections 2 and 7).
 - **The forge's protocol world,** `tests/engine/protocol-forge`: the
   forge component against the fake forge's protocol layer, over
   in-memory streams cut at random, the forge connector world's stories
-  through bytes, and the cost checks by HTTP request (testing.md,
-  section 2).
-- **The client's joined world,** `tests/client`: temper's client with
-  jig's fake person, joined to temper's engine root (testing.md, section
-  2).
-- **The one-process world,** `tests/one-process`: `temper-service` on
-  skein's simulator, killed and restarted at drawn moments, drained by a
-  shutdown (testing.md, 2.5).
-- **The process tier** and **the live tier,** outside the two suites
-  (testing.md, 2.6 and 2.7).
+  through bytes, and the cost checks by HTTP request (testing.md, 2.2).
+- **The client's joined world,** `tests/client`, a system world:
+  temper's client root and view with jig's fake person, joined to
+  temper's engine root from the first increment (testing.md, 2.1 and
+  6.3).
+- **The one-process world,** `tests/one-process`, temper's simulated
+  world: `temper-service` on skein's simulator, killed and restarted at
+  drawn moments, drained by a shutdown (testing.md, 2.5).
+- **The process tier** and **the live tier,** end to end, outside the
+  two suites, under nextest's `process` and `live` profiles, run by
+  `scripts/proof-one-process.sh` and `scripts/proof-live.sh` (testing.md,
+  2.6, 2.7 and 6.1).
 - **Budgets:** the suites' 15 s and 60 s are rules, which nextest
-  enforces. Within them, a guide: all of this design's worlds together
-  at most 4 s of the default suite and 25 s of the fuzzy suite; a test
-  that misses its share is made cheaper or moved to the fuzzy suite,
-  never merged with another. A focused protocol-world test aims at
-  0.5 s and a one-process story at 1 s, under the same rule; the
-  process tier aims at 3 minutes (testing.md, section 2).
+  enforces. Within them, guides: the worlds below the domain (the
+  protocol, machine, client and one-process worlds) together at most
+  4 s of the default suite and 25 s of the fuzzy suite; a focused
+  protocol-world test at most 0.5 s, and a one-process story at most
+  1 s. A test that misses its guide is made cheaper or moved to the
+  fuzzy suite, never merged with another (testing.md, 6.1). The process
+  tier aims at 3 minutes (testing.md, 2.6); the live tier makes at most
+  25 completions in at most 15 minutes in all, and is stopped past
+  either (testing.md, 2.7).
 
 ## 14. Open questions
 
@@ -576,8 +616,8 @@ Each document keeps its own; these cross them:
   would need skein to grow it. Default: HTTP/1.1.
 - **Generating the routing** (jig's `protocol/service.md`, section 9).
   Default: copied from jig's reference service and filled.
-- **Supervision:** what restarts `temper serve` after a failed commit or
-  a crash. Default: nothing of temper's; the person, or the machine's
+- **Supervision** (jig's `protocol/service.md`, section 9): what
+  restarts `temper serve` after a failed commit or a crash. Default: nothing of temper's; the person, or the machine's
   service manager, starts it again, and it recovers from the last
   durable commit.
 - **One listener for clients and webhooks** (jig's `protocol/README.md`,

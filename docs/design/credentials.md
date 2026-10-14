@@ -103,8 +103,9 @@ is open is listed in section 8.
   - It never opens a browser, and prints no secret.
   - It exits 1 on any failure (a refusal, the deadline passed, the
     provider's error, a record not kept), the reason on stderr.
-  - A running engine loads the new file at its next grant of the account
-    (jig's `protocol/llm.md`, 5.4): no restart.
+  - A running engine loads the new file at its next grant of the
+    account, since its driver loads an account's file again whenever it
+    holds no record of it (jig's `protocol/llm.md`, 5.4): no restart.
   - It is copied from smith's local shell's sign-in (smith's `shell.md`,
     4.5 and section 7), on the same driver.
 - **What temper does not do:** refresh an account itself, keep an
@@ -145,10 +146,14 @@ is open is listed in section 8.
   repository is granted none.
 - **On the worker,** `jig-protocol-worker-link` takes the value out into
   the worker's identities' table, by number, at most the two newest
-  generations; the hub hears the name only. The git component reads the
-  value from the table for each invocation (git.md, section 5). An entry
-  goes as jig's do (jig's `protocol/channel.md`, section 8); a git
-  identity's never expires, so only a newer generation pushes it out.
+  generations; the hub hears the name only. The routing hands the git
+  component the identity's newest value with each operation that names
+  it, and the component holds it only while that operation is in flight;
+  it never reads the table itself (git.md, sections 2 and 5). An
+  operation whose identity has no value in the table fails `Broken`
+  without running git. An entry goes as jig's do (jig's
+  `protocol/channel.md`, section 8); a git identity's never expires, so
+  only a newer generation pushes it out.
 - **In git,** the environment only:
   `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_n` and `GIT_CONFIG_VALUE_n` set
   `http.extraHeader` to `Authorization: Basic` and the base64 of
@@ -178,18 +183,22 @@ is open is listed in section 8.
 - **Checked at start.** The forge component's first exchange with each
   forge is `GET /api/v1/user`; the answer's `id` must equal
   `forges[].user`. Another id, or a `401` or `403`, stops the engine,
-  naming the forge: a wrong token would make temper act as someone
-  else, so the check is fail-stop, never a degraded mode. The service
-  drains as at a shutdown, and `temper serve` exits 1, the reason on
-  stderr (protocol.md, section 6).
-- **Until the check is answered,** the forge's calls wait in the
-  component, at most the forge client's calls in flight, each until its
-  deadline, when it ends unavailable, since it never left. A forge that
-  cannot be reached, or answers `5xx`, is checked again after the
-  component's backoff (forge.md, 3.5 and section 8).
+  naming the forge, whether at start or when the forge first answers: a
+  wrong token would make temper act as someone else, so the check is
+  fail-stop, never a degraded mode. The service drains as at a
+  shutdown, and `temper serve` exits 1, the reason on stderr
+  (protocol.md, section 6; forge.md, 3.5).
+- **Until the forge's start is done** (the check, then its page cap:
+  forge.md, 3.5), the forge's calls wait in the component, at most the
+  forge client's calls in flight, each until its deadline, when it ends
+  unavailable, since it never left. A check that goes unanswered (the
+  forge cannot be reached, answers `5xx`, or answers what does not
+  decode) is made again after the component's `start_backoff`, doubling
+  to `start_backoff_max` (forge.md, 3.5, sections 7 and 8).
 - **The same user is the forge writer** in the domain (`Writer { forge,
   author: user }`), by which the forge connector tells temper's own
-  writes from others' (`domain/forge.md`, section 6).
+  writes from others': a key's provenance, and its own writes' echoes
+  (`domain/forge.md`, 5.2; forge.md, section 4).
 - **A token the forge stops taking** fails each call as forge.md, 3.4
   classifies a refusal; nothing refreshes it. An operator replaces the
   file and restarts, and the check runs again.

@@ -17,7 +17,8 @@ credentials.md's (section 4). What is open is listed in section 10.
   `git::Op` with a deadline (`Request::Io`) and may cancel it
   (`Request::CancelIo`); the git component runs it and answers with
   exactly one `Event::Done`. It is step code, a child of the worker's
-  protocol layer, with its own limits and worst case (D8).
+  protocol layer, with its own limits and worst case (protocol.md,
+  section 5).
 - **A fixed sequence per operation:** at most four git invocations, each
   its own process in a process group of its own, all under the
   operation's one deadline. Which invocation comes next depends only on
@@ -33,7 +34,7 @@ credentials.md's (section 4). What is open is listed in section 10.
   forge gets its git identity's token as an `http.extraHeader` set
   through `GIT_CONFIG_*`, and a commit its author through `GIT_AUTHOR_*`
   and `GIT_COMMITTER_*`; never in an argument, a URL, a repository's
-  configuration or a file (D25).
+  configuration or a file (credentials.md, section 4).
 - **The remote is a URL on the command line.** The engine's routing
   makes each repository's remote from its forge's `git` base, its owner
   and its name (channel.md, section 4); every invocation that reaches the
@@ -68,7 +69,7 @@ the routing                     hands each operation over, with its identity's v
   ▲
 temper-worker-protocol-git      the operations in flight: their invocations, pipes, deadlines; the sweep
   ▲ spawn, pipe reads and writes, signal, close; file operations
-io                              processes (skein's io.md, section 6) and files (io.md, section 5)
+io                              processes (skein's `io.md`, section 6) and files (skein's `io.md`, section 5)
   ▲
 the worker's root directory     workers[].root
 ├── workspaces/<token>/         a workspace, named by the checkout's token in decimal
@@ -90,7 +91,7 @@ the worker's root directory     workers[].root
   cancel won the race (section 7). Its `owner` token is echoed.
 - **The worker's root directory** is opened once at start by the worker's
   service and is the root every spawn and file operation resolves
-  beneath (io.md, section 5). At every start the component renames
+  beneath (skein's `io.md`, section 5). At every start the component renames
   `workspaces` and `home` into `trash` if they exist, and makes them
   afresh, private (0o700), with `trash` if it is absent: the worker keeps
   nothing durable (`domain/worker.md`, section 1), and git's `HOME` must
@@ -187,7 +188,7 @@ fails a prepare (`domain/worker.md`, section 9), and Make takes two file
 operations however large the old tree was.
 
 **The sweep** empties `trash`, which io cannot do in one operation (io
-never removes a tree: io.md, section 5). While `trash` is not empty and
+never removes a tree: skein's `io.md`, section 5). While `trash` is not empty and
 the worker is not shutting down, the component runs one file operation
 at a time:
 
@@ -429,8 +430,8 @@ variable of the worker's own process reaches git.
   `GIT_CURL_VERBOSE`, so git never prints the header, and the diagnostic
   tail a run sees (section 6) holds none.
 - **What standalone accepts:** an agent run as the same user could read a
-  git process's environment while it runs (D25). Contained trees close
-  it (section 10).
+  git process's environment while it runs (credentials.md, section 8).
+  Contained trees close it (section 10).
 
 ## 6. Output and failures
 
@@ -488,7 +489,7 @@ variable of the worker's own process reaches git.
 ## 7. Processes, deadlines and cancel
 
 - **One invocation at a time per operation,** each spawned in a process
-  group of its own (io.md, section 6), until skein's contained process
+  group of its own (skein's `io.md`, section 6), until skein's contained process
   trees exist (jig's `protocol/README.md`, section 10). git's own
   children (its remote helper, `index-pack`, `pack-objects`) stay in that
   group. The settings of section 3 leave git nothing that would leave
@@ -496,7 +497,7 @@ variable of the worker's own process reaches git.
   system monitor.
 - **An invocation ends** once git has exited, stdout and stderr have
   reached their ends, and io has closed the child, which kills whatever
-  is left of its group (io.md, section 6). The next invocation starts
+  is left of its group (skein's `io.md`, section 6). The next invocation starts
   only then.
 - **One deadline per operation:** the domain's, from the checkout's
   `remote_timeout` or `local_timeout`. It covers the whole sequence,
@@ -509,8 +510,8 @@ variable of the worker's own process reaches git.
   checkout's boundary, `Request::Cancel`). A cancel between two
   invocations starts no further one.
 - **Kill at once.** A killed git may leave a lock file or half an index;
-  the checkout no longer trusts a workspace whose operation timed out,
-  was cancelled or broke, and makes it again from an empty directory
+  the checkout does not trust a workspace whose operation timed out, was
+  cancelled or broke, and makes it again from an empty directory
   (`domain/worker.md`, section 5).
 - **stdin** is written whole (the message, for `commit-tree`; nothing
   otherwise) and closed; stdout and stderr are read as they come, both at
@@ -606,10 +607,11 @@ As testing.md applies skein's strategy, within the suites' budgets
 - **Containment.** In standalone, git and agents run as one user in
   process groups: an agent could read a running git's environment, or
   write a repository's configuration (a URL rewrite, a proxy) before the
-  next invocation. Default: accepted on one person's machine (D25); the
-  command-line settings of section 3 and the URL on the command line
-  cover what they name. Contained trees (skein's `draft/process.md`), with
-  the git directory unwritable by an agent's tree, close both.
+  next invocation. Default: accepted on one person's machine
+  (credentials.md, section 8); the command-line settings of section 3
+  and the URL on the command line cover what they name. Contained trees
+  (skein's `draft/process.md`), with the git directory unwritable by an
+  agent's tree, close both.
 - **A renamed repository's remote.** The remote is made from the owner and
   name the engine's root holds. Default: git follows the forge's
   redirect for its first request (git's `http.followRedirects`, whose

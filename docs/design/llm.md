@@ -68,7 +68,11 @@ agent    every LLM call: smith's agent shell over skein's LLM client
   endpoint, window, output and prices; accounts. The engine uses the
   models and their prices, which its charters carry, and the endpoints'
   names and accounts, which its charters and grants name. It dials no
-  endpoint: their addresses and transports serve the agents.
+  LLM endpoint: their addresses and transports are jig's members, which
+  the engine does not use; the agents dial those of their own
+  configuration (below). The engine's only exchanges for LLM accounts
+  are its accounts driver's with signed-in accounts' token endpoints
+  (credentials.md, section 3).
 - **On the worker, smith's agent configuration** (smith's
   `protocol/agent.md`, section 4), named by jig's worker part
   (configuration.md, section 5): the endpoints the agents dial, each with
@@ -112,7 +116,8 @@ agent    every LLM call: smith's agent shell over skein's LLM client
   unknown tool), and decides nothing: the routing renders the error as
   smith's text and hands it to the root as `WorkerInput::RenderedHostCall
   { to, answer }`, with the answer marked an error, and the root relays
-  it to the run with no commit (`domain/agent.md`, 4.3).
+  it to the run with no commit and no record (`domain/engine.md`, 7.3);
+  the run may ask again with a corrected input under a new name.
 - **Answered in the routing:** once a decided call's commit is durable,
   the root hands its answer out (`HostDelivery::Render`); the routing
   renders it with `temper_engine_smith::answer`, as smith's text with
@@ -157,7 +162,8 @@ agent    every LLM call: smith's agent shell over skein's LLM client
   decoder, each `Problem`, each answer's rendering, the charter encoded
   by smith's codec and decoded back, each result's translation.
 - **Step tests of the routing:** a call decoded and handed back; a call
-  that does not decode answered with no commit; a result read.
+  that does not decode answered with no commit and no record; a result
+  read.
 - **The one-process world:** smith's agent processes over skein's fake
   LLM on skein's fake machine, calling host tools through bytes
   (testing.md, 2.5).

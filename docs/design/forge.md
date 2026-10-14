@@ -119,8 +119,9 @@ skein-io socket
   the configured server name and trust, or in plaintext to a loopback
   address. Each carries `Authorization: token <t>`, the forge's API
   token, which the component holds from start and never logs.
-  `Host` is the TLS server name, or the configured address's host.
-  `User-Agent` names temper and its version.
+  `Host` is the TLS server name, or the configured address's host; either
+  with `:port` when the port is not the scheme's default. `User-Agent`
+  names temper and its version.
 - **JSON in, JSON out.** Bodies are written with skein-json's sized writer
   (`Content-Type: application/json`), and answers decoded from its
   tokens. Raw files and job logs are read as bytes. Strings are UTF-8;
@@ -393,10 +394,14 @@ Mechanism only, bounded, and rebuilt by asking again:
   forge, at start or when the forge first answers: a wrong token would
   make temper act as someone else. Then `GET /api/v1/settings/api`, for
   `max_response_items`, the forge's page cap. A forge that cannot be
-  reached, or answers `5xx`, is asked again after `start_backoff`,
-  doubling to `start_backoff_max`. Calls to a forge wait until its start
-  is done, each until its deadline. These two reads are the component's
-  own, counted in no call's cost.
+  reached, or answers `429`, `5xx` or a malformed answer, is asked again
+  after `start_backoff`, doubling to `start_backoff_max` (after the
+  `Retry-After` of a `429`, when that is longer). Any other `4xx` to
+  either read (the `api` address names no Forgejo API, say) stops the
+  engine too, naming the forge and the status: asking again would not
+  mend it. Calls to a forge wait until its start is done, each until its
+  deadline. These two reads are the component's own, counted in no
+  call's cost.
 - **Repositories,** by forge and id: the path (owner and name), the
   object format, the `default_merge_style` and the `html_url` (for jobs'
   links). A row is filled by `GET /api/v1/repositories/{id}`, counted in
@@ -604,8 +609,8 @@ cost.
 
 | State | On |
 |---|---|
-| Checking | `GET /user`: the configured user: Settings; another user, `401`, `403`: Stopped; unreachable, `5xx`, malformed: Waiting |
-| Settings | `GET /settings/api`: Ready; unreachable, `5xx`, malformed: Waiting |
+| Checking | `GET /user`: the configured user: Settings; another user, `401`, `403`, any other `4xx` but `429`: Stopped; unreachable, `429`, `5xx`, malformed: Waiting |
+| Settings | `GET /settings/api`: Ready; a `4xx` but `429`: Stopped; unreachable, `429`, `5xx`, malformed: Waiting |
 | Waiting | the backoff: Checking |
 | Ready | serves calls |
 | Stopped | the engine ends, exit status 1, naming the forge (protocol.md, section 6) |
@@ -638,8 +643,13 @@ side of `temper-forge-forgejo`.
   fake's `Read` or `Write` (as the forge connector world's translation
   does, `tests/engine/forge/client/src/translate.rs`), and its answer
   encoded as Forgejo encodes it. Where a route needs what the fake's
-  vocabulary does not read (a run by its id, a run's jobs), the fake's
-  domain grows that read.
+  vocabulary does not read, the fake's domain grows that read: Actions'
+  runs, for `Read::Checks` and `Read::Job` (3.2), as a commit's run by
+  its number (`actions/runs?head_sha&run_number`), a run by its id
+  (`actions/runs/{id}`) and a run's jobs (`actions/runs/{id}/jobs`), each
+  job with its id and attempt; and the fake's CI statuses link their jobs
+  in Forgejo's shape, `<html_url>/actions/runs/<run number>/jobs/<job
+  index>`.
 - **Its names, Forgejo's shape.** The fake names repositories by their
   full name; its protocol layer gives each the id the scenario names,
   and answers `/repositories/{id}` with its path, `sha1` as its object
@@ -692,11 +702,12 @@ suites' budgets:
 - **Step tests** in the forge component: each call's plan of section 3.2
   against canned answers; the marker's encoder and decoder; the page
   size; names percent-encoded; times both ways; the failures of 3.4.
-- **The machine world:** the forge component against a scripted HTTP
-  peer, over in-memory streams: every state of section 8's machines,
-  faults at every byte, deadlines, a wrong user stopping the start, a
-  path dropped on `404` or a redirect and resolved again, a body past
-  `body_bytes`.
+- **The machine world,** in `tests/engine/protocol-forge`'s crate beside
+  the protocol world (testing.md, section 7): the forge component against
+  a scripted HTTP peer, over in-memory streams: every state of section
+  8's machines, faults at every byte, deadlines, a wrong user or another
+  `4xx` stopping the start, a path dropped on `404` or a redirect and
+  resolved again, a body past `body_bytes`.
 - **The protocol world,** `tests/engine/protocol-forge`: the engine's
   forge component and the fake forge's protocol layer, joined by
   in-memory streams cut at random, running the forge connector world's
@@ -719,15 +730,19 @@ suites' budgets:
     equal the sum of the costs the answers reported, the forges' starts'
     reads aside.
 - **The real Forgejo check,** outside the two suites:
-  `tools/forgejo-conformance` against a throwaway Forgejo v16.0.5 (the
-  binary named by `TEMPER_FORGEJO`, SQLite in a scratch directory,
-  loopback, a small `MAX_RESPONSE_ITEMS` so paging shows, webhooks
-  allowed to loopback; the script makes its admin user and tokens; never
-  an existing Forgejo). It drives the facts of section 13 through plain
-  requests and the forge component, says which hold, and records what it
-  sent and received as transcripts, masked. Actions facts need a runner,
-  registered with the throwaway instance alone, as the tool's runner
-  mode does.
+  `tools/forgejo-conformance` against a throwaway Forgejo v16.0.5 (SQLite
+  in a scratch directory, loopback, a small `MAX_RESPONSE_ITEMS` so
+  paging shows, webhooks allowed to loopback; the tool makes its admin
+  user and tokens; never an existing Forgejo). Its binary is the one
+  `TEMPER_FORGEJO` names, as the process tier's is (testing.md, 2.6): the
+  tool names no path of its own, refuses to run without the variable,
+  and refuses a binary whose `--version` is not v16.0.5, naming it; it
+  records the binary's digest with what it captured. It drives the facts
+  of section 13 through plain requests and the forge component, says
+  which hold, and records what it sent and received as transcripts,
+  masked. Actions facts need a runner: `forgejo-runner`, the program
+  `TEMPER_FORGEJO_RUNNER` names, registered with the throwaway instance
+  alone; without it the tool reports those facts unchecked.
 - **The process tier** (testing.md, 2.6): the real binary against the
   throwaway Forgejo, a repository adopted and a change landed, the
   forge component's start and polling among what it runs.
@@ -793,14 +808,14 @@ uses skein at its pinned revision as it is (protocol.md, section 11).
 
 - skein-http's client tells a request the server never saw from one it
   may have read (skein's `http.md`, 3.4), which 3.4 needs; its server
-  lets the side above answer when it chooses (`http.md`, 5.4 and 5.5),
-  which webhooks need.
+  lets the side above answer when it chooses (skein's `http.md`, 5.4 and
+  5.5), which webhooks need.
 - skein-json keeps a string only whole, within the cap its reader names
-  (`json.md`, 3.1). The component keeps bodies whole within `body_bytes`
-  and carries a longer one empty, its key none, counted (3.3). A string
-  kept to its first bytes while the rest is digested would let it keep a
-  long body's head; that is a question of section 14, not a
-  prerequisite.
+  (skein's `json.md`, 3.1). The component keeps bodies whole within
+  `body_bytes` and carries a longer one empty, its key none, counted
+  (3.3). A string kept to its first bytes while the rest is digested
+  would let it keep a long body's head; that is a question of section
+  14, not a prerequisite.
 
 ## 13. Facts checked, and to check
 
@@ -888,6 +903,15 @@ it:
 - every status and message of section 3.4, the merge's above all; that
   `OpenPull` answers `409` for an open pull request and `422` for no
   changes; that a moved repository's old path answers a redirect;
+- what the API answers for a repository the API token cannot read, by
+  path and by id (`404`, or `403`): it decides whether a locate reports
+  such a repository not found or no access (client.md, 4.7), and whether
+  a call on it is `Missing` or `Forbidden` (3.4);
+- by `tools/git-transcripts` (git.md, section 9), for the git component:
+  whether Forgejo redirects git's requests for a renamed repository's old
+  path (git.md, section 10), and the line git prints for a push a
+  protected branch refuses, which git.md, 4.8 reads as a `[remote
+  rejected]` whose reason ends in `declined`;
 - that `effective_branch_protection_name` names the rule that applies,
   for a writer and for an admin;
 - the largest body Forgejo keeps on SQLite;

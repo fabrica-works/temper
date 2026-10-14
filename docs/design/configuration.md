@@ -69,8 +69,8 @@ What is open is listed in section 11.
   - `engine.clients.listener` is a socket address on loopback (in
     `127.0.0.0/8`, or `::1`);
   - `engine.connectors` is exactly `[1]`: the forge connector, temper's
-    one connector, whose number both ends of the client's wire fix
-    (client.md, section 4);
+    one connector, whose number both ends of the client's wire fix as
+    `temper-protocol-client-wire`'s `FORGE` (client.md, 4.6);
   - the worker's `agent` paths are absolute (section 5).
 
   The worker's `agent` names temper's own binary (section 5), which no
@@ -82,9 +82,13 @@ What is open is listed in section 11.
      `temper-service`'s startup, with `jig-protocol-config`'s readers, so
      every problem names its path the same way
      (`application.forges[0].user`);
-  3. the checks across the whole: the references of sections 2 to 5, and
-     the worst case (section 7);
-  4. every private file the document names (section 6);
+  3. the checks across the whole: the references of sections 2 to 5,
+     the limits against each other and the worst case (section 7), and
+     the channel's start checks on temper's parts (channel.md, section
+     8);
+  4. every private file the document names, each within its bound
+     (section 6), then each identity's whole value against the channel's
+     bound on a grant's value (section 3);
   5. the agent's configuration (section 5).
 
   Every problem found is reported, one line each on stderr, and `temper
@@ -120,7 +124,7 @@ jig's limit on an engine's application credentials (the accounts child's
 | `number` | u32 | unique among `identities` | the credential's number, as the root names it in `Event::Credential` and in grants |
 | `token` | a file | a private file (section 6) | the token git authenticates with |
 | `login` | string | not empty; no `:` and no control byte | the user of git's HTTP basic authentication |
-| `author` | `{"name": string, "email": string}` | each not empty; no newline, `<` or `>` | the author and committer of the commits made with it (git.md, section 5) |
+| `author` | `{"name": string, "email": string}` | each not empty; no NUL byte, newline, `<` or `>` | the author and committer of the commits made with it (git.md, section 5) |
 
 The whole value, token, login and author encoded (channel.md, section
 6), must fit the channel's bound on a credential's value, or the start is
@@ -142,7 +146,7 @@ A rule is a `LandingRule`, member for member:
 |---|---|---|
 | `connector` | u16 | the forge connector's number, the one `engine.connectors` names |
 | `kind` | u16 | the effect kind the rule governs: 4, the forge's merge, the only kind a landing rule takes |
-| `pattern` | `{"segments": [string], "last": {"exact": string} or {"open": string}}` | the resources the rule covers, as jig's authority matches them: the exact base segments, then one more segment equal to `exact`, or beginning with `open` with all below it. The forge's resource path is `forge`, the forge's host (as `git` gives it), the repository's owner and name, then `branch` and the branch's segments |
+| `pattern` | jig's pattern, as jig's `rules` and `projects` write one: `{"segments": [string], "last": "exact" or "open", "value": string}` | the resources the rule covers, as jig's authority matches them: the exact base segments, then one more segment equal to `value` (`exact`), or beginning with it, with all below it (`open`). The forge's resource path is `forge`, the forge's host (as `git` gives it), the repository's owner and name, then `branch` and the branch's segments |
 | `enforce` | boolean | true makes each criterion below a requirement every landing it covers must meet (`domain/authority.md`, section 10); false leaves them to the change procedure alone |
 | `ci` | boolean | CI must have passed at the change's head |
 | `up_to_date` | boolean | the change's head must contain its base's tip |
@@ -189,7 +193,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
 | `root` | a directory | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `domain/worker.md`, section 5) |
-| `git` | string | an absolute path to an executable file, checked at start | the program the git component runs for each invocation, in the environment git.md, section 5 gives it |
+| `git` | string | an absolute path to an executable file, checked at start, whose `git version` is at least the one git.md, section 3 names | the program the git component runs for each invocation, in the environment git.md, section 5 gives it |
 
 - **The worker's root takes the rest from jig's and smith's:** the hub's
   limits from jig's worker part; smith's host limits and the bounds its
@@ -236,8 +240,10 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **Read at start,** each within its bound, with skein's
   `read_private_file` (skein's `shell.md`, 6.1): a file readable by
   anyone but the process's user, or reached through a link, refuses the
-  start, naming it. A token's bound, an API token's and an identity's
-  alike, is the one an identity's whole value must fit (section 3).
+  start, naming it. An API token's bound is the forge component's
+  `token_bytes` (forge.md, section 7); an identity's token's is the
+  channel's bound on a grant's value, which its whole value, login and
+  author included, must fit (section 3; channel.md, section 8).
 - **Never written back.** temper writes none of them; an operator
   replaces one and restarts (credentials.md, sections 4 and 5).
 - **No temper secret in jig's secrets' store** (credentials.md, section
@@ -273,11 +279,22 @@ top-level `workers`, in the same order; standalone has one. Each:
   For example `forge.repositories`, `forge.client.calls`,
   `checkout.remote_timeout_ms`.
 - **Limits checked against each other at start,** each failure naming
-  both limits: the forge component's connections equal the forge
-  client's calls in flight; its deadline is at most the forge client's
-  lifetime; its body bound holds the forge client's largest write and a
-  key's marker; every listing's page size is at least 1 (forge.md,
-  section 7).
+  both limits:
+  - the forge component's: its connections equal the forge client's
+    calls in flight; its deadline is at most the forge client's
+    lifetime; its body bound holds the forge client's largest write and
+    a key's marker; every listing's page size is at least 1 (forge.md,
+    section 7);
+  - the git component's: each rule of git.md, section 8 (its operations
+    at least the checkout's workspaces, its output caps at least what
+    it parses and the diagnostic it keeps);
+  - the channel's (channel.md, section 8): each of temper's largest
+    parts within the ceiling jig's schema gives its field; the largest
+    part the engine can send within what the worker's limits take; the
+    longest remote the routing can make (the longest `git` base, an
+    owner and a name of the forge's `name_bytes`, two `/` and `.git`),
+    and the forge's names and branches, within the checkout's
+    `name_bytes`.
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
 - **One worst case per service:** jig's sum (the root's, its components'
@@ -305,6 +322,11 @@ top-level `workers`, in the same order; standalone has one. Each:
   - temper's members apply as configured: the forges, the identities,
     the deployment's landing rules, the forge's judges for every rule,
     the charter, the limits and the workers;
+  - every limit is checked again, temper's and jig's together, with the
+    channel's start checks on temper's parts (section 7; channel.md,
+    section 8), so a `git` base or a limit changed since the last start
+    is refused before io starts when a remote or a part could pass its
+    bound;
   - every identity is announced at generation 1 before the restart
     (credentials.md, section 4), and every forge's user is checked by the
     forge component's first exchange (credentials.md, section 5);
@@ -323,18 +345,18 @@ top-level `workers`, in the same order; standalone has one. Each:
 ## 9. The client's arguments
 
 - **`temper open DIRECTORY LINK_OR_ADDRESS`** takes no configuration
-  file (client.md, section 6 holds its arguments exactly):
+  file (client.md, 6.1 holds its arguments exactly):
   - `DIRECTORY` is the client's private directory, made 0o700 if absent,
-    and refused unless it is a directory of the user's that no one else
-    may read. It holds the bearer token and the small store, jig's native
-    shell's files (jig's `protocol/client.md`, sections 8 and 10;
-    client.md, section 7).
+    and refused unless it is a directory of the user's with no group or
+    other permission bits (skein's `io.md`, 5.3). It holds the bearer
+    token and the small store, jig's native shell's files (jig's
+    `protocol/client.md`, sections 8 and 10; client.md, section 7).
   - `LINK_OR_ADDRESS` is the link `temper serve` printed, the first
     time, by which the client signs in (jig's `protocol/client.md`,
     section 8); or the engine's `http://HOST:PORT`, later, when the
     directory holds a bearer token.
-  - In standalone HOST must be a loopback address; another is refused
-    before anything is sent.
+  - HOST must be an IP address on loopback, in standalone; another is
+    refused before anything is sent.
   - The client's limits are constants of temper's client (client.md,
     section 2).
 - **`temper sign-in CONFIG.json ACCOUNT`** reads the same document as
@@ -351,8 +373,9 @@ feed:
 - **an enum's variant without fields** is a string of its name in
   snake_case (`"clean"`);
 - **a variant with fields** is an object with one member named after the
-  variant in snake_case, whose value is the field's for one unnamed field
-  (`{"exact": "main"}`), or an object of the fields by name;
+  variant in snake_case, whose value is the field's for one unnamed field,
+  or an object of the fields by name (a forge's `transport`:
+  `{"tls": {"server_name": ..., "trust": ...}}`);
 - **byte strings** are JSON strings, UTF-8;
 - **durations** are integers of milliseconds, the member's name suffixed
   `_ms`;
@@ -360,13 +383,22 @@ feed:
 - **a map keyed by a number** is a list of objects, each holding its key
   under the key's name (`landing.projects`: `project`);
 - **integers** are within their type's range; **booleans** are `true` or
-  `false`.
+  `false`;
+- **a value of one of jig's types** is written as jig's configuration
+  writes it, so one document spells one type one way: a landing rule's
+  `pattern`, jig's authority pattern, is
+  `{"segments": [...], "last": "exact" or "open", "value": ...}`, as in
+  jig's `rules` and `projects`.
 
 **jig's formats,** by citation (jig's `protocol/configuration.md`, section
 10): an address (`{"socket": ...}`, `{"host": ..., "port": ...}`,
 `{"in_process": ...}`); a secret file; a digest file; a handed-in
-account's file. A forge's `transport` has the shape jig's LLM endpoints
-and accounts use.
+account's file. A forge's `transport` offers the choices jig's LLM
+endpoints and accounts offer (plaintext to a loopback socket address
+only; TLS with a server name and a trust file, or the machine's roots),
+written by the format rule as one member of temper's own type, where
+jig's endpoints spell them as sibling members (`"transport": "tls"`,
+`"server_name"`, `"trust"`).
 
 **The `application` member for standalone,** one forge, one identity and
 one worker, complete:
@@ -398,7 +430,8 @@ one worker, complete:
         "kind": 4,
         "pattern": {
           "segments": ["forge", "forge.example", "acme", "widget", "branch"],
-          "last": {"exact": "main"}
+          "last": "exact",
+          "value": "main"
         },
         "enforce": true,
         "ci": true,
