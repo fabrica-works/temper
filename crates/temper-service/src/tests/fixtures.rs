@@ -197,3 +197,81 @@ pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
         phase: tasks::Phase::Waiting,
     }
 }
+
+pub fn store_limits() -> (temper_engine_domain::Limits, jig_domain_core::Limits, jig_protocol_store::Limits) {
+    let own = limits::profile(limits::Profile::Small);
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small);
+    let root = limits::engine(&jig, &own).expect("root limits");
+    (root, jig.core, jig.store)
+}
+
+pub fn memory_store() -> crate::store::Store {
+    let (root, core, profile) = store_limits();
+    let limits = crate::store::limits(&root, &core, &root.forge, &profile).expect("checked store limits");
+    let mut store = crate::store::Store::new(&root, &limits);
+    store.component = jig_protocol_store::Store::over(
+        &limits,
+        temper_protocol_store::application(&root.forge).expect("application sizes"),
+        jig_protocol_store::Stores {
+            store: skein_kv::Store::memory(&limits.store),
+            secrets: skein_kv::Store::memory(&limits.secrets),
+        },
+    );
+    store.ask(jig_protocol_store::Request::Open {
+        owner: OWNER,
+        root: jig_protocol_store::Root { token: OWNER, fd: skein_io::kernel::Fd::new(1) },
+    });
+    let Some(jig_protocol_store::Event::Opened { .. }) = store.above.pop() else { panic!("store opened") };
+    store.opened = true;
+    store
+}
+
+pub fn landed_row() -> temper_engine_domain_forge::Stored {
+    temper_engine_domain_forge::Stored::Landed { commit: [9; 32], task: 3 }
+}
+
+pub fn commit(store: &mut crate::store::Store, number: u64, writes: Box<[temper_engine_domain::Write]>) {
+    let mut all = skein_lib::List::with_capacity(u32::try_from(writes.len().checked_add(1).unwrap()).unwrap());
+    all.push(temper_engine_domain::Write::Save(temper_engine_domain::Record::Core(jig_domain_core::Record::Core(
+        jig_domain_core::CoreRecord::Deployment(jig_domain_core::Deployment {
+            id: [19; 16],
+            tasks: 0,
+            people: 0,
+            sign_ins: 0,
+            messages: 0,
+            runs: 0,
+            calls: 0,
+            connector_rows: 0,
+            applications: 0,
+            commits: number,
+        }),
+    ))))
+    .unwrap();
+    for write in writes {
+        all.push(write).unwrap();
+    }
+    assert!(store.down(temper_engine_domain::StoreRequest::Commit { number, writes: all.into_boxed() }));
+}
+
+pub fn load(
+    store: &mut crate::store::Store,
+    range: temper_engine_domain::Range,
+) -> Box<[temper_engine_domain::Record]> {
+    assert!(store.down(temper_engine_domain::StoreRequest::Load {
+        owner: OWNER,
+        range,
+        after: None,
+        most: 4,
+        bytes: 65_536,
+    }));
+    for _ in 0..store.above.len() {
+        crate::store::route::up(&mut store.routes, store.above.pop().expect("store event"), &mut store.routed);
+    }
+    let Some(crate::store::route::Up::Root(event)) = store.routed.pop() else { panic!("loaded root event") };
+    let temper_engine_domain::Event::Store(temper_engine_domain::StoreInput::Loaded { rows, next: None, .. }) = *event
+    else {
+        panic!("one whole loaded page")
+    };
+    assert!(store.routed.is_empty());
+    rows
+}
