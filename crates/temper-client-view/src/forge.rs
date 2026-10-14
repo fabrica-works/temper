@@ -1,10 +1,13 @@
 //! Keep: owner parts and parts held for the page generation (root.md, 6–9).
 //! Replace: Ops subjects with the forge's resource words and fixed paragraph.
-use crate::words::{self, Word, Words};
+use crate::words::{Word, Words};
 use alloc::boxed::Box;
 use jig_domain_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use jig_view::{Builder, Owner, Role, SlotRef, phrases::Hole};
 use skein_lib::{Reader, Token, Writer, bytes::copy_of};
+pub mod bindings;
+pub mod page;
+pub mod words;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Resource<'a> {
     Repository { host: &'a [u8], owner: &'a [u8], name: &'a [u8] },
@@ -110,7 +113,7 @@ pub fn part(
     match part {
         Part::Connector { .. } => words.text(builder, Word::Connector, &[]),
         Part::Resource { path, .. } => path_text(builder, path.as_slice(), words),
-        Part::Kind { kind, .. } => match words::kind(*kind) {
+        Part::Kind { kind, .. } => match crate::words::kind(*kind) {
             Some(word) => words.text(builder, word, &[]),
             None => words.text(builder, Word::OtherKind, &[Hole::Number(u64::from(*kind))]),
         },

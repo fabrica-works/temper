@@ -1,4 +1,5 @@
 mod fixtures;
+mod forge_page;
 use jig_domain_client::contract::{Part, PartScope};
 use jig_view::Role;
 

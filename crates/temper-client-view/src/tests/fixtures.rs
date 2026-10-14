@@ -139,3 +139,111 @@ pub fn built(root_forge: u16) -> crate::View {
     crate::build(&mut view, &root, &mut Queue::with_capacity(limits.tree.patches));
     view
 }
+pub fn view() -> crate::View {
+    let domain = domain_limits();
+    let jig = jig_words();
+    let words = words();
+    let limits = crate::Limits::of(&domain, &jig, &words).expect("view envelope fits");
+    crate::View::new(&limits, &domain, jig, words, FORGE)
+}
+pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a jig_view::Tree {
+    crate::build(view, root, &mut Queue::with_capacity(view.limits().tree.patches));
+    view.tree()
+}
+pub fn find(tree: &jig_view::Tree, role: jig_view::Role, name: &[u8]) -> Option<jig_view::NodeId> {
+    for node in tree.nodes() {
+        if node.role == role && node.name.as_deref() == Some(name) {
+            return Some(node.id);
+        }
+    }
+    None
+}
+pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
+    use jig_domain_client::contract::{
+        self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, ProjectRole, Subject, WatchEvent,
+    };
+    use temper_client_domain::{Address, Event, JigOut, Request};
+    let limits = domain_limits();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut root = temper_client_domain::new(&limits, SEED, forge::Config { connector: FORGE, version: 1 });
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Start {
+            address: Address::Jig(jig_domain_client::address::Address::Inbox { project }),
+            kept: List::with_capacity(0),
+            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+        },
+        &mut out,
+    );
+    let mut watch = None;
+    for _ in 0..out.len() {
+        if let Some(Request::Jig(JigOut::Open { watch: token, subject: Subject::Frame })) = out.pop() {
+            watch = Some(token);
+        }
+    }
+    let mut projects = List::with_capacity(1);
+    projects
+        .push(ProjectRole {
+            project: PROJECT,
+            name: Some(DocumentText::complete(contract::Text::new(Box::from(*b"Shop"), 32).expect("name fits"))),
+            role: HeldRole::Policy { role: 1 },
+            pool: None,
+            chat_budget: 0,
+        })
+        .expect("one project");
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Jig(jig_domain_client::Event::Hello { versions: contract::VersionRange { first: 7, last: 7 } }),
+        &mut out,
+    );
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch: watch.expect("frame opened"),
+            event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
+                party: FrameParty {
+                    number: 73,
+                    kind: PartyKind::Person,
+                    login: DocumentText::complete(contract::Text::new(Box::from(*b"pat"), 32).expect("login fits")),
+                    name: DocumentText::complete(contract::Text::new(Box::from(*b"Pat"), 32).expect("name fits")),
+                },
+                projects,
+                needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+                needs_total: 0,
+                updates: contract::Count { value: 0, limited: false },
+                results_seen: 0,
+                charters: List::with_capacity(0),
+                cut: false,
+                retention: Duration::from_secs(1000),
+                deployment_role: None,
+            }))),
+        }),
+        &mut out,
+    );
+    root
+}
+pub fn adoption_root() -> temper_client_domain::Domain {
+    let mut root = root_in_project(Some(PROJECT));
+    root_event(
+        &mut root,
+        temper_client_domain::Event::Went {
+            place: temper_client_domain::Place::Address(temper_client_domain::Address::Forge(forge::Address::Adopt {
+                project: PROJECT,
+            })),
+        },
+    );
+    root
+}
+pub fn root_event(root: &mut temper_client_domain::Domain, event: temper_client_domain::Event) {
+    let limits = domain_limits();
+    temper_client_domain::step(
+        root,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+        event,
+        &mut Queue::with_capacity(temper_client_domain::max_out(&limits)),
+    );
+}

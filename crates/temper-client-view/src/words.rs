@@ -131,8 +131,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(25);
-        let mut phrases = List::with_capacity(25);
+        let mut shapes = List::with_capacity(74);
+        let mut phrases = List::with_capacity(74);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -160,14 +160,21 @@ impl Words {
                 })
                 .expect("closed phrases fit");
         }
+        crate::forge::words::extend(connector, text, &mut shapes, &mut phrases);
         let language = Language {
             plural: PluralRule::English,
             span_unit: SpanUnit::Seconds,
             wall: WallFormat::Seconds,
             phrases: phrases.into_boxed(),
         };
-        let limits =
-            PhraseLimits { languages: 1, phrases: 25, holes: 3, segments: 175, text_bytes: 2048, hole_bytes: joined };
+        let limits = PhraseLimits {
+            languages: 1,
+            phrases: 74,
+            holes: 3,
+            segments: 518,
+            text_bytes: 6144,
+            hole_bytes: joined.max(513),
+        };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { book, language: 0, connector })
     }
@@ -184,7 +191,7 @@ impl Words {
         for word in ALL {
             most = most.max(self.book.capacity(word.id(self.connector))?);
         }
-        Some(most)
+        Some(most.max(crate::forge::words::capacity(self)?))
     }
 }
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {

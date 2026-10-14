@@ -14,6 +14,7 @@ pub struct View {
     jig_words: jig_view::words::Words,
     forge_words: Words,
     jig: JigBindings,
+    forge: forge::bindings::Bindings,
     nav: jig_view::SlotRef,
     limits: Limits,
 }
@@ -31,6 +32,7 @@ impl View {
         View {
             render: jig_view::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
+            forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             nav: forge::nav(forge),
             jig_words,
             forge_words,
@@ -52,9 +54,16 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         return;
     }
     view.jig.begin();
+    view.forge.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    jig_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig);
+    if !jig_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig) {
+        if let Some(form) = root.forge().form() {
+            let project = forge::page::project_name(root.jig(), form.project, &view.jig_words);
+            forge::page::page(&mut builder, form, &project, &view.forge_words, &view.jig_words, &mut view.forge);
+        }
+        jig_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);
+    }
     builder.close();
     for pass in 0..2 {
         for slot in builder.slots(pass) {
@@ -65,6 +74,12 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     if connector != root.forge_number() {
                         false
                     } else if slot.reference == view.nav {
+                        forge::page::navigation(
+                            &mut fragment,
+                            root.jig().frame_summary().project,
+                            &view.forge_words,
+                            &mut view.forge,
+                        );
                         true
                     } else {
                         match view.jig.part(slot.reference.token) {
@@ -107,6 +122,13 @@ pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
             Some(action) => Some(Action::Jig(action)),
             None => None,
         },
-        Owner::Side { .. } | Owner::Other { .. } => None,
+        Owner::Side { connector } => {
+            if connector == view.forge_words.connector {
+                forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
+            } else {
+                None
+            }
+        }
+        Owner::Other { .. } => None,
     }
 }
