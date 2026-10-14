@@ -95,6 +95,7 @@ fn tree(tag: u8) -> Box<[File]> {
 
 fn setup(index: u64) -> Setup {
     Setup {
+        id: u32::try_from(index).expect("scenario id fits").checked_add(1).expect("scenario id fits"),
         name: name(b'r', index),
         default: name(b'b', 0),
         tree: tree(b'0'),
@@ -287,7 +288,8 @@ fn outcome(result: Result<Answer, Error>) -> Result<Option<u64>, Error> {
         | Answer::Reviewed(number)
         | Answer::Merged(number)
         | Answer::Revision(number) => Ok(Some(number)),
-        Answer::Items { .. }
+        Answer::Located { .. }
+        | Answer::Items { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Statuses(_)

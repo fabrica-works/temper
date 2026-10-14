@@ -801,6 +801,7 @@ pub(crate) fn answered_repository(
         | Answer::Reviewed(_)
         | Answer::Merged(_)
         | Answer::Branch(_)
+        | Answer::Located { .. }
         | Answer::Done => unreachable!("listing answer shape"),
     }
 }
@@ -881,6 +882,7 @@ pub(crate) fn answered_resource(
             branch_compared(d, env, key, before, after, contains_before, out);
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Branches(_)
         | Answer::Statuses { .. }
         | Answer::Remarks { .. }

@@ -107,6 +107,7 @@ impl World {
             &mut neighbour,
             &config,
             raw::Setup {
+                id: 2,
                 name: Box::from(&b"org/repo"[..]),
                 default: Box::from(&b"main"[..]),
                 tree: Box::new([]),
@@ -204,7 +205,12 @@ impl World {
             self.readers.insert(Token::new(number), ()).expect("world reader capacity").is_none(),
             "one live fresh read per owner"
         );
-        self.event(Event::Read { owner: Token::new(number), repository: REPO, read });
+        let repository = if let api::Read::Locate { .. } = &read {
+            api::Repository { forge: REPO.forge, repository: 0 }
+        } else {
+            REPO
+        };
+        self.event(Event::Read { owner: Token::new(number), repository, read });
     }
     pub fn restart(&mut self) {
         // Volatile budget knowledge belongs to the old live generation.
@@ -411,7 +417,13 @@ impl World {
         }
     }
     fn submit(&mut self, call: Token, repository: api::Repository, op: api::Op) {
-        assert_eq!(repository, REPO);
+        let name = if let api::Op::Read(api::Read::Locate { owner, name }) = &op {
+            assert_eq!(repository, api::Repository { forge: REPO.forge, repository: 0 });
+            [owner.as_ref(), b"/", name.as_ref()].concat().into_boxed_slice()
+        } else {
+            assert_eq!(repository, REPO);
+            Box::from(&b"org/repo"[..])
+        };
         assert!(self.env.now >= self.blocked, "no class submits during a rate reset");
         match &op {
             api::Op::Write(write) => {
@@ -427,12 +439,7 @@ impl World {
         self.pending
             .insert(token, Pending { client: call, op, generation: self.generation })
             .expect("world in-flight limit");
-        self.to_forge.push(forge::Event::Call {
-            reply_to: ReplyTo::new(token),
-            user: 1,
-            repository: Box::from(&b"org/repo"[..]),
-            op: raw,
-        });
+        self.to_forge.push(forge::Event::Call { reply_to: ReplyTo::new(token), user: 1, repository: name, op: raw });
     }
     fn take_forge(&mut self) {
         for _ in 0..self.forge_out.len() {
@@ -711,6 +718,7 @@ fn inbox_count(answer: &api::Answer) -> u32 {
         api::Answer::Item { comments, .. } => u32::try_from(comments.len()).expect("bounded inbox rows"),
         api::Answer::Reviews { reviews, .. } => u32::try_from(reviews.len()).expect("bounded inbox rows"),
         api::Answer::Items { .. }
+        | api::Answer::Located { .. }
         | api::Answer::Pull(_)
         | api::Answer::Statuses { .. }
         | api::Answer::Remarks { .. }

@@ -1,5 +1,6 @@
 //! Step tests of admission, request accounting, bounded answers and recovery.
 mod keep;
+mod locate;
 mod outbox;
 use crate::api::{self, Answer, Error, Op, Read, Repository, Write};
 use crate::{Domain, Event, Fact, Limits, Priority, Request, calls, fire, resume, step, worst_case};
@@ -117,6 +118,14 @@ impl Harness {
             }
             None => None,
         }
+    }
+    fn sent(&mut self) -> (Sent, Repository) {
+        let mut out = Queue::with_capacity(1);
+        resume(&mut self.domain, &self.env, &mut out);
+        let Some(Request::Call { call, repository, op }) = out.pop() else {
+            panic!("a locate sends its call");
+        };
+        (Sent { call, op }, repository)
     }
     fn one(&mut self) -> Sent {
         self.send().expect("call ready")

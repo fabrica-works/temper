@@ -1,5 +1,6 @@
 //! Feed the forge calls, inspect its answers, webhooks and observations.
 
+mod locate;
 mod next;
 
 use alloc::boxed::Box;
@@ -144,6 +145,7 @@ fn a_converging_merge_dag_visits_each_commit_once() {
 /// labels, one CI context passing after five seconds, and a subscriber.
 fn setup() -> Setup {
     Setup {
+        id: 2,
         name: copy_of(REPOSITORY),
         default: copy_of(MAIN),
         tree: files(&[(b"README", b"hello"), (b"ci", b"green")]),

@@ -43,6 +43,7 @@ impl Referee {
                 }
             }
             api::Answer::Items { .. }
+            | api::Answer::Located { .. }
             | api::Answer::Pull(_)
             | api::Answer::Statuses { .. }
             | api::Answer::Remarks { .. }

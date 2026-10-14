@@ -18,6 +18,7 @@ use crate::limits::{self, Limits};
 /// A repository on the forge.
 #[derive(Debug)]
 pub(crate) struct Repository {
+    pub(crate) id: u32,
     pub(crate) name: Box<[u8]>,
     pub(crate) default: Box<[u8]>,
     pub(crate) styles: Styles,
@@ -133,6 +134,7 @@ impl Repository {
         hooked: bool,
     ) -> Repository {
         let mut repository = Repository {
+            id: 0,
             name,
             default,
             styles: Styles { merge: true, rebase: true, squash: true },

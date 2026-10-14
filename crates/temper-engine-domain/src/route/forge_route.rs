@@ -285,7 +285,8 @@ fn read_name(repository: &forge::Repository, read: &forge_client::api::Read, lim
         forge_client::api::Read::Branch { branch } | forge_client::api::Read::Protection { branch } => {
             Some((b"branch".as_slice(), Some(branch.clone())))
         }
-        forge_client::api::Read::File { .. }
+        forge_client::api::Read::Locate { .. }
+        | forge_client::api::Read::File { .. }
         | forge_client::api::Read::Items { .. }
         | forge_client::api::Read::PullFor { .. }
         | forge_client::api::Read::Statuses { .. }

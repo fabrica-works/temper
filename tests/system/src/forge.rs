@@ -216,6 +216,7 @@ impl World {
             &mut fake,
             &fake_config,
             raw::Setup {
+                id: 2,
                 name: Box::from(&b"org/repo"[..]),
                 default: Box::from(&b"main"[..]),
                 tree: Box::new([]),

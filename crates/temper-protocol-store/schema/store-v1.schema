@@ -110,7 +110,8 @@ record PullFilesAnswer { head: fixed 32 files: bytes 2097152 more: bool }
 record CompareAnswer { before: fixed 32 after: fixed 32 contains_before: bool files: bytes 2097152 commits: list 65536 fixed 32 }
 record ChecksAnswer { statuses: bytes 2097152 }
 record CollaboratorsAnswer { collaborators: list 65536 Collaborator more: bool }
-enum Answer { items: ItemsAnswer, item: ItemAnswer, pull: Pull, reviews: ReviewsAnswer, statuses: StatusesAnswer, remarks: RemarksAnswer, commit: Commit, branches: BranchesAnswer, pull_files: PullFilesAnswer, compare: CompareAnswer, checks: ChecksAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, collaborators: CollaboratorsAnswer, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done }
+record Located { repository: u32 }
+enum Answer { items: ItemsAnswer, item: ItemAnswer, pull: Pull, reviews: ReviewsAnswer, statuses: StatusesAnswer, remarks: RemarksAnswer, commit: Commit, branches: BranchesAnswer, pull_files: PullFilesAnswer, compare: CompareAnswer, checks: ChecksAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, collaborators: CollaboratorsAnswer, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done, located: Located }
 record AnswerValue { answer: Answer }
 enum ReadResult { answer: boxed AnswerValue, error: ErrorValue }
 record CallRead { result: ReadResult }

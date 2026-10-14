@@ -20,7 +20,12 @@ use crate::store::{Repository, fit_names, fits};
 /// commit of its tree, and returns that commit.
 pub fn repository(domain: &mut Domain, config: &Config, setup: Setup) -> u64 {
     let limits = &config.limits;
-    let Setup { name, default, tree, labels, checks, protection, hooked } = setup;
+    let Setup { id, name, default, tree, labels, checks, protection, hooked } = setup;
+    assert_ne!(id, 0, "a repository's forge id is nonzero");
+    for (_, existing) in &domain.names {
+        let repository = domain.repositories.get(*existing).expect("a named repository");
+        assert_ne!(repository.id, id, "a repository's forge id is unique");
+    }
     assert!(!domain.names.contains_key(&*name), "a repository is added once");
     fits(&name, limits.name_bytes).expect("a repository's name within the limits");
     fits(&default, limits.name_bytes).expect("a branch name within the limits");
@@ -39,6 +44,7 @@ pub fn repository(domain: &mut Domain, config: &Config, setup: Setup) -> u64 {
     let first = git::store(domain, Object { parent: None, merge_parent: None, tree, message: Box::new([]) })
         .expect("room for a first commit");
     let mut repository = Repository::new(limits, copy_of(&name), default, first, checks, protection, hooked);
+    repository.id = id;
     for label in labels {
         repository.labels.insert(label).expect("a repository's labels are within the limits");
     }

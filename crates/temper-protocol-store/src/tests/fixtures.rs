@@ -454,7 +454,7 @@ pub fn payloads() -> List<top::CallPayload> {
 fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
     top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
 }
-pub fn answers_without_item_pieces() -> [client::api::Answer; 17] {
+pub fn answers_without_item_pieces() -> [client::api::Answer; 18] {
     use client::api::{Answer, BranchCreation, JobAttempt, Permission, Protection, Settings};
     [
         Answer::Pull(pull()),
@@ -483,6 +483,7 @@ pub fn answers_without_item_pieces() -> [client::api::Answer; 17] {
         Answer::Branch(BranchCreation::Created),
         Answer::Branch(BranchCreation::Exists),
         Answer::Done,
+        Answer::Located { repository: 27 },
     ]
 }
 pub fn encoded(value: &crate::v1::Error) -> Box<[u8]> {

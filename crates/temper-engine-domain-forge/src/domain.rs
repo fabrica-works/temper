@@ -3248,6 +3248,7 @@ fn changed(
         },
         Ok(
             client::api::Answer::Items { .. }
+            | client::api::Answer::Located { .. }
             | client::api::Answer::Branches(_)
             | client::api::Answer::Statuses { .. }
             | client::api::Answer::Remarks { .. }

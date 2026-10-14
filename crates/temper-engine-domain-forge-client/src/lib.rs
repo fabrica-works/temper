@@ -18,6 +18,7 @@ mod facts;
 mod identity;
 mod keep;
 mod limits;
+mod locate;
 mod outbox;
 #[cfg(test)]
 mod tests;

@@ -495,6 +495,7 @@ pub(crate) fn answered(
         | Answer::Protection(_)
         | Answer::Settings(_)
         | Answer::Collaborators { .. }
+        | Answer::Located { .. }
         | Answer::Permission(_) => unreachable!("outbox operation has another answer shape"),
     }
 }

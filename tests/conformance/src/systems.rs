@@ -58,6 +58,7 @@ impl FakeForge {
             &mut domain,
             &config,
             raw::Setup {
+                id: 2,
                 name: b"org/repo".as_slice().into(),
                 default: b"main".as_slice().into(),
                 tree: Box::new([]),

@@ -508,7 +508,8 @@ fn execute(domain: &mut Domain, env: &Env<Config>, user: u64, repository: &[u8],
             repository.require(user, Permission::Read)?;
             match &read {
                 Read::Protection { .. } => repository.require(user, Permission::Admin)?,
-                Read::Items { .. }
+                Read::Locate
+                | Read::Items { .. }
                 | Read::Item { .. }
                 | Read::Comment { .. }
                 | Read::Dependencies { .. }

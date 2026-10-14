@@ -264,6 +264,7 @@ impl World {
             &mut fake,
             &fake_config,
             raw::Setup {
+                id: 2,
                 name: Box::from(&b"org/repo"[..]),
                 default: Box::from(&b"main"[..]),
                 tree: Box::new([]),
@@ -2140,6 +2141,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         &mut world.fake,
         &world.fake_env.limits,
         raw::Setup {
+            id: 3,
             name: Box::from(&b"org/extra"[..]),
             default: Box::from(&b"main"[..]),
             tree: Box::new([]),

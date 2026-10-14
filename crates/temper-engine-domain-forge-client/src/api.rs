@@ -47,6 +47,8 @@ pub enum Op {
 /// A typed forge read, bounded by the client’s limits.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Read {
+    /// Locate the forge's id by owner and name, addressed to repository 0.
+    Locate { owner: Box<[u8]>, name: Box<[u8]> },
     /// Inclusive forge time, least recently updated first, pages from 1.
     Items {
         /// Inclusive at the provider's time resolution. Saved positions come
@@ -126,6 +128,8 @@ pub enum Write {
 /// A decoded terminal value for one forge call.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    /// The located repository's nonzero id on its forge.
+    Located { repository: u32 },
     /// Return items.
     Items { items: Box<[Summary]>, more: bool, now: Time },
     /// Return item.
@@ -408,6 +412,7 @@ pub struct Collaborator {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum Shape {
+    Located,
     Items,
     Item,
     Pull,
@@ -434,6 +439,7 @@ enum Shape {
 }
 fn shape(answer: &Answer) -> Shape {
     match answer {
+        Answer::Located { .. } => Shape::Located,
         Answer::Items { .. } => Shape::Items,
         Answer::Item { .. } => Shape::Item,
         Answer::Pull(_) => Shape::Pull,
@@ -462,6 +468,7 @@ fn shape(answer: &Answer) -> Shape {
 pub(crate) fn accepts(op: &Op, answer: &Answer) -> bool {
     let expected = match op {
         Op::Read(read) => match read {
+            Read::Locate { .. } => Shape::Located,
             Read::Items { .. } => Shape::Items,
             Read::Item { .. } => Shape::Item,
             Read::Pull { .. } | Read::PullFor { .. } => Shape::Pull,
@@ -500,12 +507,14 @@ pub(crate) fn accepts(op: &Op, answer: &Answer) -> bool {
     }
     match op {
         Op::Read(read) => match read {
+            Read::Locate { .. } => crate::locate::accepts(answer),
             Read::Items { kind, .. } => items_ordered(answer, *kind),
             Read::Job { attempt, max_bytes } => match answer {
                 Answer::Job { attempt: received, log, .. } => {
                     received == attempt && log.len() <= usize::try_from(*max_bytes).expect("u32 fits usize")
                 }
                 Answer::Items { .. }
+                | Answer::Located { .. }
                 | Answer::Item { .. }
                 | Answer::Pull(_)
                 | Answer::Reviews { .. }
@@ -566,6 +575,7 @@ fn checks_at_head(answer: &Answer, head: Commit) -> bool {
             true
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }
@@ -613,6 +623,7 @@ fn items_ordered(answer: &Answer, kind: Option<Kind>) -> bool {
             true
         }
         Answer::Item { .. }
+        | Answer::Located { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }
         | Answer::Statuses { .. }
@@ -649,6 +660,7 @@ fn reviews_ordered(answer: &Answer) -> bool {
             true
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Statuses { .. }
@@ -688,6 +700,7 @@ fn item_matches(answer: &Answer, number: u64, after: u64) -> bool {
             true
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }
         | Answer::Statuses { .. }
@@ -715,6 +728,7 @@ fn pull_answer(answer: &Answer) -> Option<&Pull> {
     match answer {
         Answer::Pull(pull) => Some(pull),
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Reviews { .. }
         | Answer::Statuses { .. }
@@ -742,6 +756,7 @@ fn observed_head(answer: &Answer) -> Option<Commit> {
     match answer {
         Answer::PullFiles { head, .. } => Some(*head),
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }
@@ -771,6 +786,7 @@ fn compared(answer: &Answer, before: Commit, after: Commit) -> bool {
             *observed_before == before && *observed_after == after
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }
@@ -803,6 +819,7 @@ fn file_matches(answer: &Answer, head: Commit, path: &[u8], max_bytes: u32) -> b
                 && bytes.len() <= usize::try_from(max_bytes).expect("u32 fits usize")
         }
         Answer::Items { .. }
+        | Answer::Located { .. }
         | Answer::Item { .. }
         | Answer::Pull(_)
         | Answer::Reviews { .. }

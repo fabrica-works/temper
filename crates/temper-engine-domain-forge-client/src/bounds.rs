@@ -43,6 +43,7 @@ pub(crate) fn op(value: &Op, l: &Limits) -> bool {
 }
 pub(crate) fn read(value: &Read) -> Option<u64> {
     match value {
+        Read::Locate { owner, name } => crate::locate::bytes(owner, name),
         Read::File { path, .. } => {
             if path.is_empty() {
                 None
@@ -183,7 +184,8 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
             }
             Some(held)
         }
-        Answer::Permission(_)
+        Answer::Located { .. }
+        | Answer::Permission(_)
         | Answer::Commit(_)
         | Answer::Created(_)
         | Answer::Commented(_)

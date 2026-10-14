@@ -94,6 +94,7 @@ pub struct Move {
 #[derive(Debug)]
 pub struct Forge {
     domain: Domain,
+    repositories: u32,
     /// The world's clock, as of its last say.
     now: Time,
     /// The calls made, the last naming the latest.
@@ -104,7 +105,7 @@ impl Forge {
     /// An empty forge, drawing from `seed`.
     #[must_use]
     pub fn new(seed: u64) -> Forge {
-        Forge { domain: Domain::new(&CONFIG, seed), now: Time::ZERO, calls: 0 }
+        Forge { domain: Domain::new(&CONFIG, seed), repositories: 1, now: Time::ZERO, calls: 0 }
     }
 
     /// Tells the forge the world's time, for the calls that follow.
@@ -150,7 +151,9 @@ impl Forge {
     /// commit of `tree`, where the worker and another party may push, and
     /// returns that commit.
     pub fn repository(&mut self, remote: &[u8], default: &[u8], tree: Tree) -> u64 {
+        self.repositories = self.repositories.checked_add(1).expect("scenario repository bound");
         let setup = Setup {
+            id: self.repositories,
             name: remote.into(),
             default: default.into(),
             tree: files(tree),

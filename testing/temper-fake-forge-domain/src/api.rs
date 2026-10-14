@@ -40,6 +40,8 @@ pub enum Op {
 /// The reads: they change nothing. Each needs read permission.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Read {
+    /// The scenario's id for the named repository.
+    Locate,
     /// The page `page` (from one) of `limit` items (the most a page holds,
     /// if zero or more) in `state` (either, if `None`) of `kind` (either, if
     /// `None`) that carry every label of `labels`, were opened by `author`
@@ -333,6 +335,9 @@ pub enum Want {
 /// The answer to a call that succeeded.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Located {
+        id: u32,
+    },
     /// A page of items, whether a later page has more, and the forge's time
     /// as it made the page, at its resolution (what Forgejo's `Date` header
     /// says).
@@ -677,6 +682,8 @@ pub enum Change {
 /// hears of its changes.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Setup {
+    /// The forge's repository id, nonzero and unique within the scenario.
+    pub id: u32,
     pub name: Box<[u8]>,
     pub default: Box<[u8]>,
     pub tree: Box<[File]>,

@@ -528,6 +528,7 @@ fn adoption_reads_history_and_preserves_foreign_or_copied_marker_news() {
                 }
             }
             api::Answer::Items { .. }
+            | api::Answer::Located { .. }
             | api::Answer::Pull(_)
             | api::Answer::Reviews { .. }
             | api::Answer::Statuses { .. }
@@ -592,6 +593,7 @@ fn comment_ids(world: &World) -> skein_lib::List<u64> {
                 }
             }
             api::Answer::Items { .. }
+            | api::Answer::Located { .. }
             | api::Answer::Pull(_)
             | api::Answer::Reviews { .. }
             | api::Answer::Statuses { .. }
@@ -646,6 +648,7 @@ fn review_page_recovery_keeps_old_pending_submissions_without_duplicate_news() {
                 }
             }
             api::Answer::Items { .. }
+            | api::Answer::Located { .. }
             | api::Answer::Item { .. }
             | api::Answer::Pull(_)
             | api::Answer::Statuses { .. }
@@ -757,6 +760,7 @@ fn review_count(world: &World) -> u32 {
                 count = count.saturating_add(u32::try_from(reviews.len()).expect("bounded review rows"));
             }
             api::Answer::Items { .. }
+            | api::Answer::Located { .. }
             | api::Answer::Item { .. }
             | api::Answer::Pull(_)
             | api::Answer::Statuses { .. }

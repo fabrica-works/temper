@@ -418,6 +418,10 @@ fn forge_error(text: &mut Text, error: api::Error) -> Result<(), Problem> {
 #[expect(clippy::too_many_lines, reason = "one exhaustive forge answer vocabulary")]
 fn forge_answer(text: &mut Text, answer: &api::Answer) -> Result<(), Problem> {
     match answer {
+        api::Answer::Located { repository } => {
+            text.add(b"Repository ")?;
+            text.number(u64::from(*repository))?;
+        }
         api::Answer::Items { items, more, .. } => {
             text.add(b"Items:\n")?;
             for item in items {

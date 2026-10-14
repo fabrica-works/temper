@@ -39,6 +39,7 @@ pub(crate) fn read(domain: &Domain, config: &Config, id: Id<Repository>, read: &
     let limits = &config.limits;
     let repository = domain.repositories.get(id).expect("a repository of the forge");
     match read {
+        Read::Locate => Ok(Answer::Located { id: repository.id }),
         Read::Items { state, kind, labels, author, since, page, limit } => {
             let (items, more) = items(repository, config, *state, *kind, labels, *author, *since, *page, *limit);
             Ok(Answer::Items { items, more, now: domain.clock })

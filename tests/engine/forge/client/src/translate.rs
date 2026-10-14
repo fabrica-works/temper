@@ -77,6 +77,7 @@ pub fn op(op: &client::Op, l: &Limits) -> forge::Op {
 }
 fn read_op(read: &client::Read, l: &Limits) -> forge::Read {
     match read {
+        client::Read::Locate { .. } => forge::Read::Locate,
         client::Read::Items { since, page, kind } => forge::Read::Items {
             since: *since,
             page: *page,
@@ -185,6 +186,7 @@ pub fn error(error: forge::Error, now: Time) -> client::Error {
 #[must_use]
 pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::Answer {
     match answer {
+        forge::Answer::Located { id } => client::Answer::Located { repository: id },
         forge::Answer::Items { items, more, now } => {
             let mut rows = List::with_capacity(l.rows);
             for item in items {
@@ -376,6 +378,7 @@ fn pull_answer(asked: &client::Op, pull: forge::Pull, l: &Limits) -> client::Ans
             | client::Read::Settings
             | client::Read::Collaborators { .. }
             | client::Read::File { .. }
+            | client::Read::Locate { .. }
             | client::Read::Permission { .. } => panic!("pull route projection"),
         },
         client::Op::Write(_) => panic!("pull answers a read"),
