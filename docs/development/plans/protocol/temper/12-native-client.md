@@ -242,17 +242,31 @@ the person each iteration, the person's `Act` through `NativeClient::act`,
 its `Go` through `go`, a signing other than `SignedIn` failing the test
 naming it, the client closed once the script is done); `support::run`
 gains the person; `support::chat_script(answer)`; `process.rs` gains
-the story's test.
+the story's test. The process tier's configuration
+(`support::configuration`) overrides the engine's documents as
+configuration.md, 7 says ("The engine's documents fit temper's
+client"): `engine.limits.overrides` `documents.rows` 2 and
+`documents.text_bytes` 128, the native client's `rows` and `text`
+(`temper-shell-terminal/src/limits.rs`); `documents.chips` and
+`documents.lines` stay jig small's. `tests/configuration.rs` holds it to
+the native client.
 Needs: 10.4's process support.
 Files: `crates/temper/{Cargo.toml (dev-dependencies
 `temper-shell-terminal`, `temper-client-domain`, `jig-fake-person`,
-`jig-view`, `jig-domain-client`, `jig-shell-native`), tests/{process.rs,
-support/mod.rs, support/person.rs}}`; `Cargo.lock` (the pins' three
+`jig-view`, `jig-domain-client`, `jig-shell-native`, `jig-protocol-config`),
+tests/{process.rs, configuration.rs (new), support/mod.rs,
+support/person.rs}}`; `Cargo.lock` (the pins' three
 commands where a crate is new to it). No existing type changes Shape.
 Shape: the ordinary-Rust sketch of the person below.
 Test shape: `tests/process.rs`:
 `the_binary_answers_a_chat_from_a_person_signed_in_by_its_link`, aiming
-at 30 s, at most 60 s. Reference test, in full:
+at 30 s, at most 60 s; `tests/configuration.rs`:
+`the_process_configurations_documents_fit_the_native_client` (the
+configuration `support::configuration` writes, its `engine.limits`
+parsed with `jig_protocol_config` as the service parses it: its
+`core.documents.rows` at most `temper_shell_terminal::limits::native()`'s
+`client.jig.rows`, its `text_bytes` at most `client.jig.text`), under
+20 ms, in the default suite, not the process profile. Reference test, in full:
 
 ```rust
 // crates/temper/tests/process.rs
@@ -280,7 +294,9 @@ and sees the fake model's answer on jig's page (the test above, beside
 10.4's); under 3 minutes for the profile.
 Don't: give the person any link but the printed one; reach the forge
 (no call does: the run has no workspace); add a person to the native
-client.
+client; raise the native client's `rows` or `text` past what
+`Limits::compose` accepts (ruling 122), or lower its `text` to make
+room for more rows.
 Size: test code; production 0 lines.
 Removes: nothing.
 

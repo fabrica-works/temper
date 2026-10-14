@@ -297,6 +297,24 @@ top-level `workers`, in the same order; standalone has one. Each:
     `name_bytes`.
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
+- **The engine's documents fit temper's client.** A document past the
+  bounds a client decodes is refused there whole, as too large (jig's
+  `protocol/client.md`, section 3), so the documents the engine serves
+  are within what temper's native client takes (`client.md`, 5.4):
+  `engine.limits` names `documents.rows` at most the client's `rows`,
+  and `documents.text_bytes` at most its `text`, the bound its
+  receiving wire gives a document's texts. jig's small profile serves
+  more (4 rows, texts of 4,096 bytes) than the native client composes at
+  temper's pin of jig (2 rows, texts of 128 bytes, the most jig-view's
+  `Limits::compose` accepts there), so the example and the process
+  tier's configuration override both; the engine cuts each text to its
+  bound and says so (jig's `client/domain/contract.md`, section 5:
+  "A text cut to its bound ... says it was cut"). `documents.chips` and
+  `documents.lines` keep jig's small values, which the client's wire
+  takes. The engine checks none of it at start: it serves whatever
+  client the deployment lets in, whose limits are the client's. A test
+  holds the example's and the process tier's configuration to the
+  native client's limits, so the two cannot drift apart unseen.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
@@ -467,7 +485,7 @@ not itself valid JSON):
     "llm": ...,
     "clients": {"listener": {"socket": "127.0.0.1:7100"}, "link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {}},
+    "limits": {"profile": "small", "overrides": {"documents.rows": 2, "documents.text_bytes": 128}},
     "memory_bytes": ...
   },
   "workers": [{

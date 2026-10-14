@@ -906,3 +906,12 @@ with.
   alternative, a temper-side list in jig's project document, puts
   temper's records in a document jig's core owns. jig's `STATUS.md`
   records the shortfall.
+- **The engine's pages hold 2 rows and texts of 128 bytes** (the
+  designer's answer to the shipped configuration's documents,
+  2026-10-14). temper's native client composes no more at temper's pin
+  of jig (jig-view's `Limits::compose`, ruling 122), and a page past
+  what it takes is refused whole, so configuration.md, 7 has
+  `engine.limits` override jig small's `documents.rows` (4) and
+  `documents.text_bytes` (4,096) down to the client's: longer texts on a
+  page are cut and say so, and lists page 2 rows at a time. Raising them
+  needs jig-view to compose larger, a jig change and a repin.

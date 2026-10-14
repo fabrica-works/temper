@@ -261,7 +261,10 @@ processes on loopback; the person: jig's fake person in front of 12.1's
 referee pops `Service::links`)), `src/machine.rs`, `src/forge.rs` (the
 shared forge handle and its `thread_local!` cell), `src/referee.rs`
 (jig's conformance referee through bytes, `Service::fmt_roots` for the
-roots), `src/fixtures.rs` (the document, the files, the seeds, `calm`).
+roots), `src/fixtures.rs` (the document, the files, the seeds, `calm`;
+the document's `engine.limits.overrides` name `documents.rows` 2 and
+`documents.text_bytes` 128, as configuration.md, 7 says: "The engine's
+documents fit temper's client").
 Needs: at the session's start: 14.3's fake forge protocol, 12.1's
 native client, 10.1's startup, 07.2's transcripts; 17.1.
 Files: `tests/one-process/{Cargo.toml, src/{lib.rs,

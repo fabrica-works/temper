@@ -489,7 +489,9 @@ The view's limits are jig-view's, derived from the client root's limits
 (jig's `client/domain/view.md`, section 10), with the forge's page and
 fragments counted: the form's nodes, its outcome's lines, the kinds'
 list at its longest, and one paragraph per part slot. The terminal's
-print limits are derived from them (6.8).
+print limits are derived from them (6.8). The engine's configured
+documents stay within the native client's rows and texts
+(configuration.md, 7), since a document past them is refused whole.
 
 ## 6. The terminal shell
 

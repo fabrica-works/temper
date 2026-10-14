@@ -654,7 +654,9 @@ told why.
 The numbers jig's core added (the store's fill mark, a load's bytes,
 documents' limits, the hub's turns) take jig's small profile's values
 until temper's configuration names its own (jig's
-`protocol/configuration.md`, section 6).
+`protocol/configuration.md`, section 6). Documents' limits are the
+configured ones (`engine.limits`), which configuration.md, 7 keeps
+within what temper's native client takes.
 
 ## 14. Below the domain
 
