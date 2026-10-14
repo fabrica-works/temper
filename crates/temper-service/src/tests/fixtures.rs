@@ -264,7 +264,7 @@ pub fn load(
         most: 4,
         bytes: 65_536,
     }));
-    for _ in 0..store.above.len() {
+    for _ in 0_u32..store.above.len() {
         crate::store::route::up(&mut store.routes, store.above.pop().expect("store event"), &mut store.routed);
     }
     let Some(crate::store::route::Up::Root(event)) = store.routed.pop() else { panic!("loaded root event") };
@@ -352,7 +352,7 @@ pub fn want(stand: &mut AccountStand, account: u32) -> Box<[temper_engine_domain
     stand.accounts.request(jig_domain_accounts::Request::Component(jig_domain_accounts::ToComponent::Want { account }));
     stand.accounts.iterate(Time::ZERO, wall, &mut stand.values, &mut events);
     let mut out = skein_lib::List::with_capacity(events.len());
-    for _ in 0..events.len() {
+    for _ in 0_u32..events.len() {
         out.push(events.pop().unwrap()).unwrap();
     }
     out.into_boxed()
@@ -380,4 +380,76 @@ pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_dom
         root::Domain::new(config, &limits),
         skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
     )
+}
+
+pub fn started() -> crate::Service {
+    started_with_projects(&[(1, 100)])
+}
+pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
+    let mut settings = engine();
+    let first = settings.jig.projects.into_iter().next().unwrap();
+    let mut configured = skein_lib::List::with_capacity(u32::try_from(projects.len()).unwrap());
+    for (number, budget) in projects {
+        let mut project =
+            jig_protocol_config::Project { number: *number, roles: first.roles.clone(), policy: first.policy.clone() };
+        project.policy.period_spend = *budget;
+        for role in &mut project.policy.roles {
+            role.period_spend = *budget;
+        }
+        configured.push(project).unwrap();
+    }
+    settings.jig.projects = configured.into_boxed();
+    settings.files.entries = skein_lib::List::with_capacity(2);
+    settings
+        .files
+        .entries
+        .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
+        .unwrap();
+    settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
+    let mut service = crate::Service::engine(settings, &seeds(), None).unwrap();
+    service.engine.store = memory_store();
+    service
+}
+pub fn turn(service: &mut crate::Service) {
+    crate::iterate(service, skein_lib::Time::from_nanos(1), skein_lib::Wall::from_nanos(1));
+}
+pub fn restart(service: &mut crate::Service) {
+    for _ in 0_u32..256 {
+        turn(service);
+        if !service.work_pending(skein_lib::Time::from_nanos(1)) {
+            break;
+        }
+    }
+    assert!(service.engine.domain.ready(), "restart ready");
+    assert_eq!(service.end(), None);
+}
+pub fn ready() -> crate::Service {
+    let mut service = started();
+    restart(&mut service);
+    service
+}
+pub fn period(number: u64) -> temper_engine_domain::Event {
+    temper_engine_domain::Event::Party(temper_engine_domain::PartyInput::Period {
+        project: 1,
+        period: number,
+        budget: 100,
+        next: None,
+    })
+}
+pub fn get(service: &mut crate::Service, key: jig_domain_core::Key) -> Option<jig_domain_core::Record> {
+    let engine = &mut service.engine;
+    let owner = skein_lib::Token::new(991);
+    engine.store.ask(jig_protocol_store::Request::Get { owner, key: jig_protocol_store::Get::Jig(key) });
+    for _ in 0_u32..engine.store.above.len() {
+        let event = engine.store.above.pop().unwrap();
+        if let jig_protocol_store::Event::Got { row, .. } = event {
+            return match row {
+                Some(jig_protocol_store::Row::Jig(record)) => Some(record),
+                None => None,
+                Some(jig_protocol_store::Row::Application { .. }) => panic!("jig record"),
+            };
+        }
+        engine.store.above.push(event);
+    }
+    panic!("store get answered")
 }
