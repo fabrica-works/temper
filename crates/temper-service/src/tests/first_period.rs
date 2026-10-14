@@ -35,9 +35,12 @@ fn a_first_start_gives_each_project_one_period() {
 }
 #[test]
 fn a_later_start_gives_no_new_period() {
-    let mut old = fixtures::ready();
+    let mut store = {
+        let old = fixtures::ready();
+        old.engine.store
+    };
     let mut service = fixtures::started_with_projects(&[(1, 73)]);
-    ::core::mem::swap(&mut service.engine.store, &mut old.engine.store);
+    ::core::mem::swap(&mut service.engine.store, &mut store);
     fixtures::restart(&mut service);
     assert!(service.engine.first_periods.is_empty());
     let Some(core::Record::Tasks(tasks::Stored::Ledger(row))) = fixtures::get(

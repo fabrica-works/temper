@@ -524,3 +524,29 @@ pub fn decoded_identity(value: &Secret) -> temper_protocol_worker_wire::v1::Iden
     temper_protocol_worker_wire::v1::Identity::decode(&wire_limits(), &mut skein_lib::Reader::new(value.expose()))
         .unwrap()
 }
+
+pub fn encoding(settings: &settings::Engine) -> crate::assignment::Encoding {
+    let mut entries = skein_lib::List::with_capacity(u32::try_from(settings.jig.llm.endpoints.len()).unwrap());
+    for endpoint in &settings.jig.llm.endpoints {
+        entries
+            .push(smith_protocol_channel::Endpoint {
+                name: endpoint.name.clone(),
+                number: endpoint.number,
+                account: endpoint.account,
+                dialect: endpoint.dialect,
+            })
+            .unwrap();
+    }
+    crate::assignment::Encoding {
+        limits: wire_limits(),
+        endpoints: smith_protocol_channel::Endpoints::new(entries),
+        deployment: [7; 16],
+    }
+}
+pub fn answer(ending: jig_domain_host::Ending) -> jig_domain_host::LinkUp {
+    jig_domain_host::LinkUp::Answer {
+        run: skein_lib::Token::new(7),
+        attempt: skein_lib::Token::new(2),
+        answer: jig_domain_host::Answer { read: None, refused: Box::new([]), turns: 0, spent: 0, ending },
+    }
+}

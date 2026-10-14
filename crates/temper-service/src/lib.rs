@@ -10,8 +10,10 @@ mod tests;
 pub mod tokens;
 
 pub mod accounts;
+pub mod assignment;
 pub mod translate;
 pub mod values;
+pub mod workers;
 pub use accounts::AccountsRuntime;
 mod engine;
 mod route;
