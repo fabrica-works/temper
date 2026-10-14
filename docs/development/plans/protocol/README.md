@@ -165,10 +165,12 @@ them wait on them.
 
   Each is named in the commit body. Anything else outside Files is a
   question.
-- **Size:** an increment lands within 1.5 times its Size without asking;
-  a codec or document increment (03.x, 04.x, 06.x, and 02.4's family
-  part) within twice it (code-organization.md, section 8, which names
-  the count's command).
+- **Size:** an increment lands within twice its Size without asking; a
+  codec or document increment (03.x, 04.x, 06.x, and 02.4's family part)
+  within 2.5 times it; the parts of a split increment count together;
+  each report names "Size: <increment> <count> of <allowance>"
+  (code-organization.md, section 8, which names the count's command;
+  decisions.md, ruling 106, which replaced 1.5 and twice).
 - **A gate that fails only on a timeout** (a suite's global timeout or a
   test's wall-clock bound, in tests outside the session's files): the
   implementer runs `land` again at most twice on one tree, three

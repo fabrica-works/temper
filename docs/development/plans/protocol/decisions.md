@@ -249,6 +249,36 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      added. Anything larger, or outside the session's files, is a
      question.
 
+106. **Sizes: twice, and 2.5 times for a codec or document increment**
+     (temper 06.2, blocked 2026-10-14T04:35:36Z; plan defect; the second
+     size block after ruling 102). 06.2 (Size 550, allowance 1100) is
+     complete at 1287 production lines (`client/items.rs` 440,
+     `server/items.rs` 275, `decode/walk.rs` 263, ...), both sides of
+     six request families, and lands as it is. The plan's Sizes run low
+     for these increments: 04.3's parts summed 2.35 times its Size, 04.4a
+     1.99, 06.1 1.98, 06.2 2.34, 05.3 1.85 (a tool). As a standing rule,
+     replacing decision 19's 1.5 and twice and the steer of
+     2026-10-14T04:21:44Z's point 1: an increment lands within twice its
+     Size without asking, a codec or document increment within 2.5 times
+     it; a split increment's parts count together; each report names
+     "Size: <increment> <count> of <allowance>"; past the allowance it
+     asks. README, code-organization.md, section 8, and sessions 03, 04
+     and 06 say so.
+
+107. **The codecs world keeps its own store limits** (temper 04.5,
+     blocked 2026-10-14T04:35:36Z; plan defect). The fuzzy store test
+     needs a `temper_engine_domain_forge::Limits`; the store's
+     `fixtures::LIMITS` (`src/tests/fixtures.rs:31`) is in a unit test
+     module a world cannot import. code-organization.md, section 5's
+     "never redefined" binds a crate's own fixtures; a world keeps its
+     own, as `tests/codecs/src/forgejo.rs:50`'s `limits()` does beside
+     `temper-forge-forgejo`'s unit `fixtures::limits()`. So
+     `tests/codecs/tests/fuzzy_store.rs` defines its limits as one
+     constant at its top, the unit fixture's values copied, and
+     `tests/codecs/Cargo.toml` adds the forge crates it needs as
+     dev-dependencies; both are in 04.5's Files. The unit fixture stays
+     where it is; nothing is moved or included by path.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

@@ -352,7 +352,7 @@ Don't: write a translation to or from a domain type; depend on any crate
 but `skein-lib` and `skein-codec` (the world: `skein-codegen`,
 `skein-lib` and this crate); give a part a version of its own.
 Size: at most 150 lines of hand-written Rust; the schema, generated code
-and goldens aside (a codec increment lands within twice its Size).
+and goldens aside (a codec increment lands within 2.5 times its Size, ruling 106).
 Removes: nothing.
 
 ### 03.2 `temper-protocol-client-wire`

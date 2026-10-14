@@ -276,10 +276,12 @@ test that no two prefixes meet.
   (development.md, 14.3).
 - **An increment:** the Size its file gives, in hand-written production
   lines (tests, generated code, goldens and transcripts aside). It lands
-  within 1.5 times its Size without asking; a codec or document
-  increment (03.x, 04.x, 06.x, and 02.4's family part), whose code is a
-  schema, translations and decoders, within twice it. Past that, it asks
-  before landing, with the count by file. The count:
+  within twice its Size without asking; a codec or document increment
+  (03.x, 04.x, 06.x, and 02.4's family part), whose code is a schema,
+  translations and decoders, within 2.5 times it (decisions.md, ruling
+  106). The parts of a split increment count together against the
+  original increment's Size. Past that, it asks before landing, with the
+  count by file. The count:
   `git diff --numstat origin/main...HEAD -- crates testing tools ':!*/tests.rs' ':!*/tests/*' ':!*/generated/*' ':!*/golden/*' ':!*/transcripts/*'`,
   its first column summed.
 - **An increment above about 600 lines** of production code is split by

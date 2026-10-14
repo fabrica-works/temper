@@ -166,9 +166,10 @@ the transcript has.
   from `env!("CARGO_MANIFEST_DIR")`, raw bytes, never re-recorded by a
   test" (code-organization.md, 5): a failing transcript test is fixed in
   the code, or raised; it never edits a transcript.
-- "**An increment:** ... It lands within 1.5 times its Size without
-  asking; a codec or document increment, whose code is a schema,
-  translations and decoders, within twice it" (code-organization.md, 8).
+- "**An increment:** ... It lands within twice its Size without asking; a
+  codec or document increment ..., whose code is a schema, translations
+  and decoders, within 2.5 times it (decisions.md, ruling 106). The parts
+  of a split increment count together" (code-organization.md, 8).
   Every increment here is a document increment.
 
 ## Increments

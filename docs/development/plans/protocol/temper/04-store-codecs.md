@@ -198,7 +198,8 @@ run it from 18.1.
   this schema lacks breaks the translation's build, which is the check.
 - "**An increment above about 600 lines** of production code is split by
   its session before it starts" (code-organization.md, section 8); a
-  codec increment lands within twice its Size.
+  codec increment lands within 2.5 times its Size, its split parts
+  counted together (ruling 106).
 
 ## Increments
 
