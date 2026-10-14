@@ -411,7 +411,9 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      as the core takes it"), but 08 is at 08.2a. So 11.3 adds the variant
      and its routing in `crates/temper-engine-domain/src/{boundary.rs,
      route.rs}`, with one test of the routing, and 08.5a translates
-     jig's event to it. Sessions 11 and 08 say so.
+     jig's event to it. Sessions 11 and 08 say so. 11.3's Size, world
+     code only, takes those production lines: at most 20 (8 at
+     2026-10-14T07:25:24Z, `boundary.rs` 5 and `route.rs` 3).
 
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
