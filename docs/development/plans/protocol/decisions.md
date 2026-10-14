@@ -1394,6 +1394,32 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      are unchanged. A third live run needs another ruling, on the same
      terms.
 
+164. **"Done when" 12's dependency check reads as code-organization.md,
+     3's rule** (the run's final check, blocked 2026-10-14T21:46:31Z;
+     plan defect). Item 12 says `git diff cc2697cf origin/main --
+     Cargo.lock | grep '^+name = '` "names only temper's own crates,
+     crates of jig, smith and skein, and `serde_json` with its
+     dependencies"; it names 16 more: `equivalent`, `hashbrown`,
+     `indexmap`, `proc-macro2`, `quote`, `serde_derive`, `serde_spanned`,
+     `subtle`, `syn`, `toml`, `toml_datetime`, `toml_parser`,
+     `toml_writer`, `unicode-ident`, `winnow`, `zmij`
+     (`logs/temper-17/done-report.md`). The rule the item checks is
+     code-organization.md, 3: "No crate adds any other dependency from
+     outside skein, smith and jig". No temper manifest declares any of the
+     16 (`git grep` of `*Cargo.toml` prints nothing); the workspace's
+     registry dependencies are `serde_json` and `sha2`, which is in
+     `Cargo.lock` at `cc2697cf`; and `cargo tree --offline -i <crate>
+     --depth 1` at `origin/main` names their dependents: `zmij`, serde_json;
+     `serde_derive`, serde (with `proc-macro2`, `quote`, `syn`,
+     `unicode-ident`); `subtle`, rustls (skein's TLS); `toml`, smith's
+     `smith-local-shell` (with `indexmap`, `hashbrown`, `equivalent`,
+     `serde_spanned`, `toml_datetime`, `toml_parser`, `toml_writer`,
+     `winnow`). So item 12's third check passes as the rule reads: the new
+     entries are temper's crates, crates of jig, smith and skein,
+     `serde_json`, and the dependencies those crates bring at the pins.
+     That the item's list named the pins' own dependencies too narrowly is
+     a proposal for the retrospective.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
