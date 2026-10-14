@@ -1561,6 +1561,7 @@ dependencies = [
 name = "temper-shell-terminal"
 version = "0.0.0"
 dependencies = [
+ "jig-client-world",
  "jig-domain-client",
  "jig-protocol-client-link",
  "jig-protocol-client-wire",

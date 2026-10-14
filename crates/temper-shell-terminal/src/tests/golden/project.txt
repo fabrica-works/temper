@@ -1,0 +1,44 @@
+== Project == Live
+Work:
+  * Signed in as Pat
+  Person
+  Login: fixture-login
+  Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+  Results read through 0
+  [1] Sign out
+  [2] 0 updates not read
+  [3] 0 need you
+  [4] Project: First (current)
+  Held policy role 1
+  Ledger source:
+    Budget: 100
+    Spent directly: 0
+    Settled spend below: 0
+    Reserved for funded work: 0
+    Left: 100
+    Ledger source
+    Funded by pool in project 1, person 1, period 1
+    Ledger is open
+  [5] Go to task number: (empty) (enter sends)
+  Navigation:
+    [6] Inbox
+    [7] Conversations
+    [8] Deployment
+    [9] Adopt a repository
+In project 1
+pppppppppppppppppppppppppppppppp
+pppppppppppppppppppppppppppppppp:
+  [10] Overview (selected)
+  [11] Goals
+  [12] Tasks
+  [13] Notes
+  [14] Settings
+Overview:
+  ## Overview
+  Total budget: 1
+  Own spend: 0
+  Ended delegate spend: 0
+  Reserved: 0
+  Left: 1
+  By party 7
+  Shown on the forge.

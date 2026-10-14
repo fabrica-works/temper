@@ -8,6 +8,7 @@ use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
 mod family;
 mod fixtures;
+mod render;
 
 #[test]
 fn a_jig_read_reaches_the_link_with_its_own_token() {

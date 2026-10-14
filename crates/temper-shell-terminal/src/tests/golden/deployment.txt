@@ -1,0 +1,110 @@
+== Deployment == Live
+Work:
+  * Signed in as Pat
+  Person
+  Login: fixture-login
+  Questions: 0; proposals: 0; escalations: 0; person tasks: 0
+  Results read through 0
+  [1] Sign out
+  [2] 0 updates not read
+  [3] 0 need you
+  [4] Project: First
+  Held policy role 1
+  Ledger source:
+    Budget: 100
+    Spent directly: 0
+    Settled spend below: 0
+    Reserved for funded work: 0
+    Left: 100
+    Ledger source
+    Funded by pool in project 1, person 1, period 1
+    Ledger is open
+  [5] Go to task number: (empty) (enter sends)
+  Navigation:
+    [6] Inbox
+    [7] Conversations
+    [8] Deployment
+Deployment:
+  - Host 1
+    * Lost
+    Grace holds until 00:00
+    Slots used: 1
+    Slots free: 1
+    Task 9: Chat nine:
+      [9] Task 9: Chat nine
+      Agent
+      * Cannot show this part.
+    Task 9: Chat nine:
+      [10] Task 9: Chat nine
+      Agent
+      * Cannot show this part.
+    Refused
+    hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+  - Host 2
+    * Lost
+    Grace holds until 00:00
+    Slots used: 1
+    Slots free: 1
+    Task 9: Chat nine:
+      [11] Task 9: Chat nine
+      Agent
+      * Cannot show this part.
+    Task 9: Chat nine:
+      [12] Task 9: Chat nine
+      Agent
+      * Cannot show this part.
+    Refused
+    hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+- LLM account 1
+  Unavailable
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Task 9: Chat nine:
+    [13] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Task 9: Chat nine:
+    [14] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Tasks waiting for this account
+  Task 9: Chat nine:
+    [15] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Task 9: Chat nine:
+    [16] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+- LLM account 2
+  Unavailable
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Task 9: Chat nine:
+    [17] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Task 9: Chat nine:
+    [18] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Tasks waiting for this account
+  Task 9: Chat nine:
+    [19] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+  Task 9: Chat nine:
+    [20] Task 9: Chat nine
+    Agent
+    * Cannot show this part.
+Capacity:
+  ## Capacity
+  Deployment
+  Live tasks: 1
+  Task limit: 2
+  In project 1
+  Live tasks: 1
+  Task limit: 2
+  Pending proposals: 2
+  Working set limit reached
+  Read limit reached
+Shown on the forge.
+* Cannot show this part.
