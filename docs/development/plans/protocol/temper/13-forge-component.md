@@ -642,7 +642,8 @@ an Actions status reads with an absolute link (the eleven tests); under
 0.3 s. The world layer opens at 13.5.
 Don't: list without `page` and `limit`; read a body the plan does not
 carry (skip it); keep a row of a listing past the page.
-Size: at most 600 lines.
+Size: at most 600 lines; its allowance 2100, 13.3a and 13.3b summed
+(decisions.md, ruling 126).
 Removes: 13.1's rule that a call waits for its deadline once its forge is
 `Ready` (the waiting path stays for a forge still starting).
 
@@ -769,7 +770,8 @@ Don't: guess a failure from a message no transcript pinned (06's
 write; send `Update` with another style than `merge`; read a `422` on
 `OpenPull`'s `POST` as `NothingToMerge` (v16.0.5 opens such a pull
 request; the comparison is the only path to `NothingToMerge`).
-Size: at most 600 lines.
+Size: at most 1000 lines, so its allowance is 2000 (decisions.md,
+ruling 126).
 Removes: nothing.
 
 ### 13.5 The machine world

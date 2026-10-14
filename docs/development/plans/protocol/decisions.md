@@ -563,6 +563,23 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      the request. No other test; 15.1b's Size and allowance (550, 1100,
      its parts 15.1ba and 15.1bb summed) are unchanged.
 
+126. **13.3 within 2100 lines; 13.4's Size 1000** (temper 13.3b,
+     blocked 2026-10-14T10:06:56Z; plan defect, size). 13.3 (Size 600,
+     allowance 1200) counts 1819: 13.3a landed 356 (`1f433ab1`), 13.3b
+     holds 1463 (`reads.rs` 540, `component/calls.rs` 349,
+     `reads/done.rs` 319, `reading.rs` 253, `reads/size.rs` 123,
+     `component.rs` 106, `connection.rs` 80, the rest 31). Each part is
+     in 13.3's Scope: fifteen reads' plans, the resolution by id, the
+     answer's running size, a call run when a connection is free (an
+     idle one, a new one, or another forge's closed), and the reads'
+     failures. Its Size ran low, as 13.1's (998 of 1100) and 13.2's
+     (962 of 1100) nearly did. So 13.3 lands within 2100, its parts
+     summed, with no further split; past 2100 it asks. 13.4's Scope is
+     as dense (five reads, twelve writes, 3.4's classification), so its
+     Size becomes 1000 before it starts, its allowance 2000 by ruling
+     106. Its Scope, Files, Test shape and Proof are unchanged. Session
+     13 says so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
