@@ -1,311 +1,259 @@
 # Credentials
 
-Provisional, 2026-10-03. Where temper's secrets live, who uses each, and
-how they reach the processes that need them: the LLM accounts the engine
-refreshes and grants to runs, the forge credentials of the engine and of
-workers' git, and the secrets that authenticate temper's own channels.
-The overview is `protocol.md` (section 5); the channel that carries grants
-is `channel.md`, and the requests that use them are `llm.md` and
-`forge.md`. What is open is listed in section 11.
+Provisional, 2026-10-03, revised 2026-10-14. temper's credentials: which
+secrets temper's processes hold, where each comes from, who may use it,
+and how it reaches the process that does. LLM accounts, workers' secrets
+and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
+jig's `protocol/llm.md`, sections 5 and 6); temper's own are its git
+identities and the forges' API tokens. The files they come from are
+configuration.md's (section 6); a git identity's value on the channel is
+channel.md's (section 6); git's use of it is git.md's (section 5). What
+is open is listed in section 8.
 
 ## 1. In one page
 
-- **The engine holds every credential.** Workers keep only the secret that
-  lets them dial the engine; agents keep nothing beyond the access tokens
-  they are granted for their run.
-- **LLM accounts are OAuth grants,** refreshed by the engine alone. A
-  provider may rotate a refresh token each time it is used, so a second
-  process refreshing the same account would spend it twice. A rotated
-  token is made durable before the access token it bought is handed
-  out.
-- **Accounts are a child domain of the engine's.** It decides when to
-  refresh, what a failed refresh or a spent account means, and which
-  attempts must hear of a new token. The OAuth server is a peer like any
-  other.
-- **Grants are pushed.** An assignment carries its attempt's grants: one
-  per LLM account its charter's endpoints use, and one for the git
-  identity its repositories use. After each refresh, the engine pushes
-  the new grant to every live attempt that uses the account; after every
-  hello, it pushes the current grants of each attempt it keeps. A run that
-  finds its token refused reports it, and the engine may refresh early.
 - **Names through the domains, values beside them.** A domain names a
-  credential by `(account, generation)` and never holds its value. Each
-  protocol layer keeps the values it carries in a small table indexed by
-  account, fills a value in as it encodes a message, and takes it out as
-  it decodes one. No trace, snapshot or log of a domain can leak a token.
-- **Times across hosts are durations.** A grant says how long its token is
-  valid, and the receiver turns that into a deadline on its own clock.
-- **Git gets its token per invocation,** in the environment of that one
-  git process, never in a URL or a repository's configuration.
+  credential by its number and a generation, and never holds its value,
+  so no trace, snapshot, record or log of a domain can leak one. Values
+  live in the protocol layer's tables, filled in as a record is encoded
+  and taken out as it is decoded.
+- **LLM accounts are jig's,** on skein's accounts driver: refreshed by
+  the engine alone, kept before a token is lent, granted to runs with
+  their assignments (section 3). temper writes no OAuth exchange. An
+  account's first record is a file another program's login fills, or
+  `temper sign-in`'s.
+- **Git identities are temper's application credentials,** one per
+  forge: a forge token, a login and an author, read from a private file
+  at start, granted with each assignment that needs one. Each
+  repository's runs use its forge's git identity (section 4).
+- **The API token is the engine's protocol layer's only.** One per forge,
+  read at start, never granted, never stored, and checked against the
+  forge's user before temper acts as it (section 5).
+- **Git gets its credentials per invocation,** in that process's
+  environment only, never in an argument, a URL or a file.
+- **Least power.** The git identity is apart from the API token: a worker
+  needs only fetching and pushing, so a deployment can give git a token
+  with less power than the engine's.
+- **No temper secret in jig's secrets' store** in standalone: every
+  temper secret is a file read at start. jig keeps sign-ins' and
+  services' digests there.
+- **Workers keep nothing between runs.** A worker's configuration holds
+  no credential but its own secret; every other comes with assignments.
 
 ## 2. The credentials
 
-| Credential | Kind | Held by | Used by | Changes |
-|---|---|---|---|---|
-| an LLM account | OAuth: refresh token, access token, expiry | the engine | agents, through grants | the engine refreshes it |
-| a git identity | the forge's token for pushing and fetching | the engine | workers' git, through grants | an operator replaces it |
-| the forge's API token | the forge's token | the engine | the engine's forge client | an operator replaces it |
-| the webhook secret | a shared secret | the engine | checking webhooks' signatures | an operator replaces it |
-| a worker's secret | a shared secret per worker | the engine and that worker | the worker's hello | an operator replaces it |
+| Credential | Owner | Kind | Source | Held by | Used by | Changes |
+|---|---|---|---|---|---|---|
+| an LLM account | jig | an OAuth record (refresh token, access token, expiry), or a handed-in access token | `temper sign-in`, or a private file another program's login fills | skein's accounts driver; the access tokens lent, jig's accounts' table | the worker's agent processes, through grants | the driver refreshes a signed-in one; a handed-in one is replaced by hand, then read at the next start |
+| a git identity | temper | a forge token, a login, an author | a private token file per identity, and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts |
+| a forge's API token | temper | a forge token | a private file per forge | the forge component | that forge's API requests | an operator replaces the file and restarts |
+| a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
+| a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `temper open`'s directory; the engine, its digest | each of the client's requests | the sign-in ends or expires |
+| a forge's webhook secret | temper | a shared secret | after standalone (forge.md, section 5) | — | — | — |
 
-The git identity is apart from the forge's API token: workers need only
-fetching and pushing, so a deployment can give them a token with less
-power than the engine's.
+## 3. LLM accounts
 
-## 3. Where they come from
+- **Configured in jig's `engine.llm`** (jig's `protocol/configuration.md`,
+  section 3): each account numbered, either signed in (its registration
+  and token endpoint) or handed in (a private file), with the private
+  directory of their records. temper adds no member.
+- **Held as jig holds them:** skein's accounts driver signs in, refreshes
+  before expiry, keeps each new record in the account's private file
+  before lending its access token, and lends tokens by generation;
+  `jig-protocol-accounts` translates between it and the core's accounts
+  child, and holds the tokens lent (jig's `protocol/llm.md`, section 5).
+  The core wants every account its charters' models name from the
+  restart's first step (jig's `domain/engine.md`, section 12).
+- **Granted with the assignment,** pushed to every live attempt on each
+  new generation, and resent after a hello (jig's `protocol/llm.md`,
+  section 6): `jig-protocol-engine-workers` fills the value in from jig's
+  accounts' table; the worker's routing puts it in smith's form (the
+  account id's length in two bytes, big-endian, the id, then the token:
+  jig's `protocol/llm.md`, 5.3) and hands it to smith's host half, which
+  fills it into the agent's start and grants.
+- **Rejected and exhausted** travel from the agent through smith's host
+  half, the hub and the link to the accounts child, fenced by attempt, as
+  jig has them.
+- **The engine makes no LLM call** (llm.md, section 2): only agent
+  processes use an account's tokens.
+- **An account's first record,** one of two:
+  - **handed in:** a private file in jig's format (jig's
+    `protocol/configuration.md`, section 10): `access_token`,
+    `expires_at`, and `account_id` where the provider names one. The
+    driver lends it until it lapses, never refreshing it and never
+    writing its source. The live tier hands in a borrowed Codex login's
+    access token so (testing.md, 2.7);
+  - **signed in:** by `temper sign-in`, below.
+- **`temper sign-in CONFIG.json ACCOUNT`:**
+  - `ACCOUNT` is the `number` of one of `engine.llm.accounts`.
+  - It reads and checks `CONFIG.json` as `temper serve` does
+    (configuration.md, section 2), reading no secret file but the
+    account's own; it opens no store and starts no service. The engine
+    need not run.
+  - It refuses, before anything else and naming the account: a number no
+    account has; a handed-in account; and an account whose registration
+    has a client secret, since a sign-in at a terminal serves a public
+    client only (jig's `protocol/llm.md`, 5.4).
+  - It runs skein's accounts driver's sign-in (skein's `oauth.md`,
+    sections 2 and 6): it prints the visit's URL on stdout, one line;
+    waits for the provider's redirect on the registration's loopback
+    listener, within the driver's sign-in deadline (skein's `oauth.md`,
+    section 3); exchanges the code; keeps the record in the account's
+    private file; and exits 0.
+  - It never opens a browser, and prints no secret.
+  - It exits 1 on any failure (a refusal, the deadline passed, the
+    provider's error, a record not kept), the reason on stderr.
+  - A running engine loads the new file at its next grant of the account
+    (jig's `protocol/llm.md`, 5.4): no restart.
+  - It is copied from smith's local shell's sign-in (smith's `shell.md`,
+    4.5 and section 7), on the same driver.
+- **What temper does not do:** refresh an account itself, keep an
+  account's record in its store, or sign an account in through the
+  client (jig's `protocol/llm.md`, section 10).
 
-Each process has its configuration and secrets in memory when it starts.
-Where they come from is the shell's business, and not decided here. What
-the domains need of them:
+## 4. Git identities
 
-- **Each LLM endpoint names its account,** and each repository its git
-  identity, so the engine knows which accounts each run needs.
-- **Each account names its provider, its token endpoint and its client.**
-- **The engine knows each worker's secret by the worker's name,** and a
-  worker knows its own.
-- **One thing must outlive the process:** an LLM account's refresh token,
-  once rotated. The engine's protocol layer makes it durable before the
-  access token it bought is handed out (section 6). Where it is kept is
-  not decided here, beyond its carrying a version, as everything that
-  outlives a process does (protocol.md, section 3).
+- **What one is:** a forge token git authenticates with, the forge login
+  it goes with, and the author (a name and an email) of the commits made
+  with it. It is an application credential (jig's `domain/engine.md`,
+  12.1), numbered by configuration (configuration.md, section 3).
+- **Each repository to a git identity.** Each forge names one identity,
+  and each repository's runs use its forge's git identity: the root's
+  `GitIdentity { forge, credential }` comes from configuration, and each
+  repository of an assignment's workspace names its forge's. An identity
+  serves exactly one forge.
+- **Its source** is the private token file `identities[].token`, read at
+  start; its login and author are the identity's members. Each start
+  gives it generation 1. Its validity is unbounded (`Duration` at its
+  largest, as jig's reference service gives its credential): Forgejo's
+  tokens do not expire.
+- **Announced first.** The engine's routing gives the root `Event::Credential
+  { number, generation: 1, valid }` for each identity as its first
+  events, before its restart, so every identity is usable when decisions
+  open (jig's `domain/engine.md`, 12.1).
+- **The identities' table, on the engine:** each identity's value,
+  temper's record of its token, login and author (channel.md, section 6),
+  encoded once at start by `temper-protocol-worker-wire`, and held as one
+  secret by number and generation. No root, store record, fact or log
+  ever holds it.
+- **Granted with the assignment.** A run whose workspace names a
+  repository is granted its forge's identity, the grant naming the
+  application's table; `jig-protocol-engine-workers` fills the value in
+  from the identities' table, through the routing, as it encodes the
+  assignment or a grant record, and grants follow their attempts as an
+  account's do (jig's `protocol/channel.md`, section 8). A run with no
+  repository is granted none.
+- **On the worker,** `jig-protocol-worker-link` takes the value out into
+  the worker's identities' table, by number, at most the two newest
+  generations; the hub hears the name only. The git component reads the
+  value from the table for each invocation (git.md, section 5). An entry
+  goes as jig's do (jig's `protocol/channel.md`, section 8); a git
+  identity's never expires, so only a newer generation pushes it out.
+- **In git,** the environment only:
+  `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_n` and `GIT_CONFIG_VALUE_n` set
+  `http.extraHeader` to `Authorization: Basic` and the base64 of
+  `login:token`, and `GIT_AUTHOR_*` and `GIT_COMMITTER_*` come from the
+  author. Never in an argument, a URL, a repository's configuration or a
+  file. git.md, section 5 gives the environment whole.
+- **Agents never get one.** An agent process's environment holds no
+  credential (jig's `protocol/service.md`, section 6), and the hub hands
+  an agent its LLM grants only.
+- **A forge that refuses the identity** fails the workspace, never the
+  credential: a preparation it refuses is `Preparation::Refused`, a push
+  `Landing::Refused` (`domain/worker.md`, 4.3). Rejected and exhausted
+  are LLM accounts' only (jig's `domain/engine.md`, 12.1).
+- **Replaced** by an operator, who replaces the token file and restarts;
+  the new start grants generation 1 again. In standalone no worker
+  outlives the engine, since the worker is in its process, so no holder
+  can mix the two values under one name (section 8).
 
-## 4. Names, values and the tables
+## 5. The forges' API tokens
 
-- **A credential's name is `(account, generation)`.** `account` is the
-  deployment's index for it. `generation` counts the access tokens an LLM
-  account has bought since it was granted; a static secret stays at
-  generation zero. Names cross the domain boundary as plain integers.
-- **A name never means two values, across restarts too.** A worker or an
-  agent may still hold a grant from the engine's last life when the next
-  one speaks. So an account's generation is kept with its rotated tokens
-  (section 6), and a restart resumes from it: the engine grants the kept
-  token again under its kept generation, and its next refresh buys the
-  one after. An account given anew at startup, after a revocation,
-  starts above the generation kept for it.
-- **A value is the token, and what goes beside it:** a bearer token and,
-  for ChatGPT, the account id read once from the token's claims by the
-  engine. On the channels they are two byte fields (channel.md, section
-  9). Every value is under `Limits::token_bytes`.
-- **Each protocol layer has a table, indexed by account,** holding at most
-  the two newest generations of each.
-  - **The engine's** also holds each LLM account's refresh token, which
-    never leaves the engine.
-  - **The worker's** holds what grants brought it.
-  - **The agent's** holds the grants of its run.
+- **One per forge,** read at start from `forges[].api_token`, and held
+  by the forge component alone. It goes in the `Authorization: token`
+  header of each request to that forge's API (forge.md, 3.1), over TLS
+  unless the forge is on loopback (configuration.md, section 3).
+- **Never granted, never stored:** not in a grant, a root, the store, a
+  fact or a log, and never sent to another forge or another host.
+- **Checked at start.** The forge component's first exchange with each
+  forge is `GET /api/v1/user`; the answer's `id` must equal
+  `forges[].user`. Another id, or a `401` or `403`, stops the engine,
+  naming the forge: a wrong token would make temper act as someone
+  else, so the check is fail-stop, never a degraded mode. The service
+  drains as at a shutdown, and `temper serve` exits 1, the reason on
+  stderr (protocol.md, section 6).
+- **Until the check is answered,** the forge's calls wait in the
+  component, at most the forge client's calls in flight, each until its
+  deadline, when it ends unavailable, since it never left. A forge that
+  cannot be reached, or answers `5xx`, is checked again after the
+  component's backoff (forge.md, 3.5 and section 8).
+- **The same user is the forge writer** in the domain (`Writer { forge,
+  author: user }`), by which the forge connector tells temper's own
+  writes from others' (`domain/forge.md`, section 6).
+- **A token the forge stops taking** fails each call as forge.md, 3.4
+  classifies a refusal; nothing refreshes it. An operator replaces the
+  file and restarts, and the check runs again.
 
-  The table is sized at startup from the configured accounts, so it never
-  grows.
-- **Two generations, so a message in flight still finds its value.** A
-  grant for generation g can be encoded just after g+1 has arrived; the
-  table still holds g, and fills it in. A grant naming a generation older
-  than both is dropped as it is encoded, since a newer grant follows it.
-- **An entry goes when its token has expired,** on the holder's own clock,
-  or when a newer generation pushes it out. No domain tells a table to
-  forget: names carry no lifecycle beyond the token's own.
+## 6. Workers' secrets and sign-ins
 
-## 5. Accounts: the engine's child domain
+- **A worker's secret is jig's** (jig's `protocol/channel.md`, 4.1). In
+  standalone the link is in process, and still opens with the worker's
+  name and secret, which the engine compares in constant time with the
+  digest it holds; the files are jig's worker and engine parts'
+  (configuration.md, section 6).
+- **People's sign-ins are jig's** (jig's `protocol/client.md`, section 8):
+  the engine prints a link at start; `temper open` signs in by it, and
+  keeps the bearer token it is given in its private directory (client.md,
+  section 7).
+- **jig's secrets' store** keeps sign-ins' and services' digests; temper
+  keeps nothing there.
+- **The forge as a sign-in provider** comes after standalone: a component
+  of temper's to which jig's clients' side routes (jig's
+  `protocol/client.md`, section 8).
+- **No TLS key** in standalone: nothing temper serves leaves the machine.
 
-`temper-engine-domain-accounts` joins the engine's tree (engine-domain.md,
-section 3). It is a capability, like the fleet, and keeps no secret.
+## 7. Testing
 
-- **An account's state:**
-  - *Starting:* given only a refresh token, so it refreshes at once and
-    is unusable until that succeeds;
-  - *Fresh:* its generation, and its deadline: when the token expires,
-    on the engine's clock;
-  - *Refreshing:* a refresh in flight, which names the generation it
-    buys (the current one plus one), echoed when it ends;
-  - *Retrying:* the last refresh failed transiently; the next one is due
-    after a backoff;
-  - *Revoked:* the provider refused the refresh token; only a person can
-    help.
-  - *Spent* is an overlay on the others: the provider said the account's
-    usage is exhausted, until a time.
-- **Transitions:**
+- **No value across a domain boundary:** the one-process world and the
+  forge's protocol world search every root's events and requests, every
+  fact and every store record for the values their fakes issued (LLM
+  access tokens, identities' tokens, API tokens), and fail on any
+  (testing.md, 2.5).
+- **The identities' table:** step tests of its filling at start, a value
+  filled into a grant and taken out on the worker, and two generations.
+- **Git's environment:** step tests of its builder: the header's bytes,
+  the author's variables, and no credential in an argument or a URL
+  (git.md, section 9).
+- **The user check,** in the forge's protocol world: a token of another
+  user stops the engine, naming the forge; calls wait until the check is
+  answered; an unanswered check is made again.
+- **Startup:** a secret file readable by another user, or reached
+  through a link, refuses the start, naming it.
+- **`temper sign-in`,** against skein's fake issuer (skein's `oauth.md`,
+  section 5): the visit printed, the redirect taken, the record kept,
+  exit 0; a handed-in account and a confidential client refused; a
+  running engine lending the new record at its next grant.
+- **The live tier** borrows a Codex login's access token read-only,
+  never refreshes it and never writes its file (testing.md, 2.7).
 
-  | State | On | Goes to |
-  |---|---|---|
-  | Starting | the engine starts | Refreshing: asks for a refresh |
-  | Fresh | its deadline less the margin | Refreshing: asks for a refresh |
-  | Fresh | a `Rejected` naming the current generation, past the minimum interval since the last refresh | Refreshing |
-  | Fresh | a `Rejected` naming an older generation | Fresh, unchanged |
-  | Refreshing | `Refreshed { generation, valid }` | Fresh, the new generation granted to every live attempt that uses the account |
-  | Refreshing | failed: unavailable, timed out or rate limited | Retrying, the backoff doubled up to its ceiling |
-  | Refreshing | failed: refused | Revoked; people are told |
-  | Retrying | the backoff's end | Refreshing |
-  | Retrying | its token's deadline | Retrying, now unusable: the runs that need it wait |
-  | any | `Exhausted { account, retry_after }` | Spent until then, unusable; the runs that need it wait |
-  | Revoked | a new grant from a person, after a restart | Fresh |
+## 8. Open questions
 
-- **Usable or not, for the work hub.** An account is usable while it is
-  fresh, or refreshing or retrying with time left on its token, and not
-  spent. A run whose charter needs an unusable account is not started:
-  the hub treats it as waiting, as it would for a slot. The accounts
-  domain tells its parent when an account becomes usable again, and the
-  hub then starts what waited for it. A live run is not cancelled for its account: it fails
-  on its own if its calls do, and the hub's retry policy takes over.
-- **People are told** when an account becomes revoked, or spent beyond a
-  threshold. The account's state is a fact that views carry to watchers
-  (engine-domain.md, section 11), and the engine logs it. How a person is
-  reached beyond that is open (section 11).
-- **Limits:** the accounts; the refresh margin; the backoff's base and
-  ceiling; the minimum interval between refreshes that a `Rejected`
-  forces; and the threshold past which a spent account is reported.
-- **Which attempts use which accounts.** The engine's configuration maps
-  each LLM endpoint to an account, and each repository to a git identity.
-  A charter's models name their endpoints, and an assignment's workspace
-  names its repositories, so the top level knows each live attempt's
-  accounts. It routes each `Granted` from accounts to the fleet, as a
-  `Grant` for each of those attempts.
-
-## 6. Refreshing
-
-- **The exchange** is the engine's protocol layer's: an HTTP POST to the
-  account's token endpoint, over TLS. Its body is JSON:
-  `grant_type=refresh_token`, the client's id and the refresh token. The
-  answer carries a new access token, perhaps a new refresh token, and how
-  many seconds the access token lasts. The stack is that of any HTTP
-  client in temper (llm.md, forge.md): socket, TLS, HTTP, JSON tokens,
-  and a small decoder in `temper-oauth`, whose server side the fake LLM
-  provider uses.
-- **Kept before it is used.** The protocol layer makes the rotated
-  refresh token durable, with the new access token and its generation
-  (section 4). Only once that has
-  completed does it tell the domain `Refreshed`.
-  - A crash before then loses the new tokens. The old refresh token is
-    still the one kept, and the provider either still takes it, or
-    refuses it and the account is revoked.
-  - A crash after loses nothing.
-- **Keeping that fails** holds the new tokens in the table, fails the
-  refresh as unsaved, and is tried again on the domain's backoff. Until it
-  succeeds, the account is usable but at risk, and people are told.
-- **Failures,** classified for the domain:
-  - unavailable: the request provably never left;
-  - timed out: no answer, or a dropped connection after sending;
-  - rate limited, with a reset;
-  - refused: the provider answered `invalid_grant` or the like: the
-    refresh token is no good.
-- **The provider's extras.** ChatGPT's requests name the account, whose id
-  is a claim in the access token. The engine's protocol layer decodes the
-  token's payload (base64url, then JSON) once per refresh, and stores the
-  id with the token. Agents never parse tokens.
-
-## 7. Grants on the channels
-
-The messages are `channel.md`'s; their meaning is this section's.
-
-- **Down: `Grant { run, attempt, account, generation, valid }`** plus the
-  value, which the sender's protocol layer fills in and the receiver's
-  takes out.
-  - **The engine sends the attempt's first grants inside its
-    assignment,** so the git grant cannot arrive after the preparation
-    that needs it, and later ones as `Grant` messages: after every
-    refresh, and after every hello for the attempts it keeps
-    (channel.md, section 9).
-  - **The worker keeps the git grant** for its own git operations, and
-    passes LLM grants on to the agent of that attempt.
-  - **Every grant is fenced by attempt,** like every other message
-    (worker-domain.md, section 2).
-- **Up, from agent to worker to engine, two notices:**
-  - `Rejected { run, attempt, account, generation }`: the provider refused
-    that token as unauthorized;
-  - `Exhausted { run, attempt, account, retry_after }`: the provider said
-    the account's usage is spent. `retry_after` is a duration, as every
-    time on the channels is.
-
-  The worker passes both through.
-- **`valid` is a duration,** the time left on the token when sent. The
-  receiver's deadline is `env.now + valid - Limits::skew`: transit only
-  shortens what is left, and `skew` covers the time spent in queues.
-- **The agent's side:**
-  - the start message names each endpoint's account, as the worker's
-    protocol layer completes it from the worker's endpoint table (llm.md);
-  - the agent's top level holds the newest grant per account, and gives
-    each `Complete` the name to use;
-  - a call that fails as unauthorized sends `Rejected` up, once per
-    generation, and fails to the session, which tries again after its
-    backoff, by when a fresh grant has usually come;
-  - with no grant left in time, a call fails as unauthorized at once,
-    without reaching the provider.
-- **Git's side.** An assignment's repositories each name their identity,
-  which is now the git grant's account (worker-domain.md, 4.1). The
-  worker's protocol layer gives each git invocation the token in that
-  process's environment only: `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and
-  `GIT_CONFIG_VALUE_0` set `http.extraHeader` to the authorization
-  header. Agents run in their own process trees, so they never see a git
-  process's environment (section 11).
-
-## 8. The static secrets
-
-- **A worker's secret** goes in its hello, over TLS between hosts
-  (channel.md). The engine compares it in constant time with the one it
-  knows for that worker's name; a mismatch is refused before the domain
-  hears of the worker.
-- **The webhook secret** checks each webhook's signature (forge.md).
-- **The forge's API token** goes in the engine's forge requests' headers
-  (forge.md).
-
-## 9. What the domains owe
-
-- **The engine:**
-  - the accounts child domain (section 5);
-  - in the fleet, `Grant` down and `Rejected` and `Exhausted` up, all
-    fenced by attempt;
-  - at the top level, each live attempt's accounts, from configuration
-    mapping endpoints and repositories to accounts;
-  - in the hub, waiting for an unusable account as for a slot;
-  - in views, the accounts' states as facts.
-- **The worker:**
-  - an assignment's grants, by name;
-  - LLM grants passed on to the agent;
-  - each repository's identity, as the git grant's account;
-  - `Rejected` and `Exhausted` relayed up.
-- **The agent:**
-  - grants held by name at the top level, and the name given with each
-    completion request;
-  - `Rejected` and `Exhausted` sent up;
-  - in the session, `Unauthorized` becomes transient (it tries again
-    after its backoff), and an exhausted account becomes a failure of its
-    own (llm.md), which ends the run as transient for the engine to retry
-    once the account is usable.
-
-## 10. Testing
-
-- **The accounts world:** the child domain with the world as its parent
-  and a scripted token endpoint. Refreshes due by deadline, early
-  refreshes forced by `Rejected` and throttled by the minimum interval,
-  transient failures with backoff, revocation, spent accounts, and
-  writes that fail.
-- **The fake LLM provider's OAuth server** rotates refresh tokens and
-  refuses a spent one, as the real providers may. Its faults: the refresh
-  answer lost after rotating, an unavailable endpoint, a slow one.
-  Bearer tokens expire, and a call with an expired or unknown token is
-  refused as unauthorized.
-- **The system worlds** gain tokens that expire in the middle of runs, an
-  engine that restarts between refreshing and writing, workers that
-  redial and are sent grants again, and an account revoked or spent under
-  live work.
-- **Protocol worlds** check that a token's value never appears in what
-  crosses a domain boundary. The world's trace of each domain's records is
-  searched for the values the fakes issued.
-
-## 11. Open questions
-
-- **A refresh whose answer is lost** may have spent a rotating refresh
-  token on the provider's side. Retrying with the old one then fails as
-  refused, and the account needs a person. Whether providers allow the
-  old token for a grace period decides whether this is rare or a real
-  risk.
-- **Logging in through the web,** with PKCE, so an account can be added or
-  re-authorised from temper itself.
-- **Telling people about an account:** beyond views and the log, a forge
-  issue or the web's status page.
-- **Git's environment.** This assumes agents cannot read a git process's
-  environment, which holds when their containment gives them a process
-  namespace of their own (testing.md, section 10, the real loop's
-  privileges). Without one, the token goes to git through a pipe and a
-  credential helper instead.
-- **Short-lived git credentials:** Forgejo's tokens do not expire. A
+- **Git's environment, readable by agents.** An agent run as the same
+  user could read a git process's environment. Default: accepted in
+  standalone, where every process is the person's; between hosts,
+  contained process trees give agents a process namespace of their own,
+  which closes it (jig's `protocol/README.md`, section 10). Without
+  them, the token would reach git through a pipe and a credential helper
+  instead.
+- **Generations across starts.** Generation 1 at every start names a new
+  value once a token file is replaced, which is sound only while no
+  worker outlives the engine. Default: standalone only; workers on other
+  hosts wait for a generation kept across starts.
+- **Short-lived git credentials.** Forgejo's tokens do not expire. A
   forge that issues short-lived ones (GitHub's app installation tokens)
-  would make the git identity an account the engine refreshes, as it does
-  LLM accounts.
+  would make a git identity's source an exchange the protocol layer
+  refreshes, announcing each new generation (jig's `domain/engine.md`,
+  12.1). Default: static tokens only.
+- **A handed-in account read again while the engine runs** (jig's
+  `protocol/llm.md`, section 10). Default: a newer file is read at the
+  next start.

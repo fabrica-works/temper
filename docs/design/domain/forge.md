@@ -107,6 +107,19 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   from then on (`Repository { forge, repository }`), so a rename or a
   transfer on the forge keeps it the same repository. A repository the
   forge does not have refuses the adoption as unavailable.
+- **The adoption request is the forge's own,** keyed as any person's
+  request (`docs/design/client.md`, section 4): the root takes it from
+  the protocol layer typed, and the connector refuses a forge the
+  deployment does not configure; then locates the repository
+  (`Read::Locate { owner, name }`, answered `Answer::Located {
+  repository }`); then reads what temper may do there (below); and only
+  then makes jig's adoption request on the person's behalf (people.md,
+  5.1). Its outcome is the adoption's: adopted, refused by the core with
+  jig's reasons, or refused by the forge with the connector's.
+- **The forge's host** in a repository's resource path, and in what a
+  person reads of it, is the forge's as configured: the host of its `git`
+  base, with `:port` when it names one (`docs/design/configuration.md`,
+  section 3). The adoption does not ask a person for it.
 - **What temper may do is read at adoption:** its user's permission on
   the repository; the branch protection that applies to temper's prefix
   and to each landing branch; whether temper may merge there. The

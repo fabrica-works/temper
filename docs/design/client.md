@@ -1,0 +1,926 @@
+# temper's client
+
+Provisional, 2026-10-14. temper's first client: a person's terminal on
+jig's client domain and view. Its crates; its client root and view
+root, copied from jig's reference roots, with the forge's client side
+as their one child of temper's; the forge's client family, its words
+and its one form; the terminal shell that `temper open` runs; signing
+in and the small store; what the engine does for it; what it replaces;
+and how it is tested. jig's client is jig's `client/domain/` and jig's
+`protocol/client.md`, which this document takes as given and cites.
+The browser is `web/architecture.md`. What is still open is listed in
+section 11.
+
+## 1. In one page
+
+- **jig's client, temper's roots.** temper's client is jig's client
+  domain and view under a client root and a view root of temper's,
+  copied from jig's reference roots. Their one child of temper's is
+  the forge's client side (sections 3 to 5).
+- **A terminal first.** `temper open` shows jig-view's tree as text and
+  takes a person's acts as lines typed on stdin, over jig's native
+  transport. jig's browser shell is not built, its native shell has no
+  view, and jig's view leaves a text shell to applications (jig's
+  `client/domain/view.md`, 11 and 14). The browser is a later shell of
+  the same client (`web/architecture.md`).
+- **jig's pages, the inbox home,** and one page of the forge's:
+  adopting a repository into a project.
+- **The forge's family is small.** Its words for the connector, a
+  repository, a branch, a pull request and each kind of write need no
+  document. Its one request is adoption, keyed through the request
+  table like any other. Every other part of the forge (panels,
+  results, effects, outbox entries, holds, project, deployment) is not
+  served: its slot says "Shown on the forge."
+- **One crate of records.** `temper-protocol-client-wire` carries the
+  adoption, its outcome and the small store's record of a pending one.
+  The engine decodes it before its root, which locates the repository
+  and adopts it on the person's behalf (section 8).
+- **A shell, pure where it decides.** The terminal's loop is ordinary
+  Rust; its renderer (tree to lines) and its command reader (line to
+  act) are pure functions under the subset, tested by golden text.
+- **Signed in by the printed link,** kept signed in by a bearer token in
+  the client's own private directory, with the small store beside it.
+  Loopback only, in standalone.
+- **The web's own crates go** when this client's world lands; the web
+  plan's W5 to W10 are never built (section 9).
+- **Joined to the engine from the start.** The client's world runs
+  temper's client root and view, with jig's fake person, against
+  temper's engine root (testing.md, 6.3).
+
+## 2. The client's crates
+
+```
+temper's client
+temper-client-domain            the client root: the request table, routing, translation (section 3)
+├── jig-domain-client           jig's client domain: the frame, the link, jig's pages and objects
+└── forge                       the forge's client side: its parts, the adoption form (section 4)
+temper-client-view              the view root: jig's view and the forge's, slots filled (section 5)
+├── jig-view                    jig's view: the tree, the builder, the diff, words, jig's pages and cards
+└── forge                       the forge's view: its words, its page, its parts' fragments
+
+skein-lib's request table       keyed requests: the client root's only way out for them
+
+below the domain: the client's protocol layer
+jig-protocol-client-wire        jig's records, for both ends
+temper-protocol-client-wire     the forge family's records, for both ends (section 4.6)
+jig-protocol-client-link        the connection to the engine: exchanges, the stream, envelopes
+jig-protocol-transcript         turns decoded with smith's transcript crate, inside the link
+
+the shell
+jig-shell-native                the native transport: skein's HTTP client; the token's and the small store's files
+temper-shell-terminal           the native client, and the terminal in front of it (section 6)
+temper                          the binary; `temper open` runs the terminal (protocol.md, section 4)
+
+for tests
+jig's fake person               the person, on the view tree (testing.md, 4.4)
+jig's client world              the client worlds' kit: harness, referee, faults
+tests/client                    temper's client joined to temper's engine root (section 10)
+```
+
+- **The crate graph is the role graph** (jig's `client/domain/README.md`,
+  section 2). `temper-client-domain` depends on skein-lib and
+  `jig-domain-client`; `temper-client-view` on skein-lib, `jig-view`,
+  `jig-domain-client` and `temper-client-domain`. Neither links a
+  wire, the link, smith, or an engine crate of temper's: the forge's
+  side has a small vocabulary of its own (section 4), as each client
+  side does (jig's `client/domain/root.md`, section 2).
+- **`temper-protocol-client-wire`** is a codec crate generated by
+  skein's generator from a schema, depending on skein-codec alone
+  (jig's `protocol/client.md`, section 3). The engine's service and the
+  terminal both use it.
+- **`temper-shell-terminal`** holds, as modules:
+  - `client`: the native client, the composition of the client root,
+    the view root, `jig-protocol-client-link` and `jig-shell-native`'s
+    shell as one host of skein's loop, copied from the native client
+    of jig's client protocol world. Ordinary Rust. The worlds put jig's
+    fake person in front of it where `temper open` puts the terminal
+    (section 10);
+  - `route`: the client's protocol routing between the link and the
+    client root: jig's records to and from the root as the link gives
+    them, the forge family's records decoded and encoded with
+    `temper-protocol-client-wire` (jig's `protocol/client.md`, 11).
+    Step code: small total functions, exhaustive both ways;
+  - `terminal`: the loop over stdin, stdout and the native client
+    (6.2). Ordinary Rust;
+  - `render` and `command`: the renderer and the command reader (6.3,
+    6.4, 6.8). Step code;
+  - `limits`: the client's limits and their sum.
+- **Step code under the subset:** both roots, the forge's side and its
+  view, the wire, the routing, the renderer and the command reader.
+  **Ordinary Rust:** the native client's composition and the
+  terminal's loop, as a shell is (jig's `client/domain/view.md`,
+  section 11).
+- **The client's limits** are constants of `temper-shell-terminal`,
+  taking jig's client limits from jig's small profile where jig names
+  them. The client reads no configuration: its only inputs are its two
+  arguments (configuration.md, section 9).
+
+## 3. The client root
+
+`temper-client-domain` is copied from jig's reference client root
+(jig's `client/domain/root.md`, section 12: `ops`'s, and jig's test
+client root), with `ops`'s two connector sides replaced by the forge's
+one. It keeps jig's one shape (jig's `client/domain/root.md`,
+section 3), the request table (section 4), its routing (section 5),
+the small store composed (section 8), and never does what section 10
+there forbids.
+
+### 3.1 Its children
+
+- **`jig-domain-client`,** configured with temper's navigation: home is
+  the inbox; jig's entries are the inbox, the conversations across
+  projects, and the deployment, which jig offers only to a party with a
+  role on it (jig's `client/domain/pages.md`, section 2). Projects are
+  reached from the frame's projects. The forge's one entry is in the
+  frame's navigation slot (5.3).
+- **The forge's client side** (section 4): the child for the forge
+  connector. Its connector number is given at construction: the shell
+  passes `temper-protocol-client-wire`'s `FORGE` (4.6), the number the
+  engine's configuration gives the forge (configuration.md, section 3),
+  so both roots name the connector alike (jig's
+  `client/domain/root.md`, section 2).
+- **The request table,** skein-lib's, its owner the root's enum:
+  `Jig(token)`, `Forge(token)`, and `Kept { scope }` for a request
+  restored from the small store whose asker is gone.
+
+### 3.2 Its modules
+
+```
+temper-client-domain/src/
+├── lib.rs          the tree, re-exports
+├── boundary.rs     events in, requests out: one variant per child (Jig, Forge), wrapped
+├── owner.rs        the table's owner
+├── address.rs      the root's address: jig's, or the forge's (4.5)
+├── domain.rs       Domain, new, step, fire, take, next_deadline, shown, reclaim: the one shape
+├── route.rs        events, acts, answers, progress and hand-offs to their child
+├── parts.rs        parts to the forge's side by connector; any other connector a fact
+├── store.rs        the small store's records: jig's and the table's, wrapped; the version
+├── limits.rs       jig's limits, the forge side's, the table's, and their sum
+├── forge.rs        the forge's client side (section 4), with its modules below forge/
+└── tests.rs
+```
+
+The reference's comments say what to keep and what to replace; the copy
+keeps them, so the next reconciliation with jig compares like with
+like.
+
+### 3.3 Routing
+
+- **By owner** (jig's `client/domain/root.md`, section 5): every token
+  comes back wrapped with its child's variant; the root unwraps it and
+  hands it on.
+- **Parts by connector:** a part whose connector is the forge's goes to
+  the forge's side; any other is a fact (`UnknownConnector`), and its
+  slot says it cannot be shown. The match is on the forge's number
+  given at construction.
+- **Addresses:** jig's to `jig-domain-client`; the forge's adoption page
+  to the forge's side; every other child is told it left its page.
+- **The link** to every child and to the table; **the party confirmed**
+  to the table (jig's `client/domain/root.md`, section 5).
+- **Kept requests:** restored with `Kept { scope }`, parked until their
+  party is confirmed; `jig-domain-client` is told each scope and its
+  count, and each kept request the table retires (jig's
+  `client/domain/root.md`, section 8).
+  A kept adoption has no form to show it: its answer goes to no child,
+  and the adopted repository shows on the project's resources.
+
+### 3.4 At start
+
+The shell starts the root at home, the inbox. jig's records bring back
+where jig's pages were (jig's `client/domain/client.md`, section 11).
+The forge's side keeps no record of its own, so a client closed on the
+adoption page opens at the inbox, and the form's values are not kept
+across a restart.
+
+## 4. The forge's client family
+
+The forge's client side is the client root's child for the forge
+connector (jig's `client/domain/root.md`, sections 2, 6 and 7). In the
+first client it shows the forge's parts that need no document, says
+that the others are shown on the forge, and holds one form.
+
+### 4.1 Words that need no document
+
+A connector, a resource or a kind needs no document: its words are the
+owner's view's, from its number or its path (jig's
+`client/domain/root.md`, section 6).
+
+- **The connector:** "forge".
+- **A resource,** by its path (`domain/forge.md`, section 2):
+
+  | Path | Words |
+  |---|---|
+  | `forge` HOST OWNER NAME | OWNER/NAME on HOST |
+  | … `branch` S1 … Sn | branch S1/…/Sn of OWNER/NAME on HOST |
+  | … `pull` N | pull request #N of OWNER/NAME on HOST |
+  | … `issue` N | issue #N of OWNER/NAME on HOST |
+  | two segments: a forge's number (2 bytes) and a repository's id (4 bytes), big-endian, as an adoption names it | repository ID on forge F |
+  | anything else | its segments joined by `/`, as they are |
+
+  An adopted repository is named by its forge's number and its id
+  (`domain/forge.md`, section 4), so the project's resources list it by
+  those until the forge's documents name it by owner and name
+  (section 11).
+- **A resource pattern** (a grant's): the words of its segments as
+  above, its last segment as it is; an open end is its prefix followed
+  by `…` ("branch temper/7/… of acme/shop on forge.example").
+- **A kind,** by the forge's numbering (`temper-engine-domain-forge`'s
+  `effect_shape`; `domain/forge.md`, section 6):
+
+  | Kind | Words | Kind | Words |
+  |---|---|---|---|
+  | 1 | read | 9 | create a branch |
+  | 2 | push | 10 | edit a pull request |
+  | 3 | open a pull request | 11 | update a pull request from its base |
+  | 4 | merge a pull request | 12 | close or reopen a pull request |
+  | 5 | post a review | 13 | edit, close or reopen an issue |
+  | 6 | set a commit status | 14 | set reviewers |
+  | 7 | post a comment | 15 | delete a branch |
+  | 8 | create an issue | any other N | kind N |
+
+  These are the forge client's writes in words (its `Write`
+  vocabulary), with reading and pushing. A new kind is a new row here
+  in the same change that numbers it.
+
+### 4.2 Parts not served
+
+Every other part of the forge (a panel, a result, an effect, an outbox
+entry, a hold, a project's, the deployment's, and any other part of an
+application's kind that jig names) is not served by the engine yet. Its
+slot holds one paragraph, exactly:
+
+> Shown on the forge.
+
+The forge's side reads and watches nothing: `temper-protocol-client-wire`
+has no read or subject record, and the engine answers any read or
+watch of the forge's family as unknown (section 8). The slot never
+shows loading for these parts, and never an error.
+
+### 4.3 Where the form is
+
+jig's design puts a connector's adoption form in a slot of the
+project's settings (jig's `client/domain/pages.md`, 6.5). jig's view at
+temper's pinned revision lists a project's resources but builds no
+slot for a connector's form, and its confirmation says adopting is not
+offered. So the form is on a page of the forge's own, under jig's
+frame, at the forge's address `Adopt { project }`, reached from the
+forge's entry in the frame's navigation slot (5.3). When jig's settings
+leave the slot, the same fragment fills it and the page goes
+(section 11).
+
+### 4.4 The adoption form
+
+The page's title is "Adopt a repository into PROJECT", PROJECT as
+jig's frame names the project. Its fields are `forge::Adoption`'s
+(`temper-engine-domain-forge`) but the repository's id, which the
+forge connector locates by owner and name (`domain/forge.md`,
+section 4), and the forge's host, which the engine fills from the
+forge's configuration (section 8). In order:
+
+| Field | Node, named | Default | Rule |
+|---|---|---|---|
+| forge | text field "Forge number" | `1` | a number from 1 to 65535; one the engine has not configured is refused as no such forge |
+| owner | text field "Owner" | empty | required |
+| name | text field "Name" | empty | required |
+| role | choice group "Role": "Owned: temper pushes, opens pull requests and lands", "Fork: temper contributes through a fork", "Context: temper only reads" | owned | one of the three |
+| home | check "Make it the project's home" | checked | a context repository cannot be the home |
+| prefix | text field "Branch prefix" | `temper/` | required |
+| landing | text field "Landing branch" | empty | required: the forge connector refuses an adoption without one |
+| ci | check "It runs CI" | checked | without CI, at least one check |
+| checks | text field "Checks: gate numbers, separated by spaces or commas" | empty: none | numbers from 1, each once, at most the client's limit on checks |
+
+Then a button "Adopt", and below it the request's state or outcome.
+
+- **Every field is bounded** by the client's limit on a field's bytes,
+  set no larger than the forge connector's name bound in temper's small
+  profile (`temper-engine-domain-forge`'s `name_bytes`). A value past
+  it is not taken: the field keeps its last value and is marked
+  invalid, with the bound in words.
+- **Checked before sending:** each rule of the table that the draft
+  alone decides (all but whether the forge is configured) is the
+  form's own check, never one of what the person may do. A field that
+  fails is marked invalid, with one status line under it saying the
+  rule in words ("Required.", "A forge number is from 1 to 65535.",
+  "Checks are numbers from 1, each once.", "A context repository
+  cannot be the project's home.", "Without CI, name at least one
+  check."), and nothing is sent. The engine checks everything again.
+- **Adopt** makes one keyed request through the table (4.6): saved in
+  the small store before it is sent, sent again with its key after a
+  drop or a restart, parked while offline, made once (jig's
+  `client/domain/root.md`, section 4). While it is pending the button
+  is disabled and a status says its progress in jig's words (in
+  flight, retrying, parked, unknown: jig's `client/domain/client.md`,
+  section 6).
+- **Defaults when the project's facts are unknown.** The client knows
+  neither the configured forges nor whether the project has a home: no
+  document of jig's or of temper's says so yet. So the forge is asked
+  by number, and home is checked by default; the engine refuses a
+  forge it has not configured and a second home, saying which
+  (section 11).
+- **After the outcome,** the outcome stays shown until the person edits
+  a field or leaves the page. Adopted, the fields go back to their
+  defaults (written by the domain, so the view writes them).
+- **Out of date:** when the engine does not serve this client's version
+  of the forge's records (the stream's hello, jig's
+  `protocol/client.md`, section 9), the page says "This temper is out of
+  date for adopting repositories: run the temper the engine runs.",
+  the button is disabled, and a pending adoption stays in the small
+  store.
+
+### 4.5 Its address and state
+
+- **Address:** `Adopt { project }`, the forge's only one.
+- **State:** the page at the address; each field's text and the
+  domain's count of its own writes; the pending request's token and
+  progress, at most one; the last outcome; the version range the
+  engine serves for the forge's records; the parts shown in jig's
+  slots for the page's generation, each held until told the page's
+  parts left (jig's `client/domain/root.md`, section 6). Bounded by
+  its limits: the parts a page shows, the field bytes, the checks.
+- **Records:** none of its own; its pending adoption is the request
+  table's record (4.6).
+
+### 4.6 The records
+
+`temper-protocol-client-wire`, generated from one schema (jig's
+`protocol/client.md`, sections 3 and 11):
+
+- **`FORGE`:** the forge connector's number, 1, which is the family's
+  number on the wire, the engine's configured connector
+  (configuration.md, section 3), and the number the client root routes
+  by.
+- **`CLIENT_VERSION`:** the version of every record below, 1 at first;
+  it moves once per plan, at the first landing that changes one of
+  their encodings. The engine serves exactly one version: pre-release,
+  each range is one version (jig's `protocol/client.md`, section 9).
+- **The request, `Adopt`:** the project (u32); the forge's number
+  (u16); the owner, the name, the prefix and the landing branch (byte
+  strings); the role (owned, fork or context); home and ci (booleans);
+  the checks (a list of u32).
+- **Its outcome:**
+  - *adopted,* with the repository as the forge connector recorded it:
+    its forge's number and its id; its owner and name; its role;
+    whether it is the project's home; what temper may do there (the
+    forge's `Kinds`: read, push, open, land, review, status, comment,
+    issue, branch); and whether branch protection was read (unknown,
+    absent, or a rule);
+  - *refused by the core,* when the core refused the adoption the root
+    made on the party's behalf: jig's refusal facts, carried whole as
+    `jig-protocol-client-wire` encodes them, and decoded into jig's
+    `Refusal` by the client's routing;
+  - *refused by the forge,* with the forge connector's reason: no such
+    forge; not found; no access; refused; in flight; too large;
+    unreachable; invalid answer (4.7).
+
+  A refusal at admission (signed out, the party's role in the project,
+  a key sent again with another request, a limit) is not an outcome:
+  it is jig's answer, which never reaches the connector (jig's
+  `client/domain/contract.md`, 3.3), and the form shows it in jig's
+  words.
+- **The small store's record of a pending adoption** is the request
+  table's record (jig's `client/domain/root.md`, section 4): its key,
+  its scope, when it was first sent, and the request, encoded by this
+  crate as the family's record at `CLIENT_VERSION`. One of another
+  version is dropped at start, its owner told (jig's
+  `protocol/client.md`, section 10).
+- **Bounds:** the schema's ceilings bound every record at both ends,
+  and the generated worst cases price each. Within them, the client
+  bounds its fields by its own limits (4.4), and the engine's forge
+  connector refuses what is past its own as too large (4.7), so a
+  record a client can make always decodes.
+
+### 4.7 The outcome in words
+
+| Outcome | The form says |
+|---|---|
+| adopted | "Adopted OWNER/NAME on forge F as ROLE." then "It is the project's home." if so; "temper may: KINDS." in the forge's words; "Branch protection could not be read." if unknown; and a link "See the project's resources" to jig's project page, its resources |
+| refused by the core | jig's words for its refusal |
+| no such forge | "No forge F is configured." |
+| not found | "No repository OWNER/NAME on forge F that temper's forge user can see." |
+| no access | "temper's forge user may not read OWNER/NAME on forge F." |
+| refused | "The forge connector refused it: another project writes OWNER/NAME, the project has a home already, or branches under PREFIX are not this deployment's." |
+| in flight | "OWNER/NAME is being adopted already; try again when that ends." |
+| too large | "A field is past the forge's bounds, or the forge's repositories are full." |
+| unreachable | "Forge F did not answer; nothing was adopted. Try again." |
+| invalid answer | "Forge F answered what temper did not expect; nothing was adopted." |
+| unknown past the retention | "It is not known whether OWNER/NAME was adopted: see the project's resources." |
+
+KINDS lists what temper may do, in this order and these words: read;
+push; open pull requests; land; review; set statuses; comment; create
+issues; create and delete branches. The engine maps the forge
+connector's errors to these reasons (section 8).
+
+## 5. The view root
+
+### 5.1 Its shape
+
+`temper-client-view` is copied from `ops`'s view root (jig's
+`client/domain/root.md`, section 9; jig's `client/domain/view.md`,
+section 4), with the forge's view in place of `ops`'s two:
+
+- **Its state:** jig-view's render state (the last tree, a spare, the
+  shown count, node ids never reused); jig's phrasebook (English) and
+  the forge's; jig's bindings and the forge's, one table each for the
+  last tree; its limits.
+- **`build`:** when the client root's shown count moved, it opens the
+  page node, has jig's view build the frame and jig's page, or, at the
+  forge's address, the forge's page after jig's frame; then fills each
+  slot in two passes (jig's `client/domain/view.md`, section 4): a
+  part of the forge's from the forge's view, the navigation slot from
+  the forge's view, a jig object named by a forge page from jig's
+  cards (none in the first client). A slot no owner fills says, in the
+  forge's words, that it cannot be shown. Then jig-view diffs and
+  keeps the tree.
+- **`act`:** a shell's act on a node (press, input, submit, toggle) is
+  resolved in the last tree to its binding, and decoded by its owner's
+  bindings into the client root's action, wrapped with its owner. A
+  node gone, or a token of an older tree, decodes to nothing (jig's
+  `client/domain/view.md`, section 5).
+
+### 5.2 The forge's view
+
+- **Words:** a phrasebook of the forge's own phrases, English, as data
+  given at start (jig's `client/domain/view.md`, section 7): the
+  connector, resources, patterns and kinds (4.1); "Shown on the
+  forge." (4.2); the form's title, field names, roles, rules and button
+  (4.4); the outcome (4.7); the out-of-date sentence; the navigation
+  entry. Names (owners, repositories, branches) are copied in, never
+  translated.
+- **The parts' fragments:** a connector, resource, pattern or kind is
+  one text node of its words; every other part is the paragraph of
+  4.2. Neither is acted on.
+- **The page:** a level-1 heading (the title), then the form's nodes in
+  the order of 4.4: text fields with their values and write counts,
+  the role as a choice group of three choices, home and ci as checks,
+  the button, and after them a status for progress and an outcome, or
+  an alert for a refusal. Every node a person acts on has a role and a
+  name, since jig's fake person finds nodes only by them.
+- **Bindings:** writing a field, choosing a role, toggling home or ci,
+  pressing Adopt, following the outcome's link, and going to the page
+  from the navigation entry. Typed input is made here (jig's
+  `client/domain/view.md`, section 5): the forge number's digits
+  become a number, the checks' words a list, or nothing when they are
+  not one, which the form marks invalid.
+- **No drawings and no style tokens of its own** in the first client.
+
+### 5.3 Navigation
+
+The frame's navigation slot is the forge's to fill. It holds one link,
+"Adopt a repository", to `Adopt { project }` for the project the person
+is in, as jig's frame says it; with no project chosen, the slot holds
+nothing. The link is offered whatever the person's role: the engine
+judges it, and a refusal says why (jig's `client/domain/root.md`,
+section 10: the client never computes what a party may do).
+
+### 5.4 Limits
+
+The view's limits are jig-view's, derived from the client root's limits
+(jig's `client/domain/view.md`, section 10), with the forge's page and
+fragments counted: the form's nodes, its outcome's lines, the kinds'
+list at its longest, and one paragraph per part slot. The terminal's
+print limits are derived from them (6.8).
+
+## 6. The terminal shell
+
+### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
+
+- **DIRECTORY** is the client's private directory. The terminal opens
+  its parent as a root (skein-shell's `open_root`) and gives its last
+  component to `jig-shell-native`, whose files make it `0o700` if it is
+  absent and refuse it unless it is a directory of this user's with no
+  group or other bits (skein's `io.md`, 5.3). It holds the bearer
+  token and the small store (section 7).
+- **LINK_OR_ADDRESS** is one of:
+  - the link `temper serve` printed,
+    `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`: the client
+    signs in by it first (section 7);
+  - the engine's address, `http://HOST:PORT` with or without a final
+    `/`: the client uses the token DIRECTORY holds. Before its loop,
+    the terminal reads the token file once with skein-shell's
+    `read_private_file`, only to learn that there is one.
+
+  HOST is an IP address, as `jig-shell-native` parses the link, and
+  must be on loopback (in `127.0.0.0/8`, or `[::1]`).
+- **Exit status:** 0 once the client closed and drained (6.6); 1 when
+  it cannot start, with one line on stderr:
+
+  | Cause | stderr |
+  |---|---|
+  | not two arguments | `temper open: usage: temper open DIRECTORY LINK_OR_ADDRESS` |
+  | not an `http://` link or address, or HOST not an IP address and port | `temper open: not a link or an address: ARG` |
+  | HOST not on loopback | `temper open: the engine's address must be on loopback` |
+  | DIRECTORY refused | `temper open: DIRECTORY: ` and what skein's io found unsafe or failed |
+  | an address given and no token in DIRECTORY | `temper open: not signed in: give the link temper serve printed` |
+  | the link refused by the engine | `temper open: the link was refused: use the fresh link temper serve printed` |
+
+  A panic aborts the process (fail-stop); the small store and the keys
+  make what was pending safe to send again at the next `temper open`
+  (jig's `client/domain/view.md`, section 11).
+
+### 6.2 The loop
+
+- **One host on skein's loop** (skein-shell's `drive`; skein's
+  `shell.md`, section 12): the native client (the client root, the view
+  root, the routing, `jig-protocol-client-link` and
+  `jig-shell-native`'s `Shell`) and the terminal's own io beside it:
+  stdin adopted as a read pipe (skein io's `adopt_read_pipe`), stdout
+  as a write pipe (`adopt_write_pipe`, with no timeout), and SIGINT and
+  SIGTERM from skein-shell's `open_termination_signals`, adopted by
+  io. The loop routes each completion
+  to its owner by the operation's token, as jig's process tests route
+  a person's pipe reads beside its client.
+- **Time and the seed** are skein-shell's: its clock once per
+  iteration, and a seed from the kernel at each start (`seed`), from
+  which the client draws its request keys (jig's
+  `client/domain/root.md`, section 4).
+- **stdin is left as it is,** never raw: the terminal's own line editing
+  makes each line, and a pipe works as well as a terminal.
+- **Each iteration:** `jig-shell-native` iterates; its loaded records
+  start the link; its sign-in outcomes; the root starts once the
+  client is signed in, by a token loaded or by the link's sign-in
+  (3.4); the link's events through the routing into the root; the root's
+  `fire` and `take`, the link's `fire`; the view built; each whole line
+  read from stdin made into one command (6.5) and done; a print, when
+  one is due (6.3); stdout written.
+- **One line, one command.** A line is the bytes before a `\n`, without
+  a `\r` just before it. Bytes with no `\n` yet wait for it; a line
+  longer than the shell's line limit is refused whole, through its
+  `\n`.
+
+### 6.3 When it prints
+
+- **The whole page,** always: the view's last tree, never a diff.
+- **When the tree changed:** jig-view's build emitted patches since the
+  last print. At most once per second (a guide; the shell's print
+  interval, in its limits): a change within the second is printed when
+  the second ends, as the tree then is, never lost.
+- **At once after the person's own act,** once the steps that took it
+  have built the tree, whatever the interval; and at once on `p`.
+- **One print at a time:** while stdout has not taken the last print, a
+  due print waits, then shows the tree as it is when it starts.
+- **Before the first tree** (signing in), only the shell's own lines.
+- **The shell's own lines** start with `temper: `, so they are never
+  taken for the page's.
+
+### 6.4 How it prints
+
+- **The first line** is `== TITLE == LINK`. TITLE is the text of the
+  page's first level-1 heading outside the frame (`temper` when there
+  is none). LINK is the frame's first status, the link's state in
+  jig's words ("Connecting", "Live", "Offline": jig's
+  `client/domain/client.md`, 8.2), then `; ` and the frame's second
+  status when it says the page is behind. The frame is the page node's
+  first child, which jig's view builds first; its link statuses and the
+  title's heading are not printed again.
+- **Then every node in preorder,** by its role:
+
+  | Role | Prints |
+  |---|---|
+  | page | its children |
+  | region, figure, dialog | named: `NAME:` and its children indented; unnamed: its children |
+  | heading | `#` once per level, a space, its text |
+  | paragraph, text, time | its text; a time's text is the view's words for it |
+  | list, tree | named: `NAME:` and its items indented; unnamed: its items |
+  | item, tree item | `- ` before its first line, its other lines indented |
+  | table | one line per row |
+  | row | its cells' texts joined by ` \| ` |
+  | term | its text, then `:` |
+  | description | its text, indented |
+  | button, tab | `[n] NAME` |
+  | link | `[n] TEXT`; a checked external link of Markdown's: `TEXT <URL>`, with no number |
+  | text field, text area | `[n] NAME: VALUE`, or `[n] NAME: (empty)` |
+  | choice group, tabs, log | `NAME:` and its children indented, a log's entries oldest first |
+  | choice | `[n] (*) TEXT` when selected, `[n] ( ) TEXT` otherwise |
+  | check | `[n] [x] NAME` when pressed or selected, `[n] [ ] NAME` otherwise |
+  | status | `* TEXT` |
+  | alert | `! TEXT` |
+  | progress | `NAME: TEXT` |
+  | code | each line of its text, indented four spaces more |
+  | quote | each line of its text after `> ` |
+  | separator | `--` |
+  | slot | its children: the owner's fragment, or the words saying it is loading or cannot be shown |
+  | drawing | `NAME:` and its fallback indented (jig's `client/domain/view.md`, section 3) |
+
+- **Indented** means two spaces more than the line it belongs to.
+- **States** follow a node's line as words in parentheses, in this
+  order: `(disabled)`, `(expanded)`, `(busy)`, `(current)`,
+  `(invalid)`, `(pressed)`, `(selected)`, `(provisional)`; a field that
+  submits on enter adds `(enter sends)`. A check's and a choice's
+  pressed or selected state is its mark instead.
+- **Text** is a node's runs, in order: a code run between backticks,
+  every other run as it is. Style tokens are dropped: nothing a person
+  must know is said by style alone (jig's `client/domain/view.md`,
+  section 13).
+- **Nothing from the engine drives the terminal.** A control character
+  (U+0000 to U+001F, U+007F to U+009F) and a byte that is not UTF-8
+  print as U+FFFD, except a tab, which prints as a space, and a
+  newline, which starts a new line at the same indentation.
+- **Lines are not wrapped:** the terminal wraps them.
+
+For example, the adoption page, its frame left out:
+
+```
+== Adopt a repository into shop == Live
+…
+[9] Forge number: 1
+[10] Owner: acme
+[11] Name: (empty) (invalid)
+* Required.
+Role:
+  [12] (*) Owned: temper pushes, opens pull requests and lands
+  [13] ( ) Fork: temper contributes through a fork
+  [14] ( ) Context: temper only reads
+[15] [x] Make it the project's home
+```
+
+and so on to `[20] Adopt`.
+
+### 6.5 Numbers and commands
+
+- **Numbered nodes:** each node a person can act on (a button, a link,
+  a text field, a text area, a choice, a check, a tab: any node with a
+  binding or an address that is not disabled) gets `[n]`, from 1 in
+  preorder, at each print. A node of those roles that is disabled or
+  bound to nothing prints `[-]` in its place.
+  The shell keeps the numbers of its last print: each number's node
+  id, which stays the node's while jig-view's diff matches it.
+- **Commands,** one per line, after leading and trailing spaces are
+  removed:
+
+  | Line | Does |
+  |---|---|
+  | `n` | acts on node n: a button, a link, a tab or any other bound node is pressed (a link followed); a check or a choice is toggled (a choice selected); a text field or text area is written empty, then submitted if it submits on enter |
+  | `n WORDS` | writes WORDS, the rest of the line after the spaces that follow n, as field n's whole value, then submits it if it submits on enter |
+  | `p` | prints the page again, at once |
+  | `q` | closes the client (6.6) |
+  | an empty line | nothing |
+
+  A text area takes one line: a line break cannot be typed into it.
+  The words are passed as they were typed; their bounds are the
+  domain's, which marks a field invalid past them.
+- **Errors,** one line each:
+
+  | When | The shell prints |
+  |---|---|
+  | n is not a number its last print showed | `temper: no [n] on the page`, then the page again |
+  | n was shown, but its node is gone or takes no such act now | `temper: [n] is gone`, then the page again |
+  | words for a node that is not a field | `temper: [n] takes no words` |
+  | a number before the first page | `temper: no page yet` |
+  | a line past the line limit | `temper: line too long` |
+  | anything else | `temper: commands: n, n words, p, q` |
+
+### 6.6 The link, signing out and closing
+
+- **The link's state** is the first line's (6.4). Its change changes
+  the tree, so the page is printed again.
+- **Signing out** is the frame's "Sign out" button, jig's. The client
+  root asks the shell, which makes `jig-shell-native`'s sign-out
+  exchange (`Shell::sign_out`). Signed out: DIRECTORY's token is
+  erased, jig's sign-in page is printed, and the shell's line
+  `temper: signed out; to sign in again, run temper open DIRECTORY
+  LINK with a link temper serve printed`. A sign-out that did not reach
+  the engine leaves the person signed in; the frame says so and offers
+  it again (jig's `client/domain/client.md`, section 12).
+- **The sign-in page** (jig's, after signing out or when the engine says
+  the sign-in ended): pressing its provider prints the same line, since
+  a terminal cannot follow a provider's navigation.
+- **Closing:** `q`, the end of stdin, SIGINT or SIGTERM. The client does
+  not sign out. No new exchange starts; `jig-shell-native` finishes the
+  small store's last write, then closes its connections and files
+  (`Shell::close`); the process exits 0. What is pending stays in
+  DIRECTORY's small store, and the next `temper open` on the same
+  DIRECTORY sends it with its keys, within the engine's retention
+  (jig's `client/domain/client.md`, section 11).
+- **A service's credential,** when the person makes a service from
+  jig's project settings, is handed to the shell by the link, never to
+  the domain, and printed once: `temper: credential for service PARTY,
+  shown once: TOKEN`, TOKEN in base64url. It is never written to a
+  file (jig's `protocol/client.md`, section 8).
+
+### 6.7 When the engine is unreachable
+
+- **While signing in by the link,** an exchange with no answer, or
+  answered not ready (the engine stopping), prints `temper: signing in:
+  no answer from the engine; trying again`, and is made again after a
+  backoff from the shell's limits (a first span, doubling to a most).
+  `q` gives up and exits 0. A refusal (the link spent or expired, or
+  the engine's sign-ins full) exits 1 (6.1); the engine prints a fresh
+  link when a spent one is tried (jig's `protocol/client.md`,
+  section 8).
+- **Once signed in,** jig's client domain judges the link from the
+  frame's watch (jig's `client/domain/client.md`, 8.2): Connecting
+  until its first delivery, Offline when it drops or is silent past
+  its heartbeat, Live when it opens again. The first line says which,
+  and the page is printed again at each change. Requests made
+  meanwhile are kept in the small store and shown as parked, in jig's
+  words, and sent when the link is live; watches reopen after jig's
+  backoffs. Nothing the person did is lost, and `q` keeps it in
+  DIRECTORY.
+- **A small store that cannot be written** stops that step's requests,
+  whose cards say they were not sent (jig's `client/domain/client.md`,
+  section 11), and prints `temper: cannot write the small store in
+  DIRECTORY`.
+
+### 6.8 Pure where it decides
+
+The terminal is ordinary Rust, but what it decides is in two pure
+functions, step code under the subset, with no io and no clock:
+
+- **The renderer,** tree to lines: from jig-view's `Tree` alone, the
+  page's lines (6.4) and the last print's numbers (6.5). Its output is
+  bounded: the most lines and bytes the view's largest tree can print,
+  counted from the view's limits.
+- **The command reader,** line to act: from one line, the last print's
+  numbers and the view's last tree, one command: acts on a node (press,
+  toggle, or input then submit, as jig-view's `Act`), print, close,
+  nothing, or a refusal with its line (6.5).
+- **Unit tests** fix both: golden text of pages, kept as files beside
+  the tests and changed only by hand (jig's pages built by temper's
+  view root from fixture states: the inbox with entries of each kind,
+  a task page with its conversation, a project's sections, the
+  deployment, the pages that are not about the work, the adoption form
+  in each state of 4.4 and 4.7, a tree with every role and state, text
+  with control characters and bytes that are not UTF-8); and every
+  command and every refusal, with numbers kept across a print and
+  renumbered at the next.
+
+## 7. Signing in and the small store
+
+- **By the printed link** (jig's `protocol/client.md`, section 8): at
+  start, `temper serve` prints a sign-in link for the deployment's
+  first owner (protocol.md, section 4). `temper open DIRECTORY LINK`
+  gives it to `jig-shell-native`'s `Shell::sign_in`, which checks that
+  the link names the engine's address and makes the sign-in exchange
+  with the link's secret. The engine spends the secret, signs the
+  person in, and answers with a bearer token. `jig-shell-native` writes
+  the token into DIRECTORY before it reports the sign-in, and only then
+  does the client start.
+- **The link's secret** is in the command line only until the sign-in
+  spends it: it is single-use and short-lived (jig's
+  `protocol/client.md`, section 8).
+- **The bearer token,** the sign-in's number beside 32 random bytes, is
+  `DIRECTORY/token`, a private file (`0o600`). It is sent with every
+  exchange; never printed, never an argument, never in the domain. A
+  new sign-in by a link replaces it; signing out erases it.
+- **The small store** is `DIRECTORY/store`, a private file that
+  `jig-shell-native` writes whole and syncs before any request of the
+  same step leaves (jig's `protocol/client.md`, section 10). It holds
+  the request table's records (jig's requests and the forge's
+  adoptions, pending) and jig's own records (drafts, where the client
+  was). At start each record goes to its owner; kept requests are
+  parked until their party is confirmed, and another party's are shown
+  as someone else's work (jig's `client/domain/client.md`, section 11).
+- **Loopback only.** In standalone the engine's clients' listener is on
+  loopback (configuration.md, section 3), the link names it, and
+  `temper open` refuses any other address (6.1), so a bearer token
+  never crosses a network in plaintext. Clients between hosts, over
+  TLS, come after standalone.
+- **One person.** The deployment's link signs in its first owner.
+  Signing in through the forge, as people's provider, comes later
+  (section 11).
+
+## 8. On the engine's side
+
+- **jig's clients' component.** The engine's service runs
+  `jig-protocol-engine-clients` in its routing (protocol.md,
+  section 6): its listener, the clients' streams, the deployment's
+  link, sign-ins' secrets checked against their digests, and jig's
+  records translated to the core's vocabulary. The versions it serves
+  are jig's wire's and, for the family `FORGE`, `CLIENT_VERSION`
+  alone. temper adds no sign-in provider in standalone.
+- **The forge's request, decoded before the root** (jig's
+  `protocol/client.md`, section 11). An application request of the
+  family `FORGE` at `CLIENT_VERSION` is decoded by
+  `temper-protocol-client-wire`; one that does not decode, or of
+  another family or version, is answered undecodable, as jig's
+  reference service answers it. The routing fills the adoption's host
+  from that forge's configured `git` base: its host, with `:port` when
+  it names one, as the forge's resource paths have it (configuration.md,
+  section 3). It leaves the host empty for a forge number not
+  configured, and hands the
+  root the party's keyed request: its reply, its sign-in, its key, the
+  digest of the record's bytes, and the adoption.
+- **The root routes it** (`domain/forge.md`, section 4;
+  `domain/engine.md`): jig's people child admits it by key, and refuses
+  at admission as jig's answer; admitted, it goes to the forge
+  connector, which refuses a forge not configured (no such forge),
+  locates the repository by owner and name (not found when the forge
+  has none), and makes jig's adoption request on the party's behalf
+  (`adopt_repository_ask`), which the core judges as the party's own.
+  The forge connector's adoption then reads what temper may do there.
+  The outcome is kept under the request's key for the retention and
+  answered once durable (jig's `client/domain/contract.md`, 3.3).
+- **The forge's errors as reasons:** `Missing` is not found;
+  `Forbidden` is no access; `Refused` is refused; `Busy` is in flight;
+  `TooLarge` and `Full` are too large; `Unavailable`, `Timeout` and
+  `RateLimited` are unreachable; any other is an invalid answer
+  (`temper-engine-domain-forge-client`'s `api::Error`).
+- **The outcome, encoded** by `temper-protocol-client-wire`, goes back
+  as the family's answer to `jig-protocol-engine-clients`.
+- **Every read and watch of the forge's family is unknown.** The wire
+  has no read or subject record, so none decodes: the routing answers
+  each read with no record (unknown) and refuses each watch as
+  unknown, as jig's reference service answers an undecodable one,
+  without the root. When the forge serves documents, its records come
+  with them.
+
+## 9. What goes
+
+- **Retired** in the plan that lands `temper-client-domain` and
+  `tests/client`, in the same change: `crates/temper-web-domain`,
+  `crates/temper-web-view`, `testing/temper-fake-person` and
+  `tests/web/domain`. Their stories that still apply (signing in, a new
+  chat answered, a held chat's escalation decided) are written again as
+  stories of `tests/client`, on jig's pages.
+- **Never built:** the web plan's W5 to W10 (the joint world, the inbox,
+  the conversation, the task page, the board, the forge's panels). jig's
+  client domain and view are what W1 to W4 began, and jig's pages hold
+  the inbox, conversations, the task page, projects and the deployment.
+- **`web/ux/` stays** as the intent for the forge family's pages when
+  they are built: `web/ux/forge.md` (a change's panel, changes and landing
+  queues, approvals, a repository's adoption with what temper found and
+  its health, drift explained) and what the other `ux/` documents say
+  beyond jig's `client/domain/pages.md`.
+- **`web/architecture.md`** is cut to what stays true of the browser:
+  a later shell of this client.
+
+## 10. Testing
+
+The client's tiers, as testing.md places them (section 2):
+
+- **Step tests:** the client root's routing and the forge side's steps
+  (the form's rules, its request, every outcome, the version check);
+  the forge's view (words for every path shape and every kind, the
+  form in each state, every outcome); `temper-protocol-client-wire`
+  (golden bytes, bounds and fuzz targets, as skein's `codec.md`,
+  section 6 has them); the routing's translations both ways, on the
+  client and on the engine; the renderer and the command reader
+  (6.8).
+- **The terminal's machine world:** the loop against a scripted stdin
+  and stdout, over a scripted client that changes its tree on cue and
+  records the acts it is given: prints at most once per second and at
+  once after an act, a print waiting for stdout, lines cut at any byte,
+  the end of stdin, an interrupt, `q` drained.
+- **`tests/client`,** the joint world, from the first increment
+  (testing.md, 6.3). It implements jig's client world's kit for
+  temper's client root and view, and its front over temper's engine
+  root on the engine's domain world, with jig's fake person and
+  referee, as jig's joint world does (jig's `client/domain/testing.md`,
+  section 5). The translation between the contract's values and the
+  engine root's party vocabulary, the forge's request and outcome
+  included, is written once in the world, exhaustive both ways.
+  Stories: signing in and seeing the inbox; a chat started and
+  answered; a repository adopted from the navigation's link and then
+  listed on the project's resources; refused: not found, a second
+  home, a field the form refuses; a slot of each part kind saying its
+  words or "Shown on the forge."; with jig's client world's faults
+  (drops, the engine restarting, a double press of Adopt, a reload
+  with an adoption pending, kept work), each request made once. Its
+  focused tests and fuzzy sweeps keep testing.md's budgets.
+- **The one-process world** (testing.md, 2.5): jig's fake person in
+  front of temper's native client, joined through bytes to
+  `temper-service` on skein's simulator: the same stories through
+  `jig-protocol-client-link` and `temper-protocol-client-wire`, killed
+  and restarted with an adoption pending.
+- **The process tier** (testing.md, 2.6): the real `temper` binary;
+  jig's native fake person through temper's native client signs in by
+  the printed link and adopts a repository on the throwaway Forgejo.
+  And `temper open` itself, stdin and stdout piped: it signs in by the
+  printed link, prints the inbox, adopts a repository by commands, and
+  exits 0 on `q` after a drained close.
+
+## 11. Open questions
+
+- **The browser:** temper's browser client is jig's browser shell over
+  this client, once jig builds `jig-shell-web` (`web/architecture.md`).
+  Default: the terminal is temper's only client.
+- **The forge's documents and panels:** a change's panel, landing
+  queues, holds' details, a repository's health, and an adopted
+  repository named by owner and name (`web/ux/forge.md`). With them, the
+  form chooses among the configured forges (by name, the first by
+  default), says whether the project has a home, and shows what temper
+  found before the adoption is confirmed (`web/ux/forge.md`, 5.1).
+  Default:
+  not served; "Shown on the forge."; the forge asked by number; home
+  checked.
+- **The form's place:** in jig's project settings' slot once jig's view
+  builds it (jig's `client/domain/pages.md`, 6.5). Default: the forge's
+  own page.
+- **The forge's `Refused`, split** into its causes (another project
+  writes the repository; the project has a home; another deployment's
+  branches under the prefix), so the form names the one. Default: the
+  sentence of 4.7 naming the three.
+- **The forge as people's sign-in provider:** a provider component of
+  temper's, which jig's clients' component routes to (jig's
+  `protocol/client.md`, section 8). Default: the deployment's link
+  only.
+- **Several terminals:** each `temper open` with its own DIRECTORY is a
+  client of its own, as jig's tabs are. Two on one DIRECTORY share its
+  token and write its small store whole over each other. Default: not
+  supported and not detected; a lock on DIRECTORY is the candidate.
+- **A fresh link from the client:** default: the person runs `temper
+  open` with the last link, whose refusal makes the engine print a
+  fresh one.
+- **The person's time zone:** default universal time (an offset of 0)
+  for every time the view says.
+- **Several lines in a text area:** default one line per command.

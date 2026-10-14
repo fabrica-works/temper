@@ -451,6 +451,13 @@ Beyond authority, a call is refused naming what it lacked; the run may
 `propose` the same action with a reason. Calls never become proposals on
 their own, so a person is never asked by accident.
 
+**A call whose input does not decode decides nothing.** The protocol
+layer, which decodes every call the fleet has fenced
+(`docs/design/llm.md`, section 4), answers one it cannot decode at once,
+as an error naming what is wrong; the root relays that answer to the run
+with no commit and no record, as it relays a call it could not serve,
+and the run may ask again with a corrected input under a new name.
+
 ### 7.4 Answers, waiting and parking
 
 - **A run answers once:** finished, with its result; parked; or failed,

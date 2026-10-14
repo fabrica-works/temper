@@ -1,48 +1,62 @@
 # Testing temper
 
-Provisional, 2026-10-03. How temper is tested. The strategy is skein's
-`docs/foundation/testing-strategy.md`: the tiers, faults, what every fake
-shares, what every world checks, scenarios and the referee, the two
-suites, and where a failure is fixed. This document keeps what is
-temper's: its tiers (section 2), its neighbours and their fakes (sections
-3 and 4), its scenarios and referee (section 5), what its worlds check
-beyond the strategy (section 6), its layout (section 7), what is not
-built yet (section 9), and what is still open (section 10).
+Provisional, 2026-10-03, revised 2026-10-14. How temper is tested. The
+strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
+faults, what every fake shares, what every world checks, scenarios and
+the referee, the two suites, and where a failure is fixed. This document
+keeps what is temper's: its tiers (section 2), its neighbours and their
+fakes (sections 3 and 4), its scenarios and referee (section 5), what its
+worlds check beyond the strategy (section 6), its layout (section 7),
+what is not built yet (section 9), and what is still open (section 10).
 
 ## 1. In one page
 
-- **Behaviour is tested in the domain layer.** The engine, the worker and
-  the agent are each a root domain with child domains, and each has
-  worlds of its own; system worlds run the real engine, worker and agents
-  together. Domain and system worlds are all that is built so far: the
-  tiers above wait for the layers they make real.
-- **Peers across a wire, the machine beneath.** LLM providers, the forge
-  and people on the web are peers, whose fakes grow into services and
-  meet temper at the wire. The machine (files, processes, and the
-  programs they run: git, rg, sh, temper's own) stays one set of state
-  machines, with a face for each layer of temper it can sit under.
+- **Behaviour is tested in the domain layer.** The engine and the worker
+  are each a root domain with child domains, and each has worlds of its
+  own; the system world runs the real engine and worker together, with
+  smith's agents.
+- **Below the domain, one tier per layer it adds:** step tests of every
+  codec, translation and parser, against golden bytes and transcripts of
+  real peers; machine worlds of the forge component, the git component
+  and the terminal shell; the forge's protocol world; temper's client
+  joined to the engine's root; the one-process world on skein's
+  simulator; the process tier, the real binary with a throwaway Forgejo
+  and real git; and the live tier, with a real model.
+- **Peers across a wire, the machine beneath.** LLM providers and the
+  forge are peers, whose fakes grow into services and meet temper at the
+  wire; people use temper's client, and their fake is jig's fake person,
+  in front of it. The machine (files, processes, and the programs they
+  run: git, rg, sh, temper's own) stays one set of state machines, with
+  a face for each layer of temper it can sit under.
 - **The fake forge is Forgejo-shaped,** API and git in one store, so a
-  branch the worker pushes is the head the engine reads.
+  branch the worker pushes is the head the engine reads. Its protocol
+  layer serves Forgejo's API; its git is reached by the fake git program,
+  never over HTTP.
 - **Checks follow content.** The machine's sh is a small subset of POSIX
   sh, in which fake repositories write their checks and their CI, so a
   change that is wrong fails in the run and on the forge alike.
-- **The referee is built,** in the shared world harness, and every engine
-  world and both system worlds hold their scenarios' expectations in one.
-- **The fakes of temper's own components have retired:** the system
-  worlds run the real engine and worker.
+- **The referee is built,** on skein's world harness, and every engine
+  world holds its scenarios' expectations in one.
+- **No fake of temper's own components:** the system world runs the real
+  engine and worker.
+- **Two suites, and two tiers outside them.** The focused and the fuzzy
+  suites keep their 15 s and 60 s, which nextest enforces; the process
+  and live tiers run by their scripts, never at the gate.
 
 ## 2. temper's tiers
 
 | Tier (testing-strategy.md, section 2) | In temper |
 |---|---|
-| step tests | every domain crate and every fake; lib's are skein's |
+| step tests | every domain crate and every fake; every codec (golden bytes, bounds, fuzz targets) and each translation both ways; git's argument and environment builders, and git's output parsers against transcripts of real git (git.md, section 9); Forgejo's decoders against transcripts of the throwaway Forgejo (forge.md, section 10); lib's are skein's |
 | domain worlds | each child domain with the world as its parent, and each component's root domain with its child domains; most of temper's tests |
-| system worlds | the engine, the worker and agents together (2.1) |
-| machine worlds | skein's, for the machines it ships; temper's only for a machine of its own |
-| protocol worlds | each component's protocol layer against its peers' fakes, the machine at its io face (2.2) |
+| system worlds | the engine, the worker and smith's agents together; temper's client joined to the engine's root (2.1) |
+| machine worlds | the forge component against a scripted HTTP peer; the git component against scripted process ends and outputs; the terminal shell's loop against a scripted stdin and stdout; skein's, for the machines it ships |
+| protocol worlds | the forge's: the forge component against the fake forge's protocol layer (2.2) |
 | io worlds | skein's: temper does not retest io |
-| simulated worlds | every process's `iterate` on skein's simulator (2.3) |
-| real loop | temper as it ships, on the real kernel and a real machine (2.4) |
+| simulated worlds | the one-process world: `temper-service` on skein's simulator (2.3, 2.5) |
+| real loop | none of its own: the process tier stands for it (2.4) |
+| end to end | the process tier: the real binary, the throwaway Forgejo and real git (2.6) |
+| end to end, live | the live tier: the process tier's stories with a real model (2.7) |
 
 Every child domain has a world of its own but the engine's rules, which
 keep no state and are tested by their step tests alone: a departure from
@@ -51,37 +65,181 @@ world to drive.
 
 ### 2.1 System worlds
 
-Two are built, both with the real engine driving the real worker: the
-agent's top-level world, whose worker hosts real agents, and the whole
-worker's world, whose worker hosts scripted agents over a channel that
-fails (4.5). They aim at what crosses components: the tree an agent left
-is the tree the worker pushes, and the outcome the run accepted is the
-one the engine records.
+One is built with the real engine driving the real worker: the composed
+system world (`tests/system`), whose worker hosts smith's real agent
+domain over skein's fake LLM, and whose engine and worker's git meet one
+fake forge. It aims at what crosses components: the tree an agent left is
+the tree the worker pushes, and the outcome the run accepted is the one
+the engine records. Between the two roots it uses the protocol layer's
+own translation, without bytes (channel.md, section 7).
+
+temper's client joined to the engine's root, `tests/client`, is a system
+world too: temper's client root and view root, jig's fake person reading
+the view's tree, and temper's engine root on the engine world's store,
+hosts and forge (client.md, section 10). Section 6.3 says why it is
+joined from the first increment.
 
 ### 2.2 Protocol worlds
 
 Each component's protocol layer meets the protocol layers of its peers'
-fakes, and the machine sits there at its io face (3.2). They test what
-translation adds in temper: the JSON an LLM writes as a tool's input,
-the git invocations and the parsing of their output. They run the system
-worlds' scenarios, through bytes.
+fakes, joined by in-memory streams cut and joined at random, and the
+machine sits there at its io face (3.2). They test what translation adds
+in temper.
+
+- **The forge's,** `tests/engine/protocol-forge`: the engine's forge
+  component against the fake forge's protocol layer, running the forge
+  connector world's stories (`tests/engine/forge`) through bytes, with
+  the cost checks counted by HTTP request (forge.md, section 10).
+- **The worker's link and the client's connection** have their protocol
+  worlds in jig (jig's `protocol/channel.md`, section 12; jig's
+  `protocol/client.md`, section 14), and an agent's channel and its LLM
+  calls theirs in smith and skein. temper's parts and records cross them
+  as bytes those worlds never read; the one-process world carries
+  temper's through bytes (2.5).
+- **git has no protocol world:** it is a program, not a peer on a stream.
+  Its tiers are the git component's machine world, the fake git program
+  and real git in the process tier (git.md, section 9).
 
 ### 2.3 Simulated worlds
 
-Every process in a scenario runs its `iterate` on skein's simulator: the
-engine, the worker, the agents it spawns, and the fakes of the peers as
-services. A spawn the worker asks for starts an agent's service, and a
-kill ends it. The machine sits behind the simulator (3.2).
+temper's simulated world is the one-process world (2.5). Every process
+in a scenario runs its `iterate` on skein's simulator: `temper serve`'s
+service, the agents it spawns, the fake forge as a service, the fake LLM
+peer and the person's client. A spawn the worker asks for starts an agent
+process or the fake git program, and a kill ends it. The machine sits
+behind the simulator (3.2).
 
 ### 2.4 The real loop
 
-temper as it ships, with one io_uring loop driving everything: the fake
-peers as services listening on loopback sockets, the engine, the worker
-and the agents it spawns. The machine is real: a sandbox directory,
-inside the containment production uses (agent-domain.md, section 6;
-worker-domain.md, section 8), with real git, rg and sh. Beyond what the
-strategy lists, it shows that the containment holds (section 6), and
-git's actual output.
+temper has no real-loop world of its own. The process tier (2.6) runs
+temper as it ships, as processes with their own loops, which the strategy
+calls end to end (testing-strategy.md, 2.9), and stands for the real
+loop: io_uring, signals, process groups that end, real git's output and
+a real Forgejo's answers. The machine is real: a scratch directory, with
+process groups as standalone has them (git.md, section 7). The
+containment production will use (`domain/worker.md`, section 6) waits for
+skein's contained process trees, and so do the checks that it holds
+(section 6).
+
+### 2.5 The one-process world
+
+`tests/one-process`, after jig's (jig's `protocol/service.md`, sections 8
+and 10).
+
+- **What runs,** on skein's simulator and skein's fake machine:
+  - `temper-service`'s system module, the engine's and one worker's
+    services in one `iterate`, started from configuration's bytes as
+    `temper serve` starts them, joined by the in-process name `workers`;
+  - the store, jig's store component on skein-kv, on the simulator's
+    crashing disk;
+  - the worker's agents, smith's agent processes as `temper agent` runs
+    them, hosted as programs of the world, over skein's fake LLM peer;
+  - the fake git program for every git invocation (4.3);
+  - the fake forge as a service, its protocol layer over its domain
+    (4.2);
+  - people: jig's fake person in front of temper's client, over jig's
+    native client (4.4).
+- **Stories:**
+  - a person signs in by the link the engine prints, and a chat is
+    answered;
+  - a repository is adopted through temper's client, and a goal's change
+    is prepared, committed and pushed on the fake forge through the fake
+    git program;
+  - a merge in progress is resolved and pushed with both parents;
+  - a signal mid-run drains the engine, the worker ends, and the next
+    start settles the worker's claims at once;
+  - the service is killed, or the machine's power lost, at a drawn
+    moment, then started again on the same disk, an adoption pending
+    among what it finds.
+- **Faults:** kills and power loss at drawn submissions; the fake
+  forge's and the fake LLM's faults, drawn from the seed; the forge's
+  refusals and failures as the fake git program prints them. Joined
+  sockets are io's and never reach the simulator (skein's `io.md`, 3.5),
+  so the link's cuts and stalls are jig's channel world's, not this
+  world's.
+- **Its referee:**
+  - jig's conformance referee, through bytes, as jig's one-process world
+    has it: nothing a party, a host or the forge saw depended on a commit
+    that was lost, and a drained shutdown ends with nothing waiting for a
+    commit;
+  - the engine's referee over the fake forge (5.2): nothing lands on a
+    default branch without green CI, and a run's change is the tree its
+    agent left;
+  - no git identity's value or API token in a domain's state, a store
+    record or an agent process's environment.
+- **Budget:** a story aims at 1 s (6.1); sweeps of drawn kills are fuzzy
+  tests.
+
+### 2.6 The process tier
+
+`crates/temper/tests/process.rs`, after jig's reference binary's (jig's
+`protocol/service.md`, section 8): temper as it ships, as processes.
+
+- **What runs:**
+  - the real `temper` binary, `temper serve` on a scratch directory,
+    with a configuration the test writes;
+  - skein's fake LLM peer, a process of its own on loopback, over TLS
+    with a test root the agent's configuration trusts, scripted for the
+    stories;
+  - the throwaway Forgejo;
+  - real git, the machine's, at its absolute path (git.md, section 3);
+  - jig's native fake person through temper's client, and `temper open`
+    itself with stdin and stdout piped (client.md, section 10).
+- **The throwaway Forgejo:** v16.0.5, its binary named by
+  `TEMPER_FORGEJO`, with SQLite in the scratch directory, listening on
+  loopback only. The script refuses to run without `TEMPER_FORGEJO`, or
+  with a binary of another version, naming it; it makes the admin user,
+  temper's forge user, their tokens and a repository, and stops and
+  removes the instance after. Never an existing Forgejo.
+- **The story,** one test:
+  1. the person signs in by the link the binary prints;
+  2. a chat is answered;
+  3. a repository is adopted through temper's client;
+  4. a goal is given whose change lands on the throwaway Forgejo, pushed
+     by real git;
+  5. the binary is killed, and started again on the same directory;
+  6. the person finds the work, and the change's branch on the forge is
+     at the run's commit.
+- **Its referee:** the person's script finishes within its deadline; the
+  binary does not exit before it is killed, or its stderr is shown; the
+  forge's state, read through the throwaway Forgejo's API, shows the
+  change; nothing the person saw before the kill is lost after it; no
+  process the binary started outlives it.
+- **Credentials:** none borrowed. The fake LLM peer takes the account the
+  test configures in a private file; the forge's API token and the git
+  identity's token are the throwaway Forgejo's, made by the script and
+  written to private files in the scratch directory.
+- **Outside the suites:** nextest profile `process`, run by
+  `scripts/proof-one-process.sh`, which builds the binary first. It aims
+  at 3 minutes.
+
+### 2.7 The live tier
+
+`crates/temper/tests/live.rs`, after jig's (jig's `protocol/service.md`,
+section 8; testing-strategy.md, 2.9).
+
+- **What runs:** the process tier's binary, throwaway Forgejo, real git
+  and person, with a real model: the agent's endpoint is the provider's,
+  reached through a borrowed Codex login.
+- **The borrowed login:** `scripts/proof-live.sh` reads the access token,
+  its expiry and the account's id from `~/.codex/auth.json`, read-only,
+  and writes them, and nothing else, to a private file in the run's log
+  directory, removed at exit. It refuses to start when the token expires
+  within the run's span. The configuration hands that file in as the
+  account's source (jig's `protocol/llm.md`, 5.4): the token is never
+  refreshed, the refresh token is never copied, and neither an agent nor
+  `temper sign-in` signs in.
+- **The stories:** the process tier's chat, answered by the real model;
+  and one small change, made by the model in a repository of the
+  throwaway Forgejo and pushed by real git.
+- **Its referee:** the process tier's, without the restart; and the
+  completions, counted from the engine's transcripts.
+- **Budget:** at most 25 completions and 15 minutes in all. The live
+  configuration's charters bound each run's turns so the two stories
+  together make at most 25 completions, the script stops the run at 15
+  minutes, and the test fails when the transcripts count more than 25.
+- **Outside the suites:** nextest profile `live`, run only by
+  `scripts/proof-live.sh`, one at a time, never at the gate.
 
 ## 3. Neighbours and their faces
 
@@ -92,13 +250,15 @@ grows, and each tier joins the two at the lowest layer both have
 (testing-strategy.md, 4.1):
 
 ```
-agent    domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   fake LLM provider
-engine   domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   fake forge
-engine   domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   fake people, on the web
+smith's agent  domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   skein's fake LLM
+engine         domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   temper's fake forge
 ```
 
-A peer can be a client as well as a server: the fake forge serves its API
-and git, and sends webhooks to the engine.
+People are no peer of temper's: they use temper's client, temper's own,
+which reaches the engine over jig's client protocol, and their fake is
+jig's fake person in front of it (4.4). A peer can be a client as well as
+a server: after standalone, the fake forge sends webhooks to the engine
+(forge.md, section 5).
 
 ### 3.2 The machine
 
@@ -110,7 +270,7 @@ The machine's fake grows no protocol or io layers (testing-strategy.md,
 | the domain | domain face | typed operations: the tools' file operations, commands and searches; the checkout's git operations |
 | the protocol layer | io face | io's records: open, read, store, rename, spawn with an argument vector, bytes on a pipe, an exit |
 | io | behind the simulator | the file and process operations the simulator passes on |
-| everything | none | the real kernel, in a sandbox |
+| everything | none | the real kernel, in a scratch directory |
 
 Every component's files and processes go through it: the worker's
 workspaces and agent processes, the agent's tools and checks, and the
@@ -126,19 +286,21 @@ section 4).
 
 ### 4.1 LLM providers
 
-`testing/temper-fake-llm-domain` is a provider seen from the inside. It
-answers each call after a drawn latency, by a world's script or at random
-(failures by configured chance, a number of tool rounds, then a final
-answer), and rejects conversations a real provider would reject.
+temper has no fake provider of its own: the engine makes no LLM call, and
+the worker's agents are smith's (llm.md, section 2). The fake is skein's
+(skein's `fake-llm.md`):
 
-It grows the server side of each provider API the agent speaks: HTTP,
-server-sent events, the provider's JSON, its errors and rate limits, and
-an OAuth server that rotates refresh tokens (llm.md, section 11;
-credentials.md, section 10). It checks its client as the providers do:
-the bearer, ChatGPT's account id, Anthropic's identity, and the opaque
-blocks it gave coming back unchanged. Its faults move down with it: a
-stream cut mid-event or between events, a malformed event, a chunk size
-that lies, a slow trickle, a stall with pings only.
+- **Its domain,** `skein-fake-llm-domain`, a provider seen from the
+  inside: it answers each call after a drawn latency, by a world's script
+  or at random (failures by configured chance, a number of tool rounds,
+  then a final answer), and rejects conversations a real provider would
+  reject. Its scripts cue on content (5.1).
+- **Its peer,** in `skein-fake-peers`: the server side of each provider
+  API smith's agents speak, over HTTP and server-sent events, which the
+  one-process world hosts and the process tier runs as a process; with
+  skein's fake issuer (`skein-fake-oauth`) for `temper sign-in`. Its
+  faults move down with it: a stream cut mid-event or between events, a
+  malformed event, a slow trickle, a stall with pings only.
 
 ### 4.2 The forge
 
@@ -149,18 +311,25 @@ so a branch the worker pushes is the head the engine reads through the
 API, and a merge the engine asks for moves the branch the next fetch
 sees.
 
-- **A domain first.** The engine's worlds need one (engine-domain.md,
-  section 14): CI that passes, fails or never reports; merges that
+- **A domain first.** The engine's worlds need one (`domain/engine.md`,
+  section 15): CI that passes, fails or never reports; merges that
   conflict; webhooks that come late or not at all; requests that fail or
   hit a rate limit; people who comment and edit. Its git keeps git's
   rules: a push moves a branch only by a fast-forward, and another party
   can move a branch under a run.
-- **Then a service:** Forgejo's API and GitHub's, the subset temper uses,
-  over one domain; signed webhooks sent to the engine; and git over HTTP,
-  the subset real git needs to clone, fetch and push. It keeps Forgejo's
-  quirks (its default order, its page cap, its unpaged threads) and
-  counts the requests it serves, which the engine's cost checks hold to
-  ceilings (forge.md, sections 9 and 10).
+- **Then a service:** its protocol layer,
+  `testing/temper-fake-forge-protocol`, serves Forgejo's API over the
+  domain, the routes temper uses, on skein's HTTP server, from the server
+  side of `temper-forge-forgejo` (forge.md, section 9). It keeps
+  Forgejo's quirks (its default order, its page cap, its unpaged threads)
+  and counts the requests it serves, by route, which the engine's cost
+  checks hold to ceilings (forge.md, sections 9 and 10). Signed webhooks
+  sent to the engine come after standalone, and GitHub's API after
+  Forgejo's (forge.md, section 11).
+- **No git over HTTP.** The fake forge's git is reached through its
+  typed transport only: by the fake git program in the one-process world
+  (4.3), as by the fake checkout in the domain worlds. Real git meets a
+  real forge: the throwaway Forgejo, in the process and live tiers.
 - **CI follows content.** A repository's CI runs its checks in the shell
   subset (4.3) on the pushed tree, so a change that is wrong fails on the
   forge as it fails in the run.
@@ -223,7 +392,7 @@ with a vocabulary of its own. What building it settled:
   room, it forgets the statuses of the oldest commit no head shows;
   commits it never forgets.
 
-### 4.3 The machine
+### 4.3 The machine, and the fake git program
 
 The machine is the host temper's processes run on. It has three parts:
 
@@ -249,12 +418,42 @@ invocations temper makes need a face.
 
 The forge's git is not the machine's. The git program reaches the fake
 forge as real git does, across the network: through a typed transport
-that the world or the simulator routes, and over HTTP in the real loop.
-That split is built: `temper-fake-checkout` keeps working trees and
-their git directories, the commits a tree cloned, fetched or made among
-its files, while the forge keeps the repositories, and the transport
-carries git's calls between them (where a repository's branches are, a
-fetch, a push, a branch created for a base).
+that the world or the simulator routes. In the process tier, real git
+reaches the throwaway Forgejo over HTTP. That split is built:
+`temper-fake-checkout` keeps working trees and their git directories, the
+commits a tree cloned, fetched or made among its files, while the forge
+keeps the repositories, and the transport carries git's calls between
+them (where a repository's branches are, a fetch, a push, a branch
+created for a base).
+
+**The fake git program,** `testing/temper-fake-git`, is git as the
+machine runs it below the git component: a program on skein's fake
+machine whose protocol is its command line.
+
+- **What it takes:** the invocations of git.md, section 4, with their
+  settings (git.md, section 3) and their environment (git.md, section 5),
+  and nothing else. Any other argument vector exits as git's usage error
+  does, which fails the test that caused it.
+- **What it does:** it acts on the repositories' files on the machine,
+  keeping its git state in each repository's `.git` as skein's fake
+  checkout keeps it, and reaches the fake forge through its typed
+  transport. Its commits are the fake forge's counts, written as 40-digit
+  ids (forge.md, section 9).
+- **What it prints:** what real git prints for those invocations: the
+  porcelain lines, the NUL-separated paths and the ids git.md reads, and
+  git's exit statuses; and, for the fake forge's refusals and faults (a
+  missing repository, branch or commit, a wrong token, a protected
+  branch, the forge out of reach, drawn from the seed), the stderr lines
+  real git prints for them, which git.md, section 6 classifies.
+- **What it checks,** as the providers' fakes check their clients: the
+  credential only in `GIT_CONFIG_*`'s `http.extraHeader`, for an identity
+  the fake forge knows, a wrong one answered as Forgejo answers it; no
+  `PATH`; the settings present; the remote a `https` URL, or a loopback
+  `http` one.
+- **Checked against real git:** its answers to the transcripts of
+  `tools/git-transcripts` match real git's, masked (git.md, section 9).
+- **Where it runs:** the one-process world (2.5). The domain worlds keep
+  the fake checkout at the domain face.
 
 The checkout's merge world independently predicts complete trees, both
 parents and remote refs for clean and conflicted merges, unchanged merge
@@ -283,52 +482,48 @@ as named programs of the machine.
 
 ### 4.4 People
 
-People chat, accept and reject plans, release held work, and write and
-correct notes (engine-domain.md, section 14), on the forge and on the
-web. Their fake is a scripted actor, drawn from the seed. On the fake
-forge it acts as a forge user. On the web it is a client of the engine's
-web protocol, a peer like the others, and it grows that protocol's client
-side when the web is built.
+People chat, accept and reject plans, release held work, adopt
+repositories, and write and correct notes (`domain/engine.md`, section 15),
+on the forge and through temper's client. Their fake is a scripted actor,
+drawn from the seed.
 
-Today people are scripted in the engine's world, ordinary Rust rather
-than a domain: each story's person looks at the forge as observed, never
-at its store, and does what the story calls for next, one thing at a
-time, so a call lost to a restarting engine is simply tried again. On the
-web they make the engine's own calls, which no protocol carries yet. The
-whole worker's world reuses them; the agent's top-level world scripts its
-own, as its agents cannot take a session's turns yet.
+- **On the fake forge** it acts as a forge user.
+- **Through temper's client** it is jig's: jig's fake person (jig's
+  `client/domain/testing.md`, section 3), reading the tree temper's view
+  root makes and acting on it, in `tests/client`; and jig's native fake
+  person in front of temper's client, over jig's native client, in the
+  one-process world and the process tier (client.md, section 10).
+  temper's own fake person, `testing/temper-fake-person`, retires with
+  `temper-web-domain` and `temper-web-view` (protocol.md, section 5).
+
+In the engine's worlds people are scripted, ordinary Rust rather than a
+domain: each story's person looks at the forge as observed, never at its
+store, and does what the story calls for next, one thing at a time, so a
+call lost to a restarting engine is simply tried again. Where no client
+is in the world, they make the engine's own calls. The system world
+reuses them.
 
 ### 4.5 Temper's own components
 
-A fake worker served until the worker's domain was built, and a fake
-engine until the engine's was. Both have retired: the system worlds run
-the real engine, each wiring it as the protocol layers would.
+temper keeps no fake of its own components: the system world runs the
+real engine and worker, joined by the protocol layer's translation
+(channel.md, section 7).
 
-- **The agent's top-level world** (`tests/agent/domain`): the
-  real engine, worker and agents; the fake LLM provider; one fake forge,
-  which the engine reaches through the forge's protocol as the engine's
-  world plays it, and io's git through the working trees' transport; the
-  engine's store; people who hand in issues whose step is an agent step
-  or a change, each with a record as an earlier life of the engine would
-  have written it (the agent's side cannot take a session's turns yet), a
-  reviewer, and a person who stops a run now and then. Its channel
-  between engine and worker keeps its order and never drops.
-- **The whole worker's world** (`tests/worker/domain`): the
-  real engine and worker; the fake forge, reached by the engine and by
-  the worker's git; the engine's world's people and store; and the
-  process trees and scripted agents of the worker's agent world, their
-  words drawn from their charters. Its channel drops for less and more
-  than the worker's grace, stalls, and carries copies of frames, some
-  late; the worker shuts down and a new one starts cold; the engine
-  restarts, at drawn moments and while it applies an outcome.
+- **The composed system world** (`tests/system`): the real engine root,
+  worker root and smith's agent domain; skein's fake LLM, which scripts
+  only completions' contents; jig's fake store and parties; one fake
+  forge, serving the engine's API and the worker's git from one
+  repository state; smith's agent world behind the worker's process face,
+  its directories mounted from the trees the worker prepared.
+- **The whole worker's world** (`tests/worker/domain`): the real worker
+  root, its checkout and its hub, with smith's process boundary and
+  scripted agents, the protocol layer's hand-outs played with smith's
+  codecs, and the fake checkout and forge; it plays jig's worker link as
+  jig's worker worlds do: a channel ready or lost, the grace passed.
 
-Both use what the engine's world's crate offers as a library: the
-codecs for what the engine writes inside comments and wiki pages and for
-the charters and outcomes a worker carries as bytes, the forge's
-protocol as the world plays it, the store, the engine's referee, and the
-names runs and attempts take on a worker's channel (a run by its item,
-an attempt by its item and count); the whole worker's world uses its
-people too.
+The system world uses the engine's, the forge connector's and the
+worker's worlds' crates as libraries: the store, the forge's protocol as
+the world plays it, the referees, the people.
 
 Scripted stand-ins inside a world are another matter, and stay. The
 worker's worlds keep agents that hang, crash and break the channel's
@@ -342,9 +537,8 @@ real ones never do.
 A scenario (testing-strategy.md, section 7) is set up in the terms of
 temper's fakes: each conversation's script for the LLM, the repositories
 on the forge with their files and checks, the items and the people, and
-the faults to inject. A scenario cues its scripts through content, as the
-agent's top-level world does today: a repository's files say which script
-its run follows.
+the faults to inject. A scenario cues its scripts through content: a
+repository's files say which script its run follows.
 
 ### 5.2 The referee
 
@@ -358,11 +552,11 @@ the hour. What temper adds:
   iteration, so its work per iteration stays bounded. Its earliest
   deadline is covered by the shell's one ring timeout, as every layer's is
   (skein's `docs/foundation/programming-model.md`, section 9).
-- **A failure in the real loop** is reported with the trace, since the
-  seed does not replay there.
+- **A failure in the process or live tier** is reported with the trace
+  and the files the run left, since the seed does not replay there.
 
-The referee is built in the shared harness, `tests/world`,
-as ordinary Rust. Each world writes its scenario's expectations: what
+The referee is built on skein's world harness (`skein-world`), as
+ordinary Rust. Each world writes its scenario's expectations: what
 its referee observes, the names of what it expects to happen, the
 stimuli it may inject, and what it checks of each observation. Through
 them the referee checks safety and fails at once, arms a liveness
@@ -375,23 +569,18 @@ between two writes. The verdict is passed, still open (and what is
 pending), stopped early by the scenario, or failed (when, why, and what
 was pending then).
 
-Every engine world has a referee, the engine's own included, and so do
-both system worlds, each with two: the engine's world's, over what the
-forge did and what the engine assigned, and one of its own where the
-components meet (the worker and its agents; or the channel, over the
-engine's acknowledgements, the calls relayed and answered once, and each
-answer taken once). Their stimuli are an engine restarting cold (at a
-drawn moment; at once as it posts an outcome, so that it restarts while
-applying it; or, in the engine's world, at a moment a scenario chooses
-as the forge shows it), a worker's channel dropping or a worker vanishing,
-and a worker told to shut down. The engine's referee meets a story only
-when its item closes. In the agent's top-level world a story may end
-held, so its own referee ends an item's expectation on a hold the
-scenario allows (for its runs' failures, a person's stop or its plan's
-reasons, and for its writes or record only where the forge or the store
-were scripted to fail) as well as on a close; the engine's referee could
-take the allowed holds as a parameter. The worker's child domain worlds,
-and the agent's tools', session's and run's, keep their checks inline.
+Every engine world has a referee, the engine's own included, over what
+the forge did and what the engine assigned. Its stimuli are an engine
+restarting cold: at a drawn moment; at once as it posts an outcome, so
+that it restarts while applying it; or at a moment a scenario chooses as
+the forge shows it. The worker's worlds add a worker's channel dropping,
+a worker vanishing and a worker told to shut down. The engine's referee
+meets a story only when its item closes. The system world checks its
+stories independently of the roots, against durable task and call
+records and smith's own observations (`tests/system`). The conformance
+world (`tests/conformance`) runs the engine root on jig's conformance
+harness, under its outside referee. The worker's child domain worlds
+keep their checks inline.
 
 ## 6. What the tiers check
 
@@ -399,13 +588,20 @@ Every world checks what the strategy lists (testing-strategy.md, section
 6). In temper:
 
 - **Contracts** include each operation's deadline and identity, and each
-  component's own (worker-domain.md, section 9).
+  component's own (`domain/worker.md`, section 10).
 - **Memory** is measured per step: the counting allocator records the
   most a domain held in one step, against its worst case.
 - **Replay** compares traces: a seed replays to the same trace. No world
   compares a digest of the state yet.
-- **The real loop** adds that production's containment holds: a stopped
-  run's process tree is empty, and a command cannot write a git directory.
+- **Secrets stay beside the domains:** in every world with the protocol
+  layer, no git identity's value or API token appears in a domain's
+  state, a fact, a store record or a log; the fake git program checks
+  that a credential reaches git only through its environment (4.3).
+- **The process tier** adds that what the binary started ends with it:
+  after a drain or a kill, no agent or git process of its remains. Once
+  contained trees exist, it adds that production's containment holds: a
+  stopped run's process tree is empty, and a command cannot write a git
+  directory.
 
 ### 6.1 Focused tests and fuzzy tests
 
@@ -419,6 +615,18 @@ by the commands in `docs/development/workflow.md`. In temper:
 - **Fuzzy tests** are each world's `tests/fuzzy_*.rs` binaries. A sweep
   settles each random world under every invariant, and reaches every
   ending among them.
+- **Budgets.** The suites' 15 s and 60 s are rules, which nextest
+  enforces. Within them, guides: the worlds below the domain (the
+  protocol, machine, client and one-process worlds) together at most 4 s
+  of the default suite and 25 s of the fuzzy suite; a focused
+  protocol-world test at most 0.5 s, and a one-process story at most 1 s.
+  A test that misses its guide is made cheaper or moved to the fuzzy
+  suite, never merged with another.
+- **Outside both suites:** the process tier's binary `process` and the
+  live tier's binary `live`, which both suites' filters leave out, run
+  under the nextest profiles `process` and `live` by
+  `scripts/proof-one-process.sh` and `scripts/proof-live.sh`. The gate
+  never runs them.
 
 A fuzzy test lives in its world's crate, beside the focused ones, and
 uses that world: a world's settings, random ones included, are the
@@ -445,12 +653,12 @@ windows.
 
 ### 6.3 The client and the engine, joined from the start
 
-The client's world runs on a scripted engine, which speaks the client's
-vocabulary and so agrees with the client by construction. Only the joint
-world (`tests/web/engine`) shows where either side has drifted from
-their contract. jig's client met its engine only at the end, and the
-drift came at once (jig's `tech-debt.md`, section 9). So temper's
-client is joined to its engine from its first increment:
+A client's world on a scripted engine agrees with the client by
+construction: only a world that joins the client to its engine shows
+where either side has drifted from their contract. jig's client met its
+engine only at the end, and the drift came at once (jig's `tech-debt.md`,
+section 9). So temper's client is joined to its engine from its first
+increment, in `tests/client` (client.md, section 10):
 
 - **The translation** between the client's vocabulary and the engine's
   is written with the first types on both sides, exhaustive both ways.
@@ -458,66 +666,80 @@ client is joined to its engine from its first increment:
   drift is a build error the day it happens, not a finding at the end.
 - **One thin story end to end,** such as signing in and seeing the
   inbox, runs in the joint world as soon as the engine can answer it.
-  Each increment extends it, or adds its own story there beside the one
-  it adds to the client's world.
-- **The scripted engine is checked against the engine:** its scenarios
-  run in the joint world too, so the fake cannot agree with the client
-  where the engine does not.
+  Each increment extends it, or adds its own story there.
+- **jig's scripted engine** keeps the contract of jig's documents, and
+  jig checks it against jig's engine; the forge's client family has no
+  scripted engine of temper's, so its stories run against temper's
+  engine root alone.
 - **The joint world is the client's acceptance.** A client increment is
-  done when its stories pass there, not only against the scripted
-  engine.
+  done when its stories pass there.
 
 ## 7. Layout
 
 ```
-crates/*/src/tests.rs           step tests
-testing/temper-fake-*           fakes, as step crates: the forge and the LLM provider
-testing/temper-fake-person      the web person's scripts and tree face (a DOM face later)
-tests/world                     the world harness: schedule, stage, ledger, trace, heap, referee
-tests/web/domain                the client domain and view with a scripted engine
-tests/web/engine                the client with the real engine root
-tests/<component>/<child>       a child domain's world, temper-<component>-<child>-world
-tests/<component>/domain        a component's world: the engine's, and the system worlds
-tests/*/*/tests/*.rs            a world's focused tests
-tests/*/*/tests/fuzzy_*.rs      its fuzzy tests: random worlds, domains driven at random
-tests/fake-checkout             the machine and working trees' git, today
-tests/fake-forge                the fake forge's tests in ordinary Rust: its memory
-tests/fake-llm                  the fake provider's tests in ordinary Rust: its memory
+crates/*/src/tests.rs               step tests
+crates/temper/tests/process.rs      the process tier (2.6), nextest profile process
+crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
+testing/temper-fake-forge-domain    the fake forge's domain (4.2)
+testing/temper-fake-forge-protocol  the fake forge's protocol layer: Forgejo's API over skein's HTTP server
+testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
+tests/<component>/<child>           a child domain's world, temper-<component>-<child>-world
+tests/<component>/domain            a component's world: the engine's, the worker's
+tests/engine/forge                  the forge connector's world
+tests/engine/protocol-forge         the forge's protocol world (2.2)
+tests/worker/protocol-git           the git component's machine world (git.md, section 9)
+tests/system                        the composed system world (2.1)
+tests/conformance                   the engine root on jig's conformance harness
+tests/client                        temper's client with jig's fake person, joined to the engine's root (2.1, 6.3)
+tests/one-process                   the one-process world (2.5)
+tests/*/*/tests/*.rs                a world's focused tests
+tests/*/*/tests/fuzzy_*.rs          its fuzzy tests: random worlds, domains driven at random
+tests/fake-checkout                 temper-fake-checkout: working trees' git, over skein's fake checkout
+tests/fake-forge                    the fake forge's tests in ordinary Rust: its memory
+tools/forgejo-conformance           Forgejo's facts and transcripts, from the throwaway Forgejo (forge.md, section 10)
+tools/git-transcripts               git's transcripts, from real git against the throwaway Forgejo (git.md, section 9)
+scripts/proof-one-process.sh        the process tier
+scripts/proof-live.sh               the live tier
 ```
 
-Under `tests/<component>/domain`, the engine's is its own
-world, and the agent's and the whole worker's are system worlds (2.1);
-the engine world's crate is a library the system worlds use (4.5). The
-world harness is temper's until a second service needs it
-(testing-strategy.md, section 7).
-
-The protocol worlds find their homes beside the system worlds they
-replay: the link (the engine and a worker) and an agent's channel
-(a worker and its agents), then an agent against the fake provider, and
-the engine against the fake forge (channel.md, section 15; llm.md,
-section 12; forge.md, section 10). The simulated worlds and the real loop
-find theirs when the first of each is built.
+- **The worlds and the harness** are skein's world harness
+  (`skein-world`); each world's crate is a library other worlds may use
+  (4.5).
+- **The machine-level fakes are skein's:** the fake machine
+  (`skein-fake-machine`), the fake checkout, the fake LLM and its peer,
+  the fake issuer. temper's fakes sit on them.
+- **Machine worlds live in the crate's world beside it:** the forge
+  component's in `tests/engine/protocol-forge`'s crate beside its
+  protocol world, the git component's in `tests/worker/protocol-git`,
+  the terminal shell's in `temper-shell-terminal`'s tests (client.md,
+  section 10).
+- **What goes:** `testing/temper-fake-person` and `tests/web/domain`
+  retire with `temper-web-domain` and `temper-web-view`, in the plan
+  that lands `temper-client-domain` (protocol.md, section 5).
 
 ## 9. Not built yet
 
 By tier:
 
-- **System worlds:** several real workers in one world (the engine's
-  world places runs on scripted ones; worker-domain.md, section 11); in
-  the agent's top-level world, what the agent's side lacks
-  (agent-domain.md, section 10): sessions, inbound events, waiting,
-  parking and relayed calls; in the whole worker's world, plans' stories,
-  which run in the engine's world only.
-- **Protocol worlds,** each with the protocol layer it tests, and the
-  engine's cost checks through bytes (forge.md, section 10).
-- **Transcripts** of the real peers for the machines and decoders:
-  LLM providers' streams, captured through their own clients, and
-  Forgejo's answers and webhooks, recorded by the real Forgejo check
-  (llm.md, section 12; forge.md, section 10).
-- **Simulated worlds,** with the services and the shells, on skein's io
-  and simulator.
-- **The real loop:** a shell that drives every service in one loop, and
-  the sandbox.
+- **Step tests:** the codec crates (`temper-protocol-worker-wire`,
+  `temper-protocol-store`, `temper-protocol-client-wire`), Forgejo's
+  documents, the routing's translations, git's builders and parsers.
+- **Transcripts** of the real peers temper speaks to:
+  Forgejo's answers, recorded by `tools/forgejo-conformance`, and git's,
+  recorded by `tools/git-transcripts`, both against the throwaway
+  Forgejo. LLM providers' are skein's.
+- **Machine worlds:** the forge component's, the git component's and the
+  terminal shell's.
+- **System worlds:** `tests/client`; several real workers in one world
+  (the engine's world places runs on scripted ones; `domain/worker.md`,
+  section 12).
+- **Protocol worlds:** the forge's, with the engine's cost checks through
+  bytes (forge.md, section 10).
+- **The one-process world,** with the fake forge as a service and the
+  fake git program.
+- **The process tier and the live tier,** with their scripts.
+- **Containment's checks,** which wait for skein's contained process
+  trees.
 - **The referee** in the worlds that still check their scenarios inline,
   so that those checks run at every tier.
 - **Checks:** transition coverage; fuzzing, starting with the domains'
@@ -526,23 +748,17 @@ By tier:
 
 By fake:
 
-- **LLM provider:** its protocol layer and service.
 - **Forge:** inline review comments, statuses' descriptions and links,
   commit messages, more than one protected branch in a repository, and CI
-  that runs checks in the shell subset; then its protocol layer (Forgejo,
-  GitHub, webhooks, git over HTTP) and service.
-- **Machine:** a step crate; programs as step machines with command-line
-  faces; the shell subset; the io face, and its place behind the
-  simulator; the real loop's sandbox.
-- **People:** inboxes, person tasks and adoption after the new child's
-  signing-in, roles and keyed requests; then the client side of the web's
-  protocol.
+  that runs checks in the shell subset; its protocol layer, Forgejo's
+  API; webhooks and GitHub's API after standalone.
+- **Machine:** the fake git program; rg and sh as programs with
+  command-line faces; the shell subset.
+- **People:** none of temper's: jig's fake person and native fake person,
+  through temper's client.
 
 ## 10. Open questions
 
-- **The forge's git in the real loop:** git over HTTP served by the fake
-  forge, or bare repositories on disk that real git and the fake forge
-  both reach.
 - **How much sh:** which commands and syntax the subset takes. It stays a
   subset of POSIX, so that real sh agrees.
 - **Where the shell's interpreter lives,** so that the machine and the
@@ -550,10 +766,14 @@ By fake:
 - **Differential checks:** whether a scenario must end the same way at
   every tier it runs at, as a check that the layers below the domain
   decide nothing.
-- **What the referee sees in the real loop:** the machine is real there
-  and reports nothing, so an expectation about it, such as what an
+- **What the referee sees in the process tier:** the machine is real
+  there and reports nothing, so an expectation about it, such as what an
   agent's environment holds, needs facts that say so, or is checked only
-  in the tiers below.
-- **The real loop's privileges:** the containment it shares with
+  in the tiers below. Default: checked in the one-process world.
+- **The process tier's privileges:** the containment it will share with
   production needs user namespaces and a delegated cgroup on the test
-  host.
+  host. Default: process groups, until skein's contained process trees
+  exist.
+- **The machine's git in the process tier.** Default: whatever git the
+  test host has, 2.41 or later, which git.md's start refuses below
+  (git.md, section 3); transcripts are of 2.53.
