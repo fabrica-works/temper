@@ -739,7 +739,7 @@ The supervisor's rulings follow, numbered from 101 (development.md,
 134. **A native shell idle before it loaded is a refused directory**
      (temper 16.3b, blocked 2026-10-14T12:35:21Z; plan defect). Session
      16's default printed a line "on 12.1's `DirectoryRefused` notice";
-     at jig `d91a89c4`, `jig-shell-native`'s `files.rs:238-245` meets a
+     at jig `d91a89c4`, `jig-shell-native`'s `files.rs:230-256` meets a
      failed private open by marking the failure and closing its roots,
      and `Shell::is_empty` also needs `closing`, so no notice reaches the
      native client, which stalls (findings/jig-client.md, Discrepancy 4;
