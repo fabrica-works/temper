@@ -1,6 +1,6 @@
 //! Complete worker stories with real child domains and outside observations.
 use temper_worker_domain::{host, wire};
-use temper_worker_domain_world::whole::{Case, run, unprepared, workstreams};
+use temper_worker_domain_world::whole::{Case, run, saved, unprepared, workstreams};
 #[test]
 fn a_prepared_run_delivers_the_complete_tree_and_answers() {
     assert_eq!(run(1, Case::Delivered).cancellations, 0);
@@ -34,9 +34,26 @@ fn a_branch_the_forge_lacks_fails_the_prepare_naming_the_repository() {
     else {
         panic!("a permanent preparation failure: {ending:?}")
     };
-    assert_eq!(preparation, Some(wire::Preparation::Missing { repository: 0, missing: wire::Missing::Branch }));
+    assert_eq!(preparation, Some(wire::Preparation::Missing { tag: 1, missing: wire::Missing::Branch }));
 }
 #[test]
 fn the_hello_names_the_workstreams_the_checkout_holds() {
     assert_eq!(&*workstreams(6), [81]);
+}
+
+#[test]
+fn a_save_says_whether_each_repository_started_from_saved_work() {
+    let rows = [
+        (wire::Start::Base { branch: Box::from(&b"main"[..]) }, false),
+        (wire::Start::Saved { branch: Box::from(&b"saved"[..]) }, true),
+    ];
+    for (start, expected) in rows {
+        let name = format!("{start:?}");
+        let work = saved(8, start);
+        let saved = work.saved.expect("saved work");
+        let [wire::SavedRepository { tag, from_saved, landing: wire::Landing::Landed { .. } }] = saved.as_ref() else {
+            panic!("{name}: one repository's save landed: {saved:?}");
+        };
+        assert_eq!((*tag, *from_saved), (1, expected), "{name}");
+    }
 }

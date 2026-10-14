@@ -22,16 +22,11 @@ use temper_engine_domain_forge as forge;
 use temper_worker_domain::wire;
 use temper_worker_domain_world::protocol as worker_protocol;
 
-/// What the world keeps of an assignment's items to read its answer's
-/// parts: each repository's tag, in the assignment's order, and whether its
-/// checkout started from the task's saved work.
-pub type Items = Box<[(u32, bool)]>;
-
 /// The hub's assignment for the engine's, with temper's workspace items
-/// beside it and what the world keeps of them. The engine names no
+/// beside it. The engine names no
 /// saved-work branch to save to (nor did `main`'s), so the hub saves nothing.
 #[must_use]
-pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::Workspace, Items) {
+pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::Workspace) {
     let workspace = if assignment.workspace.repositories.is_empty() {
         None
     } else {
@@ -39,9 +34,7 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         Some(host::Workspace { workstream: assignment.workstream, items: Token::new(0) })
     };
     let mut repositories = Vec::with_capacity(assignment.workspace.repositories.len());
-    let mut items = Vec::with_capacity(assignment.workspace.repositories.len());
     for repository in &assignment.workspace.repositories {
-        items.push((repository.tag, matches!(repository.start, engine::ForgeStart::Saved(_))));
         repositories.push(self::repository(repository));
     }
     let hub = host::Assignment {
@@ -58,36 +51,45 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         turns: assignment.transcript.clone(),
         answered: answered(&assignment.settled),
     };
-    (hub, wire::Workspace { repositories: repositories.into_boxed_slice() }, items.into_boxed_slice())
+    (hub, wire::Workspace { repositories: repositories.into_boxed_slice() })
 }
 
 /// temper's parts beside a worker's answer, as the engine takes them: the
 /// heads its pushes landed, and, when it saved, the repositories with saved
 /// work after it: those whose save landed, and those that started from saved
-/// work and whose save left that branch as it was. A failed preparation's
-/// repository and reason have no field among the engine's parts, nor had
-/// they on `main`, whose engine never took them; the hub's answer carries
-/// whether a retry may work.
+/// work and whose save left that branch as it was. A permanent preparation
+/// names the repository by tag and what the forge lacks or refused.
 #[must_use]
-pub fn parts(work: wire::Work, items: &[(u32, bool)]) -> engine::Parts {
+pub fn parts(work: wire::Work, preparation: Option<wire::Preparation>) -> engine::Parts {
     let mut pushed = Vec::with_capacity(work.landed.len());
     for landed in &work.landed {
         pushed.push(forge::Pushed { tag: landed.tag, commit: landed.commit });
     }
     let saved = match work.saved {
-        Some(landings) => {
-            assert_eq!(landings.len(), items.len(), "one save outcome for each repository");
-            let mut tags = Vec::with_capacity(items.len());
-            for (landing, (tag, from_saved)) in landings.iter().zip(items.iter()) {
-                if saved(landing, *from_saved) {
-                    tags.push(*tag);
+        Some(repositories) => {
+            let mut tags = Vec::with_capacity(repositories.len());
+            for repository in &repositories {
+                if saved(&repository.landing, repository.from_saved) {
+                    tags.push(repository.tag);
                 }
             }
             Some(tags.into_boxed_slice())
         }
         None => None,
     };
-    engine::Parts { saved, pushed: pushed.into_boxed_slice(), preparation: None }
+    let preparation = match preparation {
+        Some(wire::Preparation::Missing { tag, missing }) => {
+            let missing = match missing {
+                wire::Missing::Repository => engine::Missing::Repository,
+                wire::Missing::Branch => engine::Missing::Branch,
+                wire::Missing::Commit => engine::Missing::Commit,
+            };
+            Some(engine::Preparation::Missing { tag, missing })
+        }
+        Some(wire::Preparation::Refused { tag }) => Some(engine::Preparation::Refused { tag }),
+        Some(wire::Preparation::Transient) | None => None,
+    };
+    engine::Parts { saved, pushed: pushed.into_boxed_slice(), preparation }
 }
 
 /// Whether a repository has saved work after a save that ended in `landing`.
@@ -254,7 +256,7 @@ mod tests {
     #[test]
     fn the_heads_a_run_landed_reach_the_engine_as_its_pushed_heads() {
         let work = wire::Work { landed: Box::new([wire::Landed { tag: 3, commit: [7; 32] }]), saved: None };
-        let parts = parts(work, &[(3, false)]);
+        let parts = parts(work, None);
         assert_eq!(
             parts,
             engine::Parts {
@@ -268,13 +270,47 @@ mod tests {
     #[test]
     fn a_save_names_each_repository_with_saved_work_after_it() {
         let saved = Box::new([
-            wire::Landing::Landed { commit: [9; 32] },
-            wire::Landing::Unchanged,
-            wire::Landing::Failed,
-            wire::Landing::Unchanged,
+            wire::SavedRepository { tag: 1, from_saved: false, landing: wire::Landing::Landed { commit: [9; 32] } },
+            wire::SavedRepository { tag: 2, from_saved: true, landing: wire::Landing::Unchanged },
+            wire::SavedRepository { tag: 3, from_saved: true, landing: wire::Landing::Failed },
+            wire::SavedRepository { tag: 4, from_saved: false, landing: wire::Landing::Unchanged },
         ]);
         let work = wire::Work { landed: Box::new([]), saved: Some(saved) };
-        let parts = parts(work, &[(1, false), (2, true), (3, true), (4, false)]);
+        let parts = parts(work, None);
         assert_eq!(parts, engine::Parts { saved: Some(Box::new([1, 2, 3])), pushed: Box::new([]), preparation: None });
+    }
+
+    #[test]
+    fn a_permanent_preparation_reaches_the_engine_by_its_tag() {
+        let rows = [
+            (
+                wire::Preparation::Missing { tag: 4, missing: wire::Missing::Commit },
+                engine::Preparation::Missing { tag: 4, missing: engine::Missing::Commit },
+            ),
+            (
+                wire::Preparation::Missing { tag: 5, missing: wire::Missing::Branch },
+                engine::Preparation::Missing { tag: 5, missing: engine::Missing::Branch },
+            ),
+            (
+                wire::Preparation::Missing { tag: 6, missing: wire::Missing::Repository },
+                engine::Preparation::Missing { tag: 6, missing: engine::Missing::Repository },
+            ),
+            (wire::Preparation::Refused { tag: 7 }, engine::Preparation::Refused { tag: 7 }),
+        ];
+        for (preparation, expected) in rows {
+            let work = wire::Work { landed: Box::new([]), saved: None };
+            let parts = parts(work, Some(preparation));
+            assert_eq!(
+                parts,
+                engine::Parts { saved: None, pushed: Box::new([]), preparation: Some(expected) },
+                "{preparation:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_transient_preparation_reaches_the_engine_as_no_part() {
+        let work = wire::Work { landed: Box::new([]), saved: None };
+        assert_eq!(parts(work, Some(wire::Preparation::Transient)), engine::Parts::none());
     }
 }

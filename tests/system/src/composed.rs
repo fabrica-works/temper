@@ -87,7 +87,6 @@ pub struct World {
     worker_events: VecDeque<worker::Event>,
     process: Process,
     assignment: Option<engine::Assignment>,
-    items: link::Items,
     adoption: Adoption,
     /// The root heard its funding period and the git identity once ready.
     funded: bool,
@@ -251,7 +250,6 @@ impl World {
             worker_events: VecDeque::from([worker::Event::Ready]),
             process: Process::new(seed, script),
             assignment: None,
-            items: Box::new([]),
             adoption: if repository { Adoption::Pending } else { Adoption::Without },
             funded: false,
             opened: false,
@@ -579,9 +577,8 @@ impl World {
                 self.observed.assignments += 1;
                 let repositories = usize::from(self.adoption != Adoption::Without);
                 assert_eq!(assignment.workspace.repositories.len(), repositories);
-                let (hub, items, kept) = link::assignment(&assignment);
+                let (hub, items) = link::assignment(&assignment);
                 self.worker_events.push_back(worker::Event::Assign { assignment: hub, items, save: None });
-                self.items = kept;
                 self.assignment = Some(assignment);
             }
             Delivery::Link { channel, down } => {
@@ -662,7 +659,7 @@ impl World {
                 }
                 self.up(engine::Link::Up { up, parts: engine::Parts::none() });
             }
-            worker::Request::Answer { run, attempt, answer, work, preparation: _ } => {
+            worker::Request::Answer { run, attempt, answer, work, preparation } => {
                 self.observed.answers += 1;
                 let (turns, spent) = self.process.answered.expect("Smith ended before the worker answered");
                 assert_eq!((answer.turns, answer.spent), (turns, spent));
@@ -676,7 +673,7 @@ impl World {
                     (ending, settled) => panic!("the worker's answer {ending:?} follows smith's {settled:?}"),
                 }
                 assert!(work.landed.is_empty() && work.saved.is_none(), "an inspecting run lands and saves nothing");
-                let parts = link::parts(work, &self.items);
+                let parts = link::parts(work, preparation);
                 self.up(engine::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, parts });
             }
             // The link cancels a relay's local wait at once.

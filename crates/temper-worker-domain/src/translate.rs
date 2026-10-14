@@ -64,13 +64,19 @@ fn start(start: wire::Start) -> checkout::Start {
 
 /// Why a prepare failed, as the host tells the engine: a retry may work, or
 /// what the forge lacks or refused, for which repository.
-pub(crate) const fn failure(failure: checkout::Failure) -> wire::Preparation {
+pub(crate) fn failure(failure: checkout::Failure, tags: &[u32]) -> wire::Preparation {
     match failure {
         checkout::Failure::Transient => wire::Preparation::Transient,
         checkout::Failure::Missing { repository, missing } => {
-            wire::Preparation::Missing { repository, missing: self::missing(missing) }
+            let place = usize::try_from(repository).expect("u32 fits usize");
+            let tag = *tags.get(place).expect("every failed repository has a tag");
+            wire::Preparation::Missing { tag, missing: self::missing(missing) }
         }
-        checkout::Failure::Refused { repository } => wire::Preparation::Refused { repository },
+        checkout::Failure::Refused { repository } => {
+            let place = usize::try_from(repository).expect("u32 fits usize");
+            let tag = *tags.get(place).expect("every failed repository has a tag");
+            wire::Preparation::Refused { tag }
+        }
     }
 }
 

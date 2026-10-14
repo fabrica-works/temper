@@ -78,6 +78,7 @@ impl World {
         let mut forge = Forge::new(seed);
         let first = forge.repository(REMOTE, b"main", [(PATH.to_vec(), b"original\n".to_vec())].into());
         forge.create_branch(REMOTE, b"topic", first).expect("topic");
+        forge.create_branch(REMOTE, b"saved", first).expect("saved");
         Self {
             domain: Domain::new(&limits),
             out: Queue::with_capacity(max_out(&limits)),
@@ -269,8 +270,12 @@ impl World {
     }
 
     fn start(&mut self) {
+        self.start_from(wire::Start::Base { branch: Box::from(&b"main"[..]) });
+    }
+
+    fn start_from(&mut self, start: wire::Start) {
         self.connect();
-        self.assign(wire::Start::Base { branch: Box::from(&b"main"[..]) });
+        self.assign(start);
         self.say(agent::Up::Admitted);
         let place = temper_worker_domain::checkout::git::Place {
             workspace: self.workspace.expect("prepared"),
@@ -405,7 +410,8 @@ impl World {
         assert_eq!(cancelled, expected);
         if case == Case::ContactPast {
             let saved = work.saved.expect("saved work");
-            let [wire::Landing::Landed { commit: saved, .. }] = saved.as_ref() else {
+            let [wire::SavedRepository { landing: wire::Landing::Landed { commit: saved }, .. }] = saved.as_ref()
+            else {
                 panic!("one saved head");
             };
             assert_eq!(*saved, translate::commit(commit).raw());
@@ -426,6 +432,28 @@ impl World {
 #[must_use]
 pub fn run(seed: u64, case: Case) -> Report {
     World::new(seed).run(case)
+}
+
+/// A run starting at `start`, whose unfinished edit is saved after contact
+/// is lost past the grace: its work, with each repository's tag and start.
+#[must_use]
+pub fn saved(seed: u64, start: wire::Start) -> wire::Work {
+    let mut world = World::new(seed);
+    world.start_from(start);
+    world.story(Case::ContactPast);
+    assert_eq!(world.domain.agent().agents(), 0);
+    assert_eq!(world.domain.workspaces(), 0);
+    let (answer, work, preparation) = world.answer.take().expect("a terminal answer");
+    assert_eq!(preparation, None);
+    assert!(matches!(
+        answer.ending,
+        host::Ending::Failed { failure: host::Failure::Cancelled(host::Reason::Contact), .. }
+    ));
+    world.event(Event::Link(host::LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT }));
+    assert_eq!(world.domain.kept_answers(), 0);
+    world.event(Event::Shutdown);
+    assert_eq!(world.stops, 1);
+    work
 }
 
 /// A run whose repository starts from a branch the forge does not have: how

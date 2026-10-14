@@ -140,9 +140,9 @@ fn workspace_memory(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(slots).checked_mul(u64::from(checkout_limits.repositories).checked_mul(root)?)?)?;
     let staged = slots.checked_add(1)?;
     let item = u64::try_from(size_of::<wire::Repository>()).ok()?.checked_add(name.checked_mul(4)?)?;
-    let feedback = u64::try_from(size_of::<wire::Landing>()).ok()?.checked_add(conflicts)?;
+    let feedback = u64::try_from(size_of::<wire::SavedRepository>()).ok()?.checked_add(conflicts)?;
     let per = u64::from(checkout_limits.repositories)
-        .checked_mul(item.checked_add(feedback)?.checked_add(4)?)?
+        .checked_mul(item.checked_add(feedback)?.checked_add(5)?)?
         .checked_add(Map::<u32, [u8; 32]>::worst_case(checkout_limits.repositories)?)?
         .checked_add(name)?
         .checked_add(agent::Delivered::worst_case())?;

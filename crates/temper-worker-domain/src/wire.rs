@@ -127,7 +127,15 @@ pub enum Landing {
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Work {
     pub landed: Box<[Landed]>,
-    pub saved: Option<Box<[Landing]>>,
+    pub saved: Option<Box<[SavedRepository]>>,
+}
+
+/// One repository's save, named by tag with how its checkout started.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SavedRepository {
+    pub tag: u32,
+    pub from_saved: bool,
+    pub landing: Landing,
 }
 
 /// A repository a run's pushes landed in: its deployment tag, and
@@ -147,12 +155,11 @@ pub enum Preparation {
     /// another run of its workstream: a retry may work.
     Transient,
     /// The forge does not have what the assignment names for the repository
-    /// at `repository`, its place in the assignment: permanent until someone
-    /// makes it.
-    Missing { repository: u32, missing: Missing },
-    /// The forge refused the identity of the repository at `repository`:
+    /// named by `tag`: permanent until someone makes it.
+    Missing { tag: u32, missing: Missing },
+    /// The forge refused the identity of the repository named by `tag`:
     /// permanent until the identity's credentials or permissions change.
-    Refused { repository: u32 },
+    Refused { tag: u32 },
 }
 
 /// What the forge does not have.

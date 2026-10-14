@@ -68,8 +68,9 @@ pub(crate) struct Items {
     spec: Option<wire::Workspace>,
     save: Option<Box<[u8]>>,
     tags: Box<[u32]>,
+    from_saved: Box<[bool]>,
     landed: Map<u32, [u8; 32]>,
-    saved: Option<Box<[wire::Landing]>>,
+    saved: Option<Box<[wire::SavedRepository]>>,
     delivery: Option<agent::Delivery>,
     preparation: Option<wire::Preparation>,
 }
@@ -109,8 +110,17 @@ pub(crate) fn stage(
     let save = if run.save && !merging { save } else { None };
     let count = u32::try_from(items.repositories.len()).expect("checked item count");
     let mut tags = List::with_capacity(count);
+    let mut from_saved = List::with_capacity(count);
     for repository in &items.repositories {
         tags.push(repository.tag).expect("room for each item tag");
+        let saved = match repository.start {
+            wire::Start::Saved { .. } => true,
+            wire::Start::Merge { .. }
+            | wire::Start::Base { .. }
+            | wire::Start::Branch { .. }
+            | wire::Start::Commit { .. } => false,
+        };
+        from_saved.push(saved).expect("room for each item start");
     }
     let saving = save.is_some();
     let entry = Items {
@@ -118,6 +128,7 @@ pub(crate) fn stage(
         spec: Some(items),
         save,
         tags: tags.into_boxed(),
+        from_saved: from_saved.into_boxed(),
         landed: Map::with_capacity(count),
         saved: None,
         delivery: None,
@@ -352,7 +363,10 @@ pub(crate) fn prepared(domain: &mut Domain, env: &Env<Limits>, client: Token, pr
     let items = record.items;
     let failure = match &prepared {
         checkout::Prepared::Refused { refusal } => Some(translate::checkout_refusal(*refusal)),
-        checkout::Prepared::Failed { failure } => Some(translate::failure(*failure)),
+        checkout::Prepared::Failed { failure } => {
+            let items = domain.items.get(&items).expect("the assignment lives through prepare");
+            Some(translate::failure(*failure, &items.tags))
+        }
         checkout::Prepared::Ready { .. } | checkout::Prepared::Aborted => None,
     };
     if let Some(failure) = failure {
@@ -414,7 +428,13 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
         let outcome = translate::delivery_outcome(&translate::summarize(landings));
         Written::Delivered(host::Delivery { outcome, left: items, changed })
     } else {
-        next.saved = Some(landings);
+        let mut saved = List::with_capacity(repositories);
+        for (index, landing) in landings.into_iter().enumerate() {
+            let tag = *next.tags.get(index).expect("every item has a tag");
+            let from_saved = *next.from_saved.get(index).expect("every item has a start");
+            saved.push(wire::SavedRepository { tag, from_saved, landing }).expect("room for every saved item");
+        }
+        next.saved = Some(saved.into_boxed());
         Written::Saved(items)
     };
     let mut then = Then::NOTHING;
@@ -530,7 +550,13 @@ fn ended(
             assert!(!abandoned, "a released hold's prepare ends aborted");
             let hold = hold.expect("a prepare that ran was held");
             then.checkout = Some(checkout::Event::Release { hold });
-            then.host = Some(unprepared(owner, translate::preparation(translate::failure(failure), items)));
+            let failure = match failure {
+                checkout::Failure::Transient => host::Preparation::Transient,
+                checkout::Failure::Missing { .. } | checkout::Failure::Refused { .. } => {
+                    host::Preparation::Permanent { resource: Some(items) }
+                }
+            };
+            then.host = Some(unprepared(owner, failure));
             State::Releasing
         }
         checkout::Prepared::Aborted => {
