@@ -25,6 +25,65 @@ fn the_worker_sizes_each_part_from_its_payload_codec() {
     assert!(worker_settings::worker_worst_case(&settings, &agent, &limits).unwrap() > 0);
 }
 
+#[test]
+fn a_workspace_start_carries_one_path_per_directory() {
+    use smith_host_domain as smith;
+    let agent = fixtures::worker_agent();
+    let mut start = decoded_chat_start(&agent);
+    let mut directories = skein_lib::List::with_capacity(2);
+    for (token, name, writable) in [(73, b"second".as_slice(), true), (41, b"first".as_slice(), false)] {
+        directories
+            .push(smith::Directory {
+                root: Token::new(token),
+                name: name.into(),
+                host: Box::new([]),
+                writable,
+                git: true,
+                conflicts: Box::new([]),
+            })
+            .unwrap();
+    }
+    start.directories = directories.into_boxed();
+    let table = jig_protocol_accounts::table::Table::new(0, 0);
+    let values = crate::worker::start_values(&table, &start, b"/worker", fixtures::NOW).unwrap();
+    assert_eq!(
+        values.paths.as_ref(),
+        [Box::from(b"/worker/workspaces/73/second".as_slice()), Box::from(b"/worker/workspaces/41/first".as_slice()),]
+    );
+    smith_host_protocol::encode_start(
+        *start,
+        smith::Window { turns: 1, bytes: 65536 },
+        values,
+        &agent.limits.bodies,
+        &agent.limits.charter,
+        &agent.limits.transcript,
+        &agent.endpoints,
+    )
+    .expect("two prepared directories encode with their paths");
+}
+
+fn decoded_chat_start(agent: &crate::settings::Agent) -> Box<smith_host_domain::Start> {
+    let link::Request::Down { down: hub::LinkDown::Assign { assignment }, .. } = fixtures::chat_assignment() else {
+        panic!("chat assignment")
+    };
+    let source = assignment.assignment;
+    crate::worker_route::decode(
+        source.run,
+        hub::Start {
+            workspace: Some(Token::new(3)),
+            charter: source.charter,
+            activation: 1,
+            identity: source.identity,
+            turns: Box::new([]),
+            answered: Box::new([]),
+            messages: Box::new([]),
+            grants: Box::new([]),
+        },
+        agent,
+    )
+    .unwrap()
+}
+
 use jig_domain_host as hub;
 use jig_protocol_engine_workers as engine_link;
 use jig_protocol_worker_link as link;

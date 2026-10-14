@@ -185,6 +185,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
         .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
         .checked_add(command.checked_mul(u64::from(jig.slots).checked_add(1)?)?)?
+        .checked_add(u64::try_from(crate::worker::WORKER_PATH_BYTES).ok()?)?
         .checked_add(skein_io::worst_case(&jig.limits.io)?)?
         .checked_add(crate::worker_git::worst_case(own)?)
 }

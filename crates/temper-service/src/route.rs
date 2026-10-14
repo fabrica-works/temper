@@ -74,7 +74,14 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             root::HostRequest::Dropped { .. } => {}
         },
         root::WorkerRequest::ReadResult { payload, outcome } => {
-            engine.events.push(crate::tools::result(payload, &outcome));
+            #[expect(clippy::manual_map, reason = "the step subset uses explicit matches")]
+            let change = match engine.domain.change_resource(payload) {
+                Some((connector, kind, resource)) => {
+                    Some(temper_engine_smith::ChangeResource { connector, kind, resource })
+                }
+                None => None,
+            };
+            engine.events.push(crate::tools::result(payload, &outcome, change));
         }
         root::WorkerRequest::Deliver(delivery) => match delivery {
             root::Delivery::Assigned { channel, assignment } => {

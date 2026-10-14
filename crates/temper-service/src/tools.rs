@@ -51,7 +51,11 @@ pub(crate) fn render(to: ReplyTo, answer: &engine::CallAnswer) -> engine::Event 
         answer: core::SettledAnswer::Host { error, body },
     })
 }
-pub(crate) fn result(payload: Token, outcome: &[u8]) -> engine::Event {
+pub(crate) fn result(
+    payload: Token,
+    outcome: &[u8],
+    change: Option<temper_engine_smith::ChangeResource>,
+) -> engine::Event {
     let end = match smith_protocol_channel::decode_declared(outcome, &smith_charter::CEILINGS) {
         Ok(outcome) => {
             let spent = run::Spend {
@@ -63,7 +67,7 @@ pub(crate) fn result(payload: Token, outcome: &[u8]) -> engine::Event {
                 reasoning: None,
                 units: 0,
             };
-            match temper_engine_smith::result(run::Answer::Accepted { outcome, spent, turns: 0 }, None) {
+            match temper_engine_smith::result(run::Answer::Accepted { outcome, spent, turns: 0 }, change) {
                 Ok(terminal) => terminal.end,
                 Err(_) => tasks::End::Failed(tasks::Class::Invalid),
             }

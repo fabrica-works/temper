@@ -92,7 +92,7 @@ fn a_result_that_does_not_decode_fails_its_attempt_invalid() {
         (b"not a result", jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid)),
         (&[0, 0, 0, 99], jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid)),
     ] {
-        let event = crate::tools::result(Token::new(3), bytes);
+        let event = crate::tools::result(Token::new(3), bytes, None);
         let root::Event::Worker(root::WorkerInput::ResultRead { payload, end }) = event else {
             panic!("read result {bytes:?}")
         };
@@ -126,7 +126,7 @@ fn a_report_result_keeps_its_words() {
         fields: Box::new([]),
     });
     let bytes = smith_protocol_channel::encode_result(&report, &smith_charter::CEILINGS).unwrap();
-    let event = crate::tools::result(Token::new(3), &bytes);
+    let event = crate::tools::result(Token::new(3), &bytes, None);
     let root::Event::Worker(root::WorkerInput::ResultRead { payload, end }) = event else { panic!("report read") };
     assert_eq!(payload, Token::new(3));
     assert_eq!(
@@ -142,7 +142,7 @@ fn a_change_result_without_settled_resource_is_invalid() {
     let change =
         smith_domain_run::outcome::Declared::Change(smith_domain_run::outcome::Change { fields: Box::new([]) });
     let bytes = smith_protocol_channel::encode_result(&change, &smith_charter::CEILINGS).unwrap();
-    let event = crate::tools::result(Token::new(3), &bytes);
+    let event = crate::tools::result(Token::new(3), &bytes, None);
     let root::Event::Worker(root::WorkerInput::ResultRead { end, .. }) = event else { panic!("change read") };
     assert_eq!(end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid));
 }

@@ -10,6 +10,32 @@ use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::{Decimal, List, Token, Writer};
+use temper_engine_domain_forge as forge;
+use temper_engine_domain_forge_client as forge_client;
+impl Domain {
+    /// The unique resource pushed under this fenced answer's authentic writer claim.
+    #[must_use]
+    pub fn change_resource(&self, payload: Token) -> Option<(u16, u16, u64)> {
+        let Some(Some(Payload::Answer { task, attempt, parts, .. })) =
+            self.payloads.get(skein_lib::Id::from_token(payload))
+        else {
+            return None;
+        };
+        if !self.core.current_proof(*task, *attempt) || !parts_within(parts, &self.limits) {
+            return None;
+        }
+        let tasks::Contract::Change { connector, kind, .. } = self.core.tasks.task(*task)?.contract else {
+            return None;
+        };
+        let heads = self.forge.reported_heads(&self.limits.forge, *task, *attempt, &parts.pushed);
+        (connector == self.config.forge_connector).then_some((connector, kind, settled_resource(&heads)?))
+    }
+}
+
+pub(crate) fn settled_resource(heads: &[(forge::Name, forge_client::api::Commit)]) -> Option<u64> {
+    let [(name, _)] = heads else { return None };
+    Some(u64::from(name.repository))
+}
 
 /// Translate one channel input into the core's fleet vocabulary; `None`
 /// when the root has no room to keep a record's bytes, which admission

@@ -11,7 +11,7 @@ use jig_protocol_config::{Problems, What};
 use jig_protocol_worker_link as link;
 use skein_channel::{Lower, LowerEvent};
 use skein_io::{self as io, kernel::Fd};
-use skein_lib::{Env, List, Map, Queue, Time, Token, Wall, Writer, stream};
+use skein_lib::{Decimal, Env, List, Map, Queue, Time, Token, Wall, Writer, stream};
 use smith_host_domain as smith;
 use smith_host_protocol as host;
 use temper_worker_domain as root;
@@ -23,6 +23,8 @@ pub struct WorkerRuntime {
     pub root: Fd,
     pub path: Box<[u8]>,
 }
+/// The filesystem's absolute path envelope, including the worker root.
+pub(crate) const WORKER_PATH_BYTES: usize = 4096;
 #[derive(Debug)]
 pub struct Worker {
     pub(super) root: root::Domain,
@@ -50,6 +52,7 @@ pub struct Worker {
     program: Box<[u8]>,
     arguments: Box<[Box<[u8]>]>,
     directory: Option<Fd>,
+    path: Box<[u8]>,
     root_close: Option<Token>,
     pub(super) submitted: Queue<io::kernel::Submit>,
     pub(super) started: bool,
@@ -66,6 +69,9 @@ impl Worker {
         runtime: WorkerRuntime,
         seed: u64,
     ) -> Result<Self, Problems> {
+        if runtime.path.len() > WORKER_PATH_BYTES {
+            return Err(problem(b"root", What::Bound));
+        }
         let prepared = worker_settings::prepare(settings, agent, limits)?;
         let config = &settings.jig;
         let secret = files.contents(&config.secret).ok_or(problem(b"secret", What::Unreadable))?;
@@ -119,6 +125,7 @@ impl Worker {
             program: config.agent.program.clone(),
             arguments: config.agent.arguments.clone(),
             directory: Some(runtime.root),
+            path: runtime.path,
             root_close: None,
             submitted: Queue::with_capacity(operations),
             started: false,
@@ -418,7 +425,7 @@ impl Worker {
     }
     fn process_send(&mut self, owner: Token, message: smith::Down) {
         let values = match &message {
-            smith::Down::Start { start, .. } => start_values(&self.values, &start.grants, self.env.now),
+            smith::Down::Start { start, .. } => start_values(&self.values, start, &self.path, self.env.now),
             smith::Down::Grant { grant } => grant_value(&self.values, *grant, self.env.now),
             smith::Down::Message { .. }
             | smith::Down::Answer { .. }
@@ -661,12 +668,29 @@ fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<Box<[u8]>> {
     writer.put(value.token.expose()).ok()?;
     Some(writer.finish())
 }
-fn start_values(table: &Table, grants: &[smith::Grant], now: Time) -> Option<host::Values> {
-    let mut values = List::with_capacity(u32::try_from(grants.len()).ok()?);
-    for grant in grants {
+pub(crate) fn start_values(table: &Table, start: &smith::Start, root: &[u8], now: Time) -> Option<host::Values> {
+    let mut values = List::with_capacity(u32::try_from(start.grants.len()).ok()?);
+    for grant in &start.grants {
         values.push(account(table, *grant, now)?).ok()?;
     }
-    Some(host::Values { paths: Box::default(), credentials: values.into_boxed() })
+    let mut paths = List::with_capacity(u32::try_from(start.directories.len()).ok()?);
+    for directory in &start.directories {
+        let token = Decimal::of(directory.root.raw());
+        let capacity = root
+            .len()
+            .checked_add(b"/workspaces/".len())?
+            .checked_add(1)?
+            .checked_add(token.as_bytes().len())?
+            .checked_add(directory.name.len())?;
+        let mut path = Writer::new(capacity);
+        path.put(root).ok()?;
+        path.put(b"/workspaces/").ok()?;
+        path.put(token.as_bytes()).ok()?;
+        path.put(b"/").ok()?;
+        path.put(&directory.name).ok()?;
+        paths.push(path.finish()).ok()?;
+    }
+    Some(host::Values { paths: paths.into_boxed(), credentials: values.into_boxed() })
 }
 fn owner_of(event: &mut io::Event, new: Token) {
     match event {
