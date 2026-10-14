@@ -1048,7 +1048,7 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      of `temper-one-process-world` follows a change aimed at a named
      cause, or a diagnostic added to the world that names what it will
      show. The world's failure output may carry, typed and formatted only
-     when a story fails (section 14.3's checklist), each task's record
+     when a story fails (development.md, 14.3's checklist), each task's record
      with its phase and subphase, and each agent's `Start`, `Failed` and
      `Refused`; that code is world code, in 17.3's Files, and stays only
      if it serves the stories' failure messages. At most five diagnostic
@@ -1058,6 +1058,36 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      session 15. 17.3's Scope, Files, Test shape, Proof and its 20-line
      fix allowance (12 used, all in `testing/temper-fake-git`) are
      unchanged.
+
+149. **15.3 makes one more marked process run, at the brief's and the
+     claim's routing** (temper 15.3, blocked 2026-10-14T18:04:26Z;
+     process, ruling 147's means spent). Ruling 147's three system-world
+     runs stopped before any gate (the fixture's authority and permission
+     tables were priced for its own limits, then its adoption failed), and
+     its marked process run (`logs/temper-15/147-process-diagnostic.log`,
+     31.2 s) printed none of its markers. Ruling 147 left one of its
+     candidates unmarked: jig's `route_claim_refused` requests
+     `Now::DropAssignment`, not `Now::RunPreparationFailed`. So 15.3
+     makes one more process run through `heavy --gate`, with temporary
+     `eprintln!` lines that print the task, the site, sizes and counts,
+     never a section's bytes, at:
+     - `route/now.rs`'s `Now::BriefCorePlanned` arm (the count of
+       sections), `Now::CompleteBrief` arm (the count of placed sections)
+       and `Now::DropAssignment` arm;
+     - `route/forge_route.rs`'s `forge::Request::BriefSized` arm (the
+       section, the size or none, `cutting`);
+     - `temper-engine-domain-forge/src/brief.rs`'s `brief_answer`, where
+       a fetch ends without a section (its stage and the error's kind).
+
+     The gate with no `BriefCorePlanned` names jig's `plan_brief`; a
+     `DropAssignment` names the claim's refusal; sections sized with no
+     `CompleteBrief` name the brief child's `Failed` or `Refused`
+     (`children.rs:68-74`), read against that run's root brief limits
+     (`147-result.md`: sections 3, `brief_bytes` 384, each budget 128).
+     Its log is kept under `logs/temper-15/`. The rest of ruling 147
+     holds: nothing diagnostic committed, jig unedited, the fix where the
+     cause is, else a question. If this run names no branch either, 15.3
+     makes no further run and asks, with both runs' logs.
 
 ## For the user
 
