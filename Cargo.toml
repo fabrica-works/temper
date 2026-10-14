@@ -5,6 +5,7 @@ resolver = "3"
 members = [
     "crates/temper-protocol-worker-wire",
     "tests/codecs",
+    "crates/temper-protocol-store",
     "crates/temper-web-domain",
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
@@ -39,6 +40,9 @@ publish = false
 temper-protocol-worker-wire = { path = "crates/temper-protocol-worker-wire" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }
+temper-protocol-store = { path = "crates/temper-protocol-store" }
+jig-protocol-store = { git = "https://github.com/forgetic/jig.git" }
+skein-kv = { git = "https://github.com/forgetic/skein.git" }
 temper-web-domain = { path = "crates/temper-web-domain" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
 skein-json = { git = "https://github.com/forgetic/skein.git" }

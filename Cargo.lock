@@ -1013,6 +1013,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-protocol-store"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-protocol-store",
+ "skein-kv",
+ "skein-lib",
+ "temper-engine-domain",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-change",
+ "temper-engine-domain-forge-client",
+ "temper-engine-domain-forge-issues",
+]
+
+[[package]]
 name = "temper-protocol-worker-wire"
 version = "0.0.0"
 dependencies = [
