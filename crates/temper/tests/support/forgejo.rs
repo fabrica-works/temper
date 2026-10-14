@@ -3,6 +3,7 @@ use super::{Forge, Scratch, write_private};
 use serde_json::{Value, json};
 use std::{fs, net::SocketAddr, path::Path};
 use temper_throwaway_forgejo::{Account, Forgejo, Init, Instance, Made, Outgoing, Settings};
+pub type BranchHead = (Box<[u8]>, Box<[u8]>);
 
 pub struct Throwaway {
     instance: Instance,
@@ -62,6 +63,23 @@ impl Throwaway {
         assert_eq!(response.status, 200, "branch answer");
         let value: Value = serde_json::from_slice(&response.body).expect("branch JSON");
         Some(value["commit"]["id"].as_str().expect("branch commit").as_bytes().into())
+    }
+    #[must_use]
+    pub fn branch_heads(&self) -> Vec<BranchHead> {
+        let response = self.get("branches?limit=8");
+        assert_eq!(response.status, 200, "branch list");
+        let value: Value = serde_json::from_slice(&response.body).expect("branches JSON");
+        value
+            .as_array()
+            .expect("branches")
+            .iter()
+            .map(|branch| {
+                (
+                    branch["name"].as_str().expect("branch name").as_bytes().into(),
+                    branch["commit"]["id"].as_str().expect("branch commit").as_bytes().into(),
+                )
+            })
+            .collect()
     }
     #[must_use]
     pub fn failure_state(&self) -> String {

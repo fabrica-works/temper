@@ -4,6 +4,7 @@ pub mod sign_in;
 pub mod terminal;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
 pub mod forgejo;
+pub mod live;
 pub mod person;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 

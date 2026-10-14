@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "tools/live-login",
     "tests/one-process",
     "testing/temper-fake-git",
     "testing/temper-fake-forge-protocol",
