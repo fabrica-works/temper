@@ -207,6 +207,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      63 facts, 83 transcripts) and README's 10 lines are unchanged, and
      06.4's and 14.5's dependencies on 05.3 stay as they are.
 
+103. **Forgejo v16.0.5's four `fails` lines** (temper 05.3, blocked
+     2026-10-14T04:06:04Z; design gap). 05.3 lands `facts.txt` as
+     observed, its Proof's "the run goes on". Two lines have the
+     design's fallback, and need nothing:
+     - `fails effective-protection-name-for-a-writer:
+       effective_branch_protection_name=""`: forge.md, 3.2's
+       `Read::Protection` row reads "`GET R/branch_protections` when it
+       names none", answered "a `403` (a writer who is not an admin)
+       `Forbidden`".
+     - `fails delete-missing-branch-is-404: HTTP 500: ""`: 3.4's "`5xx`"
+       is `Timeout`, and the find after it reads the branch
+       (`outbox.rs:310-312`), whose `404` is `Missing`.
+
+     Two are the designer's, in the run's `question.md` of this time:
+     `fails pull-for-names-the-newest-of-several: 12` (the direct lookup
+     names the oldest, closed pull) and `fails open-pull-no-changes-is-422:
+     HTTP 201: null` (Forgejo creates a pull with no changes). Their
+     answer is recorded here when it lands.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
