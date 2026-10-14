@@ -452,6 +452,12 @@ pub enum Stored {
     /// A goal issue's committed projection.
     Issue(IssueRow),
     Release(ReleaseRow),
+    /// A keyed adoption outcome retained until its wall-clock end.
+    Application {
+        token: u64,
+        until: skein_lib::Wall,
+        outcome: ApplicationOutcome,
+    },
 }
 /// A bounded connector payload awaiting an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -479,6 +485,7 @@ pub enum Key {
     Change(u64),
     Issue(u64),
     Release(u64),
+    Application(u64),
 }
 /// A completed phase of the connector's restart contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

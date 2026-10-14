@@ -3585,6 +3585,7 @@ fn deleting_entry(d: &Domain, task: u64, resource: &client::Resource, change: &c
 
 fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
     match record {
+        Stored::Application { token, until, outcome } => d.application.restore(token, until, outcome),
         Stored::Call { key, answer } => {
             d.keep_named_answer(&env.limits, key, answer).expect("restored named-call payload within limits");
         }

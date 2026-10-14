@@ -409,3 +409,241 @@ fn issue_fields_use_their_domain_limits_at_and_past_each_bound() {
         }
     }
 }
+
+fn application(outcome: forge::ApplicationOutcome) -> forge::Stored {
+    forge::Stored::Application { token: u64::MAX, until: skein_lib::Wall::from_nanos(u64::MAX), outcome }
+}
+fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
+    use jig_domain_people as p;
+    let mut rows = skein_lib::List::with_capacity(192);
+    for row in [
+        p::Refusal::Disposal { task: u64::MAX, issue: p::DisposalIssue::Missing },
+        p::Refusal::Disposal { task: 7, issue: p::DisposalIssue::Unknown },
+        p::Refusal::Disposal { task: 8, issue: p::DisposalIssue::Repeated },
+        p::Refusal::Role { held: None },
+        p::Refusal::Taken { by: u64::MAX },
+        p::Refusal::NotWaiting,
+        p::Refusal::NoFurther,
+        p::Refusal::Unknown,
+        p::Refusal::NotOffered,
+        p::Refusal::KeyConflict,
+    ] {
+        rows.push(row).expect("refusal rows fit");
+    }
+    for held in
+        [p::Role::Owner, p::Role::Maintainer, p::Role::Member, p::Role::Observer, p::Role::Policy { role: u32::MAX }]
+    {
+        rows.push(p::Refusal::Role { held: Some(held) }).expect("bounded application cases");
+    }
+    for lacking in [
+        p::Lack::Approver,
+        p::Lack::Budget { needs: u64::MAX, left: 42 },
+        p::Lack::Grant { kind: u16::MAX },
+        p::Lack::Funding,
+        p::Lack::TaskKind,
+        p::Lack::Depth { most: u32::MAX },
+        p::Lack::Deadline,
+        p::Lack::Tasks { left: u32::MAX },
+        p::Lack::Tool,
+        p::Lack::Scope,
+        p::Lack::Reference,
+        p::Lack::ResourceAccess,
+        p::Lack::ResourceUnavailable,
+        p::Lack::Shape,
+        p::Lack::Again { required: true },
+        p::Lack::Account,
+        p::Lack::Writer,
+        p::Lack::Required { connector: u16::MAX, kind: 9 },
+        p::Lack::Failed { connector: 8, kind: 7 },
+        p::Lack::Unguarded { connector: 6, kind: 5 },
+    ] {
+        for proposable in [None, Some(false), Some(true)] {
+            rows.push(p::Refusal::Authority { lacking, proposable }).expect("bounded application cases");
+        }
+    }
+    for which in [
+        p::LimitKind::Words,
+        p::LimitKind::Identity,
+        p::LimitKind::Roles,
+        p::LimitKind::Arithmetic,
+        p::LimitKind::Duplicate,
+        p::LimitKind::Empty,
+        p::LimitKind::Batch,
+        p::LimitKind::ProjectLiveTasks,
+        p::LimitKind::LiveTasks,
+        p::LimitKind::Tree,
+        p::LimitKind::Depth,
+        p::LimitKind::Delegates,
+        p::LimitKind::Subscription,
+        p::LimitKind::Dependencies,
+        p::LimitKind::Cycle,
+        p::LimitKind::Spec,
+        p::LimitKind::Contract,
+        p::LimitKind::Authority,
+        p::LimitKind::Inputs,
+        p::LimitKind::Attempts,
+        p::LimitKind::LiveDelegates,
+        p::LimitKind::Restore,
+        p::LimitKind::Read,
+        p::LimitKind::Turn,
+        p::LimitKind::HoldKind,
+        p::LimitKind::HoldTaken,
+        p::LimitKind::Holds,
+        p::LimitKind::InboxFull,
+        p::LimitKind::Notes,
+        p::LimitKind::Revision,
+        p::LimitKind::Question,
+        p::LimitKind::Priority,
+        p::LimitKind::Policy,
+        p::LimitKind::Resource,
+        p::LimitKind::Service,
+    ] {
+        rows.push(p::Refusal::Limit { which }).expect("bounded application cases");
+    }
+    application_moved_and_ended(&mut rows);
+    rows.into_boxed()
+}
+fn application_moved_and_ended(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
+    use jig_domain_people as p;
+    for reason in [
+        p::HoldReason::Failures { class: p::FailureClass::Invalid },
+        p::HoldReason::Stalled,
+        p::HoldReason::Dependency { task: u64::MAX },
+        p::HoldReason::Stopped,
+        p::HoldReason::StoppedBy { party: u64::MAX },
+        p::HoldReason::Drift,
+        p::HoldReason::Effects,
+        p::HoldReason::EffectFailed,
+        p::HoldReason::Uncertain { entry: u64::MAX },
+        p::HoldReason::Budget,
+        p::HoldReason::Deadline,
+        p::HoldReason::HoldsWaited,
+        p::HoldReason::ResourceUnavailable,
+        p::HoldReason::ResourceAccess,
+        p::HoldReason::PoolLost { pool: u64::MAX },
+        p::HoldReason::Procedure,
+    ] {
+        rows.push(p::Refusal::Moved { now: p::Moved::Hold { revision: u64::MAX, reason } })
+            .expect("bounded application cases");
+    }
+    for class in [
+        p::FailureClass::Transient,
+        p::FailureClass::Permanent,
+        p::FailureClass::Run,
+        p::FailureClass::Agent,
+        p::FailureClass::Lost,
+    ] {
+        rows.push(p::Refusal::Moved { now: p::Moved::Hold { revision: 4, reason: p::HoldReason::Failures { class } } })
+            .expect("bounded application cases");
+    }
+    for now in [
+        p::Moved::Spec { revision: u64::MAX },
+        p::Moved::Person { revision: u64::MAX },
+        p::Moved::Note { revision: u32::MAX },
+    ] {
+        rows.push(p::Refusal::Moved { now }).expect("bounded application cases");
+    }
+    for how in [
+        p::Ending::Done,
+        p::Ending::Failed,
+        p::Ending::Deleted,
+        p::Ending::Decided { by: 7, at: skein_lib::Wall::from_nanos(8) },
+    ] {
+        rows.push(p::Refusal::Ended { how }).expect("bounded application cases");
+    }
+    for by in [p::Party::Person(u64::MAX), p::Party::Task(u64::MAX), p::Party::Deployment { project: u32::MAX }] {
+        rows.push(p::Refusal::Ended { how: p::Ending::Cancelled { by, at: skein_lib::Wall::from_nanos(u64::MAX) } })
+            .expect("bounded application cases");
+    }
+}
+fn application_outcomes() -> Box<[forge::ApplicationOutcome]> {
+    let mut outcomes = skein_lib::List::with_capacity(224);
+    for refusal in application_refusals() {
+        outcomes.push(forge::ApplicationOutcome::CoreRefused(refusal)).expect("bounded application cases");
+    }
+    for reason in [
+        forge::AdoptionRefusal::NoSuchForge,
+        forge::AdoptionRefusal::NotFound,
+        forge::AdoptionRefusal::NoAccess,
+        forge::AdoptionRefusal::Refused,
+        forge::AdoptionRefusal::InFlight,
+        forge::AdoptionRefusal::TooLarge,
+        forge::AdoptionRefusal::Unreachable,
+        forge::AdoptionRefusal::InvalidAnswer,
+    ] {
+        outcomes.push(forge::ApplicationOutcome::ForgeRefused(reason)).expect("bounded application cases");
+    }
+    for protection in [
+        forge::Protection::Unknown,
+        forge::Protection::Absent,
+        forge::Protection::Rule(temper_engine_domain_forge_client::api::Protection {
+            branch: Box::from(b"main".as_slice()),
+            contexts: Box::new([Box::from(b"check".as_slice())]),
+            approvals: 2,
+            dismiss_stale: true,
+        }),
+    ] {
+        let forge::Stored::Repository(row) = fixtures::adopted(protection) else { panic!("repository fixture") };
+        outcomes
+            .push(forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
+                repository: row.provider,
+                owner: row.owner,
+                name: row.name,
+                role: row.role,
+                home: row.home,
+                kinds: row.kinds,
+                protection: row.protection,
+            }))
+            .expect("bounded application cases");
+    }
+    outcomes.into_boxed()
+}
+#[test]
+fn every_application_outcome_preserves_its_complete_record() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
+    for outcome in application_outcomes() {
+        let row = application(outcome);
+        let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).expect("key");
+        let bytes = records::encode(&row);
+        assert_eq!(records::row(&key, &bytes, &bounds), Ok(row.clone()), "{row:?}");
+        assert_eq!(bytes[2], 15, "the Application family tag");
+    }
+    assert!(
+        jig_protocol_store::people_v2::Refusal::worst_case_bytes(&jig_protocol_store::people_v2::CEILINGS)
+            .expect("bounded facts")
+            <= 23
+    );
+}
+#[test]
+fn application_decoding_refuses_malformed_refusal_facts() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
+    for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
+        let value = v1::CoreRefused::new(&v1::CEILINGS, v1::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v1::Application::new(
+            &v1::CEILINGS,
+            v1::ApplicationParts { token: 9, until: 10, outcome: v1::ApplicationOutcome::CoreRefused(value) },
+        )
+        .expect("application");
+        let row =
+            v1::Row::new(&v1::CEILINGS, v1::RowParts { value: v1::Value::Application(application) }).expect("row");
+        assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
+    }
+}
+
+#[test]
+fn an_application_adopted_name_past_its_bound_fails_to_decode() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
+    let forge::Stored::Repository(row) = fixtures::adopted(forge::Protection::Absent) else {
+        panic!("repository fixture")
+    };
+    let outcome = forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
+        repository: row.provider,
+        owner: Box::new([0; 129]),
+        name: row.name,
+        role: row.role,
+        home: row.home,
+        kinds: row.kinds,
+        protection: row.protection,
+    });
+    assert_eq!(records::decode(&records::encode(&application(outcome)), &bounds), Err(crate::Undecodable));
+}

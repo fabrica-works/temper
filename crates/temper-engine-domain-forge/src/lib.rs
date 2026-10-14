@@ -204,6 +204,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Change(row) => Key::Change(row.task),
         Stored::Issue(row) => Key::Issue(row.goal),
         Stored::Release(row) => Key::Release(row.task),
+        Stored::Application { token, .. } => Key::Application(*token),
     }
 }
 /// Checked payload bytes of one connector record for its parent's store page.
@@ -297,6 +298,26 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             }
             Some(held)
         }
+        Stored::Application { outcome, .. } => match outcome {
+            ApplicationOutcome::CoreRefused(_) | ApplicationOutcome::ForgeRefused(_) => Some(0),
+            ApplicationOutcome::Adopted(row) => {
+                let mut held = bytes(&row.owner)?.checked_add(bytes(&row.name)?)?;
+                match &row.protection {
+                    Protection::Unknown | Protection::Absent => {}
+                    Protection::Rule(rule) => {
+                        held = held.checked_add(bytes(&rule.branch)?)?.checked_add(
+                            u64::try_from(rule.contexts.len())
+                                .ok()?
+                                .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?,
+                        )?;
+                        for context in &rule.contexts {
+                            held = held.checked_add(bytes(context)?)?;
+                        }
+                    }
+                }
+                Some(held)
+            }
+        },
         Stored::Hold(row) => {
             let mut bytes = name(&row.name)?;
             if let Some(drift) = &row.drift {

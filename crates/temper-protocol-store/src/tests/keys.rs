@@ -87,3 +87,16 @@ fn the_largest_key_is_a_branch_of_empty_segments() {
     assert_eq!(keys::largest(&fixtures::LIMITS), Some(403));
     assert_eq!(keys::decode(&bytes, &fixtures::LIMITS), Some(key));
 }
+
+#[test]
+fn application_keys_follow_the_release_family_and_round_trip() {
+    use temper_engine_domain_forge::Key;
+    let previous = keys::encode(&Key::Release(u64::MAX), u32::MAX).expect("release key");
+    for token in [0, 1, u64::MAX] {
+        let key = Key::Application(token);
+        let bytes = keys::encode(&key, u32::MAX).expect("application key");
+        assert_eq!(bytes[0], 15);
+        assert_eq!(keys::decode(&bytes, &fixtures::LIMITS), Some(key));
+        assert!(bytes > previous);
+    }
+}

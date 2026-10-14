@@ -89,3 +89,22 @@ fn an_adoption_the_forge_user_may_not_read_is_refused_as_no_access() {
     adopt(&mut driver, request, 95);
     assert_eq!(outcomes(&driver), [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoAccess))]);
 }
+
+#[test]
+fn an_adoption_sent_again_after_a_restart_is_answered_its_kept_outcome() {
+    let mut first = driver();
+    adopt(&mut first, fixtures::adoption(1), 95);
+    let outcome = outcomes(&first)[0].clone();
+    let calls = first.forge.as_ref().expect("forge stand").calls;
+    let mut restarted =
+        Driver::configured(first.store, temper_engine_domain_world::walking::config(71), &fixtures::forge_limits());
+    restarted.forge = first.forge;
+    restarted.settle();
+    restarted.sign_in();
+    restarted.settle();
+    let calls_after_restart = restarted.forge.as_ref().expect("forge stand").calls;
+    assert!(calls_after_restart >= calls);
+    adopt(&mut restarted, fixtures::adoption(1), 96);
+    assert_eq!(outcomes(&restarted), [&outcome]);
+    assert_eq!(restarted.forge.as_ref().expect("forge stand").calls, calls_after_restart);
+}

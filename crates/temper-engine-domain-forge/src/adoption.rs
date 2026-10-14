@@ -1,6 +1,7 @@
 //! A core-admitted keyed adoption and its retained terminal (domain/forge.md, 4).
 use crate::{
-    Adopted, AdoptedRepository, Adoption, AdoptionRefusal, ApplicationOutcome, Domain, Limits, Request, reason,
+    Adopted, AdoptedRepository, Adoption, AdoptionRefusal, ApplicationOutcome, Domain, Key, Limits, Request, Stored,
+    reason,
 };
 use jig_domain_people as people;
 use skein_lib::{Duration, Env, Map, Queue, Token, Wall};
@@ -20,6 +21,9 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(crate) fn restore(&mut self, token: u64, until: Wall, outcome: ApplicationOutcome) {
+        assert!(self.kept.insert(Token::new(token), (until, outcome)).is_ok(), "restored application outcome fits");
+    }
     pub(crate) fn new(limits: &Limits) -> Self {
         Self { pending: Map::with_capacity(limits.adoptions), kept: Map::with_capacity(limits.applications) }
     }
@@ -54,6 +58,7 @@ pub(crate) fn start(
     }
     if let Some(token) = expired {
         d.application.kept.remove(&token);
+        out.push(Request::Erase { key: Key::Application(token.raw()) });
     }
     if d.application.kept.len().saturating_add(d.application.pending.len()) >= env.limits.applications
         || d.application.pending.len() >= env.limits.adoptions
@@ -121,7 +126,9 @@ fn finish(
     out: &mut Queue<Request>,
 ) {
     let until = Wall::from_nanos(env.wall.as_nanos().saturating_add(pending.retention.as_nanos()));
+    let row = Stored::Application { token: pending.token.raw(), until, outcome: outcome.clone() };
     assert!(d.application.kept.insert(pending.token, (until, outcome)).is_ok(), "reserved application outcome");
+    out.push(Request::Save { record: row, release: None, read_afresh: None });
     out.push(Request::ApplicationDone { request, token: pending.token });
 }
 

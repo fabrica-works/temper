@@ -73,7 +73,7 @@ pub(super) fn decode_name(value: w::Name, bounds: &Bounds) -> Result<d::Name, Un
     let w::NameParts { forge, repository, what } = value.into_parts();
     Ok(d::Name { forge, repository, what: decode_what(what, bounds)? })
 }
-fn encode_protection(value: &d::Protection) -> w::RepositoryProtection {
+pub(super) fn encode_protection(value: &d::Protection) -> w::RepositoryProtection {
     match value {
         d::Protection::Unknown => w::RepositoryProtection::Unknown,
         d::Protection::Absent => w::RepositoryProtection::Absent,
@@ -106,7 +106,7 @@ pub(super) fn decode_contexts(bytes: &[u8], bounds: &Bounds) -> Result<Box<[Box<
     }
     Err(Undecodable)
 }
-fn decode_protection(value: w::RepositoryProtection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
+pub(super) fn decode_protection(value: w::RepositoryProtection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
     Ok(match value {
         w::RepositoryProtection::Unknown => d::Protection::Unknown,
         w::RepositoryProtection::Absent => d::Protection::Absent,
@@ -122,7 +122,7 @@ fn decode_protection(value: w::RepositoryProtection, bounds: &Bounds) -> Result<
     })
 }
 
-fn encode_role(value: d::Role) -> w::Role {
+pub(super) fn encode_role(value: d::Role) -> w::Role {
     match value {
         d::Role::Owned => w::Role::Owned,
         d::Role::Adopted => w::Role::Adopted,
@@ -130,7 +130,7 @@ fn encode_role(value: d::Role) -> w::Role {
         d::Role::Context => w::Role::Context,
     }
 }
-fn decode_role(value: w::Role) -> d::Role {
+pub(super) fn decode_role(value: w::Role) -> d::Role {
     match value {
         w::Role::Owned => d::Role::Owned,
         w::Role::Adopted => d::Role::Adopted,
