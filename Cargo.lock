@@ -123,6 +123,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "jig-channel-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-core",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-fake-parties",
+ "jig-protocol-config",
+ "jig-protocol-store",
+ "jig-protocol-worker-wire",
+ "jig-test-connector",
+ "jig-test-domain",
+ "jig-test-service",
+ "jig-test-store",
+ "skein-channel",
+ "skein-fake-channel",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-world",
+ "skein-shell",
+ "skein-sim",
+ "skein-world",
+ "smith-agent-process-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-domain",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+]
+
+[[package]]
 name = "jig-client-world"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -591,6 +633,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test-protocol-client-wire"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-service"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-host",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-protocol-accounts",
+ "jig-protocol-charter",
+ "jig-protocol-client-wire",
+ "jig-protocol-config",
+ "jig-protocol-engine-clients",
+ "jig-protocol-engine-workers",
+ "jig-protocol-store",
+ "jig-protocol-tools",
+ "jig-protocol-worker-link",
+ "jig-protocol-worker-wire",
+ "jig-test-connector",
+ "jig-test-domain",
+ "jig-test-protocol-client-wire",
+ "jig-test-store",
+ "jig-test-worker",
+ "skein-channel",
+ "skein-io",
+ "skein-json",
+ "skein-kv",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
+ "smith-channel",
+ "smith-domain-run",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+]
+
+[[package]]
 name = "jig-test-store"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -640,6 +733,16 @@ dependencies = [
  "jig-test-domain-client",
  "jig-view",
  "skein-lib",
+]
+
+[[package]]
+name = "jig-test-worker"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-host",
+ "skein-lib",
+ "smith-host-domain",
 ]
 
 [[package]]
@@ -742,6 +845,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]
@@ -816,6 +920,15 @@ version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
 
 [[package]]
+name = "skein-fake-channel"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-channel",
+ "skein-lib",
+]
+
+[[package]]
 name = "skein-fake-checkout"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
@@ -848,6 +961,33 @@ dependencies = [
  "skein-io",
  "skein-lib",
  "skein-sim",
+]
+
+[[package]]
+name = "skein-fake-oauth"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+ "skein-oauth",
+]
+
+[[package]]
+name = "skein-fake-peers"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "rustls",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-oauth",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-oauth",
+ "skein-world",
 ]
 
 [[package]]
@@ -978,6 +1118,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-tls-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "rustls",
+ "skein-heap",
+ "skein-io",
+ "skein-lib",
+ "skein-sim",
+ "skein-tls",
+]
+
+[[package]]
 name = "skein-world"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
@@ -987,6 +1140,92 @@ dependencies = [
  "skein-lib",
  "skein-shell",
  "skein-sim",
+]
+
+[[package]]
+name = "smith-agent-process-world"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-fake-channel",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-llm-world",
+ "skein-shell",
+ "skein-sim",
+ "skein-tls",
+ "skein-tls-world",
+ "skein-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-agent-world",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-domain-run",
+ "smith-domain-session",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-agent-service"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-tls",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-agent-shell"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-connection",
+ "skein-shell",
+ "skein-tls",
+ "smith-agent-service",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-protocol-channel",
+ "smith-protocol-llm",
+ "smith-protocol-machine",
+ "smith-transcript",
 ]
 
 [[package]]
@@ -1095,6 +1334,72 @@ dependencies = [
 ]
 
 [[package]]
+name = "smith-inline-agent"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-lib",
+ "smith-domain",
+ "smith-host-domain",
+]
+
+[[package]]
+name = "smith-local-domain"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-lib",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-inline-agent",
+]
+
+[[package]]
+name = "smith-local-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-oauth",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-local-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
+]
+
+[[package]]
+name = "smith-local-service"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
+ "smith-agent-service",
+ "smith-channel",
+ "smith-domain",
+ "smith-events",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-inline-agent",
+ "smith-local-domain",
+ "smith-local-protocol",
+ "smith-protocol-channel",
+ "smith-transcript",
+]
+
+[[package]]
 name = "smith-protocol-channel"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
@@ -1189,6 +1494,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "temper"
+version = "0.0.0"
+dependencies = [
+ "jig-channel-world",
+ "jig-domain-host",
+ "jig-protocol-config",
+ "serde_json",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-oauth-accounts",
+ "skein-shell",
+ "skein-tls",
+ "skein-tls-world",
+ "smith-agent-shell",
+ "smith-host-protocol",
+ "smith-local-service",
+ "temper-engine-protocol-forge",
+ "temper-service",
 ]
 
 [[package]]

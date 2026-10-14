@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper",
     "tests/engine/protocol-forge",
     "crates/temper-shell-terminal",
     "tests/client",
@@ -47,6 +48,10 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
+smith-local-service = { git = "https://github.com/forgetic/smith.git" }
+jig-channel-world = { git = "https://github.com/forgetic/jig.git" }
+skein-tls-world = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-engine-clients = { git = "https://github.com/forgetic/jig.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
