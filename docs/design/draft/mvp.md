@@ -10,10 +10,17 @@ still open is listed in section 7.
 
 ## 1. In one page
 
+- **The person directs; agents own the code.** People decide at the
+  level of goals, designs and plans, and steer where agents cannot
+  decide; agents write, review and land the code. A person's approval of
+  a change is a workflow choice the person makes when giving direction
+  ("every pull request of this plan waits for me"), never temper's
+  default, and not part of the milestone (section 5.4).
 - **The milestone:** one person, on their own machine, with a terminal,
   a real Forgejo repository and a real model. They adopt the
-  repository, ask a chat for a change, see the change on its way, approve
-  it, and see it land (section 2).
+  repository, ask a chat for a change, follow the work at the chat's
+  level, and see what landed; the change is checked by CI and an agent's
+  review and lands with no person in between (section 2).
 - **The client's domain layer is on its design, for what is built.**
   temper's client root and view (`temper-client-domain`,
   `temper-client-view`) are thin by design: jig's client domain and view
@@ -23,27 +30,26 @@ still open is listed in section 7.
   (section 3).
 - **jig's client does almost everything the milestone needs:** the
   inbox, conversations, the task page with each committed turn, goals,
-  decisions, approvals as person tasks, policy and roles. It has no
+  decisions and person tasks, policy and roles. It has no
   terminal (temper's), no live text (smith's channel carries none), and
   no forge parts (temper's, section 4).
 - **The `protocol` plan is the milestone's spine.** When it ends, the
   binary serves, an agent runs, a person signs in through `temper open`,
   adopts a repository, and a change lands on a throwaway Forgejo with
   real git (section 4).
-- **Three gaps stand between that plan and the milestone** (section 5):
-  1. **A change is invisible in the client.** Every forge part but a
-     word says "Shown on the forge.", with no link: the person cannot
-     find the change, follow it, or see it land from temper.
-  2. **A person's approval has no proven path.** The engine judges
-     approvals from Forgejo reviews by a person whose identity is the
-     forge user, under provider 0; nothing says how an owner signed in by
-     the link gets that identity, and no story proves it.
-  3. **Nothing has run for real.** Every tier runs on the throwaway
-     Forgejo, and the real model only in the live tier, which stops at
-     the push. No document says how a person sets temper up.
-- **Not for the milestone:** the browser, a run's live text, the forge's
-  panels in full (queues, health, drift), webhooks, GitHub, several
-  people, findings, recurring tasks (section 6).
+- **Two gaps stand between that plan and the milestone** (section 5):
+  1. **Nothing has run for real.** Every tier runs on the throwaway
+     Forgejo, with no CI; the real model runs only in the live tier,
+     which stops at the push. No document says how a person sets temper
+     up.
+  2. **What came of the work, and why it stopped, are not in the
+     client.** The forge's results and holds say "Shown on the forge.",
+     with no link: the person cannot see what landed, or why a change is
+     held, which is where the person is needed.
+- **Not for the milestone:** a person's approval of changes, the
+  browser, a run's live text, the forge's panels in full (queues,
+  health, drift), webhooks, GitHub, several people, findings, recurring
+  tasks (section 6).
 
 ## 2. The milestone
 
@@ -58,20 +64,20 @@ One story, on one person's machine:
    the adoption form (`client.md`, section 4).
 4. The person starts a chat and asks for a change; the chat delegates
    the change procedure (`domain/forge.md`, section 8).
-5. The person sees, in the client: the change's task, its step in words,
-   its pull request (named, with a link to it on the forge), its head and
-   its CI.
-6. The person approves the change: on the forge, as a review, or in the
-   client (section 5.2); asking for changes sends the change back for a
-   repair.
-7. The change lands, and the person sees it landed: the chat's update,
-   the merge commit named.
+5. Agents do the rest: the change is produced, its pull request opened,
+   checked by CI and by an agent's review (a gate, `domain/forge.md`,
+   8.3), repaired when either fails, and landed. No person acts on it.
+6. The person follows it from the chat: its delegates and their phases
+   in words, and, if the change is held, why, with what may be done
+   (released, amended, cancelled).
+7. The person sees what landed: the chat's update names the pull
+   request and the merge commit, with a link to each on the forge.
 8. `temper serve` is stopped and started again; nothing the person saw
    is lost, and work in flight goes on.
 
-Steps 1 to 4 and 8 are the `protocol` plan's process tier (`testing.md`,
-2.6), on a throwaway Forgejo, with no approval and no CI. Steps 5 to 7
-are this draft's gaps.
+Steps 1 to 5 and 8 are the `protocol` plan's process tier (`testing.md`,
+2.6), on a throwaway Forgejo with no CI, a project check in its place.
+Running them for real, and steps 6 and 7, are this draft's gaps.
 
 ## 3. The client against its design
 
@@ -138,106 +144,94 @@ scope, participation) waits for a later plan.
   pushed.
 - **What it does not prove,** and the milestone needs: CI from Forgejo's
   Actions in a run (decoded from transcripts, judged in the worlds on
-  the fake forge's CI); a person's approval anywhere outside the
-  engine's domain world; `temper sign-in` against a real provider (it
-  runs against skein's fake issuer); a forge over TLS; a real
-  repository's size and history.
+  the fake forge's CI); a real model's change through to its landing;
+  `temper sign-in` against a real provider (it runs against skein's fake
+  issuer); a forge over TLS; a real repository's size and history.
 
 ## 5. The gaps
 
-### 5.1 A change in the client
-
-- **Today:** a change's task shows on jig's task page, its turns and its
-  delegates, but its panel, its result and its effects are the forge's
-  parts, and every one says "Shown on the forge." An adopted repository
-  is "repository ID on forge F". The person learns the pull request's
-  number only from the agent's words, and has no link to it.
-- **The least that serves the milestone:** one read family of the
-  forge's in `temper-protocol-client-wire`, beside `Adopt`, for a
-  change's panel and result: its step in `web/ux/forge.md`, 2.1's words
-  (producing to landed, repairs and updates among them), or held and
-  why; its pull request's number, owner, name and address on the
-  forge; its head; CI's state at that head; the gates' verdicts; and,
-  landed, the merge commit. The forge's view draws it as words and one
-  external link, in the task page's panel slot, the chat's delivery
-  line and the inbox's update. A repository's owner and name in place of
-  its numbers (`client.md`, section 11) comes from the same reads.
-- **Not needed for it:** queues, health, drift, holds' details beyond
-  their reason, the outbox, the deployment's forge parts.
-
-### 5.2 A person's approval
-
-- **Today:** a landing rule's `approvals` (`configuration.md`,
-  section 3) is judged by the forge connector from the pull request's
-  reviews. The root maps each review's author to a person by the
-  identity provider 0 and the forge user's id, and counts approvals by
-  people holding the rule's role (`domain/forge.md`, 8.3). The engine's
-  domain world proves the judgement. Nothing says that an owner's
-  configured identity must be provider 0 and their forge user's id for
-  their reviews to count, the standalone example names no approval, and
-  no story approves through the client or a real Forgejo.
-- **The cheapest path for the milestone:** approve on the forge. The
-  configuration names the owner by their forge identity; section 5.1's
-  link takes the person to the pull request; the process tier gains a
-  story with one approval required, given as a Forgejo review by the
-  owner's forge user.
-- **The path the design names:** a person task with jig's `Approval`
-  contract (`domain/people.md`, section 8; jig's objects.md, section 7),
-  shown in the inbox with the change's panel (section 5.1) and answered
-  in the client. temper keeps a verdict of its own instead (STATUS.md,
-  "Not planned"). It needs section 5.1 first, since an approval of a
-  head the person cannot see is no approval (`web/ux/inbox.md`, 4.4).
-- **Asking for changes** is open either way: a review that requests
-  changes refuses the approval criterion, but no document says that its
-  remarks become a repair's brief, as an agent gate's do
-  (`domain/forge.md`, 8.3 and 8.4).
-
-### 5.3 Running for real
+### 5.1 Running for real
 
 - **A person's setup:** `configuration.md` is the reference, and its
   example is complete, but no document walks a person through a first
-  deployment: a Forgejo user and tokens for temper, the owner's
-  identity, the project's landing rule, the git identity, the LLM
+  deployment: a Forgejo user and tokens for temper, the project and its
+  landing rule (CI and an agent's review), the git identity, the LLM
   account and `temper sign-in`, then `temper serve` and `temper open`.
-- **A dogfood run:** section 2's story once, by hand, on a real Forgejo
-  with Actions and a real repository, with the findings written as
-  world stories, fake corrections or charter changes (`draft/qa.md`,
-  section 1, says why). It is evidence, not a tier.
+- **A dogfood run:** section 2's story by hand, on a real Forgejo with
+  Actions and a real repository, with a real model, through to the
+  landing. Its findings are written as world stories, fake corrections
+  or charter changes (`draft/qa.md`, section 1, says why). It is
+  evidence, not a tier.
 
-### 5.4 The story in the worlds
+### 5.2 What came of the work, and why it stopped
 
-`web/ux/README.md`, section 8, walks a change from a chat to its
-landing; no current document does. `tests/client` stops at a chat
-answered and, after plan 15.2, a repository adopted; the system world
-lands changes without the person's view. Section 2's steps 4 to 7
-belong in `tests/client`, joined to the engine's root, and in the
-process tier once sections 5.1 and 5.2 exist.
+- **Today:** a change's task shows on jig's task page, with its turns and
+  its delegates, and a held task shows jig's hold card. But the
+  change's result, its effects, its panel and its hold are the forge's
+  parts, and each says "Shown on the forge." An adopted repository is
+  "repository ID on forge F". The person learns what landed only from
+  the agent's words, and why a change is held not at all: they can
+  release it only blind.
+- **The least that serves the milestone:** one read family of the
+  forge's in `temper-protocol-client-wire`, beside `Adopt`, for a
+  change's result and its hold: landed, with its pull request's number,
+  its merge commit, and the address of each on the forge; held, with its
+  reason in `web/ux/forge.md`'s words (repairs or resolutions spent, a
+  stall, a refusal) and the head and failure it is about. The forge's
+  view draws them as words and links, in the slots of the task page,
+  the chat's update and the inbox's entry. A repository's owner and name
+  in place of its numbers (`client.md`, section 11) comes from the same
+  reads.
+- **Not needed for it:** the change's way to landing step by step,
+  queues, health, drift, the outbox, the deployment's forge parts.
+
+### 5.3 The story in the worlds
+
+`tests/client` stops at a chat answered and, after plan 15.2, a
+repository adopted; the system world lands changes with no person's
+view. Section 2's steps 4 to 7 belong in `tests/client`, joined to the
+engine's root: a chat's change landed by agents, its result read in the
+chat, and a held change's reason read and released.
+
+### 5.4 A person's approval, as a workflow choice
+
+Not a gap, and not the milestone's; noted so that it stays the
+person's choice. The design already lets direction carry it: a change's
+gates are its parameters, asked for by the change, the project and the
+plan (`domain/forge.md`, 8.3), and one kind of gate is a person's
+approval. So a plan given "every pull request waits for my approval"
+adds that gate to its changes. The configuration's `approvals` member
+(`configuration.md`, section 3) sets the same for every change into a
+branch, and the standalone example leaves it empty. When used, the
+engine counts a Forgejo review only from a person whose identity is the
+forge's user id under provider 0, which `configuration.md` does not yet
+say.
 
 ## 6. In what order
 
 1. **The `protocol` plan to its end.** Nothing else serves the milestone
    sooner, and its chain is long.
-2. **A plan for sections 5.1, 5.2 (on the forge), 5.4 and 5.3's setup
-   document,** temper only, on the pattern of the adoption: a design pass
-   on `client.md` (the forge's read family, its words and slots), the
-   configuration's identity rule, then the records, the engine's reads,
-   the view, and the stories in `tests/client` and the process tier.
-3. **The dogfood run** (5.3), its findings into the worlds.
+2. **The dogfood run** (5.1), with the setup document written as it
+   goes, as soon as the binary lands a change on the throwaway Forgejo
+   (plan 15.3). Its findings feed the next plan.
+3. **A plan for 5.2 and 5.3,** temper only, on the adoption's pattern: a
+   design pass on `client.md` (the forge's read family, its words and
+   slots), then the records, the engine's reads, the view, and the
+   stories in `tests/client` and the process tier.
 4. **After the milestone,** each waiting for what its document names:
-   approving in the client (5.2), the browser, a run's live text, the
-   forge's panels in full, webhooks, GitHub, several people, repinning
-   jig, smith and skein.
+   the browser, a run's live text, the forge's panels in full, webhooks,
+   GitHub, several people, repinning jig, smith and skein; and the
+   person's own workflow, from a brainstorm through a design and a plan
+   to its supervised run, as temper's goals and plans.
 
 ## 7. Open questions
 
-- **Where the person approves for the milestone:** on the forge, or in
-  the client through jig's `Approval` person task. Default: on the
-  forge.
-- **Asking for changes:** whether a person's review that requests
-  changes becomes a repair with its remarks, or holds the change.
-  Default: a repair, as an agent gate's request does.
 - **CI for the milestone:** Forgejo's Actions with a runner, or the
   project's checks on the worker. Default: Actions, since a real
   repository has it.
 - **The milestone's model:** the account `temper sign-in` signs in,
   against which provider. Default: the provider the live tier uses.
+- **Where a person's approval is set** (5.4): as a gate the plan adds to
+  its changes when the person asks, or the configuration's landing
+  rule. Default: the plan's; the configuration's `approvals` stays
+  empty.
