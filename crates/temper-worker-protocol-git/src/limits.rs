@@ -65,7 +65,6 @@ pub fn largest_output(checkout: &checkout::Limits) -> Option<u32> {
 }
 
 /// Argument/environment/message/output/path payloads and one sweep page.
-/// File state containers are added with their implementation.
 #[must_use]
 pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
     let name = u64::from(checkout.name_bytes);
@@ -82,6 +81,8 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
         .checked_add(environment)?
         .checked_add(u64::from(checkout.message_bytes).checked_add(3)?)?
         .checked_add(paths)?;
+    // The scan retains its input paths while collecting marked paths.
+    each = each.checked_add(paths)?;
     each = each
         .checked_add(Capped::worst_case(limits.stdout_bytes)?)?
         .checked_add(ByteRing::worst_case(limits.stderr_bytes)?)?
@@ -97,7 +98,14 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
     let table = Slab::<Operation>::worst_case(capacity.checked_mul(2)?)?
         .checked_add(Map::<Token, Id<Operation>>::worst_case(capacity)?)?;
     let page = List::<kernel::Entry>::worst_case(limits.sweep_entries)?.checked_add(u64::from(limits.sweep_bytes))?;
-    u64::from(limits.operations.max(1)).checked_mul(each)?.checked_add(page)?.checked_add(table)
+    let background = u64::try_from(size_of::<crate::files::Task>())
+        .ok()?
+        .checked_add(u64::try_from(kernel::LONGEST_NAME).ok()?.checked_mul(2)?)?;
+    u64::from(limits.operations.max(1))
+        .checked_mul(each)?
+        .checked_add(page)?
+        .checked_add(table)?
+        .checked_add(background)
 }
 
 /// The most records one entry point emits, except abort.

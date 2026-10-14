@@ -6,6 +6,7 @@ extern crate alloc;
 mod boundary;
 pub mod capped;
 mod component;
+mod files;
 pub mod invocation;
 pub mod limits;
 mod operation;

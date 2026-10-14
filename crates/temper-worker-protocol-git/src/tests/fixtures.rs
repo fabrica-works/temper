@@ -39,6 +39,12 @@ pub const WORKSPACE: skein_lib::Token = skein_lib::Token::new(7);
 pub const DEADLINE: skein_lib::Time = skein_lib::Time::from_nanos(1000);
 pub const PARENT: git::Commit = COMMIT_256;
 pub const EXPECTED: git::Commit = COMMIT_256;
+pub const TRASH: skein_io::kernel::Fd = skein_io::kernel::Fd::new(4);
+pub const WORKSPACES: skein_io::kernel::Fd = skein_io::kernel::Fd::new(5);
+pub const SERIAL: u64 = 1000;
+pub fn make(owner: skein_lib::Token, workspace: skein_lib::Token) -> crate::Request {
+    crate::Request::Io { owner, op: git::Op::Make { workspace }, deadline: DEADLINE, identity: None }
+}
 pub fn at() -> git::Place {
     git::Place { workspace: WORKSPACE, repository: Box::from(&b"app"[..]) }
 }
@@ -76,7 +82,7 @@ pub fn settings() -> crate::Settings {
         home: Box::from(HOME),
         root: skein_io::kernel::Fd::new(3),
         prefix: 6_u64 << 60_u32,
-        serial: 1000,
+        serial: SERIAL,
         largest_read: 64,
         largest_room: 16,
     }
@@ -146,6 +152,7 @@ pub struct Started {
     pub component: crate::Component,
     pub below: Below,
     pub now: skein_lib::Time,
+    pub file: Option<skein_io::kernel::Submit>,
 }
 impl Started {
     pub fn unstarted() -> Started {
@@ -153,10 +160,19 @@ impl Started {
             component: crate::Component::new(&limits(), &checkout(), settings()).expect("valid limits"),
             below: Below::new(),
             now: skein_lib::Time::ZERO,
+            file: None,
         }
     }
     pub fn new() -> Started {
+        Self::laid_out()
+    }
+    pub fn version_checked() -> Started {
         let mut started = Self::unstarted();
+        started.version();
+        started
+    }
+    fn version(&mut self) {
+        let started = self;
         started.component.start(started.now, &mut started.below.out);
         let (child, pipes) = started.spawned();
         started.stdout(pipes[0], b"git version 2.53.0\n");
@@ -164,9 +180,177 @@ impl Started {
         started.end(pipes[1]);
         started.exited(child, 0);
         started.closed(child, &pipes);
-        assert_eq!(started.below.out.events.pop(), Some(crate::Event::Started));
         started.component.reclaim();
+    }
+    pub fn laid_out() -> Started {
+        let mut started = Self::unstarted();
+        started.component = crate::Component::new(
+            &limits(),
+            &checkout(),
+            crate::Settings { serial: SERIAL.checked_sub(2).expect("layout names"), ..settings() },
+        )
+        .expect("valid");
+        started.version();
+        for _ in 0_u8..7 {
+            started.file_operation();
+            started.complete_ok();
+        }
+        assert_eq!(started.below.out.events.pop(), Some(crate::Event::Started));
+        started.empty_sweep();
         started
+    }
+    pub fn file_operation(&mut self) -> skein_io::kernel::Op {
+        assert!(self.file.is_none(), "previous file operation completed");
+        let submit = self.below.out.kernel.pop().expect("kernel submission");
+        let kind = clone_file_kind(&submit.kind);
+        self.file = Some(submit);
+        kind
+    }
+    pub fn complete(&mut self, result: Result<skein_io::kernel::Done, skein_io::kernel::Error>) {
+        let submit = self.file.take().expect("file operation inspected");
+        self.component.complete(
+            self.now,
+            skein_io::kernel::Complete { op: submit.op, kind: submit.kind, result },
+            &mut self.below.out,
+        );
+    }
+    pub fn complete_ok(&mut self) {
+        let result = match &self.file.as_ref().expect("file inspected").kind {
+            skein_io::kernel::Op::Open { path, .. } => {
+                skein_io::kernel::Done::Fd(if &**path == b"trash" { TRASH } else { WORKSPACES })
+            }
+            skein_io::kernel::Op::Read { .. } | skein_io::kernel::Op::List { .. } => skein_io::kernel::Done::Count(0),
+            skein_io::kernel::Op::Rename { .. }
+            | skein_io::kernel::Op::MakeDirectory { .. }
+            | skein_io::kernel::Op::Remove { .. }
+            | skein_io::kernel::Op::Close { .. } => skein_io::kernel::Done::Nothing,
+            skein_io::kernel::Op::Socket { .. }
+            | skein_io::kernel::Op::Bind { .. }
+            | skein_io::kernel::Op::Listen { .. }
+            | skein_io::kernel::Op::Accept { .. }
+            | skein_io::kernel::Op::Connect { .. }
+            | skein_io::kernel::Op::Recv { .. }
+            | skein_io::kernel::Op::Send { .. }
+            | skein_io::kernel::Op::Shutdown { .. }
+            | skein_io::kernel::Op::Write { .. }
+            | skein_io::kernel::Op::Append { .. }
+            | skein_io::kernel::Op::Truncate { .. }
+            | skein_io::kernel::Op::Sync { .. }
+            | skein_io::kernel::Op::Stat { .. }
+            | skein_io::kernel::Op::Spawn { .. }
+            | skein_io::kernel::Op::Wait { .. }
+            | skein_io::kernel::Op::Signal { .. }
+            | skein_io::kernel::Op::Usage
+            | skein_io::kernel::Op::Window { .. }
+            | skein_io::kernel::Op::ReadSignal { .. }
+            | skein_io::kernel::Op::PipeRead { .. }
+            | skein_io::kernel::Op::PipeWrite { .. }
+            | skein_io::kernel::Op::Cancel { .. } => panic!("unexpected file request"),
+        };
+        self.complete(Ok(result));
+    }
+    pub fn complete_err(&mut self, error: skein_io::kernel::Error) {
+        self.complete(Err(error));
+    }
+    pub fn read(&mut self, bytes: &[u8]) {
+        use skein_io::kernel::Op;
+        match &mut self.file.as_mut().expect("file inspected").kind {
+            Op::Read { buf, .. } => {
+                for (slot, byte) in buf.iter_mut().zip(bytes) {
+                    *slot = *byte;
+                }
+            }
+            Op::Socket { .. }
+            | Op::Bind { .. }
+            | Op::Listen { .. }
+            | Op::Accept { .. }
+            | Op::Connect { .. }
+            | Op::Recv { .. }
+            | Op::Send { .. }
+            | Op::Shutdown { .. }
+            | Op::Close { .. }
+            | Op::Open { .. }
+            | Op::Write { .. }
+            | Op::Append { .. }
+            | Op::Truncate { .. }
+            | Op::Sync { .. }
+            | Op::Stat { .. }
+            | Op::Rename { .. }
+            | Op::Remove { .. }
+            | Op::MakeDirectory { .. }
+            | Op::List { .. }
+            | Op::Spawn { .. }
+            | Op::Wait { .. }
+            | Op::Signal { .. }
+            | Op::Usage
+            | Op::Window { .. }
+            | Op::ReadSignal { .. }
+            | Op::PipeRead { .. }
+            | Op::PipeWrite { .. }
+            | Op::Cancel { .. } => panic!("expected Read"),
+        }
+        self.complete(Ok(skein_io::kernel::Done::Count(u32::try_from(bytes.len()).expect("test read"))));
+    }
+    pub fn listing(&mut self, values: &[(&[u8], skein_io::kernel::Kind)]) {
+        use skein_io::kernel::Op;
+        match &mut self.file.as_mut().expect("file inspected").kind {
+            Op::List { entries, names, .. } => {
+                let mut start = 0;
+                for (i, (name, kind)) in values.iter().enumerate() {
+                    for (slot, byte) in names.iter_mut().skip(start).zip(*name) {
+                        *slot = *byte;
+                    }
+                    entries[i] = skein_io::kernel::Entry {
+                        kind: *kind,
+                        start: u32::try_from(start).expect("test start"),
+                        len: u32::try_from(name.len()).expect("test name"),
+                    };
+                    start = start.checked_add(name.len()).expect("test names");
+                }
+            }
+            Op::Socket { .. }
+            | Op::Bind { .. }
+            | Op::Listen { .. }
+            | Op::Accept { .. }
+            | Op::Connect { .. }
+            | Op::Recv { .. }
+            | Op::Send { .. }
+            | Op::Shutdown { .. }
+            | Op::Close { .. }
+            | Op::Open { .. }
+            | Op::Read { .. }
+            | Op::Write { .. }
+            | Op::Append { .. }
+            | Op::Truncate { .. }
+            | Op::Sync { .. }
+            | Op::Stat { .. }
+            | Op::Rename { .. }
+            | Op::Remove { .. }
+            | Op::MakeDirectory { .. }
+            | Op::Spawn { .. }
+            | Op::Wait { .. }
+            | Op::Signal { .. }
+            | Op::Usage
+            | Op::Window { .. }
+            | Op::ReadSignal { .. }
+            | Op::PipeRead { .. }
+            | Op::PipeWrite { .. }
+            | Op::Cancel { .. } => panic!("expected List"),
+        }
+        self.complete(Ok(skein_io::kernel::Done::Count(u32::try_from(values.len()).expect("test page"))));
+    }
+    pub fn empty_sweep(&mut self) {
+        for _ in 0_u8..3 {
+            self.file_operation();
+            self.complete_ok();
+        }
+    }
+    pub fn shutdown(&mut self) {
+        self.down(crate::Request::Shutdown);
+        for _ in 0_u8..2 {
+            self.file_operation();
+            self.complete_ok();
+        }
     }
     pub fn down(&mut self, request: crate::Request) {
         self.component.down(self.now, request, &mut self.below.out);
@@ -233,5 +417,41 @@ impl Started {
             None => None,
             Some(crate::Event::Started | crate::Event::Unusable { .. }) => panic!("unexpected start terminal"),
         }
+    }
+}
+fn clone_file_kind(kind: &skein_io::kernel::Op) -> skein_io::kernel::Op {
+    use skein_io::kernel::Op;
+    match kind {
+        Op::Open { root, path, how } => Op::Open { root: *root, path: path.clone(), how: *how },
+        Op::Read { fd, buf, at } => Op::Read { fd: *fd, buf: buf.clone(), at: *at },
+        Op::Rename { from_dir, from, to_dir, to } => {
+            Op::Rename { from_dir: *from_dir, from: from.clone(), to_dir: *to_dir, to: to.clone() }
+        }
+        Op::Remove { dir, name, directory } => Op::Remove { dir: *dir, name: name.clone(), directory: *directory },
+        Op::MakeDirectory { dir, name, mode } => Op::MakeDirectory { dir: *dir, name: name.clone(), mode: *mode },
+        Op::List { fd, entries, names } => Op::List { fd: *fd, entries: entries.clone(), names: names.clone() },
+        Op::Close { fd } => Op::Close { fd: *fd },
+        Op::Socket { .. }
+        | Op::Bind { .. }
+        | Op::Listen { .. }
+        | Op::Accept { .. }
+        | Op::Connect { .. }
+        | Op::Recv { .. }
+        | Op::Send { .. }
+        | Op::Shutdown { .. }
+        | Op::Write { .. }
+        | Op::Append { .. }
+        | Op::Truncate { .. }
+        | Op::Sync { .. }
+        | Op::Stat { .. }
+        | Op::Spawn { .. }
+        | Op::Wait { .. }
+        | Op::Signal { .. }
+        | Op::Usage
+        | Op::Window { .. }
+        | Op::ReadSignal { .. }
+        | Op::PipeRead { .. }
+        | Op::PipeWrite { .. }
+        | Op::Cancel { .. } => panic!("unexpected file operation"),
     }
 }

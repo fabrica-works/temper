@@ -17,6 +17,7 @@ fn a_fetch_runs_one_invocation_and_ends_fetched() {
     component.closed(child, &pipes);
     assert_eq!(component.done(), Some((fixtures::OWNER, git::Done::Fetched { commit: fixtures::COMMIT })));
     assert!(component.below.out.io.is_empty());
+    component.shutdown();
     assert!(component.component.is_empty());
 }
 #[test]
@@ -151,5 +152,9 @@ fn an_abort_during_commit_tree_spawn_settles_without_a_done() {
     assert_eq!(component.below.out.io.len(), 4, "abort child and all three pipes");
     component.closed(child, &pipes);
     assert_eq!(component.done(), None);
+    for _ in 0_u8..2 {
+        component.file_operation();
+        component.complete_ok();
+    }
     assert!(component.component.is_empty());
 }

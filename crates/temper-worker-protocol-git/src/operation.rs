@@ -23,6 +23,7 @@ pub(crate) struct Operation {
     pub(crate) stop: Option<git::Fault>,
     pub(crate) aborted: bool,
     pub(crate) ran: bool,
+    pub(crate) file: Option<crate::files::Task>,
     phase: Phase,
 }
 #[derive(Debug)]
@@ -70,6 +71,7 @@ impl Operation {
             stop: None,
             aborted: false,
             ran: false,
+            file: None,
             phase: Phase::Spawning { failed: false },
         }
     }

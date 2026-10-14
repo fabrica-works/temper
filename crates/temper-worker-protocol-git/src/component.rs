@@ -1,6 +1,7 @@
 //! The git component: counted operations, explicit lifecycle, parent queues.
 use crate::{
     Event, Identity, Limits, Outputs, Request, Settings, Unfit, Unusable, Version,
+    files::{Action, Directories, Task},
     invocation::Command,
     limits,
     operation::Operation,
@@ -14,6 +15,7 @@ use temper_worker_domain_checkout::{self as checkout, git};
 enum Start {
     Idle,
     Checking,
+    Layout,
     Started,
     Unusable,
     Aborted,
@@ -29,6 +31,8 @@ pub struct Component {
     serial: u64,
     start: Start,
     shutting_down: bool,
+    directories: Directories,
+    background: Option<Task>,
 }
 fn event(out: &mut Outputs, event: Event) {
     out.events.push(event);
@@ -40,6 +44,7 @@ impl Component {
         let capacity = limits.operations.checked_add(1).ok_or(Unfit::Memory)?;
         let slots = capacity.checked_mul(2).ok_or(Unfit::Memory)?;
         assert!(settings.largest_read > 0 && settings.largest_room > 0, "io validated usable limits");
+        let directories = Directories::new(settings.serial);
         Ok(Component {
             limits: *limits,
             checkout: *checkout,
@@ -49,6 +54,8 @@ impl Component {
             serial: 0,
             start: Start::Idle,
             shutting_down: false,
+            directories,
+            background: None,
         })
     }
     fn token(&mut self) -> Option<Token> {
@@ -64,7 +71,7 @@ impl Component {
         assert!(self.index.insert(key, id).expect("admitted index fits").is_none(), "unique invocation token");
         id
     }
-    /// Start once with git's version check; the layout is added in 07.3b.
+    /// Start once with git's version check followed by a private, fresh layout.
     pub fn start(&mut self, _now: Time, out: &mut Outputs) {
         assert_eq!(self.start, Start::Idle, "start once");
         self.start = Start::Checking;
@@ -90,7 +97,10 @@ impl Component {
                     self.slots.get_mut(id).expect("live index").cancel(git::Fault::Cancelled, &self.checkout, out);
                 }
             }
-            Request::Shutdown => self.shutting_down = true,
+            Request::Shutdown => {
+                self.shutting_down = true;
+                self.maintain(false, out);
+            }
         }
     }
     fn begin(
@@ -110,22 +120,12 @@ impl Component {
             | git::Op::Push { .. } => true,
             git::Op::Make { .. } | git::Op::CheckOut { .. } | git::Op::Merge { .. } => false,
         };
-        let unsupported = match op {
-            git::Op::Make { .. } | git::Op::Commit { merging: Some(_), .. } => true,
-            git::Op::Clone { .. }
-            | git::Op::Fetch { .. }
-            | git::Op::Create { .. }
-            | git::Op::CheckOut { .. }
-            | git::Op::Merge { .. }
-            | git::Op::Commit { merging: None, .. }
-            | git::Op::Push { .. } => false,
-        };
         if self.start != Start::Started
+            || self.shutting_down
             || self.index.len() >= self.limits.operations
             || self.slots.is_full()
             || self.owned(owner).is_some()
             || (needs_identity && identity.is_none())
-            || unsupported
         {
             event(out, Event::Done { owner, done: git::Done::Failed { fault: git::Fault::Broken } });
             return;
@@ -138,14 +138,11 @@ impl Component {
             event(out, Event::Done { owner, done: git::Done::Failed { fault: git::Fault::Broken } });
             return;
         };
-        let command = match sequence::first(&op) {
-            Next::Run(command) => command,
-            Next::Make | Next::Scan { .. } | Next::End(_) => unreachable!("supported first invocation"),
-        };
+        let next = sequence::first(&op);
         let identity = if needs_identity { identity } else { None };
-        let mut operation = Operation::new(owner, token, deadline, Some(op), identity, command.clone());
-        operation.spawn(token, command, &self.settings, out);
-        self.insert(operation);
+        let operation = Operation::new(owner, token, deadline, Some(op), identity, Command::Version);
+        let id = self.insert(operation);
+        self.advance(id, next, out);
     }
     /// Route only events accepted by the invocation or one of its pipe tokens.
     pub fn up(&mut self, now: Time, input: io::Event, out: &mut Outputs) {
@@ -175,17 +172,19 @@ impl Component {
                 self.retire(id);
                 if aborted {
                     self.start = Start::Aborted;
+                    self.maintain(false, out);
                     return;
                 }
                 if version >= Some(Version { major: 2, minor: 41, patch: 0 }) {
-                    self.start = Start::Started;
-                    event(out, Event::Started);
+                    self.start = Start::Layout;
+                    self.background(Task::layout(), out);
                 } else {
                     self.start = Start::Unusable;
                     event(out, Event::Unusable { why: Unusable::Version { found: version } });
                 }
             } else {
                 self.advance(id, next, out);
+                self.maintain(false, out);
             }
         }
     }
@@ -194,6 +193,7 @@ impl Component {
         operation.identity = None;
         operation.op = None;
         operation.command = Command::Version;
+        operation.file = None;
         let key = operation.io_owner;
         self.index.remove(&key).expect("live index");
         self.slots.retire(id);
@@ -219,7 +219,34 @@ impl Component {
                 assert!(self.index.insert(token, id).expect("same operation").is_none(), "unique token");
             }
             Next::End(done) => self.finish(id, done, out),
-            Next::Make | Next::Scan { .. } => self.finish(id, git::Done::Failed { fault: git::Fault::Broken }, out),
+            Next::Make => {
+                let op = self.slots.get(id).expect("live index").op.as_ref().expect("Make op");
+                let workspace = match op {
+                    git::Op::Make { workspace } => *workspace,
+                    git::Op::Clone { .. }
+                    | git::Op::Fetch { .. }
+                    | git::Op::Create { .. }
+                    | git::Op::CheckOut { .. }
+                    | git::Op::Merge { .. }
+                    | git::Op::Commit { .. }
+                    | git::Op::Push { .. } => unreachable!("Make sequence"),
+                };
+                self.file_start(id, Task::make(workspace), out);
+            }
+            Next::Scan { files } => {
+                let op = self.slots.get(id).expect("live index").op.as_ref().expect("Commit op");
+                let at = match op {
+                    git::Op::Commit { at, .. } => at,
+                    git::Op::Make { .. }
+                    | git::Op::Clone { .. }
+                    | git::Op::Fetch { .. }
+                    | git::Op::Create { .. }
+                    | git::Op::CheckOut { .. }
+                    | git::Op::Merge { .. }
+                    | git::Op::Push { .. } => unreachable!("scan sequence"),
+                };
+                self.file_start(id, Task::scan(files, crate::invocation::place(at)), out);
+            }
         }
     }
     fn finish(&mut self, id: Id<Operation>, done: git::Done, out: &mut Outputs) {
@@ -229,8 +256,112 @@ impl Component {
         }
         self.retire(id);
     }
-    /// File completions are owned by the next increment's file machine.
-    pub fn complete(&mut self, _now: Time, _complete: kernel::Complete, _out: &mut Outputs) {}
+    fn submit(&mut self, task: &mut Task, kind: kernel::Op, out: &mut Outputs) {
+        task.pending = self.token().expect("file token lifetime");
+        out.kernel.push(kernel::Submit { op: task.pending, kind });
+    }
+    fn background(&mut self, mut task: Task, out: &mut Outputs) {
+        let action = task.first(&mut self.directories, &self.settings);
+        self.background_action(task, action, out);
+    }
+    fn background_action(&mut self, mut task: Task, action: Action, out: &mut Outputs) {
+        match action {
+            Action::Run(kind) => {
+                self.submit(&mut task, kind, out);
+                self.background = Some(task);
+            }
+            Action::Layout(result) => {
+                if self.start != Start::Aborted {
+                    match result {
+                        Ok(()) => {
+                            self.start = Start::Started;
+                            event(out, Event::Started);
+                        }
+                        Err(error) => {
+                            self.start = Start::Unusable;
+                            event(out, Event::Unusable { why: Unusable::Layout { error } });
+                        }
+                    }
+                }
+                self.maintain(result.is_ok(), out);
+            }
+            Action::Swept(failed) => {
+                if failed {
+                    self.directories.failures = self.directories.failures.saturating_add(1);
+                }
+                self.maintain(false, out);
+            }
+            Action::Closed => {}
+            Action::Operation(_) => unreachable!("background file task"),
+        }
+    }
+    fn maintain(&mut self, sweep: bool, out: &mut Outputs) {
+        if self.background.is_some() {
+            return;
+        }
+        if (self.shutting_down || self.start == Start::Unusable) && self.index.is_empty() {
+            self.background(Task::closing(), out);
+        } else if sweep && !self.shutting_down && self.start == Start::Started {
+            self.background(Task::sweep(), out);
+        }
+    }
+    fn file_start(&mut self, id: Id<Operation>, mut task: Task, out: &mut Outputs) {
+        let action = task.first(&mut self.directories, &self.settings);
+        self.file_action(id, task, action, out);
+    }
+    fn file_action(&mut self, id: Id<Operation>, mut task: Task, action: Action, out: &mut Outputs) {
+        match action {
+            Action::Run(kind) => {
+                self.submit(&mut task, kind, out);
+                let operation = self.slots.get_mut(id).expect("live index");
+                self.index.remove(&operation.io_owner).expect("live index");
+                operation.io_owner = task.pending;
+                assert!(self.index.insert(task.pending, id).expect("same operation").is_none(), "unique token");
+                operation.file = Some(task);
+            }
+            Action::Operation(mut next) => {
+                let operation = self.slots.get(id).expect("live index");
+                if let Some(fault) = operation.stop {
+                    next = if operation.ran {
+                        sequence::failed(fault, b"", 0)
+                    } else {
+                        Next::End(git::Done::Failed { fault })
+                    };
+                }
+                let make = operation.op.as_ref().expect("file op").kind() == git::Kind::Make;
+                self.advance(id, next, out);
+                self.maintain(make, out);
+            }
+            Action::Layout(_) | Action::Swept(_) | Action::Closed => unreachable!("operation file task"),
+        }
+    }
+    /// Settle owned kernel work before advancing or answering its caller.
+    pub fn complete(&mut self, now: Time, complete: kernel::Complete, out: &mut Outputs) {
+        let background = match &self.background {
+            Some(task) => task.pending == complete.op,
+            None => false,
+        };
+        if background {
+            let mut task = self.background.take().expect("pending task");
+            let action =
+                task.complete(complete, &mut self.directories, &self.settings, &self.limits, self.shutting_down);
+            self.background_action(task, action, out);
+            return;
+        }
+        let Some(id) = self.index.get(&complete.op).copied() else {
+            return;
+        };
+        let operation = self.slots.get_mut(id).expect("live index");
+        let Some(mut task) = operation.file.take() else {
+            return;
+        };
+        if now >= operation.deadline && operation.stop.is_none() {
+            operation.stop = Some(git::Fault::TimedOut);
+        }
+        let action =
+            task.complete(complete, &mut self.directories, &self.settings, &self.limits, operation.stop.is_some());
+        self.file_action(id, task, action, out);
+    }
     /// Kill and settle at most one operation whose one deadline has elapsed.
     pub fn fire(&mut self, now: Time, out: &mut Outputs) {
         for (_, id) in &self.index {
@@ -251,6 +382,7 @@ impl Component {
             operation.identity = None;
             operation.cancel(git::Fault::Cancelled, &self.checkout, out);
         }
+        self.maintain(false, out);
     }
     #[must_use]
     pub fn accepts(&self, event: &io::Event) -> bool {
@@ -292,6 +424,9 @@ impl Component {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.index.is_empty()
+            && self.background.is_none()
+            && self.directories.trash.is_none()
+            && self.directories.workspaces.is_none()
     }
     #[must_use]
     pub fn operations(&self) -> u32 {
