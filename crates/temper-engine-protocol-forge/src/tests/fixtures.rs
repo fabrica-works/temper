@@ -140,6 +140,9 @@ impl Harness {
     pub fn call(&mut self, call: u64, repository: api::Repository, op: api::Op) {
         self.send(crate::Request::Call { call: skein_lib::Token::new(call), repository, op });
     }
+    pub fn known(&mut self, repository: api::Repository, row: crate::tables::Repository) {
+        self.component.tables().keep_repository(repository, row);
+    }
     pub fn send(&mut self, request: crate::Request) {
         self.component.down(&self.env, request, &mut self.up, &mut self.io);
     }
@@ -249,6 +252,7 @@ impl Harness {
         h
     }
     fn drain(&mut self) {
+        let mut quiet = 0_u32;
         for _ in 0..1024_u32 {
             for _ in 0..self.io.len() {
                 match self.io.pop().expect("queued request") {
@@ -303,16 +307,28 @@ impl Harness {
                 }
             }
             let mut events = List::with_capacity(32);
+            let mut moved = false;
             for owner in self.owners().into_boxed() {
                 let peer = self.peers.get_mut(&owner).expect("fixture peer");
+                let trace = peer.wire.trace.len();
                 if peer.connected
                     && let Some(up) = peer.wire.answer()
                 {
                     events.push(skein_io::Event::Stream { owner, up }).expect("fixture events fit");
                 }
+                moved |= peer.wire.trace.len() != trace;
             }
+            moved |= !events.is_empty();
             for event in events.into_boxed() {
                 self.event(event);
+            }
+            if !moved && self.io.is_empty() {
+                quiet = quiet.saturating_add(1);
+                if quiet == 32 {
+                    break;
+                }
+            } else {
+                quiet = 0;
             }
         }
     }
@@ -330,6 +346,9 @@ pub fn ok(body: &[u8]) -> Box<[u8]> {
     out.put(b"\r\nDate: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n").expect("date fits");
     out.put(body).expect("body fits");
     out.finish()
+}
+pub fn ok_dated(body: &[u8]) -> Box<[u8]> {
+    ok(body)
 }
 pub fn status(code: u16) -> Box<[u8]> {
     let decimal = skein_lib::Decimal::of(u64::from(code));

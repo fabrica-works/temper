@@ -347,10 +347,20 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(u64::from(l.body_bytes).checked_mul(6)?.checked_add(1024)?)?
         .checked_add(socket)?;
     let calls = Slab::<Waiting>::worst_case(s.client.calls)?
+        .checked_add(Map::<Token, Token>::worst_case(l.connections)?)?
+        .checked_add(List::<(Token, Id<Waiting>)>::worst_case(s.client.calls)?)?
         .checked_add(Map::<Token, Id<Waiting>>::worst_case(s.client.calls)?)?
         .checked_add(
-            u64::from(s.client.calls)
-                .checked_mul(u64::from(s.client.op_bytes).checked_add(u64::from(s.client.answer_bytes))?)?,
+            u64::from(s.client.calls).checked_mul(
+                u64::from(s.client.op_bytes)
+                    .checked_mul(3)?
+                    .checked_add(u64::from(s.client.answer_bytes))?
+                    .checked_add(u64::from(l.string_bytes).checked_mul(u64::from(l.inner).checked_add(5)?)?)?
+                    .checked_add(
+                        u64::from(l.inner)
+                            .checked_mul(u64::try_from(size_of::<temper_forge_forgejo::document::User>()).ok()?)?,
+                    )?,
+            )?,
         )?;
     let held = Map::<Token, Held>::worst_case(s.client.calls)?
         .checked_add(u64::from(s.client.calls).checked_mul(u64::from(s.client.answer_bytes))?)?;

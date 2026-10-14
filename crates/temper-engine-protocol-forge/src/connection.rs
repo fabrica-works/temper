@@ -105,6 +105,7 @@ pub(crate) struct Connection {
     tls_down: Queue<Down>,
     json_up: Queue<tokenizer::Event>,
     json_down: Queue<Down>,
+    json_next: Option<tokenizer::Request>,
     heard: Queue<Heard>,
     request: Option<request::Request>,
     receive: Receiving,
@@ -140,6 +141,7 @@ impl Connection {
             tls_down: Queue::with_capacity(8),
             json_up: Queue::with_capacity(8),
             json_down: Queue::with_capacity(8),
+            json_next: None,
             heard: Queue::with_capacity(16),
             request: None,
             receive: Receiving::Empty,
@@ -297,6 +299,10 @@ impl Connection {
             }
             if let Some(down) = self.json_down.pop() {
                 self.http_down(env, http::Request::Body(down));
+                continue;
+            }
+            if let Some(request) = self.json_next.take() {
+                self.json_down(env, request);
                 continue;
             }
             if let Some(event) = self.json_up.pop() {
@@ -520,7 +526,7 @@ impl Connection {
             decode::Step::Demand(request) => self.json_down(env, request),
             decode::Step::Row(row, request) => {
                 self.heard.push(Heard::Row(row));
-                self.json_down(env, request);
+                self.json_next = Some(request);
             }
             decode::Step::Done(document) => {
                 self.done = Some(Body::Document(document));
@@ -580,8 +586,8 @@ impl Connection {
             || !self.json_up.is_empty()
             || !self.json_down.is_empty()
             || !self.heard.is_empty()
+            || self.json_next.is_some()
     }
-    #[expect(dead_code, reason = "13.3 supplies listing cursors")]
     pub fn keep_after(&mut self, after: u64) {
         self.after = after;
         if let Some(decoder) = self.decoder() {
@@ -593,11 +599,10 @@ impl Connection {
     pub fn raw_room(&mut self, room: u32) {
         self.raw_cap = room;
     }
-    #[expect(dead_code, reason = "13.3 cuts bounded listings")]
-    pub fn cut(&mut self, env: &Env<Limits>) {
+    pub fn cut(&mut self, _env: &Env<Limits>) {
         if let Some(decoder) = self.decoder() {
             let request = documents::cut(decoder);
-            self.json_down(env, request);
+            self.json_next = Some(request);
         }
     }
 }

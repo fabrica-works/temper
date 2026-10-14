@@ -9,6 +9,8 @@ use crate::{
     tables::Tables,
 };
 use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
+mod calls;
+use crate::{plan::Step, reads::Plan};
 use temper_engine_domain_forge_client::api;
 /// Output reservations for each entry point.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -25,10 +27,13 @@ pub struct Diagnostics {
     pub malformed: u64,
 }
 #[derive(Debug)]
-#[expect(dead_code, reason = "13.3 consumes waiting operations after a forge starts")]
 pub(crate) struct Waiting {
     pub repository: api::Repository,
-    pub op: api::Op,
+    pub op: Option<api::Op>,
+    pub plan: Option<Plan>,
+    pub connection: Option<Token>,
+    pub cost: u32,
+    pub charged: bool,
     pub deadline: Time,
 }
 #[derive(Debug)]
@@ -45,6 +50,7 @@ pub struct Component {
     waiting: Slab<Waiting>,
     calls: Map<Token, Id<Waiting>>,
     held: Map<Token, Held>,
+    holders: Map<Token, Token>,
     closed: bool,
     diagnostics: Diagnostics,
     shared: Shared,
@@ -71,6 +77,7 @@ impl Component {
             waiting: Slab::with_capacity(shared.client.calls),
             calls: Map::with_capacity(shared.client.calls),
             held: Map::with_capacity(shared.client.calls),
+            holders: Map::with_capacity(shared.client.calls),
             closed: false,
             diagnostics: Diagnostics { long_bodies: 0, malformed: 0 },
             shared: *shared,
@@ -107,9 +114,18 @@ impl Component {
                 assert!(!self.calls.contains_key(&call), "one live call per token");
                 let id = self
                     .waiting
-                    .insert(Waiting { repository, op, deadline: env.now.saturating_add(env.limits.deadline) })
+                    .insert(Waiting {
+                        repository,
+                        op: Some(op),
+                        plan: None,
+                        connection: None,
+                        cost: 0,
+                        charged: false,
+                        deadline: env.now.saturating_add(env.limits.deadline),
+                    })
                     .expect("client bounds admitted calls");
                 let _previous: Option<Id<Waiting>> = self.calls.insert(call, id).expect("call index matches its slab");
+                self.drive(env, up, io, MAX_OUT.above);
             }
             Request::Refused(answer) => {
                 drop(
@@ -152,6 +168,7 @@ impl Component {
                     let _removed: Option<Id<Waiting>> = self.calls.remove(&call);
                 }
                 self.held = Map::with_capacity(self.held.capacity());
+                self.holders = Map::with_capacity(self.holders.capacity());
                 self.closed = true;
                 self.drive(env, up, io, MAX_OUT.above);
             }
@@ -165,6 +182,7 @@ impl Component {
         up: &mut Queue<Event>,
         io: &mut Queue<skein_io::Request>,
     ) {
+        let above = up.len();
         match event {
             skein_io::Event::Connecting { owner, socket } => {
                 if let Some(id) = self.connections.get(&owner)
@@ -198,6 +216,14 @@ impl Component {
             skein_io::Event::Closed { owner } => {
                 if let Some(id) = self.connections.remove(&owner) {
                     let closing = self.connection_slab.get(id).expect("indexed connection").closing;
+                    if let Some(call) = self.holders.remove(&owner)
+                        && !self.closed
+                    {
+                        let call_id = *self.calls.get(&call).expect("holding call");
+                        let c = self.connection_slab.get(id).expect("closed connection");
+                        let error = if c.written { api::Error::Timeout } else { api::Error::Unavailable };
+                        self.finish(call, call_id, Err(error), up);
+                    }
                     self.connection_slab.retire(id);
                     for at in 0..self.start_tokens.len() {
                         if self.start_tokens.get(at) == Some(&Some(owner)) {
@@ -219,7 +245,7 @@ impl Component {
             | skein_io::Event::Window { .. }
             | skein_io::Event::Shutdown { .. } => {}
         }
-        self.drive(env, up, io, MAX_OUT.above);
+        self.drive(env, up, io, MAX_OUT.above.saturating_sub(up.len().saturating_sub(above)));
     }
     pub fn fire(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>) {
         if self.closed {
@@ -227,22 +253,30 @@ impl Component {
             return;
         }
         let above = up.len();
+        let below = io.len();
         for _ in 0..MAX_OUT.above {
-            let mut next = None;
+            if io.len().saturating_sub(below) >= MAX_OUT.below {
+                break;
+            }
+            let mut due = None;
             for (call, id) in &self.calls {
-                if self.waiting.get(*id).expect("indexed live call").deadline <= env.now {
-                    next = Some((*call, *id));
+                if self.waiting.get(*id).expect("live call").deadline <= env.now {
+                    due = Some((*call, *id));
                     break;
                 }
             }
-            let Some((call, id)) = next else {
+            let Some((call, id)) = due else {
                 break;
             };
-            self.waiting.retire(id);
-            let _removed: Option<Id<Waiting>> = self.calls.remove(&call);
-            up.push(Event::Answered(Answered { call, cost: 0, result: Err(api::Error::Unavailable) }));
+            self.expire(call, id, up, io);
         }
-        self.drive(env, up, io, MAX_OUT.above.saturating_sub(up.len().saturating_sub(above)));
+        self.drive_room(
+            env,
+            up,
+            io,
+            MAX_OUT.above.saturating_sub(up.len().saturating_sub(above)),
+            MAX_OUT.below.saturating_sub(io.len().saturating_sub(below)),
+        );
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
@@ -291,12 +325,19 @@ impl Component {
             up.push(Event::Stopped { forge: forge.number, why: reason });
         }
     }
-    fn drive(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>, above_room: u32) {
+    fn drive_starts(
+        &mut self,
+        env: &Env<Limits>,
+        up: &mut Queue<Event>,
+        io: &mut Queue<skein_io::Request>,
+        above_room: u32,
+        below_room: u32,
+    ) {
         let below = io.len();
         let above = up.len();
         self.wake = None;
         for at in 0..self.starts.len() {
-            if io.len().saturating_sub(below) >= MAX_OUT.below || up.len().saturating_sub(above) >= above_room {
+            if io.len().saturating_sub(below) >= below_room || up.len().saturating_sub(above) >= above_room {
                 self.wake = Some(env.now);
                 break;
             }
@@ -319,7 +360,7 @@ impl Component {
                 continue;
             };
             for _ in 0..64_u32 {
-                if io.len().saturating_sub(below) >= MAX_OUT.below || up.len().saturating_sub(above) >= above_room {
+                if io.len().saturating_sub(below) >= below_room || up.len().saturating_sub(above) >= above_room {
                     self.wake = Some(env.now);
                     break;
                 }
@@ -347,7 +388,7 @@ impl Component {
                     c.start(env, self.settings.forges.get(at).expect("configured forge"), request, None)
                         .expect("checked start request");
                 }
-                c.pump(env, io, MAX_OUT.below.saturating_sub(io.len().saturating_sub(below)).saturating_sub(1));
+                c.pump(env, io, below_room.saturating_sub(io.len().saturating_sub(below)).saturating_sub(1));
                 if let Some(heard) = c.heard() {
                     let heard = match heard {
                         Heard::Head { status, fields } if status != 200 => {
@@ -385,6 +426,28 @@ impl Component {
                 self.wake = Some(env.now);
             }
         }
+    }
+    fn drive(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>, above_room: u32) {
+        self.drive_room(env, up, io, above_room, MAX_OUT.below);
+    }
+    fn drive_room(
+        &mut self,
+        env: &Env<Limits>,
+        up: &mut Queue<Event>,
+        io: &mut Queue<skein_io::Request>,
+        above_room: u32,
+        below_room: u32,
+    ) {
+        let above = up.len();
+        let below = io.len();
+        self.drive_starts(env, up, io, above_room, below_room);
+        self.drive_calls(
+            env,
+            up,
+            io,
+            above_room.saturating_sub(up.len().saturating_sub(above)),
+            below_room.saturating_sub(io.len().saturating_sub(below)),
+        );
         if self.closed && self.connections.is_empty() && !self.ended {
             self.ended = true;
             up.push(Event::Closed);
