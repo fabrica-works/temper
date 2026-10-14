@@ -755,6 +755,18 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      (a directory with group bits set), joins 16.3's Test shape. Saying
      why stays jig's (later.md).
 
+135. **A push that lost a ref-lock race is tried once more** (temper
+     16.3a, blocked 2026-10-14T12:38:18Z; process). `land` exited 7
+     ("fetching or pushing failed") when its push met `cannot lock ref`,
+     another push to `main` at the same moment (here `2dec7fb5`), with
+     the gate passed and nothing wrong in the commit. development.md,
+     8.5 stops on 7, as it should for a failure that needs a person; this
+     one is main moving, as 6 is. As a standing rule (README): on exit 7
+     whose message names `cannot lock ref`, the implementer waits 60
+     seconds and runs `land` once more; a second exit 7 is a block, kind
+     infrastructure. Whether `land` should report this race as 6 is a
+     proposal for the retrospective (skein's kit).
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

@@ -193,6 +193,11 @@ them wait on them.
   attempts in all; the third such failure is a block, kind
   infrastructure. This replaces development.md, 8.5's and 8.7's one
   retry for this plan.
+- **`land` exiting 7 on a push race** (decisions.md, ruling 135): when
+  its message names `cannot lock ref` (another push to `main` at the
+  same moment), the implementer waits 60 seconds and runs `land` once
+  more, as development.md, 8.5 does for 6; a second exit 7 is a block,
+  kind infrastructure. Any other exit 7 stops as 8.5 says.
 - **Waiting.** An implementer waits on a running command with one wait
   of 300,000 ms on its cell, as development.md, 7.4 says for the
   coordinator; it never sends empty input to a running command, and
