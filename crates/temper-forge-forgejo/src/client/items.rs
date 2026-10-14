@@ -153,7 +153,19 @@ fn target(request: &Request, out: &mut Target) {
         | Request::ApiSettings
         | Request::RepositoryById { .. }
         | Request::Repository { .. }
-        | Request::UserSearch { .. } => unreachable!("item encoder dispatch"),
+        | Request::UserSearch { .. }
+        | Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. } => unreachable!("item encoder dispatch"),
     }
 }
 
@@ -286,14 +298,21 @@ impl Items {
             }
             Move::End(Kind::Item(Item::Comment)) => {
                 let value = core::mem::replace(&mut self.comment, comment());
-                if value.id > self.after {
+                if self.root == Item::Comment {
+                    self.comment = value;
+                } else if value.id > self.after {
                     return Step::Row(Row::Comment(value), skein_json::tokenizer::Request::Next);
                 }
                 Ok(())
             }
             Move::End(Kind::Item(Item::Status)) => {
                 let value = core::mem::replace(&mut self.status, status());
-                return Step::Row(Row::Status(value), skein_json::tokenizer::Request::Next);
+                if self.root == Item::Status {
+                    self.status = value;
+                } else {
+                    return Step::Row(Row::Status(value), skein_json::tokenizer::Request::Next);
+                }
+                Ok(())
             }
             Move::End(Kind::Item(Item::Pull)) => {
                 self.finish_pull();
@@ -319,6 +338,7 @@ impl Items {
                 | Kind::Action(_)
                 | Kind::Review(_)
                 | Kind::Branch(_)
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
@@ -351,6 +371,7 @@ impl Items {
                 | Kind::Review(_)
                 | Kind::Branch(_)
                 | Kind::User
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
@@ -386,10 +407,10 @@ impl Items {
             Item::Pull => Document::Pull(core::mem::replace(&mut self.pull, pull())),
             Item::Combined => Document::CombinedStatus(self.combined),
             Item::Pulls | Item::Issues | Item::Comments => Document::Listed { skipped },
-            Item::Comment
-            | Item::Head
+            Item::Comment => Document::Comment(core::mem::replace(&mut self.comment, comment())),
+            Item::Status => Document::Status(core::mem::replace(&mut self.status, status())),
+            Item::Head
             | Item::Base
-            | Item::Status
             | Item::Statuses
             | Item::Label
             | Item::Labels

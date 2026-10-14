@@ -152,7 +152,7 @@ fn issue(json: &mut Encoder, value: &Issue) -> Result<(), writer::Refusal> {
     json.object_end();
     Ok(())
 }
-fn comment(json: &mut Encoder, value: &Comment) -> Result<(), writer::Refusal> {
+pub(super) fn comment(json: &mut Encoder, value: &Comment) -> Result<(), writer::Refusal> {
     json.object_start();
     json.key(b"id");
     json.unsigned(value.id);
@@ -220,29 +220,16 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             } else {
                 json.array_start();
                 for value in statuses {
-                    json.object_start();
-                    json.key(b"creator");
-                    match &value.creator {
-                        Some(user) => super::start::user(json, user),
-                        None => json.null(),
-                    }
-                    json.key(b"updated_at");
-                    json.string(&time::write(value.updated_at));
-                    json.key(b"context");
-                    json.string(&value.context);
-                    json.key(b"status");
-                    json.string(status(value.status));
-                    json.key(b"description");
-                    json.string(&value.description);
-                    json.key(b"target_url");
-                    json.string(&value.target_url);
-                    json.object_end();
+                    commit_status(json, value);
                 }
                 json.array_end();
             }
             json.object_end();
         }
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
@@ -293,5 +280,25 @@ pub(super) fn pull(json: &mut Encoder, value: &crate::document::PullRequest) {
         super::start::user(json, user);
     }
     json.array_end();
+    json.object_end();
+}
+
+pub(super) fn commit_status(json: &mut Encoder, value: &crate::document::CommitStatus) {
+    json.object_start();
+    json.key(b"creator");
+    match &value.creator {
+        Some(user) => super::start::user(json, user),
+        None => json.null(),
+    }
+    json.key(b"updated_at");
+    json.string(&time::write(value.updated_at));
+    json.key(b"context");
+    json.string(&value.context);
+    json.key(b"status");
+    json.string(status(value.status));
+    json.key(b"description");
+    json.string(&value.description);
+    json.key(b"target_url");
+    json.string(&value.target_url);
     json.object_end();
 }

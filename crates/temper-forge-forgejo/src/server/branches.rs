@@ -114,7 +114,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             super::start::user(json, &value.user);
             json.object_end();
         }
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)

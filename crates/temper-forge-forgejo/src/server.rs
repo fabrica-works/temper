@@ -15,6 +15,16 @@ mod files;
 mod items;
 mod reviews;
 mod start;
+pub(crate) mod writes;
+use crate::decode::Malformed;
+use skein_json::tokenizer;
+pub use writes::{BodyDecoder, body, body_first};
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum BodyStep {
+    Demand(tokenizer::Request),
+    Decoded(Request),
+    Malformed(Malformed),
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Unrouted {
     NotFound,
@@ -24,8 +34,15 @@ pub enum Unrouted {
 #[derive(Debug)]
 pub enum Route {
     Ready(Request),
+    Body(BodyDecoder),
 }
 pub fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Unrouted> {
+    match writes::route(method, target, limits) {
+        Err(Unrouted::NotFound) => read_route(method, target, limits),
+        other => other,
+    }
+}
+fn read_route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Unrouted> {
     match start::route(method, target, limits) {
         Err(Unrouted::NotFound) => match reviews::route(method, target, limits) {
             Err(Unrouted::NotFound) => match branches::route(method, target, limits) {
@@ -55,6 +72,9 @@ pub enum Answer {
     Issues(Box<[Issue]>),
     Issue(Issue),
     Comments(Box<[Comment]>),
+    Comment(Comment),
+    Status(CommitStatus),
+    Review(Review),
     Pull(PullRequest),
     Files(Box<[crate::document::ChangedFile]>),
     Compare {
@@ -93,6 +113,12 @@ pub fn encode(answer: &Answer, limits: &Limits) -> Result<Box<[u8]>, writer::Ref
 }
 fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refusal> {
     match answer {
+        Answer::Comment(value) => items::comment(json, value),
+        Answer::Status(value) => {
+            items::commit_status(json, value);
+            Ok(())
+        }
+        Answer::Review(value) => reviews::review(json, value),
         Answer::Files(_) | Answer::Compare { .. } => {
             files::write(json, answer);
             Ok(())

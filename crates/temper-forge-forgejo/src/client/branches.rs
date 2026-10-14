@@ -153,7 +153,8 @@ impl Branches {
                 ),
             ) => Ok(()),
             Move::End(
-                Kind::Settings
+                Kind::Write(_)
+                | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
                 | Kind::Users

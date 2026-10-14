@@ -44,7 +44,10 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::ApiSettings(value) => (Document::ApiSettings(value), vec![]),
         Answer::Repository(value) => (Document::Repository(value), vec![]),
         Answer::Search { ok, data } => (Document::Search { ok }, data.into_vec().into_iter().map(Row::User).collect()),
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)

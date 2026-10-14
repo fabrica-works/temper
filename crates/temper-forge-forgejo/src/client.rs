@@ -12,13 +12,14 @@ use skein_json::tokenizer;
 pub(crate) mod actions;
 pub(crate) mod branches;
 pub(crate) mod files;
-mod items;
+pub(crate) mod items;
 use actions::ActionKind;
 use files::FileKind;
 pub(crate) mod reviews;
 use branches::BranchKind;
 use reviews::ReviewKind;
 mod start;
+pub(crate) mod writes;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Encoded {
     pub method: Method,
@@ -32,6 +33,18 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
+        Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. } => writes::encode(request, limits),
         Request::PullFiles { .. }
         | Request::Compare { .. }
         | Request::Raw { .. }
@@ -78,15 +91,24 @@ enum DecoderState {
 #[must_use]
 pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
     let kind = match request {
-        Request::Raw { .. } | Request::JobLog { .. } => return None,
+        Request::Raw { .. }
+        | Request::JobLog { .. }
+        | Request::Update { .. }
+        | Request::DeleteBranch { .. }
+        | Request::Merge { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. } => return None,
         Request::PullFiles { .. } => Kind::File(FileKind::Files),
         Request::Compare { .. } => Kind::File(FileKind::Compare),
         Request::Runs { .. } => Kind::Action(ActionKind::Listing),
         Request::Run { .. } => Kind::Action(ActionKind::Run),
         Request::Jobs { .. } => Kind::Action(ActionKind::Jobs),
+        Request::PostComment { .. } => Kind::Item(Item::Comment),
+        Request::PostStatus { .. } => Kind::Item(Item::Status),
+        Request::PostReview { .. } => Kind::Review(ReviewKind::Review),
         Request::Reviews { .. } => Kind::Review(ReviewKind::Reviews),
         Request::ReviewComments { .. } => Kind::Review(ReviewKind::Comments),
-        Request::Branch { .. } => Kind::Branch(BranchKind::Branch),
+        Request::Branch { .. } | Request::CreateBranch { .. } => Kind::Branch(BranchKind::Branch),
         Request::Branches { .. } => Kind::Branch(BranchKind::Branches),
         Request::Protection { .. } => Kind::Branch(BranchKind::Protection),
         Request::Protections { .. } => Kind::Branch(BranchKind::Protections),
@@ -98,15 +120,16 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::RepositoryById { .. } | Request::Repository { .. } => Kind::Repository,
         Request::UserSearch { .. } => Kind::Search,
         Request::Issues { .. } => Kind::Item(Item::Issues),
-        Request::Issue { .. } => Kind::Item(Item::Issue),
+        Request::Issue { .. } | Request::CreateIssue { .. } | Request::EditIssue { .. } => Kind::Item(Item::Issue),
         Request::Comments { .. } => Kind::Item(Item::Comments),
-        Request::Pull { .. } | Request::PullFor { .. } => Kind::Item(Item::Pull),
+        Request::Pull { .. } | Request::PullFor { .. } | Request::OpenPull { .. } => Kind::Item(Item::Pull),
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
+        Kind::Write(_) => unreachable!("answer kind selection"),
         Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
         Kind::Action(kind) => DecoderState::Actions(actions::Actions::new(kind)),
-        Kind::Review(_) => DecoderState::Reviews(Box::new(reviews::Reviews::new())),
+        Kind::Review(kind) => DecoderState::Reviews(Box::new(reviews::Reviews::new(kind))),
         Kind::Branch(kind) => DecoderState::Branches(Box::new(branches::Branches::new(kind, limits))),
         Kind::Item(item) => DecoderState::Items(Box::new(items::Items::new(item, limits))),
         Kind::User | Kind::Settings | Kind::Repository | Kind::Search | Kind::Users => {

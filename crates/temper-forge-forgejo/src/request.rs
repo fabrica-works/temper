@@ -148,4 +148,82 @@ pub enum Request {
         job: u64,
         attempt: u32,
     },
+    CreateIssue {
+        at: Repo,
+        title: Box<[u8]>,
+        body: Box<[u8]>,
+    },
+    OpenPull {
+        at: Repo,
+        head: Box<[u8]>,
+        base: Box<[u8]>,
+        title: Box<[u8]>,
+        body: Box<[u8]>,
+    },
+    PostComment {
+        at: Repo,
+        number: u64,
+        body: Box<[u8]>,
+    },
+    PostReview {
+        at: Repo,
+        number: u64,
+        event: ReviewEvent,
+        body: Box<[u8]>,
+    },
+    EditIssue {
+        at: Repo,
+        number: u64,
+        title: Option<Box<[u8]>>,
+        body: Option<Box<[u8]>>,
+        state: Option<crate::document::IssueState>,
+    },
+    RequestReviewers {
+        at: Repo,
+        number: u64,
+        reviewers: Box<[Box<[u8]>]>,
+    },
+    RemoveReviewers {
+        at: Repo,
+        number: u64,
+        reviewers: Box<[Box<[u8]>]>,
+    },
+    Merge {
+        at: Repo,
+        number: u64,
+        style: crate::document::MergeStyle,
+        head: crate::id::ObjectId,
+    },
+    Update {
+        at: Repo,
+        number: u64,
+        style: Option<UpdateStyle>,
+    },
+    PostStatus {
+        at: Repo,
+        commit: crate::id::ObjectId,
+        state: crate::document::StatusState,
+        context: Box<[u8]>,
+    },
+    CreateBranch {
+        at: Repo,
+        branch: Box<[u8]>,
+        from: crate::id::ObjectId,
+    },
+    DeleteBranch {
+        at: Repo,
+        branch: Box<[u8]>,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ReviewEvent {
+    Approved,
+    RequestChanges,
+    Comment,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum UpdateStyle {
+    Merge,
+    Rebase,
 }

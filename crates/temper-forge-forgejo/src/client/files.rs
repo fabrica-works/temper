@@ -121,7 +121,19 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Protections { .. }
         | Request::Collaborators { .. }
         | Request::Permission { .. }
-        | Request::Pulls { .. } => unreachable!("file encoder selection"),
+        | Request::Pulls { .. }
+        | Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. } => unreachable!("file encoder selection"),
     }
 }
 pub(crate) fn status(text: &[u8]) -> Option<FileStatus> {
@@ -171,6 +183,7 @@ impl Files {
             }
             Move::End(
                 Kind::User
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search

@@ -24,6 +24,7 @@ pub(crate) enum Item {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Kind {
+    Write(crate::server::writes::WriteKind),
     User,
     Settings,
     Repository,
@@ -60,6 +61,7 @@ const fn optional(key: &'static [u8], read: Read) -> Field {
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
+        Kind::Write(kind) => crate::server::writes::fields(kind),
         Kind::File(kind) => crate::client::files::fields(kind),
         Kind::Action(kind) => crate::client::actions::fields(kind),
         Kind::Review(kind) => crate::client::reviews::fields(kind),
@@ -171,6 +173,7 @@ fn pull_branch(empty: bool) -> &'static [Field] {
 }
 fn element(kind: Kind) -> Option<Kind> {
     match kind {
+        Kind::Write(kind) => crate::server::writes::element(kind),
         Kind::File(kind) => crate::client::files::element(kind),
         Kind::Action(kind) => crate::client::actions::element(kind),
         Kind::Review(kind) => crate::client::reviews::element(kind),
@@ -292,10 +295,17 @@ impl Walk {
                     self.end()
                 } else {
                     let kind = element(self.parent().expect("array element")).expect("array kind");
-                    if kind == Kind::Branch(crate::client::branches::BranchKind::Context) {
-                        let value = scalar(field(b"status_check_contexts", Read::Text), event)?;
+                    if kind == Kind::Branch(crate::client::branches::BranchKind::Context)
+                        || kind == Kind::Write(crate::server::writes::WriteKind::Login)
+                    {
+                        let key = if kind == Kind::Write(crate::server::writes::WriteKind::Login) {
+                            b"reviewers".as_slice()
+                        } else {
+                            b"status_check_contexts".as_slice()
+                        };
+                        let value = scalar(field(key, Read::Text), event)?;
                         self.want = Want::Element;
-                        Ok(Move::Scalar { kind, key: b"status_check_contexts", value })
+                        Ok(Move::Scalar { kind, key, value })
                     } else {
                         self.start(kind, event)
                     }

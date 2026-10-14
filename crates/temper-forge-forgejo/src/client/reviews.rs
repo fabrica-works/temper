@@ -133,7 +133,19 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Comments { .. }
         | Request::Pull { .. }
         | Request::PullFor { .. }
-        | Request::CombinedStatus { .. } => unreachable!("review encoder selection"),
+        | Request::CombinedStatus { .. }
+        | Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. } => unreachable!("review encoder selection"),
     }
 }
 pub(crate) fn state(text: &[u8]) -> Option<ReviewState> {
@@ -164,13 +176,14 @@ fn comment() -> ReviewComment {
 }
 #[derive(Debug)]
 pub(super) struct Reviews {
+    single: bool,
     user: User,
     review: Review,
     comment: ReviewComment,
 }
 impl Reviews {
-    pub(super) fn new() -> Self {
-        Self { user: document::user(), review: review(), comment: comment() }
+    pub(super) fn new(kind: ReviewKind) -> Self {
+        Self { single: kind == ReviewKind::Review, user: document::user(), review: review(), comment: comment() }
     }
     pub(super) fn step(&mut self, movement: Move, walk: &Walk) -> Step {
         let result = match movement {
@@ -187,6 +200,9 @@ impl Reviews {
             }
             Move::End(Kind::Review(kind)) => match kind {
                 ReviewKind::Review => {
+                    if walk.parent().is_none() {
+                        return Step::Demand(skein_json::tokenizer::Request::Next);
+                    }
                     return Step::Row(
                         Row::Review(core::mem::replace(&mut self.review, review())),
                         skein_json::tokenizer::Request::Next,
@@ -201,7 +217,8 @@ impl Reviews {
                 ReviewKind::Reviews | ReviewKind::Comments => Ok(()),
             },
             Move::End(
-                Kind::Settings
+                Kind::Write(_)
+                | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
                 | Kind::Users
@@ -210,7 +227,13 @@ impl Reviews {
                 | Kind::Item(_)
                 | Kind::Branch(_),
             ) => unreachable!("review tables"),
-            Move::Done => return Step::Done(Document::Listed { skipped: walk.skipped() }),
+            Move::Done => {
+                return Step::Done(if self.single {
+                    Document::Review(core::mem::replace(&mut self.review, review()))
+                } else {
+                    Document::Listed { skipped: walk.skipped() }
+                });
+            }
         };
         match result {
             Ok(()) => Step::Demand(skein_json::tokenizer::Request::Next),

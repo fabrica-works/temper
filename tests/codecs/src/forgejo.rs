@@ -66,7 +66,67 @@ pub struct Decoded {
 #[must_use]
 pub fn decode(request: &Request, body: &[u8]) -> Decoded {
     let limits = limits();
-    let mut decoder = client::decoder(request, &limits).expect("JSON answer");
+    let decoder = client::decoder(request, &limits).expect("JSON answer");
+    decode_answer(decoder, body, &limits)
+}
+#[must_use]
+pub fn decode_answer(mut decoder: client::Decoder, body: &[u8], limits: &Limits) -> Decoded {
+    let mut rows = Vec::new();
+    let mut document = None;
+    let first = client::first(&decoder);
+    let steps = drive(body, limits, first, |event| match client::step(&mut decoder, limits, event) {
+        Step::Demand(next) => Some(next),
+        Step::Row(row, next) => {
+            rows.push(row);
+            Some(next)
+        }
+        Step::Done(value) => {
+            document = Some(Ok(value));
+            None
+        }
+        Step::Malformed(error) => {
+            document = Some(Err(error));
+            None
+        }
+    });
+    Decoded { rows, document: document.expect("terminal decoder"), steps }
+}
+#[must_use]
+pub fn route(transcript: &Transcript) -> Request {
+    decode_route(transcript.method, &transcript.target, &transcript.request_body, &limits())
+        .expect("transcript request")
+        .0
+}
+/// # Errors
+/// Returns the route or body refusal for malformed input.
+pub fn decode_route(method: Method, target: &[u8], body: &[u8], limits: &Limits) -> Result<(Request, usize), String> {
+    match server::route(method, target, limits) {
+        Err(error) => Err(format!("route: {error:?}")),
+        Ok(server::Route::Ready(request)) => Ok((request, 0)),
+        Ok(server::Route::Body(mut decoder)) => {
+            let mut result = None;
+            let first = server::body_first(&decoder);
+            let steps = drive(body, limits, first, |event| match server::body(&mut decoder, limits, event) {
+                server::BodyStep::Demand(next) => Some(next),
+                server::BodyStep::Decoded(request) => {
+                    result = Some(Ok(request));
+                    None
+                }
+                server::BodyStep::Malformed(error) => {
+                    result = Some(Err(format!("body: {error:?}")));
+                    None
+                }
+            });
+            result.expect("terminal body decoder").map(|request| (request, steps))
+        }
+    }
+}
+fn drive(
+    body: &[u8],
+    limits: &Limits,
+    mut demand: tokenizer::Request,
+    mut event: impl FnMut(&tokenizer::Event) -> Option<tokenizer::Request>,
+) -> usize {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.json };
     let mut tokenizer = tokenizer::Tokenizer::new(&limits.json);
     let mut above = Queue::with_capacity(1);
@@ -75,17 +135,15 @@ pub fn decode(request: &Request, body: &[u8]) -> Decoded {
         u32::try_from(body.len()).expect("body fits").max(tokenizer::largest_demand(&limits.json)),
     );
     intake.append(body).expect("input fits");
-    let mut rows = Vec::new();
-    let mut demand = client::first(&decoder);
     let mut read = None;
     for steps in 1..=body.len() * 4 + 32 {
         match read.take() {
             Some(read) => {
-                let event = match intake.meet(read) {
+                let up = match intake.meet(read) {
                     Some(bytes) => Up::Bytes(bytes),
                     None => Up::End,
                 };
-                tokenizer::up(&mut tokenizer, &env, event, &mut above, &mut below);
+                tokenizer::up(&mut tokenizer, &env, up, &mut above, &mut below);
             }
             None => tokenizer::down(&mut tokenizer, &env, demand, &mut above, &mut below),
         }
@@ -94,25 +152,14 @@ pub fn decode(request: &Request, body: &[u8]) -> Decoded {
             None => {}
             Some(other) => panic!("unexpected demand {other:?}"),
         }
-        if let Some(event) = above.pop() {
-            match client::step(&mut decoder, &limits, &event) {
-                Step::Demand(next) => demand = next,
-                Step::Row(row, next) => {
-                    rows.push(row);
-                    demand = next;
-                }
-                Step::Done(document) => return Decoded { rows, document: Ok(document), steps },
-                Step::Malformed(error) => return Decoded { rows, document: Err(error), steps },
+        if let Some(token) = above.pop() {
+            match event(&token) {
+                Some(next) => demand = next,
+                None => return steps,
             }
         }
     }
     panic!("decoder exhausted its input step bound")
-}
-#[must_use]
-pub fn route(transcript: &Transcript) -> Request {
-    let server::Route::Ready(request) =
-        server::route(transcript.method, &transcript.target, &limits()).expect("transcript route");
-    request
 }
 #[must_use]
 pub fn specimen() -> Repo {
@@ -163,4 +210,137 @@ fn walk(value: &serde_json::Value, path: &str, set: &mut BTreeSet<(String, Kind)
         serde_json::Value::Null => Kind::Null,
     };
     set.insert((path.to_string(), kind));
+}
+
+#[must_use]
+pub fn user(id: u64) -> temper_forge_forgejo::document::User {
+    temper_forge_forgejo::document::User {
+        id,
+        login: Box::from(if id == 1 { b"fixture".as_slice() } else { b"writer" }),
+    }
+}
+#[must_use]
+pub fn write_cases() -> Vec<(&'static str, Request)> {
+    use temper_forge_forgejo::document::IssueState;
+    let mut rows = vec![
+        (
+            "create-issue",
+            Request::CreateIssue {
+                at: specimen(),
+                title: Box::from(*b"fixture issue"),
+                body: Box::from(*b"<!-- temper:key 01000001 -->\nissue text"),
+            },
+        ),
+        (
+            "open-pull",
+            Request::OpenPull {
+                at: specimen(),
+                head: Box::from(*b"writer-head"),
+                base: Box::from(*b"landing"),
+                title: Box::from(*b"writer pull"),
+                body: Box::from(*b"writer text"),
+            },
+        ),
+        (
+            "open-pull-no-changes",
+            Request::OpenPull {
+                at: specimen(),
+                head: Box::from(*b"no-changes"),
+                base: Box::from(*b"main"),
+                title: Box::from(*b"empty"),
+                body: Box::from(*b"text"),
+            },
+        ),
+        (
+            "post-comment",
+            Request::PostComment {
+                at: specimen(),
+                number: 3,
+                body: Box::from(*b"<!-- temper:key 01000002 -->\ncomment text"),
+            },
+        ),
+        ("post-comment-plain", Request::PostComment { at: specimen(), number: 3, body: Box::from(*b"plain comment") }),
+        (
+            "edit-issue-title",
+            Request::EditIssue {
+                at: specimen(),
+                number: 3,
+                title: Some(Box::from(*b"edited title")),
+                body: None,
+                state: None,
+            },
+        ),
+        (
+            "close-issue",
+            Request::EditIssue { at: specimen(), number: 3, title: None, body: None, state: Some(IssueState::Closed) },
+        ),
+        (
+            "reopen-issue",
+            Request::EditIssue { at: specimen(), number: 3, title: None, body: None, state: Some(IssueState::Open) },
+        ),
+    ];
+    rows.extend(write_other_cases());
+    rows
+}
+fn write_other_cases() -> Vec<(&'static str, Request)> {
+    use temper_forge_forgejo::{
+        document::{MergeStyle, StatusState},
+        request::{ReviewEvent, UpdateStyle},
+    };
+    let mut rows = vec![
+        (
+            "request-reviewers",
+            Request::RequestReviewers {
+                at: specimen(),
+                number: 1,
+                reviewers: Box::from([Box::<[u8]>::from(*b"stranger")]),
+            },
+        ),
+        (
+            "remove-reviewers",
+            Request::RemoveReviewers {
+                at: specimen(),
+                number: 1,
+                reviewers: Box::from([Box::<[u8]>::from(*b"stranger")]),
+            },
+        ),
+        ("merge-pull", Request::Merge { at: specimen(), number: 5, style: MergeStyle::Merge, head: sha(5) }),
+        ("update-pull", Request::Update { at: specimen(), number: 4, style: Some(UpdateStyle::Merge) }),
+        (
+            "post-status",
+            Request::PostStatus {
+                at: specimen(),
+                commit: sha(4),
+                state: StatusState::Success,
+                context: Box::from(*b"fixture/test"),
+            },
+        ),
+        (
+            "post-status-pending",
+            Request::PostStatus {
+                at: specimen(),
+                commit: sha(4),
+                state: StatusState::Pending,
+                context: Box::from(*b"fixture/other"),
+            },
+        ),
+        ("create-branch", Request::CreateBranch { at: specimen(), branch: Box::from(*b"recorded"), from: sha(4) }),
+        ("delete-branch", Request::DeleteBranch { at: specimen(), branch: Box::from(*b"recorded") }),
+    ];
+    for (case, event, key) in [
+        ("post-review-approved", ReviewEvent::Approved, "01000003"),
+        ("post-review-request-changes", ReviewEvent::RequestChanges, "01000004"),
+        ("post-review-comment", ReviewEvent::Comment, "01000005"),
+    ] {
+        rows.push((
+            case,
+            Request::PostReview {
+                at: specimen(),
+                number: 1,
+                event,
+                body: format!("<!-- temper:key {key} -->\nreview text").into_bytes().into_boxed_slice(),
+            },
+        ));
+    }
+    rows
 }

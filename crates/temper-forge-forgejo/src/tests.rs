@@ -358,7 +358,10 @@ fn raw_file_targets_keep_slashes_and_encode_each_other_byte() {
         &*encoded.target,
         b"/api/v1/repos/fixture/specimen/raw/docs/a%20b.md?ref=0000000000000000000000000000000000000000"
     );
-    let crate::server::Route::Ready(routed) = crate::server::route(encoded.method, &encoded.target, &limits).unwrap();
+    let crate::server::Route::Ready(routed) = crate::server::route(encoded.method, &encoded.target, &limits).unwrap()
+    else {
+        panic!("read route has no body")
+    };
     assert_eq!(routed, request);
     assert!(client::decoder(&request, &limits).is_none());
 }
@@ -379,5 +382,39 @@ fn a_job_link_of_another_shape_names_no_job() {
         (b"/fixture/specimen/actions/runs/1/jobs/-1", None),
     ] {
         assert_eq!(crate::header::job_link(link, repository), expected, "{link:?}");
+    }
+}
+#[test]
+fn a_write_whose_text_is_not_utf8_is_refused_before_encoding() {
+    let limits = fixtures::limits();
+    let at = crate::request::Repo { owner: Box::from(*b"a"), name: Box::from(*b"b") };
+    let rows = [
+        Request::CreateIssue { at: at.clone(), title: Box::from([255]), body: Box::from([]) },
+        Request::PostComment { at: at.clone(), number: 1, body: Box::from([255]) },
+        Request::RequestReviewers { at, number: 1, reviewers: Box::from([Box::<[u8]>::from([255u8])]) },
+    ];
+    for request in rows {
+        assert_eq!(client::encode(&request, &limits), Err(client::Refusal::Text), "{request:?}");
+    }
+}
+#[test]
+fn an_edit_writes_only_the_fields_it_is_given() {
+    type EditRow = (Option<Box<[u8]>>, Option<Box<[u8]>>, Option<crate::document::IssueState>, &'static [u8]);
+    let limits = fixtures::limits();
+    let rows: [EditRow; 4] = [
+        (None, None, None, b"{}"),
+        (Some(Box::from(*b"title")), None, None, br#"{"title":"title"}"#),
+        (None, Some(Box::from(*b"body")), None, br#"{"body":"body"}"#),
+        (None, None, Some(crate::document::IssueState::Closed), br#"{"state":"closed"}"#),
+    ];
+    for (title, body, state, expected) in rows {
+        let request = Request::EditIssue {
+            at: crate::request::Repo { owner: Box::from(*b"a"), name: Box::from(*b"b") },
+            number: 1,
+            title,
+            body,
+            state,
+        };
+        assert_eq!(client::encode(&request, &limits).unwrap().body.as_deref(), Some(expected));
     }
 }

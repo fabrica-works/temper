@@ -112,7 +112,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.array_end();
             json.object_end();
         }
-        Answer::User(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)
         | Answer::Search { .. }

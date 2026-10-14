@@ -48,7 +48,19 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
         | Request::Comments { .. }
         | Request::Pull { .. }
         | Request::PullFor { .. }
-        | Request::CombinedStatus { .. } => unreachable!("start encoder dispatch"),
+        | Request::CombinedStatus { .. }
+        | Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. } => unreachable!("start encoder dispatch"),
     };
     if length > usize::try_from(limits.target_bytes).expect("u32 fits") {
         return Err(Refusal::TooLong);
@@ -106,6 +118,18 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
         | Request::Comments { .. }
         | Request::Pull { .. }
         | Request::PullFor { .. }
+        | Request::CreateIssue { .. }
+        | Request::OpenPull { .. }
+        | Request::PostComment { .. }
+        | Request::PostReview { .. }
+        | Request::EditIssue { .. }
+        | Request::RequestReviewers { .. }
+        | Request::RemoveReviewers { .. }
+        | Request::Merge { .. }
+        | Request::Update { .. }
+        | Request::PostStatus { .. }
+        | Request::CreateBranch { .. }
+        | Request::DeleteBranch { .. }
         | Request::CombinedStatus { .. } => unreachable!("start encoder dispatch"),
     }
 }
@@ -146,6 +170,7 @@ impl Start {
                 None
                 | Some(
                     Kind::User
+                    | Kind::Write(_)
                     | Kind::Settings
                     | Kind::Search
                     | Kind::Review(_)
@@ -156,7 +181,8 @@ impl Start {
                 ) => Step::Demand(tokenizer::Request::Next),
             },
             Move::End(
-                Kind::Settings
+                Kind::Write(_)
+                | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
                 | Kind::Users
@@ -175,7 +201,12 @@ impl Start {
                     }
                     Kind::Search => Document::Search { ok: self.ok },
                     Kind::Users => Document::Listed { skipped: 0 },
-                    Kind::Review(_) | Kind::Branch(_) | Kind::File(_) | Kind::Action(_) | Kind::Item(_) => {
+                    Kind::Write(_)
+                    | Kind::Review(_)
+                    | Kind::Branch(_)
+                    | Kind::File(_)
+                    | Kind::Action(_)
+                    | Kind::Item(_) => {
                         unreachable!("start decoder selection")
                     }
                 };
@@ -198,7 +229,8 @@ impl Start {
                         _ => unreachable!("settings table"),
                     }
                 }
-                Kind::Search
+                Kind::Write(_)
+                | Kind::Search
                 | Kind::Users
                 | Kind::Review(_)
                 | Kind::Branch(_)
@@ -227,7 +259,8 @@ impl Start {
                     }
                     _ => unreachable!("repository string table"),
                 },
-                Kind::Settings
+                Kind::Write(_)
+                | Kind::Settings
                 | Kind::Search
                 | Kind::Users
                 | Kind::Review(_)
@@ -247,6 +280,7 @@ impl Start {
                     _ => unreachable!("repository bool table"),
                 },
                 Kind::User
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Users
                 | Kind::Review(_)

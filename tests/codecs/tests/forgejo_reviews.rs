@@ -5,18 +5,15 @@ use temper_forge_forgejo::{
     decode::Malformed,
     document::{
         Body, Branch, BranchProtection, CollaboratorPermission, CombinedStatus, Document, Permission, Review,
-        ReviewComment, ReviewState, Row, User,
+        ReviewComment, ReviewState, Row,
     },
     request::Request,
     server::{self, Answer},
 };
-fn user(id: u64) -> User {
-    User { id, login: Box::from(if id == 1 { b"fixture".as_slice() } else { b"writer" }) }
-}
 fn review(id: u64, state: ReviewState, official: bool, dismissed: bool, key: &[u8]) -> Review {
     Review {
         id,
-        user: user(2),
+        user: forgejo::user(2),
         state,
         commit_id: forgejo::sha(4),
         body: Body::Kept(Box::from(key)),
@@ -62,7 +59,7 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>)> {
             Request::ReviewComments { at: forgejo::specimen(), number: 1, review: 5 },
             Some(Answer::ReviewComments(Box::from([ReviewComment {
                 id: 18,
-                user: user(1),
+                user: forgejo::user(1),
                 path: Box::from(*b"file-0.txt"),
                 position: 1,
                 body: Body::Kept(Box::from(*b"remark text")),
@@ -101,12 +98,12 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>)> {
         (
             "collaborators",
             Request::Collaborators { at: forgejo::specimen(), page: forgejo::page(1, 2) },
-            Some(Answer::Collaborators(Box::from([user(2)]))),
+            Some(Answer::Collaborators(Box::from([forgejo::user(2)]))),
         ),
         (
             "collaborator-permission",
             Request::Permission { at: forgejo::specimen(), login: Box::from(*b"writer") },
-            Some(Answer::Permission(CollaboratorPermission { permission: Permission::Write, user: user(2) })),
+            Some(Answer::Permission(CollaboratorPermission { permission: Permission::Write, user: forgejo::user(2) })),
         ),
         ("owner-permission", Request::Permission { at: forgejo::specimen(), login: Box::from(*b"fixture") }, None),
     ]
@@ -130,7 +127,10 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::CombinedStatus { state, statuses, .. } => {
             (Document::CombinedStatus(state), statuses.into_vec().into_iter().map(Row::Status).collect())
         }
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
@@ -240,7 +240,10 @@ fn open_pulls_rows_are_the_pull_transcripts_documents() {
     assert_eq!(encoded.method, temper_forge_forgejo::request::Method::Get);
     assert_eq!(&*encoded.target, b"/api/v1/repos/fixture/specimen/pulls?state=open&sort=oldest&page=1&limit=2");
     let server::Route::Ready(routed) =
-        server::route(encoded.method, &encoded.target, &forgejo::limits()).expect("route");
+        server::route(encoded.method, &encoded.target, &forgejo::limits()).expect("route")
+    else {
+        panic!("read route has no body")
+    };
     assert_eq!(routed, request);
 }
 

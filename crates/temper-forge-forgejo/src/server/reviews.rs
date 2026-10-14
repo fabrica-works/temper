@@ -119,7 +119,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.array_end();
         }
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)

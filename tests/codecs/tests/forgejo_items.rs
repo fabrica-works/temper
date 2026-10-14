@@ -5,20 +5,17 @@ use temper_forge_forgejo::{
     decode::Malformed,
     document::{
         Body, CombinedStatus, Comment, CommitStatus, Document, Issue, IssueState, PullBranch, PullRequest, Row,
-        StatusState, User,
+        StatusState,
     },
     request::{IssueKind, Request, Sort, StateFilter},
     server::{self, Answer},
 };
-fn user(id: u64) -> User {
-    User { id, login: Box::from(if id == 1 { b"fixture".as_slice() } else { b"writer" }) }
-}
 fn issue(number: u64, pull: bool, title: &[u8], body: &[u8], author: u64, at: u64) -> Issue {
     Issue {
         number,
         pull,
         state: IssueState::Open,
-        user: user(author),
+        user: forgejo::user(author),
         labels: Box::from([]),
         updated_at: Wall::from_nanos(at),
         title: Box::from(title),
@@ -70,7 +67,7 @@ fn pull(merged: bool) -> PullRequest {
             merge_commit_sha: None,
             merge_base: Some(forgejo::sha(6)),
             mergeable: true,
-            requested_reviewers: Box::from([user(2)]),
+            requested_reviewers: Box::from([forgejo::user(2)]),
         }
     }
 }
@@ -97,14 +94,14 @@ fn cases() -> Vec<(&'static str, Request, Answer)> {
             Answer::Comments(Box::from([
                 Comment {
                     id: 4,
-                    user: user(2),
+                    user: forgejo::user(2),
                     created_at: Some(Wall::from_nanos(1_577_817_005_000_000_000)),
                     updated_at: Some(Wall::from_nanos(1_577_817_005_000_000_000)),
                     body: Body::Kept(Box::from(*b"<!-- temper:key 01000002 -->\ncomment text")),
                 },
                 Comment {
                     id: 5,
-                    user: user(2),
+                    user: forgejo::user(2),
                     created_at: Some(Wall::from_nanos(1_577_817_005_000_000_000)),
                     updated_at: Some(Wall::from_nanos(1_577_817_005_000_000_000)),
                     body: Body::Kept(Box::from(*b"plain comment")),
@@ -125,7 +122,7 @@ fn cases() -> Vec<(&'static str, Request, Answer)> {
                 state: CombinedStatus { state: Some(StatusState::Pending), total_count: 1 },
                 sha: Some(forgejo::sha(4)),
                 statuses: Box::from([CommitStatus {
-                    creator: Some(user(2)),
+                    creator: Some(forgejo::user(2)),
                     updated_at: Wall::from_nanos(1_577_817_005_000_000_000),
                     context: Box::from(*b"fixture/other"),
                     status: StatusState::Pending,
@@ -158,7 +155,10 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::CombinedStatus { state, statuses, .. } => {
             (Document::CombinedStatus(state), statuses.into_vec().into_iter().map(Row::Status).collect())
         }
-        Answer::Files(_)
+        Answer::Comment(_)
+        | Answer::Status(_)
+        | Answer::Review(_)
+        | Answer::Files(_)
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
