@@ -334,7 +334,7 @@ fn item_transcripts_decode_to_their_documents_and_rows() {
     let transcript = forgejo::transcript("combined-status");
     let request = Request::CombinedStatus { at: forgejo::specimen(), commit: forgejo::sha(1), page: forgejo::page(1, 2) };
     let decoded = forgejo::decode(&request, &transcript.body);
-    assert_eq!(decoded.document, Ok(Document::CombinedStatus(CombinedStatus { state: StatusState::Success, total_count: 1 })));
+    assert_eq!(decoded.document, Ok(Document::CombinedStatus(CombinedStatus { state: Some(StatusState::Success), total_count: 1 })));
     assert_eq!(decoded.rows.len(), 1, "one status on the head");
     let Row::Status(status) = &decoded.rows[0] else { panic!("a status row") };
     assert_eq!(&*status.context, b"fixture/test");
@@ -833,9 +833,11 @@ pub mod document {
     }
 
     /// A combined status's own fields; its `statuses` come as `Row::Status` (06.2).
+    /// `state` is none when Forgejo sends `""`, as it does for a commit with no
+    /// status (ruling 104).
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     pub struct CombinedStatus {
-        pub state: StatusState,
+        pub state: Option<StatusState>,
         pub total_count: u64,
     }
 
@@ -1451,8 +1453,9 @@ pub mod server {
         Comment(Comment),
         /// A pull request; an opened one.
         Pull(PullRequest),
-        /// A combined status's page.
-        CombinedStatus { state: CombinedStatus, sha: ObjectId, statuses: Box<[CommitStatus]> },
+        /// A combined status's page; `sha` none and no statuses are written
+        /// `"sha":""` and `"statuses":null`, as Forgejo does (ruling 104).
+        CombinedStatus { state: CombinedStatus, sha: Option<ObjectId>, statuses: Box<[CommitStatus]> },
         /// A posted status.
         Status(CommitStatus),
         /// A pull request's reviews' page.

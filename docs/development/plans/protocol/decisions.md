@@ -226,6 +226,20 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      HTTP 201: null` (Forgejo creates a pull with no changes). Their
      answer is recorded here when it lands.
 
+104. **A combined status with no status** (temper 06.2, blocked
+     2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
+     `{"state":"","sha":"","total_count":0,"statuses":null,...}`
+     (05.2's transcript `combined-status-empty`). `CombinedStatus.state`
+     becomes `Option<StatusState>`, none for `""`, as forge.md, 3.2 reads
+     `base.sha` ("none when empty"); the server's
+     `Answer::CombinedStatus` takes `sha: Option<ObjectId>` the same way,
+     and writes no statuses as `null`. `StatusState` gains no variant: it
+     is also a commit status's and `PostStatus`'s word, where `""` is
+     none of Forgejo's. The decoder takes `statuses` `null` or `[]` as no
+     rows, and checks nothing across fields: "a `total_count` of 0 is
+     `None`, whatever the state says" (forge.md, 3.2) is the component's
+     reading (13.3).
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
