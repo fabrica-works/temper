@@ -313,6 +313,19 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      and any other). The hand-written lines count in its Size; the
      schema, generated code and goldens do not.
 
+111. **A commit status's creator may be `null`** (temper 06.4, blocked
+     2026-10-14T04:58:18Z; design gap, in part). 05.3's
+     `actions-combined-status` transcript has two statuses with
+     `"creator":null`, written by Actions. 06's documents "carry what
+     Forgejo says, typed, not translated", so `CommitStatus.creator`
+     becomes `Option<User>`: none for `null`, the key still required,
+     and the server writes none as `null`. What the component makes of a
+     status with no creator (the domain's `api::Status.author` is a
+     `u64`), and the job link's shape (forge.md, 3.2 says
+     `<html_url>/actions/runs/<n>/jobs/<i>`; v16.0.5 writes
+     `/fixture/specimen/actions/runs/1/jobs/0`, relative to the origin),
+     are the designer's, in the run's `question.md` of this time.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

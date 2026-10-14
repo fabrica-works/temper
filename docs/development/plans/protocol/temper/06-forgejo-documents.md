@@ -869,7 +869,8 @@ pub mod document {
     /// One commit status (06.2, and `Read::Statuses`, `Read::Checks`).
     #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub struct CommitStatus {
-        pub creator: User,
+        /// None when Forgejo writes `null`, as for an Actions job's status (ruling 111).
+        pub creator: Option<User>,
         pub updated_at: Wall,
         pub context: Box<[u8]>,
         pub status: StatusState,
