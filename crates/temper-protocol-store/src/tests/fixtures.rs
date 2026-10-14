@@ -736,3 +736,54 @@ pub fn change_states() -> List<temper_engine_domain_forge_change::State> {
     states.push(State::Held { was: Box::new(held), why: Hold::BranchMissing }).expect("fixture room");
     states
 }
+
+pub fn issue_row() -> top::IssueRow {
+    use temper_engine_domain_forge_issues::{GoalView, Milestone, MilestoneKey, Phase, PlanItem, Projected};
+    let keys = [
+        MilestoneKey::Lifecycle { task: 1, position: 2 },
+        MilestoneKey::TaskRevision { task: 3, revision: 4 },
+        MilestoneKey::PlanAccepted,
+        MilestoneKey::Revision(5),
+        MilestoneKey::ChangeLanded(6),
+        MilestoneKey::ChangeHeld(7),
+        MilestoneKey::Report(8),
+        MilestoneKey::Finished,
+    ];
+    let mut milestones = List::with_capacity(8);
+    for key in keys {
+        milestones.push(Milestone { key, text: "milestone λ".into() }).expect("fixture room");
+    }
+    let mut plan = List::with_capacity(7);
+    for phase in
+        [Phase::Waiting, Phase::Active, Phase::Settling, Phase::Held, Phase::Done, Phase::Failed, Phase::Cancelled]
+    {
+        plan.push(PlanItem { text: "task λ".into(), phase }).expect("fixture room");
+    }
+    let state = Projected {
+        opened: true,
+        digest: Some([9; 32]),
+        last_body: Some(skein_lib::Wall::from_nanos(10)),
+        body_revision: 11,
+        milestones: Box::new(keys),
+        closed: true,
+    };
+    top::IssueRow {
+        goal: 12,
+        repository: REPO,
+        state: state.clone(),
+        number: Some(13),
+        pending: Some(14),
+        before: Some(state),
+        failed: true,
+        desired: Some(GoalView {
+            phase: Phase::Done,
+            goal: 12,
+            repository: 2,
+            title: "goal λ".into(),
+            goal_text: "goal text λ".into(),
+            plan: plan.into_boxed(),
+            milestones: milestones.into_boxed(),
+            finished: Some("finished λ".into()),
+        }),
+    }
+}

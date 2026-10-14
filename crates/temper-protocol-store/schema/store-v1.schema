@@ -159,5 +159,15 @@ record GateReport { number: u64 head: fixed 32 status: ChangeStatus }
 record GateRemark { number: u64 head: fixed 32 words: bytes 1048576 }
 record Change { task: u64 state: ChangeState gates: list 1024 Gate clean: list 1024 fixed 32 repairs: u32 resolutions: u32 updates: u32 since: u64 ready_since: option u64 owns_turn: bool last_head: option fixed 32 }
 record ChangeRow { task: u64 repository: Repository branch: bytes 4096 base: bytes 4096 title: bytes 1048576 body: bytes 1048576 priority: u32 change: Change pull: option u64 pending: option u64 effect: EffectResult delegate: option DelegateRef delegate_status: ChangeStatus verdicts: list 1024 GateReport gate_remarks: list 1024 GateRemark drift: option ChangeHold base_repair: bool queue_repair: option u64 queue_repairs: u32 }
-enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, release: ReleaseRow }
+# 04.4ac: goal issue projections and the root-authorized desired view.
+enum Phase { waiting, active, settling, held, done, failed, cancelled }
+record PlanItem { text: text 65536 phase: Phase }
+record Lifecycle { task: u64 position: u64 }
+record TaskRevision { task: u64 revision: u64 }
+enum MilestoneKey { lifecycle: Lifecycle, task_revision: TaskRevision, plan_accepted, revision: Number, change_landed: Number, change_held: Number, report: Number, finished }
+record Milestone { key: MilestoneKey text: text 65536 }
+record GoalView { phase: Phase goal: u64 repository: u64 title: text 65536 goal_text: text 65536 plan: list 1024 PlanItem milestones: list 1024 Milestone finished: option text 65536 }
+record Projected { opened: bool digest: option fixed 32 last_body: option u64 body_revision: u64 milestones: list 1024 MilestoneKey closed: bool }
+record IssueRow { goal: u64 repository: Repository state: Projected number: option u64 pending: option u64 before: option Projected failed: bool desired: option GoalView }
+enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, issue: boxed IssueRow, release: ReleaseRow }
 versioned record Row { value: Value }

@@ -10,13 +10,14 @@ mod client;
 #[cfg(test)]
 pub(crate) use api::encode_error;
 mod entries;
+mod issues;
 mod names;
 mod topics;
 const FITS: &str = "admitted fields fit the schema";
 
-/// Encode a supported family admitted by the domain; later families return none.
+/// Encode every durable family admitted by the domain.
 #[must_use]
-pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
+pub fn encode(value: &d::Stored) -> Box<[u8]> {
     let value = match value {
         d::Stored::Repository(value) => w::Value::Repository(names::encode_adopted(value)),
         d::Stored::Hold(value) => w::Value::Hold(names::encode_hold(value)),
@@ -32,18 +33,19 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
         d::Stored::Client(value) => w::Value::Client(client::encode(value)),
         d::Stored::Change(value) => w::Value::Change(Box::new(change::encode_change_row(value))),
-        d::Stored::Issue(_) => return None,
+        d::Stored::Issue(value) => w::Value::Issue(Box::new(issues::encode(value))),
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
     row.encode(&mut writer).expect("measured room");
-    Some(writer.finish())
+    writer.finish()
 }
 
 /// Decode one supported row with the checked startup bounds.
 pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     let row = w::Row::decode(bounds.limits(), &mut Reader::new(bytes)).or(Err(Undecodable))?;
     Ok(match row.into_parts().value {
+        w::Value::Issue(value) => d::Stored::Issue(issues::decode(*value)),
         w::Value::Change(value) => d::Stored::Change(change::decode_change_row(*value)),
         w::Value::Client(value) => d::Stored::Client(client::decode(value, bounds)?),
         w::Value::Call(value) => entries::decode_call(value, bounds)?,
@@ -69,6 +71,14 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        plan_item_text: forge.issue_policy.comment_bytes,
+        milestone_text: forge.issue_policy.comment_bytes,
+        goal_view_title: forge.issue_policy.title_bytes,
+        goal_view_goal_text: forge.issue_policy.body_bytes,
+        goal_view_plan: forge.issue_policy.plan_items,
+        goal_view_milestones: forge.issue_policy.milestones,
+        goal_view_finished_some: forge.issue_policy.comment_bytes,
+        projected_milestones: forge.issue_policy.milestones,
         gating_asked: forge.change_policy.gates,
         change_gates: forge.change_policy.gates,
         change_clean: forge.change_policy.clean_heads,
