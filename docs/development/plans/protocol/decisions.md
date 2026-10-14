@@ -929,6 +929,26 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      test, `a_workspace_start_carries_one_path_per_directory`. 15.3's
      Proof is its check.
 
+145. **15.3 traces its stopped change in stored state and the
+     one-process world, not by re-running the process tier** (temper
+     15.3, blocked 2026-10-14T16:34:51Z; process). After ruling 144, 15.3's
+     process proof reaches a real push (`temper/2/c3` on the throwaway
+     Forgejo) and stops there: no pull request, no gate's run reaching
+     the fake model, `main` unchanged, the test's 30 s deadline passed
+     (`logs/temper-15/15.3-proof-25.log`); its 19 runs of the hour each
+     took that deadline. Session 15's own question ("if no gate's run
+     reaches the fake model, raise it with the forge's change state") is
+     answered: trace the producer's delivery into the forge's procedure
+     (the engine's forge records, the outbox, the component's
+     `OpenPull`) in the last run's stored state, read by the store's
+     codecs, and reproduce it where it is cheap, the one-process world
+     (17.2's, on skein's simulator, whose 17.3 adopts and pushes a change
+     now) or the system world; fix it where it is found, a production
+     fault outside Files by the README's 20-line fix or else a question
+     naming its cause. The process proof runs again only after a change
+     aimed at a named cause, once per change; a third failure on the
+     same symptom is a question with the logs.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
