@@ -8,7 +8,7 @@ use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, ReplyTo, Token};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use temper_engine_domain as engine;
 
 /// The bounds every scripted worker says in its hello: wide enough for the
@@ -107,6 +107,7 @@ fn link(channel: Token, link: engine::Link) -> engine::Event {
 #[derive(Debug, Default)]
 pub struct Protocol {
     calls: BTreeMap<Box<[u8]>, engine::Call>,
+    undecodable: BTreeSet<Box<[u8]>>,
     ends: BTreeMap<Box<[u8]>, tasks::End>,
     serial: u64,
     /// Each decided call's typed answer, by its opaque call name, in render order.
@@ -118,6 +119,25 @@ pub struct Protocol {
 }
 
 impl Protocol {
+    /// A run's call that the world's protocol answers as an undecodable tool.
+    pub fn undecodable(&mut self, channel: Token, task: u64, attempt: u64, name: u64) -> engine::Event {
+        let call: Box<[u8]> = name.to_be_bytes().into();
+        self.undecodable.insert(call.clone());
+        up(
+            channel,
+            host::LinkUp::Call {
+                run: Token::new(task),
+                attempt: Token::new(attempt),
+                call,
+                tool: b"unknown".as_slice().into(),
+                writes: true,
+                input: Box::new([]),
+                deadline: Duration::from_secs(10),
+            },
+            engine::Parts::none(),
+        )
+    }
+
     /// A run's call of one engine tool, named `name`; its decoded body waits
     /// for the root's decode request.
     pub fn call(&mut self, channel: Token, task: u64, attempt: u64, name: u64, body: engine::Call) -> engine::Event {
@@ -172,6 +192,12 @@ impl Protocol {
                 engine::HostRequest::Decode { to, task, attempt, call } => match self.calls.get(&call.name) {
                     Some(body) => {
                         Ok(vec![engine::Event::Worker(engine::WorkerInput::DecodedHostCall { to, body: body.clone() })])
+                    }
+                    None if self.undecodable.contains(&call.name) => {
+                        Ok(vec![engine::Event::Worker(engine::WorkerInput::RenderedHostCall {
+                            to,
+                            answer: core::SettledAnswer::Host { error: true, body: b"unknown tool".as_slice().into() },
+                        })])
                     }
                     None => Err(Box::new(engine::Request::Worker(engine::WorkerRequest::Host(Box::new(
                         engine::HostRequest::Decode { to, task, attempt, call },

@@ -112,7 +112,10 @@ pub(crate) fn rendered(domain: &mut Domain, to: ReplyTo, answer: SettledAnswer) 
     let right = to.into_token();
     let to = ReplyTo::new(right);
     let Some(flight) = domain.host_calls.remove(&right) else { return };
-    let Some(key) = flight.key else { return };
+    let Some(key) = flight.key else {
+        undecoded(domain, to, flight, answer);
+        return;
+    };
     let mut call = SettledCall { serial: 0, name: flight.name, tool: flight.tool, answer };
     let recorded = domain.core.call_parts.contains_key(&key);
     let answer_bytes = match super::call_answer(domain, key) {
@@ -139,6 +142,21 @@ pub(crate) fn rendered(domain: &mut Domain, to: ReplyTo, answer: SettledAnswer) 
         let id = domain.payloads.insert(Some(Payload::SettledCall(call))).expect("fleet call reserved answer room");
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
     }
+}
+
+fn undecoded(domain: &mut Domain, to: ReplyTo, flight: Flight, answer: SettledAnswer) {
+    let mut call = SettledCall { serial: 0, name: flight.name, tool: flight.tool, answer };
+    let body = if call.valid(&super::core_limits(&domain.limits)) {
+        match call.answer {
+            SettledAnswer::Host { body, .. } => body,
+            SettledAnswer::Delivery { .. } => Box::from(&b"invalid call"[..]),
+        }
+    } else {
+        Box::from(&b"invalid call"[..])
+    };
+    call.answer = SettledAnswer::Host { error: true, body };
+    let id = domain.payloads.insert(Some(Payload::SettledCall(call))).expect("fleet call reserved answer room");
+    domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
 }
 
 pub(crate) fn settled(domain: &mut Domain, limits: &Limits, decision: &mut Decision, to: ReplyTo, call: SettledCall) {
