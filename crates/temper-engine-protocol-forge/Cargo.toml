@@ -1,0 +1,23 @@
+[package]
+name = "temper-engine-protocol-forge"
+description = "Forge protocol component over HTTP, TLS and Forgejo documents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+
+skein-io.workspace = true
+skein-http.workspace = true
+skein-tls.workspace = true
+skein-json.workspace = true
+temper-forge-forgejo.workspace = true
+temper-engine-domain-forge-client.workspace = true
+
+[dev-dependencies]
+skein-world.workspace = true
+
+[lints]
+workspace = true
