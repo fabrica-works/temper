@@ -8,6 +8,7 @@ development.md, section 3.3).
 
 | Plan | State | Takes the design to | Where |
 |---|---|---|---|
+| protocol | ready | the protocol layer, standalone (`protocol.md`, section 12, steps 1 to 13): the codecs, `temper-service`, the binary's four commands, the client root and view and the terminal, the forge component and its worlds, the git component, the one-process world, the process and live tiers; the domain changes of `protocol.md`, section 5; the engine worlds on jig's store; the web crates retired | `docs/development/plans/protocol/` |
 | web-implementation | done 2026-10-06 to W4; W5 to W10 superseded 2026-10-14 | `web/` in `temper-web-domain` and `temper-web-view`, W1 to W4: the two spines, the person and the client's world, the first slice. W5 to W10 are never built: temper's client is jig's client with temper's client root (`client.md`), which retires both crates (`client.md`, section 9) | `docs/plans/web-implementation/` |
 
 The domain migration and jig extraction are complete; their plans and
@@ -20,11 +21,12 @@ and the system world composes the engine, worker and real Smith agents
 (`tests/system/README.md`).
 
 The protocol layer is designed for standalone mode (`protocol.md`); the
-plan that builds it, `protocol`, is to be written. "protocol" in the
-table below names it.
+plan that builds it is `protocol` (`docs/development/plans/protocol/`),
+ready. "protocol" in the table below names it.
 
-No plan is active. The designer marks plans active and done in this file
-(skein's development.md, sections 3.3 and 10.5).
+No plan is active. The supervisor marks a plan active and done in this
+file, and the designer keeps the rest (skein's development.md, section
+3.3).
 
 ## 2. The design
 
