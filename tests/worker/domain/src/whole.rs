@@ -312,7 +312,7 @@ impl World {
             },
         };
         let items = wire::Workspace { repositories: Box::new([repository]) };
-        self.event(Event::Assign { assignment, items, save: Some(Box::from(&b"saved"[..])) });
+        self.event(Event::Assign { assignment, items: Ok(items), save: Some(Box::from(&b"saved"[..])) });
     }
 
     fn deliver(&mut self) {

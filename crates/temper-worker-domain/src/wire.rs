@@ -6,6 +6,10 @@
 pub use crate::push::{PushDiagnostic, PushFailure, PushReason};
 use alloc::boxed::Box;
 
+/// Workspace items whose channel bytes did not decode (channel.md, 7).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Undecodable;
+
 /// The repositories a run works in (`domain/worker.md`, 4.1). The checkout
 /// that holds them is keyed by jig's workstream, the holding task's number;
 /// an empty list means the run has no workspace items, so no checkout is

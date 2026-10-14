@@ -8,10 +8,19 @@ use alloc::boxed::Box;
 use skein_lib::Duration;
 
 #[test]
+fn workspace_items_that_did_not_decode_are_refused_naming_them() {
+    let mut h = Harness::new();
+    let assign =
+        Event::Assign { assignment: assignment(true, Box::new([])), items: Err(crate::wire::Undecodable), save: None };
+    assert_eq!(&*h.step(assign), [refused(b"workspace items")]);
+    assert_eq!(h.domain.host().hosted(), 0);
+}
+
+#[test]
 fn a_repository_named_twice_is_refused_as_an_invalid_start_naming_it() {
     let mut h = Harness::new();
     let assign =
-        Event::Assign { assignment: assignment(true, Box::new([])), items: items(&[b"app", b"app"]), save: None };
+        Event::Assign { assignment: assignment(true, Box::new([])), items: Ok(items(&[b"app", b"app"])), save: None };
     assert_eq!(&*h.step(assign), [refused(b"repository named twice")]);
     assert_eq!(h.domain.host().hosted(), 0);
 }
@@ -19,7 +28,7 @@ fn a_repository_named_twice_is_refused_as_an_invalid_start_naming_it() {
 #[test]
 fn workspace_items_without_a_workstream_are_refused_as_an_invalid_start() {
     let mut h = Harness::new();
-    let assign = Event::Assign { assignment: assignment(false, Box::new([])), items: items(&[b"app"]), save: None };
+    let assign = Event::Assign { assignment: assignment(false, Box::new([])), items: Ok(items(&[b"app"])), save: None };
     assert_eq!(&*h.step(assign), [refused(b"workstream")]);
 }
 

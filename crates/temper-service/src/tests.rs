@@ -11,4 +11,5 @@ mod stop;
 
 mod tools;
 mod translate;
+mod worker_parts;
 mod workers;

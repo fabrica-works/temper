@@ -40,7 +40,7 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
         Event::Assign { assignment, items, save } => assign(domain, env, assignment, items, save, out),
         Event::Link(host::LinkDown::Assign { assignment }) => {
             let items = wire::Workspace { repositories: Box::new([]) };
-            assign(domain, env, assignment, items, None, out);
+            assign(domain, env, assignment, Ok(items), None, out);
         }
         Event::Link(host::LinkDown::Acknowledge { run, attempt }) => {
             host_step(domain, env, host::Event::Down(host::LinkDown::Acknowledge { run, attempt }));
@@ -96,7 +96,7 @@ fn assign(
     domain: &mut Domain,
     env: &Env<Limits>,
     assignment: host::Assignment,
-    items: wire::Workspace,
+    items: Result<wire::Workspace, wire::Undecodable>,
     save: Option<Box<[u8]>>,
     out: &mut Queue<Request>,
 ) {
@@ -104,6 +104,13 @@ fn assign(
     if domain.host.is_hosting(run, attempt) {
         return;
     }
+    let items = match items {
+        Ok(items) => items,
+        Err(wire::Undecodable) => {
+            let why = words(b"workspace items", env.limits.host.detail_bytes);
+            return refuse(run, attempt, host::Refusal::Invalid(host::Invalid::Start { why }), out);
+        }
+    };
     let checked = if !items.repositories.is_empty() && assignment.assignment.workspace.is_none() {
         Err(&b"workstream"[..])
     } else {

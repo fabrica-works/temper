@@ -486,7 +486,7 @@ impl World {
             },
         };
         let items = wire::Workspace { repositories: Box::new([repository]) };
-        self.send(Event::Assign { assignment, items, save: Some(Box::from(&b"saved"[..])) });
+        self.send(Event::Assign { assignment, items: Ok(items), save: Some(Box::from(&b"saved"[..])) });
     }
 
     /// One turn of the run, numbered `number`: the engine answers it busy

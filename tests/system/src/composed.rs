@@ -578,7 +578,7 @@ impl World {
                 let repositories = usize::from(self.adoption != Adoption::Without);
                 assert_eq!(assignment.workspace.repositories.len(), repositories);
                 let (hub, items) = link::assignment(&assignment);
-                self.worker_events.push_back(worker::Event::Assign { assignment: hub, items, save: None });
+                self.worker_events.push_back(worker::Event::Assign { assignment: hub, items: Ok(items), save: None });
                 self.assignment = Some(assignment);
             }
             Delivery::Link { channel, down } => {

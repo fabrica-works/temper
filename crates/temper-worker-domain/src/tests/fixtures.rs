@@ -265,5 +265,5 @@ pub fn assignment_of(run: u64, names: &[&[u8]], messages: u64) -> crate::Event {
         inbox.push(message).expect("room for each message");
     }
     assignment.messages = inbox.into_boxed();
-    crate::Event::Assign { assignment, items: items(names), save: None }
+    crate::Event::Assign { assignment, items: Ok(items(names)), save: None }
 }

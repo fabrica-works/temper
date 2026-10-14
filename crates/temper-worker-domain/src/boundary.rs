@@ -58,7 +58,7 @@ pub enum Event {
     /// items and the saved-work branch beside it (jig's `protocol/channel.md`,
     /// 6.2). The record's workspace, if it has one, names the workstream the
     /// checkout is keyed by; the root names the items to the hub itself.
-    Assign { assignment: host::Assignment, items: wire::Workspace, save: Option<Box<[u8]>> },
+    Assign { assignment: host::Assignment, items: Result<wire::Workspace, wire::Undecodable>, save: Option<Box<[u8]>> },
     /// From the engine: any other record of jig's link. An assignment here
     /// has no workspace items.
     Link(host::LinkDown),
