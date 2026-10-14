@@ -1325,6 +1325,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      and agent environment as the world observes it, as before. 17.4's
      Scope is unchanged.
 
+161. **16.6 traces its process proof's sign-in failure in its own 16.5
+     support** (temper 16.6, blocked 2026-10-14T21:01:29Z; cross-session
+     scope as asked, in fact session 16's own files). 16.6's one run of
+     `scripts/proof-one-process.sh` (`logs/20261014T205900-0.log`)
+     passed the landing story and failed
+     `a_running_engine_lends_the_record_temper_sign_in_kept` on its world
+     deadline after 30.1 s (`crates/temper/tests/support/sign_in.rs:271`:
+     "stopped: false; empty hosts: [true, true, false, true, false,
+     false, false]; issuer deadline: None"); the same test passed in
+     0.279 s, second of five as here, in 15.3's landing run on
+     `eb9ec31f` (`logs/20261014T204556-0.log`), the tree 16.6's WIP
+     builds on, and the profile runs one test at a time. `sign_in.rs` is
+     16.5's, so in 16.6's Files (ruling 108). So session 16 first runs that
+     test alone once (`heavy --gate cargo nextest run -p temper --profile
+     process -E 'test(a_running_engine_lends_the_record_temper_sign_in_kept)'`)
+     on its WIP: a pass names an interaction with the run before it or
+     with 16.6's diff, a failure names 16.6's diff (`git diff origin/main`).
+     It fixes the named cause in its own files, then runs the whole proof
+     once; later proofs follow each newly named cause, counted by symptom
+     as ruling 158 says. A cause in another session's file, or in
+     production code past the README's 20-line fix, is a question.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
