@@ -275,3 +275,89 @@ pub fn load(
     assert!(store.routed.is_empty());
     rows
 }
+
+pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
+pub fn seeds() -> settings::Seeds {
+    settings::Seeds { deployment: [7; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
+}
+
+pub struct AccountStand {
+    pub accounts: crate::accounts::Accounts,
+    pub values: crate::values::Values,
+}
+
+pub fn accounts_with(record: &[u8]) -> AccountStand {
+    let config = engine().jig;
+    let mut entries = skein_lib::List::with_capacity(1);
+    entries.push((Box::from(&b"accounts/chat.json"[..]), Secret::new(record.into()))).unwrap();
+    account_stand(&config, &settings::Files { entries }, None)
+}
+
+pub fn missing_account() -> AccountStand {
+    let mut config = engine().jig;
+    config.llm.accounts[0].source = jig_protocol_config::Source::SignIn(jig_protocol_config::SignIn {
+        client: Box::from(&b"client"[..]),
+        secret: None,
+        authorization: Box::from(&b"http://127.0.0.1:7102/authorize"[..]),
+        token: Box::from(&b"http://127.0.0.1:7102/token"[..]),
+        endpoint: jig_protocol_config::Address::Addr(skein_io::Addr::Ip(core::net::SocketAddr::from((
+            [127, 0, 0, 1],
+            7102,
+        )))),
+        transport: jig_protocol_config::Transport::Plaintext,
+        redirect: Box::from(&b"http://127.0.0.1:7103/callback"[..]),
+        scope: Box::from(&b"read"[..]),
+    });
+    let mut issuers = skein_lib::List::with_capacity(1);
+    issuers
+        .push((
+            1,
+            skein_oauth_accounts::Endpoint {
+                address: core::net::SocketAddr::from(([127, 0, 0, 1], 7102)),
+                transport: skein_oauth_accounts::Transport::Plaintext,
+            },
+        ))
+        .unwrap();
+    account_stand(
+        &config,
+        &settings::Files { entries: skein_lib::List::with_capacity(0) },
+        Some(crate::AccountsRuntime {
+            root: skein_io::kernel::Fd::new(10),
+            effective_user: 1000,
+            issuers,
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        }),
+    )
+}
+fn account_stand(
+    config: &jig_protocol_config::Engine,
+    files: &settings::Files,
+    runtime: Option<crate::AccountsRuntime>,
+) -> AccountStand {
+    AccountStand {
+        accounts: crate::accounts::Accounts::new(config, files, &seeds(), runtime, 64).expect("configured account"),
+        values: crate::values::Values::new(
+            config.limits.core.accounts.accounts.checked_add(1).unwrap(),
+            config.limits.driver.client.document.token_bytes,
+        ),
+    }
+}
+
+pub fn want(stand: &mut AccountStand, account: u32) -> Box<[temper_engine_domain::Event]> {
+    use skein_lib::{Queue, Time, Wall};
+    let mut events = Queue::with_capacity(8);
+    let wall = Wall::from_nanos(1_000_000_000);
+    stand.accounts.iterate(Time::ZERO, wall, &mut stand.values, &mut events);
+    stand.accounts.request(jig_domain_accounts::Request::Component(jig_domain_accounts::ToComponent::Want { account }));
+    stand.accounts.iterate(Time::ZERO, wall, &mut stand.values, &mut events);
+    let mut out = skein_lib::List::with_capacity(events.len());
+    for _ in 0..events.len() {
+        out.push(events.pop().unwrap()).unwrap();
+    }
+    out.into_boxed()
+}
+
+pub fn lent(stand: &AccountStand, account: u32, generation: u64) -> &Secret {
+    &stand.values.accounts.value(account, generation, skein_lib::Time::ZERO).expect("lent account").token
+}

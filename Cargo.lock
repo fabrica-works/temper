@@ -333,6 +333,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-accounts"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-accounts",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+]
+
+[[package]]
 name = "jig-protocol-charter"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -1415,16 +1426,20 @@ dependencies = [
 name = "temper-service"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-accounts",
  "jig-domain-core",
  "jig-domain-host",
  "jig-domain-notes",
  "jig-domain-people",
  "jig-domain-tasks",
+ "jig-protocol-accounts",
  "jig-protocol-config",
  "jig-protocol-store",
  "skein-io",
  "skein-kv",
  "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
  "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",

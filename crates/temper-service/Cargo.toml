@@ -9,6 +9,10 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 skein-io.workspace = true
+skein-oauth.workspace = true
+skein-oauth-accounts.workspace = true
+jig-protocol-accounts.workspace = true
+jig-domain-accounts.workspace = true
 jig-domain-core.workspace = true
 jig-domain-tasks.workspace = true
 jig-domain-notes.workspace = true

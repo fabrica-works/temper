@@ -68,6 +68,9 @@ temper-protocol-worker-wire = { path = "crates/temper-protocol-worker-wire" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }
 temper-protocol-store = { path = "crates/temper-protocol-store" }
+jig-protocol-accounts = { git = "https://github.com/forgetic/jig.git" }
+skein-oauth = { git = "https://github.com/forgetic/skein.git" }
+skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-store = { git = "https://github.com/forgetic/jig.git" }
 skein-kv = { git = "https://github.com/forgetic/skein.git" }
 temper-throwaway-forgejo = { path = "testing/temper-throwaway-forgejo" }
