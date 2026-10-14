@@ -4,8 +4,8 @@ use jig_client_world::{
     harness::{ClientId, Front, FrontFault, Observed},
     joint::{packets, transport::Transport},
 };
-use skein_lib::{Duration, Time, Wall};
-use std::collections::BTreeMap;
+use skein_lib::{Duration, RequestEnvelope, Time, Token, Wall};
+use std::collections::{BTreeMap, BTreeSet};
 use temper_client_domain::{self as client, Event, Request};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
@@ -14,6 +14,10 @@ use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
+    pub answer_runs: bool,
+    keyed_fault: Option<RequestEnvelope>,
+    reads: usize,
+    read_loads: BTreeSet<Token>,
     transport: Transport,
     limits: client::Limits,
     callbacks: Vec<(ClientId, Event)>,
@@ -31,6 +35,7 @@ impl Joint {
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
         let mut engine = Driver::configured(Store::new(), walking::config(seed), &walking::limits());
+        engine.hello(Token::new(7));
         engine.settle();
         let last_commit = engine.store.header().commits;
         let truth = jig_client_world::joint::truth::Truth::after(core_rows(&engine));
@@ -39,6 +44,10 @@ impl Joint {
         Joint {
             engine,
             sign_ins: 0,
+            answer_runs: false,
+            keyed_fault: None,
+            reads: 0,
+            read_loads: BTreeSet::new(),
             transport: Transport::new(jig_domain_client::contract::VersionRange {
                 first: jig_domain_client::contract::CLIENT_VERSION,
                 last: jig_domain_client::contract::CLIENT_VERSION,
@@ -72,6 +81,15 @@ impl Joint {
             self.parked.entry(who).or_default().push(request);
             return;
         }
+        if let Request::Send { attempt, .. } = &request
+            && let Some(envelope) = self.keyed_fault.take()
+        {
+            if envelope == RequestEnvelope::SignedOut {
+                self.transport.signed_out(who);
+            }
+            self.callbacks.push((who, Event::Answer { attempt: *attempt, envelope, answer: None }));
+            return;
+        }
         for event in translate::request(&mut self.transport, who, &request, &self.limits.jig) {
             self.send(event);
         }
@@ -101,8 +119,26 @@ impl Joint {
             self.incoming(packet);
         }
     }
+    fn settle(&mut self) {
+        for _ in 0..200 {
+            for event in &mut self.engine.events {
+                if let engine::Event::Store(engine::StoreInput::ReadLoaded { load, result }) = event
+                    && self.read_loads.insert(*load)
+                    && let Some(range) = self.engine.protocol.reads.get(self.reads)
+                {
+                    *result = fixtures::read(&self.engine.store, range);
+                    self.reads += 1;
+                }
+            }
+            self.engine.advance(true);
+            if self.engine.root.quiescent() && self.engine.events.is_empty() && self.engine.store.pending.is_empty() {
+                return;
+            }
+        }
+        panic!("joint engine did not settle");
+    }
     fn drain(&mut self) {
-        self.engine.settle();
+        self.settle();
         let commit = self.engine.store.header().commits;
         if commit != self.last_commit {
             self.observed.extend(self.truth.applied(jig_core_world::store_peer::DurableSnapshot {
@@ -114,6 +150,23 @@ impl Joint {
         }
         let deliveries = std::mem::take(&mut self.engine.delivered);
         for delivery in deliveries {
+            if self.answer_runs
+                && let engine::Delivery::Assigned { assignment, .. } = &delivery
+            {
+                self.engine.answer(
+                    Token::new(7),
+                    assignment.task,
+                    assignment.attempt,
+                    0,
+                    jig_domain_tasks::End::Finished {
+                        result: jig_domain_tasks::TaskResult::Report {
+                            words: b"Answered by the run".as_slice().into(),
+                        },
+                        cancel_delegates: false,
+                    },
+                    engine::Parts::none(),
+                );
+            }
             self.packet(engine::Request::Party(engine::PartyRequest::Deliver(delivery)));
         }
         let immediate = std::mem::take(&mut self.engine.immediate);
@@ -166,6 +219,9 @@ impl Front<Temper> for Joint {
             self.observed.push(Observed::Reachable { live: true });
             for who in self.transport.clients() {
                 self.callbacks.push((who, Event::Jig(self.transport.hello())));
+                if self.transport.sign_in(who).is_none() {
+                    self.callbacks.push((who, Event::SignedOut));
+                }
             }
             for (who, requests) in std::mem::take(&mut self.parked) {
                 for request in requests {
@@ -193,6 +249,8 @@ impl Front<Temper> for Joint {
                 let store = std::mem::replace(&mut self.engine.store, Store::new());
                 self.engine = Driver::configured(store, walking::config(self.seed), &walking::limits());
                 self.engine.settle();
+                self.reads = 0;
+                self.read_loads.clear();
                 self.offline_until = Some(now.saturating_add(offline));
                 self.observed.push(Observed::Reachable { live: false });
                 self.drop_watches();
@@ -200,11 +258,11 @@ impl Front<Temper> for Joint {
             FrontFault::Slow { span } => self.due = Some(now.saturating_add(span)),
             FrontFault::NoAnswer => self.lose_answers = self.lose_answers.checked_add(1).expect("finite lost answers"),
             FrontFault::DropWatch => self.drop_watches(),
-            FrontFault::Busy
-            | FrontFault::NotReady
-            | FrontFault::SignedOut
-            | FrontFault::Versions
-            | FrontFault::ObjectGone => panic!("not a temper joint story fault: {fault:?}"),
+            FrontFault::Busy => self.keyed_fault = Some(RequestEnvelope::Again),
+            FrontFault::SignedOut => self.keyed_fault = Some(RequestEnvelope::SignedOut),
+            FrontFault::NotReady | FrontFault::Versions | FrontFault::ObjectGone => {
+                panic!("not a temper joint story fault: {fault:?}")
+            }
         }
     }
     fn reload(&mut self, who: ClientId, now: Time) {
@@ -212,6 +270,9 @@ impl Front<Temper> for Joint {
         self.detach(who);
         if self.offline_until.is_none() {
             self.callbacks.push((who, Event::Jig(self.transport.hello())));
+            if self.transport.sign_in(who).is_none() {
+                self.callbacks.push((who, Event::SignedOut));
+            }
         }
     }
     fn received(&mut self, who: ClientId, event: &Event) {
@@ -226,6 +287,8 @@ impl Front<Temper> for Joint {
     }
     fn sign_in(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
+        self.callbacks.retain(|(client, event)| *client != who || !matches!(event, Event::SignedOut));
+        self.callbacks.push((who, Event::Jig(self.transport.hello())));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
     }

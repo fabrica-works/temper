@@ -1,13 +1,17 @@
 //! Named story values and one client profile, shared by every story.
 use crate::{app::Temper, front::Joint};
+use jig_client_world::harness::FrontFault;
 use jig_client_world::harness::{Settings, World};
-use skein_lib::{Duration, RequestLimits};
+use jig_domain_tasks as tasks;
+use skein_lib::{Duration, RequestLimits, Time, Token};
 use std::{
     collections::BTreeMap,
     sync::{Mutex, OnceLock},
 };
 use temper_client_domain::{Limits, forge};
 use temper_client_view as view;
+use temper_engine_domain as engine;
+use temper_engine_domain_world::direct::Driver;
 pub const FORGE: u16 = 0;
 pub const PARTY: u64 = 1;
 pub const SEED: u64 = 1101;
@@ -37,7 +41,7 @@ pub fn domain_limits() -> Limits {
             projects: 4,
             roles: 2,
             charters: 4,
-            text: 32,
+            text: 64,
             rows: 4,
             conversation_words: 2,
             navigation_entries: 8,
@@ -128,4 +132,121 @@ pub fn codec() -> jig_protocol_transcript::Limits {
         bytes: 32768,
         turn: jig_domain_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     }
+}
+
+#[must_use]
+pub fn conversations() -> temper_client_domain::Address {
+    temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations { project: None })
+}
+#[must_use]
+pub fn chats(driver: &Driver) -> u32 {
+    u32::try_from(
+        driver
+            .store
+            .rows
+            .values()
+            .filter(|record| {
+                matches!(
+                    record,
+                    engine::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row) | tasks::Stored::Ended(row)))
+                    if matches!(row.requester, tasks::Party::Person(_)) && row.tracked.is_none()
+                )
+            })
+            .count(),
+    )
+    .expect("bounded chats")
+}
+#[must_use]
+pub fn faults(seed: u64) -> Vec<(Time, FrontFault)> {
+    let choices = [
+        FrontFault::Restart { offline: Duration::from_millis(30) },
+        FrontFault::NoAnswer,
+        FrontFault::DropWatch,
+        FrontFault::Busy,
+        FrontFault::SignedOut,
+    ];
+    (0..4)
+        .map(|index| {
+            (
+                Time::from_nanos(Duration::from_millis(20 * (index + 1)).as_nanos()),
+                choices[usize::try_from((seed + index) % 5).expect("five faults")].clone(),
+            )
+        })
+        .collect()
+}
+/// A chat made and held by two failed real worker attempts.
+pub fn held_chat(front: &mut Joint) -> u64 {
+    let driver = &mut front.engine;
+    driver.hello(Token::new(7));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(Token::new(1001)),
+        sign_in: driver.session(),
+        key: [31; 16],
+        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"Held chat".as_slice().into() },
+    }));
+    driver.settle();
+    let first = driver.last_assignment();
+    driver.answer(
+        Token::new(7),
+        first.task,
+        first.attempt,
+        0,
+        tasks::End::Failed(tasks::Class::Run),
+        engine::Parts::none(),
+    );
+    driver.settle();
+    driver.env.now = Time::from_nanos(Duration::from_secs(2).as_nanos());
+    engine::fire(&mut driver.root, &driver.env);
+    engine::release(&mut driver.root, &driver.env, &mut driver.out);
+    driver.collect();
+    driver.settle();
+    let second = driver.last_assignment();
+    driver.answer(
+        Token::new(7),
+        second.task,
+        second.attempt,
+        0,
+        tasks::End::Failed(tasks::Class::Run),
+        engine::Parts::none(),
+    );
+    driver.settle();
+    assert!(matches!(driver.task(first.task).expect("held chat").phase, tasks::Phase::Held { .. }));
+    first.task
+}
+
+/// The stored ended task a client's one-shot task/result read asks for.
+#[must_use]
+pub fn read(
+    store: &temper_engine_domain_world::store::Store,
+    range: &jig_domain_core::reads::Range,
+) -> jig_domain_core::reads::Loaded {
+    use jig_domain_core::{Key, Record, reads};
+    let (reads::Scope::Task { task } | reads::Scope::Result { task } | reads::Scope::PersonTask { task }) = range.scope
+    else {
+        return reads::Loaded::Gone;
+    };
+    let Some(engine::Record::Core(Record::Tasks(tasks::Stored::Ended(row)))) =
+        store.rows.get(&engine::Key::Core(Key::Tasks(tasks::Key::Ended(task))))
+    else {
+        return reads::Loaded::Gone;
+    };
+    let value = reads::Row {
+        value: Record::Tasks(tasks::Stored::Ended(row.clone())),
+        owner: Some(row.clone()),
+        ancestors: Box::new([]),
+        related: None,
+        unjoined: None,
+        linked: Box::new([]),
+        inbox: None,
+    };
+    if range.after.is_some() {
+        return reads::Loaded::Page { rows: Box::new([]), next: None };
+    }
+    if range.rows == 0 || value.owned_bytes().expect("finite ended row") > range.bytes {
+        return reads::Loaded::Busy;
+    }
+    reads::Loaded::Page { rows: Box::new([value]), next: None }
 }

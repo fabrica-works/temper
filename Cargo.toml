@@ -17,7 +17,6 @@ members = [
     "tests/codecs",
     "crates/temper-protocol-store",
     "testing/temper-throwaway-forgejo",
-    "crates/temper-web-domain",
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
     "crates/temper-engine-domain-forge-client",
@@ -26,9 +25,7 @@ members = [
     "crates/temper-engine-domain-forge",
     "crates/temper-worker-domain",
     "crates/temper-worker-domain-checkout",
-    "crates/temper-web-view",
     "testing/temper-fake-forge-domain",
-    "testing/temper-fake-person",
     "tests/fake-checkout",
     "tests/engine/domain",
     "tests/system",
@@ -38,7 +35,6 @@ members = [
     "tests/fake-forge",
     "tests/worker/checkout",
     "tests/worker/domain",
-    "tests/web/domain",
 ]
 
 [workspace.package]
@@ -76,7 +72,6 @@ skein-kv = { git = "https://github.com/forgetic/skein.git" }
 temper-throwaway-forgejo = { path = "testing/temper-throwaway-forgejo" }
 skein-io = { git = "https://github.com/forgetic/skein.git" }
 serde_json = "=1.0.154"
-temper-web-domain = { path = "crates/temper-web-domain" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
 skein-json = { git = "https://github.com/forgetic/skein.git" }
 skein-world = { git = "https://github.com/forgetic/skein.git" }
@@ -93,8 +88,6 @@ smith-charter = { git = "https://github.com/forgetic/smith.git" }
 smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-transcript = { git = "https://github.com/forgetic/smith.git" }
 sha2 = { version = "=0.10.9", default-features = false }
-temper-web-view = { path = "crates/temper-web-view" }
-temper-fake-person = { path = "testing/temper-fake-person" }
 jig-domain-accounts = { git = "https://github.com/forgetic/jig.git" }
 jig-test-connector = { git = "https://github.com/forgetic/jig.git" }
 jig-test-domain = { git = "https://github.com/forgetic/jig.git" }
