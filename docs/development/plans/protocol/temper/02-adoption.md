@@ -477,7 +477,8 @@ tests/system/src/forge.rs:310, `forge_stand.rs`).
 `forge_routes.rs`'s adoption tests at :2003-2087 move to
 `applications.rs` on the keyed request; :2088-2134 (`an_adoption_sent_twice_across_a_restart_is_made_once`)
 goes, and 02.4 writes its keyed counterpart.
-Needs: 02.1's locate, 02.2's application.
+Needs: 02.1's locate, 02.2's application, and 02.4's outcome kept
+durably: 02.4 lands before 02.3 (decisions.md, ruling 119).
 Files: `crates/temper-engine-domain-forge/src/{boundary.rs, adoption.rs,
 domain.rs (the moved section out; at most 40 lines added), tests.rs (the
 `Adoption` literals at :241-253, :385-397; `Event::Adopt` at :254, :397),

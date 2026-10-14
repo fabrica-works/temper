@@ -438,6 +438,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `kache stats | head -1`, and blocks only if disk stays below 40 GB.
      kache's late eviction is a proposal for the retrospective.
 
+119. **02.4 lands before 02.3** (temper 02.3, blocked
+     2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
+     conformance worlds' adoption to `PartyInput::Application`; after a
+     crash cut with the people's token durable, the outcome is gone on
+     restart until 02.4 keeps it durably, so eight conformance fuzzy
+     stories fail (`tests/conformance/src/lib.rs:641`; the gate at
+     `6693b866`, 8 of 35 fuzzy failed). 02.4 needs only 02.2's kept
+     outcomes. So 02.4 runs next and lands first, and 02.3's commit is
+     replayed on it, its assertions kept; 08.5b's and 17.4's needs are
+     unchanged.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
