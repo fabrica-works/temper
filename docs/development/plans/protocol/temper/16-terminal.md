@@ -214,6 +214,16 @@ indentation's last two columns, its other lines two spaces deeper; a row
 prints its cells' texts joined by ` | ` and its subtree no more; a cell
 outside a row its own line; code each line four spaces deeper; quote
 `> ` per line; a link with an external target `TEXT <URL>`, unnumbered.
+A node's text (6.4's "its text", TEXT) is the runs of the text nodes
+under it that no nearer node of another role holds, in preorder; NAME is
+its name, or its text when it has none (jig's `client/domain/view.md`,
+3: text "on text nodes only, as runs", "a name, where its text does not
+give it"). The text nodes a line took, as its text or under a named
+control, print no line of their own; a text node nobody took (under a
+page, region, item, slot and the like) prints its runs as its own line;
+a node of another role under a text-bearing one (a link in a paragraph)
+prints its own line at that node's indentation (decisions.md, ruling
+129).
 Numbers: button, link, text field, text area, choice, check, tab with
 `tree.bound(id)` and no `Disabled` state: `[n] `, `n` from 1 in
 preorder; the same roles otherwise `[-] `. The walk, with no recursion

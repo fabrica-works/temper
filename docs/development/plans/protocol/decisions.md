@@ -619,6 +619,24 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `target/`, and that 11.4's 1 to 8 GB is now 12 to 15 GB in temper,
      is a proposal for the retrospective.
 
+129. **A node's text is its text nodes' runs, printed once** (temper
+     16.1, blocked 2026-10-14T11:45:30Z; plan defect, read from the
+     design). client.md, 6.4 prints "every node in preorder, by its
+     role", a heading as "its text", a button as `[n] NAME`; at jig's pin
+     a node's text lives in text-node children (`jig-view` `Builder::run`
+     admits only `Role::Text`, `builder.rs:134-135`), and `frame::control`
+     gives a button both a name and a text child with the same label
+     (`frame.rs:98-111`), so a literal walk prints every label twice.
+     jig's `client/domain/view.md`, 3 decides it: a node carries "text,
+     on text nodes only, as runs" and "a name, where its text does not
+     give it". So a node's text is the runs of the text nodes under it
+     that no nearer node of another role holds, NAME is its name or else
+     its text, and the text nodes a line took print nothing more; a text
+     node nobody took prints its own line, and a node of another role
+     under a text-bearing one prints its own line. Session 16's 16.1
+     Shape says so; its Size (900), Files (the golden `control_text`
+     among them) and tests are unchanged.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
