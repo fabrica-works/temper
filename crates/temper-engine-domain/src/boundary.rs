@@ -287,14 +287,40 @@ pub struct Parts {
     pub saved: Option<Box<[u32]>>,
     /// Last heads actually pushed by the worker, indexed by deployment repository tag.
     pub pushed: Box<[forge::Pushed]>,
+    /// A permanent failure to prepare, naming its repository by tag.
+    pub preparation: Option<Preparation>,
 }
 
 impl Parts {
     /// A record that carries no application part.
     #[must_use]
     pub fn none() -> Parts {
-        Parts { saved: None, pushed: Box::new([]) }
+        Parts { saved: None, pushed: Box::new([]), preparation: None }
     }
+}
+
+/// Why a repository could not be prepared, permanently (channel.md, 5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Preparation {
+    /// The forge lacks what the assignment names for this repository.
+    Missing { tag: u32, missing: Missing },
+    /// The forge refused this repository's identity.
+    Refused { tag: u32 },
+}
+
+/// What the forge lacks for a preparation (channel.md, 5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Missing {
+    Repository,
+    Branch,
+    Commit,
+}
+
+/// An observation of the root, which decides nothing (domain/engine.md, 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Fact {
+    /// A fenced answer reported a permanent preparation failure.
+    PreparationFailed { task: u64, attempt: u64, preparation: Preparation },
 }
 
 #[derive(Debug)]

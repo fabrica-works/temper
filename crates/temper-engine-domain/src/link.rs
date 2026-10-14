@@ -219,7 +219,12 @@ pub(crate) fn result_event(domain: &mut Domain, payload: Token, end: tasks::End)
             )
             | None => return None,
         };
-    let Parts { saved, pushed } = if parts_within(&parts, &domain.limits) { parts } else { Parts::none() };
+    let Parts { saved, pushed, preparation } = if parts_within(&parts, &domain.limits) { parts } else { Parts::none() };
+    if let Some(preparation) = preparation
+        && domain.facts.try_push(crate::Fact::PreparationFailed { task, attempt, preparation }).is_err()
+    {
+        domain.facts_lost = domain.facts_lost.saturating_add(1);
+    }
     drop(domain.forge_left.insert((task, attempt), pushed));
     let (saved, invalid_saved) = match saved {
         Some(tags) => match crate::route::forge_route::saved_resources(domain.config.forge_connector, &tags) {

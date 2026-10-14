@@ -1,6 +1,6 @@
 //! Child limits and checked route and heap sums (jig's domain/root.md, 10).
 use crate::boundary::{
-    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Request, Work,
+    Assignment, BriefConnector, BriefSection, Event, Fact, Payload, PreparedWorkspace, Read, Request, Work,
 };
 use crate::domain::{Domain, max_out};
 use crate::route::{LandingRule, forge_route, host_route};
@@ -18,6 +18,9 @@ use jig_domain_views as views;
 use skein_lib::{Env, List, Map, Queue, ReplyTo, Slab, Token};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
+
+/// How many of the root's own facts wait to be drained.
+pub const FACTS: u32 = 32;
 
 /// Root startup bounds, supplied by configuration and immutable at every step
 /// (domain/engine.md, 4–5). `worst_case` checks the cross-child route, page,
@@ -261,6 +264,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(load_bytes)?
         .checked_add(landing_bytes)?
         .checked_add(permission_bytes)?;
+    bytes = bytes.checked_add(Queue::<Fact>::worst_case(FACTS)?)?;
     let effects = limits.call_records.checked_add(limits.tasks.tasks)?;
     let brief_fetches = limits.brief.briefs.checked_mul(limits.brief.sections)?.checked_mul(2)?;
     bytes = bytes

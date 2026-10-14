@@ -870,7 +870,7 @@ fn a_pushed_change_is_recovered_before_its_worker_reports_the_head() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -927,7 +927,7 @@ fn a_change_whose_ci_never_reports_is_stalled_and_held() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..450 {
@@ -988,7 +988,7 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1024,7 +1024,7 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
             result: tasks::TaskResult::Verdict { code: 1, fields: Box::new([]), words: Box::from(&b"approved"[..]) },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1079,7 +1079,7 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1102,7 +1102,7 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1135,7 +1135,7 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1159,7 +1159,7 @@ fn check_gate_repair(no_ci: bool) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1213,7 +1213,7 @@ fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1276,7 +1276,7 @@ fn an_unreadable_failed_job_log_is_named_and_repair_still_runs() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1328,7 +1328,7 @@ fn failed_ci_with_delayed_brief() -> (World, u64, u64) {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     (world, chat.task, producer.task)
@@ -1486,7 +1486,7 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1541,7 +1541,7 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1589,7 +1589,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..100 {
@@ -1691,7 +1691,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1751,7 +1751,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..100 {
@@ -1846,7 +1846,7 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1914,7 +1914,7 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..200 {
@@ -1961,7 +1961,7 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..1000 {
@@ -2206,7 +2206,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         first.attempt,
         0,
         tasks::End::Parked,
-        engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]) },
+        engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]), preparation: None },
     );
     world.send(event);
     for _ in 0..30 {
@@ -2260,7 +2260,7 @@ fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
             result: tasks::TaskResult::Report { words: Box::from(&b"done"[..]) },
             cancel_delegates: false,
         },
-        engine::Parts { saved: None, pushed: Box::new([]) },
+        engine::Parts::none(),
     );
     world.send(event);
     for _ in 0..300 {
@@ -2976,6 +2976,7 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
                 tag: forge_world::REPO.repository,
                 commit: translate::commit(pushed),
             }]),
+            preparation: None,
         },
     );
     world.send(event);

@@ -1,6 +1,6 @@
 //! The admitted step and ordered journal release (jig's domain/root.md, 3).
 use crate::boundary::{
-    Assignment, BriefConnector, BriefSection, Event, Payload, PreparedWorkspace, Read, Released, Request, Work,
+    Assignment, BriefConnector, BriefSection, Event, Fact, Payload, PreparedWorkspace, Read, Released, Request, Work,
 };
 use crate::limits::{
     Limits, core_limits, environment_core, payload_slots, root_journal_limits, route_bound, route_decision,
@@ -63,6 +63,8 @@ pub struct Domain {
     pub(crate) store_answers: Queue<Event>,
     pub(crate) host_calls: Map<Token, host_route::Flight>,
     pub(crate) work: Queue<Work>,
+    pub(crate) facts: Queue<Fact>,
+    pub(crate) facts_lost: u64,
 }
 
 impl Domain {
@@ -265,6 +267,8 @@ impl Domain {
             store_answers: Queue::with_capacity(limits.loads.loads),
             host_calls: Map::with_capacity(limits.fleet.calls),
             work: Queue::with_capacity(route_bound(limits).expect("valid routes")),
+            facts: Queue::with_capacity(crate::limits::FACTS),
+            facts_lost: 0,
             config: root_config,
             limits: *limits,
         }
@@ -333,6 +337,17 @@ impl Domain {
     /// child's configured fact capacity. Emits no effect or terminal and changes no decision state.
     pub fn drain_facts(&mut self) {
         self.core.drain_facts(&core_limits(&self.limits));
+    }
+
+    /// The oldest of the root's own facts not drained yet.
+    pub fn pop_fact(&mut self) -> Option<Fact> {
+        self.facts.pop()
+    }
+
+    /// How many of the root's own facts were dropped for want of room.
+    #[must_use]
+    pub const fn facts_lost(&self) -> u64 {
+        self.facts_lost
     }
 }
 

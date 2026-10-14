@@ -87,7 +87,7 @@ pub fn parts(work: wire::Work, items: &[(u32, bool)]) -> engine::Parts {
         }
         None => None,
     };
-    engine::Parts { saved, pushed: pushed.into_boxed_slice() }
+    engine::Parts { saved, pushed: pushed.into_boxed_slice(), preparation: None }
 }
 
 /// Whether a repository has saved work after a save that ended in `landing`.
@@ -255,7 +255,14 @@ mod tests {
     fn the_heads_a_run_landed_reach_the_engine_as_its_pushed_heads() {
         let work = wire::Work { landed: Box::new([wire::Landed { tag: 3, commit: [7; 32] }]), saved: None };
         let parts = parts(work, &[(3, false)]);
-        assert_eq!(parts, engine::Parts { saved: None, pushed: Box::new([forge::Pushed { tag: 3, commit: [7; 32] }]) });
+        assert_eq!(
+            parts,
+            engine::Parts {
+                saved: None,
+                pushed: Box::new([forge::Pushed { tag: 3, commit: [7; 32] }]),
+                preparation: None
+            }
+        );
     }
 
     #[test]
@@ -268,6 +275,6 @@ mod tests {
         ]);
         let work = wire::Work { landed: Box::new([]), saved: Some(saved) };
         let parts = parts(work, &[(1, false), (2, true), (3, true), (4, false)]);
-        assert_eq!(parts, engine::Parts { saved: Some(Box::new([1, 2, 3])), pushed: Box::new([]) });
+        assert_eq!(parts, engine::Parts { saved: Some(Box::new([1, 2, 3])), pushed: Box::new([]), preparation: None });
     }
 }

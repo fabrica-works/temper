@@ -91,7 +91,7 @@ pub(crate) fn worker_event(peers: &mut Peers, up: workers::Up) -> engine::Event 
                 };
                 pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
             }
-            let parts = engine::Parts { saved: None, pushed };
+            let parts = engine::Parts { saved: None, pushed, preparation: None };
             peers.protocol.answer(Token::new(channel), task, attempt, spent, end, parts)
         }
         workers::Up::Call { .. } => panic!("scenarios send typed calls"),

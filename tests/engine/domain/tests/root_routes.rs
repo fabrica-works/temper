@@ -3934,7 +3934,7 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
 #[test]
 fn saved_work_reaches_the_next_attempt() {
     let (mut driver, first) = Driver::chat();
-    let parts = engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]) };
+    let parts = engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]), preparation: None };
     driver.answer(Token::new(7), first.task, first.attempt, 0, tasks::End::Parked, parts);
     driver.settle();
     assert_eq!(

@@ -35,6 +35,6 @@ pub use boundary::Request as Output;
 pub use boundary::*;
 pub use domain::{Domain, fire, max_out, release, step};
 pub use jig_domain_core::{Charter, Delegate, Dependency, Model, ProcedureAction, RunCharter, RunPolicy};
-pub use limits::{BriefBudgets, BriefLimits, Limits, worst_case};
+pub use limits::{BriefBudgets, BriefLimits, FACTS, Limits, worst_case};
 pub use route::{Approval, Freshness, Gate, HostDelivery, HostRequest, LandingRule, adopt_repository_ask};
 pub use translate::{Config, LandingPolicy};
