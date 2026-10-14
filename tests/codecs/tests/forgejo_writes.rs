@@ -145,7 +145,8 @@ fn expected(answer: Answer) -> Document {
         Answer::Review(value) => Document::Review(value),
         Answer::Status(value) => Document::Status(value),
         Answer::Branch(value) => Document::Branch(value),
-        Answer::User(_)
+        Answer::Error(_)
+        | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)
         | Answer::Search { .. }
@@ -223,5 +224,69 @@ fn write_bodies_enforce_fields_types_and_bounds() {
         let error = forgejo::decode_route(temper_forge_forgejo::request::Method::Post, &target, body, &limits)
             .expect_err("malformed request");
         assert!(error.contains(&format!("{:?}", field.as_bytes())), "{field}: {error}");
+    }
+}
+use temper_forge_forgejo::{
+    document::ErrorBody,
+    failure::{self, Refusal},
+};
+fn failure_cases() -> Vec<(&'static str, u16, &'static [u8], Option<Refusal>)> {
+    vec![
+        ("merge-stale-head", 409, b"head out of date", Some(Refusal::HeadOutOfDate)),
+        ("update-conflict", 409, b"merge failed because of conflict", Some(Refusal::UpdateConflict)),
+        ("merge-closed", 405, b"", Some(Refusal::MergeClosed)),
+        ("merge-conflict", 405, b"Please try again later", Some(Refusal::MergeConflict)),
+        ("merge-protected", 405, b"not allowed to merge [reason: Does not have enough approvals]", Some(Refusal::MergeProtected)),
+        ("merge-style-refused", 405, b"squash is not an allowed merge style for this repository", Some(Refusal::MergeStyle)),
+        ("create-issue-empty-title", 422, b"[Title]: Required", Some(Refusal::Empty)),
+        ("create-branch-exists", 409, b"The branch already exists.", None),
+        ("no-token", 401, b"token is required", None),
+        ("wrong-token", 401, b"token is malformed: token contains an invalid number of segments\naccess token does not exist [sha: 000000000000000000000000000000000000000c]\ntoken is malformed: token contains an invalid number of segments\ntask with token \"000000000000000000000000000000000000000c\": resource does not exist\nauthorized integration: parse JWT error: token is malformed: token contains an invalid number of segments", None),
+        ("owner-permission", 403, b"Only admins can query all permissions, repo admins can query all repo permissions, collaborators can query only their own", None),
+        ("writer-branch-protection", 403, b"user should be an owner or a collaborator with admin write of a repository", None),
+        ("writer-branch-protections", 403, b"user should be an owner or a collaborator with admin write of a repository", None),
+        ("delete-protected-branch", 403, b"can not delete default branch", None),
+        ("archived-write", 423, b"<Repository 3:fixture/archived> is archived", None),
+        ("missing-issue", 404, b"The target couldn't be found.", None),
+        ("raw-file-missing", 404, b"The target couldn't be found.", None),
+        ("stranger-repository-by-path", 404, b"The target couldn't be found.", None),
+        ("stranger-repository-by-id", 404, b"The target couldn't be found.", None),
+        ("delete-missing-branch", 500, b"", None),
+        ("moved-repository", 301, b"", None),
+        ("open-pull-exists", 409, b"pull request already exists for these targets [id: 1, issue_id: 1, head_repo_id: 1, base_repo_id: 1, head_branch: feature/slash, base_branch: main]", None),
+    ]
+}
+#[test]
+fn failure_transcripts_name_their_refusal_by_status_and_message() {
+    for (case, status, message, expected) in failure_cases() {
+        let transcript = forgejo::transcript(case);
+        assert_eq!(transcript.status, status, "{case}");
+        let decoded = forgejo::decode_error(&transcript.body);
+        if case == "moved-repository" {
+            assert!(decoded.document.is_err(), "{case}: no JSON message");
+        } else {
+            assert_eq!(
+                decoded.document,
+                Ok(Document::Error(ErrorBody { message: Body::Kept(Box::from(message)) })),
+                "{case}"
+            );
+        }
+        assert!(decoded.rows.is_empty(), "{case}");
+        assert_eq!(failure::refusal(status, message), expected, "{case}");
+    }
+}
+#[test]
+fn error_answers_meet_the_client_with_the_transcripts_shape() {
+    for (case, _, message, _) in failure_cases() {
+        if case == "wrong-token" || case == "moved-repository" {
+            continue;
+        }
+        let expected = ErrorBody { message: Body::Kept(Box::from(message)) };
+        let encoded = server::encode(&Answer::Error(expected.clone()), &forgejo::limits()).expect("error encoding");
+        let shape = forgejo::shape(&forgejo::transcript(case).body);
+        for field in forgejo::shape(&encoded) {
+            assert!(shape.contains(&field), "{case}: {field:?}");
+        }
+        assert_eq!(forgejo::decode_error(&encoded).document, Ok(Document::Error(expected)), "{case}");
     }
 }

@@ -87,7 +87,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             }
             json.array_end();
         }
-        Answer::Comment(_)
+        Answer::Error(_)
+        | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)
         | Answer::User(_)

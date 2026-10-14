@@ -170,6 +170,7 @@ impl Start {
                 None
                 | Some(
                     Kind::User
+                    | Kind::Error
                     | Kind::Write(_)
                     | Kind::Settings
                     | Kind::Search
@@ -181,7 +182,8 @@ impl Start {
                 ) => Step::Demand(tokenizer::Request::Next),
             },
             Move::End(
-                Kind::Write(_)
+                Kind::Error
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
@@ -201,7 +203,8 @@ impl Start {
                     }
                     Kind::Search => Document::Search { ok: self.ok },
                     Kind::Users => Document::Listed { skipped: 0 },
-                    Kind::Write(_)
+                    Kind::Error
+                    | Kind::Write(_)
                     | Kind::Review(_)
                     | Kind::Branch(_)
                     | Kind::File(_)
@@ -229,7 +232,8 @@ impl Start {
                         _ => unreachable!("settings table"),
                     }
                 }
-                Kind::Write(_)
+                Kind::Error
+                | Kind::Write(_)
                 | Kind::Search
                 | Kind::Users
                 | Kind::Review(_)
@@ -259,7 +263,8 @@ impl Start {
                     }
                     _ => unreachable!("repository string table"),
                 },
-                Kind::Write(_)
+                Kind::Error
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Search
                 | Kind::Users
@@ -280,6 +285,7 @@ impl Start {
                     _ => unreachable!("repository bool table"),
                 },
                 Kind::User
+                | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Users

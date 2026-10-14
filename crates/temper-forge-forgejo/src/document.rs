@@ -98,6 +98,14 @@ pub enum Document {
     Compare(Compare),
     Runs { total_count: u64 },
     Run(Run),
+    Error(ErrorBody),
+}
+/// An error message capped at `string_bytes`, retaining its length when long.
+/// A real 401 may echo the API token in this message; callers must never log it.
+/// Fake 401 answers use only `token is required`.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ErrorBody {
+    pub message: Body,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum IssueState {

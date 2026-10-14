@@ -75,6 +75,7 @@ pub enum Answer {
     Comment(Comment),
     Status(CommitStatus),
     Review(Review),
+    Error(crate::document::ErrorBody),
     Pull(PullRequest),
     Files(Box<[crate::document::ChangedFile]>),
     Compare {
@@ -113,6 +114,16 @@ pub fn encode(answer: &Answer, limits: &Limits) -> Result<Box<[u8]>, writer::Ref
 }
 fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refusal> {
     match answer {
+        Answer::Error(value) => {
+            json.object_start();
+            json.key(b"message");
+            match &value.message {
+                crate::document::Body::Kept(message) => json.string(message),
+                crate::document::Body::Long(_) => return Err(writer::Refusal::TooLong),
+            }
+            json.object_end();
+            Ok(())
+        }
         Answer::Comment(value) => items::comment(json, value),
         Answer::Status(value) => {
             items::commit_status(json, value);

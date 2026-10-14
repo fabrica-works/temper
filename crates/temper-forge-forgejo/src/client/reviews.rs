@@ -217,7 +217,8 @@ impl Reviews {
                 ReviewKind::Reviews | ReviewKind::Comments => Ok(()),
             },
             Move::End(
-                Kind::Write(_)
+                Kind::Error
+                | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search

@@ -6,6 +6,7 @@ use crate::{
     limits::Limits,
     request::{Method, Request, ReviewEvent, UpdateStyle},
 };
+use alloc::boxed::Box;
 use skein_json::writer::{self, Encoder};
 use skein_lib::Writer;
 pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
@@ -246,4 +247,39 @@ fn write(json: &mut Encoder, request: &Request) {
         | Request::DeleteBranch { .. } => unreachable!("write body selection"),
     }
     json.object_end();
+}
+
+use crate::{
+    decode::{
+        Step,
+        walk::{Move, Value},
+    },
+    document::{Body, Document, ErrorBody},
+};
+#[derive(Debug)]
+pub(super) struct Error {
+    message: Body,
+}
+impl Error {
+    pub(super) fn new() -> Self {
+        Self { message: Body::Kept(Box::from([])) }
+    }
+    pub(super) fn step(&mut self, movement: Move) -> Step {
+        match movement {
+            Move::Demand(demand) => Step::Demand(demand),
+            Move::Scalar { value, .. } => {
+                match value {
+                    Value::Body(body) => self.message = body,
+                    Value::Number(_) | Value::Text(_) | Value::Boolean(_) | Value::Time(_) | Value::Id(_) => {
+                        unreachable!("error field table")
+                    }
+                }
+                Step::Demand(skein_json::tokenizer::Request::Next)
+            }
+            Move::End(_) => Step::Demand(skein_json::tokenizer::Request::Next),
+            Move::Done => Step::Done(Document::Error(ErrorBody {
+                message: core::mem::replace(&mut self.message, Body::Kept(Box::from([]))),
+            })),
+        }
+    }
 }

@@ -344,3 +344,41 @@ fn write_other_cases() -> Vec<(&'static str, Request)> {
     }
     rows
 }
+/// A global bound above every committed JSON transcript's tokenizer steps.
+pub const STEP_BOUND: usize = 1_000_000;
+#[must_use]
+pub fn decode_error(body: &[u8]) -> Decoded {
+    let limits = limits();
+    decode_answer(client::error_decoder(&limits), body, &limits)
+}
+/// JSON transcripts with their request, or none when their status is an error.
+/// Unread write answers also use the error decoder as a bounded JSON shape check.
+#[must_use]
+pub fn json_cases() -> Vec<(String, Option<Request>)> {
+    let mut cases = vec![];
+    for case in transcript_cases() {
+        let transcript = transcript(&case);
+        if serde_json::from_slice::<serde_json::Value>(&transcript.body).is_err() {
+            continue;
+        }
+        let request = if transcript.status < 300 {
+            let request = route(&transcript);
+            if client::decoder(&request, &limits()).is_some() { Some(request) } else { None }
+        } else {
+            None
+        };
+        cases.push((case, request));
+    }
+    cases
+}
+#[must_use]
+pub fn transcript_cases() -> Vec<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/forgejo-conformance/transcripts");
+    let mut entries: Vec<_> = fs::read_dir(root)
+        .expect("transcripts directory")
+        .map(|entry| entry.expect("transcript entry"))
+        .filter(|entry| entry.file_type().expect("entry type").is_dir())
+        .collect();
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    entries.into_iter().map(|entry| entry.file_name().into_string().expect("transcript name")).collect()
+}

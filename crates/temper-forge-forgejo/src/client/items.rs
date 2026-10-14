@@ -338,6 +338,7 @@ impl Items {
                 | Kind::Action(_)
                 | Kind::Review(_)
                 | Kind::Branch(_)
+                | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository
@@ -371,6 +372,7 @@ impl Items {
                 | Kind::Review(_)
                 | Kind::Branch(_)
                 | Kind::User
+                | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository

@@ -24,6 +24,7 @@ pub(crate) enum Item {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Kind {
+    Error,
     Write(crate::server::writes::WriteKind),
     User,
     Settings,
@@ -61,6 +62,7 @@ const fn optional(key: &'static [u8], read: Read) -> Field {
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
+        Kind::Error => error_fields(),
         Kind::Write(kind) => crate::server::writes::fields(kind),
         Kind::File(kind) => crate::client::files::fields(kind),
         Kind::Action(kind) => crate::client::actions::fields(kind),
@@ -68,22 +70,7 @@ fn fields(kind: Kind) -> &'static [Field] {
         Kind::Branch(kind) => crate::client::branches::fields(kind),
         Kind::User => const { &[field(b"id", Read::Number), field(b"login", Read::Text)] },
         Kind::Settings => settings_fields(),
-        Kind::Repository => {
-            const {
-                &[
-                    field(b"id", Read::Number),
-                    field(b"owner", Read::Object(Kind::User)),
-                    field(b"name", Read::Text),
-                    field(b"object_format_name", Read::Text),
-                    field(b"default_branch", Read::Text),
-                    field(b"default_merge_style", Read::Text),
-                    field(b"allow_merge_commits", Read::Boolean),
-                    field(b"allow_squash_merge", Read::Boolean),
-                    field(b"allow_rebase", Read::Boolean),
-                    field(b"html_url", Read::Text),
-                ]
-            }
-        }
+        Kind::Repository => repository_fields(),
         Kind::Search => const { &[field(b"data", Read::Array(Kind::Users)), field(b"ok", Read::Boolean)] },
         Kind::Item(Item::Issue) => {
             const {
@@ -161,6 +148,9 @@ fn fields(kind: Kind) -> &'static [Field] {
         ) => const { &[] },
     }
 }
+fn error_fields() -> &'static [Field] {
+    const { &[field(b"message", Read::Body)] }
+}
 fn settings_fields() -> &'static [Field] {
     const { &[field(b"max_response_items", Read::Number), field(b"default_paging_num", Read::Number)] }
 }
@@ -184,7 +174,8 @@ fn element(kind: Kind) -> Option<Kind> {
         Kind::Item(Item::Comments) => Some(Kind::Item(Item::Comment)),
         Kind::Item(Item::Statuses) => Some(Kind::Item(Item::Status)),
         Kind::Item(Item::Labels) => Some(Kind::Item(Item::Label)),
-        Kind::User
+        Kind::Error
+        | Kind::User
         | Kind::Settings
         | Kind::Repository
         | Kind::Search
@@ -369,7 +360,11 @@ impl Walk {
                         self.want = Want::Value { field: *field, bit };
                         let demand = match field.read {
                             Read::Text | Read::Time | Read::Id { .. } => tokenizer::Request::Text(limits.string_bytes),
-                            Read::Body => tokenizer::Request::Text(limits.body_bytes),
+                            Read::Body => tokenizer::Request::Text(if frame.kind == Kind::Error {
+                                limits.string_bytes
+                            } else {
+                                limits.body_bytes
+                            }),
                             Read::Number | Read::Boolean | Read::Object(_) | Read::Array(_) => tokenizer::Request::Next,
                         };
                         return Ok(Move::Demand(demand));
@@ -485,5 +480,22 @@ fn scalar(field: Field, event: &tokenizer::Event) -> Result<Value, Malformed> {
         | tokenizer::Event::Done
         | tokenizer::Event::Failed(_)
         | tokenizer::Event::Closed => Err(wrong),
+    }
+}
+
+fn repository_fields() -> &'static [Field] {
+    const {
+        &[
+            field(b"id", Read::Number),
+            field(b"owner", Read::Object(Kind::User)),
+            field(b"name", Read::Text),
+            field(b"object_format_name", Read::Text),
+            field(b"default_branch", Read::Text),
+            field(b"default_merge_style", Read::Text),
+            field(b"allow_merge_commits", Read::Boolean),
+            field(b"allow_squash_merge", Read::Boolean),
+            field(b"allow_rebase", Read::Boolean),
+            field(b"html_url", Read::Text),
+        ]
     }
 }

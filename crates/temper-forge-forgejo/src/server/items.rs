@@ -226,7 +226,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.object_end();
         }
-        Answer::Comment(_)
+        Answer::Error(_)
+        | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)
         | Answer::Files(_)

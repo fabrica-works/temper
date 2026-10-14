@@ -155,7 +155,8 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::CombinedStatus { state, statuses, .. } => {
             (Document::CombinedStatus(state), statuses.into_vec().into_iter().map(Row::Status).collect())
         }
-        Answer::Comment(_)
+        Answer::Error(_)
+        | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)
         | Answer::Files(_)

@@ -183,6 +183,7 @@ impl Files {
             }
             Move::End(
                 Kind::User
+                | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository

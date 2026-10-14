@@ -81,6 +81,7 @@ impl Actions {
             Move::End(Kind::Action(ActionKind::Runs | ActionKind::Jobs | ActionKind::Listing)) => Ok(()),
             Move::End(
                 Kind::User
+                | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Repository

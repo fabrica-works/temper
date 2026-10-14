@@ -81,6 +81,7 @@ pub struct Decoder {
 }
 #[derive(Debug)]
 enum DecoderState {
+    Error(writes::Error),
     Start(start::Start),
     Items(Box<items::Items>),
     Files(Box<files::Files>),
@@ -126,6 +127,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
+        Kind::Error => DecoderState::Error(writes::Error::new()),
         Kind::Write(_) => unreachable!("answer kind selection"),
         Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
         Kind::Action(kind) => DecoderState::Actions(actions::Actions::new(kind)),
@@ -142,10 +144,17 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
 pub fn first(_decoder: &Decoder) -> tokenizer::Request {
     tokenizer::Request::Next
 }
+/// Decodes error JSON. A malformed body yields no document and no message;
+/// the caller reads its status alone, including for an empty or non-JSON body.
+#[must_use]
+pub fn error_decoder(limits: &Limits) -> Decoder {
+    Decoder { walk: Walk::new(Kind::Error, limits), state: DecoderState::Error(writes::Error::new()) }
+}
 pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) -> Step {
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
+            DecoderState::Error(state) => state.step(movement),
             DecoderState::Files(state) => state.step(movement, &decoder.walk),
             DecoderState::Actions(state) => state.step(movement, &decoder.walk),
             DecoderState::Start(state) => state.step(movement, decoder.walk.parent()),
@@ -159,7 +168,8 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
 pub fn keep_after(decoder: &mut Decoder, after: u64) {
     match &mut decoder.state {
         DecoderState::Items(state) => state.keep_after(after),
-        DecoderState::Files(_)
+        DecoderState::Error(_)
+        | DecoderState::Files(_)
         | DecoderState::Actions(_)
         | DecoderState::Start(_)
         | DecoderState::Reviews(_)

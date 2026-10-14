@@ -418,3 +418,58 @@ fn an_edit_writes_only_the_fields_it_is_given() {
         assert_eq!(client::encode(&request, &limits).unwrap().body.as_deref(), Some(expected));
     }
 }
+#[test]
+fn each_refusal_message_reads_back_from_what_the_server_answers() {
+    use crate::failure::{self, Refusal};
+    for refusal in [
+        Refusal::MergeClosed,
+        Refusal::MergeConflict,
+        Refusal::MergeProtected,
+        Refusal::MergeStyle,
+        Refusal::HeadOutOfDate,
+        Refusal::UpdateConflict,
+        Refusal::Empty,
+    ] {
+        let (status, message) = failure::answer(refusal);
+        assert_eq!(failure::refusal(status, message), Some(refusal));
+        assert_eq!(failure::refusal(status.saturating_add(1), message), None);
+        let mut longer = Writer::new(message.len().saturating_add(1));
+        longer.put(message).unwrap();
+        longer.put(b"!").unwrap();
+        let longer = longer.finish();
+        assert_eq!(failure::refusal(status, &longer), None);
+        let limits = fixtures::limits();
+        let encoded = crate::server::encode(
+            &crate::server::Answer::Error(crate::document::ErrorBody { message: Body::Kept(Box::from(message)) }),
+            &limits,
+        )
+        .unwrap();
+        let decoded = fixtures::decode(client::error_decoder(&limits), &encoded, &limits);
+        assert_eq!(
+            decoded.document,
+            Ok(Document::Error(crate::document::ErrorBody { message: Body::Kept(Box::from(message)) }))
+        );
+    }
+}
+#[test]
+fn an_error_message_keeps_its_cap_and_a_long_messages_length() {
+    let limits = fixtures::small();
+    let rows: [(&[u8], Body); 2] = [
+        (br#"{"message":"12345678"}"#, Body::Kept(Box::from(*b"12345678"))),
+        (br#"{"message":"123456789"}"#, Body::Long(9)),
+    ];
+    for (bytes, message) in rows {
+        let decoded = fixtures::decode(client::error_decoder(&limits), bytes, &limits);
+        assert_eq!(decoded.document, Ok(Document::Error(crate::document::ErrorBody { message })));
+    }
+}
+
+#[test]
+fn an_empty_or_non_json_error_body_has_no_message_document() {
+    let limits = fixtures::limits();
+    for bytes in [b"".as_slice(), b"method not allowed"] {
+        let decoded = fixtures::decode(client::error_decoder(&limits), bytes, &limits);
+        assert!(decoded.document.is_err(), "no message document for {bytes:?}");
+        assert!(decoded.rows.is_empty());
+    }
+}
