@@ -1446,6 +1446,7 @@ dependencies = [
  "skein-lib",
  "skein-oauth",
  "skein-oauth-accounts",
+ "skein-tls",
  "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",

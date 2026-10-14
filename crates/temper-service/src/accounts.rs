@@ -9,7 +9,7 @@ use jig_protocol_accounts::{handed_in, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
 use skein_io::{
     self as io, file, file_layer,
-    kernel::{Complete, Fd, Submit},
+    kernel::{Complete, Fd, Op, Submit},
 };
 use skein_lib::{CryptoRng, Decimal, Env, List, Map, Queue, Secret, Time, Token, Wall};
 use skein_oauth as oauth;
@@ -503,4 +503,92 @@ fn number(bytes: &[u8]) -> Option<u32> {
         value = value.checked_mul(10)?.checked_add(u32::from(byte.checked_sub(b'0')?))?;
     }
     Some(value)
+}
+#[derive(Debug)]
+pub(super) struct Kernel {
+    routes: Map<Token, (bool, Token, Option<Token>)>,
+    retired: Map<(bool, Token), Token>,
+    next: u64,
+}
+impl Kernel {
+    pub fn new(room: u32) -> Self {
+        Self { routes: Map::with_capacity(room), retired: Map::with_capacity(room), next: 1 }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.routes.is_empty() && self.retired.is_empty()
+    }
+    pub fn publish(&mut self, files: bool, source: &mut Queue<Submit>, target: &mut Queue<Submit>) {
+        for _ in 0..source.len() {
+            if target.room() == 0 || self.routes.len() == self.routes.capacity() {
+                break;
+            }
+            let mut submit = source.pop().expect("kernel submissions");
+            let mut cancel = None;
+            if let Op::Cancel { target } = &mut submit.kind {
+                cancel = Some(*target);
+                let mut found = None;
+                for (external, (owner, internal, _)) in &self.routes {
+                    if *owner == files && *internal == *target {
+                        found = Some(*external);
+                        break;
+                    }
+                }
+                *target = match found {
+                    Some(external) => external,
+                    None => self.retired.remove(&(files, *target)).expect("cancel names submitted operation"),
+                };
+            }
+            let external = Token::new(self.next);
+            self.next = self.next.checked_add(1).expect("kernel operation ids");
+            self.routes.insert(external, (files, submit.op, cancel)).expect("kernel route room");
+            submit.op = external;
+            target.push(submit);
+        }
+    }
+    pub fn complete(
+        &mut self,
+        mut complete: Complete,
+        sockets: &Queue<Submit>,
+        files_queue: Option<&Queue<Submit>>,
+    ) -> (bool, Complete) {
+        let (files, internal, cancel) = self.routes.remove(&complete.op).expect("submitted operation route");
+        let source = if files { files_queue.expect("file route has queue") } else { sockets };
+        for queued in source {
+            if let Op::Cancel { target } = queued.kind
+                && target == internal
+            {
+                self.retired.insert((files, internal), complete.op).expect("pending cancellation route");
+                break;
+            }
+        }
+        complete.op = internal;
+        if let Some(internal) = cancel
+            && let Op::Cancel { target } = &mut complete.kind
+        {
+            *target = internal;
+        }
+        (files, complete)
+    }
+}
+pub(crate) fn worst_case(limits: &driver::Limits, room: u32) -> Option<u64> {
+    driver::worst_case(limits)?
+        .checked_add(u64::try_from(size_of::<Accounts>()).ok()?)?
+        .checked_add(file_layer::FileIo::worst_case(
+            limits.accounts.checked_add(2)?,
+            limits.http.read,
+            1,
+            limits.client.document.record_bytes,
+        )?)?
+        .checked_add(Queue::<io::Request>::worst_case(room)?)?
+        .checked_add(Queue::<driver::Event>::worst_case(room)?)?
+        .checked_add(Queue::<driver::FileLower>::worst_case(room)?)?
+        .checked_add(Queue::<(file::Request, Time)>::worst_case(room)?)?
+        .checked_add(Queue::<Submit>::worst_case(room)?)?
+        .checked_add(Queue::<file::Event>::worst_case(room)?)?
+        .checked_add(List::<Secret>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<Token, u32>::worst_case(limits.accounts)?)?
+        .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
+        .checked_add(u64::from(room).checked_mul(u64::from(limits.client.document.record_bytes).checked_add(4096)?)?)?
+        .checked_add(List::<driver::Request>::worst_case(limits.accounts)?)?
+        .checked_add(u64::from(limits.accounts).checked_mul(u64::from(limits.client.document.record_bytes))?)
 }

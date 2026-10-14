@@ -134,3 +134,53 @@ fn a_failed_commit_releases_nothing_after_it() {
     assert!(service.engine.requests.is_empty(), "later outputs stayed behind the barrier");
     assert!(service.engine.store.above.is_empty());
 }
+
+#[test]
+fn an_engine_that_cannot_fit_its_memory_is_refused_before_start() {
+    let mut settings = fixtures::engine();
+    settings.jig.memory = 1;
+    // Instruction content must be available before children are constructed.
+    settings.files.entries = skein_lib::List::with_capacity(1);
+    settings
+        .files
+        .entries
+        .push((b"charters/chat.txt".as_slice().into(), skein_lib::Secret::new(b"Answer".as_slice().into())))
+        .unwrap();
+    let Err(problems) = crate::Service::engine(settings, &fixtures::seeds(), None) else { panic!("memory refused") };
+    let problem = problems.problems.get(0).unwrap();
+    assert_eq!(problem.path, jig_protocol_config::Path::root().member(b"engine").member(b"memory_bytes"));
+}
+#[test]
+fn kernel_operation_numbers_do_not_mix_account_files_and_io() {
+    use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
+    use skein_lib::{Queue, Token};
+    let mut kernel = crate::accounts::Kernel::new(4);
+    let mut submissions = Queue::with_capacity(4);
+    let mut source = Queue::with_capacity(1);
+    let original = Token::new(7);
+    for files in [false, true] {
+        source.push(Submit { op: original, kind: Op::Close { fd: Fd::new(7) } });
+        kernel.publish(files, &mut source, &mut submissions);
+    }
+    let first = submissions.pop().unwrap();
+    let second = submissions.pop().unwrap();
+    assert_ne!(first.op, second.op);
+    for (submit, expected_files) in [(first, false), (second, true)] {
+        let external = submit.op;
+        let (files, complete) = kernel.complete(
+            Complete { op: external, kind: submit.kind, result: Ok(Done::Nothing) },
+            &source,
+            Some(&source),
+        );
+        assert_eq!(files, expected_files, "operation {external:?}");
+        assert_eq!(complete.op, original, "operation {external:?}");
+    }
+    assert!(kernel.is_empty());
+}
+#[test]
+fn an_io_listener_failure_stops_the_engine() {
+    let mut service = fixtures::started();
+    service.told.push(skein_io::Event::Closed { owner: skein_lib::Token::new(crate::tokens::WORKER_LISTENERS) });
+    fixtures::turn(&mut service);
+    assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Listener)));
+}
