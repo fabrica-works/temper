@@ -76,7 +76,7 @@ pub fn page(
     builder.open(Role::Button);
     builder.name(&words::say(words, Word::Adopt, &[]));
     builder.bind(bindings.insert(Meaning::Adopt));
-    if form.pending.is_some() || form.served == forge::Served::OutOfDate {
+    if !form.confirmed || form.pending.is_some() || form.served == forge::Served::OutOfDate {
         builder.state(State::Disabled);
     }
     builder.close();

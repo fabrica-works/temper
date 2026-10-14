@@ -74,6 +74,7 @@ pub struct Form {
     pub pending: Option<(Token, RequestProgress)>,
     pub outcome: Option<Answer>,
     pub served: Served,
+    pub confirmed: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Marks {
@@ -101,6 +102,7 @@ pub fn form(project: u32) -> Form {
         pending: None,
         outcome: None,
         served: Served::Unknown,
+        confirmed: false,
     }
 }
 fn forge_number(form: &Form) -> Option<u16> {
@@ -232,6 +234,7 @@ pub(super) fn mark(form: &mut Form, most: u32) {
 pub(super) fn reset(form: &mut Form, answer: Answer) {
     let mut defaults = self::form(form.project);
     defaults.served = form.served;
+    defaults.confirmed = form.confirmed;
     for (field, old) in defaults.texts.iter_mut().zip(&form.texts) {
         field.written = old.written.checked_add(1).expect("field writes fit u64");
     }

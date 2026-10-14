@@ -95,12 +95,17 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
     match event {
         Event::Confirmed { party } => {
             side.party = party;
+            if let Some(draft) = &mut side.form {
+                draft.confirmed = party.is_some();
+                side.changed();
+            }
         }
         Event::Went { address } => {
             side.address = Some(address);
             let Address::Adopt { project } = address;
             let mut draft = form(project);
             draft.served = side.served;
+            draft.confirmed = side.party.is_some();
             side.form = Some(draft);
             side.changed();
         }

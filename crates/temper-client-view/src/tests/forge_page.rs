@@ -66,6 +66,7 @@ fn a_check_takes_a_press_or_a_toggle() {
 }
 fn form() -> forge::Form {
     let mut form = forge::form(1);
+    form.confirmed = true;
     form.texts[forge::Text::Owner.index()].text = Box::from(*b"acme");
     form.texts[forge::Text::Name.index()].text = Box::from(*b"shop");
     form
@@ -191,6 +192,21 @@ fn a_field_input_is_typed_and_older_binding_tokens_decode_nothing() {
     bindings.begin();
     let _new = bindings.insert(bindings::Meaning::Adopt);
     assert_eq!(bindings::decode(&bindings, field.token, Act::Press), None);
+}
+#[test]
+fn adopt_is_disabled_until_a_party_is_confirmed() {
+    let mut view = fixtures::view();
+    let mut root = fixtures::adoption_root();
+    for (party, disabled) in [(None, true), (Some(73), false), (None, true)] {
+        fixtures::root_event(&mut root, temper_client_domain::Event::Forge(forge::Event::Confirmed { party }));
+        let rendered = fixtures::build(&mut view, &root);
+        let node = fixtures::find(rendered, Role::Button, b"Adopt").expect("Adopt button");
+        for button in rendered.nodes() {
+            if button.id == node {
+                assert_eq!(button.states.as_slice().contains(&State::Disabled), disabled, "party {party:?}");
+            }
+        }
+    }
 }
 #[test]
 fn pending_or_out_of_date_disables_adopt() {
