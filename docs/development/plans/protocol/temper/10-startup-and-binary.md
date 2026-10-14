@@ -984,9 +984,13 @@ enum Process { Binary(Box<Binary>), Stdout(Box<StdoutReader>), Peer(Box<skein_fa
 - **The worker's root through a link.** configuration.md, 4 refuses one;
   `make_root` follows links. Default: `symlink_metadata` before and after
   `make_root`, both refusing a link.
-- **One io in one process** (09's question). Default: 10.2's sockets
-  check as Scope says; if 09.3 landed another rule, that rule, checked
-  here.
+- **One io in one process** (09's question). Decided by ruling 132:
+  the process's io is the engine part's `limits.io` with the worker
+  part's added, as jig's reference startup composes them
+  (`testing/jig-test-service/src/startup.rs:547-600`: `sockets` and
+  `names` summed, `intake`, `receive`, `output` and `sends` the larger);
+  10.2's check counts the entities the configuration enables against
+  that sum.
 - **A problem past jig's 32.** Default: `and N more`, as jig's `past`
   counts them.
 - **The unreached forge once 14.1 lands.** The process tier's forge is

@@ -687,6 +687,27 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      names the values. The client's, the root's and the store's presets
      are unchanged; a larger profile, later, raises them together.
 
+132. **One process's io is its parts' io, summed** (temper 10.2,
+     blocked 2026-10-14T12:16:25Z; plan defect). 09's and 10's default,
+     "one io from the engine's limits", refuses every small document:
+     jig's small `io.sockets` is 16 (`jig-protocol-config/src/profile/small.rs`),
+     the pinned parser has no `io.*` override (`overrides.rs:8-35`), and
+     one process needs at least 24 (the implementer's count: the client
+     listener and 4 client connections, the worker listener, the accepted
+     worker and the worker's link, `slots × 4` agents, `git_component.operations
+     × 4`). jig's reference startup composes one process's io from each
+     part's: the engine's `limits.io`, then each worker's `sockets` and
+     `names` added and `intake`, `receive`, `output` and `sends` the
+     larger (`testing/jig-test-service/src/startup.rs:547-600`), and jig's
+     worker part has `limits.io` of its own (`worker.rs:17`). So temper
+     does the same, in one function `Service::new` and startup's
+     envelope share (ruling 130's `startup_worst_case` takes it); 10.2's
+     check counts the entities the configuration enables (the count
+     above, the accounts' connections when accounts are configured)
+     against the summed `sockets`, refusing at `engine.limits.io.sockets`
+     "by how much". No profile constant and no parser change. Sessions
+     09 and 10 say so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
