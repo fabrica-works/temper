@@ -56,8 +56,8 @@ pub struct Place {
 /// names, in [`Done::Succeeded`] if it names none, or in [`Done::Failed`].
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Op {
-    /// Make the workspace's directory, empty: io removes whatever is there
-    /// first, what the cache evicts or what an earlier worker left.
+    /// Make the workspace's directory empty: rename the old tree aside
+    /// into trash, make it afresh, and sweep the old tree later.
     Make { workspace: Token },
     /// Clone the repository at `remote` on the forge into its directory, which
     /// does not exist yet, without checking a tree out. Fails `Missing` if the
@@ -72,9 +72,10 @@ pub enum Op {
     /// `Exists`.
     Create { at: Place, remote: Box<[u8]>, branch: Box<[u8]>, commit: Commit, identity: u32 },
     /// Make the repository's working tree exactly `commit`'s tree: what is not
-    /// in it is removed, and the git directory is left as it is.
+    /// in it is removed, including untracked nested repositories. HEAD is
+    /// detached at commit, and the merge state is cleared.
     CheckOut { at: Place, commit: Commit },
-    /// Merge fetched `theirs` into the checked-out branch, without committing;
+    /// Merge fetched `theirs` into the checked-out commit, without committing;
     /// leave conflict markers and merge state on disk. Ends Merged/Conflicted.
     Merge { at: Place, theirs: Commit },
     /// Commit the working tree exactly as it is, on `parent`, with the message `title` and `body`,
@@ -134,12 +135,13 @@ pub enum Done {
 /// Why an operation failed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Fault {
-    /// `Clone`, `Fetch`: the forge has no such repository, branch or commit.
+    /// `Clone`, `Fetch`, `Create`, `Push`: the forge has no such repository;
+    /// Fetch may also name a branch or commit the forge lacks.
     Missing { missing: Missing },
     /// `Clone`, `Fetch`, `Create`, `Push`: the forge refused: the identity's
     /// credentials or permissions, a protected branch, a hook.
     Refused,
-    /// `Clone`, `Fetch`, `Create`, `Push`: the forge could not be reached.
+    /// `Clone`, `Fetch`, `Create`, `Push`: the forge could not be reached or failed.
     Unreachable,
     /// Something failed on the worker's side: the disk, or git itself.
     Broken,

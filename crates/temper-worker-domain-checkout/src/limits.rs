@@ -16,8 +16,7 @@ pub struct Limits {
     pub workspaces: u32,
     /// Repositories a spec names: at least one.
     pub repositories: u32,
-    /// The longest workstream key, repository name or remote, branch or
-    /// identity.
+    /// The longest workstream key, repository name or remote, or branch.
     pub name_bytes: u32,
     /// The longest commit message, its title and body together.
     pub message_bytes: u32,
