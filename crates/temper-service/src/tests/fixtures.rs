@@ -515,6 +515,12 @@ pub fn repository(tag: u32, owner: &[u8], name: &[u8]) -> temper_engine_domain::
 }
 pub fn assignment_with(repository: temper_engine_domain::ForgeRepository) -> temper_engine_domain::Assignment {
     let settings = engine();
+    assignment_with_settings(repository, &settings)
+}
+pub fn assignment_with_settings(
+    repository: temper_engine_domain::ForgeRepository,
+    settings: &settings::Engine,
+) -> temper_engine_domain::Assignment {
     let task = task_record(7);
     temper_engine_domain::Assignment {
         task: 7,
@@ -698,6 +704,10 @@ pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
 }
 pub fn agent() -> settings::Agent {
     use skein_lib::Duration;
+    let mut endpoints = skein_lib::List::with_capacity(1);
+    endpoints
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, account: 1, dialect: 0 })
+        .unwrap();
     let host_limits = smith_host_domain::Limits {
         agents: 1,
         directories: 1,
@@ -761,7 +771,7 @@ pub fn agent() -> settings::Agent {
     };
     limits.channel.output_bytes = smith_host_protocol::output_bytes(&limits).expect("host frames");
     settings::Agent {
-        endpoints: encoding(&engine()).endpoints,
+        endpoints: smith_protocol_channel::Endpoints::new(endpoints),
         limits,
         host_limits,
         bounds: jig_domain_host::Bounds {
@@ -783,10 +793,12 @@ pub fn agent() -> settings::Agent {
 }
 
 mod worker;
+mod worker_git;
 pub use worker::{
     AGENT_JSON, NOW, TEMPER, application_value, assignment as worker_assignment, chat_assignment, identity,
     one_repository, repository_assignment, spawn, worker, worker_agent, worker_files, worker_limits, worker_settings,
 };
+pub use worker_git::{IDENTITY, WorkerStand, started_worker};
 pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
 }

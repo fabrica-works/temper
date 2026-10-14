@@ -50,7 +50,7 @@ pub fn worker() -> crate::Worker {
         &worker_agent(),
         &worker_limits(),
         &worker_files(),
-        crate::WorkerRuntime { root: skein_io::kernel::Fd::new(9) },
+        crate::WorkerRuntime { root: skein_io::kernel::Fd::new(9), path: b"/worker".as_slice().into() },
         7,
     )
     .expect("worker settings fit")
@@ -67,11 +67,11 @@ pub fn spawn(worker: &mut crate::Worker) -> (skein_lib::Token, skein_io::kernel:
 fn assigned(repository: bool) -> jig_protocol_worker_link::Request {
     let settings = super::engine();
     let encoding = super::encoding(&settings);
-    let mut assignment = super::assignment_with(super::repository(3, b"acme", b"app"));
+    let mut assignment = super::assignment_with_settings(super::repository(3, b"acme", b"app"), &settings);
     if !repository {
         assignment.workspace.repositories = Box::new([]);
     }
-    let values = super::values_with_identity(1, b"git-token");
+    let values = crate::values::Values::new(2, 8192);
     let jig_protocol_engine_workers::Event::Down { mut down, mut parts, .. } =
         crate::assignment::down(assignment, &settings.forges, &encoding, &values, skein_lib::Token::new(1), NOW)
             .expect("assignment encodes")

@@ -51,7 +51,7 @@ fn an_assignment_with_items_reaches_the_root_decoded_with_its_save() {
 #[test]
 fn undecodable_items_refuse_the_start_as_invalid_naming_them() {
     let mut peer = LinkPeer::new();
-    let mut worker = fixtures::worker();
+    let mut worker = fixtures::started_worker().worker;
     peer.open(&mut worker);
     let link::Request::Down { down, .. } = fixtures::repository_assignment() else { panic!("assignment") };
     worker.link(
@@ -71,7 +71,7 @@ fn undecodable_items_refuse_the_start_as_invalid_naming_them() {
 #[test]
 fn an_answer_goes_up_with_its_left_and_saved_parts() {
     let mut peer = LinkPeer::new();
-    let mut worker = fixtures::worker();
+    let mut worker = fixtures::started_worker().worker;
     peer.open(&mut worker);
     let hub::LinkUp::Answer { run, attempt, answer } = fixtures::answer(hub::Ending::Parked {
         work: hub::Work { left: Some(Token::new(11)), saved: Some(Token::new(12)) },
@@ -127,33 +127,13 @@ fn a_git_identity_s_value_lands_in_the_identities_table_only() {
 
 #[test]
 fn the_agent_runs_as_temper_agent_with_no_credential_in_its_environment() {
-    let mut worker = fixtures::worker();
+    let mut worker = fixtures::started_worker().worker;
     worker.link(fixtures::NOW, fixtures::chat_assignment());
     let (_, launched) = fixtures::spawn(&mut worker);
     assert_eq!(launched.program.as_ref(), fixtures::TEMPER);
     assert_eq!(launched.args.as_ref(), [Box::from(&b"agent"[..]), Box::from(fixtures::AGENT_JSON)]);
     assert_eq!(launched.root, io::kernel::Fd::new(9));
     assert!(launched.env.is_empty(), "no credential reaches an agent");
-}
-
-#[test]
-fn a_git_operation_fails_broken_until_the_git_component_is_wired() {
-    use root::checkout::{Ending, Fact, git::Fault};
-    let mut worker = fixtures::worker();
-    worker.link(fixtures::NOW, fixtures::repository_assignment());
-    worker.iterate(fixtures::NOW, Wall::EPOCH);
-    let mut ends = skein_lib::List::with_capacity(1);
-    while let Some(fact) = worker.root.pop_fact() {
-        if let root::Fact::Checkout { fact: Fact::Ended { done, .. } } = fact {
-            ends.push(done).unwrap();
-        }
-    }
-    assert_eq!(ends.into_boxed().as_ref(), [Ending::Failed { fault: Fault::Broken }]);
-    for request in &*worker.io() {
-        if let io::Request::Spawn { .. } = request {
-            panic!("an unprepared run spawns no agent");
-        }
-    }
 }
 
 #[test]
@@ -170,7 +150,7 @@ fn a_worker_s_secret_is_read_and_checked_at_its_path() {
             &fixtures::worker_agent(),
             &fixtures::worker_limits(),
             &files,
-            crate::WorkerRuntime { root: io::kernel::Fd::new(9) },
+            crate::WorkerRuntime { root: io::kernel::Fd::new(9), path: b"/worker".as_slice().into() },
             7,
         )
         .unwrap_err();
@@ -231,9 +211,6 @@ impl LinkPeer {
     }
     fn open(&mut self, worker: &mut crate::Worker) {
         worker.iterate(fixtures::NOW, Wall::EPOCH);
-        let Some(io::Request::Connect { .. }) = worker.io().pop() else {
-            panic!("worker dials");
-        };
         worker.up(fixtures::NOW, io::Event::Connecting { owner: self.owner, socket: Token::new(44) });
         worker.up(fixtures::NOW, io::Event::Connected { owner: self.owner });
         self.component.down(fixtures::NOW, engine_link::Event::Accepted { connection: Token::new(1) }, &mut self.out);

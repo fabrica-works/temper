@@ -23,6 +23,7 @@ pub struct Limits {
     pub root: Root,
     pub forge: forge::Limits,
     pub checkout: checkout::Limits,
+    pub git_component: temper_worker_protocol_git::Limits,
 }
 /// Refusal of an override; the caller retains its name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -244,7 +245,7 @@ const ROOT: Root = Root {
 #[must_use]
 pub fn profile(profile: Profile) -> Limits {
     match profile {
-        Profile::Small => Limits { root: ROOT, forge: FORGE, checkout: CHECKOUT },
+        Profile::Small => Limits { root: ROOT, forge: FORGE, checkout: CHECKOUT, git_component: GIT },
     }
 }
 /// Set one dotted field name byte for byte.
@@ -270,3 +271,18 @@ pub fn engine(jig: &jig_protocol_config::Limits, limits: &Limits) -> Option<engi
     engine::worst_case(&root)?;
     Some(root)
 }
+
+const GIT: temper_worker_protocol_git::Limits = temper_worker_protocol_git::Limits {
+    // One operation per cached workspace, plus the component's startup and sweep.
+    operations: 3,
+    // At least every conflict path including its terminating NUL.
+    stdout_bytes: 1024,
+    // The tail retained for classification and the checkout's diagnostic.
+    stderr_bytes: 512,
+    // Each stdout/stderr demand, bounded further by io's read size.
+    read_bytes: 4096,
+    // One page of trash entries held while sweeping.
+    sweep_entries: 16,
+    // Every name in that page at the kernel's longest name.
+    sweep_bytes: 4080,
+};

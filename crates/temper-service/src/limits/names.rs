@@ -148,6 +148,24 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"checkout.remote_timeout_ms" => limits.checkout.remote_timeout = duration(value)?,
         b"checkout.local_timeout_ms" => limits.checkout.local_timeout = duration(value)?,
         b"checkout.facts" => limits.checkout.facts = u32::try_from(value).or(Err(Refused::Range))?,
+        b"git_component.operations" => {
+            limits.git_component.operations = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"git_component.stdout_bytes" => {
+            limits.git_component.stdout_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"git_component.stderr_bytes" => {
+            limits.git_component.stderr_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"git_component.read_bytes" => {
+            limits.git_component.read_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"git_component.sweep_entries" => {
+            limits.git_component.sweep_entries = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"git_component.sweep_bytes" => {
+            limits.git_component.sweep_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
         _ => return Err(Refused::Unknown),
     }
     Ok(())

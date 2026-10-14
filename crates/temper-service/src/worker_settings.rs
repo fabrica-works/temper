@@ -28,6 +28,7 @@ pub(crate) fn problem(member: &[u8], what: What) -> Problems {
 
 /// Check the root, host adapter and link before any state is allocated.
 pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> Result<Prepared, Problems> {
+    io::worst_case(&worker.jig.limits.io).ok_or(problem(b"limits", What::Bound))?;
     let address = match worker.jig.engine {
         config::Address::Addr(address) => address,
         config::Address::Host { .. } => return Err(problem(b"engine", What::Form)),
@@ -179,7 +180,8 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
         .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
         .checked_add(command.checked_mul(u64::from(jig.slots).checked_add(1)?)?)?
-        .checked_add(skein_io::worst_case(&jig.limits.io)?)
+        .checked_add(skein_io::worst_case(&jig.limits.io)?)?
+        .checked_add(crate::worker_git::worst_case(own)?)
 }
 
 /// The application's payload version is part of every worker's opening.

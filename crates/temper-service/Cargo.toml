@@ -50,6 +50,7 @@ jig-protocol-worker-link.workspace = true
 
 [dev-dependencies]
 skein-world.workspace = true
+temper-worker-protocol-git-world.workspace = true
 smith-transcript.workspace = true
 
 [lints]

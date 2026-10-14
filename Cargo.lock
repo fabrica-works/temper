@@ -1539,6 +1539,7 @@ dependencies = [
  "temper-worker-domain",
  "temper-worker-domain-checkout",
  "temper-worker-protocol-git",
+ "temper-worker-protocol-git-world",
 ]
 
 [[package]]

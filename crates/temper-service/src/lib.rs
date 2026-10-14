@@ -16,6 +16,7 @@ pub mod identities;
 pub mod translate;
 pub mod values;
 mod worker;
+mod worker_git;
 pub mod worker_route;
 pub mod worker_settings;
 pub use worker::{Worker, WorkerRuntime};

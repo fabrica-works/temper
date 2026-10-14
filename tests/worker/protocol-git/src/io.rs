@@ -106,6 +106,12 @@ impl Below {
         self.arguments.clear();
         self.messages.clear();
     }
+    /// Use the directory descriptor supplied to the worker service.
+    pub fn adopt_root(&mut self, root: kernel::Fd) {
+        assert!(self.children.is_empty() && self.pending.is_empty());
+        self.files.clear();
+        self.files.insert(root, Vec::new());
+    }
     fn token(&mut self) -> Token {
         self.serial += 1;
         Token::new(self.serial)

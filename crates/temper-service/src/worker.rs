@@ -21,11 +21,13 @@ use worker_settings::problem;
 #[derive(Debug)]
 pub struct WorkerRuntime {
     pub root: Fd,
+    pub path: Box<[u8]>,
 }
 #[derive(Debug)]
 pub struct Worker {
     pub(super) root: root::Domain,
-    env: Env<root::Limits>,
+    pub(crate) env: Env<root::Limits>,
+    pub(crate) git: crate::worker_git::Git,
     agent: Agent,
     link: link::Component,
     link_out: Queue<link::Request>,
@@ -74,7 +76,16 @@ impl Worker {
             .or(Err(problem(b"limits", What::Bound)))?;
         let room = prepared.room;
         let slots = config.slots;
+        let git = crate::worker_git::Git::new(settings, limits, &runtime.path, runtime.root, seed)?;
+        let operations = git.component.operations().checked_add(2).ok_or(problem(b"limits", What::Bound))?;
+        let bytes = crate::worker_worst_case(settings, agent, limits).ok_or(problem(b"memory_bytes", What::Bound))?;
+        if let Err(what) =
+            jig_protocol_config::fits(config.memory, &[jig_protocol_config::Share { name: b"worker", bytes }])
+        {
+            return Err(problem(b"memory_bytes", what));
+        }
         Ok(Self {
+            git,
             root: root::Domain::new(&prepared.root),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: prepared.root },
             agent: Agent {
@@ -108,7 +119,7 @@ impl Worker {
             arguments: config.agent.arguments.clone(),
             directory: Some(runtime.root),
             root_close: None,
-            submitted: Queue::with_capacity(1),
+            submitted: Queue::with_capacity(operations),
             started: false,
             closed: false,
             stopping: false,
@@ -118,6 +129,7 @@ impl Worker {
     pub fn stop(&mut self) {
         if !self.stopping {
             self.stopping = true;
+            self.git_request(temper_worker_protocol_git::Request::Shutdown);
             self.events.push(root::Event::Shutdown);
         }
     }
@@ -128,6 +140,8 @@ impl Worker {
         }
         self.aborted = Some(());
         self.stopping = true;
+        self.git.component.abort(&mut self.git.out);
+        self.git_drain();
         for _ in 0..self.events.len() {
             let _event = self.events.pop();
         }
@@ -141,6 +155,9 @@ impl Worker {
     }
     #[must_use]
     pub fn accepts(&self, event: &io::Event) -> bool {
+        if self.git.component.accepts(event) {
+            return true;
+        }
         match crate::workers::owner(event) {
             Some(owner) => {
                 owner == Token::new(self.prefix)
@@ -156,6 +173,11 @@ impl Worker {
             && self.process_events.room() >= 8
     }
     pub fn up(&mut self, now: Time, mut event: io::Event) {
+        if self.git.component.accepts(&event) {
+            self.git.component.up(now, event, &mut self.git.out);
+            self.git_drain();
+            return;
+        }
         let owner = crate::workers::owner(&event).expect("routed owner");
         if owner == Token::new(self.prefix) {
             match event {
@@ -323,11 +345,16 @@ impl Worker {
                     link::Event::Up { up: hub::LinkUp::Answer { run, attempt, answer }, parts },
                 );
             }
-            root::Request::Io { owner, .. } => {
-                let done = root::checkout::git::Done::Failed { fault: root::checkout::git::Fault::Broken };
-                root::step(&mut self.root, &self.env, root::Event::Done { owner, done }, &mut self.out);
+            root::Request::Io { owner, op, deadline } => {
+                let identity = match crate::worker_git::identity(&op) {
+                    Some(number) => self.identities.newest(number).cloned(),
+                    None => None,
+                };
+                self.git_request(temper_worker_protocol_git::Request::Io { owner, op, deadline, identity });
             }
-            root::Request::CancelIo { .. } => {}
+            root::Request::CancelIo { owner } => {
+                self.git_request(temper_worker_protocol_git::Request::CancelIo { owner });
+            }
             root::Request::CancelRelay { run, attempt, call } => {
                 self.link_down(self.env.now, link::Event::CancelRelay { run, attempt, call });
             }
@@ -447,8 +474,19 @@ impl Worker {
         if !self.started {
             self.started = true;
         }
-        self.link.fire(now, &mut self.link_out);
-        self.drain_link(now);
+        if !self.git.started && !self.stopping {
+            self.git.started = true;
+            self.git.component.start(now, &mut self.git.out);
+            self.git_drain();
+        }
+        if self.git.component.is_due(now) {
+            self.git.component.fire(now, &mut self.git.out);
+            self.git_drain();
+        }
+        if self.git.ready {
+            self.link.fire(now, &mut self.link_out);
+            self.drain_link(now);
+        }
         let mut agents = List::with_capacity(self.processes.len());
         for (agent, _) in &self.processes {
             agents.push(*agent).expect("process count");
@@ -524,6 +562,7 @@ impl Worker {
         }
         self.retired.clear();
         self.root.reclaim();
+        self.git.component.reclaim();
         self.close_root();
     }
     #[must_use]
@@ -531,7 +570,8 @@ impl Worker {
         if !self.started || self.aborted.is_some() {
             return None;
         }
-        let mut next = [self.root.next_deadline(), self.link.next_deadline(), self.values.next_expiry()]
+        let link = if self.git.ready { self.link.next_deadline() } else { None };
+        let mut next = [self.root.next_deadline(), link, self.values.next_expiry(), self.git.component.next_deadline()]
             .into_iter()
             .flatten()
             .min();
@@ -563,10 +603,11 @@ impl Worker {
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.closed() && self.directory.is_none() && self.submitted.is_empty()
+        self.closed() && self.directory.is_none() && self.submitted.is_empty() && self.git.component.is_empty()
     }
     pub(super) fn close_root(&mut self) {
         if self.closed()
+            && self.git.component.is_empty()
             && self.root_close.is_none()
             && let Some(fd) = self.directory
         {
@@ -577,7 +618,12 @@ impl Worker {
             });
         }
     }
-    pub fn complete(&mut self, _now: Time, complete: io::kernel::Complete) -> Result<(), io::kernel::Complete> {
+    pub fn complete(&mut self, now: Time, complete: io::kernel::Complete) -> Result<(), io::kernel::Complete> {
+        if self.git.component.owns(complete.op) {
+            self.git.component.complete(now, complete, &mut self.git.out);
+            self.git_drain();
+            return Ok(());
+        }
         if complete.op == Token::new(self.prefix.checked_add(1).expect("root close")) {
             assert!(self.root_close.is_some(), "the worker closes its own descriptor");
             self.directory = None;
@@ -594,12 +640,12 @@ impl Worker {
         &mut self.submitted
     }
     #[must_use]
-    pub const fn refused(&self) -> Option<&Problems> {
-        None
+    pub fn refused(&self) -> Option<&Problems> {
+        self.git.refused.as_ref()
     }
     #[must_use]
-    pub const fn operations(&self) -> u32 {
-        1
+    pub fn operations(&self) -> u32 {
+        self.git.component.operations().checked_add(1).expect("checked worker operations")
     }
 }
 fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Values> {
