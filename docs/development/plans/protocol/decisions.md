@@ -1034,6 +1034,31 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      the pins, and rulings 144's and 146's fixes, landed as 15.3a
      (`ead325c3`).
 
+148. **17.3 runs its own world with typed diagnostics; only an
+     unchanged re-run is barred** (temper 17.3, blocked
+     2026-10-14T17:53:06Z; process). The steer of 2026-10-14T17:34:50Z
+     told session 17 to trace 17.3's adoption failure "not by
+     re-running", after ruling 145, which bars re-running the process
+     tier (30 s a run through the gate lane, 19 runs in one hour). 17.3's
+     Proof is the one-process world, whose stories fail in 0.47 to 0.75
+     s, and its records (`logs/temper-17/17.3-stored-trace.md`) hold no
+     task subphase and no agent's `Start`, `Failed` or `Refused`, while
+     `drain_facts` keeps no root fact (ruling 147). So, for 17.3 until it
+     lands, the steer's words read "not by re-running unchanged": each run
+     of `temper-one-process-world` follows a change aimed at a named
+     cause, or a diagnostic added to the world that names what it will
+     show. The world's failure output may carry, typed and formatted only
+     when a story fails (section 14.3's checklist), each task's record
+     with its phase and subphase, and each agent's `Start`, `Failed` and
+     `Refused`; that code is world code, in 17.3's Files, and stays only
+     if it serves the stories' failure messages. At most five diagnostic
+     runs; a sixth without a named cause is a question with their logs.
+     No production observer, no process-tier run (15.3's), and a fault
+     in a file session 15 is changing still goes to the coordinator for
+     session 15. 17.3's Scope, Files, Test shape, Proof and its 20-line
+     fix allowance (12 used, all in `testing/temper-fake-git`) are
+     unchanged.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
