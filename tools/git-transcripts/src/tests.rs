@@ -5,8 +5,7 @@ use crate::{
 use std::{collections::BTreeMap, path::Path};
 #[test]
 fn the_environment_is_given_whole_and_holds_the_header_only_for_remote_operations() {
-    for (name, identity, author) in
-        [("fetch-branch", Some(("writer", "secret")), "writer"), ("checkout-1", None, "temper")]
+    for (name, identity, author) in [("fetch-branch", Some(("writer", "t")), "writer"), ("checkout-1", None, "temper")]
     {
         let cmd = command(
             Path::new("/usr/bin/git"),
@@ -34,7 +33,7 @@ fn the_environment_is_given_whole_and_holds_the_header_only_for_remote_operation
             expected.extend([
                 ("GIT_CONFIG_COUNT", "1"),
                 ("GIT_CONFIG_KEY_0", "http.extraHeader"),
-                ("GIT_CONFIG_VALUE_0", "Authorization: Basic d3JpdGVyOnNlY3JldA=="),
+                ("GIT_CONFIG_VALUE_0", "Authorization: Basic d3JpdGVyOnQ="),
             ]);
         }
         assert_eq!(seen, expected, "{name}");
