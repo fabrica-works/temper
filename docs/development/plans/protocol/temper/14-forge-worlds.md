@@ -581,7 +581,8 @@ writes nothing (the nine unit tests and the three joint ones); under
 Don't: keep state of a call past its reply; answer from the domain's
 store but through a call (a world's `inspect` is a world's); write a
 field 06's documents do not carry.
-Size: at most 600 lines.
+Size: at most 600 lines; its allowance 2400, its parts summed
+(decisions.md, ruling 139).
 Removes: nothing.
 
 ### 14.4 The protocol world

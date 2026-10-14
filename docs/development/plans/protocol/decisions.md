@@ -807,6 +807,36 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      tally, and a fault drawn after the write as before. The fake
      domain's boundary types are unchanged. Session 14 says so.
 
+138. **16.4's process proof waits for 12.2** (temper 16.4, blocked
+     2026-10-14T13:46:53Z; order). 16.4's proof signs in by the printed
+     link, then prints `== Connecting ==` and `== Offline ==` and never the
+     inbox (`logs/temper-16/16.4-proof{,-diagnostic}.log`); 12.2's
+     process proof, "a chat answered by the real binary" through 12.1's
+     native client, failed at 13:34Z on the same path (exit 100). The
+     native client's stream to the real binary is 12.2's to prove, and
+     12.1's code is session 12's. So session 12 diagnoses and fixes it
+     within 12.2 (the README's edits outside Files apply to a fault in
+     another session's file); session 16 edits neither the native client
+     nor the service's client side for it, finishes 16.4's other work on
+     its branch, and runs its process proof once more after 12.2 lands.
+     The coordinator gives session 12 16.4's evidence now. If 12.2's
+     proof passes without meeting the fault, 16.4 diagnoses against it
+     and asks with a concrete fix. README's 16.4 row gains "its Proof
+     after 12.2".
+
+139. **14.3 within 2400 lines** (temper 14.3c, blocked
+     2026-10-14T13:46:53Z; plan defect, size; as ruling 126 for 13.3).
+     14.3 (Size 600, allowance 1200) counts 1559 before its HTTP
+     machines: 14.3a 551, 14.3b 459, 14.3c 549, all in
+     `testing/temper-fake-forge-protocol` (`response.rs` 548, `answers.rs`
+     458, `routes.rs` 320, `tally.rs` 125, `lib.rs` 48, `errors.rs` 43,
+     `Cargo.toml` 17), each within 14.3's Scope: every Forgejo route the
+     component reads or writes, as requests, documents and responses.
+     About 600 more remain (the Service and Server machines, ruling 137's
+     read-back, Pipe and Joint). So 14.3 lands within 2400, its parts
+     summed; past 2400 it asks. Its Scope, Test shape and Proof are
+     unchanged, the nine HTTP and three joint tests among them.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

@@ -60,7 +60,7 @@ capability, with the increment that lands it.
 | `temper/13-forge-component.md` | temper 13: the forge component and its machine world | 06.5's documents | 13.3: 02.1's `Read::Locate` |
 | `temper/14-forge-worlds.md` | temper 14: the forge component wired, the fake forge's protocol layer, the protocol world, the conformance run through the component | 13.5's component; 08.5b's engine | 14.5: 05.3's facts |
 | `temper/15-adoption-and-landing.md` | temper 15: the adoption form, a change landed on the throwaway Forgejo, the live tier | 12.1's native client and routing; 03.2's records | 15.2: 15.1b's form, 11.3's joint world, 02.3's adoption; 15.3: 14.1, 09.2, 10.4, 12.2; 15.4: 15.3 |
-| `temper/16-terminal.md` | temper 16: the terminal shell, `temper open`, `temper sign-in` | 12.1's native client | 16.4: 10.3's binary, 10.4's process support; 16.5: 10.1b's startup, 10.4, 12.2; 16.6: 15.1b's form, 15.3's landed change |
+| `temper/16-terminal.md` | temper 16: the terminal shell, `temper open`, `temper sign-in` | 12.1's native client | 16.4: 10.3's binary, 10.4's process support, its Proof after 12.2 (ruling 138); 16.5: 10.1b's startup, 10.4, 12.2; 16.6: 15.1b's form, 15.3's landed change |
 | `temper/17-one-process.md` | temper 17: the fake git program and the one-process world | 14.3's fake forge protocol; 12.1's native client; 10.1b's startup; 07.2's transcripts world | 17.3: 15.1b's form; 17.4: 02.4's durable outcome |
 | `temper/18-real-store-worlds.md` | temper 18: the engine worlds on jig's real store; the system world on the service's translations | 04.5's store codecs; 08.2b's store driver | 18.3: 08.3's translations and charter, 09.1a's worker translations |
 
