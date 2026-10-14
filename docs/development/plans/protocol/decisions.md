@@ -1241,6 +1241,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      naming its site, with no production edit. Ruling 148's other terms
      hold.
 
+157. **Adopt is disabled until a party is confirmed: step 17.s3**
+     (temper 17.4, blocked 2026-10-14T20:21:44Z; cross-session scope, a
+     gap in ruling 124's means). Ruling 124 has the forge side send
+     "nothing while no party is confirmed", and
+     `temper-client-domain/src/forge.rs:194-196` returns from `Act::Adopt`
+     with no party; but `temper-client-view/src/forge/page.rs:75-81`
+     disables the button only while a request is pending or the side is
+     out of date, so a press before the first frame's confirmation is
+     dropped unseen (17.4's diagnostic 2: "Adopt presses had frame
+     [(1,false)]"; `logs/temper-17/17.4-w76-cause.md`). client.md, 4.4:
+     "Adopt makes one keyed request through the table", and the button
+     "is disabled" in the other states that send nothing (pending, out of
+     date). So `forge::Form` gains `confirmed: bool`, the side's `party`
+     being some, and the view disables Adopt while it is false; a press
+     then reaches `act_on` only with a party. Its users are edited by
+     ruling 123. Step `temper-17.s3`, session 17's, from `origin/main`
+     before 17.4 lands (session 15's implementer waits on the designer,
+     and these files are in no running session's WIP); its session file
+     is `temper/17-one-process.md`'s 17.s3. 17.4's power-loss story then
+     presses Adopt once it is enabled, its pending-at-cut assertion kept,
+     with no second press standing in for the replay.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

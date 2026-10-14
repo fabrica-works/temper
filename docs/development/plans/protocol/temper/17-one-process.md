@@ -386,6 +386,26 @@ Runs: at most five world runs, as ruling 148 says; past them, a
 question with their logs.
 Size: world code, at most 150 lines.
 
+### 17.s3 Adopt is disabled until a party is confirmed
+
+A step not in the plan (decisions.md, ruling 157), from `origin/main`,
+landed before 17.4.
+Scope: `forge::Form` (`crates/temper-client-domain/src/forge.rs`)
+gains `confirmed: bool`, true while the side's `party` is some; the
+forge page (`crates/temper-client-view/src/forge/page.rs:75-81`)
+disables Adopt while it is false, beside the pending and out-of-date
+cases.
+Files: those two files, their users (ruling 123), the view's
+`src/tests/forge_page.rs` and the domain's fixtures.
+Test shape: one view test,
+`adopt_is_disabled_until_a_party_is_confirmed`, under 20 ms; every
+existing test's name and expected value kept, a fixture's form gaining
+`confirmed: true` where its test presses Adopt.
+Proof: unit, that test; the gate.
+Don't: queue or park a press made before confirmation; change ruling
+124's scope or the request table.
+Size: at most 30 production lines.
+
 ### 17.4 A drain, kills and power loss, and the secrets check
 
 Scope: the drain story: a signal mid-run drains the engine, the worker
