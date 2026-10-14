@@ -33,14 +33,16 @@ impl Service {
         settings: settings::Engine,
         seeds: &settings::Seeds,
         accounts: Option<AccountsRuntime>,
+        forges: List<crate::ForgeRuntime>,
     ) -> Result<Self, Problems> {
-        Self::new(settings, seeds, accounts, None, 0)
+        Self::new(settings, seeds, accounts, forges, None, 0)
     }
     /// Join the configured engine and worker in one io, with their checked memory envelopes.
     pub(crate) fn new(
         mut settings: settings::Engine,
         seeds: &settings::Seeds,
         accounts: Option<AccountsRuntime>,
+        forges: List<crate::ForgeRuntime>,
         worker: Option<Worker>,
         worker_bytes: u64,
     ) -> Result<Self, Problems> {
@@ -49,6 +51,8 @@ impl Service {
         if temper_engine_domain::worst_case(&limits).is_none() {
             return Err(start_problem(b"limits", What::Bound));
         }
+        let (forge_settings, forge_roots) = crate::forge::prepare(&settings, forges)?;
+        let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)
             .ok_or(start_problem(b"limits", What::Bound))?;
@@ -65,6 +69,7 @@ impl Service {
             .ok_or(start_problem(b"limits", What::Bound))?;
         let bytes = memory(&settings, &limits, &store_limits, accounts.as_ref(), queue, operations)
             .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+        let bytes = bytes.checked_add(forge_roots).ok_or(start_problem(b"memory_bytes", What::Bound))?;
         if let Err(what) =
             jig_protocol_config::fits(settings.jig.memory, &[jig_protocol_config::Share { name: b"service", bytes }])
         {
@@ -88,17 +93,7 @@ impl Service {
         );
         let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
         values.fill(&settings.identities, &wire)?;
-        let count = u32::try_from(settings.forges.len()).expect("configured forges");
-        let mut writers = List::with_capacity(count);
-        let mut identities = List::with_capacity(count);
-        for forge in &settings.forges {
-            writers
-                .push(temper_engine_domain_forge_client::Writer { forge: forge.number, author: forge.user })
-                .expect("forge writers");
-            identities
-                .push(temper_engine_domain_forge::GitIdentity { forge: forge.number, credential: forge.identity })
-                .expect("forge identities");
-        }
+        let (forge_config, identities) = crate::forge::config(&settings, seeds.deployment);
         let mut first_periods = List::with_capacity(limits.authority.projects);
         for project in &settings.jig.projects {
             first_periods
@@ -111,15 +106,22 @@ impl Service {
             .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
             .expect("client routing room");
         let clients = clients::Clients::new(&settings.jig, seeds, client_room, &limits.journal)?;
+        let forge = crate::forge::Layer::new(
+            forge_settings,
+            settings.limits.forge_component,
+            &shared,
+            max.checked_add(2).expect("forge routing headroom"),
+        )
+        .expect("checked forge limits");
+        for configured in &mut settings.forges {
+            configured.api_token = skein_lib::Secret::new(Box::new([]));
+        }
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
             landing: settings.landing,
-            forge: temper_engine_domain_forge_client::Config {
-                namespace: Box::new(seeds.deployment),
-                writers: writers.into_boxed(),
-            },
-            identities: identities.into_boxed(),
+            forge: forge_config,
+            identities,
             forge_charter: settings.charter,
         };
         Ok(Self {
@@ -128,7 +130,7 @@ impl Service {
                 config,
                 &limits,
                 store::Store::new(&limits, &store_limits),
-                engine::Children { accounts, workers, clients },
+                engine::Children { accounts, workers, clients, forge },
                 values,
                 first_periods,
             ),
@@ -246,6 +248,9 @@ impl Service {
                 Some(worker) => worker.is_empty(),
                 None => true,
             }
+            && self.engine.forge.closed
+            && self.engine.forge.io.is_empty()
+            && self.engine.forge.above.is_empty()
             && self.engine.store.closed()
             && self.engine.workers.closed()
             && self.engine.clients.closed
@@ -272,6 +277,13 @@ impl Service {
             self.raw_submissions.push(self.engine.store.submitted.pop().expect("store submissions"));
         }
         if self.engine.store.opened || self.engine.end.is_some() {
+            for _ in 0..self.engine.forge.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                let request = self.engine.forge.io.pop().expect("forge io requests");
+                io::down(&mut self.io, &self.io_env, crate::forge::tag(request), &mut self.raw_submissions);
+            }
             for _ in 0..self.engine.clients.io.len() {
                 if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
                     break;
@@ -440,6 +452,9 @@ fn route_events(service: &mut Service) {
         {
             break;
         }
+        if !service.engine.forge.room(1) {
+            break;
+        }
         if let Some(worker) = &service.worker
             && !worker.room()
         {
@@ -481,6 +496,10 @@ fn route_events(service: &mut Service) {
         {
             worker.up(service.io_env.now, event);
         } else if let Some(owner) = owner
+            && crate::tokens::prefix(owner) == 5
+        {
+            service.engine.forge.up(event);
+        } else if let Some(owner) = owner
             && clients::owns(owner)
         {
             if !service.engine.clients.up(event) {
@@ -521,7 +540,6 @@ fn memory(
         .checked_add(List::<(u32, u64)>::worst_case(root.authority.projects)?)?
         .checked_add(Queue::<temper_engine_domain::Event>::worst_case(events)?)?
         .checked_add(Queue::<temper_engine_domain::Request>::worst_case(temper_engine_domain::max_out(root))?)?
-        .checked_add(Queue::<Box<temper_engine_domain_forge::Event>>::worst_case(events)?)?
         .checked_add(payload.checked_mul(u64::from(events).checked_mul(2)?.checked_add(1)?)?)?
         .checked_add(Queue::<Complete>::worst_case(queue)?)?
         .checked_add(Queue::<Submit>::worst_case(queue)?.checked_mul(2)?)?
@@ -539,6 +557,24 @@ fn memory(
         temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         &root.journal,
     )?)?;
+    let forges = u32::try_from(settings.forges.len()).ok()?;
+    let batch = temper_engine_domain::max_out(root).checked_add(2)?;
+    bytes = bytes
+        .checked_add(temper_engine_protocol_forge::limits::worst_case(
+            &settings.limits.forge_component,
+            &crate::forge::shared(&settings.limits, &settings.jig.limits.io),
+            forges,
+        )?)?
+        .checked_add(Queue::<temper_engine_protocol_forge::Event>::worst_case(
+            batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.above)?,
+        )?)?
+        .checked_add(
+            u64::from(batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.above)?)
+                .checked_mul(u64::from(settings.limits.forge.client.answer_bytes))?,
+        )?
+        .checked_add(Queue::<io::Request>::worst_case(
+            batch.checked_mul(temper_engine_protocol_forge::MAX_OUT.below)?,
+        )?)?;
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;
     bytes = bytes

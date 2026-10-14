@@ -166,6 +166,49 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"git_component.sweep_bytes" => {
             limits.git_component.sweep_bytes = u32::try_from(value).or(Err(Refused::Range))?;
         }
+        b"forge_component.forges" => limits.forge_component.forges = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.token_bytes" => {
+            limits.forge_component.token_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.connections" => {
+            limits.forge_component.connections = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.head_bytes" => {
+            limits.forge_component.head_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.headers" => limits.forge_component.headers = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.body_bytes_in" => {
+            limits.forge_component.body_bytes_in = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.depth" => limits.forge_component.depth = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.chunk" => limits.forge_component.chunk = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.string_bytes" => {
+            limits.forge_component.string_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.body_bytes" => {
+            limits.forge_component.body_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.inner" => limits.forge_component.inner = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.target_bytes" => {
+            limits.forge_component.target_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.repositories" => {
+            limits.forge_component.repositories = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.users" => limits.forge_component.users = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.tls.read" => {
+            limits.forge_component.tls.read = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.tls.send" => {
+            limits.forge_component.tls.send = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.tls.records" => {
+            limits.forge_component.tls.records = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.deadline_ms" => limits.forge_component.deadline = duration(value)?,
+        b"forge_component.idle_ms" => limits.forge_component.idle = duration(value)?,
+        b"forge_component.start_backoff_ms" => limits.forge_component.start_backoff = duration(value)?,
+        b"forge_component.start_backoff_max_ms" => limits.forge_component.start_backoff_max = duration(value)?,
         _ => return Err(Refused::Unknown),
     }
     Ok(())

@@ -82,7 +82,7 @@ impl Kernel {
                     self.pipes.remove(fd);
                     Ok(Done::Nothing)
                 }
-                Op::Accept { .. } => {
+                Op::Accept { .. } | Op::Connect { .. } => {
                     service.submissions.push(submit);
                     continue;
                 }
@@ -151,8 +151,7 @@ impl Kernel {
                     }
                     Ok(Done::Nothing)
                 }
-                other @ (Op::Connect { .. }
-                | Op::Recv { .. }
+                other @ (Op::Recv { .. }
                 | Op::Send { .. }
                 | Op::Shutdown { .. }
                 | Op::Read { .. }

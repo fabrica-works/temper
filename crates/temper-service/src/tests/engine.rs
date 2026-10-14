@@ -73,29 +73,6 @@ fn the_restart_asks_one_load_at_a_time() {
     fixtures::restart(&mut service);
 }
 #[test]
-fn a_forge_call_is_answered_unavailable_at_no_cost() {
-    use temper_engine_domain_forge_client as client;
-    let mut service = fixtures::started();
-    let call = skein_lib::Token::new(7);
-    crate::route::request(
-        &mut service.engine,
-        root::Request::Forge {
-            call,
-            repository: client::api::Repository { forge: 1, repository: 2 },
-            op: client::api::Op::Read(client::api::Read::Settings),
-        },
-    );
-    let Some(root::Event::Forge(answer)) = service.engine.events.pop() else { panic!("forge answer") };
-    assert_eq!(
-        *answer,
-        temper_engine_domain_forge::Event::Client(client::Event::Answered {
-            call,
-            cost: 0,
-            result: Err(client::api::Error::Unavailable),
-        })
-    );
-}
-#[test]
 fn a_store_answer_is_taken_with_the_journal_full() {
     let mut service = fixtures::ready();
     let engine = &mut service.engine;
@@ -146,7 +123,9 @@ fn an_engine_that_cannot_fit_its_memory_is_refused_before_start() {
         .entries
         .push((b"charters/chat.txt".as_slice().into(), skein_lib::Secret::new(b"Answer".as_slice().into())))
         .unwrap();
-    let Err(problems) = crate::Service::engine(settings, &fixtures::seeds(), None) else { panic!("memory refused") };
+    let Err(problems) = crate::Service::engine(settings, &fixtures::seeds(), None, fixtures::forge_runtime()) else {
+        panic!("memory refused")
+    };
     let problem = problems.problems.get(0).unwrap();
     assert_eq!(problem.path, jig_protocol_config::Path::root().member(b"engine").member(b"memory_bytes"));
 }

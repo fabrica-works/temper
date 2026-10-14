@@ -1,9 +1,7 @@
-//! Exhaustive root routing, with forge calls unavailable until its component.
+//! Exhaustive root routing to its protocol components.
 use crate::{engine::Engine, stop};
-use alloc::boxed::Box;
 use temper_engine_domain as root;
-use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client as client;
+use temper_engine_protocol_forge as forge;
 
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
@@ -20,20 +18,14 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 accounts.request(request);
             }
         }
-        root::Request::Forge { call, .. } => {
-            engine.events.push(root::Event::Forge(Box::new(forge::Event::Client(client::Event::Answered {
-                call,
-                cost: 0,
-                result: Err(client::api::Error::Unavailable),
-            }))));
+        root::Request::Forge { call, repository, op } => {
+            engine.forge.down(forge::Request::Call { call, repository, op });
         }
         root::Request::ToChild(released) => engine.events.push(root::Event::Released(released)),
         root::Request::Busy(event) => {
-            if let Some(drain) = &mut engine.drain {
-                drain.busy.push(event);
-            } else {
-                engine.events.push(root::Event::Forge(event));
-            }
+            engine.forge.down(forge::Request::Returned(
+                crate::forge::back(event).expect("the routing hands the root only the component's answers"),
+            ));
         }
         root::Request::Drained => stop::drained(engine),
         root::Request::Stop => stop::unavailable(engine, b"deployment"),

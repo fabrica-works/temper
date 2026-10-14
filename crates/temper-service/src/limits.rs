@@ -20,6 +20,7 @@ pub struct Root {
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    pub forge_component: temper_engine_protocol_forge::Limits,
     pub root: Root,
     pub forge: forge::Limits,
     pub checkout: checkout::Limits,
@@ -245,7 +246,13 @@ const ROOT: Root = Root {
 #[must_use]
 pub fn profile(profile: Profile) -> Limits {
     match profile {
-        Profile::Small => Limits { root: ROOT, forge: FORGE, checkout: CHECKOUT, git_component: GIT },
+        Profile::Small => Limits {
+            forge_component: crate::forge::small(&FORGE),
+            root: ROOT,
+            forge: FORGE,
+            checkout: CHECKOUT,
+            git_component: GIT,
+        },
     }
 }
 /// Set one dotted field name byte for byte.

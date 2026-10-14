@@ -11,6 +11,7 @@ pub(crate) struct Engine {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) forge: crate::forge::Layer,
     pub(crate) admission: Option<skein_lib::Token>,
     pub(crate) facts: u64,
     pub(crate) values: crate::values::Values,
@@ -31,6 +32,7 @@ pub(crate) struct Children {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) forge: crate::forge::Layer,
 }
 impl Engine {
     pub(crate) fn new(
@@ -41,7 +43,7 @@ impl Engine {
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
-        let Children { accounts, workers, clients } = children;
+        let Children { accounts, workers, clients, forge } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -56,6 +58,7 @@ impl Engine {
             accounts,
             workers,
             clients,
+            forge,
             admission: None,
             facts: 0,
             values,
@@ -73,15 +76,12 @@ impl Engine {
         }
     }
     pub(crate) fn room(&self) -> bool {
-        self.store.room()
+        self.forge.room(self.max_out)
+            && self.store.room()
             && self.workers.batch_room(self.max_out)
             && self.clients.room(self.max_out)
             && self.clients.commit_room()
             && self.events.room() >= self.max_out.checked_mul(route_out()).expect("translated root outputs")
-            && match &self.drain {
-                Some(drain) => drain.busy.room() >= self.max_out,
-                None => true,
-            }
             && match &self.accounts {
                 Some(accounts) => accounts.batch_room(self.max_out),
                 None => true,
@@ -112,6 +112,7 @@ impl Engine {
             next = crate::accounts::earliest(next, self.values.accounts.next_expiry());
         }
         next = crate::accounts::earliest(next, self.clients.next_deadline());
+        next = crate::accounts::earliest(next, self.forge.component.next_deadline());
         crate::accounts::earliest(
             next,
             match &self.accounts {
@@ -123,6 +124,7 @@ impl Engine {
     pub(crate) fn work_pending(&self, now: Time) -> bool {
         let components = (self.store.opened || self.end.is_some()) && self.clients.work_pending(now)
             || self.store.work_pending(now)
+            || (self.store.opened || self.end.is_some()) && self.forge.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.workers.work_pending(now)
             || (self.store.opened || self.end.is_some())
                 && match &self.accounts {
@@ -147,6 +149,9 @@ impl Engine {
                             || self.domain.ready() && !self.first_periods.is_empty()))
     }
     pub(crate) fn abort_if_ended(&mut self) {
+        if self.end.is_some() && self.forge.room(1) {
+            self.forge.down(temper_engine_protocol_forge::Request::Close);
+        }
         if let Some(End::Aborted | End::Stopped(_)) = self.end
             && self.aborted.is_none()
         {
@@ -173,6 +178,8 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
     }
+    engine.forge.iterate(now, wall);
+    forge_pass(engine);
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
     engine.clients.starting = if open { None } else { Some(()) };
@@ -230,6 +237,9 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         engine.drain_facts();
     }
     release(engine);
+    if engine.forge.room(1) {
+        engine.forge.down(temper_engine_protocol_forge::Request::Offer);
+    }
     clients_pass(engine);
 }
 fn clients_pass(engine: &mut Engine) {
@@ -364,5 +374,32 @@ fn watcher(event: &root::Event) -> Option<skein_lib::Token> {
         | root::Event::Restart
         | root::Event::Stop
         | root::Event::Resume => None,
+    }
+}
+
+pub(crate) fn forge_pass(engine: &mut Engine) {
+    use temper_engine_protocol_forge as kit;
+    for _ in 0..engine.forge.above.len() {
+        if !engine.forge.room(1) || engine.end.is_none() && !engine.room() {
+            break;
+        }
+        match engine.forge.above.pop().expect("forge outputs") {
+            kit::Event::Answered(answer) => {
+                if engine.end.is_some() {
+                    engine.forge.down(kit::Request::Returned(answer));
+                    continue;
+                }
+                if let Err(root::Event::Forge(event)) =
+                    root::try_step(&mut engine.domain, &engine.env, crate::forge::event(answer))
+                {
+                    engine.forge.down(kit::Request::Refused(
+                        crate::forge::back(event).expect("the routing hands the root only the component's answers"),
+                    ));
+                }
+                engine.drain_facts();
+            }
+            kit::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
+            kit::Event::Closed => engine.forge.closed = true,
+        }
     }
 }

@@ -1,20 +1,18 @@
 //! Drain before closing children, close the store last (protocol.md, 6).
 use crate::{End, Stop, engine::Engine};
-use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, What};
-use skein_lib::Queue;
 use temper_engine_domain as root;
 
 pub(crate) struct Drain {
     closing: bool,
-    pub(crate) busy: Queue<Box<temper_engine_domain_forge::Event>>,
+    stopped: Option<Stop>,
 }
 pub(crate) fn shutdown(engine: &mut Engine) {
     if engine.drain.is_some() {
         engine.end = Some(End::Aborted);
         return;
     }
-    engine.drain = Some(Drain { closing: false, busy: Queue::with_capacity(engine.events.capacity()) });
+    engine.drain = Some(Drain { closing: false, stopped: None });
     engine.workers.down(engine.env.now, jig_protocol_engine_workers::Event::Stop, &mut engine.events);
     engine.clients.down(jig_protocol_engine_clients::Event::Stop);
     engine.events.push(root::Event::Stop);
@@ -27,6 +25,7 @@ pub(crate) fn drained(engine: &mut Engine) {
         return;
     }
     drain.closing = true;
+    engine.forge.down(temper_engine_protocol_forge::Request::Close);
     engine.clients.down(jig_protocol_engine_clients::Event::Close);
     engine.workers.close(engine.env.now, &mut engine.events);
     if engine.accounts.is_some() {
@@ -34,6 +33,9 @@ pub(crate) fn drained(engine: &mut Engine) {
     }
 }
 pub(crate) fn advance(engine: &mut Engine) {
+    if engine.end.is_some() {
+        return;
+    }
     let Some(drain) = &mut engine.drain else {
         return;
     };
@@ -45,6 +47,8 @@ pub(crate) fn advance(engine: &mut Engine) {
         None => true,
     };
     if closed
+        && engine.forge.closed
+        && engine.forge.io.is_empty()
         && engine.workers.closed()
         && engine.clients.closed
         && engine.clients.io.is_empty()
@@ -54,10 +58,10 @@ pub(crate) fn advance(engine: &mut Engine) {
     {
         engine.store.close();
         if engine.store.closed() {
-            for _ in 0..drain.busy.len() {
-                let _held = drain.busy.pop();
-            }
-            engine.end = Some(End::Drained);
+            engine.end = Some(match drain.stopped.take() {
+                Some(why) => End::Stopped(why),
+                None => End::Drained,
+            });
         }
     }
 }
@@ -69,4 +73,15 @@ pub(crate) fn unavailable(engine: &mut Engine, member: &[u8]) {
     let mut problems = Problems::empty();
     problems.push(Path::root().member(member), What::Refers);
     engine.end = Some(End::Stopped(Stop::Start(problems)));
+}
+
+pub(crate) fn forge(engine: &mut Engine, number: u16, why: temper_engine_protocol_forge::Stopped) {
+    if engine.drain.is_none() {
+        shutdown(engine);
+    }
+    if let Some(drain) = &mut engine.drain
+        && drain.stopped.is_none()
+    {
+        drain.stopped = Some(Stop::Forge { number, why });
+    }
 }

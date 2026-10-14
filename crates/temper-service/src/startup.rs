@@ -154,6 +154,7 @@ pub fn startup(
     seeds: &settings::Seeds,
     accounts: Option<AccountsRuntime>,
     runtime: WorkerRuntime,
+    forges: List<crate::ForgeRuntime>,
 ) -> Result<Service, Problems> {
     let parsed = parse(document)?;
     check_files(&parsed, files)?;
@@ -184,7 +185,7 @@ pub fn startup(
         charter: parsed.application.charter,
         limits: parsed.application.limits,
     };
-    match Service::new(engine, seeds, accounts, Some(worker), bytes) {
+    match Service::new(engine, seeds, accounts, forges, Some(worker), bytes) {
         Ok(service) => Ok(service),
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }

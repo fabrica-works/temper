@@ -2,6 +2,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod forge;
+pub use forge::ForgeRuntime;
 pub mod limits;
 pub mod settings;
 pub mod startup;
@@ -45,5 +47,6 @@ pub enum Stop {
     CommitFailed { number: u64 },
     Start(Problems),
     Listener,
+    Forge { number: u16, why: temper_engine_protocol_forge::Stopped },
 }
 use jig_protocol_config::Problems;

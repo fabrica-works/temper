@@ -1550,6 +1550,7 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
+ "temper-engine-protocol-forge",
  "temper-engine-smith",
  "temper-protocol-client-wire",
  "temper-protocol-store",

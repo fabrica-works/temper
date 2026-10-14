@@ -462,7 +462,7 @@ fn start_with_worker(
         Some(store) => store,
         None => memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store),
     };
-    let mut service = crate::Service::new(settings, &seeds(), None, worker, worker_bytes).unwrap();
+    let mut service = crate::Service::new(settings, &seeds(), None, forge_runtime(), worker, worker_bytes).unwrap();
     service.engine.store = store;
     service
 }
@@ -733,3 +733,18 @@ pub fn clients() -> crate::clients::Clients {
 }
 mod startup;
 pub use startup::{APPLICATION, document, files, parsed, startup_agent, without, worker_runtime};
+pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
+    let mut runtime = skein_lib::List::with_capacity(1);
+    runtime
+        .push(crate::ForgeRuntime {
+            number: 1,
+            address: core::net::SocketAddr::from(([127, 0, 0, 1], 3000)),
+            transport: temper_engine_protocol_forge::settings::Transport::Plaintext,
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        })
+        .unwrap();
+    runtime
+}
+mod forge;
+pub use forge::ForgeFace;

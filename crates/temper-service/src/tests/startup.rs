@@ -232,6 +232,7 @@ fn a_file_named_but_not_given_refuses_the_start_naming_it() {
         &fixtures::seeds(),
         None,
         fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
     );
     let Err(problems) = refused else { panic!("a missing token refuses the start") };
     assert_eq!(&*lines(&problems), b"application.identities[0].token: not read\n".as_slice());
@@ -254,6 +255,7 @@ fn startup_makes_the_one_process_from_the_example() {
         &fixtures::seeds(),
         None,
         fixtures::worker_runtime(),
+        fixtures::forge_runtime(),
     ) {
         Ok(service) => service,
         Err(problems) => panic!("startup: {}", core::str::from_utf8(&lines(&problems)).unwrap()),
@@ -287,7 +289,15 @@ fn a_workers_missing_or_oversized_secret_keeps_its_absolute_path() {
         if let Some(bytes) = bytes {
             files.entries.push((b"worker-secret".as_slice().into(), skein_lib::Secret::new(bytes))).unwrap();
         }
-        let found = match crate::startup(&document, &files, &agent, &seeds, None, fixtures::worker_runtime()) {
+        let found = match crate::startup(
+            &document,
+            &files,
+            &agent,
+            &seeds,
+            None,
+            fixtures::worker_runtime(),
+            fixtures::forge_runtime(),
+        ) {
             Ok(service) => {
                 drop(service);
                 Problems::empty()
