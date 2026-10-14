@@ -108,3 +108,92 @@ pub fn engine() -> settings::Engine {
         limits: limits::profile(limits::Profile::Small),
     }
 }
+
+pub const OWNER: skein_lib::Token = skein_lib::Token::new(91);
+pub fn routes() -> crate::store::route::Routes {
+    let own = limits::profile(limits::Profile::Small);
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small);
+    let root = limits::engine(&jig, &own).expect("root limits");
+    let bounds = temper_protocol_store::bounds(&root.forge).expect("family bounds");
+    crate::store::route::Routes::new(2, &root, bounds)
+}
+
+pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
+    use jig_domain_tasks as tasks;
+    use skein_lib::Wall;
+    tasks::TaskRecord {
+        ended_below: tasks::Endings::ZERO,
+        question_lines: Box::new([]),
+        hold: 0,
+        proposal_rows: Box::new([]),
+        instructions: None,
+        refused: Box::new([]),
+        chat_close: None,
+        created_at: Wall::EPOCH,
+        changed: Wall::EPOCH,
+        phase_since: Wall::EPOCH,
+        run_since: None,
+        retry_notice: None,
+        ended_at: None,
+        revision: 0,
+        revisions: tasks::Revisions { hold: 0, spec: 0, person: 0 },
+        milestone: 0,
+        activity: 0,
+        due_reason: tasks::Why::Made,
+        narrowing: false,
+        result_position: 0,
+        last_reply: 0,
+        replies: Box::new([]),
+        escalation: tasks::Escalation::Unheld { revision: 0 },
+        proposal: None,
+        result_proposal: false,
+        number,
+        project: 1,
+        requester: tasks::Party::Deployment { project: 1 },
+        run_spent: 0,
+        run_reserved: 0,
+        root: number,
+        depth: 0,
+        executor: tasks::Executor::Agent { charter: 1 },
+        taken_by: None,
+        person_answer: None,
+        person_wait: None,
+        result_followups: Box::new([]),
+        tracked: None,
+        recurring: None,
+        spec: tasks::Spec { words: Box::new([]), parameters: Box::new([]), inputs: Box::new([]) },
+        contract: tasks::Contract::Report { words: 32 },
+        authority: tasks::Authority {
+            tools: tasks::Tools(0),
+            grants: Box::new([]),
+            delegation: tasks::Delegation { kinds: Box::new([]), tasks: 1, depth: 0 },
+            budget: tasks::Budget { spend: 1, deadline: None },
+            notes: tasks::Scopes(0),
+            note_resources: Box::new([]),
+        },
+        numbers: tasks::Numbers { budget: 1, spent: 0, spent_below: 0, reserved: 0 },
+        funder: tasks::Funder::Period { project: 1, period: 1 },
+        waiting_on: Box::new([]),
+        holdings: Box::new([]),
+        holds_taken: false,
+        hold_wait_since: None,
+        dependencies: Box::new([]),
+        delegates: Box::new([]),
+        references: Box::new([]),
+        questions: Box::new([]),
+        subscriptions: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+        turn: 0,
+        last_message: 0,
+        inbox: Box::new([]),
+        saved: Box::new([]),
+        ever_turned: false,
+        made: 1,
+        attempt: 0,
+        last_answer: None,
+        tries: tasks::Tries::NONE,
+        invalid_result: None,
+        refusals: 0,
+        phase: tasks::Phase::Waiting,
+    }
+}

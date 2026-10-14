@@ -269,11 +269,32 @@ pub enum CoreRange {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Range {
     Core(CoreRange),
-    /// The ended owners named by the inbox census's durable indexes
-    /// (jig's `protocol/store.md`, 7.2): the store joins each admitted index
-    /// row to its owner and pages the owners in key order.
+    /// Ended owners in jig's census index-walk order, with repeats. The
+    /// cursor is the last index key walked, rather than an owner row's key
+    /// (store/README.md, section 5).
     Census(jig_domain_core::Census),
     Forge,
+}
+
+/// Place an admitted census index key in jig's walk order (store/README.md, 5).
+#[must_use]
+pub fn census_interval(census: &jig_domain_core::Census, key: &jig_domain_core::Key) -> Option<u32> {
+    use jig_domain_core::Key as Core;
+    match key {
+        Core::Tasks(jig_domain_tasks::Key::ConversationOldest { .. }) => Some(0),
+        Core::Tasks(jig_domain_tasks::Key::Result { party, .. }) => {
+            if !census.admits(key) {
+                return None;
+            }
+            for (index, read) in census.results.iter().enumerate() {
+                if read.party == *party {
+                    return u32::try_from(index).ok()?.checked_add(1);
+                }
+            }
+            None
+        }
+        Core::Tasks(_) | Core::Core(_) | Core::People(_) | Core::Notes(_) => None,
+    }
 }
 
 impl Range {

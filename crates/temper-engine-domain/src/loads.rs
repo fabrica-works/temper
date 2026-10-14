@@ -159,10 +159,17 @@ pub fn begin(
     if most == 0 || most > domain.limits.rows || !valid_range(&range) {
         return None;
     }
-    if let Some(key) = &after
-        && !range.contains(key)
-    {
-        return None;
+    if let Some(key) = &after {
+        match &range {
+            Range::Census(census) => {
+                census_position(census, key)?;
+            }
+            Range::Core(_) | Range::Forge => {
+                if !range.contains(key) {
+                    return None;
+                }
+            }
+        }
     }
     let entry = Entry { waiter, range: range.clone(), after: after.clone(), most, phase: Phase::Waiting };
     let id = domain.entries.insert(entry).ok()?;
@@ -274,7 +281,8 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
         if !entry.range.contains(&key) {
             return Err(Failure::Range);
         }
-        if let Some(old) = &previous
+        if let Range::Census(_) = &entry.range {
+        } else if let Some(old) = &previous
             && key <= *old
         {
             return Err(Failure::Order);
@@ -296,7 +304,15 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
         }
     }
     if let Some(cursor) = &next {
-        if rows.is_empty() || Some(cursor) != previous.as_ref() || !entry.range.contains(cursor) {
+        if let Range::Census(census) = &entry.range {
+            let position = census_position(census, cursor).ok_or(Failure::Cursor)?;
+            if let Some(after) = &entry.after {
+                let start = census_position(census, after).ok_or(Failure::Cursor)?;
+                if position <= start {
+                    return Err(Failure::Order);
+                }
+            }
+        } else if rows.is_empty() || Some(cursor) != previous.as_ref() || !entry.range.contains(cursor) {
             return Err(Failure::Cursor);
         }
         match &entry.range {
@@ -330,7 +346,24 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
     } else {
         None
     };
-    Ok(Page { keep, next: if cutting { last_kept } else { next }, cut })
+    let continuation = match &entry.range {
+        Range::Census(_) => next,
+        Range::Core(_) | Range::Forge => {
+            if cutting {
+                last_kept
+            } else {
+                next
+            }
+        }
+    };
+    Ok(Page { keep, next: continuation, cut })
+}
+
+fn census_position(census: &jig_domain_core::Census, key: &Key) -> Option<(u32, jig_domain_core::Key)> {
+    let Key::Core(key) = key else {
+        return None;
+    };
+    Some((crate::census_interval(census, key)?, key.clone()))
 }
 
 fn valid_range(range: &Range) -> bool {

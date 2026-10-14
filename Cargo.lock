@@ -1415,8 +1415,14 @@ dependencies = [
 name = "temper-service"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-core",
  "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
  "jig-protocol-config",
+ "jig-protocol-store",
+ "skein-kv",
  "skein-lib",
  "smith-host-domain",
  "smith-host-protocol",
@@ -1426,6 +1432,7 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
+ "temper-protocol-store",
  "temper-worker-domain-checkout",
 ]
 

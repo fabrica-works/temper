@@ -27,7 +27,8 @@ pub use decision::{
 };
 pub use store::{
     CallAnswer, CallKey, CallRecord, CoreRange, Deployment, EscalationDecisionRecord, Family, Key,
-    ProposalDecisionRecord, Range, Record, RunProof, TerminalRecord, TurnProof, TurnRecord, Write, record_bytes,
+    ProposalDecisionRecord, Range, Record, RunProof, TerminalRecord, TurnProof, TurnRecord, Write, census_interval,
+    record_bytes,
 };
 
 pub use admission::try_step;

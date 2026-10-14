@@ -221,3 +221,91 @@ fn store_terminals_are_taken_while_the_commit_barrier_has_no_admission_room() {
     loads::unloaded(&mut loads, owner, &mut out);
     assert_eq!(out.pop(), Some(Request::Unloaded { waiter: Token::new(51), failure: Failure::Store }));
 }
+
+fn ended_record(number: u64) -> Record {
+    use temper_engine_domain_world::walking::{Settings, World};
+    let mut world = World::new(Settings::calm(65));
+    world.run();
+    let mut record = world
+        .store
+        .rows
+        .values()
+        .find_map(|row| {
+            if let Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(record))) = row {
+                Some(record.clone())
+            } else {
+                None
+            }
+        })
+        .expect("story ended its task");
+    record.number = number;
+    Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(record)))
+}
+fn census_range() -> Range {
+    Range::Census(jig_domain_core::Census {
+        results: Box::new([
+            jig_domain_core::ReadResults { party: 8, after: 0 },
+            jig_domain_core::ReadResults { party: 4, after: 0 },
+        ]),
+    })
+}
+fn result_key(party: u64, position: u64) -> Key {
+    Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Result { party, position }))
+}
+#[test]
+fn a_census_page_takes_repeated_owners_and_an_index_cursor() {
+    let mut store = Store::new();
+    for number in [5, 3] {
+        let record = ended_record(number);
+        store.rows.insert(record.key(), record);
+    }
+    for (party, position, task) in [(8, 1, 5), (8, 2, 5), (8, 3, 3), (4, 1, 3)] {
+        let record = Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Result(
+            jig_domain_tasks::ResultRow { party, position, task },
+        )));
+        store.rows.insert(record.key(), record);
+    }
+    let limits = Limits { bytes: 16_384, reply_bytes: 16_384, transcript_bytes: 16_384, ..LIMITS };
+    let mut loads = Loads::new(&limits);
+    let mut out = Queue::with_capacity(1);
+    let owner = loads::begin(&mut loads, Token::new(51), census_range(), None, 3, &mut out).expect("census admitted");
+    out.pop();
+    let (rows, next) = store.page(&census_range(), None, 3);
+    assert_eq!(next, Some(result_key(8, 3)));
+    loads::loaded(&mut loads, owner, rows, next, &mut out);
+    let Some(Request::Loaded { rows, next, cut: None, .. }) = out.pop() else { panic!("census page") };
+    assert_eq!(
+        rows.iter().map(Record::key).collect::<Vec<_>>(),
+        [5, 5, 3].map(|number| Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(number))))
+    );
+    assert_eq!(next, Some(result_key(8, 3)));
+    let (rows, next) = store.page(&census_range(), Some(&result_key(8, 3)), 3);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].key(), Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(3))));
+    assert_eq!(next, None);
+}
+
+#[test]
+fn a_census_cursor_behind_its_start_is_out_of_order() {
+    let mut loads = Loads::new(&LIMITS);
+    let mut out = Queue::with_capacity(1);
+    for (after, next, expected) in [
+        (result_key(4, 2), result_key(8, 3), Some(Failure::Order)),
+        (result_key(8, 2), result_key(8, 2), Some(Failure::Order)),
+        (result_key(8, 2), result_key(8, 3), None),
+        (result_key(8, 2), key(3), Some(Failure::Cursor)),
+    ] {
+        let owner = loads::begin(&mut loads, Token::new(51), census_range(), Some(after), 3, &mut out)
+            .expect("census cursor admitted");
+        out.pop();
+        loads::loaded(&mut loads, owner, Box::new([]), Some(next.clone()), &mut out);
+        match expected {
+            Some(failure) => assert_eq!(out.pop(), Some(Request::Unloaded { waiter: Token::new(51), failure })),
+            None => assert_eq!(
+                out.pop(),
+                Some(Request::Loaded { waiter: Token::new(51), rows: Box::new([]), next: Some(next), cut: None })
+            ),
+        }
+        loads::reclaim(&mut loads);
+    }
+}

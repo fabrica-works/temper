@@ -4,6 +4,7 @@
 extern crate alloc;
 pub mod limits;
 pub mod settings;
+pub mod store;
 #[cfg(test)]
 mod tests;
 pub mod tokens;

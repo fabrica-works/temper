@@ -99,38 +99,41 @@ impl Store {
 }
 
 impl Store {
-    /// The census's index rows joined to the ended owners they name, paged
-    /// by owner key, as jig's store joins them (jig's `protocol/store.md`, 7.2).
+    /// Walk the conversations, then each party's result interval; keep repeats.
     fn census(&self, range: &Range, after: Option<&Key>, most: u32) -> (Box<[Record]>, Option<Key>) {
         let Range::Census(census) = range else { unreachable!("census range") };
-        let mut owners = std::collections::BTreeSet::new();
+        let position = after.map(|key| {
+            let Key::Core(key) = key else { panic!("census index key") };
+            (temper_engine_domain::census_interval(census, key).expect("admitted cursor"), key.clone())
+        });
+        let mut selected = Vec::new();
         for (key, row) in &self.rows {
-            let Key::Core(core) = key else { continue };
-            if !census.admits(core) {
+            let Key::Core(key) = key else { continue };
+            let Some(interval) = temper_engine_domain::census_interval(census, key) else { continue };
+            let current = (interval, key.clone());
+            if position.as_ref().is_some_and(|after| &current <= after) {
                 continue;
             }
-            if let Record::Core(jig_domain_core::Record::Tasks(
+            selected.push((current, row));
+        }
+        selected.sort_by(|(left, _), (right, _)| left.cmp(right));
+        let count = usize::try_from(most).expect("small page");
+        let more = selected.len() > count;
+        let mut last = None;
+        let mut rows = Vec::new();
+        for ((_, key), row) in selected.into_iter().take(count) {
+            let Record::Core(jig_domain_core::Record::Tasks(
                 jig_domain_tasks::Stored::Result(jig_domain_tasks::ResultRow { task, .. })
                 | jig_domain_tasks::Stored::ConversationOldest(jig_domain_tasks::Conversation { task, .. }),
             )) = row
-            {
-                owners.insert(Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(*task))));
-            }
+            else {
+                panic!("census index record")
+            };
+            let owner = Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(*task)));
+            rows.push(self.rows.get(&owner).expect("census owner").clone());
+            last = Some(Key::Core(key));
         }
-        let count = usize::try_from(most).expect("small page");
-        let mut selected: Vec<Record> = owners
-            .iter()
-            .filter(|key| after.is_none_or(|old| *key > old))
-            .filter_map(|key| self.rows.get(key).cloned())
-            .take(count.saturating_add(1))
-            .collect();
-        let more = selected.len() > count;
-        if more {
-            selected.pop();
-        }
-        let rows: Box<[Record]> = selected.into_boxed_slice();
-        let next = if more { Some(rows.last().expect("positive page").key()) } else { None };
-        (rows, next)
+        (rows.into_boxed_slice(), if more { last } else { None })
     }
 }
 
