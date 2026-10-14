@@ -43,14 +43,15 @@ pub fn native() -> Limits {
                 records: 16,                            // Jig records restored at start.
                 kept: 16,                               // Restored table scopes.
                 drafts: 8,                              // Conversation drafts retained across navigation.
-                projects: 16,                           // Project labels in the frame.
-                roles: 16,                              // Visible role names.
-                charters: 16,                           // Charter choices.
-                text: 128,                              // Ops's 32 raised to 128; 256 is refused by Limits::compose.
-                rows: 2,                                // Ops's 2; 4 is refused by Limits::compose.
-                conversation_words: 8,                  // Pending conversation snapshots.
-                navigation_entries: 8,                  // Navigation destinations.
-                updates_count: 99,                      // Unread counter before its lower-bound mark.
+                // Ops's 2 stays below the receiving wire's frame_projects ceiling of 7.
+                projects: 2,
+                roles: 16,             // Visible role names.
+                charters: 16,          // Charter choices.
+                text: 128,             // Ops's 32 raised to 128; 256 is refused by Limits::compose.
+                rows: 2,               // Ops's 2; 4 is refused by Limits::compose.
+                conversation_words: 8, // Pending conversation snapshots.
+                navigation_entries: 8, // Navigation destinations.
+                updates_count: 99,     // Unread counter before its lower-bound mark.
                 backoff: jig_domain_client::limits::Backoff {
                     first: Duration::from_secs(1), // First watch reconnect span.
                     most: Duration::from_secs(30), // Longest watch reconnect span.
