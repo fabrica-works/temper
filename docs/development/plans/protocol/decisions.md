@@ -842,6 +842,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      rest 8) on 1559. It lands at 2452, 14.3 closed; nothing more is
      added under 14.3.
 
+140. **The engine root takes the configured document limits** (temper
+     12.2, blocked 2026-10-14T14:47:48Z; plan defect). 12.2's chat
+     reached an Activity page of three rows, which the native client
+     (`rows: 2`, ruling 122; `temper-shell-terminal/src/limits.rs:51`)
+     refuses as `TooLarge`, while the process configuration's
+     `documents.rows` 2 never reached the root: `core_limits` uses the
+     constant `DOCUMENTS` (`temper-engine-domain/src/limits.rs:97-103`,
+     jig small's rows 4) and 08.1's `Limits` has no `documents`.
+     domain/engine.md, 13: documents' limits "take jig's small profile's
+     values until temper's configuration names its own". So the root's
+     `Limits` gains `documents: jig_domain_core::documents::DocumentLimits`,
+     `core_limits` uses it, the service's and the worker's builders copy
+     the configured `jig.core.documents`, `DOCUMENTS` goes, and every
+     other constructor passes jig small's values, unchanged; one test
+     shows configured rows reaching the core. Its users are edited by
+     ruling 123. Whether the shipped configuration's default (profile
+     `small`, no overrides: rows 4) must change, since the native client
+     takes 2, is the designer's, in the run's `question.md` of this time.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
