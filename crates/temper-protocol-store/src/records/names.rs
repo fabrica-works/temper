@@ -42,7 +42,7 @@ fn decode_segments(bytes: &[u8], bounds: &Bounds) -> Result<Box<[Box<[u8]>]>, Un
     }
     Err(Undecodable)
 }
-fn encode_what(value: &d::What) -> w::What {
+pub(super) fn encode_what(value: &d::What) -> w::What {
     match value {
         d::What::Repository => w::What::Repository,
         d::What::Branch(segments) => w::What::Branch(
@@ -56,7 +56,7 @@ fn encode_what(value: &d::What) -> w::What {
         }
     }
 }
-fn decode_what(value: w::What, bounds: &Bounds) -> Result<d::What, Undecodable> {
+pub(super) fn decode_what(value: w::What, bounds: &Bounds) -> Result<d::What, Undecodable> {
     Ok(match value {
         w::What::Repository => d::What::Repository,
         w::What::Branch(value) => d::What::Branch(decode_segments(value.segments(), bounds)?),

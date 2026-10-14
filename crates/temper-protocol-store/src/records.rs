@@ -3,6 +3,8 @@ use crate::{Bounds, Undecodable, v1 as w};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
+mod api;
+mod entries;
 mod names;
 mod topics;
 const FITS: &str = "admitted fields fit the schema";
@@ -20,12 +22,9 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::Ci(value) => w::Value::Ci(topics::encode_ci_state(value)),
         d::Stored::Landed { commit, task } => w::Value::Landed(topics::encode_landed(*commit, *task)),
         d::Stored::Release(value) => w::Value::Release(topics::encode_release(value)),
-        d::Stored::Call { .. }
-        | d::Stored::ProposedEffect(_)
-        | d::Stored::Entry { .. }
-        | d::Stored::Client(_)
-        | d::Stored::Change(_)
-        | d::Stored::Issue(_) => return None,
+        d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
+        d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
+        d::Stored::Call { .. } | d::Stored::Client(_) | d::Stored::Change(_) | d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
@@ -37,6 +36,8 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
 pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     let row = w::Row::decode(bounds.limits(), &mut Reader::new(bytes)).or(Err(Undecodable))?;
     Ok(match row.into_parts().value {
+        w::Value::ProposedEffect(value) => d::Stored::ProposedEffect(entries::decode_proposed(value, bounds)?),
+        w::Value::Entry(value) => entries::decode_entry_row(value),
         w::Value::Repository(value) => d::Stored::Repository(names::decode_adopted(value, bounds)?),
         w::Value::Hold(value) => d::Stored::Hold(names::decode_hold(value, bounds)?),
         w::Value::Names(value) => {

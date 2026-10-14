@@ -343,3 +343,52 @@ pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
     add_releases(&name, &mut rows);
     rows.into_boxed()
 }
+
+pub fn entry(write: client::api::Write, condition: client::Condition) -> client::Entry {
+    client::Entry {
+        number: 3,
+        task: 4,
+        repository: REPO,
+        effect: client::Effect { write, condition },
+        start: Some(client::Position { at: skein_lib::Time::from_nanos(11), comment: 12, review: 13, review_page: 14 }),
+        attempt: Some(client::Attempt {
+            sent: skein_lib::Time::from_nanos(15),
+            deadline: skein_lib::Time::from_nanos(16),
+            wall: skein_lib::Wall::from_nanos(17),
+            expires: skein_lib::Wall::from_nanos(18),
+        }),
+        failures: 19,
+    }
+}
+pub fn writes() -> [(&'static str, client::api::Write); 13] {
+    use client::api::{Check, Verdict, Write};
+    [
+        ("issue", Write::CreateIssue { key: Box::new([0, 1]), title: Box::new([2]), body: Box::new([3]) }),
+        (
+            "pull",
+            Write::OpenPull { title: Box::new([1]), body: Box::new([2]), head: Box::new([3]), base: Box::new([4]) },
+        ),
+        ("post", Write::Post { number: 1, key: Box::new([2]), body: Box::new([3]) }),
+        (
+            "review",
+            Write::Review { number: 1, key: Box::new([2]), verdict: Verdict::RequestChanges, body: Box::new([3]) },
+        ),
+        ("edit", Write::Edit { number: 1, title: Some(Box::new([2])), body: Some(Box::new([3])) }),
+        ("reviewers", Write::SetReviewers { number: 1, reviewers: Box::new([2, 3]) }),
+        ("close", Write::Close { number: 1 }),
+        ("reopen", Write::Reopen { number: 2 }),
+        ("merge", Write::Merge { number: 1, head: [3; 32] }),
+        ("update", Write::Update { number: 1 }),
+        ("status", Write::Status { commit: [1; 32], context: Box::new([2]), check: Check::Failed }),
+        ("create branch", Write::CreateBranch { branch: Box::new([2]), commit: [3; 32] }),
+        ("delete branch", Write::DeleteBranch { branch: Box::new([2]) }),
+    ]
+}
+pub fn conditions() -> [client::Condition; 4] {
+    [
+        client::Condition::None,
+        client::Condition::Merge { base: Box::new([0, 255]) },
+        client::Condition::Update { head: [2; 32], base: [3; 32] },
+        client::Condition::Review { head: [4; 32] },
+    ]
+}

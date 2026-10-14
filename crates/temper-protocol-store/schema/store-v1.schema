@@ -45,5 +45,29 @@ record Landed { commit: fixed 32 task: u64 }
 enum ReleaseEnding { done, failed, cancelled }
 record PendingRelease { entry: u64 name: option Name }
 record ReleaseRow { task: u64 root: u64 ending: ReleaseEnding close_pull: option u64 pending_release: option PendingRelease failed: bool effects_settled: bool releasing: bool }
-enum Value { repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, release: ReleaseRow }
+
+# 04.3a: writes, conditions, proposed effects and outbox entries.
+enum Verdict { approve, request_changes, comment }
+enum Check { pending, passed, failed }
+record CreateIssue { key: bytes 1048576 title: bytes 1048576 body: bytes 1048576 }
+record OpenPull { title: bytes 1048576 body: bytes 1048576 head: bytes 1048576 base: bytes 1048576 }
+record Post { number: u64 key: bytes 1048576 body: bytes 1048576 }
+record PostReview { number: u64 key: bytes 1048576 verdict: Verdict body: bytes 1048576 }
+record Edit { number: u64 title: option bytes 1048576 body: option bytes 1048576 }
+record SetReviewers { number: u64 reviewers: list 65536 u64 }
+record MergeWrite { number: u64 head: fixed 32 }
+record SetStatus { commit: fixed 32 context: bytes 1048576 status: Check }
+record CreateBranch { branch: bytes 1048576 commit: fixed 32 }
+record DeleteBranch { branch: bytes 1048576 }
+enum Write { create_issue: CreateIssue, open_pull: OpenPull, post: Post, review: PostReview, edit: Edit, set_reviewers: SetReviewers, close: Number, reopen: Number, merge: MergeWrite, update: Number, status: SetStatus, create_branch: CreateBranch, delete_branch: DeleteBranch }
+record MergeCondition { base: bytes 1048576 }
+record UpdateCondition { head: fixed 32 base: fixed 32 }
+enum Condition { none, merge: MergeCondition, update: UpdateCondition, review: Commit }
+record Effect { write: Write condition: Condition }
+record Position { at: u64 comment: u64 review: u64 review_page: u32 }
+record Attempt { sent: u64 deadline: u64 wall: u64 expires: u64 }
+record Entry { number: u64 task: u64 repository: Repository effect: Effect start: option Position attempt: option Attempt failures: u32 }
+record EntryRow { entry: Entry held: bool }
+record ProposedEffect { number: u64 resource: What entry: Entry }
+enum Value { proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, release: ReleaseRow }
 versioned record Row { value: Value }

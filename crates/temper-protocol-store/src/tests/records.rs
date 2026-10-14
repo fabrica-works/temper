@@ -57,3 +57,45 @@ fn bounds_refuse_sources_past_schema_ceilings() {
     larger.name_bytes = v1::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
+
+#[test]
+fn each_write_of_an_entry_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for (name, write) in fixtures::writes() {
+        for condition in fixtures::conditions() {
+            for held in [false, true] {
+                let row = forge::Stored::Entry { entry: fixtures::entry(write.clone(), condition.clone()), held };
+                let bytes = records::encode(&row).expect("entry encoded");
+                assert_eq!(records::decode(&bytes, &bounds), Ok(row), "{name}, {condition:?}, {held}");
+            }
+        }
+    }
+}
+#[test]
+fn a_proposed_effect_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    let row = forge::Stored::ProposedEffect(forge::ProposedEffect {
+        number: 1,
+        resource: forge::What::Branch(Box::new([Box::new([0_u8, 255])])),
+        entry: fixtures::entry(
+            temper_engine_domain_forge_client::api::Write::Merge { number: 2, head: [3; 32] },
+            temper_engine_domain_forge_client::Condition::Merge { base: Box::new([4]) },
+        ),
+    });
+    let bytes = records::encode(&row).expect("proposal encoded");
+    assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+}
+#[test]
+fn outbox_decoding_refuses_fields_past_their_bounds() {
+    use temper_engine_domain_forge_client::{Condition, api::Write};
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    let rows = [
+        ("reviewer count", Write::SetReviewers { number: 1, reviewers: Box::new([1; 9]) }),
+        ("operation bytes", Write::Post { number: 1, key: Box::new([]), body: Box::new([1; 513]) }),
+    ];
+    for (name, write) in rows {
+        let row = forge::Stored::Entry { entry: fixtures::entry(write, Condition::None), held: false };
+        let bytes = records::encode(&row).expect("schema ceilings admit the row");
+        assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable), "{name}");
+    }
+}
