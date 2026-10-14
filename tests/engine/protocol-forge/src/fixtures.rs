@@ -157,3 +157,38 @@ pub fn protocol_config() -> temper_fake_forge_protocol::Config {
         faults: Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }
+
+/// The connector world's writer, matching the fake's API token.
+#[must_use]
+pub fn writer_settings() -> Settings {
+    let mut settings = settings();
+    settings.forges.get_mut(0).expect("forge").user = 1;
+    settings
+}
+/// Component bounds use exactly the top's client limits.
+#[must_use]
+pub fn protocol_shared() -> Shared {
+    Shared { client: temper_engine_forge_world::LIMITS.client, ..shared() }
+}
+#[must_use]
+pub fn goal_view() -> temper_engine_domain_forge_issues::GoalView {
+    use temper_engine_domain_forge_issues::{GoalView, Phase};
+    GoalView {
+        phase: Phase::Waiting,
+        goal: 42,
+        repository: 2,
+        title: Box::from("Goal"),
+        goal_text: Box::from("Plan"),
+        plan: Box::new([]),
+        milestones: Box::new([]),
+        finished: None,
+    }
+}
+
+/// Both byte-valued records' Debug and text-valued facts must hide the API token.
+#[must_use]
+pub fn token_absent(value: &impl core::fmt::Debug) -> bool {
+    let text = format!("{value:?}");
+    let bytes = format!("{TOKEN:?}");
+    !text.as_bytes().windows(TOKEN.len()).any(|part| part == TOKEN) && !text.contains(&bytes[1..bytes.len() - 1])
+}

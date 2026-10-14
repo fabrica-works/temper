@@ -17,17 +17,17 @@ struct Peer {
     below: Queue<skein_lib::stream::Down>,
 }
 pub struct Joint {
-    component: Component,
-    env: Env<Limits>,
-    above: Queue<Event>,
-    below: Queue<skein_io::Request>,
+    pub(crate) component: Component,
+    pub(crate) env: Env<Limits>,
+    pub(crate) above: Queue<Event>,
+    pub(crate) below: Queue<skein_io::Request>,
     peers: BTreeMap<Token, Peer>,
     service: Service,
-    fake_env: Env<fake::Config>,
+    pub(crate) fake_env: Env<fake::Config>,
     protocol_env: Env<protocol::Limits>,
     pub domain: fake::Domain,
     fake_out: Queue<fake::Request>,
-    answers: BTreeMap<u64, temper_engine_protocol_forge::Answered>,
+    pub(crate) answers: BTreeMap<u64, temper_engine_protocol_forge::Answered>,
     pub observations: Vec<fake::Observation>,
     rng: Rng,
     cut_chance: u32,
@@ -111,6 +111,12 @@ impl Joint {
             &mut self.below,
         );
     }
+    pub(crate) fn busy(&self) -> bool {
+        !self.below.is_empty()
+            || self.peers.values().any(|peer| {
+                peer.pipe.has_work() || peer.server.has_work() || !peer.below.is_empty() || !peer.above.is_empty()
+            })
+    }
     pub fn run_for(&mut self, span: Duration) {
         let end = self.env.now.saturating_add(span);
         while self.env.now < end {
@@ -129,7 +135,7 @@ impl Joint {
         }
         self.tick();
     }
-    fn time(&mut self, now: Time) {
+    pub(crate) fn time(&mut self, now: Time) {
         self.env.now = now;
         self.env.wall = Wall::from_nanos(now.as_nanos());
         self.fake_env.now = now;
@@ -248,7 +254,9 @@ impl Joint {
                 self.up(skein_io::Event::Connected { owner });
             }
             skein_io::Request::Stream { stream, down } => {
-                self.peers.get_mut(&stream).expect("stream peer").pipe.client_down(down);
+                if let Some(peer) = self.peers.get_mut(&stream) {
+                    peer.pipe.client_down(down);
+                }
             }
             skein_io::Request::Abort { entity } | skein_io::Request::Close { entity } => self.end(entity),
             other @ (skein_io::Request::Listen { .. }
@@ -261,7 +269,7 @@ impl Joint {
             | skein_io::Request::Window { .. }) => panic!("unexpected io {other:?}"),
         }
     }
-    fn end(&mut self, owner: Token) {
+    pub(crate) fn end(&mut self, owner: Token) {
         if let Some(mut peer) = self.peers.remove(&owner) {
             protocol::closed(&mut peer.server, &mut self.service, &self.protocol_env, &mut peer.above, &mut peer.below);
             self.up(skein_io::Event::Closed { owner });
@@ -302,6 +310,17 @@ impl Joint {
             self.time(self.env.now.saturating_add(Duration::from_millis(1)));
         }
         panic!("direct reply")
+    }
+    /// Drops the old process's connections and installs its fresh component.
+    pub(crate) fn replace(&mut self, component: Component) {
+        let owners: Vec<_> = self.peers.keys().copied().collect();
+        for owner in owners {
+            self.end(owner);
+        }
+        self.component = component;
+        while self.above.pop().is_some() {}
+        while self.below.pop().is_some() {}
+        self.component.begin(&self.env, &mut self.above, &mut self.below);
     }
     pub fn issue(&mut self, title: &[u8], body: &[u8]) -> u64 {
         let raw::Answer::Created(id) = self

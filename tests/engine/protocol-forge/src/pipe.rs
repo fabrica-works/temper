@@ -89,7 +89,7 @@ impl End {
     }
     fn busy(&self, eof: bool) -> bool {
         !self.pending.is_empty()
-            || !self.intake.is_empty()
+            || self.demand.is_some_and(|(read, _)| read != Read::Nothing && !self.intake.is_empty())
             || self.demand.is_some_and(|(read, room)| room > 0 || (read != Read::Nothing && eof && !self.ended))
     }
 }

@@ -558,7 +558,9 @@ fn respond(server: &mut Server, reply: response::Reply) {
         body: http::Body::Length(length),
         close: false,
     }));
-    if length > 0 {
+    if length == 0 {
+        server.requests.push(http::Request::Reply(Down::Finish));
+    } else {
         server.requests.push(http::Request::Reply(Down::Demand {
             read: Read::Nothing,
             room: u32::try_from(length).unwrap_or(u32::MAX).min(server.send),

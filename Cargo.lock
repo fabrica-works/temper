@@ -1747,13 +1747,17 @@ dependencies = [
 name = "temper-engine-protocol-forge-world"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-people",
  "skein-http",
  "skein-io",
  "skein-json",
  "skein-lib",
  "skein-tls",
  "skein-world",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
+ "temper-engine-domain-forge-issues",
  "temper-engine-forge-world",
  "temper-engine-protocol-forge",
  "temper-fake-forge-domain",
