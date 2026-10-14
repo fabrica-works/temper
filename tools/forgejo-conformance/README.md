@@ -25,7 +25,10 @@ provisioning has a fixed order. Every output is checked for all fixture
 secrets before it is written, and response bodies are also checked before
 masking. A leak reports the case and secret kind without printing its value.
 
-The same run writes `facts.txt`, with provenance followed by `holds`,
-`fails` or `unchecked` lines. Actions execution follows in 05.3b; webhooks
-are left unchecked until webhooks are built. The committed facts retain the
-full observed Forgejo/runner capture; the runner implementation follows.
+The same run writes `facts.txt`, with Forgejo and runner provenance followed
+by `holds`, `fails` or `unchecked` lines. Set `TEMPER_FORGEJO_RUNNER` to the
+checked v12.13.2 runner for Actions facts and six Actions transcripts.
+The runner registers with this instance only and executes two inline host
+shell jobs, one succeeding and one failing; no actions or containers are
+downloaded. Without a runner those facts remain unchecked. Webhook facts
+are left unchecked until webhooks are built.

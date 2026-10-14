@@ -10,6 +10,9 @@ pub enum SecretKind {
 }
 pub struct Secrets(Vec<(SecretKind, String)>);
 impl Secrets {
+    pub fn add(&mut self, kind: SecretKind, value: &str) {
+        self.0.push((kind, value.into()));
+    }
     #[must_use]
     pub fn of(values: &[(SecretKind, &str)]) -> Self {
         Self(values.iter().map(|(kind, value)| (*kind, (*value).into())).collect())

@@ -3,6 +3,7 @@ mod cases;
 pub mod facts;
 mod fixture;
 pub mod mask;
+mod runner;
 pub mod write;
 use std::{error::Error, path::Path};
 use temper_throwaway_forgejo::{Exchange, Forgejo};
@@ -16,11 +17,11 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     let forgejo = Forgejo::from_env().map_err(|e| format!("{e:?}"))?;
     let fixture = fixture::Fixture::new(&forgejo, scratch)?;
     let mut mask = mask::Mask::new(fixture.instance.port());
-    let secrets = write::Secrets::from_instance(&fixture.instance);
+    let mut secrets = write::Secrets::from_instance(&fixture.instance);
     cases::record(&fixture, out, &mut mask, &secrets)?;
     let mut facts = facts::evaluate(&forgejo, &fixture, out)?;
-    let runner = "none";
-    facts.extend(facts::unchecked_actions());
+    let (runner, actions) = runner::run(&fixture, out, &mut mask, &mut secrets)?;
+    facts.extend(actions);
     facts.push(facts::Fact {
         name: "webhook-deliveries",
         outcome: facts::Outcome::Unchecked("webhooks are built after standalone".into()),

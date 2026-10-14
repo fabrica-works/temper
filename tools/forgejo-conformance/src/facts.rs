@@ -498,17 +498,3 @@ fn errors(out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     }
     Ok(())
 }
-#[must_use]
-pub fn unchecked_actions() -> Vec<Fact> {
-    [
-        "actions-report-each-job-as-a-status-on-its-head",
-        "actions-status-link-is-runs-n-jobs-i",
-        "actions-status-link-names-no-attempt",
-        "run-number-is-index-in-repo",
-        "run-jobs-come-in-index-order",
-        "job-log-range-answers-206",
-    ]
-    .into_iter()
-    .map(|name| Fact { name, outcome: Outcome::Unchecked("runner facts follow in 05.3b".into()) })
-    .collect()
-}
