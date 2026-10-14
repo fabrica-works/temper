@@ -1446,7 +1446,9 @@ dependencies = [
 name = "temper-worker-protocol-git-world"
 version = "0.0.0"
 dependencies = [
+ "skein-io",
  "skein-lib",
+ "skein-world",
  "temper-worker-domain-checkout",
  "temper-worker-protocol-git",
 ]

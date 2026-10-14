@@ -8,6 +8,8 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
+skein-io.workspace = true
+skein-world.workspace = true
 temper-worker-domain-checkout.workspace = true
 temper-worker-protocol-git.workspace = true
 
