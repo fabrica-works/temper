@@ -1206,6 +1206,22 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      and its retained states, with no run of the one-process world or the
      process tier, until 17.s2 reports.
 
+155. **17.s1's startup fixture agent takes the profile's conflicts**
+     (temper 17.s1, blocked 2026-10-14T19:10:13Z; plan defect). With
+     ruling 153's 4 and 255, the gate's `startup_makes_the_one_process_from_the_example`
+     and `a_workers_missing_or_oversized_secret_keeps_its_absolute_path`
+     refuse `workers[0].limits`: `temper_worker_domain`'s worst case needs
+     the checkout's `conflicts` and `path_bytes` within the agent's
+     (`crates/temper-worker-domain/src/limits.rs:74-75`), and the service's
+     test agent is written by hand with 0 and 64
+     (`crates/temper-service/src/tests/fixtures/agent.rs:11-12`), while the
+     shipped worker derives its agent's from the checkout's
+     (`crates/temper-service/src/worker_settings.rs:87`). So the fixture's
+     `conflicts` becomes 4 and its `path_bytes` 255: a fixture's inputs
+     changed so its tests check the same behaviour, the README's 20-line
+     fix, outside 17.s1's Files, named in its commit body; every check,
+     test name and expected value kept.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
