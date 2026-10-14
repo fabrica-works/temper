@@ -44,7 +44,29 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             {
                 engine.admission = None;
             }
-            if let Some(event) = crate::clients::translation::to_component(request) {
+            let event = match request {
+                root::PartyRequest::Deliver(root::Delivery::Application { to, outcome }) => {
+                    match crate::family::answer(
+                        outcome,
+                        &temper_protocol_client_wire::v1::CEILINGS,
+                        &engine.clients.env.limits.wire,
+                    ) {
+                        Some(record) => Some(jig_protocol_engine_clients::Event::Application(
+                            jig_protocol_engine_clients::FromApplication::Answered {
+                                to,
+                                family: temper_protocol_client_wire::FORGE,
+                                record,
+                            },
+                        )),
+                        None => Some(jig_protocol_engine_clients::Event::Abort),
+                    }
+                }
+                request @ (root::PartyRequest::SignInRefused { .. }
+                | root::PartyRequest::WatchRefused { .. }
+                | root::PartyRequest::RunText { .. }
+                | root::PartyRequest::Deliver(_)) => crate::clients::translation::to_component(request),
+            };
+            if let Some(event) = event {
                 engine.clients.down(event);
             }
         }

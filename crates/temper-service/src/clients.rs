@@ -85,6 +85,13 @@ impl Clients {
                 last: jig_protocol_client_wire::VERSION,
             })
             .or(Err(invalid(What::Bound)))?;
+        served
+            .push(kit::Served {
+                family: Some(temper_protocol_client_wire::FORGE),
+                first: temper_protocol_client_wire::CLIENT_VERSION,
+                last: temper_protocol_client_wire::CLIENT_VERSION,
+            })
+            .or(Err(invalid(What::Bound)))?;
         let settings = kit::Settings {
             listener,
             link,
@@ -197,7 +204,7 @@ impl Clients {
             events.push(value);
         }
     }
-    pub fn advance(&mut self, events: &mut Queue<root::Event>) {
+    pub fn advance(&mut self, events: &mut Queue<root::Event>, forges: &[crate::settings::Forge]) {
         for _ in 0..self.out.len() {
             if self.io.room() == 0
                 || self.links.room() == 0
@@ -215,7 +222,12 @@ impl Clients {
                     Ok(value) => self.root(root::Event::Party(value), events),
                     Err(value) => self.down(*value),
                 },
-                kit::Request::Application(value) => self.down(application(value)),
+                kit::Request::Application(value) => {
+                    match crate::family::to_root(value, forges, &temper_protocol_client_wire::v1::CEILINGS) {
+                        Ok(value) => self.root(value, events),
+                        Err(value) => self.down(*value),
+                    }
+                }
                 kit::Request::Provider { exchange, .. } => {
                     self.down(kit::Event::Provider { exchange, verdict: kit::Verdict::Refused });
                 }
@@ -223,21 +235,27 @@ impl Clients {
             }
         }
     }
-    pub fn iterate(&mut self, now: Time, wall: Wall, events: &mut Queue<root::Event>) {
+    pub fn iterate(
+        &mut self,
+        now: Time,
+        wall: Wall,
+        events: &mut Queue<root::Event>,
+        forges: &[crate::settings::Forge],
+    ) {
         self.env.now = now;
         self.env.wall = wall;
         if self.closed || !self.room(1) || self.early.room() < kit::MAX_OUT_DOWN || events.room() < kit::MAX_OUT_DOWN {
             return;
         }
-        self.endings_step(events);
-        self.advance(events);
+        self.endings_step(events, forges);
+        self.advance(events, forges);
         if self.closed {
             return;
         }
         self.component.fire(&self.env, &mut self.out);
-        self.advance(events);
+        self.advance(events, forges);
         self.pending = self.component.up(&self.env, &mut self.out);
-        self.advance(events);
+        self.advance(events, forges);
     }
 }
 #[must_use]
@@ -338,7 +356,7 @@ impl Clients {
         }
         false
     }
-    fn endings_step(&mut self, events: &mut Queue<root::Event>) {
+    fn endings_step(&mut self, events: &mut Queue<root::Event>, forges: &[crate::settings::Forge]) {
         for _ in 0..self.endings.len().checked_mul(self.writes).expect("bounded sign-in endings") {
             if !self.room(1) || events.room() < kit::MAX_OUT_DOWN {
                 break;
@@ -358,7 +376,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events);
+            self.advance(events, forges);
         }
     }
 }
@@ -477,18 +495,4 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
     }
     let expires = u64::from_be_bytes(bytes.get(..8)?.try_into().ok()?);
     Some(kit::Kept { digest: skein_lib::Secret::new(Box::from(bytes.get(8..)?)), expires: Wall::from_nanos(expires) })
-}
-
-fn application(value: kit::ToApplication) -> kit::Event {
-    match value {
-        kit::ToApplication::Request { reply_to, .. } => {
-            kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })
-        }
-        kit::ToApplication::Read { reply, family, .. } => {
-            kit::Event::Application(kit::FromApplication::Read { reply, family, record: None })
-        }
-        kit::ToApplication::Watch { watcher, .. } => {
-            kit::Event::WatchRefused { watcher, why: core::WatchRefusal::Unknown }
-        }
-    }
 }

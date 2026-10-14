@@ -102,12 +102,11 @@ fn delivered(delivery: root::Delivery) -> Option<kit::Event> {
         root::Delivery::Read { reply, answer } => Some(kit::Event::Read { reply, answer }),
         root::Delivery::Document { watcher, document } => Some(kit::Event::Delivery { watcher, document }),
         root::Delivery::WatchEnded { watcher, why } => Some(kit::Event::WatchEnded { watcher, why }),
-        root::Delivery::Application { to, .. } => {
-            Some(kit::Event::Application(kit::FromApplication::Undecodable { to }))
-        }
+
         // Durable results are read through the core's existing documents and
         // watches, as in the reference's Held::Result routing.
-        root::Delivery::Result { .. }
+        root::Delivery::Application { .. }
+        | root::Delivery::Result { .. }
         | root::Delivery::Host(_)
         | root::Delivery::Link { .. }
         | root::Delivery::ForgeCommitted { .. }

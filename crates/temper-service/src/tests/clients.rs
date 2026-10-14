@@ -69,29 +69,29 @@ fn a_released_reply_keeps_its_terminal_and_destination() {
 fn the_component_prints_one_sign_in_link_at_start() {
     let mut clients = super::fixtures::clients();
     let mut events = skein_lib::Queue::with_capacity(64);
-    clients.advance(&mut events);
+    clients.advance(&mut events, &[]);
     let Some(skein_io::Request::Listen { owner, addr }) = clients.io.pop() else { panic!("listen") };
     assert!(clients.up(skein_io::Event::Listening { owner, listener: Token::new(77), addr }));
-    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     let link = clients.links.pop().unwrap();
     assert!(link.starts_with(b"http://127.0.0.1:7100/jig/v1/sign-in/link?secret="));
     assert!(clients.links.is_empty());
-    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     assert!(clients.links.is_empty());
 }
 #[test]
 fn closing_a_listener_during_start_closes_the_component() {
     let mut clients = super::fixtures::clients();
     let mut events = skein_lib::Queue::with_capacity(64);
-    clients.advance(&mut events);
+    clients.advance(&mut events, &[]);
     let Some(skein_io::Request::Listen { owner, addr }) = clients.io.pop() else { panic!("listen") };
     clients.down(kit::Event::Close);
     assert!(clients.up(skein_io::Event::Listening { owner, listener: Token::new(77), addr }));
-    clients.advance(&mut events);
+    clients.advance(&mut events, &[]);
     let Some(skein_io::Request::Close { entity }) = clients.io.pop() else { panic!("late listener close") };
     assert_eq!(entity, Token::new(77));
     assert!(clients.up(skein_io::Event::Closed { owner }));
-    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     assert!(clients.closed);
 }
 
@@ -128,10 +128,10 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
     clients.commit(3, &[root::Write::Erase(root::Key::Core(core::Key::People(people::Key::SignIn(7))))]);
     assert!(!clients.commit_room());
     let mut events = skein_lib::Queue::with_capacity(64);
-    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     assert!(!clients.commit_room());
     clients.committed(3);
-    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     assert!(clients.commit_room());
 }
 
@@ -175,10 +175,10 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
 fn a_request_before_decisions_open_is_answered_not_ready() {
     let mut service = super::fixtures::started();
     let engine = &mut service.engine;
-    engine.clients.advance(&mut engine.events);
+    engine.clients.advance(&mut engine.events, &engine.workers.forges);
     let Some(skein_io::Request::Listen { owner, addr }) = engine.clients.io.pop() else { panic!("listener") };
     assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: Token::new(99), addr }));
-    engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events);
+    engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events, &engine.workers.forges);
     let link = engine.clients.links.pop().unwrap();
     let body = peer::link_body(engine, &link);
     let mut peer = peer::Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);

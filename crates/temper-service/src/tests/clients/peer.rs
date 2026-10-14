@@ -63,7 +63,12 @@ impl Peer {
             if decide {
                 crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
             } else {
-                engine.clients.iterate(Time::from_nanos(1), Wall::from_nanos(1), &mut engine.events);
+                engine.clients.iterate(
+                    Time::from_nanos(1),
+                    Wall::from_nanos(1),
+                    &mut engine.events,
+                    &engine.workers.forges,
+                );
             }
             for _ in 0..engine.clients.io.len() {
                 match engine.clients.io.pop().unwrap() {

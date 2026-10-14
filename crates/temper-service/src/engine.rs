@@ -176,7 +176,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
     engine.clients.starting = if open { None } else { Some(()) };
-    engine.clients.iterate(now, wall, &mut engine.events);
+    engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges);
     clients_pass(engine);
     for _ in 0..engine.clients.early.len() {
         if !engine.clients.room(1) || engine.events.room() == 0 {
@@ -233,11 +233,11 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     clients_pass(engine);
 }
 fn clients_pass(engine: &mut Engine) {
-    engine.clients.advance(&mut engine.events);
+    engine.clients.advance(&mut engine.events, &engine.workers.forges);
     if engine.end.is_none() {
         engine.clients.secrets_step(&mut engine.store);
     }
-    engine.clients.advance(&mut engine.events);
+    engine.clients.advance(&mut engine.events, &engine.workers.forges);
 }
 fn release(engine: &mut Engine) {
     engine.ready = true;

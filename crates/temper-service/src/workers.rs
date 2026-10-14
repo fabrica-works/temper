@@ -28,7 +28,7 @@ pub struct Workers {
     ending: Option<Closing>,
     pub(crate) component_closed: bool,
     encoding: Encoding,
-    forges: Box<[Forge]>,
+    pub(crate) forges: Box<[Forge]>,
     pub(crate) bad_parts: u64,
 }
 fn invalid(what: What) -> Problems {
