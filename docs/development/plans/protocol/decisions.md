@@ -457,6 +457,15 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      needs, at most 20 lines" in an increment whose Size is world code
      only counts against 20 production lines, with no question.
 
+121. **The forge connection's deadlines are its holder's** (temper
+     13.2, blocked 2026-10-14T08:38:38Z; design gap, session 13's
+     questions). The designer answered at 2026-10-14T08:41:34Z, landed
+     in `0be9dd34`: a start read's deadline is the component's
+     `deadline` from when it is asked; connect and handshake have no
+     limit of their own; `idle` is 4 s in the profile `small`, below
+     Apache's 5 s `KeepAliveTimeout` default (forge.md, 7 and 8; session
+     13, its limits table, 13.2).
+
 119. **02.4 lands before 02.3** (temper 02.3, blocked
      2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
      conformance worlds' adoption to `PartyInput::Application`; after a
