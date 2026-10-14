@@ -21,12 +21,14 @@ and the system world composes the engine, worker and real Smith agents
 (`tests/system/README.md`).
 
 The protocol layer is designed for standalone mode (`protocol.md`); the
-plan that builds it is `protocol` (`docs/development/plans/protocol/`),
-ready. "protocol" in the table below names it.
+plan that builds it is `protocol` (`docs/development/plans/protocol/`).
+"protocol" in the table below names it. The supervisor marks a plan
+active and done in this file, and the designer keeps the rest (skein's
+development.md, section 3.3).
 
-No plan is active. The supervisor marks a plan active and done in this
-file, and the designer keeps the rest (skein's development.md, section
-3.3).
+The first milestone, a person's change from a chat to its landing on a
+real forge, and what stands between the `protocol` plan and it, is
+`draft/mvp.md`.
 
 ## 2. The design
 
@@ -34,7 +36,7 @@ file, and the designer keeps the rest (skein's development.md, section
 |---|---|---|
 | `agent-domain.md` | no | describes the legacy agent, superseded by smith and `domain/agent.md`; to be removed: not planned |
 | `channel.md` | no | all: temper's parts on jig's channel, the payload version, a git identity's value: protocol |
-| `client.md` | no | all: temper's client root and view over jig's, the forge's words and adoption form, the terminal shell: protocol; the browser (section 11): not planned, waits for jig's browser shell |
+| `client.md` | partly | built: the client root and view over jig's (3, 5), the forge's words and "Shown on the forge." (4.1, 4.2), its records (4.6), the native client and its sign-in (6.2's client, 7), the web crates retired (9), `tests/client`'s first stories (10). Left: the forge's ask and address, the adoption form, its page and navigation link (4.3 to 4.7, 5.2, 5.3), the engine's side (8), the terminal's renderer, command reader and loop, `temper open` (6), the one-process and process tiers (10): protocol; the forge's documents and panels, the browser (section 11): not planned |
 | `configuration.md` | no | all but the `webhooks` member: protocol; `webhooks`: not planned |
 | `credentials.md` | no | all: protocol; the forge as people's sign-in provider: not planned |
 | `engine-domain.md` | no | the legacy engine, superseded by `domain/`; still cited by the fake forge and the checkout; to be removed: not planned |
@@ -43,7 +45,7 @@ file, and the designer keeps the rest (skein's development.md, section
 | `llm.md` | partly | `temper-engine-smith` decodes and renders host tools and reads results; its place in the engine's routing: protocol |
 | `performance.md` | no | section 3's two containers: protocol; sections 5 and 6, measurements once `temper serve` runs: not planned |
 | `protocol.md` | no | standalone (sections 4 to 10, 12): protocol; between hosts (TLS, contained process trees, a worker-only process): not planned |
-| `testing.md` | partly | the domain and system worlds stand; section 2's tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer (4.2) and the fake git program (4.3): protocol |
+| `testing.md` | partly | the domain and system worlds and the client's joint world (6.3) stand; section 2's tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer (4.2) and the fake git program (4.3): protocol |
 | `worker-domain.md` | no | the worker before jig's hub, superseded by `domain/worker.md` and jig's `hosts.md`; still cited by the worker's crates and worlds; to be removed: not planned |
 | `domain/README.md` | yes | the names and maps stand; section 5 points at the protocol documents |
 | `domain/core.md` | yes | built in `jig-core` and its children under temper's root; the document still describes primitives owned by jig; to keep temper's application side and cite jig for the rest: not planned |
@@ -56,7 +58,7 @@ file, and the designer keeps the rest (skein's development.md, section
 | `domain/agent.md` | partly | the typed translation to smith (`temper-engine-smith`), the worker hosting smith, the system world; section 3's agent shell as temper's `agent` command, section 9's protocol tests and the charter's encoding: protocol |
 | `domain/worker.md` | partly | the worker root on jig's hub (`jig-domain-host`), the checkout and smith's host domain, with whole-worker worlds; section 9 below the domain, its parts naming repositories by tag: protocol; section 11's contraction (a missing base branch created, a push with no expected head): not planned |
 | `store/README.md` | no | all: temper's families on jig's store: protocol |
-| `web/` | partly | W1 to W4 built in `temper-web-domain` and `temper-web-view`, which `client.md` retires (protocol); `web/architecture.md`, the browser: not planned; `web/ux/`, the forge's family's pages: not planned |
+| `web/` | no | W1 to W4's crates retired by `client.md`, section 9 (protocol 11.4); `web/architecture.md`, the browser: not planned; `web/ux/`, the forge's family's pages: not planned. `web/ux/` predates jig's client and is partly superseded by jig's `pages.md` and `objects.md` (`draft/mvp.md`, section 3) |
 
 ## 3. Not planned
 
@@ -124,5 +126,6 @@ file, and the designer keeps the rest (skein's development.md, section
 
 | Draft | About | Next |
 |---|---|---|
+| `mvp.md` | the first milestone: the client against its design, and what stands between the `protocol` plan and a change landed for real | discuss; its section 6 names the plan after `protocol` |
 | `factory.md` | the software factory: write, prove and run planes, the lab, on jig and os | not adopted: discuss; its section 13 changes `qa.md` |
 | `qa.md` | continuous QA on a running build of main | not adopted: discuss; its order of building (section 8) waits for a running build |
