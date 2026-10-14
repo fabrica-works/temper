@@ -359,14 +359,18 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      deliveries). configuration.md, section 7 fixes no number ("Its
      numbers are constants in `temper-service`'s limits module, each
      documented with what it bounds"). So the implementer's profile
-     stands: root journal `{commits: 3, held: 1536, writes: 4096,
+     stands: root journal `{commits: 3, held: 1536, writes: 6144,
      deliveries: 512, transcript_bytes: 65536, result_bytes: 2048,
      run_bytes: 16384}`, root loads `{loads: 2, rows: 1, bytes: 65536,
      reply_bytes: 65536, transcript_bytes: 65536}`, `forge.named_calls`
      32, the other fixture values kept; each raised constant's doc line
      names the check that needs it, and
      `the_small_profile_passes_each_domains_worst_case` is the check.
-     Tighter numbers wait for startup's memory measure.
+     Tighter numbers wait for startup's memory measure. `writes` was 4096
+     in the first answer; 08.1's proof measured the root's worst case
+     at 6048 (`route_bound` 6016 with jig small's `tasks::max_out` 724,
+     and `call_records` 32), so it is 6144 (blocked
+     2026-10-14T05:24:23Z).
 
 114. **Make's rename needs no probe** (temper 07.3b, blocked
      2026-10-14T05:23:47Z; plan defect). Session 07's Choices promise
