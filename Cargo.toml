@@ -101,7 +101,6 @@ jig-domain-accounts = { git = "https://github.com/forgetic/jig.git" }
 jig-test-connector = { git = "https://github.com/forgetic/jig.git" }
 jig-test-domain = { git = "https://github.com/forgetic/jig.git" }
 jig-conformance = { git = "https://github.com/forgetic/jig.git" }
-jig-fake-store = { git = "https://github.com/forgetic/jig.git" }
 jig-test-store-files = { git = "https://github.com/forgetic/jig.git" }
 jig-fake-workers = { git = "https://github.com/forgetic/jig.git" }
 jig-fake-parties = { git = "https://github.com/forgetic/jig.git" }

@@ -152,7 +152,7 @@ fn env(config: &Config, clock: Clock) -> Env<engine::Limits> {
 impl Application for Temper {
     type Domain = Domain;
     type Store = Store;
-    type Write = jig_fake_store::Write<root::Key, observations::Record>;
+    type Write = engine::Write;
     type Config = Config;
     type Systems = systems::FakeForge;
     type Peers = Peers;
@@ -180,8 +180,8 @@ impl Application for Temper {
             returned: None,
         }
     }
-    fn store(_: &Config) -> Store {
-        Store::new()
+    fn store(config: &Config) -> Store {
+        Store::with_limits(&config.limits)
     }
     fn systems(config: &Config, _: u64) -> systems::FakeForge {
         let mut system = systems::FakeForge::new_with_ci(
@@ -288,7 +288,7 @@ impl Application for Temper {
     }
     fn cold(peers: &mut Peers, store: &Store, _: Clock) {
         peers.observed.push(r::Observed::ColdStore { receipts: observations::snapshot(store).receipts });
-        for record in store.rows.values().map(|record| &record.0) {
+        for record in store.rows.values() {
             if let root::Record::Forge { row } = record
                 && let forge::Stored::Entry { entry, held: false } = row.as_ref()
                 && entry.attempt.is_some()
@@ -337,11 +337,7 @@ impl Application for Temper {
         clippy::wildcard_enum_match_arm,
         reason = "every native nonstore request is retained unchanged as a released delivery"
     )]
-    fn release(
-        domain: &mut Domain,
-        config: &Config,
-        clock: Clock,
-    ) -> Vec<Output<jig_fake_store::Write<root::Key, observations::Record>, Delivery>> {
+    fn release(domain: &mut Domain, config: &Config, clock: Clock) -> Vec<Output<engine::Write, Delivery>> {
         let environment = env(config, clock);
         engine::release(&mut domain.root, &environment, &mut domain.outputs);
         if domain.outputs.is_empty() {
@@ -354,19 +350,9 @@ impl Application for Temper {
         let mut outputs = Vec::new();
         while let Some(request) = domain.outputs.pop() {
             outputs.push(match request {
-                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => Output::Commit {
-                    number,
-                    writes: writes
-                        .into_vec()
-                        .into_iter()
-                        .map(|w| match w {
-                            root::Write::Save(row) => {
-                                jig_fake_store::Write::Save { key: row.key(), row: observations::Record(row) }
-                            }
-                            root::Write::Erase(key) => jig_fake_store::Write::Erase(key),
-                        })
-                        .collect(),
-                },
+                engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
+                    Output::Commit { number, writes }
+                }
                 engine::Request::Stop => Output::Stop,
                 other => Output::Deliver(Delivery::Root(other)),
             });
@@ -441,24 +427,8 @@ impl Application for Temper {
         match request {
             engine::Request::ToChild(released) => events.push(engine::Event::Released(released)),
             engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
-                let rows: Vec<_> = store
-                    .rows
-                    .iter()
-                    .filter(|(key, _)| range.contains(key) && after.as_ref().is_none_or(|previous| *key > previous))
-                    .take(usize::try_from(most + 1).expect("tiny load"))
-                    .map(|(_, row)| row.0.clone())
-                    .collect();
-                let more = rows.len() > usize::try_from(most).expect("tiny load");
-                let mut rows = rows;
-                if more {
-                    rows.pop();
-                }
-                let next = if more { rows.last().map(root::Record::key) } else { None };
-                events.push(engine::Event::Store(engine::StoreInput::Loaded {
-                    owner,
-                    rows: rows.into_boxed_slice(),
-                    next,
-                }));
+                let (rows, next) = store.page(&range, after.as_ref(), most);
+                events.push(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
             }
             engine::Request::Forge { call, repository, op } => {
                 events.extend(systems.call(store, clock, call, repository, op));
@@ -577,7 +547,7 @@ impl Application for Temper {
             peers.applied = store.applied;
             let mut snapshot = observations::snapshot(store);
             observations::resolved(store, &mut snapshot, &mut peers.effects, &mut peers.held, &mut peers.settled);
-            for record in store.rows.values().map(|record| &record.0) {
+            for record in store.rows.values() {
                 if let root::Record::Core(jig_domain_core::Record::Tasks(
                     tasks::Stored::Live(task) | tasks::Stored::Ended(task),
                 )) = record

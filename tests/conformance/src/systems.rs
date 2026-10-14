@@ -121,7 +121,6 @@ impl FakeForge {
             let entry = store
                 .rows
                 .values()
-                .map(|record| &record.0)
                 .find_map(|row| match row {
                     root::Record::Forge { row } => match row.as_ref() {
                         forge::Stored::Entry { entry, held: false } if &entry.effect.write == write => Some(entry),

@@ -66,7 +66,7 @@ pub fn parts(write: &client::api::Write) -> (u16, Vec<r::Name>, Option<u64>, u64
 #[must_use]
 #[expect(clippy::wildcard_enum_match_arm, reason = "only named effect call rows identify this outbox entry")]
 pub fn key(store: &Store, entry: &client::Entry) -> SystemKey {
-    let call = store.rows.values().map(|record| &record.0).find_map(|row| match row {
+    let call = store.rows.values().find_map(|row| match row {
         root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if matches!(row.part, core::CallPart::Effect { entry: n, .. } if n == entry.number) => Some(row.key),
         _ => None,
     });
@@ -138,22 +138,15 @@ pub fn pattern(p: &jig_domain_authority::Pattern) -> r::Pattern {
     };
     r::Pattern { base: p.segments.iter().map(|x| x.to_vec()).collect(), terminal, open }
 }
-/// Full native row retained by the fake store, with compact harness tracing.
-#[derive(Clone)]
-pub struct Record(pub root::Record);
-impl std::fmt::Debug for Record {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Record").field(&self.0.key()).finish()
-    }
-}
-pub type Store = jig_fake_store::Store<root::Key, Record>;
+pub type Record = root::Record;
+pub type Store = temper_engine_domain_world::store::Store;
 
 #[expect(clippy::too_many_lines, reason = "one outside translation covers the durable row vocabulary")]
 #[must_use]
 pub fn snapshot(store: &Store) -> r::Snapshot {
     let mut snapshot = r::Snapshot::default();
     let mut decisions = Vec::new();
-    for record in store.rows.values().map(|record| &record.0) {
+    for record in store.rows.values() {
         match record {
             root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row) | tasks::Stored::Ended(row))) => {
                 snapshot.tasks.insert(row.number, jig_core_world::observations::task(row));
@@ -245,7 +238,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     );
                 }
                 snapshot.decisions.push(r::Decision {
-                    projection: key.attempt == 0 && store.rows.values().map(|record| &record.0).any(|record| matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)|tasks::Stored::Ended(task))) if task.number==row.task && task.tracked.is_some())),
+                    projection: key.attempt == 0 && store.rows.values().any(|record| matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)|tasks::Stored::Ended(task))) if task.number==row.task && task.tracked.is_some())),
                     connector: 0,
                     key,
                     kind,
@@ -300,7 +293,7 @@ pub fn resolved(
     settled: &mut BTreeSet<SystemKey>,
 ) {
     let mut live = BTreeSet::new();
-    for record in store.rows.values().map(|record| &record.0) {
+    for record in store.rows.values() {
         if let root::Record::Forge { row } = record
             && let forge::Stored::Entry { entry, held: false } = row.as_ref()
         {
@@ -308,7 +301,7 @@ pub fn resolved(
             live.insert(key);
             let evidence = EffectEvidence {
                 kind: parts(&entry.effect.write).0,
-                projection: store.rows.values().map(|record| &record.0).any(|record| {
+                projection: store.rows.values().any(|record| {
                     matches!(record,
                     root::Record::Forge { row } if matches!(row.as_ref(), forge::Stored::Issue(issue)
                         if issue.goal == key.task && issue.pending == Some(key.purpose)))
@@ -326,7 +319,7 @@ pub fn resolved(
         if held.contains_key(&key) || settled.contains(&key) {
             continue;
         }
-        let answer = store.rows.values().map(|record| &record.0).find_map(|record| match record {
+        let answer = store.rows.values().find_map(|record| match record {
             root::Record::Core(core::Record::Core(core::CoreRecord::Call(call)))
                 if call.key.task == key.task
                     && call.key.attempt == key.attempt
@@ -357,7 +350,7 @@ pub fn resolved(
             None if live.contains(&key) => {}
             None => {
                 let projection_failed = evidence.projection
-                    && store.rows.values().map(|record| &record.0).any(|record| {
+                    && store.rows.values().any(|record| {
                         matches!(record,
                     root::Record::Forge { row } if matches!(row.as_ref(), forge::Stored::Issue(issue)
                         if issue.goal == key.task && issue.failed))

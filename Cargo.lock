@@ -1254,7 +1254,6 @@ dependencies = [
  "jig-domain-host",
  "jig-domain-people",
  "jig-domain-tasks",
- "jig-fake-store",
  "jig-fake-workers",
  "jig-test-system",
  "skein-lib",
@@ -1325,6 +1324,7 @@ dependencies = [
 name = "temper-engine-domain-world"
 version = "0.0.0"
 dependencies = [
+ "jig-conformance",
  "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-brief",

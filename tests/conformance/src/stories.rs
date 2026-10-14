@@ -42,7 +42,7 @@ fn require(holds: bool, why: &str) -> Result<(), Violation> {
     if holds { Ok(()) } else { Err(Violation { promise: Promise::Lost, why: why.into() }) }
 }
 fn change_row(store: &Store) -> Option<&forge::ChangeRow> {
-    store.rows.values().map(|record| &record.0).find_map(|record| {
+    store.rows.values().find_map(|record| {
         let root::Record::Forge { row } = record else { return None };
         let forge::Stored::Change(change) = row.as_ref() else { return None };
         Some(change)
@@ -73,9 +73,9 @@ fn wait(world: &mut World, done: impl Fn(&World) -> bool) -> Result<(), Violatio
             change_row(&world.store),
             world.peers.assignments.iter().map(|run| (run.task, run.attempt)).collect::<Vec<_>>(),
             &world.trace[world.trace.len().saturating_sub(5)..], issue_row(world),
-            world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Core(core::Record::Core(core::CoreRecord::Call(_))))).collect::<Vec<_>>(),
-            world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Core(core::Record::Tasks(_)))).collect::<Vec<_>>(),
-            world.store.rows.values().map(|record| &record.0).filter(|row| matches!(row,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Release(_)|forge::Stored::Entry { .. }))).collect::<Vec<_>>()
+            world.store.rows.values().filter(|row| matches!(row,root::Record::Core(core::Record::Core(core::CoreRecord::Call(_))))).collect::<Vec<_>>(),
+            world.store.rows.values().filter(|row| matches!(row,root::Record::Core(core::Record::Tasks(_)))).collect::<Vec<_>>(),
+            world.store.rows.values().filter(|row| matches!(row,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Release(_)|forge::Stored::Entry { .. }))).collect::<Vec<_>>()
         ),
     })
 }
@@ -162,7 +162,7 @@ fn positive_change(world: &mut World, repair: bool) -> Result<(), Violation> {
         "landing lacked a human approval of that exact head",
     )?;
     wait(world, |world| {
-        world.store.rows.values().map(|record| &record.0).any(|record| {
+        world.store.rows.values().any(|record| {
             matches!(record,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) if row.number == task
         && matches!(row.phase,tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Change {..}))))
@@ -188,7 +188,7 @@ fn other_hand(world: &mut World) -> Result<(), Violation> {
     world.systems.hold = false;
     world.systems.release_late(world.clock());
     wait(world, |world| {
-        world.store.rows.values().map(|record| &record.0).any(|record|matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.number == task && matches!(row.phase,tasks::Phase::Held {..})))
+        world.store.rows.values().any(|record|matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.number == task && matches!(row.phase,tasks::Phase::Held {..})))
     })?;
     require(
         world.systems.effects.iter().filter(|effect| effect.kind == 4).all(|effect| !effect.applied),
@@ -254,10 +254,10 @@ fn person_words(world: &mut World) -> Result<(), Violation> {
                 run.task == task && run.messages.iter().any(|word| word.words.as_ref() == b"Check the edge case")
             })
     })?;
-    require(world.store.rows.values().map(|record| &record.0).any(|record|matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)|tasks::Stored::Ended(row))) if row.number==task && row.inbox.iter().any(|word|word.from==tasks::Party::Person(1) && word.words.as_ref()==b"Check the edge case"))),"person's words were not durably retained")
+    require(world.store.rows.values().any(|record|matches!(record,root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)|tasks::Stored::Ended(row))) if row.number==task && row.inbox.iter().any(|word|word.from==tasks::Party::Person(1) && word.words.as_ref()==b"Check the edge case"))),"person's words were not durably retained")
 }
 fn issue_row(world: &World) -> Option<&forge::IssueRow> {
-    world.store.rows.values().map(|record| &record.0).find_map(|record| {
+    world.store.rows.values().find_map(|record| {
         let root::Record::Forge { row } = record else { return None };
         let forge::Stored::Issue(issue) = row.as_ref() else { return None };
         Some(issue)
@@ -266,7 +266,7 @@ fn issue_row(world: &World) -> Option<&forge::IssueRow> {
 fn projection_held(world: &World) -> bool {
     issue_row(world).is_some_and(|issue| {
         issue.failed
-            && world.store.rows.values().map(|record| &record.0).any(|record| {
+            && world.store.rows.values().any(|record| {
                 matches!(record,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
         if task.number == issue.goal && matches!(task.phase,tasks::Phase::Held {..}))
@@ -325,7 +325,7 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
     );
     world.drain()?;
     require(
-        !world.store.rows.values().map(|record| &record.0).any(|record| {
+        !world.store.rows.values().any(|record| {
             matches!(record,
             root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Subscription(subscription)
             if subscription.task == goal && subscription.topic == forge::Topic::Participation {
@@ -334,7 +334,7 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
         }),
         "owned goal issue acquired a participant subscription",
     )?;
-    require(!world.store.rows.values().map(|record| &record.0).any(|record| matches!(record,
+    require(!world.store.rows.values().any(|record| matches!(record,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task))) if task.number == goal
         && task.inbox.iter().any(|word| matches!(word.kind,tasks::MessageKind::News {class: tasks::NewsClass::Wakes,..})))),
         "human issue comments woke the projected goal")?;
@@ -417,7 +417,7 @@ fn issue_creation(world: &mut World) -> Result<(), Violation> {
     require(!world.systems.uncertain.is_empty(), "lost issue supplied no outside uncertainty evidence")?;
     world.crash()?;
     wait(world, |world| {
-        world.store.rows.values().map(|record| &record.0).any(|record| matches!(record,
+        world.store.rows.values().any(|record| matches!(record,
         root::Record::Core(core::Record::Core(core::CoreRecord::Call(call)))
         if call.key.completion == 401 && matches!(call.part, core::CallPart::Effect {outcome: Some(core::connector::OutboxOutcome::Made),..})))
     })?;
@@ -433,7 +433,7 @@ fn issue_creation(world: &mut World) -> Result<(), Violation> {
     )
 }
 fn creation_held(world: &World) -> bool {
-    world.store.rows.values().map(|record| &record.0).any(|record| {
+    world.store.rows.values().any(|record| {
         matches!(record,
         root::Record::Core(core::Record::Core(core::CoreRecord::Call(call)))
         if call.key.completion == 401 && matches!(call.part,core::CallPart::Effect {

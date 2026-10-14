@@ -23,7 +23,6 @@ temper-engine-forge-world = { path = "../engine/forge" }
 temper-fake-forge-domain.workspace = true
 
 jig-conformance.workspace = true
-jig-fake-store.workspace = true
 jig-fake-workers.workspace = true
 jig-test-system.workspace = true
 jig-core-world.workspace = true

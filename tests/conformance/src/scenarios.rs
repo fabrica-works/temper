@@ -41,7 +41,7 @@ pub(crate) fn ask(world: &mut World, key: u8, ask: people::Ask) {
 }
 fn authority(world: &World) -> tasks::Authority {
     let task = world.peers.assignments[0].task;
-    match world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))).map(|record| &record.0) {
+    match world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))) {
         Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => row.authority.clone(),
         other => panic!("live parent {other:?}"),
     }
@@ -143,7 +143,6 @@ impl ScenarioApplication for Temper {
                             .store
                             .rows
                             .values()
-                            .map(|record| &record.0)
                             .filter(|r| matches!(r, root::Record::Core(core::Record::Tasks(_))))
                             .collect::<Vec<_>>(),
                         &world.trace[world.trace.len().saturating_sub(5)..],
@@ -274,7 +273,6 @@ impl ScenarioApplication for Temper {
                     .store
                     .rows
                     .values()
-                    .map(|record| &record.0)
                     .find_map(|row| match row {
                         root::Record::Forge { row } => match row.as_ref() {
                             forge::Stored::Entry { entry, held: false } => entry.attempt.map(|a| a.expires),
@@ -310,7 +308,6 @@ impl ScenarioApplication for Temper {
                             .store
                             .rows
                             .values()
-                            .map(|record| &record.0)
                             .filter_map(|r| match r {
                                 root::Record::Core(core::Record::Tasks(tasks::Stored::Live(t))) =>
                                     Some((t.number, t.phase.clone(), t.authority.tools, t.proposal.clone())),
@@ -321,7 +318,6 @@ impl ScenarioApplication for Temper {
                             .store
                             .rows
                             .values()
-                            .map(|record| &record.0)
                             .filter(|r| matches!(r, root::Record::Core(core::Record::Core(core::CoreRecord::Call(_)))))
                             .collect::<Vec<_>>()
                     )
@@ -385,7 +381,6 @@ impl ScenarioApplication for Temper {
                     .store
                     .rows
                     .values()
-                    .map(|record| &record.0)
                     .filter_map(|row| match row {
                         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
                             if row.spec.words.as_ref() == b"period work" =>
@@ -426,7 +421,6 @@ impl ScenarioApplication for Temper {
                             .store
                             .rows
                             .values()
-                            .map(|record| &record.0)
                             .filter_map(|r| match r {
                                 root::Record::Core(core::Record::Tasks(
                                     tasks::Stored::Live(t) | tasks::Stored::Ended(t),
@@ -491,7 +485,7 @@ impl ScenarioApplication for Temper {
                     },
                 );
                 world.drain()?;
-                check(world.store.rows.values().map(|record| &record.0).any(|row|matches!(row,root::Record::Core(core::Record::People(people::Stored::Policy {value,..})) if value.requirements.iter().any(|r|r.kind==6))),"narrow requirement not committed")?;
+                check(world.store.rows.values().any(|row|matches!(row,root::Record::Core(core::Record::People(people::Stored::Policy {value,..})) if value.requirements.iter().any(|r|r.kind==6))),"narrow requirement not committed")?;
                 if !world.peers.policy.requirements.iter().any(|r| r.kind == 6) {
                     world.peers.policy.requirements.push(jig_conformance::referee::Requirement {
                         project: Some(1),
@@ -549,7 +543,7 @@ impl ScenarioApplication for Temper {
             Scenario::ChangedJudge => check(
                 world.systems.effects.iter().filter(|x| x.kind == 4 && x.applied).count() == 1
                     && world.systems.effects.iter().filter(|x| x.kind == 3 && x.applied).count() == 2
-                    && world.store.rows.values().map(|record| &record.0).any(ci_repair),
+                    && world.store.rows.values().any(ci_repair),
                 "observed judge did not grandfather the decided flight and stop a new merge",
             ),
             Scenario::NarrowingPolicy => check_lazy(
@@ -567,7 +561,6 @@ impl ScenarioApplication for Temper {
                             .store
                             .rows
                             .values()
-                            .map(|record| &record.0)
                             .filter(|r| matches!(r, root::Record::Core(core::Record::Core(core::CoreRecord::Call(_)))))
                             .collect::<Vec<_>>()
                     )
@@ -674,7 +667,6 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
                 .store
                 .rows
                 .values()
-                .map(|record| &record.0)
                 .filter_map(|r| match r {
                     root::Record::Core(core::Record::Tasks(tasks::Stored::Live(t))) =>
                         Some((t.number, t.phase.clone(), t.spec.words.clone())),
@@ -691,14 +683,14 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
     world.peers.worker.message(producer.task, producer.attempt, 200, b"report push".as_slice().into());
     world.drain()?;
     for _ in 0..40 {
-        if world.peers.story.is_some() && world.store.rows.values().map(|record| &record.0).any(|record|
+        if world.peers.story.is_some() && world.store.rows.values().any(|record|
             matches!(record,root::Record::Forge {row} if matches!(row.as_ref(),forge::Stored::Change(change) if change.pull.is_some()))) {
             break;
         }
         if world.systems.delayed_merge() {
             break;
         }
-        if completion == 2 && world.systems.failed && world.store.rows.values().map(|record| &record.0).any(ci_repair) {
+        if completion == 2 && world.systems.failed && world.store.rows.values().any(ci_repair) {
             break;
         }
         world.advance(if completion == 1 { 2_000_000_000 } else { 500_000_000 });
