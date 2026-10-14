@@ -368,6 +368,20 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `the_small_profile_passes_each_domains_worst_case` is the check.
      Tighter numbers wait for startup's memory measure.
 
+114. **Make's rename needs no probe** (temper 07.3b, blocked
+     2026-10-14T05:23:47Z; plan defect). Session 07's Choices promise
+     "a Make whose rename meets a name anyway ends `Broken`", while
+     skein's pinned `kernel::Op::Rename` reads "replacing what `to`
+     named" (`kernel.rs:447-448`) and git.md, 4.1 names two operations.
+     The pin submits a plain `renameat` (`skein-shell/src/ring.rs:827-831`,
+     no flags), and a workspace is a directory: rename(2) refuses to
+     replace a directory that holds anything (`ENOTEMPTY`) and replaces
+     an empty one. Checked on x1 with `mv -T ws trash/7` onto a
+     non-empty `trash/7`: "cannot overwrite 'trash/7': Directory not
+     empty", exit 1; onto an empty one, exit 0. So Make keeps git.md's
+     two operations, with no probe, and the promise holds where a
+     collision would lose anything. Session 07 says so.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

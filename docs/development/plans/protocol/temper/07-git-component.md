@@ -135,7 +135,11 @@ scripted io 09.2 and 09.3 reuse.
   the worker's service from its seed at each start, counts up from there
   in decimal (git.md, 4.1: "counted from a number the component draws
   from its seed at each start"); a Make whose rename meets a name anyway
-  ends `Broken`, which the domain retries as transient.
+  ends `Broken`, which the domain retries as transient: the `Rename` of
+  a directory onto a `trash/<n>` that holds anything fails
+  (`ENOTEMPTY`), and one onto an empty directory replaces it, losing
+  nothing; Make takes git.md's two operations, with no probe before the
+  rename (ruling 114).
 - **Commit's scan** opens `workspaces/<token>/<repository>/<path>`
   beneath the root with `OpenHow::ReadNoFollow` and reads it at offsets in
   pieces of `read_bytes` until a read returns 0. `NotFound`,
