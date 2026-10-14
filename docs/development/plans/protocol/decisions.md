@@ -899,6 +899,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      planner's Sizes for test support and fakes ran low as for component
      code (rulings 102, 106, 126, 139, 142).
 
+143. **14.5 lands at 787 lines** (temper 14.5, blocked
+     2026-10-14T15:23:14Z; plan defect, size). 14.5 (Size 300, allowance
+     600) is complete, its Proof passed against the real Forgejo and
+     runner (exit 0, the 39 component facts holding, 25 s), at 787:
+     `tools/forgejo-conformance`'s `component/hosted.rs` 293,
+     `component/writes.rs` 194, `component/reads.rs` 110, `component.rs`
+     85, `facts.txt` 39 and the rest 66, with one line of
+     `temper-engine-protocol-forge/src/writes.rs` (a review's success is
+     Forgejo's 200, not 201) under the README's 20-line fix. It lands as
+     it is; session 14 ends.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
