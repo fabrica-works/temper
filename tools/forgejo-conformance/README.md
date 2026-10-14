@@ -24,3 +24,8 @@ Last-Modified become 2020-01-01. Numeric resource ids remain stable because
 provisioning has a fixed order. Every output is checked for all fixture
 secrets before it is written, and response bodies are also checked before
 masking. A leak reports the case and secret kind without printing its value.
+
+The same run writes `facts.txt`, with provenance followed by `holds`,
+`fails` or `unchecked` lines. Actions execution follows in 05.3b; webhooks
+are left unchecked until webhooks are built. The committed facts retain the
+full observed Forgejo/runner capture; the runner implementation follows.

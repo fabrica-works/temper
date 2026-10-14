@@ -1,5 +1,6 @@
 //! Records format-faithful exchanges against an isolated Forgejo (forge.md, 10).
 mod cases;
+pub mod facts;
 mod fixture;
 pub mod mask;
 pub mod write;
@@ -17,6 +18,20 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     let mut mask = mask::Mask::new(fixture.instance.port());
     let secrets = write::Secrets::from_instance(&fixture.instance);
     cases::record(&fixture, out, &mut mask, &secrets)?;
+    let mut facts = facts::evaluate(&forgejo, &fixture, out)?;
+    let runner = "none";
+    facts.extend(facts::unchecked_actions());
+    facts.push(facts::Fact {
+        name: "webhook-deliveries",
+        outcome: facts::Outcome::Unchecked("webhooks are built after standalone".into()),
+    });
+    let lines = facts.iter().map(facts::Fact::line).collect::<String>();
+    write::check("facts.txt", b"", lines.as_bytes(), &secrets)?;
+    facts::write(out, &facts)?;
+    std::fs::write(
+        out.join("facts.txt"),
+        format!("# forgejo {} sha256 {}\n# runner {runner}\n{lines}", forgejo.version(), forgejo.sha256()),
+    )?;
     std::fs::write(
         out.join("transcripts/binary.txt"),
         format!("version {}\nsha256 {}\n", forgejo.version(), forgejo.sha256()),

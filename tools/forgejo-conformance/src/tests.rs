@@ -61,3 +61,26 @@ fn targets_encode_every_byte_but_unreserved_ones() {
         assert_eq!(encode(plain), encoded, "{plain}");
     }
 }
+#[test]
+fn a_fact_line_is_holds_fails_or_unchecked_with_its_reason() {
+    use crate::facts::{Fact, Outcome};
+    for (outcome, expected) in [
+        (Outcome::Holds, "holds example\n"),
+        (Outcome::Fails("HTTP 500".into()), "fails example: HTTP 500\n"),
+        (Outcome::Unchecked("runner absent".into()), "unchecked example: runner absent\n"),
+    ] {
+        assert_eq!(Fact { name: "example", outcome }.line(), expected);
+    }
+}
+#[test]
+fn a_fact_read_from_a_case_compares_its_status_and_message() {
+    let mut exchange = Exchange {
+        sent: Vec::new(),
+        status: 409,
+        head: b"HTTP/1.1 409 Conflict\r\n".to_vec(),
+        body: b"{\"message\":\"head out of date\"}".to_vec(),
+    };
+    assert!(crate::facts::matches(&exchange, 409, "head out of date"));
+    exchange.status = 405;
+    assert!(!crate::facts::matches(&exchange, 409, "head out of date"));
+}
