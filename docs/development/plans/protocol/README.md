@@ -158,7 +158,11 @@ them wait on them.
   - code that moved since the plan was written, followed to its file;
   - the fixtures a Test shape names, in the crate's fixture module;
   - an item made visible within its own crate;
-  - the session's own earlier code, replaced;
+  - the session's own earlier code, replaced or extended: a file its
+    own earlier increments created is in each later increment's Files,
+    and an expected literal there gains a field the Shape adds, with the
+    value its transcript or fixture gives, no other value changed
+    (decisions.md, ruling 108);
   - a fixture that gains what a real component requires (18's real
     store), its expected values literals built from the fixture's
     constants, none loosened or removed.

@@ -279,6 +279,29 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      dev-dependencies; both are in 04.5's Files. The unit fixture stays
      where it is; nothing is moved or included by path.
 
+108. **A session's own earlier files are in its later increments' Files**
+     (temper 06.3, blocked 2026-10-14T04:43:10Z; plan defect). 06.3's
+     Files omit `decode/walk.rs`, `client/items.rs`, `server/items.rs`,
+     `client/start.rs` and `server/start.rs`, which 06.1 and 06.2 created
+     and which its Shape must extend (the walker's tables and dispatch;
+     `PullBranch::repo_id` in 06.2's pull), and
+     `tests/codecs/tests/forgejo_items.rs`, whose pull literals gain
+     `repo_id`. As a standing rule, the README's "the session's own
+     earlier code, replaced" becomes "replaced or extended": a file the
+     session's own earlier increments created is in each later
+     increment's Files, its lines counted in the Size, and an expected
+     literal there gains a field the Shape adds, with the value its
+     transcript or fixture gives, no other value changed. A file another
+     session created stays outside.
+
+109. **`owner-permission` is a `403`** (temper 06.3, blocked
+     2026-10-14T04:43:37Z; plan defect). 05.2 recorded it as `HTTP 403`
+     with `{message, url}`, no permission. 06.3's rows assert its status
+     and its error body is decoded by 06.5's `error_decoder`, in 06.5's
+     failure table; `Permission::Owner` is read from a literal unit
+     document, and 06.3's Proof counts eleven documents. forge.md, 3.4
+     reads a `403` as `Forbidden` ("| `401`, `403` | `Forbidden` |").
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

@@ -398,10 +398,14 @@ tests in `tests/codecs/tests/forgejo_reviews.rs`, as 06.2's five
 cases `reviews`, `statuses-page-2`, `review-comments`, `branch`,
 `branch-with-slash`, `branches-page-1`, `branches-page-2`,
 `branch-protection`, `branch-protections`, `collaborators`,
-`collaborator-permission`, `owner-permission`. Ceilings as 06.1.
+`collaborator-permission`, `owner-permission` (a `403` with
+`{message, url}`: its rows assert the status, and its error body is
+06.5's; `Permission::Owner` is read from a literal unit document;
+ruling 109). Ceilings as 06.1.
 Proof: world, `heavy cargo nextest run -p temper-forge-forgejo -p
-temper-codecs-world`, run once: the twelve transcripts decode, both
-sides meet their requests, mutations are malformed naming their
+temper-codecs-world`, run once: eleven transcripts decode, and
+`owner-permission`'s answers `403` (its error body is 06.5's; ruling
+109), both sides meet their requests, mutations are malformed naming their
 fields, and the open pulls' listing decodes its rows as pulls; under 2 s.
 Don't: map `owner` to `admin` (13.3's mapping); read a review's
 comments by page (Forgejo does not page them); filter the pulls'
@@ -494,7 +498,8 @@ Test shape: unit tests in `src/tests.rs`:
 tests in `tests/codecs/tests/forgejo_writes.rs`, as 06.2's five, named
 `write_...` in place of `item_...`, over the write cases of 05.2 (`create-issue` to `delete-branch`), plus
 `failure_transcripts_name_their_refusal_by_status_and_message` (a table
-over the failure cases of 05.2). Fuzzy, in
+over the failure cases of 05.2, and `owner-permission`, a `403` on a
+read; ruling 109). Fuzzy, in
 `tests/codecs/tests/fuzzy_forgejo.rs`:
 `forgejo_decoders_answer_every_mutated_transcript_without_panicking`
 (each JSON transcript body, mutated 200 times by 03.1's `mutated` with
