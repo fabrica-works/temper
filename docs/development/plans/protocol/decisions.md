@@ -1115,6 +1115,31 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      the process proof runs once. If this run names no site, 15.3 asks
      with its log and makes no further run. Rulings 147's and 149's other
      terms hold.
+     At 2026-10-14T18:36:45Z the run had named `contents.rs`'s `heard`
+     (HTTP 200, a files row whose `status` Forgejo v16.0.5 writes
+     `changed`, refused by `temper-forge-forgejo/src/client/files.rs:211`);
+     15.3 fixed it in one line under the README's 20-line fix, with a
+     decoder test, and the gate's task now runs.
+
+151. **The process story's fake gate answers with `label`** (temper 15.3,
+     blocked 2026-10-14T18:36:45Z; plan defect). After ruling 150's fix,
+     the gate's run reaches the fake model, whose scripted finish
+     (`crates/temper/tests/support/forgejo.rs`, 15.3's own file) sends
+     `{"form":"verdict","verdict":"1",...}`; pinned smith's `declared`
+     reads a verdict's name from `label`
+     (`smith-protocol-llm/src/contract.rs:279-280`), and temper's start
+     names each verdict rule by its code's decimal
+     (`temper-engine-smith/src/start.rs:171`, the gate's choices codes 1
+     and 2, `forge_route.rs:1740-1750`), so `"1"` is right and the member
+     is wrong. "The gate's script" kept unchanged in rulings 145 to 150
+     and the steer of 2026-10-14T17:34:50Z means: no assertion, expected
+     literal or scripted step loosened or removed so the story passes. A
+     member or value corrected to the pinned contract is a fixture's input
+     corrected so the test checks the same behaviour (README, edits
+     outside Files). So the member becomes `label`, its value `"1"` and
+     every other member kept; the gate is the check below the process
+     tier, and the process proof runs once, as the change aimed at this
+     cause. Ruling 145's same-symptom count runs on from ruling 150's fix.
 
 ## For the user
 
