@@ -138,7 +138,8 @@ facts as the component sees them.
   (`engine.rs`). An io event whose token's prefix is `tokens::FORGE`
   goes to `Component::up` with the prefix taken off; the component's io
   requests leave with it put on.
-- **What the binary resolves** comes as `ForgeRuntime`, beside
+- **What the binary resolves** comes as `ForgeRuntime` (with
+  `trust_roots` and `trust_root_bytes`, as `AccountsRuntime`; ruling 133), beside
   `AccountsRuntime`, wherever that is passed (`Service::engine` and its
   callers): the address resolved and the TLS configuration made, as jig's
   binary makes an issuer's (`testing/jig-test/src/lib.rs:117-170`).

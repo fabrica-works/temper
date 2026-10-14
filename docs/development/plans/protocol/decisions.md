@@ -719,6 +719,23 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      fields changed, is in 10.2's Files, named in its commit body, with
      no question.
 
+133. **A TLS forge's trust roots are priced as the accounts' are**
+     (temper 14.1, blocked 2026-10-14T12:22:01Z; plan defect, a boundary
+     type). skein-tls's client worst case leaves out the shared trust
+     configuration, "counted once by its service"
+     (`skein_tls::roots_worst_case(count, each)`); 14's sketch gave
+     `ForgeRuntime` its number, address and transport only, so a TLS
+     forge's roots go unpriced, or are priced at the reader's cap (1,024
+     roots of 65,536 bytes). `AccountsRuntime` already carries
+     `trust_roots: u32` and `trust_root_bytes: u32`
+     (`crates/temper-service/src/accounts.rs:26-27`), checked at
+     `accounts.rs:82` and priced at `system.rs:556`. So `ForgeRuntime`
+     gains the same two fields, filled by whoever reads the trust roots
+     for it as for the accounts; `system`'s memory adds
+     `roots_worst_case` for each TLS forge, as for the accounts; a TLS
+     forge with no roots is refused as `accounts.rs:82` refuses; a
+     plaintext forge carries 0 and 0. Session 14 says so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
