@@ -1,5 +1,6 @@
 use crate::{limits, settings};
-use skein_lib::Secret;
+use jig_domain_host as host;
+use skein_lib::{Secret, Token};
 
 pub const ENGINE: &[u8] = br#"{
 "limits": {"profile": "small", "overrides": {"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1}},
@@ -109,7 +110,7 @@ pub fn engine() -> settings::Engine {
     }
 }
 
-pub const OWNER: skein_lib::Token = skein_lib::Token::new(91);
+pub const OWNER: Token = Token::new(91);
 pub fn routes() -> crate::store::route::Routes {
     let own = limits::profile(limits::Profile::Small);
     let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small);
@@ -456,7 +457,7 @@ pub fn period(number: u64) -> temper_engine_domain::Event {
 }
 pub fn get(service: &mut crate::Service, key: jig_domain_core::Key) -> Option<jig_domain_core::Record> {
     let engine = &mut service.engine;
-    let owner = skein_lib::Token::new(991);
+    let owner = Token::new(991);
     engine.store.ask(jig_protocol_store::Request::Get { owner, key: jig_protocol_store::Get::Jig(key) });
     for _ in 0_u32..engine.store.above.len() {
         let event = engine.store.above.pop().unwrap();
@@ -554,8 +555,8 @@ pub fn encoding(settings: &settings::Engine) -> crate::assignment::Encoding {
 }
 pub fn answer(ending: jig_domain_host::Ending) -> jig_domain_host::LinkUp {
     jig_domain_host::LinkUp::Answer {
-        run: skein_lib::Token::new(7),
-        attempt: skein_lib::Token::new(2),
+        run: Token::new(7),
+        attempt: Token::new(2),
         answer: jig_domain_host::Answer { read: None, refused: Box::new([]), turns: 0, spent: 0, ending },
     }
 }
@@ -571,4 +572,102 @@ pub fn workers() -> crate::workers::Workers {
     let limits = crate::workers::limits(&settings).unwrap();
     crate::workers::Workers::new(&settings.jig, &settings::Files { entries }, encoding, settings.forges, &limits, 256)
         .unwrap()
+}
+
+pub fn settle_root(
+    service: &mut crate::Service,
+    delivered: &mut skein_lib::Queue<temper_engine_domain::Delivery>,
+) -> Option<temper_engine_domain::Assignment> {
+    use temper_engine_domain as root;
+    let engine = &mut service.engine;
+    let mut assignment = None;
+    for _ in 0_u32..256 {
+        if let Some(event) = engine.events.pop() {
+            engine.step(event);
+        }
+        root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        if engine.requests.is_empty() {
+            engine.step(root::Event::Resume);
+            root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        }
+        for _ in 0..engine.requests.len() {
+            let request = engine.requests.pop().unwrap();
+            match request {
+                root::Request::Worker(root::WorkerRequest::Deliver(root::Delivery::Assigned {
+                    assignment: run,
+                    ..
+                })) => assignment = Some(run),
+                root::Request::Worker(root::WorkerRequest::Deliver(delivery)) => delivered.push(delivery),
+                root::Request::Party(_) => {}
+                request @ root::Request::Worker(_) => crate::route::request(engine, request),
+                request @ (root::Request::Store(_) | root::Request::Account(_) | root::Request::ToChild(_)) => {
+                    crate::route::request(engine, request);
+                }
+                root::Request::Forge { .. } | root::Request::Busy(_) | root::Request::Drained | root::Request::Stop => {
+                    panic!("unexpected chat request")
+                }
+            }
+        }
+        engine.store.iterate();
+        for _ in 0..engine.store.above.len() {
+            let event = engine.store.above.pop().unwrap();
+            crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+        }
+        for _ in 0..engine.store.routed.len() {
+            match engine.store.routed.pop().unwrap() {
+                crate::store::route::Up::Root(event) => engine.events.push(*event),
+                crate::store::route::Up::Ask(request) => engine.store.ask(request),
+            }
+        }
+        if let Some(accounts) = &mut engine.accounts {
+            accounts.iterate(engine.env.now, engine.env.wall, &mut engine.values, &mut engine.events);
+        }
+        engine.domain.reclaim();
+        if engine.domain.quiescent() && engine.events.is_empty() && engine.store.idle() {
+            return assignment;
+        }
+    }
+    panic!("chat settled");
+}
+pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
+    use temper_engine_domain as root;
+    let mut service = ready();
+    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+        channel: Token::new(7),
+        link: root::Link::Hello(host::Hello {
+            slots: 1,
+            stop_bound: skein_lib::Duration::from_millis(100),
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+            bounds: host::Bounds {
+                models: Box::new([host::ModelBound { name: b"small".as_slice().into(), window: 8192, output: 1024 }]),
+                turns: 8,
+                spend: 1000,
+                time: skein_lib::Duration::from_secs(60),
+                waiting: skein_lib::Duration::from_secs(60),
+                checks: skein_lib::Duration::from_secs(1),
+                message_bytes: 512,
+                inbox: 8,
+                unacknowledged: 32,
+            },
+        }),
+    }));
+    settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
+    service.engine.step(root::Event::Party(root::PartyInput::SignedIn {
+        reply_to: skein_lib::ReplyTo::new(Token::new(100)),
+        identity: jig_domain_people::Identity {
+            key: jig_domain_people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },
+            login: b"owner".as_slice().into(),
+            name: b"Owner".as_slice().into(),
+        },
+    }));
+    settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
+    service.engine.step(root::Event::Party(root::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(Token::new(101)),
+        sign_in: 1,
+        key: [31; 16],
+        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
+    }));
+    let run = settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32)).expect("chat assigned");
+    (service, run)
 }

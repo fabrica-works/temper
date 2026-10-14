@@ -346,103 +346,10 @@ fn an_assignment_that_cannot_encode_is_answered_invalid_through_the_link() {
     );
 }
 
-fn settle_root(service: &mut crate::Service) -> Option<temper_engine_domain::Assignment> {
-    use temper_engine_domain as root;
-    let engine = &mut service.engine;
-    let mut assignment = None;
-    for _ in 0_u32..256 {
-        if let Some(event) = engine.events.pop() {
-            engine.step(event);
-        }
-        root::release(&mut engine.domain, &engine.env, &mut engine.requests);
-        if engine.requests.is_empty() {
-            engine.step(root::Event::Resume);
-            root::release(&mut engine.domain, &engine.env, &mut engine.requests);
-        }
-        for _ in 0..engine.requests.len() {
-            let request = engine.requests.pop().unwrap();
-            match request {
-                root::Request::Worker(root::WorkerRequest::Deliver(root::Delivery::Assigned {
-                    assignment: run,
-                    ..
-                })) => assignment = Some(run),
-                root::Request::Worker(root::WorkerRequest::Deliver(_)) | root::Request::Party(_) => {}
-                root::Request::Worker(_) => panic!("unexpected host tool request"),
-                request @ (root::Request::Store(_) | root::Request::Account(_) | root::Request::ToChild(_)) => {
-                    crate::route::request(engine, request);
-                }
-                root::Request::Forge { .. } | root::Request::Busy(_) | root::Request::Drained | root::Request::Stop => {
-                    panic!("unexpected chat request")
-                }
-            }
-        }
-        engine.store.iterate();
-        for _ in 0..engine.store.above.len() {
-            let event = engine.store.above.pop().unwrap();
-            crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
-        }
-        for _ in 0..engine.store.routed.len() {
-            match engine.store.routed.pop().unwrap() {
-                crate::store::route::Up::Root(event) => engine.events.push(*event),
-                crate::store::route::Up::Ask(request) => engine.store.ask(request),
-            }
-        }
-        if let Some(accounts) = &mut engine.accounts {
-            accounts.iterate(engine.env.now, engine.env.wall, &mut engine.values, &mut engine.events);
-        }
-        engine.domain.reclaim();
-        if engine.domain.quiescent() && engine.events.is_empty() && engine.store.idle() {
-            return assignment;
-        }
-    }
-    panic!("chat settled");
-}
-fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
-    use temper_engine_domain as root;
-    let mut service = fixtures::ready();
-    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
-        channel: Token::new(7),
-        link: root::Link::Hello(host::Hello {
-            slots: 1,
-            stop_bound: skein_lib::Duration::from_millis(100),
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-            bounds: host::Bounds {
-                models: Box::new([host::ModelBound { name: b"small".as_slice().into(), window: 8192, output: 1024 }]),
-                turns: 8,
-                spend: 1000,
-                time: skein_lib::Duration::from_secs(60),
-                waiting: skein_lib::Duration::from_secs(60),
-                checks: skein_lib::Duration::from_secs(1),
-                message_bytes: 512,
-                inbox: 8,
-                unacknowledged: 32,
-            },
-        }),
-    }));
-    settle_root(&mut service);
-    service.engine.step(root::Event::Party(root::PartyInput::SignedIn {
-        reply_to: skein_lib::ReplyTo::new(Token::new(100)),
-        identity: jig_domain_people::Identity {
-            key: jig_domain_people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },
-            login: b"owner".as_slice().into(),
-            name: b"Owner".as_slice().into(),
-        },
-    }));
-    settle_root(&mut service);
-    service.engine.step(root::Event::Party(root::PartyInput::Ask {
-        reply_to: skein_lib::ReplyTo::new(Token::new(101)),
-        sign_in: 1,
-        key: [31; 16],
-        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
-    }));
-    let run = settle_root(&mut service).expect("chat assigned");
-    (service, run)
-}
 #[test]
 fn the_roots_facts_are_drained_and_counted_after_each_step() {
     use temper_engine_domain as root;
-    let (mut service, run) = claimed_chat();
+    let (mut service, run) = fixtures::claimed_chat();
     let preparation = root::Preparation::Missing { tag: 3, missing: root::Missing::Branch };
     let up = host::LinkUp::Answer {
         run: Token::new(run.task),
@@ -466,7 +373,7 @@ fn the_roots_facts_are_drained_and_counted_after_each_step() {
             parts: root::Parts { saved: None, pushed: Box::new([]), preparation: Some(preparation) },
         },
     }));
-    settle_root(&mut service);
+    fixtures::settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
     assert_eq!(service.engine.facts, 1);
     assert_eq!(service.engine.domain.pop_fact(), None);
     assert_eq!(service.engine.domain.facts_lost(), 0);

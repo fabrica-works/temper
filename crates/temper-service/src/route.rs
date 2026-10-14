@@ -41,7 +41,15 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
 
 fn worker(engine: &mut Engine, request: root::WorkerRequest) {
     match request {
-        root::WorkerRequest::Host(_) | root::WorkerRequest::ReadResult { .. } => stop::unavailable(engine, b"workers"),
+        root::WorkerRequest::Host(request) => match *request {
+            root::HostRequest::Decode { to, task, attempt, call } => {
+                engine.events.push(crate::tools::decode(to, task, attempt, &call));
+            }
+            root::HostRequest::Dropped { .. } => {}
+        },
+        root::WorkerRequest::ReadResult { payload, outcome } => {
+            engine.events.push(crate::tools::result(payload, &outcome));
+        }
         root::WorkerRequest::Deliver(delivery) => match delivery {
             root::Delivery::Assigned { channel, assignment } => {
                 engine.workers.assignment(engine.env.now, channel, assignment, &engine.values, &mut engine.events);
@@ -64,8 +72,22 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
                 jig_protocol_engine_workers::Event::NotAdmitted { channel, text: b"not admitted".as_slice().into() },
                 &mut engine.events,
             ),
-            root::Delivery::Host(_)
-            | root::Delivery::Procedure { .. }
+            root::Delivery::Host(delivery) => match *delivery {
+                root::HostDelivery::Render { to, answer, .. } => engine.events.push(crate::tools::render(to, &answer)),
+                root::HostDelivery::Answer { channel, task, attempt, name, call } => engine.workers.send(
+                    engine.env.now,
+                    channel,
+                    jig_domain_host::LinkDown::Relayed {
+                        run: skein_lib::Token::new(task),
+                        attempt: skein_lib::Token::new(attempt),
+                        call: name,
+                        answer: crate::tools::settled(call.answer),
+                    },
+                    &engine.values,
+                    &mut engine.events,
+                ),
+            },
+            root::Delivery::Procedure { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::WebReply { .. }
             | root::Delivery::Read { .. }

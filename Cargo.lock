@@ -1487,6 +1487,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-core",
+ "jig-domain-fleet",
  "jig-domain-host",
  "jig-domain-notes",
  "jig-domain-people",
@@ -1504,7 +1505,9 @@ dependencies = [
  "skein-oauth",
  "skein-oauth-accounts",
  "skein-tls",
+ "smith-channel",
  "smith-charter",
+ "smith-domain-run",
  "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",
