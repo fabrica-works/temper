@@ -1311,7 +1311,7 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      restart. client.md, 3.3: "A kept adoption has no form to show it:
      its answer goes to no child"; 3.4: "a client closed on the adoption
      page opens at the inbox, and the form's values are not kept across
-     a restart". The unblock of 2026-10-14T20:25Z said "keep the
+     a restart". The unblock of 2026-10-14T20:24:20Z said "keep the
      pending-at-cut assertion and its literal", meaning the assertion's
      own words; it kept no sentence after a restart. So the power-loss
      story's person waits for no form sentence after the restart; the
