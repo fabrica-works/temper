@@ -1,0 +1,34 @@
+family temper-worker-wire 1
+
+# Down: the workspace items (channel.md, 4). Names, branches and the save
+# branch take Bounds.name_bytes; the remote Bounds.remote_bytes; the list
+# Bounds.repositories.
+record Merge { branch: bytes 1024 base: fixed 32 }
+record Branch { branch: bytes 1024 }
+record Commit { commit: fixed 32 }
+enum Start { merge: Merge, base: Branch, branch: Branch, commit: Commit, saved: Branch }
+record Writable { push: bytes 1024 expected: option fixed 32 }
+enum Access { writable: Writable, read_only }
+record Repository { tag: u32 name: bytes 1024 remote: bytes 1024 start: Start access: Access identity: u32 }
+record Items { repositories: list 64 Repository save: option bytes 1024 }
+
+# Up: what a run left and saved, a failed preparation (channel.md, 5).
+# Lists of repositories take Bounds.repositories; Files Bounds.conflicts
+# paths of Bounds.path_bytes; the diagnostic its ceiling, the domain's
+# PushDiagnostic::CAPACITY.
+record Landed { tag: u32 commit: fixed 32 }
+record Left { landed: list 64 Landed }
+record Files { files: list 1024 bytes 4096 }
+enum PushReason { missing_repository, missing_branch, missing_commit, refused, unreachable, broken, timed_out, cancelled, unavailable, busy, too_large, nothing, unknown }
+record Diagnostic { output: bytes 512 cut: u64 }
+record PushFailure { repository: option u32 reason: PushReason diagnostic: Diagnostic }
+enum Landing { conflicted: Files, explained: PushFailure, landed: Commit, moved, failed, refused, unchanged }
+record SavedRepository { tag: u32 from_saved: bool landing: Landing }
+record Saved { repositories: list 64 SavedRepository }
+enum Missing { repository, branch, commit }
+record Missed { tag: u32 missing: Missing }
+record Tag { tag: u32 }
+enum Preparation { transient, missing: Missed, refused: Tag }
+
+# Beside a grant: a git identity's value (channel.md, 6).
+record Identity { token: secret 4096 login: text 256 name: text 256 email: text 256 }

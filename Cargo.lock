@@ -486,6 +486,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-codegen"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+
+[[package]]
 name = "skein-fake-checkout"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
@@ -814,6 +819,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "temper-codecs-world"
+version = "0.0.0"
+dependencies = [
+ "skein-codegen",
+ "skein-lib",
+ "temper-protocol-worker-wire",
+]
+
+[[package]]
 name = "temper-conformance-world"
 version = "0.0.0"
 dependencies = [
@@ -996,6 +1010,14 @@ dependencies = [
  "skein-lib",
  "temper-web-domain",
  "temper-web-view",
+]
+
+[[package]]
+name = "temper-protocol-worker-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]
