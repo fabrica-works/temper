@@ -1279,6 +1279,29 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      without asking; a symptom met a third time is still a question with
      the logs. Every assertion, expected literal and limit stays.
 
+159. **17.4 draws its cut while the adoption is pending** (temper 17.4,
+     blocked 2026-10-14T20:41:35Z; process and plan defect). 17.4's Scope
+     cuts "before a drawn submission" with "an adoption pending among
+     what it finds", and its reference test draws `before = 75 +
+     draw.below(59)` of the service's submissions; the world counts every
+     submission from startup (`World.cut`), so a drawn cut may fall
+     before the native client's adoption is saved or after it is
+     answered, and 17.4's pending-at-cut assertion fails without saying
+     which (ruling 156's third run, `logs/temper-17/17.4-156-diagnostic-3.md`).
+     So the world draws the cut among the submissions after the native
+     client's durable save of the pending adoption and before the
+     service's answer to it, both of which the world observes; the
+     reference test's range `75 + draw.below(59)` becomes that window's
+     length, every assertion and literal kept, and "before a drawn
+     submission" still holds. One more diagnostic run is granted, typed and
+     printed only on failure, at the pending-at-cut assertion as at the
+     person's failure. After it, runs follow named changes as ruling 148
+     says, counted by symptom as ruling 158 says. The adoption story's
+     focused time (3.38 s at 17.4's WIP, 0.79 s at 17.3's measure) rose
+     inside 17.4: before 17.4 lands, one run of that story prints the
+     world's time per phase once, and the change aimed at the largest
+     brings the world within ruling 152's 2.0 s.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
