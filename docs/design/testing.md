@@ -220,15 +220,24 @@ and 10).
   5. the binary is killed, and started again on the same directory;
   6. the person finds the work, and the change's branch on the forge is
      at the run's commit.
+
+  At temper's pin of jig the native client shows no page of a task that
+  holds or is granted the forge's resources (`client.md`, 5.4). So the
+  person reads the chat that gives the goal, and finds the work, in the
+  inbox: the chat's entry, its replies counted as they arrive, and the
+  same entries after the restart; the words of the forge task's replies
+  are not read on its page. The forge's state is the story's proof of
+  the change, read through the throwaway Forgejo's API.
 - **The terminal,** a second test, on a scratch directory of its own:
   `temper open DIRECTORY LINK` with stdin and stdout piped signs in by
   the link `temper serve` printed, prints the inbox, adopts a repository
   as above by commands (the form's fields written with `n words`, then
   Adopt pressed with `n`), and exits 0 on `q` after a drained close. Its
-  referee reads the printed pages (the inbox, the adoption's outcome,
-  the project's page its link opens; the repository listed there once
-  jig's core lists adopted resources, `client.md`, 4.3) and the exit
-  status.
+  referee reads the printed pages (the inbox and the adoption's
+  outcome; the project's page its link opens once the native client
+  takes a page whose policy names the forge's patterns, and the
+  repository listed there once jig's core lists adopted resources,
+  `client.md`, 4.3 and 5.4) and the exit status.
 - **In the order of building** (protocol.md, section 12): the story's
   chat first, then its change landed, then the terminal's test.
 - **Its referee:** the person's script finishes within its deadline; the

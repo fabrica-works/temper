@@ -309,9 +309,15 @@ top-level `workers`, in the same order; standalone has one. Each:
   `Limits::compose` accepts there), so the example and the process
   tier's configuration override both; the engine cuts each text to its
   bound and says so (jig's `client/domain/contract.md`, section 5:
-  "A text cut to its bound ... says it was cut"). `documents.chips` and
-  `documents.lines` keep jig's small values, which the client's wire
-  takes. The engine checks none of it at start: it serves whatever
+  "A text cut to its bound ... says it was cut"). `documents.lines`
+  bounds a document's short lists and also the segments of each part's
+  path and each pattern it holds, which the native client bounds by its
+  `rows`; so `engine.limits` names it at most the client's `rows` too,
+  and a page the client could not take is refused by the engine as too
+  large, a typed answer, rather than sent and found undecodable (client.md,
+  5.4, says which pages that is at temper's pin). `documents.chips`
+  keeps jig's small value, which the client's wire takes. The engine
+  checks none of it at start: it serves whatever
   client the deployment lets in, whose limits are the client's. A test
   holds the example's and the process tier's configuration to the
   native client's limits, so the two cannot drift apart unseen.
@@ -485,7 +491,7 @@ not itself valid JSON):
     "llm": ...,
     "clients": {"listener": {"socket": "127.0.0.1:7100"}, "link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {"documents.rows": 2, "documents.text_bytes": 128}},
+    "limits": {"profile": "small", "overrides": {"documents.rows": 2, "documents.text_bytes": 128, "documents.lines": 2}},
     "memory_bytes": ...
   },
   "workers": [{

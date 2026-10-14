@@ -1295,3 +1295,23 @@ with.
   `documents.text_bytes` (4,096) down to the client's: longer texts on a
   page are cut and say so, and lists page 2 rows at a time. Raising them
   needs jig-view to compose larger, a jig change and a repin.
+- **The native client shows no page of the forge's work** (the
+  designer's answer to temper 15.3, 2026-10-14). At temper's pin of jig,
+  jig's core refuses a whole document when a part's path or a pattern
+  has more segments than `documents.lines`, and the native client bounds
+  those segments by its `rows`, 2, the most jig-view composes. temper's
+  branch holds have three segments and its forge patterns five or more,
+  so no page of a task that holds or is granted the forge's resources,
+  nor of a project whose policy names them, reaches the terminal; the
+  inbox, outcomes' sentences and the forge show the work (client.md,
+  5.4). The process and live stories check that, and the forge's state.
+  temper keeps its names: shortening them to two segments would change
+  how holds, grants and configured rules name repositories, which people
+  write by host, owner and name before adoption. The fix is jig's: its
+  client link bounding a path's and a pattern's segments by a limit of
+  their own (`jig-protocol-client-link/src/limits.rs` sets them from
+  `rows`), and its core cutting a long path or pattern with a mark
+  rather than refusing the page (`documents/task_tree.rs`, `path`), then
+  a repin in a later plan. The designer's recommendation: make that jig
+  change, and repin, before temper is used on a forge, since a person
+  cannot open their own forge chats in the terminal until then.

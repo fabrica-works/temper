@@ -489,12 +489,28 @@ scripts `adopt_and_change` and `found`; the referee polling the forge's
 API every 2 s for the merged pull request, killing the binary once it is
 merged, starting it again on the same directory, then checking the
 forge's state and the second person's script. 12.2's test becomes this
-story (its steps 1 and 2 kept as the first).
+story (its steps 1 and 2 kept as the first). At temper's pin of jig the
+native client shows no page of a task that holds or is granted the
+forge's resources (client.md, 5.4; testing.md, 2.6), so the person's
+scripts read no such page: `adopt_and_change` gives the goal in a chat,
+then waits in the inbox for that chat's entry to count a reply (its
+`replies_unread`, or its `last_reply` moving), not for the reply's words
+on the chat's page; `found` reads the same inbox entries after the
+restart. An inbox answered too large while such a chat is waiting or
+held (its chip then carries its holdings) is waited past, as any page
+not yet showing what the script waits for. The first chat (steps 1 and
+2) holds and is granted nothing of the forge's, and its answer is still
+read on its page. The process
+configuration (`support::configuration`) adds the override
+`documents.lines` 2 (configuration.md, 7), so such a page is the engine's
+`TooLarge` and never an undecodable document at the client; 12.2's
+`the_process_configurations_documents_fit_the_native_client` also
+asserts `core.documents.lines` at most the native client's `rows`.
 Needs: 14.1's forge component wired, 09.2's git component, 10.4's
 process support, 12.2's story.
 Files: `crates/temper/{Cargo.toml (dev-dependency
-`temper-throwaway-forgejo`), tests/{process.rs, support/mod.rs,
-support/person.rs, support/forgejo.rs}}`.
+`temper-throwaway-forgejo`), tests/{process.rs, configuration.rs,
+support/mod.rs, support/person.rs, support/forgejo.rs}}`.
 Shape: the session's ordinary-Rust sketch of the support's growth below.
 Test shape: `tests/process.rs`:
 `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`,
@@ -530,7 +546,10 @@ merged, `main` holding the edit), the binary is killed and started again
 on the same directory, and the person finds the work (the test above,
 beside 10.4's); under 4 minutes for the profile.
 Don't: start any Forgejo but `TEMPER_FORGEJO`'s, or one under `/tmp`;
-write a token to the log; skip the restart.
+write a token to the log; skip the restart; wait for a page of a task
+that holds or is granted the forge's resources, or of the project
+(its policy names the forge's patterns): the native client takes none
+at temper's pin; shorten temper's resource names or patterns to fit.
 Size: test code; production 0 lines.
 Removes: 12.2's test (its steps are this story's first).
 
@@ -553,7 +572,8 @@ IPv4 socket address); prints `live-login: model M, token valid for N s`.
 (`[[test]] name = "live"`): one test, two stories (the chat answered;
 one small change in `acme/widget` adopted as 15.3's and pushed; the
 story ends once the change's branch on the forge is at the run's
-commit), with the real model when the account file exists (its endpoint
+commit; the person's scripts are 15.3's, which read no page of a forge
+task), with the real model when the account file exists (its endpoint
 `chatgpt.com` over TLS with the machine's roots, its headers
 `skein_llm::openai::identity::headers()`, the charters' `turns` bounding
 the two stories to at most 20 completions, `time_ms` 240,000), else the

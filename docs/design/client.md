@@ -493,6 +493,24 @@ print limits are derived from them (6.8). The engine's configured
 documents stay within the native client's rows and texts
 (configuration.md, 7), since a document past them is refused whole.
 
+At temper's pin of jig, those bounds keep the forge's work off the
+native client's pages. jig's core refuses a whole document when one
+part's path, or one pattern of a grant or a rule, has more segments than
+`documents.lines`, and the native client bounds those segments by its
+`rows`, 2, the most jig-view composes there. temper's forge names a
+branch it holds by three segments (the forge, the repository, the
+branch), and people write the forge's patterns by host, owner and name
+(configuration.md, section 3: five segments or more). So the native
+client shows no page of a task that holds or is granted the forge's
+resources, nor of a project whose policy names the forge's patterns, nor
+a list while one of its tasks holding the forge's resources is waiting
+or held (its chip then carries its holdings): the engine answers them as
+too large. What such a task did shows in the inbox (a chat's entry and
+its unread replies), in outcomes' sentences, and on the forge itself. temper keeps its names: they are what a hold,
+a grant and a rule must say, and people write rules before a
+repository is adopted, by its host, owner and name. The fix is jig's
+(section 11).
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -924,6 +942,14 @@ The client's tiers, as testing.md places them (section 2):
 - **The form's place:** in jig's project settings' slot once jig's view
   builds it (jig's `client/domain/pages.md`, 6.5). Default: the forge's
   own page.
+- **Pages of the forge's work on the native client:** at temper's pin
+  of jig, a page holding a forge path or pattern past two segments is
+  refused (5.4). jig's to change: its client bounding a path's and a
+  pattern's segments by a limit of their own, not by `rows`; its core
+  cutting a long path or a long list of patterns with a mark rather than
+  refusing the page; or jig-view composing more rows; then a repin.
+  Default: the inbox, outcomes and the forge show the work, and no
+  forge task's or forge-ruled project's page is shown.
 - **An adopted repository on the project's resources:** jig's core
   lists only roles live tasks narrowed, never an owned one (4.3); the
   listing is jig's core's to make, as jig's `domain/core.md`, 6.1
