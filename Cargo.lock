@@ -923,8 +923,11 @@ name = "temper-codecs-world"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-client-wire",
+ "serde_json",
  "skein-codegen",
+ "skein-json",
  "skein-lib",
+ "temper-forge-forgejo",
  "temper-protocol-client-wire",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
@@ -1113,6 +1116,14 @@ dependencies = [
  "skein-lib",
  "temper-web-domain",
  "temper-web-view",
+]
+
+[[package]]
+name = "temper-forge-forgejo"
+version = "0.0.0"
+dependencies = [
+ "skein-json",
+ "skein-lib",
 ]
 
 [[package]]

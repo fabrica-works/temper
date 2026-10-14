@@ -41,3 +41,6 @@ pub fn mutated(rng: &mut Rng, golden: &[u8]) -> Vec<u8> {
     }
     bytes
 }
+
+/// Forgejo transcript fixtures.
+pub mod forgejo;

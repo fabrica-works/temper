@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper-forge-forgejo",
     "crates/temper-worker-protocol-git",
     "crates/temper-protocol-client-wire",
     "tools/forgejo-conformance",
@@ -41,6 +42,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-forge-forgejo = { path = "crates/temper-forge-forgejo" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }
 temper-protocol-client-wire = { path = "crates/temper-protocol-client-wire" }
 jig-protocol-client-wire = { git = "https://github.com/forgetic/jig.git" }
