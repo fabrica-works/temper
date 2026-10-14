@@ -707,6 +707,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      against the summed `sockets`, refusing at `engine.limits.io.sockets`
      "by how much". No profile constant and no parser change. Session
      10 says so (09 has ended).
+     At 2026-10-14T12:19:43Z 10.2 asked for the means: the crate-internal
+     `Service::new` takes the composed `io::Limits` as a parameter
+     (`Service::new` holds a built `Worker`, which keeps no settings),
+     startup computes it once with `checks::process_io` and passes it to
+     `startup_worst_case` and `Service::new`, and the fixtures' callers
+     pass it; no second constructor. From then, any change rulings 130
+     and 132 need inside `temper-service` and the git component (a
+     crate-internal function's signature, its callers, a fixture's call),
+     every test's name and expected value kept and no public type's
+     fields changed, is in 10.2's Files, named in its commit body, with
+     no question.
 
 ## For the user
 
