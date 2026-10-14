@@ -10,6 +10,8 @@ publish.workspace = true
 skein-lib.workspace = true
 
 [dev-dependencies]
+jig-protocol-client-wire.workspace = true
+temper-protocol-client-wire.workspace = true
 skein-codegen.workspace = true
 temper-protocol-worker-wire.workspace = true
 

@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper-protocol-client-wire",
     "crates/temper-protocol-worker-wire",
     "tests/codecs",
     "crates/temper-protocol-store",
@@ -38,6 +39,8 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-protocol-client-wire = { path = "crates/temper-protocol-client-wire" }
+jig-protocol-client-wire = { git = "https://github.com/forgetic/jig.git" }
 temper-protocol-worker-wire = { path = "crates/temper-protocol-worker-wire" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }

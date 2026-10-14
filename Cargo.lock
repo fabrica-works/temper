@@ -280,6 +280,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-client-wire"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-store"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -905,8 +914,10 @@ dependencies = [
 name = "temper-codecs-world"
 version = "0.0.0"
 dependencies = [
+ "jig-protocol-client-wire",
  "skein-codegen",
  "skein-lib",
+ "temper-protocol-client-wire",
  "temper-protocol-worker-wire",
 ]
 
@@ -1093,6 +1104,14 @@ dependencies = [
  "skein-lib",
  "temper-web-domain",
  "temper-web-view",
+]
+
+[[package]]
+name = "temper-protocol-client-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]
