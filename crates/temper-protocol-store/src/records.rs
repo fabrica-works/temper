@@ -69,6 +69,16 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     })
 }
 
+/// Restore a decoded record only when its durable key agrees with the row.
+pub fn row(key: &[u8], value: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
+    let row = decode(value, bounds)?;
+    let encoded = crate::keys::encode(&d::stored_key(&row), u32::MAX).ok_or(Undecodable)?;
+    if encoded.as_ref() != key {
+        return Err(Undecodable);
+    }
+    Ok(row)
+}
+
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
         plan_item_text: forge.issue_policy.comment_bytes,

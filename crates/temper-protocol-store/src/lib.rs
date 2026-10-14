@@ -14,6 +14,17 @@ mod tests;
 /// One version for every durable family (store/README.md, section 4).
 pub const STORE_VERSION: u32 = 1;
 
+/// Largest encodings under the forge's checked bounds, before jig's key tag.
+#[must_use]
+pub fn application(limits: &temper_engine_domain_forge::Limits) -> Option<jig_protocol_store::sizes::Application> {
+    let bounds = bounds(limits)?;
+    Some(jig_protocol_store::sizes::Application {
+        version: STORE_VERSION,
+        key: keys::largest(limits)?,
+        value: u32::try_from(v1::Row::worst_case_bytes(bounds.limits())?).ok()?,
+    })
+}
+
 /// A malformed row, which the routing reports before stopping the engine.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Undecodable;
