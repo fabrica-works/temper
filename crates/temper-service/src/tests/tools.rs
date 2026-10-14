@@ -87,13 +87,17 @@ fn a_decided_answer_is_rendered_as_smiths_text() {
 }
 #[test]
 fn a_result_that_does_not_decode_fails_its_attempt_invalid() {
-    for bytes in [b"".as_slice(), b"not a result", &[0, 0, 0, 99]] {
+    for (bytes, expected) in [
+        (b"".as_slice(), jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid)),
+        (b"not a result", jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid)),
+        (&[0, 0, 0, 99], jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid)),
+    ] {
         let event = crate::tools::result(Token::new(3), bytes);
         let root::Event::Worker(root::WorkerInput::ResultRead { payload, end }) = event else {
             panic!("read result {bytes:?}")
         };
         assert_eq!(payload, Token::new(3), "{bytes:?}");
-        assert_eq!(end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid), "{bytes:?}");
+        assert_eq!(end, expected, "{bytes:?}");
     }
 }
 
