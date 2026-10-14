@@ -886,6 +886,19 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      commit body and counted in 17.1's Size; every existing test's name
      and expected value kept. clone-empty stays in 17.1's proof.
 
+142. **17.1 within 2000 lines** (temper 17.1b, blocked
+     2026-10-14T15:21:49Z; plan defect, size; as rulings 126 and 139).
+     17.1 (Size 600, allowance 1200) counts 1745: 17.1a 368, 17.1b's WIP
+     1377 (`testing/temper-fake-git`: `program.rs` 424, `fixtures.rs` 373,
+     `answer.rs` 312, `transport.rs` 218, the rest 16; ruling 141's
+     `scenario.rs` 30 and `lib.rs` 4), each within 17.1's Scope: a fake
+     git program answering 41 transcripts' cases over the fake forge.
+     Its final proof and the hosted file-system check remain. So 17.1
+     lands within 2000, its parts summed; past 2000 it asks. Its Scope,
+     Test shape and Proof are unchanged. For the retrospective: the
+     planner's Sizes for test support and fakes ran low as for component
+     code (rulings 102, 106, 126, 139, 142).
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

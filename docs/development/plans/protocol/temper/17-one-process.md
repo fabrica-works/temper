@@ -242,7 +242,8 @@ classifies alike (the six tests above); under 0.2 s.
 Don't: run a program of the machine's own; answer an invocation git.md
 does not list; re-record a transcript; let a token reach the fake's
 files or its output.
-Size: at most 600 lines (test support, ordinary Rust).
+Size: at most 600 lines (test support, ordinary Rust); its allowance
+2000, its parts summed (decisions.md, ruling 142).
 Removes: nothing.
 
 ### 17.2 The world, and a chat answered
