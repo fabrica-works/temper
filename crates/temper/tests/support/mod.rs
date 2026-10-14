@@ -1,10 +1,12 @@
 //! Shared configuration fixtures for startup and the process tier.
+pub mod terminal;
+pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub enum Forge {
     Unreached,
 }
-fn private(path: &Path, bytes: &[u8]) {
+fn write_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
@@ -15,16 +17,16 @@ pub fn configuration(directory: &Path, forge: &Forge) {
         fs::create_dir(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
-        private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
+        write_private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
     }
-    private(&directory.join("worker.secret"), b"worker-secret");
-    private(
+    write_private(&directory.join("worker.secret"), b"worker-secret");
+    write_private(
         &directory.join("accounts/chat.json"),
         br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
     );
-    private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
-    private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");
-    private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
+    write_private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
+    write_private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");
+    write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     let agent = serde_json::json!({
         "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
             "conversations":1,"calls_per_response":1},
@@ -34,7 +36,7 @@ pub fn configuration(directory: &Path, forge: &Forge) {
             "identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],
         "environment":[]});
-    private(&directory.join("agent.json"), &serde_json::to_vec(&agent).expect("agent JSON"));
+    write_private(&directory.join("agent.json"), &serde_json::to_vec(&agent).expect("agent JSON"));
     let mut value: serde_json::Value =
         serde_json::from_slice(&jig_channel_world::fixtures::engine_document()).expect("engine JSON");
     value.as_object_mut().expect("whole object").remove("service");
@@ -62,7 +64,7 @@ pub fn configuration(directory: &Path, forge: &Forge) {
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
             "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
-    private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+    write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
 }
 
 /// A case's scratch, retained if a test panics.
@@ -351,4 +353,10 @@ fn run(directory: &Path, signal: Signal, deadline: Duration, peer: Option<skein_
 #[must_use]
 pub fn until_link_then(directory: &Path, signal: Signal, deadline: Duration) -> Ended {
     run(directory, signal, deadline, None)
+}
+
+#[must_use]
+pub fn private(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o777 == 0o600)
 }

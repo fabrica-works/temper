@@ -12,6 +12,8 @@ path = "src/main.rs"
 
 [dependencies]
 temper-service.workspace = true
+temper-shell-terminal.workspace = true
+jig-view.workspace = true
 temper-worker-domain.workspace = true
 temper-engine-protocol-forge.workspace = true
 jig-protocol-config.workspace = true

@@ -14,3 +14,18 @@ fn temper_serve_prints_its_link_and_drains_on_a_signal() {
     assert_eq!(ended.exit, Some(Exit::Code(0)), "drained: {}", String::from_utf8_lossy(&ended.stderr));
     scratch.remove();
 }
+
+#[test]
+fn temper_open_signs_in_prints_the_inbox_and_exits_on_q() {
+    let scratch = support::Scratch::new("temper_open_inbox");
+    support::configuration(scratch.path(), &support::Forge::Unreached);
+    let mut serve = support::serve(scratch.path());
+    let link = support::terminal::link(&mut serve, support::WITHIN);
+    let open = support::terminal::open(scratch.path(), &scratch.path().join("client"), link.as_ref());
+    let mut typist = support::terminal::Typist::new(open, serve, link);
+    typist.wait_for(b"== Inbox == Live", support::WITHIN);
+    typist.type_line(b"q");
+    assert_eq!(typist.exit(support::WITHIN), 0, "stderr: {}", typist.stderr());
+    assert!(support::private(&scratch.path().join("client/token")), "the bearer token is kept 0o600");
+    scratch.remove();
+}

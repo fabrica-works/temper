@@ -1503,6 +1503,7 @@ dependencies = [
  "jig-channel-world",
  "jig-domain-host",
  "jig-protocol-config",
+ "jig-view",
  "serde_json",
  "skein-fake-llm-domain",
  "skein-fake-peers",
@@ -1521,6 +1522,7 @@ dependencies = [
  "smith-local-service",
  "temper-engine-protocol-forge",
  "temper-service",
+ "temper-shell-terminal",
  "temper-worker-domain",
 ]
 

@@ -57,3 +57,24 @@ fn problems_reach_stderr_one_line_each() {
     );
     scratch.remove();
 }
+
+#[test]
+fn an_address_with_no_token_in_the_directory_is_not_signed_in() {
+    for (row, token, expected) in [
+        ("absent", None, "temper open: not signed in: give the link temper serve printed\n"),
+        ("empty", Some(b"".as_slice()), "temper open: not signed in: give the link temper serve printed\n"),
+    ] {
+        let scratch = support::Scratch::startup(&format!("open-{row}"));
+        if let Some(token) = token {
+            fs::write(scratch.path().join("token"), token).expect("token file");
+            fs::set_permissions(scratch.path().join("token"), fs::Permissions::from_mode(0o600))
+                .expect("private token");
+        }
+        assert_eq!(
+            temper::open::check_token(scratch.path()).expect_err("not signed in").line(scratch.path()),
+            expected,
+            "{row}"
+        );
+        scratch.remove();
+    }
+}
