@@ -1525,6 +1525,7 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "jig-protocol-client-link",
+ "jig-protocol-client-wire",
  "jig-shell-native",
  "jig-view",
  "skein-http",

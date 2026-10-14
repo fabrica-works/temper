@@ -50,8 +50,15 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                     }
                 }
             }
-            let Address::Jig(jig_address) = address;
+            let jig_address = match &address {
+                Address::Jig(address) => *address,
+                Address::Forge(_) => jig_domain_client::address::Address::Inbox { project: None },
+            };
             jig(root, env, jig_domain_client::Event::Start { address: jig_address, kept: jig_kept, offset }, out);
+            match address {
+                Address::Jig(_) => {}
+                Address::Forge(address) => went(root, env, Place::Address(Address::Forge(address)), out),
+            }
             for (scope, requests) in &scopes {
                 jig(root, env, jig_domain_client::Event::Kept { scope: *scope, requests: *requests }, out);
             }
@@ -64,12 +71,14 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
             crate::domain::answered(root, env, attempt, envelope, answer, out);
         }
         Event::Jig(event) => jig(root, env, event, out),
+        Event::Forge(event) => forge(root, env, event, out),
         Event::SignedOut => jig(root, env, jig_domain_client::Event::SignedOut, out),
     }
 }
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
     match place {
         Place::Address(Address::Jig(address)) => {
+            forge(root, env, forge::Event::Left, out);
             jig(
                 root,
                 env,
@@ -77,7 +86,12 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
                 out,
             );
         }
+        Place::Address(Address::Forge(address)) => {
+            jig(root, env, jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Elsewhere }, out);
+            forge(root, env, forge::Event::Went { address }, out);
+        }
         Place::Missing => {
+            forge(root, env, forge::Event::Left, out);
             jig(root, env, jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Missing }, out);
         }
     }
@@ -150,6 +164,7 @@ pub(crate) fn progress(
     out: &mut Queue<Request>,
 ) {
     match owner {
+        Owner::Forge(_) => {}
         Owner::Jig(request) => {
             let progress = match progress {
                 RequestProgress::InFlight => jig_domain_client::intents::Progress::InFlight,

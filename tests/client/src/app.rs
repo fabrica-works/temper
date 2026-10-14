@@ -37,7 +37,7 @@ impl App for Temper {
         let limits = limits();
         let (jig, forge) = fixtures::phrasebooks(&limits);
         let bounds = fixtures::view_bounds(&limits, &jig, &forge);
-        let mut root = domain::new(&limits, seed, fixtures::FORGE);
+        let mut root = domain::new(&limits, seed, domain::forge::Config { connector: fixtures::FORGE, version: 1 });
         domain::configure_navigation(&mut root, domain::navigation(&limits)).expect("navigation fits");
         (root, view::View::new(&bounds, &limits, jig, forge, fixtures::FORGE))
     }
@@ -129,7 +129,12 @@ impl App for Temper {
             Event::Act { action: Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => {
                 observe::jig_window_changed(act)
             }
-            Event::Start { .. } | Event::Went { .. } | Event::Answer { .. } | Event::Jig(_) | Event::SignedOut => false,
+            Event::Start { .. }
+            | Event::Went { .. }
+            | Event::Answer { .. }
+            | Event::Jig(_)
+            | Event::Forge(_)
+            | Event::SignedOut => false,
         }
     }
     fn seen(tree: &Tree) -> Vec<Seen> {
@@ -138,6 +143,7 @@ impl App for Temper {
     fn sent(request: &Request) -> Option<Sent> {
         let Request::Send { attempt, key, ask } = request else { return None };
         match ask {
+            domain::Ask::Forge(_) => None,
             domain::Ask::Jig(ask) => Some(observe::jig_sent(*attempt, *key, ask)),
         }
     }
@@ -152,12 +158,12 @@ impl App for Temper {
                     Some(domain::Answered::Jig(Answer::Done(Outcome::Made {
                         what: Made::Words { task, message },
                     }))) => Some((*task, *message)),
-                    Some(domain::Answered::Jig(_)) | None => None,
+                    Some(domain::Answered::Jig(_) | domain::Answered::Forge(_)) | None => None,
                 };
                 vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
             }
             Event::SignedOut => vec![Receipt::Parked],
-            Event::Start { .. } | Event::Went { .. } | Event::Act { .. } => vec![],
+            Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::Forge(_) => vec![],
         }
     }
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {

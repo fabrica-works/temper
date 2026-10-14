@@ -117,7 +117,10 @@ pub fn request(
     match request {
         Request::Send { attempt, key, ask } => {
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
-            let client::Ask::Jig(ask) = ask;
+            let ask = match ask {
+                client::Ask::Jig(ask) => ask,
+                client::Ask::Forge(_) => return events,
+            };
             let ask = wire::asks::ask(ask).expect("whole jig ask translates");
             let reply_to =
                 transport.reply_to(Reply::Keyed { client: who, attempt: *attempt, key: *key, owner: KeyedOwner::Jig });

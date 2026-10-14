@@ -16,13 +16,13 @@ pub struct Domain {
     pub(crate) table: RequestTable<Owner, Ask>,
 }
 #[must_use]
-pub fn new(limits: &Limits, seed: u64, forge: u16) -> Domain {
+pub fn new(limits: &Limits, seed: u64, forge: forge::Config) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
     let mut rng = Rng::new(seed);
     Domain {
         jig: jig_domain_client::Domain::new(&limits.jig, rng.next_u64()),
-        forge: forge::Side::new(&limits.forge),
-        forge_number: forge,
+        forge: forge::Side::new(&limits.forge, forge),
+        forge_number: forge.connector,
         table: RequestTable::new(&limits.table, rng.next_u64()),
     }
 }
@@ -105,10 +105,13 @@ pub(crate) fn answered(
                 Some(crate::Answered::Jig(answer)) => {
                     route::jig(root, env, jig_domain_client::Event::Answered { request, answer }, out);
                 }
-                None => {
+                Some(crate::Answered::Forge(_)) | None => {
                     out.push(Request::Fact { fact: Fact::InvalidAnswer });
                 }
             },
+            Owner::Forge(_) => {
+                out.push(Request::Fact { fact: Fact::InvalidAnswer });
+            }
             Owner::Kept { scope } => {
                 out.push(Request::Fact { fact: Fact::KeptAnswered });
                 route::jig(root, env, jig_domain_client::Event::KeptGone { scope }, out);
@@ -132,7 +135,7 @@ pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64
 }
 pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
     match ask {
-        Ask::Jig(_) => limits.jig.document_bytes,
+        Ask::Jig(_) | Ask::Forge(_) => limits.jig.document_bytes,
     }
 }
 

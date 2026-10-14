@@ -10,11 +10,13 @@ use skein_lib::{List, RequestEnvelope, RequestKey, Token};
 /// One keyed request, tagged with the child that owns its meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
+    Forge(crate::forge::Ask),
     Jig(Box<JigAsk>),
 }
 /// A decoded terminal tagged with its owning child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
+    Forge(crate::forge::Answer),
     Jig(jig_domain_client::contract::Answer),
 }
 /// A view act routed exhaustively to its child.
@@ -25,6 +27,7 @@ pub enum Action {
 /// One external fact or act for the root to route.
 #[derive(Debug)]
 pub enum Event {
+    Forge(crate::forge::Event),
     Start { address: Address, kept: List<Record>, offset: jig_domain_client::boundary::Offset },
     Went { place: Place },
     Act { action: Action },

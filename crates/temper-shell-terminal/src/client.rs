@@ -48,6 +48,7 @@ enum Phase {
 pub struct NativeClient {
     shell: Shell,
     link: link::Link,
+    family: route::family::Family,
     root: domain::Domain,
     view: view::View,
     env: Env<domain::Limits>,
@@ -111,11 +112,19 @@ impl NativeClient {
             Start::Token => true,
         };
         shell.adopt(directory, user, seed);
-        let mut root = domain::new(&bounds.client, seed, temper_protocol_client_wire::FORGE);
+        let mut root = domain::new(
+            &bounds.client,
+            seed,
+            domain::forge::Config {
+                connector: temper_protocol_client_wire::FORGE,
+                version: temper_protocol_client_wire::CLIENT_VERSION,
+            },
+        );
         domain::configure_navigation(&mut root, domain::navigation(&bounds.client)).expect("native navigation fits");
         Ok(Self {
             shell,
             link,
+            family: limits::family(&bounds).expect("native family capacities are checked"),
             root,
             view: view::View::new(
                 &view_limits,
@@ -218,7 +227,7 @@ impl NativeClient {
         // two bounded queues together before admitting the next external event.
         while !self.out.is_empty() || !self.linked.is_empty() {
             while let Some(request) = self.out.pop() {
-                match route::down(request) {
+                match route::down(request, &mut self.family) {
                     Down::Link(event) => self.link.step(self.env.now, event, &mut self.linked),
                     Down::Duty(duty) => match duty {
                         Duty::Show { address, .. } => {
@@ -239,7 +248,7 @@ impl NativeClient {
                 }
             }
             while let Some(request) = self.linked.pop() {
-                match route::up(request) {
+                match route::up(request, &mut self.family) {
                     Up::Root(event) => self.event(event),
                     Up::Shell(request) => {
                         if matches!(self.phase, Phase::Closing { .. })

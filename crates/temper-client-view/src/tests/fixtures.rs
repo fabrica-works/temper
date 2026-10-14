@@ -111,7 +111,7 @@ pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[
 }
 pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> jig_view::Tree {
     let limits = forge::Limits { parts: 1 };
-    let mut side = forge::Side::new(&limits);
+    let mut side = forge::Side::new(&limits, forge::Config { connector: FORGE, version: 1 });
     if held {
         forge::step(
             &mut side,
@@ -129,7 +129,7 @@ pub fn part_text(words: &crate::words::Words, part: Part, held: bool) -> Box<[u8
 }
 pub fn built(root_forge: u16) -> crate::View {
     let domain = domain_limits();
-    let root = temper_client_domain::new(&domain, SEED, root_forge);
+    let root = temper_client_domain::new(&domain, SEED, forge::Config { connector: root_forge, version: 1 });
     let jig = jig_words();
     let forge = words();
     let envelope = crate::Limits::of(&domain, &jig, &forge).expect("composed envelope fits");

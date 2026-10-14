@@ -11,6 +11,7 @@ use jig_domain_client::contract::VersionRange;
 use jig_protocol_client_link as link;
 use skein_lib::{RequestRecord, Secret};
 use temper_client_domain as client;
+pub mod family;
 
 /// Each link output has exactly one destination.
 #[derive(Debug)]
@@ -46,7 +47,7 @@ pub enum Duty {
     Fact(client::Fact),
 }
 #[must_use]
-pub fn up(request: link::Request) -> Up {
+pub fn up(request: link::Request, family: &mut family::Family) -> Up {
     match request {
         transport @ (link::Request::Write { .. }
         | link::Request::Remove { .. }
@@ -60,15 +61,50 @@ pub fn up(request: link::Request) -> Up {
                 link::Saved::Table { .. } => link::Keeper::Table,
                 link::Saved::Family { family, .. } => link::Keeper::Family(*family),
             };
-            match kept(record) {
+            let dropped = match &record {
+                link::Saved::Table {
+                    record: skein_lib::RequestRecord { request: link::Ask::Family(record), .. },
+                    ..
+                } => {
+                    record.family == temper_protocol_client_wire::FORGE
+                        && record.version != temper_protocol_client_wire::CLIENT_VERSION
+                }
+                link::Saved::Jig(_) | link::Saved::Table { .. } | link::Saved::Family { .. } => false,
+            };
+            if dropped {
+                return Up::Notice(Notice::Dropped {
+                    keeper: link::Keeper::Family(temper_protocol_client_wire::FORGE),
+                });
+            }
+            match kept(record, family) {
                 Some(record) => Up::Kept(record),
                 None => Up::Notice(Notice::Unread { keeper }),
             }
         }
         link::Request::Answer { attempt, envelope, answer } => {
+            // Every Answer ends its attempt, even when the keyed request retries.
+            let forge = family.attempts.answered(attempt, true);
             let answer = match answer {
+                Some(link::Answered::Jig(jig_domain_client::contract::Answer::Refused(refusal))) if forge => {
+                    match jig_domain_client::contract::EntranceRefusal::new(refusal) {
+                        Ok(refusal) => Some(client::Answered::Forge(client::forge::Answer::EntranceRefused(refusal))),
+                        Err(_) => None,
+                    }
+                }
                 Some(link::Answered::Jig(answer)) => Some(client::Answered::Jig(answer)),
-                Some(link::Answered::Family(_)) | None => None,
+                Some(link::Answered::Family(record)) => {
+                    family::answer(&record, &family.wire, &family.link).map(client::Answered::Forge)
+                }
+                None => None,
+            };
+            let envelope = match &answer {
+                None => match envelope {
+                    skein_lib::RequestEnvelope::Final => skein_lib::RequestEnvelope::Lost,
+                    skein_lib::RequestEnvelope::Again
+                    | skein_lib::RequestEnvelope::Lost
+                    | skein_lib::RequestEnvelope::SignedOut => envelope,
+                },
+                Some(_) => envelope,
             };
             Up::Root(client::Event::Answer { attempt, envelope, answer })
         }
@@ -85,7 +121,13 @@ pub fn up(request: link::Request) -> Up {
         link::Request::Hello { family: None, versions } => {
             Up::Root(client::Event::Jig(jig_domain_client::Event::Hello { versions }))
         }
-        link::Request::Hello { family: Some(family), versions } => Up::Notice(Notice::Served { family, versions }),
+        link::Request::Hello { family: Some(number), versions } => {
+            if number == temper_protocol_client_wire::FORGE {
+                Up::Root(client::Event::Forge(client::forge::Event::Served { versions }))
+            } else {
+                Up::Notice(Notice::Served { family: number, versions })
+            }
+        }
         link::Request::ServiceCredential { party, credential } => Up::Notice(Notice::Credential { party, credential }),
         link::Request::Dropped { keeper } => Up::Notice(Notice::Dropped { keeper }),
         link::Request::FamilyDelivery { .. } => Up::Notice(Notice::Unasked),
@@ -93,12 +135,27 @@ pub fn up(request: link::Request) -> Up {
     }
 }
 #[must_use]
-pub fn down(request: client::Request) -> Down {
+pub fn down(request: client::Request, family: &mut family::Family) -> Down {
     match request {
-        client::Request::Save { record } => Down::Link(link::Event::Save { record: saved(record) }),
+        client::Request::Save { record } => match saved(record, family) {
+            Some(record) => Down::Link(link::Event::Save { record }),
+            None => Down::Duty(Duty::Fact(client::Fact::InvalidRecord)),
+        },
         client::Request::Erase { key } => Down::Link(link::Event::Erase { key: erased(key) }),
         client::Request::Send { attempt, key, ask: client::Ask::Jig(ask) } => {
             Down::Link(link::Event::Send { attempt, key, ask: link::Ask::Jig(ask) })
+        }
+        client::Request::Send { attempt, key, ask: client::Ask::Forge(ask) } => {
+            match family::request(&ask, &family.wire) {
+                Some(record) => {
+                    if family.attempts.sent(attempt).is_err() {
+                        Down::Duty(Duty::Fact(client::Fact::TableFull))
+                    } else {
+                        Down::Link(link::Event::Send { attempt, key, ask: link::Ask::Family(record) })
+                    }
+                }
+                None => Down::Duty(Duty::Fact(client::Fact::InvalidRecord)),
+            }
         }
         client::Request::Jig(request) => match request {
             client::JigOut::Read { read, what } => {
@@ -118,8 +175,8 @@ pub fn down(request: client::Request) -> Down {
     }
 }
 #[must_use]
-pub fn saved(record: client::store::Record) -> link::Saved {
-    match record {
+pub fn saved(record: client::store::Record, family: &family::Family) -> Option<link::Saved> {
+    Some(match record {
         client::store::Record::Jig(record) => link::Saved::Jig(record),
         client::store::Record::Table { version, record } => link::Saved::Table {
             version,
@@ -129,19 +186,20 @@ pub fn saved(record: client::store::Record) -> link::Saved {
                 first_sent: record.first_sent,
                 request: match record.request {
                     client::Ask::Jig(ask) => link::Ask::Jig(ask),
+                    client::Ask::Forge(ask) => link::Ask::Family(family::request(&ask, &family.wire)?),
                 },
             },
         },
-    }
+    })
 }
 #[must_use]
-pub fn kept(saved: link::Saved) -> Option<client::store::Record> {
+pub fn kept(saved: link::Saved, family: &family::Family) -> Option<client::store::Record> {
     match saved {
         link::Saved::Jig(record) => Some(client::store::Record::Jig(record)),
         link::Saved::Table { version, record } => {
             let request = match record.request {
                 link::Ask::Jig(ask) => client::Ask::Jig(ask),
-                link::Ask::Family(_) => return None,
+                link::Ask::Family(record) => client::Ask::Forge(family::restored(&record, &family.wire)?),
             };
             Some(client::store::Record::Table {
                 version,

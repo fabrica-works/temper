@@ -3,6 +3,8 @@
 //! `Show` retains a part; `PartsLeft` frees that generation and every older one.
 use jig_domain_client::contract::Part;
 use skein_lib::{Env, List, Queue, Time};
+mod vocabulary;
+pub use vocabulary::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -10,6 +12,9 @@ pub struct Limits {
 }
 #[derive(Debug)]
 pub enum Event {
+    Went { address: Address },
+    Left,
+    Served { versions: jig_domain_client::contract::VersionRange },
     Show { part: Part, generation: u32 },
     PartsLeft { generation: u32 },
 }
@@ -28,13 +33,24 @@ struct Held {
 }
 #[derive(Debug)]
 pub struct Side {
+    config: Config,
+    address: Option<Address>,
+    served: Served,
     held: List<Held>,
     shown: u64,
 }
 impl Side {
     #[must_use]
-    pub fn new(limits: &Limits) -> Side {
-        Side { held: List::with_capacity(limits.parts), shown: 0 }
+    pub fn new(limits: &Limits, config: Config) -> Side {
+        Side { config, address: None, served: Served::Unknown, held: List::with_capacity(limits.parts), shown: 0 }
+    }
+    #[must_use]
+    pub const fn address(&self) -> Option<Address> {
+        self.address
+    }
+    #[must_use]
+    pub const fn served(&self) -> Served {
+        self.served
     }
     #[must_use]
     pub fn contains(&self, part: &Part, generation: u32) -> bool {
@@ -51,6 +67,19 @@ impl Side {
 }
 pub fn step(side: &mut Side, _env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Went { address } => {
+            side.address = Some(address);
+            side.changed();
+        }
+        Event::Left => {
+            if side.address.take().is_some() {
+                side.changed();
+            }
+        }
+        Event::Served { versions } => {
+            side.served = if versions.contains(side.config.version) { Served::Yes } else { Served::OutOfDate };
+            side.changed();
+        }
         Event::Show { part, generation } => {
             if side.contains(&part, generation) {
                 return;

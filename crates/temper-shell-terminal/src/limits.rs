@@ -98,6 +98,20 @@ pub fn native() -> Limits {
 pub fn link(limits: &Limits) -> Result<link::Limits, link::Unusable> {
     link::Limits::new(limits.client.jig, EXCHANGES, DEADLINE)
 }
+/// Family bounds mirror the small forge's names, gates and protection contexts.
+#[must_use]
+pub fn family(limits: &Limits) -> Option<crate::route::family::Family> {
+    Some(crate::route::family::Family {
+        attempts: crate::route::family::Attempts::new(limits.client.table.requests),
+        wire: temper_protocol_client_wire::limits(&temper_protocol_client_wire::Bounds {
+            field_bytes: 256,
+            checks: 8,
+            contexts: 16,
+            refusal_bytes: 65_536,
+        })?,
+        link: link(limits).ok()?,
+    })
+}
 /// Checked words and the view bounds used at construction and accounting.
 #[must_use]
 pub fn view(
@@ -120,7 +134,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let root = client::worst_case(&limits.client)?;
     let view = temper_client_view::worst_case(&view, &limits.client, &jig, &forge)?;
     let link = link::worst_case(&link(limits).ok()?)?;
-    root.checked_add(view)?.checked_add(link)?.checked_add(shell(limits)?)
+    root.checked_add(view)?.checked_add(link)?.checked_add(shell(limits)?)?.checked_add(skein_lib::Set::<
+        skein_lib::Token,
+    >::worst_case(
+        limits.client.table.requests
+    )?)
 }
 /// The published `Shell::worst_case` formula, with every operation checked.
 #[must_use]

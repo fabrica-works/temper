@@ -5,8 +5,11 @@ use skein_lib::Token;
 /// The child request token, or restored request scope with no live child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
+    Forge(Token),
     /// jig owns this live request.
     Jig(Token),
     /// The original child disappeared on reload.
-    Kept { scope: u64 },
+    Kept {
+        scope: u64,
+    },
 }
