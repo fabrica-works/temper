@@ -218,3 +218,41 @@ fn fixed_answer_lists_past_their_counts_fail_to_decode() {
         assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable), "{name}");
     }
 }
+
+#[test]
+fn each_client_row_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for row in &fixtures::client_rows() {
+        let bytes = records::encode(row).expect("client row encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row.clone()));
+    }
+}
+#[test]
+fn client_list_counts_take_their_domain_bounds() {
+    use temper_engine_domain_forge_client::{Delivery, Echo, Stored, What};
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    let mut echoes = fixtures::live(What::Issue(1));
+    echoes.echoes = Box::new([Echo::Comment(1); 9]);
+    let mut comments = fixtures::live(What::Issue(1));
+    comments.comments = Box::new([Delivery { id: 1, revision: 1 }; 17]);
+    let mut reviews = fixtures::live(What::Issue(1));
+    reviews.reviews = Box::new([Delivery { id: 1, revision: 1 }; 17]);
+    for (name, value) in [("echoes use rows", echoes), ("comments use inbox", comments), ("reviews use inbox", reviews)]
+    {
+        let row = forge::Stored::Client(Stored::Live(value));
+        let bytes = records::encode(&row).expect("schema ceiling admits lists");
+        assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable), "{name}");
+    }
+}
+#[test]
+fn a_cached_summary_key_uses_the_answer_byte_bound() {
+    use temper_engine_domain_forge_client::{Stored, What};
+    let mut live = fixtures::live(What::Issue(1));
+    let mut summary = fixtures::summary();
+    summary.key = Some(Box::new([1_u8; 600]));
+    live.cached.item = Some(summary);
+    let row = forge::Stored::Client(Stored::Live(live));
+    let bytes = records::encode(&row).expect("cached key encoded");
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+}

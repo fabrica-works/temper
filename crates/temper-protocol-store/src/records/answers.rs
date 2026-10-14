@@ -38,7 +38,7 @@ fn encode_reviewers(values: &[u64]) -> List<u64> {
     }
     result
 }
-fn encode_pull(value: &d::Pull) -> w::Pull {
+pub(super) fn encode_pull(value: &d::Pull) -> w::Pull {
     let d::Pull { reviewers, number, state, head, base, commit, base_commit, merged, mergeable, ci } = value;
     w::Pull::new(
         &w::CEILINGS,
@@ -57,7 +57,7 @@ fn encode_pull(value: &d::Pull) -> w::Pull {
     )
     .expect(FITS)
 }
-fn decode_pull(value: w::Pull) -> d::Pull {
+pub(super) fn decode_pull(value: w::Pull) -> d::Pull {
     let w::PullParts { reviewers, number, state, head, base, commit, base_commit, merged, mergeable, ci } =
         value.into_parts();
     d::Pull {
@@ -491,7 +491,7 @@ fn encode_statuses_answer(ci: d::Ci, statuses: &[d::Status], more: bool) -> w::S
 fn encode_remarks_answer(remarks: &[d::Remark], more: bool) -> w::RemarksAnswer {
     w::RemarksAnswer::new(&w::CEILINGS, w::RemarksAnswerParts { remarks: encode_remarks(remarks), more }).expect(FITS)
 }
-fn encode_pull_files_answer(head: d::Commit, files: &[d::File], more: bool) -> w::PullFilesAnswer {
+pub(super) fn encode_pull_files_answer(head: d::Commit, files: &[d::File], more: bool) -> w::PullFilesAnswer {
     w::PullFilesAnswer::new(&w::CEILINGS, w::PullFilesAnswerParts { head, files: encode_files(files), more })
         .expect(FITS)
 }

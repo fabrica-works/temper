@@ -83,11 +83,11 @@ fn decode_entry(value: w::Entry) -> d::Entry {
         failures,
     }
 }
-fn encode_position(value: d::Position) -> w::Position {
+pub(super) fn encode_position(value: d::Position) -> w::Position {
     let d::Position { at, comment, review, review_page } = value;
     w::Position::new(&w::CEILINGS, w::PositionParts { at: at.as_nanos(), comment, review, review_page }).expect(FITS)
 }
-fn decode_position(value: w::Position) -> d::Position {
+pub(super) fn decode_position(value: w::Position) -> d::Position {
     let w::PositionParts { at, comment, review, review_page } = value.into_parts();
     d::Position { at: Time::from_nanos(at), comment, review, review_page }
 }

@@ -5,6 +5,7 @@ use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
 mod answers;
 mod api;
+mod client;
 #[cfg(test)]
 pub(crate) use api::encode_error;
 mod entries;
@@ -28,7 +29,8 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
         d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
-        d::Stored::Client(_) | d::Stored::Change(_) | d::Stored::Issue(_) => return None,
+        d::Stored::Client(value) => w::Value::Client(client::encode(value)),
+        d::Stored::Change(_) | d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
@@ -40,6 +42,7 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
 pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     let row = w::Row::decode(bounds.limits(), &mut Reader::new(bytes)).or(Err(Undecodable))?;
     Ok(match row.into_parts().value {
+        w::Value::Client(value) => d::Stored::Client(client::decode(value, bounds)?),
         w::Value::Call(value) => entries::decode_call(value, bounds)?,
         w::Value::ProposedEffect(value) => d::Stored::ProposedEffect(entries::decode_proposed(value, bounds)?),
         w::Value::Entry(value) => entries::decode_entry_row(value),
@@ -63,6 +66,10 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        live_branch_branch: forge.name_bytes,
+        live_record_comments: forge.client.inbox,
+        live_record_reviews: forge.client.inbox,
+        live_record_echoes: forge.client.rows,
         status_context: forge.client.answer_bytes,
         status_description: forge.client.answer_bytes,
         status_url: forge.client.answer_bytes,

@@ -455,20 +455,9 @@ fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
     top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
 }
 pub fn answers_without_item_pieces() -> [client::api::Answer; 17] {
-    use client::api::{Answer, BranchCreation, Ci, JobAttempt, Permission, Protection, Pull, Settings, State};
+    use client::api::{Answer, BranchCreation, JobAttempt, Permission, Protection, Settings};
     [
-        Answer::Pull(Pull {
-            reviewers: Box::new([1, 2]),
-            number: 3,
-            state: State::Closed,
-            head: Box::new([4]),
-            base: Box::new([5]),
-            commit: [6; 32],
-            base_commit: Some([7; 32]),
-            merged: Some([8; 32]),
-            mergeable: true,
-            ci: Ci::Passed,
-        }),
+        Answer::Pull(pull()),
         Answer::Commit([9; 32]),
         Answer::Branches(Box::new([Box::new([0, 255]), Box::new([1])])),
         Answer::Job {
@@ -618,4 +607,60 @@ pub fn remaining_answers() -> [client::api::Answer; 6] {
             more: true,
         },
     ]
+}
+
+pub fn pull() -> client::api::Pull {
+    use client::api::{Ci, State};
+    client::api::Pull {
+        reviewers: Box::new([1, 2]),
+        number: 3,
+        state: State::Closed,
+        head: Box::new([4]),
+        base: Box::new([5]),
+        commit: [6; 32],
+        base_commit: Some([7; 32]),
+        merged: Some([8; 32]),
+        mergeable: true,
+        ci: Ci::Passed,
+    }
+}
+
+pub fn live(what: client::What) -> client::LiveRecord {
+    client::LiveRecord {
+        watch: client::Watch { resource: client::Resource { repository: REPO, what }, participating: true },
+        position: entry(client::api::Write::Close { number: 1 }, client::Condition::None)
+            .start
+            .expect("fixture position"),
+        listed: skein_lib::Time::from_nanos(2),
+        comment_after: 3,
+        comment_page: 4,
+        comment_scanning: true,
+        comment_repair: false,
+        review_page: 5,
+        comments: Box::new([client::Delivery { id: 6, revision: 7 }]),
+        reviews: Box::new([client::Delivery { id: 8, revision: 9 }]),
+        cached: Box::new(client::Cached { item: Some(summary()), pull: Some(pull()), tip: Some([10; 32]) }),
+        pushed: Some([11; 32]),
+        echoes: Box::new([client::Echo::Comment(12), client::Echo::Review(13)]),
+    }
+}
+pub fn client_rows() -> List<top::Stored> {
+    let mut rows = List::with_capacity(6);
+    for what in [
+        client::What::Repository,
+        client::What::Branch(Box::new([0, 255])),
+        client::What::Pull(1),
+        client::What::Issue(2),
+    ] {
+        rows.push(top::Stored::Client(client::Stored::Live(live(what)))).expect("fixture room");
+    }
+    for mark in [None, Some(skein_lib::Time::from_nanos(1))] {
+        rows.push(top::Stored::Client(client::Stored::Repository(client::RepositoryRecord {
+            repository: REPO,
+            mark,
+            clock: skein_lib::Time::from_nanos(2),
+        })))
+        .expect("fixture room");
+    }
+    rows
 }
