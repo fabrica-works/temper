@@ -402,6 +402,21 @@ impl Domain {
         self.client.next_deadline()
     }
 
+    /// Earliest procedure or projection wait, reported to the root's clock.
+    #[must_use]
+    pub fn next_wall_deadline(&self) -> Option<skein_lib::Wall> {
+        let mut next: Option<skein_lib::Wall> = None;
+        for deadlines in [&self.projection_due, &self.change_due] {
+            for (_, deadline) in deadlines {
+                next = Some(match next {
+                    Some(previous) => previous.min(*deadline),
+                    None => *deadline,
+                });
+            }
+        }
+        next
+    }
+
     /// Whether a child call or a newly committed entry may be sent.
     #[must_use]
     pub fn is_ready(&self) -> bool {

@@ -596,7 +596,12 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
         let routed =
             jig_domain_core::step(&mut domain.core, &environment_core(env), jig_domain_core::Event::EffectDeadline);
         route_core_requests(domain, env, &mut decision, routed);
-        for timer in [jig_domain_core::Timer::Tasks, jig_domain_core::Timer::Fleet, jig_domain_core::Timer::Brief] {
+        for timer in [
+            jig_domain_core::Timer::People,
+            jig_domain_core::Timer::Tasks,
+            jig_domain_core::Timer::Fleet,
+            jig_domain_core::Timer::Brief,
+        ] {
             let routed = jig_domain_core::fire(&mut domain.core, &environment_core(env), timer);
             route_core_requests(domain, env, &mut decision, routed);
         }
