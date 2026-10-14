@@ -731,3 +731,5 @@ pub use worker_git::{IDENTITY, WorkerStand, started_worker};
 pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
 }
+mod startup;
+pub use startup::{APPLICATION, document, files, parsed};

@@ -1,0 +1,538 @@
+//! Temper's members, read strictly with jig's readers (configuration.md, 3, 4, 10).
+mod landing;
+mod read;
+use super::{Problems, What};
+use crate::{limits, settings};
+use alloc::boxed::Box;
+use jig_protocol_config::{self as config, Path};
+use skein_json::{Document, document::Kind};
+use skein_lib::{List, bytes};
+
+#[derive(Debug)]
+pub struct Members {
+    pub forges: Box<[Forge]>,
+    pub identities: Box<[Identity]>,
+    pub landing: temper_engine_domain::LandingPolicy,
+    pub charter: u32,
+    pub limits: limits::Limits,
+    pub workers: Box<[Worker]>,
+}
+#[derive(Debug)]
+pub struct Forge {
+    pub number: u16,
+    pub kind: settings::Kind,
+    pub api: config::Address,
+    pub transport: Transport,
+    pub git: Box<[u8]>,
+    pub api_token: Box<[u8]>,
+    pub user: u64,
+    pub identity: u32,
+}
+#[derive(Debug)]
+pub enum Transport {
+    Plaintext,
+    Tls { server_name: Box<[u8]>, trust: Option<Box<[u8]>> },
+}
+#[derive(Debug)]
+pub struct Identity {
+    pub number: u32,
+    pub token: Box<[u8]>,
+    pub login: Box<[u8]>,
+    pub author: settings::Author,
+}
+#[derive(Debug)]
+pub struct Worker {
+    pub root: Box<[u8]>,
+    pub git: Box<[u8]>,
+}
+fn configured_limits(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<limits::Limits> {
+    let mut object = read::object(document, at, path, problems)?;
+    let profile = read::text(&mut object, document, b"profile", path, problems);
+    let overrides = read::required(&mut object, document, b"overrides", path, problems);
+    read::finish(object, document, path, problems);
+    if let Some(profile) = profile
+        && profile.as_ref() != b"small"
+    {
+        problems.push(path.member(b"profile"), What::Profile);
+    }
+    let mut limits = limits::profile(limits::Profile::Small);
+    let path = path.member(b"overrides");
+    if let Some(at) = overrides
+        && let Some(mut object) = read::object(document, at, &path, problems)
+    {
+        let end = config::read::after(document, at).ok()?;
+        for index in at..end {
+            let Some(token) = document.token(index) else { continue };
+            if token.kind != Kind::Key {
+                continue;
+            }
+            let name = document.text(token).expect("object key text");
+            let Some(value_at) = object.member(document, name) else { continue };
+            match config::read::integer(document, value_at, u64::MAX) {
+                Ok(value) => {
+                    if let Err(what) = limits::apply(&mut limits, name, value) {
+                        problems.push(path.member(name), What::Override(what));
+                    }
+                }
+                Err(config::What::Bound) => problems.push(path.member(name), What::Override(limits::Refused::Range)),
+                Err(what) => problems.push(path.member(name), What::Jig(what)),
+            }
+        }
+        read::finish(object, document, &path, problems);
+    }
+    Some(limits)
+}
+fn transport(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Transport> {
+    if document.token(at)?.kind == Kind::String {
+        let value = match config::read::text(document, at, 16) {
+            Ok(value) => value,
+            Err(what) => {
+                problems.push(path.clone(), What::Jig(what));
+                return None;
+            }
+        };
+        read::form(value.as_ref() == b"plaintext", path.clone(), problems);
+        return Some(Transport::Plaintext);
+    }
+    let mut outer = read::object(document, at, path, problems)?;
+    let tls = read::required(&mut outer, document, b"tls", path, problems);
+    read::finish(outer, document, path, problems);
+    let path = path.member(b"tls");
+    let mut object = read::object(document, tls?, &path, problems)?;
+    let server_name = read::text(&mut object, document, b"server_name", &path, problems);
+    let at = read::required(&mut object, document, b"trust", &path, problems);
+    let mut trust = None;
+    if let Some(at) = at
+        && document.token(at)?.kind != Kind::Null
+    {
+        match config::read::text(document, at, 1_048_576) {
+            Ok(value) => trust = Some(value),
+            Err(what) => problems.push(path.member(b"trust"), What::Jig(what)),
+        }
+    }
+    read::finish(object, document, &path, problems);
+    Some(Transport::Tls { server_name: server_name?, trust })
+}
+#[expect(clippy::disallowed_methods, reason = "the configuration protocol parses URL hosts and ports")]
+fn git_base(input: &[u8]) -> bool {
+    let (rest, plain) = if let Some(rest) = input.strip_prefix(b"https://") {
+        (rest, false)
+    } else if let Some(rest) = input.strip_prefix(b"http://") {
+        (rest, true)
+    } else {
+        return false;
+    };
+    if rest.is_empty() || rest.ends_with(b"/") {
+        return false;
+    }
+    for byte in rest {
+        if byte.is_ascii_control() || byte.is_ascii_whitespace() || b"@?#\\".contains(byte) {
+            return false;
+        }
+    }
+    let mut end = rest.len();
+    for (index, byte) in rest.iter().enumerate() {
+        if *byte == b'/' {
+            end = index;
+            break;
+        }
+    }
+    let Ok(authority) = core::str::from_utf8(rest.get(..end).expect("host prefix")) else { return false };
+    let (host, port) = if let Some(ipv6) = authority.strip_prefix('[') {
+        let Some((host, suffix)) = ipv6.split_once(']') else { return false };
+        if suffix.is_empty() {
+            (host, None)
+        } else if let Some(port) = suffix.strip_prefix(':') {
+            (host, Some(port))
+        } else {
+            return false;
+        }
+    } else if let Some((host, port)) = authority.split_once(':') {
+        (host, Some(port))
+    } else {
+        (authority, None)
+    };
+    if host.is_empty() {
+        return false;
+    }
+    if let Some(port) = port
+        && port.parse::<u16>().is_err()
+    {
+        return false;
+    }
+    match host.parse::<core::net::IpAddr>() {
+        Ok(ip) => !plain || ip.is_loopback(),
+        Err(_) => {
+            for byte in host.bytes() {
+                if !byte.is_ascii_alphanumeric() && byte != b'-' && byte != b'.' {
+                    return false;
+                }
+            }
+            !plain || host.eq_ignore_ascii_case("localhost")
+        }
+    }
+}
+fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Forge> {
+    let mut object = read::object(document, at, path, problems)?;
+    let number = read::short(&mut object, document, b"number", path, problems);
+    let kind = read::text(&mut object, document, b"kind", path, problems);
+    let at = read::required(&mut object, document, b"api", path, problems);
+    let mut found = config::Problems::empty();
+    let api = match at {
+        Some(at) => config::address::read(document, at, &path.member(b"api"), &mut found),
+        None => None,
+    };
+    problems.append(found, &Path::root());
+    let at = read::required(&mut object, document, b"transport", path, problems);
+    let transport = match at {
+        Some(at) => transport(document, at, &path.member(b"transport"), problems),
+        None => None,
+    };
+    let git = read::text(&mut object, document, b"git", path, problems);
+    let api_token = read::text(&mut object, document, b"api_token", path, problems);
+    let user = read::integer(&mut object, document, b"user", path, problems);
+    let identity = read::number(&mut object, document, b"identity", path, problems);
+    read::finish(object, document, path, problems);
+    if let Some(kind) = kind {
+        read::form(kind.as_ref() == b"forgejo", path.member(b"kind"), problems);
+    }
+    if let Some(git) = &git {
+        read::form(git_base(git), path.member(b"git"), problems);
+    }
+    if let Some(user) = user {
+        read::form(user > 0, path.member(b"user"), problems);
+    }
+    let api = api?;
+    let transport = transport?;
+    match &api {
+        config::Address::Addr(skein_io::Addr::InProcess(_)) => read::form(false, path.member(b"api"), problems),
+        config::Address::Addr(skein_io::Addr::Ip(_)) | config::Address::Host { .. } => {}
+    }
+    match &transport {
+        Transport::Plaintext => {
+            let loopback = match &api {
+                config::Address::Addr(skein_io::Addr::Ip(socket)) => socket.ip().is_loopback(),
+                config::Address::Addr(skein_io::Addr::InProcess(_)) | config::Address::Host { .. } => false,
+            };
+            if !loopback {
+                problems.push(path.member(b"transport"), What::Loopback);
+            }
+        }
+        Transport::Tls { .. } => {}
+    }
+    Some(Forge {
+        number: number?,
+        kind: settings::Kind::Forgejo,
+        api,
+        transport,
+        git: git?,
+        api_token: api_token?,
+        user: user?,
+        identity: identity?,
+    })
+}
+fn identity(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Identity> {
+    let mut object = read::object(document, at, path, problems)?;
+    let number = read::number(&mut object, document, b"number", path, problems);
+    let token = read::text(&mut object, document, b"token", path, problems);
+    let login = read::text(&mut object, document, b"login", path, problems);
+    let author_at = read::required(&mut object, document, b"author", path, problems);
+    read::finish(object, document, path, problems);
+    if let Some(login) = &login {
+        let mut valid = !login.is_empty();
+        for byte in login {
+            if *byte == b':' || byte.is_ascii_control() {
+                valid = false;
+            }
+        }
+        read::form(valid, path.member(b"login"), problems);
+    }
+    let author_path = path.member(b"author");
+    let mut author = read::object(document, author_at?, &author_path, problems)?;
+    let name = read::text(&mut author, document, b"name", &author_path, problems);
+    let email = read::text(&mut author, document, b"email", &author_path, problems);
+    read::finish(author, document, &author_path, problems);
+    for (field, value) in [(b"name".as_slice(), &name), (b"email".as_slice(), &email)] {
+        if let Some(value) = value {
+            let mut valid = !value.is_empty();
+            for byte in value {
+                if b"\0\n<>".contains(byte) {
+                    valid = false;
+                }
+            }
+            read::form(valid, author_path.member(field), problems);
+        }
+    }
+    Some(Identity {
+        number: number?,
+        token: token?,
+        login: login?,
+        author: settings::Author { name: name?, email: email? },
+    })
+}
+fn references(
+    forges: &List<Forge>,
+    identities: &List<Identity>,
+    charter: u32,
+    jig: &config::Engine,
+    problems: &mut Problems,
+) {
+    let path = Path::root().member(b"application");
+    for (index, forge) in forges.iter().enumerate() {
+        let path = read::index(&path.member(b"forges"), index);
+        for previous in forges.iter().take(index) {
+            if previous.number == forge.number {
+                problems.push(path.member(b"number"), What::Jig(config::What::Unique));
+            }
+        }
+        let mut found = false;
+        for identity in identities {
+            if identity.number == forge.identity {
+                found = true;
+            }
+        }
+        if !found {
+            problems.push(path.member(b"identity"), What::Jig(config::What::Refers));
+        }
+    }
+    for (index, identity) in identities.iter().enumerate() {
+        let path = read::index(&path.member(b"identities"), index);
+        for previous in identities.iter().take(index) {
+            if previous.number == identity.number {
+                problems.push(path.member(b"number"), What::Jig(config::What::Unique));
+            }
+        }
+        let mut count = 0_u32;
+        for forge in forges {
+            if forge.identity == identity.number {
+                count = count.saturating_add(1);
+            }
+        }
+        if count != 1 {
+            problems.push(path.member(b"number"), What::Jig(config::What::Refers));
+        }
+    }
+    {
+        let mut found = false;
+        for entry in &jig.charters {
+            if entry.number == charter {
+                found = true;
+            }
+        }
+        if !found {
+            problems.push(path.member(b"charter"), What::Jig(config::What::Refers));
+        }
+    }
+}
+pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut Problems) -> Option<Members> {
+    let path = Path::root().member(b"application");
+    let mut object = read::object(document, at, &path, problems)?;
+    let limit_at = read::required(&mut object, document, b"limits", &path, problems);
+    let limits = match limit_at {
+        Some(at) => configured_limits(document, at, &path.member(b"limits"), problems),
+        None => None,
+    };
+    let bounds = limits.unwrap_or(limits::profile(limits::Profile::Small));
+    let forge_ats = read::list(&mut object, document, b"forges", bounds.forge.client.repositories, &path, problems);
+    let identity_ats =
+        read::list(&mut object, document, b"identities", jig.limits.core.accounts.credentials, &path, problems);
+    let workers_ats = read::list(&mut object, document, b"workers", jig.limits.core.fleet.workers, &path, problems);
+    let charter = read::number(&mut object, document, b"charter", &path, problems);
+    let landing_at = read::required(&mut object, document, b"landing", &path, problems);
+    if object.member(document, b"webhooks").is_some() {
+        problems.push(path.member(b"webhooks"), What::NotBuilt);
+    }
+    read::finish(object, document, &path, problems);
+    let forge_count = match &forge_ats {
+        Some(ats) => ats.len(),
+        None => 0,
+    };
+    let identity_count = match &identity_ats {
+        Some(ats) => ats.len(),
+        None => 0,
+    };
+    if forge_ats.is_some() && forge_count == 0 {
+        problems.push(path.member(b"forges"), What::Jig(config::What::Bound));
+    }
+    if identity_ats.is_some() && forge_ats.is_some() && identity_count != forge_count {
+        problems.push(path.member(b"identities"), What::Jig(config::What::Bound));
+    }
+    let mut forges = List::with_capacity(bounds.forge.client.repositories);
+    if let Some(ats) = forge_ats {
+        for (index, at) in ats.iter().enumerate() {
+            if let Some(forge) = forge(document, *at, &read::index(&path.member(b"forges"), index), problems) {
+                forges.push(forge).expect("bounded forges");
+            }
+        }
+    }
+    let mut identities = List::with_capacity(jig.limits.core.accounts.credentials);
+    if let Some(ats) = identity_ats {
+        for (index, at) in ats.iter().enumerate() {
+            if let Some(identity) = identity(document, *at, &read::index(&path.member(b"identities"), index), problems)
+            {
+                identities.push(identity).expect("bounded identities");
+            }
+        }
+    }
+    let mut workers = List::with_capacity(jig.limits.core.fleet.workers);
+    if let Some(ats) = workers_ats {
+        for (index, at) in ats.iter().enumerate() {
+            let path = read::index(&path.member(b"workers"), index);
+            let Some(mut object) = read::object(document, *at, &path, problems) else { continue };
+            let root = read::text(&mut object, document, b"root", &path, problems);
+            let git = read::text(&mut object, document, b"git", &path, problems);
+            read::finish(object, document, &path, problems);
+            if let Some(git) = git
+                && let Some(root) = root
+            {
+                if !git.starts_with(b"/") {
+                    problems.push(path.member(b"git"), What::Absolute);
+                }
+                workers.push(Worker { root, git }).expect("bounded workers");
+            }
+        }
+    }
+    if let Some(charter) = charter
+        && forges.len() == forge_count
+        && identities.len() == identity_count
+    {
+        references(&forges, &identities, charter, jig, problems);
+    }
+    let landing = match landing_at {
+        Some(at) => landing::parse(document, at, jig, &bounds, problems),
+        None => None,
+    };
+    if !problems.is_empty() {
+        return None;
+    }
+    Some(Members {
+        forges: forges.into_boxed(),
+        identities: identities.into_boxed(),
+        workers: workers.into_boxed(),
+        charter: charter?,
+        limits: limits?,
+        landing: landing?,
+    })
+}
+pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[config::File]> {
+    let count = members
+        .forges
+        .len()
+        .checked_mul(2)
+        .expect("bounded forges")
+        .checked_add(members.identities.len())
+        .expect("bounded files");
+    let mut files = List::with_capacity(u32::try_from(count).expect("bounded files"));
+    for (index, forge) in members.forges.iter().enumerate() {
+        let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
+        files
+            .push(config::File {
+                at: path.member(b"api_token"),
+                path: forge.api_token.clone(),
+                max: api_token_bytes,
+                private: true,
+            })
+            .expect("bounded files");
+        match &forge.transport {
+            Transport::Plaintext => {}
+            Transport::Tls { trust, .. } => {
+                if let Some(trust) = trust {
+                    files
+                        .push(config::File {
+                            at: path.member(b"transport").member(b"tls").member(b"trust"),
+                            path: trust.clone(),
+                            max: 1_048_576,
+                            private: false,
+                        })
+                        .expect("bounded files");
+                }
+            }
+        }
+    }
+    for (index, identity) in members.identities.iter().enumerate() {
+        files
+            .push(config::File {
+                at: read::index(&Path::root().member(b"application").member(b"identities"), index).member(b"token"),
+                path: identity.token.clone(),
+                max: token_bytes,
+                private: true,
+            })
+            .expect("bounded files");
+    }
+    files.into_boxed()
+}
+#[derive(Debug)]
+pub struct Resolved {
+    pub forges: Box<[settings::Forge]>,
+    pub identities: Box<[settings::Identity]>,
+}
+fn contents(files: &settings::Files, name: &[u8], max: u32, at: Path, problems: &mut Problems) -> Option<Box<[u8]>> {
+    for (path, value) in &files.entries {
+        if path.as_ref() == name {
+            if value.expose().len() > usize::try_from(max).expect("file bound") {
+                problems.push(at, What::Jig(config::What::Bound));
+                return None;
+            }
+            return Some(bytes::copy_of(value.expose()));
+        }
+    }
+    problems.push(at, What::Jig(config::What::Unreadable));
+    None
+}
+pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Problems) -> Option<Resolved> {
+    let mut forges = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
+    let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
+    for (index, forge) in members.forges.iter().enumerate() {
+        let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
+        let token = contents(files, &forge.api_token, 4096, path.member(b"api_token"), problems);
+        let transport = match &forge.transport {
+            Transport::Plaintext => settings::Transport::Plaintext,
+            Transport::Tls { server_name, trust } => {
+                let trust = match trust {
+                    Some(name) => contents(
+                        files,
+                        name,
+                        1_048_576,
+                        path.member(b"transport").member(b"tls").member(b"trust"),
+                        problems,
+                    ),
+                    None => None,
+                };
+                settings::Transport::Tls { server_name: server_name.clone(), trust }
+            }
+        };
+        if let Some(token) = token {
+            forges
+                .push(settings::Forge {
+                    number: forge.number,
+                    kind: forge.kind,
+                    api: forge.api.clone(),
+                    transport,
+                    git: forge.git.clone(),
+                    api_token: config::secret(token),
+                    user: forge.user,
+                    identity: forge.identity,
+                })
+                .expect("bounded forges");
+        }
+    }
+    for (index, identity) in members.identities.iter().enumerate() {
+        let path = read::index(&Path::root().member(b"application").member(b"identities"), index).member(b"token");
+        if let Some(token) =
+            contents(files, &identity.token, jig_protocol_worker_wire::CEILINGS.grant_value, path, problems)
+        {
+            identities
+                .push(settings::Identity {
+                    number: identity.number,
+                    token: config::secret(token),
+                    login: identity.login.clone(),
+                    author: identity.author.clone(),
+                })
+                .expect("bounded identities");
+        }
+    }
+    if !problems.is_empty() {
+        return None;
+    }
+    Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed() })
+}
