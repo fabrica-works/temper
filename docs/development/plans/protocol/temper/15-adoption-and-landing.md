@@ -83,10 +83,14 @@ README's budget (testing.md, 2.7).
   project }` for the project the person is in, as jig's frame says it;
   with no project chosen, the slot holds nothing."
 - **The joint world** (client.md, 10): "a repository adopted from the
-  navigation's link and then listed on the project's resources; refused:
-  not found, a second home, a field the form refuses; ... a double press
-  of Adopt, a reload with an adoption pending ..., each request made
-  once."
+  navigation's link, its outcome read and the engine holding it, and
+  listed on the project's resources once jig's core lists adopted ones
+  (4.3); refused: not found, a second home, a field the form refuses;
+  ... a double press of Adopt, a reload with an adoption pending ...,
+  each request made once." client.md, 4.3: jig's core at temper's pin
+  "lists there only the roles a live task's resources narrowed, and
+  never an owned one", so no story looks for the repository on the
+  project's page.
 - **The process tier's story** (testing.md, 2.6, steps 3 to 6): "a
   repository is adopted through temper's client" with "It runs CI"
   unchecked and one check; "a goal is given whose change, its check
@@ -411,7 +415,9 @@ repositories: 02.2's `ForgeStand::new()` is fixed to `org/repo` and
 &[(&[u8], &[u8], u32)])` (owner, name, id; `new` calls it with 02.2's
 two) and `direct::Driver` a constructor that takes them, and the joint
 world's scenario holds `acme/shop` (id 7) and no `acme/none`; the stories
-of client.md, 10: adopted then listed on the project's resources;
+of client.md, 10: adopted, its outcome read, its link opening the
+project's page, and the engine holding it (in place of the listing,
+client.md, 4.3);
 refused: not found, a second home, a field the form refuses; a double
 press of Adopt made once; a reload with an adoption pending sent once.
 `Delivery::Application`'s `None` reaches the client as 08.5b answers it,
@@ -428,7 +434,11 @@ Shape: world code: `translate/forge.rs` (`adoption(&forge::Adoption, host:
 &[u8]) -> temper_engine_domain_forge::Adoption`, `outcome(&ApplicationOutcome)
 -> forge::Answer`, each a `match` with no wildcard).
 Test shape: `tests/client/tests/adoption.rs`:
-`a_repository_adopted_from_the_navigation_link_is_listed`,
+`a_repository_adopted_from_the_navigation_link_is_held_by_the_engine`
+(the world gains `Joint::engine_adopted(forge: u16, repository: u32) ->
+bool`: the engine store's forge row at
+`Key::Repository(Repository { forge, repository })` names the
+scenario's project and the owned role),
 `adopting_a_repository_the_forge_lacks_says_not_found`,
 `a_second_home_is_refused_by_the_forge_connector`,
 `a_field_the_form_refuses_sends_nothing_to_the_engine`,
@@ -439,20 +449,20 @@ Reference test, in full (names as 11.3 lands its world):
 ```rust
 // tests/client/tests/adoption.rs
 #[test]
-fn a_repository_adopted_from_the_navigation_link_is_listed() {
+fn a_repository_adopted_from_the_navigation_link_is_held_by_the_engine() {
     let mut world = fixtures::joint(fixtures::SEED);
     let outcome = world.run(fixtures::person(fixtures::adopt_then_open_resources(b"acme", b"shop")));
     assert_eq!(outcome.verdict, Verdict::Passed, "{:?}", outcome.why);
     assert_eq!(world.front().applications_admitted(), 1);
     assert!(world.saw_text(b"Adopted acme/shop on forge 1 as owned."), "the outcome's sentence");
-    assert!(world.saw_text(b"repository 7 on forge 1"), "the project's resources list it");
+    assert!(world.engine_adopted(1, 7), "the engine holds acme/shop, id 7, in the project, owned");
 }
 ```
 
 Proof: joint, `heavy cargo nextest run -p temper-client-world -E
 'binary(adoption)'`, run once: through temper's client and engine roots,
-a repository adopted from the navigation's link is listed on the
-project's resources, three refusals read as the design's sentences, and
+a repository adopted from the navigation's link is held by the engine
+and its outcome read, three refusals read as the design's sentences, and
 a double press and a reload each adopt once (the six tests above); their
 sum within what is left of `tests/client`'s 1.0 s focused share after
 11.4 (about 1.0 s already): `heavy --gate cargo nextest run -p

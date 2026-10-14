@@ -226,7 +226,9 @@ and 10).
   as above by commands (the form's fields written with `n words`, then
   Adopt pressed with `n`), and exits 0 on `q` after a drained close. Its
   referee reads the printed pages (the inbox, the adoption's outcome,
-  the project's resources listing the repository) and the exit status.
+  the project's page its link opens; the repository listed there once
+  jig's core lists adopted resources, `client.md`, 4.3) and the exit
+  status.
 - **In the order of building** (protocol.md, section 12): the story's
   chat first, then its change landed, then the terminal's test.
 - **Its referee:** the person's script finishes within its deadline; the

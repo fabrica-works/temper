@@ -650,3 +650,17 @@ with.
   completions of the user's Codex account (README, "Live services").
 - **No repin of jig,** although jig's `main` is ahead of temper's pin;
   a later plan repins once jig's test-budgets plan ends.
+- **An adopted repository is not listed on the project's resources**
+  (the designer's answer to temper 15.2, 2026-10-14). jig's core, at
+  temper's pin and at jig's `main`, lists on a project's page only the
+  roles a live task's resources narrowed, and never an owned one
+  (`jig-domain-core/src/resources.rs:170-182` keeps narrowings, not
+  adoptions), though jig's `domain/core.md`, 6.1 and
+  `client/domain/pages.md`, 6.5 ask for every adopted resource. temper's
+  client.md, 4.3 and 10 and testing.md, 2.6 now say so, and its tests
+  check the outcome's sentence and the engine's record of the adoption
+  in place of the listing. The fix is jig's core's (keep each adoption's
+  role, owned included, and list it), then a repin of jig in temper; the
+  alternative, a temper-side list in jig's project document, puts
+  temper's records in a document jig's core owns. jig's `STATUS.md`
+  records the shortfall.

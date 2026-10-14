@@ -704,8 +704,9 @@ Removes: nothing.
 Scope: the adoption form's golden pages, each state of client.md, 4.4
 and 4.7 (6.8), and the process tier's terminal test's adoption: the
 form's fields written with `n words`, "It runs CI" toggled off and one
-check named, `Adopt` pressed with `n`, the outcome and the project's
-resources printed, `q`, exit 0 (testing.md, 2.6).
+check named, `Adopt` pressed with `n`, the outcome printed, its link
+followed and the project's page printed, `q`, exit 0 (testing.md, 2.6;
+the repository is not looked for on that page: client.md, 4.3).
 Needs: 15.1's form (the forge's page, bindings and navigation link);
 15.3's process story (the forge component wired, the throwaway Forgejo
 in the process support).
@@ -724,8 +725,10 @@ aiming at 60 s: 15.3's `support::forgejo::Throwaway::start(&scratch)`
 &throwaway.forge())`, the typist following the navigation's link,
 writing owner `acme`, name `widget`, landing branch `main` and one
 check, toggling CI, pressing Adopt, then waiting for "Adopted
-acme/widget on forge 1 as owned." and, on the project's resources page,
-the repository's words.
+acme/widget on forge 1 as owned.", following "See the project's
+resources" and waiting for the project's page (its level-1 heading).
+The repository's words on that page are not waited for: jig's core
+lists no owned resource at temper's pin (client.md, 4.3).
 Proof: process, `TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v16.0.5/forgejo-16.0.5-linux-amd64
 heavy --gate scripts/proof-one-process.sh`, run once: its log names the
 story and the terminal's tests passed (the README's "Done when", 8);

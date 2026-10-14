@@ -183,7 +183,8 @@ like.
   count, and each kept request the table retires (jig's
   `client/domain/root.md`, section 8).
   A kept adoption has no form to show it: its answer goes to no child,
-  and the adopted repository shows on the project's resources.
+  and the adopted repository shows on the project's resources, once
+  jig's core lists them (4.3).
 
 ### 3.4 At start
 
@@ -268,6 +269,15 @@ frame, at the forge's address `Adopt { project }`, reached from the
 forge's entry in the frame's navigation slot (5.3). When jig's settings
 leave the slot, the same fragment fills it and the page goes
 (section 11).
+
+jig's design lists each adopted resource on the project's page with its
+role (jig's `domain/core.md`, 6.1; `client/domain/pages.md`, 6.5).
+jig's core at temper's pinned revision lists there only the roles a
+live task's resources narrowed, and never an owned one: it keeps
+narrowings, not adoptions. So, until jig's core lists adopted
+resources, an adopted repository shows on no page of jig's: the
+outcome's sentence (4.7) is what tells the person it was adopted, and
+its link opens the project's page all the same (section 11).
 
 ### 4.4 The adoption form
 
@@ -872,13 +882,15 @@ The client's tiers, as testing.md places them (section 2):
   engine root's party vocabulary, the forge's request and outcome
   included, is written once in the world, exhaustive both ways.
   Stories: signing in and seeing the inbox; a chat started and
-  answered; a repository adopted from the navigation's link and then
-  listed on the project's resources; refused: not found, a second
-  home, a field the form refuses; a slot of each part kind saying its
-  words or "Shown on the forge."; with jig's client world's faults
-  (drops, the engine restarting, a double press of Adopt, a reload
-  with an adoption pending, kept work), each request made once. Its
-  focused tests and fuzzy sweeps keep the budgets of testing.md, 6.1.
+  answered; a repository adopted from the navigation's link, its
+  outcome read and the engine holding it, and listed on the project's
+  resources once jig's core lists adopted ones (4.3); refused: not
+  found, a second home, a field the form refuses; a slot of each part
+  kind saying its words or "Shown on the forge."; with jig's client
+  world's faults (drops, the engine restarting, a double press of
+  Adopt, a reload with an adoption pending, kept work), each request
+  made once. Its focused tests and fuzzy sweeps keep the budgets of
+  testing.md, 6.1.
 - **The one-process world** (testing.md, 2.5): jig's fake person in
   front of temper's native client, joined through bytes to
   `temper-service` on skein's simulator: the same stories through
@@ -910,6 +922,12 @@ The client's tiers, as testing.md places them (section 2):
 - **The form's place:** in jig's project settings' slot once jig's view
   builds it (jig's `client/domain/pages.md`, 6.5). Default: the forge's
   own page.
+- **An adopted repository on the project's resources:** jig's core
+  lists only roles live tasks narrowed, never an owned one (4.3); the
+  listing is jig's core's to make, as jig's `domain/core.md`, 6.1
+  asks. Default: the outcome's sentence says the adoption, its link
+  opens the project's page, and the tests check the engine's record of
+  it in place of the listing.
 - **The forge's `Refused`, split** into its causes (another project
   writes the repository; the project has a home; another deployment's
   branches under the prefix), so the form names the one. Default: the
