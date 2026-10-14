@@ -705,8 +705,8 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      check counts the entities the configuration enables (the count
      above, the accounts' connections when accounts are configured)
      against the summed `sockets`, refusing at `engine.limits.io.sockets`
-     "by how much". No profile constant and no parser change. Sessions
-     09 and 10 say so.
+     "by how much". No profile constant and no parser change. Session
+     10 says so (09 has ended).
 
 ## For the user
 
