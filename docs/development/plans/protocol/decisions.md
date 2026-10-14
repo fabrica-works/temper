@@ -415,6 +415,18 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      code only, takes those production lines: at most 20 (8 at
      2026-10-14T07:25:24Z, `boundary.rs` 5 and `route.rs` 3).
 
+117. **The core's restore ranges and the census are jig's** (temper
+     08.2a, blocked 2026-10-14T07:21:33Z; plan defect crossing the root's
+     load seam, put to the designer). The designer answered at
+     2026-10-14T07:29:45Z, landed in `f5e4672d` ("Design: the core's
+     restart ranges and the census are jig's"): `CoreRange::Tasks` is
+     jig's `[Core, Tasks]`, filtered, a page that keeps nothing asked
+     again; the census is jig's index walk, its rows in walk order,
+     repeated owners kept, its cursor the last index row's key; the
+     root's part (`store.rs`, `loads.rs` for `Range::Census` only) and
+     the engine world's fake census join 08.2a, whose Size is at most
+     570 (store/README.md, 5; session 08).
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
