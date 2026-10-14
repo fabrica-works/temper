@@ -193,6 +193,20 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      (`grep -cE '^temper-(engine|worker)-domain[ .=]'`) still prints 0.
      code-organization.md, section 3 and session 04 say so.
 
+102. **05.3 lands as one increment, at most 800 lines** (temper 05.3,
+     blocked 2026-10-14T03:57:07Z; plan defect). Its Size is 450, so 675
+     with 1.5 times; the implementer counted about 740 production lines
+     already written (`facts.rs` 490, `runner.rs` 222, about 30 more),
+     most of it the 63 facts of forge.md, section 13 that the Shape lists
+     one by one. A split into 05.3a and 05.3b, proposed as the
+     alternative, would add a gate and a landing for code already
+     written, and leave `facts.txt` with six Actions facts unchecked
+     between them. The bound is code-organization.md, section 8's count
+     on the increment's commit, at most 800; past 800 it splits as the
+     implementer proposed. Its Files, Test shape, Proof (one process run,
+     63 facts, 83 transcripts) and README's 10 lines are unchanged, and
+     06.4's and 14.5's dependencies on 05.3 stay as they are.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

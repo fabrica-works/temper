@@ -462,7 +462,8 @@ forge.md's text it contradicts, unless the design names its fallback;
 the run goes on.
 Don't: register the runner with any instance but this run's; download
 an action or a container; change the design's text to fit a fact.
-Size: at most 450 lines.
+Size: at most 450 lines; ruling 102 lets it land as one increment at
+at most 800 (decisions.md).
 Removes: nothing.
 
 ### 05.4 `tools/git-transcripts`: git 2.53 against the throwaway Forgejo
