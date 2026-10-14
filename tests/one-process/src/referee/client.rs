@@ -1,4 +1,5 @@
 //! Client receipts decoded from the kernel's HTTP and SSE bytes.
+pub(crate) mod cache;
 use jig_domain_client::contract as client;
 use jig_protocol_client_link::translate;
 use jig_protocol_client_wire::v7 as wire;
@@ -14,6 +15,8 @@ pub(crate) enum Received {
     Answer { key: [u8; 16], answer: client::Answer },
     Delivery(client::Delivery),
     Read(client::ReadValue),
+    ApplicationSent { key: [u8; 16] },
+    Application { key: [u8; 16], answer: temper_client_domain::forge::Answer },
 }
 #[derive(Default)]
 struct Connection {
@@ -24,6 +27,7 @@ struct Connection {
     header: bool,
     body: Vec<u8>,
     answered: bool,
+    sent_application: Option<()>,
 }
 #[derive(Default)]
 pub(crate) struct Wire {
@@ -37,11 +41,9 @@ impl Wire {
     pub(crate) fn complete(&mut self, complete: &Complete) {
         match (&complete.kind, &complete.result) {
             (Op::Send { fd, bytes, from }, Ok(Done::Count(count))) => {
-                self.connections
-                    .entry(fd.raw())
-                    .or_default()
-                    .sent
-                    .extend_from_slice(&bytes[*from as usize..(*from + *count) as usize]);
+                let connection = self.connections.entry(fd.raw()).or_default();
+                connection.sent.extend_from_slice(&bytes[*from as usize..(*from + *count) as usize]);
+                connection.request(&mut self.received);
             }
             (Op::Recv { fd, buf }, Ok(Done::Count(count))) => {
                 let connection = self.connections.entry(fd.raw()).or_default();
@@ -56,6 +58,35 @@ impl Wire {
     }
 }
 impl Connection {
+    fn request(&mut self, received: &mut Vec<Received>) {
+        if self.sent_application.is_some() {
+            return;
+        }
+        let Some(end) = mark(&self.sent, b"\r\n\r\n") else { return };
+        if self.sent.split(|byte| *byte == b' ').nth(1) != Some(b"/jig/v1/request".as_slice()) {
+            return;
+        }
+        let header = std::str::from_utf8(&self.sent[..end]).expect("request header");
+        let Some(length) = header
+            .lines()
+            .filter_map(|line| line.split_once(':'))
+            .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+            .map(|(_, value)| value.trim().parse::<usize>().expect("request length"))
+        else {
+            return;
+        };
+        if self.sent.len() < end + 4 + length {
+            return;
+        }
+        let limits =
+            temper_shell_terminal::limits::link(&temper_shell_terminal::limits::native()).expect("native bounds");
+        let keyed =
+            wire::Keyed::decode(&limits.wire, &mut Reader::new(&self.sent[end + 4..])).expect("sent keyed request");
+        self.sent_application = Some(());
+        if matches!(keyed.owner(), wire::Owner::Family(_)) {
+            received.push(Received::ApplicationSent { key: *keyed.key() });
+        }
+    }
     fn progress(&mut self, received: &mut Vec<Received>) {
         if !self.header {
             let Some(end) = mark(&self.incoming, b"\r\n\r\n") else { return };
@@ -112,6 +143,18 @@ impl Connection {
                 if matches!(&value, wire::Answer::FinalAnswer(document) if document.owner() == &wire::Owner::Jig) {
                     let answer = translate::answers::answer(value, &limits).expect("jig answer document");
                     received.push(Received::Answer { key: *keyed.key(), answer });
+                } else if let wire::Answer::FinalAnswer(document) = value {
+                    let wire::Owner::Family(family) = document.owner() else { panic!("application family owner") };
+                    let record = jig_protocol_client_link::Family {
+                        family: family.number(),
+                        version: document.version(),
+                        bytes: document.record().into(),
+                    };
+                    let bounds = temper_shell_terminal::limits::family(&temper_shell_terminal::limits::native())
+                        .expect("family bounds");
+                    let answer = temper_shell_terminal::route::family::answer(&record, &bounds.wire, &limits)
+                        .expect("adoption answer");
+                    received.push(Received::Application { key: *keyed.key(), answer });
                 }
             }
             b"/jig/v1/read" => {

@@ -5,7 +5,7 @@ use crate::{
     referee::{self, Capture, Store, Wire},
     stories,
 };
-use jig_fake_person::{Doing, Find, Next, Step, TreeFace};
+use jig_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
 use skein_shell::Host;
@@ -21,6 +21,7 @@ pub struct Settings {
 pub enum Story {
     Chat { words: &'static [u8] },
     ChatReadThenWait { words: &'static [u8] },
+    Adoption,
     Adopt,
     Merge,
 }
@@ -31,6 +32,28 @@ pub struct Outcome {
     pub chats_answered: u32,
     pub adopted: u32,
     pub pushed: Vec<Pushed>,
+    pub drained: bool,
+    pub restarts: u32,
+    pub claims_settled_at_restart: u32,
+    pub adoptions_answered: u32,
+    pub adoption_pending_at_restart: bool,
+}
+#[derive(Clone, Copy)]
+pub(crate) enum Phase {
+    Story,
+    Drain,
+    Restart,
+    Fault { cut: skein_world::Cut, before: u32 },
+}
+#[derive(Default)]
+struct Progress {
+    at: usize,
+    life: u32,
+    signed: bool,
+    sent: Vec<(u32, [u8; 16])>,
+    answers: Vec<(u32, [u8; 16])>,
+    press_had_frame: Vec<(u32, bool)>,
+    cache: referee::client::cache::History,
 }
 #[derive(Debug)]
 pub struct Pushed {
@@ -38,18 +61,26 @@ pub struct Pushed {
     pub commit: u64,
     pub parents: Vec<u64>,
 }
-thread_local! { static STORE: RefCell<Option<Rc<RefCell<Store>>>> = const { RefCell::new(None) }; }
+thread_local! {
+    static STORE: RefCell<Option<Rc<RefCell<Store>>>> = const { RefCell::new(None) };
+    static PROGRESS: RefCell<Progress> = RefCell::new(Progress::default());
+}
 pub(crate) struct ServiceHost {
     pub(crate) service: temper_service::Service,
     capture: Capture,
     store: Rc<RefCell<Store>>,
     pub(crate) commits: Vec<crate::referee::durable::Commit>,
     pub(crate) wire: Wire,
+    pub(crate) attached: bool,
+    pub(crate) cut_before: Option<u32>,
+    pub(crate) submitted: u32,
+    pub(crate) before_iteration: u32,
     codec: jig_protocol_store::codec::Limits,
     families: temper_protocol_store::Bounds,
 }
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
+        self.before_iteration = self.submitted;
         for complete in self.service.completions().iter() {
             self.capture.complete(complete);
             self.wire.complete(complete);
@@ -58,6 +89,11 @@ impl Host for ServiceHost {
         temper_service::iterate(&mut self.service, now, wall);
         for submit in self.service.submissions().iter() {
             self.capture.pending(&submit.kind);
+        }
+        self.submitted += self.service.submissions().len();
+        if self.cut_before.is_some_and(|before| self.before_iteration <= before && before < self.submitted) {
+            referee::Referee::check_roots(self);
+            self.cut_before = None;
         }
     }
     fn completions(&mut self) -> &mut Queue<Complete> {
@@ -91,8 +127,8 @@ pub(crate) enum Proc {
     Git(Box<temper_fake_git::Git>),
     Shell(Box<stories::Shell>),
     Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
-    Forge(Box<forge::ForgeHost>),
-    Client(Box<Person>),
+    Forge(Box<SignalHost<forge::ForgeHost>>),
+    Client(Box<SignalHost<Person>>),
 }
 impl Proc {
     fn host(&self) -> &dyn Host {
@@ -155,6 +191,7 @@ impl Host for Proc {
 }
 pub(crate) struct Person {
     pub(crate) wire: referee::client::Wire,
+    cache: referee::client::cache::Cache,
     client: Option<NativeClient>,
     root: Option<Fd>,
     actor: jig_fake_person::Person<temper_client_domain::Address>,
@@ -163,6 +200,9 @@ pub(crate) struct Person {
     pub(crate) finished: bool,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
+    offset: usize,
+    pub(crate) life: u32,
+    cutting: bool,
 }
 impl Person {
     fn new(root: Fd, scenario: Story) -> Self {
@@ -181,18 +221,39 @@ impl Person {
                 Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
                 Step::See { find: Find::text(fixtures::ANSWER), within: Duration::from_secs(5) },
             ],
+            Story::Adoption => stories::adoption_person(),
             Story::Adopt | Story::Merge => stories::person(),
         };
+        let mut offset = PROGRESS.with(|progress| progress.borrow().at);
+        if matches!(scenario, Story::Adoption) && offset < fixtures::ADOPTION_REPLY_STEP {
+            offset = 0;
+        }
+        let mut remaining: Vec<_> = steps.into_iter().skip(offset).collect();
+        if matches!(scenario, Story::Adoption) && offset >= fixtures::ADOPTION_REPLY_STEP {
+            remaining.clear();
+        }
+        let life = PROGRESS.with(|progress| {
+            progress.borrow_mut().life += 1;
+            progress.borrow().life
+        });
         Self {
             wire: referee::client::Wire::default(),
+            cache: referee::client::cache::Cache::new(
+                root,
+                life,
+                PROGRESS.with(|progress| progress.borrow().cache.clone()),
+            ),
             client: None,
             root: Some(root),
-            actor: jig_fake_person::Person::new(steps.into_boxed_slice()),
+            actor: jig_fake_person::Person::new(remaining.into_boxed_slice()),
             wake: None,
             signed_in: 0,
             finished: false,
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
+            offset,
+            life,
+            cutting: matches!(scenario, Story::Adoption),
         }
     }
     pub(crate) fn sign_in(&mut self, link: &[u8]) {
@@ -212,6 +273,12 @@ impl Person {
             .expect("service's printed link"),
         );
     }
+    pub(crate) fn finish(&mut self) {
+        self.finished = true;
+        if let Some(client) = &mut self.client {
+            client.close();
+        }
+    }
 }
 impl Host for Person {
     fn iterate(&mut self, now: Time, wall: Wall) {
@@ -219,15 +286,35 @@ impl Host for Person {
             return;
         };
         while let Some(complete) = self.completions.pop() {
+            self.cache.complete(&complete);
+            let received = self.wire.received.len();
             self.wire.complete(&complete);
+            for event in &self.wire.received[received..] {
+                if let referee::client::Received::ApplicationSent { key } = event {
+                    PROGRESS.with(|progress| progress.borrow_mut().sent.push((self.life, *key)));
+                } else if let referee::client::Received::Application { key, .. } = event {
+                    PROGRESS.with(|progress| progress.borrow_mut().answers.push((self.life, *key)));
+                }
+            }
             client.completions().push(complete);
         }
         client.iterate(now, wall);
         while let Some(signing) = client.signing() {
             assert!(matches!(signing, jig_shell_native::Signing::SignedIn { .. }), "sign-in failed: {signing:?}");
             self.signed_in += 1;
+            PROGRESS.with(|progress| progress.borrow_mut().signed = true);
         }
         while let Some(notice) = client.notices() {
+            if self.cutting
+                && matches!(
+                    notice,
+                    temper_shell_terminal::client::Shown::Notice(temper_shell_terminal::route::Notice::Fact(
+                        jig_protocol_client_link::Fact::StreamDropped
+                    ))
+                )
+            {
+                continue;
+            }
             assert!(
                 !matches!(
                     notice,
@@ -239,8 +326,38 @@ impl Host for Person {
         self.wake = None;
         if client.started() && !self.finished {
             let before = self.actor.at();
-            match self.actor.next(&mut TreeFace::new(client.tree()), now) {
-                Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),
+            let mut face = TreeFace::new(client.tree());
+            let next = if self.cutting
+                && self.life > 1
+                && !self
+                    .wire
+                    .received
+                    .iter()
+                    .any(|event| matches!(event, referee::client::Received::Application { .. }))
+            {
+                Next::Wait { until: None }
+            } else if self.cutting && self.offset + before as usize + 1 == fixtures::ADOPTION_REPLY_STEP {
+                match face.find(&Find::exactly_named(jig_view::Role::Button, b"Adopt")) {
+                    Found::Node(node) if face.allows(node, &jig_view::Act::Press) => self.actor.next(&mut face, now),
+                    Found::Node(_) | Found::Absent | Found::Pending => Next::Wait { until: None },
+                }
+            } else {
+                self.actor.next(&mut face, now)
+            };
+            match next {
+                Next::Do(Doing::Act { node, act }) => {
+                    if self.cutting && self.offset + before as usize + 1 == fixtures::ADOPTION_REPLY_STEP {
+                        let frame = self.wire.received.iter().any(|event| {
+                            matches!(
+                                event,
+                                referee::client::Received::Delivery(jig_domain_client::contract::Delivery::Frame(_))
+                                    | referee::client::Received::Read(jig_domain_client::contract::ReadValue::Frame(_))
+                            )
+                        });
+                        PROGRESS.with(|progress| progress.borrow_mut().press_had_frame.push((self.life, frame)));
+                    }
+                    assert!(client.act(node, act), "offered person act");
+                }
                 Next::Do(Doing::Go { address }) => client.go(address),
                 Next::Do(Doing::Reload) => panic!("chat script has no reload"),
                 Next::Wait { until } => self.wake = until,
@@ -248,9 +365,12 @@ impl Host for Person {
                     self.finished = true;
                     client.close();
                 }
-                Next::Failed { step, why } => panic!("person step {step}: {why:?}"),
+                Next::Failed { step, why } => person_failed(step, &why, &self.wire, self.life),
             }
             if self.actor.at() != before {
+                PROGRESS.with(|progress| {
+                    progress.borrow_mut().at = self.offset + usize::try_from(self.actor.at()).expect("person step");
+                });
                 self.wake = Some(now);
             }
         }
@@ -285,6 +405,38 @@ impl Host for Person {
         512
     }
 }
+fn person_failed(step: u32, why: &jig_fake_person::Why, wire: &referee::client::Wire, life: u32) -> ! {
+    let sent: Vec<_> = wire
+        .received
+        .iter()
+        .filter_map(|event| match event {
+            referee::client::Received::ApplicationSent { key } => Some(*key),
+            referee::client::Received::SignedIn(_)
+            | referee::client::Received::Answer { .. }
+            | referee::client::Received::Application { .. }
+            | referee::client::Received::Delivery(_)
+            | referee::client::Received::Read(_) => None,
+        })
+        .collect();
+    let answered: Vec<_> = wire
+        .received
+        .iter()
+        .filter_map(|event| match event {
+            referee::client::Received::Application { key, .. } => Some(*key),
+            referee::client::Received::SignedIn(_)
+            | referee::client::Received::Answer { .. }
+            | referee::client::Received::ApplicationSent { .. }
+            | referee::client::Received::Delivery(_)
+            | referee::client::Received::Read(_) => None,
+        })
+        .collect();
+    let durable = STORE.with(|store| store.borrow().as_ref().expect("world store").borrow().rows.values().filter(|row| matches!(row, temper_engine_domain::Record::Forge { row } if matches!(row.as_ref(), temper_engine_domain_forge::Stored::Application { .. }))).count());
+    PROGRESS.with(|progress| {
+        let progress = progress.borrow();
+        let before: Vec<_> = progress.sent.iter().filter(|(sent_life, _)| *sent_life < life).collect();
+        panic!("person step {step}: {why:?}; adoption keys sent {sent:?}, answered {answered:?}, durable outcomes {durable}; pre-cut sent {before:?}; Adopt presses had frame {:?}; private cache {:?}", progress.press_had_frame, progress.cache.borrow());
+    })
+}
 fn service(inherited: &Inherited) -> Proc {
     let root = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"state").expect("state root").1;
     let worker = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"worker").expect("worker root").1;
@@ -311,6 +463,10 @@ fn service(inherited: &Inherited) -> Proc {
         store: STORE.with(|store| store.borrow().as_ref().expect("world store").clone()),
         commits: Vec::new(),
         wire: Wire::new(STORE.with(|store| store.borrow().as_ref().expect("world store").clone())),
+        attached: false,
+        cut_before: None,
+        submitted: 0,
+        before_iteration: 0,
         codec: fixtures::codec(),
         families,
     }))
@@ -358,20 +514,98 @@ fn agent_root(_spawn: &skein_io::kernel::Spawn) -> Vec<skein_world::StartupRoot>
 }
 #[must_use]
 pub fn run(settings: Settings, scenario: Story) -> Outcome {
-    stories::set(scenario);
-    let mut disk = machine::fresh();
-    let client = disk.reopen_root(2);
-    let store = Rc::new(RefCell::new(Store::new()));
-    STORE.with(|cell| {
-        *cell.borrow_mut() = Some(store.clone());
-    });
-    let transport = stories::forge(scenario);
-    let observed_forge = Rc::new(RefCell::new(referee::forge::Forge::new(transport.clone(), scenario)));
-    forge::set(Some(transport.clone()));
-    let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
-        referee::Referee::new(controls, store.clone(), scenario, observed_forge.clone())
-    })
-    .with_machine(Machine(disk));
+    run_phase(
+        settings,
+        scenario,
+        Phase::Story,
+        machine::fresh(),
+        Store::new(),
+        Rc::new(RefCell::new(referee::Run::default())),
+    )
+    .0
+}
+#[must_use]
+pub fn drain_mid_run(settings: Settings, restart: bool) -> Outcome {
+    let run = Rc::new(RefCell::new(referee::Run::default()));
+    let (mut outcome, disk, store) = run_phase(
+        settings,
+        Story::ChatReadThenWait { words: b"Hello" },
+        Phase::Drain,
+        machine::fresh(),
+        Store::new(),
+        run.clone(),
+    );
+    if restart {
+        let (next, _, _) =
+            run_phase(settings, Story::ChatReadThenWait { words: b"Hello" }, Phase::Restart, disk, store, run);
+        outcome.restarts = next.restarts;
+        outcome.claims_settled_at_restart = next.claims_settled_at_restart;
+        outcome.drained &= next.drained;
+    }
+    outcome
+}
+#[must_use]
+pub fn crash(settings: Settings, cut: skein_world::Cut, draw: &mut skein_lib::Rng) -> (u32, Outcome) {
+    // The pinned world arms cuts before running. Observe the deterministic
+    // pending window on fresh disk, then replay that scenario with its cut.
+    let setup = Rc::new(RefCell::new(referee::Run::default()));
+    run_phase(settings, Story::Adoption, Phase::Story, machine::fresh(), Store::new(), setup.clone());
+    let (start, end) = setup.borrow().window.expect("saved pending adoption window");
+    let length = end.checked_sub(start).expect("pending window ordering");
+    assert!(length > 0, "pending window has a submission");
+    let before = start + u32::try_from(draw.below(u64::from(length))).expect("bounded pending draw");
+    let outcome = run_phase(
+        settings,
+        Story::Adoption,
+        Phase::Fault { cut, before },
+        machine::fresh(),
+        Store::new(),
+        Rc::new(RefCell::new(referee::Run::default())),
+    )
+    .0;
+    (before, outcome)
+}
+pub(crate) fn saved_adoptions() -> std::collections::BTreeSet<[u8; 16]> {
+    PROGRESS.with(|progress| referee::client::cache::saved(&progress.borrow().cache))
+}
+pub fn require_pending_at_cut(outcome: &Outcome, seed: u64, before: u32) {
+    if !outcome.adoption_pending_at_restart {
+        PROGRESS.with(|progress| {
+            let progress = progress.borrow();
+            panic!("seed {seed}, before {before}: pending adoption at cut; original sent {:?}; answers {:?}; frames {:?}; private cache {:?}", progress.sent, progress.answers, progress.press_had_frame, progress.cache.borrow());
+        });
+    }
+}
+fn person(inherited: &Inherited) -> Proc {
+    let root = inherited.roots.first().expect("client root").1;
+    let signed = PROGRESS.with(|progress| progress.borrow().signed);
+    let mut person = Person::new(root, Story::Adoption);
+    if signed {
+        person.client = Some(
+            NativeClient::new(
+                ClientSettings {
+                    engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
+                    directory: b"private".as_slice().into(),
+                    limits: temper_shell_terminal::limits::native(),
+                },
+                person.root.take().expect("private root"),
+                1000,
+                fixtures::SEED,
+                Start::Token,
+            )
+            .expect("stored sign-in"),
+        );
+        person.signed_in = 1;
+    }
+    Proc::Client(Box::new(SignalHost::new(person, Some(inherited.signal))))
+}
+fn peer(inherited: &Inherited) -> Proc {
+    Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), Some(inherited.signal))))
+}
+fn fake_forge(inherited: &Inherited) -> Proc {
+    Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), Some(inherited.signal))))
+}
+fn host_programs(world: &mut skein_world::World<Proc, referee::Referee, Machine>) {
     world.host_roots(
         skein_world::HostedProgram {
             program: b"/opt/temper/bin/temper".as_slice().into(),
@@ -394,6 +628,30 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         skein_world::HostedProgram { program: b"/bin/sh".as_slice().into(), make: shell, instances: 1, operations: 1 },
         agent_root,
     );
+}
+fn run_phase(
+    settings: Settings,
+    scenario: Story,
+    phase: Phase,
+    mut disk: skein_fake_machine::Machine,
+    previous: Store,
+    run: Rc<RefCell<referee::Run>>,
+) -> (Outcome, skein_fake_machine::Machine, Store) {
+    stories::set(scenario);
+    PROGRESS.with(|progress| *progress.borrow_mut() = Progress::default());
+    let client = matches!(phase, Phase::Story | Phase::Drain).then(|| disk.reopen_root(2));
+    let store = Rc::new(RefCell::new(previous));
+    STORE.with(|cell| {
+        *cell.borrow_mut() = Some(store.clone());
+    });
+    let transport = stories::forge(scenario);
+    let observed_forge = Rc::new(RefCell::new(referee::forge::Forge::new(transport.clone(), scenario)));
+    forge::set(Some(transport.clone()));
+    let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
+        referee::Referee::new(controls, store.clone(), scenario, observed_forge.clone(), run.clone(), phase)
+    })
+    .with_machine(Machine(disk));
+    host_programs(&mut world);
     world.spawn_restartable(
         vec![
             skein_world::StartupRoot { name: b"state".as_slice().into(), path: b"state".as_slice().into() },
@@ -401,10 +659,32 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         ],
         service,
     );
-    world.spawn_root(skein_sim::Handle::new(client.raw()), |root| Proc::Client(Box::new(Person::new(root, scenario))));
-    world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
-    world.spawn(|| Proc::Forge(Box::new(forge::ForgeHost::new())));
-    let outcome = world.run();
+    match phase {
+        Phase::Fault { cut, before } => {
+            world.spawn_restartable(
+                vec![skein_world::StartupRoot {
+                    name: b"private".as_slice().into(),
+                    path: b"client".as_slice().into(),
+                }],
+                person,
+            );
+            world.spawn_restartable(vec![], peer);
+            world.spawn_restartable(vec![], fake_forge);
+            world.cut(0, before, cut);
+        }
+        Phase::Restart => {
+            world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
+            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), None))));
+        }
+        Phase::Story | Phase::Drain => {
+            world.spawn_root(skein_sim::Handle::new(client.expect("story client root").raw()), |root| {
+                Proc::Client(Box::new(SignalHost::new(Person::new(root, scenario), None)))
+            });
+            world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
+            world.spawn(|| Proc::Forge(Box::new(SignalHost::new(forge::ForgeHost::new(), None))));
+        }
+    }
+    let mut outcome = world.run();
     let signed_in = outcome
         .procs
         .iter()
@@ -419,11 +699,28 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         referee::terminals(&store.borrow())
     };
     let adopted = stories::adopted(&store.borrow().rows);
+    if matches!(phase, Phase::Fault { .. }) {
+        referee::require_replayed(&run.borrow(), &store.borrow());
+    }
     let pushed = std::mem::take(&mut observed_forge.borrow_mut().pushed);
     assert!(outcome.procs.iter().all(Host::is_empty), "all processes drain");
     forge::set(None);
     STORE.with(|cell| {
         *cell.borrow_mut() = None;
     });
-    Outcome { verdict: skein_world::domain::Verdict::Passed, signed_in, chats_answered, adopted, pushed }
+    let records = std::mem::take(&mut *store.borrow_mut());
+    let result = Outcome {
+        verdict: skein_world::domain::Verdict::Passed,
+        signed_in,
+        chats_answered,
+        adopted,
+        pushed,
+        drained: run.borrow().drained,
+        restarts: run.borrow().restarts,
+        claims_settled_at_restart: run.borrow().settled,
+        adoptions_answered: u32::try_from(run.borrow().answers.len()).expect("adoption answers"),
+        adoption_pending_at_restart: run.borrow().pending_adoption,
+    };
+    drop(run);
+    (result, std::mem::replace(&mut outcome.machine.0, machine::fresh()), records)
 }

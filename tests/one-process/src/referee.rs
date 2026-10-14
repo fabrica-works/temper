@@ -1,437 +1,11 @@
 //! Outside conformance over actual bytes and independently decoded durable records.
-pub(crate) mod durable {
-    //! Durability observations from real file completions, independent of the service.
-    use jig_domain_core as core;
-    use jig_protocol_store::{codec, keys, transcripts};
-    use skein_io::kernel::{Complete, Done, Fd, Op};
-    use skein_lib::Reader;
-    use std::collections::{BTreeMap, VecDeque};
-    use temper_engine_domain as root;
-
-    #[derive(Debug)]
-    pub struct Commit {
-        pub number: u64,
-        pub writes: Vec<root::Write>,
-    }
-    #[derive(Default)]
-    pub struct Store {
-        pub rows: BTreeMap<root::Key, root::Record>,
-        pub(crate) agent_records: Vec<super::agent::Record>,
-        pub pending: VecDeque<Commit>,
-        pub applied: u64,
-        pub recovered: std::collections::BTreeSet<u64>,
-        files: BTreeMap<Vec<u8>, Vec<u8>>,
-        lengths: BTreeMap<u64, u64>,
-    }
-    #[derive(Debug)]
-    pub enum Observed {
-        Bytes { path: Vec<u8>, at: usize, bytes: Vec<u8> },
-        Sync(Vec<u8>),
-        Recovered(Vec<u8>),
-        Pending(Vec<u8>),
-    }
-    #[derive(Default)]
-    pub struct Capture {
-        names: BTreeMap<i32, Vec<u8>>,
-        pub events: Vec<Observed>,
-    }
-    impl Capture {
-        pub fn root(&mut self, fd: Fd) {
-            self.names.insert(fd.raw(), Vec::new());
-        }
-        fn path(&self, fd: Fd) -> Option<&[u8]> {
-            self.names.get(&fd.raw()).map(Vec::as_slice)
-        }
-        pub fn complete(&mut self, complete: &Complete) {
-            match (&complete.kind, &complete.result) {
-                (Op::Open { root, path, .. }, Ok(Done::Fd(fd))) => {
-                    let Some(parent) = self.path(*root) else { return };
-                    let mut name = parent.to_vec();
-                    if !name.is_empty() {
-                        name.push(b'/');
-                    }
-                    if path.as_ref() != b"." {
-                        name.extend_from_slice(path);
-                    }
-                    self.names.insert(fd.raw(), name);
-                }
-                (Op::Write { fd, bytes, from, at }, Ok(Done::Count(count))) => {
-                    if let Some(path) = self.path(*fd) {
-                        let from = *from as usize;
-                        self.events.push(Observed::Bytes {
-                            path: path.to_vec(),
-                            at: usize::try_from(*at).expect("fixture file offset"),
-                            bytes: bytes[from..from + *count as usize].to_vec(),
-                        });
-                    }
-                }
-                (Op::Read { fd, buf, at }, Ok(Done::Count(count))) => {
-                    if let Some(path) = self.path(*fd).map(<[u8]>::to_vec) {
-                        self.events.push(Observed::Bytes {
-                            path: path.clone(),
-                            at: usize::try_from(*at).expect("fixture file offset"),
-                            bytes: buf[..*count as usize].to_vec(),
-                        });
-                        if path.starts_with(b"store/") {
-                            self.events.push(Observed::Recovered(path.clone()));
-                        }
-                    }
-                }
-                (Op::Sync { fd }, Ok(Done::Nothing)) => {
-                    if let Some(path) = self.path(*fd) {
-                        self.events.push(Observed::Sync(path.to_vec()));
-                    }
-                }
-                (Op::Close { fd }, _) => {
-                    self.names.remove(&fd.raw());
-                }
-                _ => {}
-            }
-        }
-        pub fn pending(&mut self, op: &Op) {
-            if let Op::Write { fd, bytes, from: 0, .. } = op
-                && self.path(*fd).is_some_and(|path| path.starts_with(b"store/"))
-            {
-                self.events.push(Observed::Pending(bytes.to_vec()));
-            }
-        }
-    }
-    impl Store {
-        #[must_use]
-        pub fn new() -> Self {
-            Self::default()
-        }
-        pub fn observe(
-            &mut self,
-            events: &mut Vec<Observed>,
-            limits: &codec::Limits,
-            connector: &temper_protocol_store::Bounds,
-        ) -> Vec<Commit> {
-            let mut committed = Vec::new();
-            for event in events.drain(..) {
-                match event {
-                    Observed::Bytes { path, at, bytes } => {
-                        let file = self.files.entry(path).or_default();
-                        file.resize(file.len().max(at + bytes.len()), 0);
-                        file[at..at + bytes.len()].copy_from_slice(&bytes);
-                    }
-                    Observed::Pending(bytes) => {
-                        self.pending = frames(&bytes, self.applied)
-                            .into_iter()
-                            .map(|(number, ops)| self.commit(number, ops, limits, connector))
-                            .collect();
-                    }
-                    Observed::Recovered(path) => {
-                        if let Some(bytes) = self.files.get(&path) {
-                            self.recovered.extend(frames(bytes, 0).into_iter().map(|(number, _)| number));
-                        }
-                        committed.extend(self.durable(&path, limits, connector));
-                    }
-                    Observed::Sync(path) if path.starts_with(b"store/") => {
-                        committed.extend(self.durable(&path, limits, connector));
-                    }
-                    Observed::Sync(_) => {}
-                }
-            }
-            committed
-        }
-        fn durable(
-            &mut self,
-            path: &[u8],
-            limits: &codec::Limits,
-            connector: &temper_protocol_store::Bounds,
-        ) -> Vec<Commit> {
-            let mut committed = Vec::new();
-            let Some(bytes) = self.files.get(path) else { return committed };
-            let frames = frames(bytes, self.applied);
-            for (number, ops) in frames {
-                if number <= self.applied {
-                    continue;
-                }
-                let commit = self.commit(number, ops, limits, connector);
-                for write in &commit.writes {
-                    match write {
-                        root::Write::Save(row) => {
-                            self.rows.insert(row.key(), row.clone());
-                            if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {
-                                let len = transcripts::frame::encode(turn, limits).expect("observed frame bounds").len()
-                                    as u64;
-                                *self.lengths.entry(turn.task).or_default() += len;
-                            }
-                        }
-                        root::Write::Erase(key) => {
-                            self.rows.remove(key);
-                        }
-                    }
-                }
-                self.applied = number;
-                self.pending.retain(|pending| pending.number > number);
-                committed.push(commit);
-            }
-            committed
-        }
-        fn commit(
-            &self,
-            number: u64,
-            ops: Box<[skein_kv::Op]>,
-            limits: &codec::Limits,
-            connector: &temper_protocol_store::Bounds,
-        ) -> Commit {
-            let mut writes = Vec::new();
-            for op in ops {
-                match op {
-                    skein_kv::Op::Put { key, value } => {
-                        if let Some(key) = keys::decode(&key) {
-                            let row = codec::decode(&key, &value, limits).expect("real stored row decodes");
-                            writes.push(root::Write::Save(root::Record::Core(row)));
-                        } else if let Some(keys::Own::Transcript { task }) = keys::decode_own(&key) {
-                            let place = codec::component::Transcript::decode(&value).expect("real transcript place");
-                            let name = format!("transcripts/{:016x}/{task:016x}", task >> 12).into_bytes();
-                            let bytes = self.files.get(&name).expect("transcript write precedes map commit");
-                            let mut at = usize::try_from(self.lengths.get(&task).copied().unwrap_or(0))
-                                .expect("fixture transcript offset");
-                            while at < usize::try_from(place.length).expect("fixture transcript length") {
-                                let len =
-                                    u32::from_be_bytes(bytes[at..at + 4].try_into().expect("frame length")) as usize;
-                                let turn = transcripts::frame::decode(&bytes[at..at + len], limits)
-                                    .expect("whole real transcript frame");
-                                writes.push(root::Write::Save(root::Record::Core(core::Record::Core(
-                                    core::CoreRecord::Turn(turn),
-                                ))));
-                                at += len;
-                            }
-                        } else if key.first() == Some(&keys::APPLICATION) {
-                            let row = temper_protocol_store::records::decode(&value, connector)
-                                .expect("real application row");
-                            writes.push(root::Write::Save(root::Record::Forge { row: Box::new(row) }));
-                        }
-                    }
-                    skein_kv::Op::Erase { key } => {
-                        if let Some(key) = keys::decode(&key) {
-                            writes.push(root::Write::Erase(root::Key::Core(key)));
-                        } else if key.first() == Some(&keys::APPLICATION) {
-                            let key = temper_protocol_store::keys::decode(&key[1..], connector.forge())
-                                .expect("real application key");
-                            writes.push(root::Write::Erase(root::Key::Forge(key)));
-                        }
-                    }
-                }
-            }
-            Commit { number, writes }
-        }
-    }
-    fn frames(bytes: &[u8], after: u64) -> Vec<(u64, Box<[skein_kv::Op]>)> {
-        let mut reader = Reader::new(bytes);
-        let mut frames = Vec::new();
-        while reader.remaining() >= 26 {
-            let start = bytes.len() - reader.remaining() as usize;
-            assert_eq!(reader.bytes(4), Some(b"SKVC".as_slice()), "real KV frame magic");
-            assert_eq!(reader.u16(), Some(1), "real KV frame version");
-            let number = reader.u64().expect("frame number");
-            let count = reader.u32().expect("frame writes");
-            let body = reader.u32().expect("frame body length");
-            if reader.remaining() < body + 4 {
-                break;
-            }
-            let end = (bytes.len() - reader.remaining() as usize) + body as usize;
-            let mut ops = Vec::new();
-            for _ in 0..count {
-                let kind = reader.u8().expect("write kind");
-                let len = reader.u32().expect("key length");
-                let key = reader.bytes(len).expect("key");
-                match kind {
-                    1 => {
-                        let len = reader.u32().expect("value length");
-                        let value = reader.bytes(len).expect("value");
-                        if number > after {
-                            ops.push(skein_kv::Op::Put { key: key.into(), value: value.into() });
-                        }
-                    }
-                    2 => {
-                        if number > after {
-                            ops.push(skein_kv::Op::Erase { key: key.into() });
-                        }
-                    }
-                    _ => panic!("real KV write kind"),
-                }
-            }
-            assert_eq!((bytes.len() - reader.remaining() as usize), end, "whole frame operations");
-            let expected = transcripts::frame::crc32c(&bytes[start..end]);
-            assert_eq!(reader.u32(), Some(expected), "real KV frame checksum");
-            if number > after {
-                frames.push((number, ops.into_boxed_slice()));
-            }
-        }
-        frames
-    }
-}
+pub(crate) mod durable;
 pub(crate) use durable::{Capture, Store};
+mod agent;
 pub(crate) mod client;
 pub(crate) mod forge;
-mod agent {
-    //! The worker's actual agent pipe bytes, decoded independently of its root.
-    use jig_conformance::referee::Observed;
-    use skein_io::kernel::{Complete, Done, Op};
-    use skein_lib::Reader;
-    use std::collections::BTreeMap;
-
-    pub(crate) enum Record {
-        Start { task: u64, attempt: u64, workspace: Option<smith_channel::Workspace> },
-        Answer { task: u64, attempt: u64, result: smith_channel::RunResult },
-    }
-    impl std::fmt::Debug for Record {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::Start { task, attempt, workspace } => f
-                    .debug_struct("Start")
-                    .field("task", task)
-                    .field("attempt", attempt)
-                    .field("workspace", workspace)
-                    .finish(),
-                Self::Answer { task, attempt, result } => f
-                    .debug_struct("Answer")
-                    .field("task", task)
-                    .field("attempt", attempt)
-                    .field("result", result)
-                    .finish(),
-            }
-        }
-    }
-
-    pub(crate) struct Wire {
-        pipes: BTreeMap<i32, (bool, i32, Vec<u8>)>,
-        limits: smith_channel::Limits,
-        store: std::rc::Rc<std::cell::RefCell<super::Store>>,
-        runs: BTreeMap<i32, (u64, u64)>,
-        pub events: Vec<Observed>,
-    }
-    impl Wire {
-        pub(crate) fn new(store: std::rc::Rc<std::cell::RefCell<super::Store>>) -> Self {
-            Self {
-                pipes: BTreeMap::new(),
-                limits: crate::fixtures::agent_limits().channel.bodies,
-                store,
-                runs: BTreeMap::new(),
-                events: Vec::new(),
-            }
-        }
-        pub fn complete(&mut self, complete: &Complete) {
-            match (&complete.kind, &complete.result) {
-                (Op::Spawn { spawn }, Ok(Done::Spawned { .. }))
-                    if spawn.program.as_ref() == b"/opt/temper/bin/temper" =>
-                {
-                    let identity = spawn
-                        .pipes
-                        .iter()
-                        .find(|pipe| pipe.child == 0)
-                        .expect("agent input pipe")
-                        .parent
-                        .expect("real agent input pipe")
-                        .raw();
-                    self.runs.remove(&identity);
-                    for pipe in spawn.pipes.iter().filter(|pipe| pipe.child < 2) {
-                        self.pipes.insert(
-                            pipe.parent.expect("real agent pipe").raw(),
-                            (pipe.child == 0, identity, Vec::new()),
-                        );
-                    }
-                }
-                (Op::Write { fd, bytes, from, .. } | Op::PipeWrite { fd, bytes, from }, Ok(Done::Count(count))) => {
-                    self.bytes(fd.raw(), &bytes[*from as usize..(*from + *count) as usize]);
-                }
-                (Op::Read { fd, buf, .. } | Op::PipeRead { fd, buf }, Ok(Done::Count(count))) => {
-                    self.bytes(fd.raw(), &buf[..*count as usize]);
-                }
-                (Op::Close { fd }, _) => {
-                    self.pipes.remove(&fd.raw());
-                }
-                _ => {}
-            }
-        }
-        fn bytes(&mut self, fd: i32, bytes: &[u8]) {
-            let Some((down, identity, buffer)) = self.pipes.get_mut(&fd) else { return };
-            buffer.extend_from_slice(bytes);
-            let mut frames = Vec::new();
-            while buffer.len() >= 8 {
-                let kind = u16::from_be_bytes(buffer[..2].try_into().expect("frame kind"));
-                assert_eq!(&buffer[2..4], &[0, 0], "agent frame flags");
-                let length = u32::from_be_bytes(buffer[4..8].try_into().expect("frame length")) as usize;
-                if buffer.len() < 8 + length {
-                    break;
-                }
-                frames.push((*down, *identity, kind, buffer[8..8 + length].to_vec()));
-                buffer.drain(..8 + length);
-            }
-            for (down, identity, kind, body) in frames {
-                self.frame(down, identity, kind, &body);
-            }
-        }
-        fn frame(&mut self, down: bool, identity_fd: i32, kind: u16, bytes: &[u8]) {
-            let limits = &self.limits;
-            if down && kind == 0x0100 {
-                let start = smith_channel::Start::decode(limits, &mut Reader::new(bytes)).expect("agent Start bytes");
-                let store = self.store.borrow();
-                let proof = store
-                    .rows
-                    .values()
-                    .find_map(|row| match row {
-                        temper_engine_domain::Record::Core(jig_domain_core::Record::Core(
-                            jig_domain_core::CoreRecord::RunProof(proof),
-                        )) if proof.attempt == start.activation()
-                            && Some(identity(proof.task, proof.conversation)) == *start.identity() =>
-                        {
-                            Some(proof)
-                        }
-                        temper_engine_domain::Record::Core(_) | temper_engine_domain::Record::Forge { .. } => None,
-                    })
-                    .expect("agent identity names a durable claim");
-                self.runs.insert(identity_fd, (proof.task, start.activation()));
-                let charter =
-                    smith_charter::Charter::decode(&smith_charter::CEILINGS, &mut Reader::new(start.charter()))
-                        .expect("agent charter bytes");
-                self.events.push(Observed::Assigned {
-                    task: proof.task,
-                    attempt: start.activation(),
-                    conversation: proof.conversation,
-                    resumed: !start.transcript().is_empty(),
-                    budget: charter.budget().spend(),
-                });
-                let task = proof.task;
-                drop(store);
-                self.store.borrow_mut().agent_records.push(Record::Start {
-                    task,
-                    attempt: start.activation(),
-                    workspace: start.workspace().clone(),
-                });
-            } else if !down && kind == 0x0109 {
-                let (task, attempt) = *self.runs.get(&identity_fd).expect("turn after agent Start");
-                let turn = smith_channel::Turn::decode(limits, &mut Reader::new(bytes)).expect("agent Turn bytes");
-                self.events.push(Observed::Completion { task, attempt, cumulative: turn.spent() });
-            } else if !down && kind == 0x0110 {
-                let answer =
-                    smith_channel::Answer::decode(limits, &mut Reader::new(bytes)).expect("agent Answer bytes");
-                if matches!(answer.result(), smith_channel::RunResult::Failed(_) | smith_channel::RunResult::Refused(_))
-                {
-                    let (task, attempt) = *self.runs.get(&identity_fd).expect("answer after agent Start");
-                    self.store.borrow_mut().agent_records.push(Record::Answer {
-                        task,
-                        attempt,
-                        result: answer.result().clone(),
-                    });
-                }
-            }
-            // The worker's agent ACK grants retention credit, not durable engine commitment.
-            // Commit prerequisites are checked on the client's actual released documents.
-        }
-    }
-
-    fn identity(task: u64, conversation: u64) -> [u8; 16] {
-        let bytes =
-            [crate::fixtures::seeds().deployment.as_slice(), &task.to_be_bytes(), &conversation.to_be_bytes()].concat();
-        let digest = skein_io::digest::digest(&bytes);
-        [digest.0[0].to_be_bytes(), digest.0[1].to_be_bytes()].concat().try_into().expect("sixteen identity bytes")
-    }
-}
+pub mod restart;
+pub mod secrets;
 use crate::world::Proc;
 pub(crate) use agent::Wire;
 use jig_conformance::referee as rules;
@@ -441,17 +15,41 @@ use skein_shell::Host;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
     rc::Rc,
 };
 use temper_engine_domain as root;
+#[derive(Default)]
+pub(crate) struct Run {
+    rules: Option<Rc<RefCell<rules::Referee>>>,
+    pub(crate) rows: BTreeMap<root::Key, root::Record>,
+    pub(crate) applied: u64,
+    pub(crate) restarts: u32,
+    pub(crate) drained: bool,
+    pub(crate) settled: u32,
+    pub(crate) answers: BTreeMap<[u8; 16], temper_client_domain::forge::Answer>,
+    applications: BTreeMap<[u8; 16], u32>,
+    pub(crate) pending_adoption: bool,
+    pub(crate) window: Option<(u32, u32)>,
+    window_start: Option<u32>,
+    saved: BTreeSet<[u8; 16]>,
+    pending_keys: BTreeSet<[u8; 16]>,
+}
 pub(crate) struct Referee {
     controls: skein_world::Controls,
     pub(crate) store: Rc<RefCell<Store>>,
-    rules: rules::Referee,
+    rules: Rc<RefCell<rules::Referee>>,
+    run: Rc<RefCell<Run>>,
+    phase: crate::world::Phase,
+    attached: Option<()>,
+    cold: Option<()>,
+    acknowledged: restart::Records,
+    uncertain: Option<restart::Records>,
     applied: u64,
     committed: Store,
     agent_seen: usize,
     client_seen: usize,
+    client_life: u32,
     party: Option<u64>,
     handed: bool,
     signed_in: bool,
@@ -467,6 +65,8 @@ impl Referee {
         store: Rc<RefCell<Store>>,
         scenario: crate::world::Story,
         forge: Rc<RefCell<forge::Forge>>,
+        run: Rc<RefCell<Run>>,
+        phase: crate::world::Phase,
     ) -> Self {
         let mut scope = rules::Scope {
             budget: 100,
@@ -476,7 +76,7 @@ impl Referee {
             ..rules::Scope::default()
         };
         let mut implications = BTreeSet::new();
-        if matches!(scenario, crate::world::Story::Adopt | crate::world::Story::Merge) {
+        if matches!(scenario, crate::world::Story::Adoption | crate::world::Story::Adopt | crate::world::Story::Merge) {
             scope.tools = 3;
             scope.depth = 3;
             scope.executors.insert((1, 2));
@@ -509,14 +109,26 @@ impl Referee {
             uncertainty_bound: 10_000_000_000,
             story_steps: 100_000,
         };
+        let rules = run.borrow().rules.clone().unwrap_or_else(|| Rc::new(RefCell::new(rules::Referee::new(policy))));
+        let applied = run.borrow().applied;
+        let mut committed = Store::new();
+        committed.rows = run.borrow().rows.clone();
+        run.borrow_mut().rules = Some(rules.clone());
         Self {
             controls,
             store,
-            rules: rules::Referee::new(policy),
-            applied: 0,
-            committed: Store::new(),
+            rules,
+            run,
+            phase,
+            attached: None,
+            cold: (applied > 0).then_some(()),
+            acknowledged: restart::forge(&committed.rows),
+            uncertain: None,
+            applied,
+            committed,
             agent_seen: 0,
             client_seen: 0,
+            client_life: 0,
             party: None,
             handed: false,
             signed_in: false,
@@ -528,7 +140,31 @@ impl Referee {
         }
     }
     fn say(&mut self, now: Time, event: rules::Observed) {
-        self.rules.observe(now.as_nanos(), event).expect("one-process conformance over bytes and durable rows");
+        self.rules
+            .borrow_mut()
+            .observe(now.as_nanos(), event)
+            .expect("one-process conformance over bytes and durable rows");
+    }
+    fn adoption_window(&mut self, service: &crate::world::ServiceHost) {
+        let saved = crate::world::saved_adoptions();
+        if !saved.is_empty() && self.run.borrow().window_start.is_none() {
+            self.run.borrow_mut().window_start = Some(service.submitted);
+        }
+        self.run.borrow_mut().saved = saved;
+        let start = self.run.borrow().window_start;
+        if let Some(start) = start
+            && self.run.borrow().window.is_none()
+            && self.store.borrow().rows.values().any(|row| matches!(row,
+                root::Record::Forge { row } if matches!(row.as_ref(), temper_engine_domain_forge::Stored::Application { .. })
+            ))
+        {
+            self.run.borrow_mut().window = Some((start, service.before_iteration));
+        }
+    }
+    pub(crate) fn check_roots(service: &crate::world::ServiceHost) {
+        let mut text = String::new();
+        write!(&mut text, "{:?}", secrets::Roots(&service.service)).expect("root formatting");
+        secrets::require_formatted(&text, "root");
     }
 }
 pub(crate) fn terminals(store: &Store) -> u32 {
@@ -580,14 +216,43 @@ fn snapshot(store: &Store) -> rules::Snapshot {
     snapshot
 }
 impl skein_world::Referee<Proc> for Referee {
-    fn act(&mut self, _now: Time, procs: &mut [Proc]) {
+    fn act(&mut self, now: Time, procs: &mut [Proc]) {
         let (service, other) = procs.split_at_mut(1);
         let Proc::Service(service) = &mut service[0] else { panic!("service first") };
+        if !service.attached {
+            service.attached = true;
+            if self.attached.is_some() || self.cold.is_some() {
+                let pending_keys = {
+                    let run = self.run.borrow();
+                    run.saved.iter().filter(|key| !run.answers.contains_key(*key)).copied().collect::<BTreeSet<_>>()
+                };
+                self.run.borrow_mut().pending_adoption = !pending_keys.is_empty();
+                self.run.borrow_mut().pending_keys = pending_keys;
+                self.acknowledged = restart::forge(&self.committed.rows);
+                self.uncertain = self
+                    .store
+                    .borrow()
+                    .pending
+                    .front()
+                    .map(|pending| restart::next(&self.committed.rows, &pending.writes));
+                self.say(now, rules::Observed::Restart);
+                self.store.borrow_mut().recovering();
+                self.cold = Some(());
+                self.handed = false;
+                self.agent_seen = 0;
+                self.run.borrow_mut().restarts += 1;
+            } else if let crate::world::Phase::Fault { before, .. } = self.phase {
+                service.cut_before = Some(before);
+            }
+            self.attached = Some(());
+        }
         if !self.handed
             && let Some(link) = service.service.links().pop()
         {
             for proc in other.iter_mut() {
-                if let Proc::Client(person) = proc {
+                if let Proc::Client(person) = proc
+                    && person.signed_in == 0
+                {
                     person.sign_in(&link);
                 }
             }
@@ -600,12 +265,32 @@ impl skein_world::Referee<Proc> for Referee {
         if crate::stories::adopted(&self.store.borrow().rows) > 0 {
             self.forge.borrow_mut().adopted();
         }
-        let complete = match self.story {
-            crate::world::Story::Chat { .. } => terminals(&self.store.borrow()) > 0,
-            crate::world::Story::ChatReadThenWait { .. } => chat_waited(&self.store.borrow()),
-            crate::world::Story::Adopt | crate::world::Story::Merge => self.forge.borrow().complete(),
+        let complete = match self.phase {
+            crate::world::Phase::Drain => {
+                snapshot(&self.store.borrow()).receipts.contains(&rules::Receipt::Turn(1, 1, 1))
+            }
+            crate::world::Phase::Restart => settled(&self.store.borrow()) > 0 && self.cold.is_none(),
+            crate::world::Phase::Fault { .. } => {
+                self.run.borrow().restarts > 0
+                    && self.cold.is_none()
+                    && crate::stories::adopted(&self.store.borrow().rows) > 0
+            }
+            crate::world::Phase::Story => match self.story {
+                crate::world::Story::Chat { .. } => terminals(&self.store.borrow()) > 0,
+                crate::world::Story::ChatReadThenWait { .. } => chat_waited(&self.store.borrow()),
+                crate::world::Story::Adoption => crate::stories::adopted(&self.store.borrow().rows) > 0,
+                crate::world::Story::Adopt | crate::world::Story::Merge => self.forge.borrow().complete(),
+            },
         };
-        if self.done.is_none() && done && complete {
+        if self.done.is_none()
+            && (done || matches!(self.phase, crate::world::Phase::Drain | crate::world::Phase::Restart))
+            && complete
+        {
+            for proc in other.iter_mut() {
+                if let Proc::Client(person) = proc {
+                    person.finish();
+                }
+            }
             self.controls.signal(0, skein_io::kernel::ServiceSignal::Terminate);
             self.done = Some(());
         }
@@ -622,6 +307,7 @@ impl skein_world::Referee<Proc> for Referee {
     fn observe(&mut self, now: Time, procs: &[Proc]) {
         self.forge.borrow_mut().observe(procs);
         let Proc::Service(service) = &procs[0] else { panic!("service first") };
+        self.adoption_window(service);
         let store = self.store.borrow();
         for commit in &service.commits {
             if commit.number <= self.applied {
@@ -638,21 +324,59 @@ impl skein_world::Referee<Proc> for Referee {
                 }
             }
             self.rules
+                .borrow_mut()
                 .observe(
                     now.as_nanos(),
                     rules::Observed::Durable { number: commit.number, snapshot: snapshot(&self.committed) },
                 )
                 .expect("durable conformance");
             self.applied = commit.number;
+            self.run.borrow_mut().applied = self.applied;
+            self.run.borrow_mut().rows.clone_from(&self.committed.rows);
         }
         drop(store);
+        let restored = self.store.borrow_mut().restored.take();
+        if self.cold.is_some()
+            && let Some(rows) = restored
+        {
+            restart::check(&self.acknowledged, self.uncertain.as_ref(), &restart::forge(&rows))
+                .expect("restart recovered a whole forge commit");
+            let mut recovered = Store::new();
+            recovered.rows = rows;
+            let receipts = snapshot(&recovered).receipts;
+            self.say(now, rules::Observed::ColdStore { receipts });
+            self.cold = None;
+        }
+        self.run.borrow_mut().settled = settled(&self.store.borrow());
         for event in &service.wire.events[self.agent_seen..] {
             self.say(now, event.clone());
         }
         self.agent_seen = service.wire.events.len();
         for proc in procs {
             if let Proc::Client(person) = proc {
+                if person.life != self.client_life {
+                    self.client_life = person.life;
+                    self.client_seen = 0;
+                }
                 for event in &person.wire.received[self.client_seen..] {
+                    match event {
+                        client::Received::ApplicationSent { key } => {
+                            *self.run.borrow_mut().applications.entry(*key).or_default() += 1;
+                        }
+                        client::Received::Application { key, answer } => {
+                            assert!(
+                                matches!(answer, temper_client_domain::forge::Answer::Adopted(_)),
+                                "adoption succeeded"
+                            );
+                            if let Some(old) = self.run.borrow_mut().answers.insert(*key, answer.clone()) {
+                                assert_eq!(&old, answer, "one outcome per adoption key");
+                            }
+                        }
+                        client::Received::SignedIn(_)
+                        | client::Received::Answer { .. }
+                        | client::Received::Delivery(_)
+                        | client::Received::Read(_) => {}
+                    }
                     if let client::Received::SignedIn(party) = event {
                         self.party = Some(*party);
                         self.signed_in = true;
@@ -667,9 +391,14 @@ impl skein_world::Referee<Proc> for Referee {
             }
         }
         if self.done.is_some() && self.drained.is_none() && service.is_empty() {
+            Self::check_roots(service);
             assert!(self.store.borrow().pending.is_empty(), "drain settles commits");
             self.say(now, rules::Observed::Drained { at: self.applied });
             self.drained = Some(());
+            self.run.borrow_mut().drained = true;
+        }
+        if self.cold.is_none() {
+            self.run.borrow_mut().settled = settled(&self.store.borrow());
         }
         self.say(now, rules::Observed::Tick);
     }
@@ -704,9 +433,52 @@ impl skein_world::Referee<Proc> for Referee {
     }
     fn passed(&self) -> bool {
         self.done.is_some()
-            && self.signed_in
-            && (self.released || matches!(self.story, crate::world::Story::Adopt | crate::world::Story::Merge))
+            && (matches!(self.phase, crate::world::Phase::Restart)
+                || self.signed_in
+                    && (self.released
+                        || !matches!(self.phase, crate::world::Phase::Story)
+                        || matches!(
+                            self.story,
+                            crate::world::Story::Adoption | crate::world::Story::Adopt | crate::world::Story::Merge
+                        )))
     }
+}
+pub(crate) fn require_replayed(run: &Run, store: &Store) {
+    assert_eq!(
+        run.answers.keys().copied().collect::<BTreeSet<_>>(),
+        run.pending_keys,
+        "original pending keys answered"
+    );
+    assert_eq!(run.answers.len(), 1, "original adoption answered once");
+    assert_eq!(
+        store
+            .rows
+            .values()
+            .filter(|row| matches!(row,
+                root::Record::Forge { row } if matches!(row.as_ref(),
+                    temper_engine_domain_forge::Stored::Application {
+                        outcome: temper_engine_domain_forge::ApplicationOutcome::Adopted(_), ..
+                    })
+            ))
+            .count(),
+        1,
+        "one durable adoption outcome"
+    );
+}
+fn settled(store: &Store) -> u32 {
+    u32::try_from(
+        store
+            .rows
+            .values()
+            .filter(|row| {
+                matches!(row,
+                    root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal)))
+                        if matches!(terminal.end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Lost))
+                )
+            })
+            .count(),
+    )
+    .expect("settled claims")
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "the conformance receipts select committed client documents")]
 fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) -> Vec<rules::Receipt> {
@@ -749,6 +521,11 @@ fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) 
                 }
             })
             .collect(),
-        client::Received::Delivery(_) | client::Received::Read(_) => Vec::new(),
+        client::Received::Application { key, .. } => {
+            vec![rules::Receipt::Party(party.expect("signed-in adoption"), *key)]
+        }
+        client::Received::ApplicationSent { .. } | client::Received::Delivery(_) | client::Received::Read(_) => {
+            Vec::new()
+        }
     }
 }

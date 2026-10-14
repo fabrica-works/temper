@@ -2,6 +2,6 @@
 pub mod fixtures;
 mod forge;
 mod machine;
-mod referee;
+pub mod referee;
 mod stories;
 pub mod world;

@@ -4,9 +4,70 @@ use jig_channel_world::fixtures as channel;
 use skein_lib::{Duration, List, Secret};
 pub const SEED: u64 = 7;
 pub const ANSWER: &[u8] = b"World answer";
+pub const LLM_TOKEN: &[u8] = channel::TOKEN;
+pub const GIT_TOKEN: &[u8] = temper_fake_git::fixtures::TOKEN;
+pub const API_TOKEN: &[u8] = temper_fake_git::fixtures::TOKEN;
+#[must_use]
+pub fn two_forge_records() -> Vec<temper_engine_domain_forge::Stored> {
+    [1, 2]
+        .into_iter()
+        .map(|task| temper_engine_domain_forge::Stored::Names { task, resources: Box::default() })
+        .collect()
+}
 pub const BRANCH_HEAD: u64 = 2;
 pub const MOVED_BASE: u64 = 3;
 pub(crate) const MERGE_BRANCH: &[u8] = b"temper/1/c2";
+pub(crate) const PROJECT: u32 = 1;
+pub(crate) const FORGE_CONNECTOR: u16 = 1;
+pub(crate) const GRANT_KINDS: [u16; 2] = [3, 11];
+pub(crate) const PROCEDURE_CODE: u16 = 2;
+pub(crate) const AGENT_KIND: u16 = 1;
+pub(crate) const CHARTER_NUMBER: u16 = 1;
+pub(crate) const REPOSITORY: u32 = 2;
+pub(crate) const PARAMETER_NAMES: [u16; 3] = [1, 2, 3];
+pub(crate) const CHANGE_KIND: u16 = 1;
+pub(crate) const CHANGE_WORDS: u32 = 64;
+pub(crate) const PRODUCER_TOOLS: u64 = 3;
+pub(crate) const PRODUCER_TASKS: u32 = 2;
+pub(crate) const PRODUCER_DEPTH: u32 = 1;
+pub(crate) const PRODUCER_SPEND: u64 = 40;
+pub(crate) const PRODUCER_NOTES: u32 = 0;
+pub(crate) const CALL_TOKENS: u64 = 1;
+pub(crate) const PERSON_WAIT: Duration = Duration::from_secs(5);
+pub(crate) const CHAT_WAIT_MS: u32 = 1000;
+pub(crate) const GOAL_BUDGET: &[u8] = b"100";
+pub(crate) const FORGE_STATUSES: u32 = 8;
+pub(crate) const CI_SILENT: u32 = 0;
+pub(crate) const CI_PASSES: u32 = 1000;
+pub(crate) const CI_RERUNS: u32 = 0;
+pub(crate) const WORKER_USER: u64 = 1;
+pub(crate) const MOVING_USER: u64 = 2;
+pub(crate) const AUTHORITY_DEPTH: u32 = 3;
+pub(crate) const CHARTER_TURNS: u32 = 8;
+pub(crate) const IMPLICATIONS: [u16; 2] = [1, 2];
+pub(crate) const ENGINE_OVERRIDES: [(&str, u32); 18] = [
+    ("tasks.tasks", 4),
+    ("tasks.project_tasks", 4),
+    ("tasks.tree_tasks", 4),
+    ("people.people", 4),
+    ("people.inbox_tasks", 8),
+    ("fleet.attempts", 4),
+    ("fleet.turns", 16),
+    ("brief.sections", 8),
+    ("brief.brief_bytes", 4096),
+    ("tasks.result_bytes", 128),
+    ("tasks.parameters", 4),
+    ("tasks.executor_kinds", 2),
+    ("tasks.authority_grants", 4),
+    ("tasks.authority_segments", 4),
+    ("tasks.authority_bytes", 128),
+    ("core.policy_bytes", 4096),
+    ("authority.segments", 8),
+    ("core.call_answer_bytes", 2048),
+];
+pub(crate) const ADOPTION_FORM_START: usize = 3;
+pub(crate) const ADOPTION_FORM_STEPS: usize = 7;
+pub(crate) const ADOPTION_REPLY_STEP: usize = 7;
 pub(crate) const PREPARED_REPOSITORY: &[u8] = b"workspaces/0/app";
 pub(crate) const AGENTS: u32 = 2;
 #[must_use]

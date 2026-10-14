@@ -16,7 +16,7 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     let mut steps = vec![
         Step::Go {
             address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
-                project: 1,
+                project: fixtures::PROJECT,
                 section: jig_domain_client::address::ProjectSection::Overview,
             }),
         },
@@ -31,14 +31,14 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
         see(Find::text(b"Adopted acme/app on forge 1 as owned.")),
         Step::Go {
             address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
-                project: 1,
+                project: fixtures::PROJECT,
                 section: jig_domain_client::address::ProjectSection::Goals,
             }),
         },
         see(Find::named(Role::TextArea, b"Goal specification")),
         ty(Role::TextArea, b"Goal specification", b"@plan Fix the adopted repository"),
         press(Role::Button, b"Charter 1"),
-        ty(Role::TextField, b"Goal budget", b"100"),
+        ty(Role::TextField, b"Goal budget", fixtures::GOAL_BUDGET),
         press(Role::Button, b"Set goal"),
         see(Find::named(Role::Button, b"Confirm")),
         press(Role::Button, b"Confirm"),
@@ -46,8 +46,17 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     steps.push(see(Find::text(b"@plan Fix the adopted repository")));
     steps
 }
+pub(crate) fn adoption_person() -> Vec<Step<temper_client_domain::Address>> {
+    let mut steps = vec![Step::Go {
+        address: temper_client_domain::Address::Forge(temper_client_domain::forge::Address::Adopt {
+            project: fixtures::PROJECT,
+        }),
+    }];
+    steps.extend(person().into_iter().skip(fixtures::ADOPTION_FORM_START).take(fixtures::ADOPTION_FORM_STEPS));
+    steps
+}
 fn see(find: Find) -> Step<temper_client_domain::Address> {
-    Step::See { find, within: Duration::from_secs(5) }
+    Step::See { find, within: fixtures::PERSON_WAIT }
 }
 fn press(role: Role, name: &[u8]) -> Step<temper_client_domain::Address> {
     Step::Press { find: Find::named(role, name) }
@@ -59,29 +68,31 @@ fn call(name: &[u8], arguments: &[u8]) -> Turn {
     Turn {
         lines: Box::new([Line::Call { name: name.into(), arguments: arguments.into() }]),
         finish: Finish::ToolCalls,
-        tokens: 1,
+        tokens: fixtures::CALL_TOKENS,
     }
 }
 pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
+    if matches!(story, Story::Adoption) {
+        return fixtures::provider();
+    }
     if matches!(story, Story::ChatReadThenWait { .. }) {
         return fixtures::read_then_wait_provider();
     }
     if matches!(story, Story::Chat { .. }) {
         return fixtures::provider();
     }
-    let grant = |kind| serde_json::json!({"connector":1,"kind":kind,"segments":["forge","127.0.0.1:3000"],"terminal":"open","last":"acme"});
-    let delegate = serde_json::to_vec(&serde_json::json!({"batch":[{
-        "executor":{"kind":"procedure","connector":1,"code":2},
-        "spec":{"words":"@edit Fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":2},{"name":2,"kind":"bytes","value":"main"}]},
-        "contract":{"kind":"change","connector":1,"change_kind":1,"words":64},
-        "authority":{"tools":3,"grants":[grant(3),grant(11)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":2,"depth":1},"budget":{"spend":40},"notes":0}
-    }]})).expect("delegate JSON");
-    let mut delegate: serde_json::Value = serde_json::from_slice(&delegate).expect("delegate");
+    let grant = |kind| serde_json::json!({"connector":fixtures::FORGE_CONNECTOR,"kind":kind,"segments":["forge","127.0.0.1:3000"],"terminal":"open","last":"acme"});
+    let mut delegate = serde_json::json!({"batch":[{
+        "executor":{"kind":"procedure","connector":fixtures::FORGE_CONNECTOR,"code":fixtures::PROCEDURE_CODE},
+        "spec":{"words":"@edit Fix","parameters":[{"name":fixtures::PARAMETER_NAMES[0],"kind":"resource","connector":fixtures::FORGE_CONNECTOR,"resource":fixtures::REPOSITORY},{"name":fixtures::PARAMETER_NAMES[1],"kind":"bytes","value":"main"}]},
+        "contract":{"kind":"change","connector":fixtures::FORGE_CONNECTOR,"change_kind":fixtures::CHANGE_KIND,"words":fixtures::CHANGE_WORDS},
+        "authority":{"tools":fixtures::PRODUCER_TOOLS,"grants":fixtures::GRANT_KINDS.map(grant),"delegation":{"kinds":[{"kind":"agent","number":fixtures::AGENT_KIND}],"tasks":fixtures::PRODUCER_TASKS,"depth":fixtures::PRODUCER_DEPTH},"budget":{"spend":fixtures::PRODUCER_SPEND},"notes":fixtures::PRODUCER_NOTES}
+    }]});
     if matches!(story, Story::Merge) {
         delegate["batch"][0]["spec"]["parameters"]
             .as_array_mut()
             .expect("parameters")
-            .push(serde_json::json!({"name":3,"kind":"bytes","value":std::str::from_utf8(fixtures::MERGE_BRANCH).expect("fixture branch")}));
+            .push(serde_json::json!({"name":fixtures::PARAMETER_NAMES[2],"kind":"bytes","value":std::str::from_utf8(fixtures::MERGE_BRANCH).expect("fixture branch")}));
     }
     let delegate = serde_json::to_vec(&delegate).expect("delegate JSON");
     let finish = call(
@@ -114,7 +125,10 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
 }
 pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
     let config = temper_fake_forge_domain::Config {
-        limits: temper_fake_forge_domain::Limits { statuses: 8, ..temper_fake_git::fixtures::CONFIG.limits },
+        limits: temper_fake_forge_domain::Limits {
+            statuses: fixtures::FORGE_STATUSES,
+            ..temper_fake_git::fixtures::CONFIG.limits
+        },
         ..temper_fake_git::fixtures::CONFIG
     };
     let mut domain = temper_fake_forge_domain::Domain::new(&config, fixtures::SEED);
@@ -122,7 +136,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
         &mut domain,
         &config,
         temper_fake_forge_domain::api::Setup {
-            id: 2,
+            id: fixtures::REPOSITORY,
             name: b"acme/app".as_slice().into(),
             default: b"main".as_slice().into(),
             tree: Box::new([temper_fake_forge_domain::api::File {
@@ -134,16 +148,21 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
                 contexts: Box::new([b"check".as_slice().into()]),
                 latency_min: Duration::ZERO,
                 latency_max: Duration::ZERO,
-                silent: 0,
-                passes: 1000,
-                reruns: 0,
+                silent: fixtures::CI_SILENT,
+                passes: fixtures::CI_PASSES,
+                reruns: fixtures::CI_RERUNS,
                 cue: None,
             },
             protection: None,
             hooked: false,
         },
     );
-    temper_fake_forge_domain::grant(&mut domain, b"acme/app", 1, temper_fake_forge_domain::api::Permission::Write);
+    temper_fake_forge_domain::grant(
+        &mut domain,
+        b"acme/app",
+        fixtures::WORKER_USER,
+        temper_fake_forge_domain::api::Permission::Write,
+    );
     let forge = std::rc::Rc::new(std::cell::RefCell::new(temper_fake_git::Forge::new(domain, config)));
     let mut transport = temper_fake_git::Transport::new(forge, &temper_fake_git::fixtures::table(b"acme/app", None));
     let identity = temper_fake_git::fixtures::identity();
@@ -167,7 +186,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
             b"main",
             b"conflict.txt",
             b"moved\n",
-            2,
+            fixtures::MOVING_USER,
         )
         .expect("another party moves the base");
         assert_eq!(moved, fixtures::MOVED_BASE, "counted moved base");
@@ -185,7 +204,7 @@ pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
         &env,
         temper_fake_forge_domain::Event::Call {
             reply_to: skein_lib::ReplyTo::new(token),
-            user: 1,
+            user: fixtures::WORKER_USER,
             repository: b"acme/app".as_slice().into(),
             op: temper_fake_forge_domain::api::Op::Git(temper_fake_forge_domain::api::Git::Create {
                 branch: fixtures::MERGE_BRANCH.into(),
@@ -234,7 +253,7 @@ pub(crate) fn adopted(rows: &BTreeMap<root::Key, root::Record>) -> u32 {
 }
 pub(crate) fn configure(value: &mut serde_json::Value) {
     if STORY.with(|slot| matches!(slot.get(), Story::ChatReadThenWait { .. })) {
-        value["engine"]["charters"][0]["waiting_ms"] = 1000.into();
+        value["engine"]["charters"][0]["waiting_ms"] = fixtures::CHAT_WAIT_MS.into();
         return;
     }
     if STORY.with(|slot| matches!(slot.get(), Story::Chat { .. })) {
@@ -242,54 +261,35 @@ pub(crate) fn configure(value: &mut serde_json::Value) {
     }
     value["workers"][0]["slots"] = fixtures::AGENTS.into();
     value["workers"][0]["limits"]["overrides"]["hub.slots"] = fixtures::AGENTS.into();
-    let grants: Vec<_> = [3, 11]
+    let grants: Vec<_> = fixtures::GRANT_KINDS
         .into_iter()
         .map(|kind| {
             serde_json::json!({
-                "connector":1,"kind":kind,"pattern":{"segments":["forge","127.0.0.1:3000"],"last":"open","value":"acme"}
+                "connector":fixtures::FORGE_CONNECTOR,"kind":kind,"pattern":{"segments":["forge","127.0.0.1:3000"],"last":"open","value":"acme"}
             })
         })
         .collect();
-    let kinds = serde_json::json!([{"kind":"charter","number":1},{"kind":"procedure","number":2}]);
+    let kinds = serde_json::json!([{"kind":"charter","number":fixtures::CHARTER_NUMBER},{"kind":"procedure","number":fixtures::PROCEDURE_CODE}]);
     let mut ceiling = value["engine"]["rules"]["ceiling"].clone();
-    ceiling["tools"] = 3.into();
+    ceiling["tools"] = fixtures::PRODUCER_TOOLS.into();
     ceiling["grants"] = grants.into();
     ceiling["delegation"]["kinds"] = kinds;
-    ceiling["delegation"]["depth"] = 3.into();
+    ceiling["delegation"]["depth"] = fixtures::AUTHORITY_DEPTH.into();
     value["engine"]["rules"]["ceiling"] = ceiling.clone();
-    value["engine"]["rules"]["implies"] = [1, 2]
+    value["engine"]["rules"]["implies"] = fixtures::IMPLICATIONS
         .into_iter()
-        .map(|implies| serde_json::json!({"connector":1,"kind":3,"implies":implies}))
+        .map(|implies| serde_json::json!({"connector":fixtures::FORGE_CONNECTOR,"kind":fixtures::GRANT_KINDS[0],"implies":implies}))
         .collect::<Vec<_>>()
         .into();
-    value["engine"]["rules"]["maximum_run_spend"] = 40.into();
+    value["engine"]["rules"]["maximum_run_spend"] = fixtures::PRODUCER_SPEND.into();
     value["engine"]["projects"][0]["policy"]["ceiling"] = ceiling.clone();
     value["engine"]["projects"][0]["policy"]["roles"][0]["authority"] = ceiling;
     for name in ["inspect", "modify", "shell"] {
         value["engine"]["charters"][0][name] = true.into();
     }
-    value["engine"]["charters"][0]["turns"] = 8.into();
-    value["engine"]["charters"][0]["spend"] = 40.into();
-    for (name, count) in [
-        ("tasks.tasks", 4),
-        ("tasks.project_tasks", 4),
-        ("tasks.tree_tasks", 4),
-        ("people.people", 4),
-        ("people.inbox_tasks", 8),
-        ("fleet.attempts", 4),
-        ("fleet.turns", 16),
-        ("brief.sections", 8),
-        ("brief.brief_bytes", 4096),
-        ("tasks.result_bytes", 128),
-        ("tasks.parameters", 4),
-        ("tasks.executor_kinds", 2),
-        ("tasks.authority_grants", 4),
-        ("tasks.authority_segments", 4),
-        ("tasks.authority_bytes", 128),
-        ("core.policy_bytes", 4096),
-        ("authority.segments", 8),
-        ("core.call_answer_bytes", 2048),
-    ] {
+    value["engine"]["charters"][0]["turns"] = fixtures::CHARTER_TURNS.into();
+    value["engine"]["charters"][0]["spend"] = fixtures::PRODUCER_SPEND.into();
+    for (name, count) in fixtures::ENGINE_OVERRIDES {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
     let overrides = value["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides");
