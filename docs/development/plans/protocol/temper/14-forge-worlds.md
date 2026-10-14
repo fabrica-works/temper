@@ -192,7 +192,9 @@ facts as the component sees them.
   tally, the faults' generator) and a `Server` per connection (skein-http's
   server, a tokenizer for a write's body with 06's `BodyDecoder`), free
   functions `start`, `up`, `down`, `resume`, `close`, `closed`. One
-  request is one domain call, but `/user`, `/settings/api` and
+  request is one domain call (a write whose Forgejo answer is a
+  document: its write, then one read of that document; ruling 137),
+  but `/user`, `/settings/api` and
   `/users/search`, which its tables answer. The scenario gives each
   repository's protected branch (`Setup.protection` names it, and
   nothing changes it at run time), so `/branches/{b}` needs one call.
@@ -436,7 +438,10 @@ request is read; then, after the domain made the call, `drop` or
 `server_error`); `/user`, `/settings/api` and `/users/search` answered
 from the tables; each other route as one domain `Call` by the token's
 user on the repository's full name (by id from `Config.repositories`,
-or by path), its reply encoded by 06's `server::encode` with Forgejo's
+or by path); a write whose Forgejo answer is a document, its write
+`Call`, then one read `Call` of that document, answered with what the
+read returns, the fault drawn after the write (ruling 137); its reply
+encoded by 06's `server::encode` with Forgejo's
 statuses (the table below); Forgejo's quirks: the default order
 (`sort` other than `leastupdate`: `Order::NewestCreated`), the lookup
 `pulls/{base}/{head}` by `FirstPull` (the oldest, open or not), the

@@ -789,6 +789,24 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `crates/temper/src/lib.rs` are in 10.4's Files, counted in its Size;
      the check is 10.4's Proof, the real binary starting.
 
+137. **A fake forge write that Forgejo answers with a document reads it
+     back through a call** (temper 14.3b, blocked 2026-10-14T13:21:42Z;
+     plan defect). 14.3 makes "each other route ... one domain `Call`",
+     "its reply encoded by 06's `server::encode`", and its Don't forbids
+     answering "from the domain's store but through a call". The fake
+     forge domain answers writes with ids (`Created(number)`,
+     `Commented(id)`, `Reviewed(id)`, `Done`;
+     `testing/temper-fake-forge-domain/src/api.rs:428-442`), while
+     Forgejo answers them with documents the component reads
+     (`Review.commit_id`, an issue's user, times, title and body, a
+     pull's `head.sha`, `base.sha` and `merge_base`;
+     `temper-engine-protocol-forge/src/writes.rs:588`). So such a write
+     makes its one write `Call`, then one read `Call` of the document
+     Forgejo returns, and answers with what the read returns: nothing
+     made up, the write made once, the HTTP request counted once in the
+     tally, and a fault drawn after the write as before. The fake
+     domain's boundary types are unchanged. Session 14 says so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
