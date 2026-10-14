@@ -853,13 +853,38 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      domain/engine.md, 13: documents' limits "take jig's small profile's
      values until temper's configuration names its own". So the root's
      `Limits` gains `documents: jig_domain_core::documents::DocumentLimits`,
-     `core_limits` uses it, the service's and the worker's builders copy
-     the configured `jig.core.documents`, `DOCUMENTS` goes, and every
+     `core_limits` uses it, the service's engine builder (`limits::engine`,
+     which one process uses too) copies the configured
+     `jig.core.documents` (corrected at 2026-10-14T14:55:30Z: the worker's
+     `root_limits` builds `temper_worker_domain::Limits`, which holds no
+     documents), `DOCUMENTS` goes, and every
      other constructor passes jig small's values, unchanged; one test
      shows configured rows reaching the core. Its users are edited by
      ruling 123. Whether the shipped configuration's default (profile
      `small`, no overrides: rows 4) must change, since the native client
      takes 2, is the designer's, in the run's `question.md` of this time.
+     The designer answered at 2026-10-14T14:55:21Z, landed in `b5dd62bc`:
+     the configuration moves, for texts as well as rows (the client's
+     wire bounds a document's texts by its `text`, 128): `engine.limits`
+     overrides `documents.rows` 2 and `documents.text_bytes` 128, and
+     12.2's `the_process_configurations_documents_fit_the_native_client`
+     holds the process tier's configuration to the native client's
+     limits; no start check (configuration.md, 7; sessions 12 and 17).
+
+141. **The fake forge can hold an unborn repository** (temper 17.1b,
+     blocked 2026-10-14T14:55:30Z; plan defect). 17.1 answers "each
+     transcript's case ... over the equivalent fixture"; 05.4's
+     `clone-empty` transcript comes from an empty repository
+     (`tools/git-transcripts/src/cases.rs:44`, `Init::Empty`), while the
+     fake forge domain's `repository()` always stores a first commit and
+     its default branch (`testing/temper-fake-forge-domain/src/scenario.rs:43-46`)
+     and `Setup` has no unborn state (`api.rs:734-743`). So the fake
+     forge domain gains one scenario helper for an unborn repository (no
+     commit, no branch), beside `repository()`, `Setup`'s shared fields
+     unchanged; its clone reports no heads. At most 30 lines in
+     `scenario.rs` and its users, outside 17.1's Files, named in the
+     commit body and counted in 17.1's Size; every existing test's name
+     and expected value kept. clone-empty stays in 17.1's proof.
 
 ## For the user
 
