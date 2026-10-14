@@ -46,6 +46,7 @@
 
 extern crate alloc;
 
+mod actions;
 pub mod api;
 mod boundary;
 mod ci;

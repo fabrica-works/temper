@@ -27,7 +27,7 @@ fn chat_script() -> Script {
 
 fn repair_script() -> Script {
     Script {
-        cue: b"Repair the failed check".as_slice().into(),
+        cue: b"Repair the failed CI".as_slice().into(),
         turns: Box::new([
             Turn {
                 lines: Box::new([Line::Call {

@@ -506,7 +506,7 @@ fn raw_parts(write: &raw::Write) -> (u16, Vec<r::Name>, Option<u64>, u64) {
             name.path.extend([b"branch".to_vec(), b"main".to_vec()]);
             (4, Some(observations::value(&translate::commit(*head))), *number)
         }
-        raw::Write::OpenPull { title, body, head, base } => {
+        raw::Write::OpenPull { title, body, head, base, opens_empty: _ } => {
             (3, None, observations::value(format!("{title:?}:{body:?}:{head:?}:{base:?}").as_bytes()))
         }
         raw::Write::DeleteBranch { branch } => {

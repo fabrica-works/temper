@@ -168,6 +168,7 @@ impl World {
         // Historical items are created independently, before keeping starts.
         for number in 0..settings.history {
             let read = raw::Read::Items {
+                order: raw::Order::LeastUpdated,
                 state: None,
                 kind: None,
                 labels: Box::new([]),
@@ -504,6 +505,7 @@ impl World {
         self.historical_topic();
         let raw::Answer::Created(number) = self.external(
             raw::Op::Write(raw::Write::OpenPull {
+                opens_empty: false,
                 title: Box::from(&b"pull"[..]),
                 body: Box::new([]),
                 head: Box::from(&b"topic"[..]),

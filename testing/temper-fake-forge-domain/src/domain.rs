@@ -172,6 +172,8 @@ pub struct Domain {
     /// The last id given to a comment, and to a review.
     pub(crate) comments: u64,
     pub(crate) reviews: u64,
+    pub(crate) runs: u64,
+    pub(crate) jobs: u64,
     /// The forge's time at the last step or timer: what [`Domain::inspect`]
     /// shows a listing was made at.
     pub(crate) clock: Time,
@@ -256,6 +258,8 @@ impl Domain {
             made: 0,
             comments: 0,
             reviews: 0,
+            runs: 0,
+            jobs: 0,
             clock: Time::ZERO,
             calls: Slab::with_capacity(limits.calls),
             deliveries: Slab::with_capacity(limits.hooks),
@@ -454,6 +458,8 @@ fn call(
             | Write::DefineLabel { .. }
             | Write::OpenPull { .. }
             | Write::SetReviewers { .. }
+            | Write::RequestReviewers { .. }
+            | Write::RemoveReviewers { .. }
             | Write::Review { .. }
             | Write::Submit { .. }
             | Write::Merge { .. }
@@ -517,6 +523,12 @@ fn execute(domain: &mut Domain, env: &Env<Config>, user: u64, repository: &[u8],
                 | Read::PullFiles { .. }
                 | Read::Compare { .. }
                 | Read::Checks { .. }
+                | Read::Runs { .. }
+                | Read::Run { .. }
+                | Read::Jobs { .. }
+                | Read::Comments { .. }
+                | Read::FirstPull { .. }
+                | Read::OpenPulls { .. }
                 | Read::Job { .. }
                 | Read::PullFor { .. }
                 | Read::Statuses { .. }
@@ -547,7 +559,15 @@ fn execute(domain: &mut Domain, env: &Env<Config>, user: u64, repository: &[u8],
             Write::DefineLabel { name } => issues::define(domain, env, id, user, name),
             Write::Close { number } => issues::close(domain, env, id, user, number),
             Write::Reopen { number } => issues::reopen(domain, env, id, user, number),
-            Write::OpenPull { title, body, head, base } => pulls::open(domain, env, id, user, title, body, head, base),
+            Write::OpenPull { title, body, head, base, opens_empty } => {
+                pulls::open(domain, env, id, user, title, body, head, base, opens_empty)
+            }
+            Write::RequestReviewers { number, reviewers } => {
+                pulls::reviewers(domain, env, id, user, number, reviewers, true)
+            }
+            Write::RemoveReviewers { number, reviewers } => {
+                pulls::reviewers(domain, env, id, user, number, reviewers, false)
+            }
             Write::SetReviewers { number, reviewers } => pulls::request(domain, env, id, user, number, reviewers),
             Write::Review { number, verdict, body } => pulls::review(domain, env, id, user, number, verdict, body),
             Write::Submit { number, review, verdict } => pulls::submit(domain, env, id, user, number, review, verdict),

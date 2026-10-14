@@ -234,7 +234,9 @@ pub(crate) fn subject(op: &Op) -> Option<(Operation, Option<u64>, Option<u64>)> 
             Write::RemoveLabels { number, .. } => (Operation::RemoveLabels, Some(*number), None),
             Write::DefineLabel { .. } => (Operation::DefineLabel, None, None),
             Write::OpenPull { .. } => (Operation::OpenPull, None, None),
-            Write::SetReviewers { number, .. } => (Operation::SetReviewers, Some(*number), None),
+            Write::RequestReviewers { number, .. }
+            | Write::RemoveReviewers { number, .. }
+            | Write::SetReviewers { number, .. } => (Operation::SetReviewers, Some(*number), None),
             Write::Review { number, .. } => (Operation::Review, Some(*number), None),
             Write::Submit { number, .. } => (Operation::Submit, Some(*number), None),
             Write::Merge { number, head } => (Operation::Merge, Some(*number), Some(*head)),

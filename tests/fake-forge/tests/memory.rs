@@ -7,7 +7,7 @@
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
 use temper_fake_forge_domain::api::{
-    Answer, Check, Checks, Cue, Error, File, Git, Op, Permission, Protection, Read, Setup, Verdict, Write,
+    Answer, Check, Checks, Cue, Error, File, Git, Op, Order, Permission, Protection, Read, Setup, Verdict, Write,
 };
 use temper_fake_forge_domain::{Config, Domain, Event, Limits, MAX_OUT, Request, Skew, fire, step, worst_case};
 
@@ -171,6 +171,7 @@ fn full_merge_history_and_both_parent_traversals_stay_bounded() {
             AUTHOR,
             &repository,
             Op::Write(Write::OpenPull {
+                opens_empty: false,
                 title: text(LIMITS.title_bytes, b't'),
                 body: text(LIMITS.body_bytes, b'b'),
                 head: name(b'w', 0),
@@ -308,6 +309,11 @@ fn outcome(result: Result<Answer, Error>) -> Result<Option<u64>, Error> {
         | Answer::PullFiles { .. }
         | Answer::Comparison { .. }
         | Answer::Checks(_)
+        | Answer::Runs(_)
+        | Answer::Run(_)
+        | Answer::Jobs(_)
+        | Answer::Comments(_)
+        | Answer::Pulls(_)
         | Answer::Protection(_)
         | Answer::Settings(_)
         | Answer::Collaborators(_)
@@ -337,6 +343,7 @@ fn fill(forge: &mut Measured, index: u64, first: u64) {
     // Two pull requests, and two issues carrying every label.
     for branch in 0..2_u64 {
         let open = Write::OpenPull {
+            opens_empty: false,
             title: text(LIMITS.title_bytes, b't'),
             body: text(LIMITS.body_bytes, b'b'),
             head: name(b'w', branch),
@@ -423,6 +430,7 @@ fn a_forge_filled_to_its_limits_stays_within_its_worst_case() {
     let big = [
         Op::Read(Read::Tree { commit: firsts[0] }),
         Op::Read(Read::Items {
+            order: Order::LeastUpdated,
             state: None,
             kind: None,
             labels: Box::new([]),

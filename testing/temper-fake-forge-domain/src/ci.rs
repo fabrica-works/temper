@@ -45,6 +45,7 @@ pub(crate) fn start(domain: &mut Domain, env: &Env<Config>, id: Id<Repository>, 
         let repository = domain.repositories.get_mut(id).expect("a repository of the forge");
         repository.statuses.insert(commit, Map::with_capacity(limits.contexts)).expect("room was made");
     }
+    crate::actions::start(domain, id, commit);
     let repository = domain.repositories.get(id).expect("a repository of the forge");
     let contexts = u32::try_from(repository.checks.contexts.len()).expect("contexts within the limits");
     for context in 0..contexts {
@@ -120,6 +121,7 @@ pub(crate) fn rerun(domain: &mut Domain, env: &Env<Config>, id: Id<Repository>, 
     let Some(name) = name(domain, id, context) else {
         unreachable!("a re-run's context is one of its repository's");
     };
+    crate::actions::rerun(domain, id, commit, context);
     let pending = Status { state: Check::Pending, author: env.limits.ci, at: domain::clock(env), rerun: true };
     let kept = set(domain, id, commit, &name, pending);
     assert!(kept, "a context reported is replaced");
@@ -185,6 +187,7 @@ fn room(domain: &mut Domain, id: Id<Repository>) -> bool {
     let contexts = u32::try_from(repository.checks.contexts.len()).expect("contexts within the limits");
     let repository = domain.repositories.get_mut(id).expect("a repository of the forge");
     repository.statuses.remove(&commit);
+    repository.runs.remove(&commit);
     for context in 0..contexts {
         domain.timers.cancel(Alarm::Check { repository: id, commit, context });
         domain.timers.cancel(Alarm::Rerun { repository: id, commit, context });

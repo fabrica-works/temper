@@ -28,7 +28,7 @@ use alloc::boxed::Box;
 use skein_lib::bytes::copy_of;
 use skein_lib::{Id, List, Time};
 
-use crate::api::{Answer, Error, File, Kind, Read, State, Summary, What};
+use crate::api::{Answer, Error, File, Kind, Order, Read, State, Summary, What};
 use crate::domain::{self, Config, Domain};
 use crate::limits::Limits;
 use crate::store::{Repository, names, numbers};
@@ -40,8 +40,9 @@ pub(crate) fn read(domain: &Domain, config: &Config, id: Id<Repository>, read: &
     let repository = domain.repositories.get(id).expect("a repository of the forge");
     match read {
         Read::Locate => Ok(Answer::Located { id: repository.id }),
-        Read::Items { state, kind, labels, author, since, page, limit } => {
-            let (items, more) = items(repository, config, *state, *kind, labels, *author, *since, *page, *limit);
+        Read::Items { state, kind, labels, author, order, since, page, limit } => {
+            let (items, more) =
+                items(repository, config, *state, *kind, labels, *author, *order, *since, *page, *limit);
             Ok(Answer::Items { items, more, now: domain.clock })
         }
         Read::Item { number, after } => item(repository, limits, *number, *after),
@@ -63,9 +64,7 @@ pub(crate) fn read(domain: &Domain, config: &Config, id: Id<Repository>, read: &
             crate::next::compare(domain, limits, repository, *base, *head)
         }
         Read::Checks { commit } => crate::next::checks(repository, limits, *commit, config.ci),
-        Read::Job { commit, run, job, attempt, max_bytes } => {
-            crate::next::job(repository, *commit, *run, *job, *attempt, *max_bytes, config.ci)
-        }
+        Read::Job { job, attempt, max_bytes } => crate::next::job(repository, *job, *attempt, *max_bytes, config.ci),
         Read::Protection { branch } => {
             let protection = match &repository.protection {
                 Some(protection) if protection.branch == *branch => Some(protection.clone()),
@@ -75,10 +74,26 @@ pub(crate) fn read(domain: &Domain, config: &Config, id: Id<Repository>, read: &
         }
         Read::Settings => Ok(crate::next::settings(repository)),
         Read::Collaborators => Ok(crate::next::collaborators(repository)),
-        Read::PullFor { head, base } => match repository.newest_pull(head, base) {
+        Read::PullFor { head, base } => match repository.open_pull(head, base).or(repository.first_pull(head, base)) {
             Some(number) => pulls::view(domain, limits, repository, number),
             None => Err(Error::Missing(What::Pull)),
         },
+        Read::FirstPull { head, base } => match repository.first_pull(head, base) {
+            Some(number) => pulls::view(domain, limits, repository, number),
+            None => Err(Error::Missing(What::Pull)),
+        },
+        Read::OpenPulls { page, limit } => open_pulls(domain, limits, repository, *page, *limit),
+        Read::Comments { number } => {
+            let item = repository.item(*number)?;
+            let mut comments = List::with_capacity(limits.comments);
+            for (&id, comment) in &item.comments {
+                comments.push(comment.view(id)).expect("bounded thread");
+            }
+            Ok(Answer::Comments(comments.into_boxed()))
+        }
+        Read::Runs { commit, number } => Ok(crate::actions::runs(repository, *commit, *number)),
+        Read::Run { run } => Ok(Answer::Run(crate::actions::run(repository, *run)?.run)),
+        Read::Jobs { run } => crate::actions::jobs(repository, *run),
         Read::Statuses { commit } => {
             if !repository.has.contains(commit) {
                 return Err(Error::Missing(What::Commit));
@@ -126,6 +141,7 @@ fn items(
     kind: Option<Kind>,
     labels: &[Box<[u8]>],
     author: Option<u64>,
+    order: Order,
     since: Time,
     page: u32,
     limit: u32,
@@ -137,7 +153,23 @@ fn items(
     let mut skipped: u64 = 0;
     let mut items = List::with_capacity(size);
     let mut more = false;
-    for &(updated, number) in &repository.recent {
+    let mut ordered = skein_lib::Set::with_capacity(repository.items.len());
+    for (&number, item) in &repository.items {
+        let key = match order {
+            Order::LeastUpdated => (item.updated, number),
+            Order::NewestCreated => (Time::ZERO, u64::MAX.saturating_sub(number)),
+        };
+        ordered.insert(key).expect("one key per item");
+    }
+    for &(stamp, key) in &ordered {
+        let number = match order {
+            Order::LeastUpdated => key,
+            Order::NewestCreated => u64::MAX.saturating_sub(key),
+        };
+        let updated = match order {
+            Order::LeastUpdated => stamp,
+            Order::NewestCreated => repository.items.get(&number).expect("indexed item").updated,
+        };
         if updated < since {
             continue;
         }
@@ -184,4 +216,32 @@ fn item(repository: &Repository, limits: &Limits, number: u64, after: u64) -> Re
         comments.push(comment.view(id)).expect("checked for room above");
     }
     Ok(Answer::Item { item: item.summary(number), comments: comments.into_boxed(), more })
+}
+
+fn open_pulls(
+    domain: &Domain,
+    limits: &Limits,
+    repository: &Repository,
+    page: u32,
+    limit: u32,
+) -> Result<Answer, Error> {
+    let size = if limit == 0 { limits.page_size } else { limit.min(limits.page_size) };
+    let skip = u64::from(page.saturating_sub(1)).saturating_mul(u64::from(size));
+    let mut skipped: u64 = 0;
+    let mut answer = List::with_capacity(size);
+    for (&number, item) in &repository.items {
+        if item.pull.is_none() || item.state != State::Open {
+            continue;
+        }
+        if skipped < skip {
+            skipped = skipped.saturating_add(1);
+            continue;
+        }
+        if answer.room() == 0 {
+            break;
+        }
+        let Answer::Pull(pull) = pulls::view(domain, limits, repository, number)? else { unreachable!("pull view") };
+        answer.push(pull).expect("a pull page");
+    }
+    Ok(Answer::Pulls(answer.into_boxed()))
 }

@@ -38,6 +38,8 @@ pub(crate) struct Repository {
     /// merged.
     pub(crate) has: Set<u64>,
     /// The statuses on its commits, by commit and context.
+    pub(crate) runs: Map<u64, crate::actions::Kept>,
+    pub(crate) run_number: u64,
     pub(crate) statuses: Map<u64, Map<Box<[u8]>, Status>>,
     pub(crate) wiki: Map<Box<[u8]>, Page>,
     /// The last revision given to a wiki page.
@@ -146,6 +148,8 @@ impl Repository {
             numbered: 0,
             branches: Map::with_capacity(limits.branches),
             has: Set::with_capacity(limits.commits),
+            runs: Map::with_capacity(limits.statuses),
+            run_number: 0,
             statuses: Map::with_capacity(limits.statuses),
             wiki: Map::with_capacity(limits.pages),
             revisions: 0,
@@ -264,19 +268,18 @@ impl Repository {
         None
     }
 
-    /// The newest pull request, open or not, that merges `head` into `base`,
+    /// The oldest pull request, open or not, that merges `head` into `base`,
     /// if there is one.
-    pub(crate) fn newest_pull(&self, head: &[u8], base: &[u8]) -> Option<u64> {
-        let mut newest = None;
+    pub(crate) fn first_pull(&self, head: &[u8], base: &[u8]) -> Option<u64> {
         for (&number, item) in &self.items {
             if let Some(pull) = &item.pull
                 && *pull.head == *head
                 && *pull.base == *base
             {
-                newest = Some(number);
+                return Some(number);
             }
         }
-        newest
+        None
     }
 
     /// Whether `commit` is a branch's head or an open pull request's.

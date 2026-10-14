@@ -79,6 +79,7 @@ fn read_op(read: &client::Read, l: &Limits) -> forge::Read {
     match read {
         client::Read::Locate { .. } => forge::Read::Locate,
         client::Read::Items { since, page, kind } => forge::Read::Items {
+            order: forge::Order::LeastUpdated,
             since: *since,
             page: *page,
             kind: match kind {
@@ -107,13 +108,9 @@ fn read_op(read: &client::Read, l: &Limits) -> forge::Read {
         }
         client::Read::File { head, path, .. } => forge::Read::File { commit: number(*head), path: path.clone() },
         client::Read::Checks { commit } => forge::Read::Checks { commit: number(*commit) },
-        client::Read::Job { attempt, max_bytes } => forge::Read::Job {
-            commit: number(attempt.head),
-            run: attempt.run,
-            job: attempt.job,
-            attempt: attempt.attempt,
-            max_bytes: *max_bytes,
-        },
+        client::Read::Job { attempt, max_bytes } => {
+            forge::Read::Job { job: attempt.job, attempt: attempt.attempt, max_bytes: *max_bytes }
+        }
         client::Read::Protection { branch } => forge::Read::Protection { branch: branch.clone() },
         client::Read::Settings => forge::Read::Settings,
         client::Read::Collaborators { .. } => forge::Read::Collaborators,
@@ -125,9 +122,13 @@ fn write_op(write: &client::Write) -> forge::Write {
         client::Write::CreateIssue { key, title, body } => {
             forge::Write::CreateIssue { title: title.clone(), body: keyed(key, body), labels: Box::new([]) }
         }
-        client::Write::OpenPull { title, body, head, base } => {
-            forge::Write::OpenPull { title: title.clone(), body: body.clone(), head: head.clone(), base: base.clone() }
-        }
+        client::Write::OpenPull { title, body, head, base } => forge::Write::OpenPull {
+            opens_empty: false,
+            title: title.clone(),
+            body: body.clone(),
+            head: head.clone(),
+            base: base.clone(),
+        },
         client::Write::Post { number, key, body } => forge::Write::Comment { number: *number, body: keyed(key, body) },
         client::Write::Review { number, key, verdict, body } => {
             forge::Write::Review { number: *number, body: keyed(key, body), verdict: Some(verdict_out(*verdict)) }
@@ -270,6 +271,11 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         | forge::Answer::Pages { .. }
         | forge::Answer::Page(_)
         | forge::Answer::Revision(_)
+        | forge::Answer::Runs(_)
+        | forge::Answer::Run(_)
+        | forge::Answer::Jobs(_)
+        | forge::Answer::Comments(_)
+        | forge::Answer::Pulls(_)
         | forge::Answer::Pushed(_) => panic!("new client does not ask these fake routes"),
     }
 }

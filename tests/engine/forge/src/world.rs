@@ -292,6 +292,7 @@ impl World {
     pub fn open_pull(&mut self, head: &[u8], base: &[u8]) -> u64 {
         let raw::Answer::Created(number) = self.external(
             raw::Op::Write(raw::Write::OpenPull {
+                opens_empty: false,
                 title: Box::from(&b"Change"[..]),
                 body: Box::from(&b"Description"[..]),
                 head: Box::from(head),

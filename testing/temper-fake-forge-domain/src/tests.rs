@@ -1,5 +1,6 @@
 //! Feed the forge calls, inspect its answers, webhooks and observations.
 
+mod actions;
 mod locate;
 mod next;
 
@@ -9,8 +10,8 @@ use skein_lib::bytes::copy_of;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::api::{
-    Answer, Change, Check, Checks, Comment, Created, Cue, Error, File, Git, Head, Kind, Op, Page, PageName, Permission,
-    Protection, Pull, Pushed, Read, Setup, State, Summary, Verdict, Want, What, Write,
+    Answer, Change, Check, Checks, Comment, Created, Cue, Error, File, Git, Head, Kind, Op, Order, Page, PageName,
+    Permission, Protection, Pull, Pushed, Read, Setup, State, Summary, Verdict, Want, What, Write,
 };
 use crate::{
     Branches, Config, Domain, Event, Limits, MAX_OUT, Observation, Operation, Request, Skew, fire, step, worst_case,
@@ -404,6 +405,7 @@ impl Harness {
     /// `labels`, and whether a later page has more.
     fn list(&mut self, user: u64, state: Option<State>, labels: &[&[u8]], page: u32) -> (List<u64>, bool) {
         let op = read(Read::Items {
+            order: Order::LeastUpdated,
             state,
             kind: None,
             labels: names(labels),
@@ -559,6 +561,7 @@ fn listings_page_least_recently_updated_first_by_page_number() {
     assert_eq!(h.list(ENGINE, None, &[], 0).0.as_slice(), [2, 3], "a page before the first is the first");
     assert!(h.list(ENGINE, None, &[], 3).0.is_empty());
     let one = read(Read::Items {
+        order: Order::LeastUpdated,
         state: None,
         kind: None,
         labels: names(&[]),
@@ -605,8 +608,16 @@ fn listings_are_at_the_forges_resolution_with_since_inclusive_and_ties_by_number
     h.wait(Duration::from_secs(1));
     h.comment(PERSON, 2, b"later");
     let since = Time::ZERO.saturating_add(Duration::from_millis(2900));
-    let recent =
-        read(Read::Items { state: None, kind: None, labels: names(&[]), author: None, since, page: 1, limit: 0 });
+    let recent = read(Read::Items {
+        order: Order::LeastUpdated,
+        state: None,
+        kind: None,
+        labels: names(&[]),
+        author: None,
+        since,
+        page: 1,
+        limit: 0,
+    });
     let Answer::Items { items, more: false, .. } = h.ok(ENGINE, recent) else {
         unreachable!("one page");
     };
@@ -653,6 +664,7 @@ fn listings_filter_by_state_kind_labels_and_time() {
     assert!(page.is_empty(), "every label must be there");
     let since = h.env.now;
     let pulls = read(Read::Items {
+        order: Order::LeastUpdated,
         state: None,
         kind: Some(Kind::Pull),
         labels: names(&[]),
@@ -667,6 +679,7 @@ fn listings_filter_by_state_kind_labels_and_time() {
     assert!(items.is_empty(), "no pull requests");
     h.comment(PERSON, 2, b"later");
     let recent = read(Read::Items {
+        order: Order::LeastUpdated,
         state: None,
         kind: Some(Kind::Issue),
         labels: names(&[]),
@@ -782,6 +795,7 @@ fn listings_filter_by_who_opened_the_items() {
     h.issue(PERSON, b"theirs");
     let by = |author: u64| {
         read(Read::Items {
+            order: Order::LeastUpdated,
             state: None,
             kind: None,
             labels: names(&[]),
@@ -999,6 +1013,7 @@ fn deleting_a_branch_closes_the_pull_requests_from_or_into_it() {
     h.push(ENGINE, b"next", next).expect("pushed");
     h.open(b"work").expect("opened");
     let op = write(Write::OpenPull {
+        opens_empty: false,
         title: copy_of(b"t"),
         body: copy_of(b""),
         head: copy_of(b"next"),
@@ -1071,6 +1086,7 @@ fn opening_a_pull_request_refuses_what_forgejo_refuses() {
     assert_eq!(h.open(b"work"), Ok(Answer::Created(3)), "once the first is closed");
     assert_eq!(h.call(ENGINE, write(Write::Reopen { number: 2 })), Err(Error::Exists));
     let op = write(Write::OpenPull {
+        opens_empty: false,
         title: copy_of(b"t"),
         body: copy_of(b""),
         head: copy_of(b"work"),
@@ -1483,6 +1499,7 @@ fn the_forges_clock_is_its_own() {
     assert_eq!(item.updated, Time::ZERO.saturating_add(Duration::from_secs(900)), "the forge's time, behind");
     assert_eq!(crate::time(&h.env.limits, h.env.now), Time::ZERO.saturating_add(Duration::from_secs(901)));
     let op = read(Read::Items {
+        order: Order::LeastUpdated,
         state: None,
         kind: None,
         labels: names(&[]),
@@ -1582,12 +1599,14 @@ fn run(seed: u64) -> Run {
         write(Write::Comment { number: 1, body: copy_of(b"hi") }),
         Op::Git(Git::Push { branch: copy_of(b"work"), commit: work, expected: None }),
         write(Write::OpenPull {
+            opens_empty: false,
             title: copy_of(b"t"),
             body: copy_of(b""),
             head: copy_of(b"work"),
             base: copy_of(MAIN),
         }),
         read(Read::Items {
+            order: Order::LeastUpdated,
             state: None,
             kind: None,
             labels: names(&[]),
@@ -1686,7 +1705,7 @@ fn a_pull_request_is_found_by_its_branches_and_statuses_by_their_commit() {
     let Answer::Pull(pull) = h.ok(PERSON, find) else {
         unreachable!("a pull request");
     };
-    assert_eq!((pull.number, pull.state), (2, State::Closed), "open or not");
+    assert_eq!((pull.number, pull.state), (1, State::Closed), "the oldest when none is open");
     h.settle();
     let Answer::Statuses(statuses) = h.ok(PERSON, read(Read::Statuses { commit: work })) else {
         unreachable!("statuses");
@@ -1857,6 +1876,7 @@ fn refused_writes_and_rejected_pushes_are_observed() {
 /// Opens a pull request of `head` into `main`.
 fn open_op(head: &[u8]) -> Op {
     write(Write::OpenPull {
+        opens_empty: false,
         title: copy_of(b"change"),
         body: copy_of(b"body"),
         head: copy_of(head),
@@ -2051,6 +2071,7 @@ fn every_call_is_answered_once_under_every_fault() {
                     3 => open_op(b"work"),
                     4 => merge(1, work),
                     _ => read(Read::Items {
+                        order: Order::LeastUpdated,
                         state: None,
                         kind: None,
                         labels: names(&[]),

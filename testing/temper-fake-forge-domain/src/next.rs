@@ -2,7 +2,7 @@
 //! Comparisons deliberately do not page; excessive data is an explicit
 //! refusal, never a short answer claiming to be complete.
 
-use crate::api::{Answer, ChangedFile, Check, CheckSummary, Collaborator, Error, JobRef, Settings, State, What};
+use crate::api::{Answer, ChangedFile, Check, CheckSummary, Collaborator, Error, Settings, State, What};
 use crate::domain::Domain;
 use crate::git;
 use crate::limits::Limits;
@@ -130,74 +130,40 @@ pub(crate) fn checks(repository: &Repository, limits: &Limits, commit: u64, ci_u
             Check::Failed => b"CI failed",
         };
         fits(description, limits.body_bytes)?;
-        let mut link = List::with_capacity(limits.name_bytes);
-        for &byte in b"/job/" {
-            if link.push(byte).is_err() {
-                return Err(Error::TooLarge);
-            }
-        }
-        let mut digits = [0_u8; 20];
-        let mut at = digits.len();
-        let mut remainder = commit;
-        for _ in 0..digits.len() {
-            at = at.checked_sub(1).expect("a u64 has at most twenty digits");
-            *digits.get_mut(at).expect("within the digit array") =
-                u8::try_from(remainder.checked_rem(10).expect("ten is nonzero"))
-                    .expect("a digit")
-                    .checked_add(b'0')
-                    .expect("an ASCII digit");
-            remainder = remainder.checked_div(10).expect("ten is nonzero");
-            if remainder == 0 {
-                break;
-            }
-        }
-        assert!(remainder == 0, "a u64 has at most twenty digits");
-        for &byte in digits.get(at..).expect("within the digit array") {
-            if link.push(byte).is_err() {
-                return Err(Error::TooLarge);
-            }
-        }
-        let job =
-            if status.state == Check::Failed { job_ref(repository, commit, &status.context, ci_user) } else { None };
+        let link = if status.author == ci_user {
+            crate::actions::link(repository, commit, &status.context)
+        } else {
+            Box::new([])
+        };
+        let job = if status.state == Check::Failed && status.author == ci_user {
+            crate::actions::reference(repository, commit, &status.context)
+        } else {
+            None
+        };
         summaries
-            .push(CheckSummary { status, description: copy_of(description), link: link.into_boxed(), job })
+            .push(CheckSummary { status, description: copy_of(description), link, job })
             .expect("one summary per admitted context");
     }
     Ok(Answer::Checks(summaries.into_boxed()))
 }
 
-fn job_ref(repository: &Repository, commit: u64, context: &[u8], ci_user: u64) -> Option<JobRef> {
-    let source = repository.statuses.get(&commit)?.get(context)?;
-    if source.author != ci_user || source.state != Check::Failed {
-        return None;
-    }
-    let mut job = 0xcbf2_9ce4_8422_2325_u64;
-    for byte in context {
-        job = (job ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
-    }
-    Some(JobRef { run: commit, job, attempt: if source.rerun { 2 } else { 1 } })
-}
-
 pub(crate) fn job(
     repository: &Repository,
-    commit: u64,
-    run: u64,
     job: u64,
     attempt: u32,
     max_bytes: u32,
     ci_user: u64,
 ) -> Result<Answer, Error> {
-    if !repository.has.contains(&commit) {
-        return Err(Error::Missing(What::Commit));
+    let (commit, context) = crate::actions::job(repository, job, attempt)?;
+    let status = repository
+        .statuses
+        .get(&commit)
+        .ok_or(Error::Missing(What::Job))?
+        .get(context)
+        .ok_or(Error::Missing(What::Job))?;
+    if status.author != ci_user || status.state != Check::Failed {
+        return Err(Error::Missing(What::Job));
     }
-    let statuses = repository.statuses.get(&commit).ok_or(Error::Missing(What::Job))?;
-    let mut found = None;
-    for (context, _) in statuses {
-        if job_ref(repository, commit, context, ci_user) == Some(JobRef { run, job, attempt }) {
-            found = Some(context.as_ref());
-        }
-    }
-    let context: &[u8] = found.ok_or(Error::Missing(What::Job))?;
     if max_bytes == 0 {
         return Err(Error::TooLarge);
     }

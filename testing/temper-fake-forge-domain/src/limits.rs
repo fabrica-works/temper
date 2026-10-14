@@ -6,9 +6,10 @@ use core::mem::size_of;
 
 use skein_lib::{Deadlines, Id, List, Map, Queue, Set, Slab, Time};
 
+use crate::actions::{Job, Kept as RunKept, Run};
 use crate::api::{
-    ChangedFile, CheckSummary, Collaborator, Comment, File, Head, PageName, Permission, Review, Status as StatusView,
-    Summary,
+    ChangedFile, CheckSummary, Collaborator, Comment, File, Head, PageName, Permission, Pull, Review,
+    Status as StatusView, Summary,
 };
 use crate::domain::{Alarm, Call};
 use crate::faults::Window;
@@ -118,6 +119,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<StatusView>::worst_case(limits.contexts)?)?
         .checked_add(List::<u64>::worst_case(limits.commits)?)?
         .checked_add(List::<u64>::worst_case(limits.items)?)?
+        .checked_add(Set::<(Time, u64)>::worst_case(limits.items)?)?
         .checked_add(call(limits)?)?
         .checked_add(item(limits)?)?
         .checked_add(observation(limits)?)?;
@@ -153,6 +155,8 @@ fn repository(limits: &Limits) -> Option<u64> {
     let contexts = Map::<Box<[u8]>, Status>::worst_case(limits.contexts)?.checked_add(times(limits.contexts, name)?)?;
     let statuses = Map::<u64, Map<Box<[u8]>, Status>>::worst_case(limits.statuses)?
         .checked_add(times(limits.statuses, contexts)?)?;
+    let runs = Map::<u64, RunKept>::worst_case(limits.statuses)?
+        .checked_add(times(limits.statuses, List::<Job>::worst_case(limits.contexts)?)?)?;
     let page = name.checked_add(u64::from(limits.content_bytes))?;
     let wiki = Map::<Box<[u8]>, Page>::worst_case(limits.pages)?.checked_add(times(limits.pages, page)?)?;
     setup
@@ -162,6 +166,7 @@ fn repository(limits: &Limits) -> Option<u64> {
         .checked_add(branches)?
         .checked_add(has)?
         .checked_add(statuses)?
+        .checked_add(runs)?
         .checked_add(wiki)
 }
 
@@ -222,8 +227,16 @@ fn answer(limits: &Limits) -> Option<u64> {
     let comparison = changes(limits)?.checked_add(times(limits.commits, number)?)?;
     let checks = times(
         limits.contexts,
-        name.checked_mul(2)?.checked_add(body)?.checked_add(u64::try_from(size_of::<CheckSummary>()).ok()?)?,
+        name.checked_mul(2)?
+            .checked_add(51)?
+            .checked_add(body)?
+            .checked_add(u64::try_from(size_of::<CheckSummary>()).ok()?)?,
     )?;
+    let threads = times(limits.comments, comment)?;
+    let pulls = times(limits.page_size, pull.checked_add(u64::try_from(size_of::<Pull>()).ok()?)?)?;
+    let runs = u64::try_from(size_of::<Run>()).ok()?;
+    let jobs = times(limits.contexts, u64::try_from(size_of::<Job>()).ok()?)?;
+    let log = name.checked_add(17)?.checked_mul(4)?;
     let protection = name.checked_add(names(limits.contexts, limits)?)?;
     let collaborators = times(limits.users, u64::try_from(size_of::<Collaborator>()).ok()?)?;
     Some(
@@ -239,7 +252,12 @@ fn answer(limits: &Limits) -> Option<u64> {
             .max(comparison)
             .max(checks)
             .max(protection)
-            .max(collaborators),
+            .max(collaborators)
+            .max(threads)
+            .max(pulls)
+            .max(runs)
+            .max(jobs)
+            .max(log),
     )
 }
 

@@ -46,7 +46,7 @@ pub enum Read {
     /// if zero or more) in `state` (either, if `None`) of `kind` (either, if
     /// `None`) that carry every label of `labels`, were opened by `author`
     /// (anyone, if `None`: Forgejo's `created_by`) and were updated at or
-    /// after `since`, at the forge's resolution: least recently updated
+    /// after `since`, at the forge's resolution, in `order`: least updated
     /// first, then by number, as Forgejo pages them. Answered by
     /// [`Answer::Items`]. Pages are offsets into an order that moves: see
     /// the `reads` module for what a pass over them finds.
@@ -55,6 +55,7 @@ pub enum Read {
         kind: Option<Kind>,
         labels: Box<[Box<[u8]>]>,
         author: Option<u64>,
+        order: Order,
         since: Time,
         page: u32,
         limit: u32,
@@ -103,11 +104,34 @@ pub enum Read {
     /// Bounded plaintext output of one Forgejo v16.0.5 job attempt. The
     /// existing byte answer carries one extra byte when truncated.
     Job {
-        commit: u64,
-        run: u64,
         job: u64,
         attempt: u32,
         max_bytes: u32,
+    },
+    /// Actions routes, bounded by the repository's retained CI history.
+    Runs {
+        commit: u64,
+        number: u64,
+    },
+    Run {
+        run: u64,
+    },
+    Jobs {
+        run: u64,
+    },
+    /// The whole thread, oldest first.
+    Comments {
+        number: u64,
+    },
+    /// The oldest matching pull, open or not.
+    FirstPull {
+        head: Box<[u8]>,
+        base: Box<[u8]>,
+    },
+    /// Open pulls, oldest first, paged from one.
+    OpenPulls {
+        page: u32,
+        limit: u32,
     },
     /// Requires admin permission, including when no protection exists.
     Protection {
@@ -115,7 +139,7 @@ pub enum Read {
     },
     Settings,
     Collaborators,
-    /// The newest pull request, open or not, that merges `head` into
+    /// The open pull request, else the oldest, that merges `head` into
     /// `base`. Answered by [`Answer::Pull`].
     PullFor {
         head: Box<[u8]>,
@@ -226,11 +250,21 @@ pub enum Write {
         body: Box<[u8]>,
         head: Box<[u8]>,
         base: Box<[u8]>,
+        /// Open even when the head adds no commits to the base.
+        opens_empty: bool,
     },
     /// Makes the users asked to review the open pull request `number`
     /// exactly `reviewers`, each of whom may read and none of whom is its
     /// author. A request ends when its reviewer reviews. Needs write
     /// permission.
+    RequestReviewers {
+        number: u64,
+        reviewers: Box<[u64]>,
+    },
+    RemoveReviewers {
+        number: u64,
+        reviewers: Box<[u64]>,
+    },
     SetReviewers {
         number: u64,
         reviewers: Box<[u64]>,
@@ -354,6 +388,11 @@ pub enum Answer {
         more: bool,
     },
     Pull(Pull),
+    Pulls(Box<[Pull]>),
+    Comments(Box<[Comment]>),
+    Runs(Box<[Run]>),
+    Run(Run),
+    Jobs(Box<[Job]>),
     PullFiles {
         head: u64,
         files: Box<[ChangedFile]>,
@@ -473,6 +512,15 @@ pub enum What {
     Job,
 }
 
+pub use crate::actions::{Job, Run};
+
+/// The order of an item listing.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Order {
+    LeastUpdated,
+    NewestCreated,
+}
+
 /// Whether an item is an issue or a pull request.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Kind {
@@ -526,6 +574,8 @@ pub struct Pull {
     pub commit: u64,
     /// Where the base branch is, unless it was deleted.
     pub base_commit: Option<u64>,
+    /// The newest commit head and base share.
+    pub merge_base: Option<u64>,
     /// The commit its merge made.
     pub merged: Option<u64>,
     /// Whether the head merges into the base without a conflict.

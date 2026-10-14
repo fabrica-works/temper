@@ -39,6 +39,7 @@ pub(crate) fn open(
     body: Box<[u8]>,
     head: Box<[u8]>,
     base: Box<[u8]>,
+    opens_empty: bool,
 ) -> Result<Answer, Error> {
     let limits = &env.limits.limits;
     let repository = domain.repositories.get(id).expect("a repository of the forge");
@@ -51,7 +52,7 @@ pub(crate) fn open(
     let Some(&onto) = repository.branches.get(&*base) else {
         return Err(Error::Missing(What::Branch));
     };
-    if head == base || git::is_ancestor(domain, commit, onto) {
+    if head == base || (!opens_empty && git::is_ancestor(domain, commit, onto)) {
         return Err(Error::NothingToMerge);
     }
     if repository.open_pull(&head, &base).is_some() {
@@ -334,6 +335,10 @@ pub(crate) fn merge(
 
 /// The pull request `number` as a read shows it.
 pub(crate) fn view(domain: &Domain, limits: &Limits, repository: &Repository, number: u64) -> Result<Answer, Error> {
+    Ok(Answer::Pull(pull(domain, limits, repository, number)?))
+}
+
+pub(crate) fn pull(domain: &Domain, limits: &Limits, repository: &Repository, number: u64) -> Result<PullView, Error> {
     let item = repository.item(number)?;
     let Some(pull) = &item.pull else {
         return Err(Error::Missing(What::Pull));
@@ -353,19 +358,23 @@ pub(crate) fn view(domain: &Domain, limits: &Limits, repository: &Repository, nu
     }
     let statuses = statuses(repository, limits, pull.commit);
     let reviewers = numbers(&pull.requested);
-    Ok(Answer::Pull(PullView {
+    Ok(PullView {
         number,
         state: item.state,
         head: copy_of(&pull.head),
         base: copy_of(&pull.base),
         commit: pull.commit,
         base_commit,
+        merge_base: match base_commit {
+            Some(onto) => git::merge_base(domain, pull.commit, onto),
+            None => None,
+        },
         merged: pull.merged,
         mergeable,
         reviewers,
         reviews: reviews.into_boxed(),
         statuses,
-    }))
+    })
 }
 
 /// The latest status of each context on `commit`, in their contexts' order.
@@ -468,4 +477,38 @@ pub(crate) fn merged(domain: &Domain, limits: &Limits, head: u64, onto: u64) -> 
         }
     }
     Ok(tree)
+}
+
+/// Adds or removes reviewers through Forgejo's two routes.
+pub(crate) fn reviewers(
+    domain: &mut Domain,
+    env: &Env<Config>,
+    id: Id<Repository>,
+    user: u64,
+    number: u64,
+    reviewers: Box<[u64]>,
+    add: bool,
+) -> Result<Answer, Error> {
+    let repository = domain.repositories.get(id).expect("a repository");
+    repository.require(user, Permission::Write)?;
+    fit_numbers(&reviewers, env.limits.limits.users)?;
+    let item = repository.item(number)?;
+    let pull = item.pull.as_ref().ok_or(Error::Missing(What::Pull))?;
+    let mut requested = Set::with_capacity(env.limits.limits.users);
+    for &reviewer in &pull.requested {
+        requested.insert(reviewer).expect("bounded reviewers");
+    }
+    for &reviewer in &reviewers {
+        if reviewer == item.author || repository.permission(reviewer) < Permission::Read {
+            return Err(Error::Forbidden);
+        }
+        if add {
+            if requested.insert(reviewer).is_err() {
+                return Err(Error::TooLarge);
+            }
+        } else {
+            requested.remove(&reviewer);
+        }
+    }
+    request(domain, env, id, user, number, numbers(&requested))
 }

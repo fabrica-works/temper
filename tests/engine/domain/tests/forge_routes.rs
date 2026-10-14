@@ -2255,6 +2255,7 @@ fn a_pull_subscription_receives_the_connectors_state_news() {
     let raw::Answer::Created(pull) = world.external(
         2,
         raw::Op::Write(raw::Write::OpenPull {
+            opens_empty: false,
             title: Box::from(&b"change"[..]),
             body: Box::new([]),
             head: Box::from(&b"work"[..]),
@@ -2287,6 +2288,7 @@ fn ci_subscription_story(restart: bool) {
     let raw::Answer::Created(_pull) = world.external(
         2,
         raw::Op::Write(raw::Write::OpenPull {
+            opens_empty: false,
             title: Box::from(&b"change"[..]),
             body: Box::new([]),
             head: Box::from(&b"work"[..]),
@@ -2353,6 +2355,7 @@ fn a_participation_subscription_receives_the_connectors_comment_news() {
     let raw::Answer::Created(pull) = world.external(
         2,
         raw::Op::Write(raw::Write::OpenPull {
+            opens_empty: false,
             title: Box::from(&b"change"[..]),
             body: Box::new([]),
             head: Box::from(&b"work"[..]),
@@ -2669,6 +2672,7 @@ fn issue_count(world: &mut World) -> usize {
     let raw::Answer::Items { items, more: false, .. } = world.external(
         1,
         raw::Op::Read(raw::Read::Items {
+            order: raw::Order::LeastUpdated,
             state: None,
             kind: Some(raw::Kind::Issue),
             labels: Box::new([]),
