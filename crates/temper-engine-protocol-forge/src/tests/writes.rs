@@ -262,3 +262,192 @@ fn write_refusals_read_only_known_entire_messages() {
 type CreationRow = (&'static str, Write, &'static [u8], &'static [u8], Answer);
 type WriteRow = (&'static str, Write, &'static [u8], &'static [u8], u16, &'static [u8], Answer);
 type FailureRow = (&'static str, Asked, u16, Option<Refusal>, Option<Duration>, Error, Drop);
+const PULL: &[u8] = br#"{"number":7,"state":"open","head":{"repo_id":1,"ref":"work","sha":"0100000000000000000000000000000000000000"},"base":{"repo_id":1,"ref":"main","sha":"0200000000000000000000000000000000000000"},"merged":false,"merge_commit_sha":null,"merge_base":"0200000000000000000000000000000000000000","mergeable":true,"requested_reviewers":[]}"#;
+const MERGED: &[u8] = br#"{"number":7,"state":"closed","head":{"repo_id":1,"ref":"work","sha":"0100000000000000000000000000000000000000"},"base":{"repo_id":1,"ref":"main","sha":"0200000000000000000000000000000000000000"},"merged":true,"merge_commit_sha":"0300000000000000000000000000000000000000","merge_base":"0200000000000000000000000000000000000000","mergeable":true,"requested_reviewers":[]}"#;
+const REVIEWERS: &[u8] = br#"{"number":7,"state":"open","head":{"repo_id":1,"ref":"work","sha":"0100000000000000000000000000000000000000"},"base":{"repo_id":1,"ref":"main","sha":"0200000000000000000000000000000000000000"},"merged":false,"merge_commit_sha":null,"merge_base":"0200000000000000000000000000000000000000","mergeable":true,"requested_reviewers":[{"id":2,"login":"writer"},{"id":3,"login":"extra"}]}"#;
+fn opening(h: &mut Harness) {
+    h.call(
+        1,
+        fixtures::REPO,
+        Op::Write(Write::OpenPull {
+            title: boxed(b"title"),
+            body: boxed(b"body"),
+            head: boxed(b"work"),
+            base: boxed(b"main"),
+        }),
+    );
+    h.run(Duration::ZERO);
+}
+fn response(h: &mut Harness, code: u16, body: &[u8]) {
+    h.answer(fixtures::FORGE, &fixtures::response(code, body));
+    h.run(Duration::ZERO);
+}
+#[test]
+fn open_pull_with_nothing_to_merge_compares_and_writes_nothing() {
+    let mut h = known();
+    opening(&mut h);
+    response(&mut h, 200, BRANCH);
+    response(&mut h, 200, BRANCH);
+    response(&mut h, 200, br#"{"total_commits":0,"commits":[],"files":[]}"#);
+    let answered = h.answered(1).expect("empty comparison answered");
+    assert_eq!((answered.cost, &answered.result), (3, &Err(Error::NothingToMerge)));
+    let written = h.request_bytes(fixtures::FORGE);
+    assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/branches/work ").is_some());
+    assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/branches/main ").is_some());
+    assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0100000000000000000000000000000000000000 ").is_some());
+    assert!(bytes::find(&written, b"POST ").is_none(), "nothing written after comparison");
+}
+#[test]
+fn open_pull_posts_only_after_its_comparison_has_commits() {
+    let mut h = known();
+    opening(&mut h);
+    response(&mut h, 200, BRANCH);
+    response(&mut h, 200, BRANCH);
+    response(
+        &mut h,
+        200,
+        br#"{"total_commits":1,"commits":[{"sha":"0100000000000000000000000000000000000000"}],"files":[]}"#,
+    );
+    let written = h.request_bytes(fixtures::FORGE);
+    assert!(bytes::find(&written, br#"{"head":"work","base":"main","title":"title","body":"body"}"#).is_some());
+    response(&mut h, 201, PULL);
+    let answered = h.answered(1).expect("opened");
+    assert_eq!((answered.cost, &answered.result), (4, &Ok(Answer::Created(7))));
+}
+#[test]
+fn opening_before_its_post_turns_uncertain_reads_into_unavailable() {
+    let rows = [
+        ("5xx", 500, b"".as_slice(), Error::Unavailable),
+        ("malformed", 200, b"{}".as_slice(), Error::Unavailable),
+        ("missing", 404, b"".as_slice(), Error::Missing),
+        ("unknown 4xx", 418, br#"{"message":"other"}"#.as_slice(), Error::Unavailable),
+    ];
+    for (name, code, body, expected) in rows {
+        let mut h = known();
+        opening(&mut h);
+        response(&mut h, code, body);
+        let answered = h.answered(1).expect("failed branch read");
+        assert_eq!((answered.cost, &answered.result), (1, &Err(expected)), "{name}");
+    }
+}
+#[test]
+fn openings_deadline_before_post_is_unavailable_after_post_timeout() {
+    for (name, post, expected, cost) in [("before", false, Error::Unavailable, 1), ("after", true, Error::Timeout, 4)] {
+        let mut h = known();
+        opening(&mut h);
+        if post {
+            response(&mut h, 200, BRANCH);
+            response(&mut h, 200, BRANCH);
+            response(&mut h, 200, br#"{"total_commits":1,"commits":[],"files":[]}"#);
+        }
+        h.run(Duration::from_secs(10));
+        let answered = h.answered(1).expect("deadline answered");
+        assert_eq!((answered.cost, &answered.result), (cost, &Err(expected)), "{name}");
+    }
+}
+#[test]
+fn a_merge_sends_the_rows_style_and_reads_its_commit() {
+    let mut h = known();
+    h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
+    h.run(Duration::ZERO);
+    let written = h.request_bytes(fixtures::FORGE);
+    assert!(
+        bytes::find(&written, br#"{"Do":"squash","head_commit_id":"0100000000000000000000000000000000000000"}"#)
+            .is_some()
+    );
+    response(&mut h, 200, b"");
+    assert!(bytes::find(&h.request_bytes(fixtures::FORGE), b"GET /api/v1/repos/fixture/specimen/pulls/7 ").is_some());
+    response(&mut h, 200, MERGED);
+    let mut commit = [0; 32];
+    commit[0] = 3;
+    let answered = h.answered(1).expect("merge answered");
+    assert_eq!((answered.cost, &answered.result), (2, &Ok(Answer::Merged(commit))));
+}
+#[test]
+fn every_failure_of_a_merges_read_is_timeout() {
+    let rows = [
+        ("missing", 404, b"".as_slice()),
+        ("rate", 429, br#"{"message":"wait"}"#.as_slice()),
+        ("malformed", 200, b"{}".as_slice()),
+        ("unmerged", 200, PULL),
+    ];
+    for (name, code, body) in rows {
+        let mut h = known();
+        h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
+        response(&mut h, 200, b"");
+        response(&mut h, code, body);
+        let answered = h.answered(1).expect("uncertain merge answered");
+        assert_eq!((answered.cost, &answered.result), (2, &Err(Error::Timeout)), "{name}");
+    }
+}
+#[test]
+fn a_merge_style_refusal_drops_the_repository_row() {
+    let mut h = known();
+    h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
+    response(&mut h, 405, br#"{"message":"squash is not an allowed merge style for this repository"}"#);
+    let answered = h.answered(1).expect("style refused");
+    assert_eq!((answered.cost, &answered.result), (1, &Err(Error::Refused)));
+    h.call(2, fixtures::REPO, Op::Write(Write::Update { number: 7 }));
+    h.run(Duration::ZERO);
+    assert!(bytes::find(&h.request_bytes(fixtures::FORGE), b"GET /api/v1/repositories/1 ").is_some());
+}
+#[test]
+fn set_reviewers_looks_up_missing_ids_then_adds_and_removes_only_the_difference() {
+    let mut h = known();
+    h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([2, 4]) }));
+    response(&mut h, 200, REVIEWERS);
+    assert!(bytes::find(&h.request_bytes(fixtures::FORGE), b"GET /api/v1/users/search?uid=4&limit=1 ").is_some());
+    response(&mut h, 200, br#"{"ok":true,"data":[{"id":4,"login":"missing"}]}"#);
+    assert!(bytes::find(&h.request_bytes(fixtures::FORGE), br#"{"reviewers":["missing"]}"#).is_some());
+    response(&mut h, 201, b"");
+    let written = h.request_bytes(fixtures::FORGE);
+    assert!(bytes::find(&written, b"DELETE /api/v1/repos/fixture/specimen/pulls/7/requested_reviewers ").is_some());
+    assert!(bytes::find(&written, br#"{"reviewers":["extra"]}"#).is_some());
+    response(&mut h, 204, b"");
+    let answered = h.answered(1).expect("reviewers answered");
+    assert_eq!((answered.cost, &answered.result), (4, &Ok(Answer::Done)));
+}
+#[test]
+fn set_reviewers_with_no_difference_writes_only_the_pull_read() {
+    let mut h = known();
+    h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([2, 3]) }));
+    response(&mut h, 200, REVIEWERS);
+    let answered = h.answered(1).expect("reviewers unchanged");
+    assert_eq!((answered.cost, &answered.result), (1, &Ok(Answer::Done)));
+    let written = h.request_bytes(fixtures::FORGE);
+    assert!(bytes::find(&written, b"POST ").is_none());
+    assert!(bytes::find(&written, b"DELETE ").is_none());
+}
+#[test]
+fn a_missing_reviewer_fails_before_any_reviewer_write() {
+    let mut h = known();
+    h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([4]) }));
+    response(&mut h, 200, PULL);
+    response(&mut h, 200, br#"{"ok":true,"data":[]}"#);
+    let answered = h.answered(1).expect("reviewer missing");
+    assert_eq!((answered.cost, &answered.result), (2, &Err(Error::Missing)));
+    assert!(bytes::find(&h.request_bytes(fixtures::FORGE), b"POST ").is_none());
+}
+#[test]
+fn write_answers_with_another_object_format_are_uncertain() {
+    let rows = [
+        ("branch", Write::CreateBranch { branch: boxed(b"work"), commit: head() }, 201, BRANCH),
+        (
+            "review",
+            Write::Review { number: 7, key: boxed(b"key"), verdict: Verdict::Comment, body: boxed(b"body") },
+            201,
+            REVIEW,
+        ),
+        ("reviewers", Write::SetReviewers { number: 7, reviewers: Box::from([2]) }, 200, REVIEWERS),
+    ];
+    for (name, write, code, body) in rows {
+        let mut h = known();
+        let mut row = fixtures::specimen();
+        row.object_format = temper_forge_forgejo::id::ObjectFormat::Sha256;
+        h.known(fixtures::REPO, row);
+        h.call(1, fixtures::REPO, Op::Write(write));
+        response(&mut h, code, body);
+        let answered = h.answered(1).expect("bad format answered");
+        assert_eq!((answered.cost, &answered.result), (1, &Err(Error::Timeout)), "{name}");
+    }
+}

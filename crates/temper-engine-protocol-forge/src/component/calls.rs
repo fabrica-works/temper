@@ -15,6 +15,10 @@ impl Component {
     ) {
         let waiting = self.waiting.get(id).expect("indexed call");
         let error = if waiting.cost == 0 { api::Error::Unavailable } else { api::Error::Timeout };
+        let error = match &waiting.plan {
+            Some(plan) => plan.error(error),
+            None => error,
+        };
         if let Some(token) = waiting.connection {
             self.connection_slab
                 .get_mut(*self.connections.get(&token).expect("holder"))
@@ -131,9 +135,6 @@ impl Component {
         };
         let mut token = None;
 
-        if !supported(waiting.op.as_ref().expect("waiting operation")) {
-            return false;
-        }
         let mut other = None;
         for (owner, connection) in &self.connections {
             let c = self.connection_slab.get(*connection).expect("indexed connection");
@@ -291,7 +292,9 @@ impl Component {
                     .expect("connection");
                 if c.phase == Phase::Closed {
                     c.close(true, io);
-                    self.finish(call, id, Err(api::Error::Timeout), up);
+                    let error =
+                        self.waiting.get(id).expect("call").plan.as_ref().expect("plan").error(api::Error::Timeout);
+                    self.finish(call, id, Err(error), up);
                     return true;
                 }
                 self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").set_pending(exchange);
@@ -312,43 +315,5 @@ impl Component {
                 true
             }
         }
-    }
-}
-fn supported(op: &api::Op) -> bool {
-    match op {
-        api::Op::Read(
-            api::Read::Locate { .. }
-            | api::Read::Items { .. }
-            | api::Read::Item { .. }
-            | api::Read::Pull { .. }
-            | api::Read::PullFor { .. }
-            | api::Read::Reviews { .. }
-            | api::Read::Statuses { .. }
-            | api::Read::Remarks { .. }
-            | api::Read::Branch { .. }
-            | api::Read::Branches
-            | api::Read::Protection { .. }
-            | api::Read::Settings
-            | api::Read::Collaborators { .. }
-            | api::Read::Permission { .. }
-            | api::Read::PullFiles { .. }
-            | api::Read::Compare { .. }
-            | api::Read::File { .. }
-            | api::Read::Checks { .. }
-            | api::Read::Job { .. },
-        ) => true,
-        api::Op::Write(write) => match write {
-            api::Write::OpenPull { .. } | api::Write::SetReviewers { .. } | api::Write::Merge { .. } => false,
-            api::Write::CreateIssue { .. }
-            | api::Write::Post { .. }
-            | api::Write::Review { .. }
-            | api::Write::Edit { .. }
-            | api::Write::Close { .. }
-            | api::Write::Reopen { .. }
-            | api::Write::Update { .. }
-            | api::Write::Status { .. }
-            | api::Write::CreateBranch { .. }
-            | api::Write::DeleteBranch { .. } => true,
-        },
     }
 }

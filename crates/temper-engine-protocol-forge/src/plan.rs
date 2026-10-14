@@ -28,6 +28,12 @@ pub(crate) enum Plan {
     Write(Box<crate::writes::Plan>),
 }
 impl Plan {
+    pub fn error(&self, error: api::Error) -> api::Error {
+        match self {
+            Self::Read(_) => error,
+            Self::Write(plan) => plan.error(error),
+        }
+    }
     pub fn new(repository: api::Repository, op: api::Op, cap: u32) -> Self {
         match op {
             api::Op::Read(read) => Self::Read(Box::new(crate::reads::Plan::new(repository, read, cap))),
