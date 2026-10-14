@@ -342,6 +342,27 @@ a push the transport did not carry.
 Size: world code; no production line.
 Removes: nothing.
 
+### 17.s1 The shipped profile admits a merge's conflicts
+
+A step not in the plan (decisions.md, ruling 153), before 17.4.
+Scope: the profile `small`'s checkout limits
+(`crates/temper-service/src/limits.rs:170-173`) take `conflicts` 4 and
+`path_bytes` 255 in place of 0 and 0, each doc line naming what it
+bounds and where its number comes from (the checkout merges world;
+`largest_output` within `stdout_bytes` 1,024); 17.3's two overrides,
+`checkout.conflicts` and `checkout.path_bytes`, leave the world's
+document.
+Files: `crates/temper-service/src/limits.rs`,
+`tests/one-process/src/fixtures.rs`.
+Test shape: no new test; every test's name and expected value kept.
+Proof: joint, `heavy cargo nextest run -p temper-one-process-world
+--ignore-default-filter`, once: the merge story passes with the two
+overrides gone; the gate.
+Don't: change `stdout_bytes`, another profile constant or the
+configuration document's defaults; a startup or worst-case check that
+now refuses the profile is a question naming the check and its numbers.
+Size: at most 10 production lines.
+
 ### 17.4 A drain, kills and power loss, and the secrets check
 
 Scope: the drain story: a signal mid-run drains the engine, the worker

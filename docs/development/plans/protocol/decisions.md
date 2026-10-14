@@ -1141,6 +1141,47 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      tier, and the process proof runs once, as the change aimed at this
      cause. Ruling 145's same-symptom count runs on from ruling 150's fix.
 
+152. **The one-process world's share is measured as "Done when" 11
+     measures it** (temper 17.4, blocked 2026-10-14T18:53:13Z; process).
+     code-organization.md, 5's shares are "guides on the summed time of
+     their tests"; the gate runs its tests side by side, so its log's
+     times (`temper-one-process-world`'s focused 2.278 s at 17.3's gate,
+     its own proof's 0.246 s and 0.815 s) are not the share. "Done when"
+     11 measures serially. So session 17, after 17.s1 (ruling 153) and
+     before 17.4, runs that item's focused command once, as the README
+     quotes it, and its `awk` sum, then the same `awk` over the lines
+     naming `temper-one-process-world`, and reports both sums:
+     - the world within 2.0 s and the total within 4.0 s: 17.4 goes on,
+       the world made no cheaper now, and 17.4's new focused stories each
+       aim at 0.25 s, as its Test shape says. This replaces
+       code-organization.md, 5's "made cheaper before more stories land
+       in it" for session 17 while the total holds;
+     - the world past 2.0 s, or the total past 4.0 s: the world is made
+       cheaper first, its slowest story first, with the cause named, then
+       the command runs once more.
+
+     No other measurement; the fuzzy half waits for "Done when" 11 at the
+     run's end.
+
+153. **The shipped profile admits a merge's conflicts: step 17.s1**
+     (temper 17.3, found in its landing `c554fa64`; plan defect). The
+     profile `small`'s checkout limits carry `conflicts: 0` and
+     `path_bytes: 0`, "from the checkout world fixture"
+     (`crates/temper-service/src/limits.rs:170-173`), and
+     `crates/temper-worker-domain/src/assignment.rs:52-54` refuses every
+     `Start::Merge` at `conflicts == 0` ("merge in progress"), so a
+     default service never resolves a merge (git.md, 4.6). 17.3's world
+     passed by overriding them to 1 and 64 in its document
+     (`tests/one-process/src/fixtures.rs`). configuration.md, 7 fixes no
+     number. So the profile takes `conflicts` 4, the checkout merges
+     world's (`tests/worker/checkout/src/merges.rs:49`), and `path_bytes`
+     255, so that `largest_output`'s paths, 4 × (255 + 1) = 1,024
+     (`temper-worker-protocol-git/src/limits.rs:63-70`), fit the profile's
+     `stdout_bytes` 1,024. Step `temper-17.s1`, session 17's, before
+     17.4; its session file is `temper/17-one-process.md`'s 17.s1.
+     `reserve: 0` (`limits.rs:45`) is the profile's other zero, and stays:
+     forge.md makes reserved writes optional.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
