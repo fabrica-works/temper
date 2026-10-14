@@ -469,7 +469,7 @@ fn start_with_worker(
 mod agent;
 mod clients;
 pub use agent::agent;
-mod system;
+pub(super) mod system;
 pub use system::{Kernel, hello, one_process, until_hosting};
 pub fn turn(service: &mut crate::Service) {
     crate::iterate(service, skein_lib::Time::from_nanos(1), skein_lib::Wall::from_nanos(1));
@@ -732,4 +732,4 @@ pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
 }
 mod startup;
-pub use startup::{APPLICATION, document, files, parsed};
+pub use startup::{APPLICATION, document, files, parsed, startup_agent, without, worker_runtime};

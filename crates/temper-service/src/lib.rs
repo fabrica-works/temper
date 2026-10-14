@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod limits;
 pub mod settings;
 pub mod startup;
+pub use startup::{Named, named, startup};
 pub mod system;
 pub use system::{Service, iterate};
 pub mod store;

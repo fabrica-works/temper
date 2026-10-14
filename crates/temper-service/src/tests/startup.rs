@@ -192,3 +192,124 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
     assert!(application::resolve(&members, &fixtures::files(), &mut problems).is_none(), "trust file must be read");
     assert_eq!(&*lines(&problems), b"application.forges[0].transport.tls.trust: not read\n".as_slice());
 }
+#[test]
+fn named_lists_each_file_with_its_bound_and_privacy() {
+    let named = crate::named(&fixtures::document()).unwrap();
+    assert_eq!(named.files.len(), 7, "all files listed");
+    for (name, path, max, private) in [
+        (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_219, false),
+        (b"secrets/worker-a.digest", b"engine.hosts.workers[0].digest", 65, true),
+        (b"accounts/chat.json", b"engine.llm.accounts[0].source.handed_in.file", 65_536, true),
+        (b"worker-secret", b"workers[0].secret", 257, true),
+        (fixtures::AGENT_JSON, b"workers[0].agent.configuration", 1_048_576, false),
+        (b"secrets/forge-1.api-token", b"application.forges[0].api_token", 4096, true),
+        (b"secrets/forge-1.git-token", b"application.identities[0].token", 8192, true),
+    ] {
+        let file = named.files.iter().find(|file| file.path.as_ref() == name).expect("listed file");
+        assert_eq!(file.max, max, "bound {name:?}");
+        assert_eq!(file.private, private, "privacy {name:?}");
+        let mut problems = Problems::empty();
+        problems.push(file.at.clone(), What::Jig(config::What::Missing));
+        let expected = [path, b": missing\n"].concat();
+        assert_eq!(&*lines(&problems), expected.as_slice(), "path {name:?}");
+    }
+}
+#[test]
+fn named_returns_the_worker_root_and_the_agent_configuration() {
+    let named = crate::named(&fixtures::document()).unwrap();
+    assert_eq!(named.deployment.as_ref(), b"state");
+    assert_eq!(named.worker_root.as_ref(), b"worker-root");
+    assert_eq!(named.agent.as_ref(), fixtures::AGENT_JSON);
+}
+#[test]
+fn a_file_named_but_not_given_refuses_the_start_naming_it() {
+    let mut files = fixtures::files();
+    files.entries = fixtures::without(files.entries, b"secrets/forge-1.git-token");
+    let refused = crate::startup(
+        &fixtures::document(),
+        &files,
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+    );
+    let Err(problems) = refused else { panic!("a missing token refuses the start") };
+    assert_eq!(&*lines(&problems), b"application.identities[0].token: not read\n".as_slice());
+}
+#[test]
+fn jigs_problems_keep_their_paths_under_engine() {
+    let input = fixtures::document();
+    let input = core::str::from_utf8(&input)
+        .unwrap()
+        .replace("\"memory_bytes\": 1152921504606846976,", "\"memory_bytes\": \"bad\",");
+    let problems = crate::named(input.as_bytes()).unwrap_err();
+    assert_eq!(&*lines(&problems), b"engine.memory_bytes: wrong value kind\n".as_slice());
+}
+#[test]
+fn startup_makes_the_one_process_from_the_example() {
+    let mut service = match crate::startup(
+        &fixtures::document(),
+        &fixtures::files(),
+        &fixtures::startup_agent(),
+        &fixtures::seeds(),
+        None,
+        fixtures::worker_runtime(),
+    ) {
+        Ok(service) => service,
+        Err(problems) => panic!("startup: {}", core::str::from_utf8(&lines(&problems)).unwrap()),
+    };
+    service.engine.store = fixtures::memory_store();
+    let mut stand = fixtures::system::SystemStand { service, kernel: fixtures::Kernel::new() };
+    fixtures::until_hosting(&mut stand);
+    let (channel, hello) = fixtures::hello(&stand.service).expect("worker linked through bytes");
+    assert_eq!(channel, skein_lib::Token::new(1));
+    assert_eq!(hello.slots, 1);
+    for _ in 0_u16..256 {
+        if stand.service.engine.domain.ready() {
+            break;
+        }
+        stand.turn();
+    }
+    assert!(stand.service.engine.domain.ready(), "engine restored its store");
+    assert_eq!(stand.service.end(), None);
+}
+#[test]
+fn a_workers_missing_or_oversized_secret_keeps_its_absolute_path() {
+    let document = fixtures::document();
+    let agent = fixtures::startup_agent();
+    let seeds = fixtures::seeds();
+    for (row, bytes, expected) in [
+        ("missing", None, b"workers[0].secret: not read\n".as_slice()),
+        ("past", Some(Box::from([b'x'; 257])), b"workers[0].secret: past its bound\n"),
+    ] {
+        let mut files = fixtures::files();
+        files.entries = fixtures::without(files.entries, b"worker-secret");
+        if let Some(bytes) = bytes {
+            files.entries.push((b"worker-secret".as_slice().into(), skein_lib::Secret::new(bytes))).unwrap();
+        }
+        let found = match crate::startup(&document, &files, &agent, &seeds, None, fixtures::worker_runtime()) {
+            Ok(service) => {
+                drop(service);
+                Problems::empty()
+            }
+            Err(problems) => problems,
+        };
+        assert_eq!(&*lines(&found), expected, "row {row}");
+    }
+}
+#[test]
+fn a_worker_secret_at_its_bound_excludes_its_final_newline() {
+    let mut worker = fixtures::worker_settings();
+    worker.jig.limits.link.secret = 4;
+    let mut entries = skein_lib::List::with_capacity(1);
+    entries.push((b"worker-secret".as_slice().into(), skein_lib::Secret::new(b"four\n".as_slice().into()))).unwrap();
+    let made = crate::Worker::new(
+        &worker,
+        &fixtures::worker_agent(),
+        &fixtures::worker_limits(),
+        &crate::settings::Files { entries },
+        fixtures::worker_runtime(),
+        7,
+    );
+    assert!(made.is_ok(), "four secret bytes plus their final newline fit four");
+}

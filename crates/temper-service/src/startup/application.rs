@@ -484,7 +484,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
-        let token = contents(files, &forge.api_token, 4096, path.member(b"api_token"), problems);
+        let token = contents(files, &forge.api_token, super::API_TOKEN_BYTES, path.member(b"api_token"), problems);
         let transport = match &forge.transport {
             Transport::Plaintext => settings::Transport::Plaintext,
             Transport::Tls { server_name, trust } => {

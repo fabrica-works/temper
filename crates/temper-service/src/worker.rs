@@ -69,7 +69,8 @@ impl Worker {
         let prepared = worker_settings::prepare(settings, agent, limits)?;
         let config = &settings.jig;
         let secret = files.contents(&config.secret).ok_or(problem(b"secret", What::Unreadable))?;
-        if secret.len() > usize::try_from(config.limits.link.secret).expect("secret bound") {
+        let bytes = secret.strip_suffix(b"\n").unwrap_or(secret);
+        if bytes.len() > usize::try_from(config.limits.link.secret).expect("secret bound") {
             return Err(problem(b"secret", What::Bound));
         }
         let link = link::Component::new(&prepared.link, worker_settings::credential(settings, secret), seed)

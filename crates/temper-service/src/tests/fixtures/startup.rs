@@ -53,3 +53,27 @@ pub fn files() -> settings::Files {
     }
     settings::Files { entries }
 }
+pub fn without(entries: List<(Box<[u8]>, Secret)>, name: &[u8]) -> List<(Box<[u8]>, Secret)> {
+    let mut kept = List::with_capacity(entries.len());
+    for entry in entries.into_boxed() {
+        if entry.0.as_ref() != name {
+            kept.push(entry).unwrap();
+        }
+    }
+    kept
+}
+pub fn worker_runtime() -> crate::WorkerRuntime {
+    crate::WorkerRuntime { root: skein_io::kernel::Fd::new(9), path: b"/worker".as_slice().into() }
+}
+pub fn startup_agent() -> settings::Agent {
+    let mut agent = super::agent();
+    let hub = jig_protocol_config::profile(jig_protocol_config::Profile::Small).hub;
+    agent.host_limits.directories = 3;
+    agent.host_limits.name_bytes = 256;
+    agent.host_limits.accounts = hub.accounts;
+    agent.host_limits.messages = hub.held.max(hub.inbox);
+    agent.host_limits.call_bytes = 256;
+    agent.host_limits.message_bytes = 65_538;
+    agent.bounds.message_bytes = 512;
+    agent
+}
