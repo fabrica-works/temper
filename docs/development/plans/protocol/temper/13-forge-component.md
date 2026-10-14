@@ -498,7 +498,11 @@ other rows skipped; then the status read of the pull answered: the open
 one, else the lookup's; each page in the cost), `Reviews` (`PENDING`
 and `REQUEST_REVIEW` skipped, counted
 towards a page coming full), `Statuses` (`more` while the pages read
-fall short of `total_count`), `Remarks` (the `page`th slice of the page
+fall short of `total_count`; a status's `url` its `target_url`, one
+that starts with a single `/` given the origin of the repository's
+`html_url` before it, forge.md, 3.2, "Links are absolute"; no author:
+`creator`, `null` on every Actions status, only fills the users' table
+when present), `Remarks` (the `page`th slice of the page
 size, cut as it streams), `Branch`, `Branches` (pages from 1 until one
 comes short, past `answer_bytes` `TooLarge`), `Protection`
 (`effective_branch_protection_name`, then the rule, or the listing when
@@ -527,7 +531,15 @@ reading.rs, failure.rs, component.rs, tables.rs, lib.rs, tests.rs,
 tests/fixtures.rs, tests/reads.rs}`;
 `crates/temper-engine-domain-forge-client/src/api.rs:64`, whose doc
 comment `/// Newest matching pull, open or closed.` becomes `/// The
-open matching pull, else the oldest.` (that line only).
+open matching pull, else the oldest.` (that line only). `api::Status`
+loses `author` (forge.md, 3.2, "Who posted a status is not carried"),
+unless a step before 13.3 removed it: `api.rs:366`, its construction
+in `crates/temper-engine-domain-forge-client/src/tests.rs:523`, the
+forge world's `tests/engine/forge/client/src/translate.rs:459-469`, and
+the store's record `Status` (`schema/store-v1.schema:103`, the generated
+code, `src/records/api.rs:409-436`, `src/tests/fixtures.rs:562-572`),
+by the README's rule that a durable record's codec follows its record
+(ruling 110); nothing else names the field.
 Shape: the sketch's `plan` and `reading`. A call's cost is the number of
 exchanges whose first byte was written. `Item`'s summary comes from
 `GET R/issues/<number>`, its comments from `GET R/issues/<number>/comments`;
@@ -546,6 +558,10 @@ Test shape: unit tests in `src/tests/reads.rs`; fixtures grow:
 `a_call_without_a_kept_path_resolves_by_id_and_counts_it`,
 `a_pending_review_is_skipped_but_fills_the_page`,
 `statuses_say_more_while_pages_fall_short_of_total_count`,
+`an_actions_status_reads_with_no_creator_and_an_absolute_link` (a
+status with `"creator":null` and `"target_url":"/fixture/specimen/actions/runs/1/jobs/0"`,
+as 05.3's `actions-combined-status` has them: its `url` is
+`http://127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0`),
 `revisions_and_provenance_follow_the_body_and_its_times` (rows: equal
 times, a later update, a missing `updated_at`, a `Long` body),
 `a_malformed_read_answer_is_invalid_and_closes_its_connection`,
@@ -603,8 +619,9 @@ Proof: unit, `heavy cargo nextest run -p temper-engine-protocol-forge -E
 `state=all`, `since`, `sort=leastupdate`, `page` and `limit`, a thread
 stops at the answer's bound, a missing path is resolved and counted, a
 malformed answer is `InvalidAnswer` with its connection closed, and
-`PullFor` answers the open pull when the lookup names a closed one (the
-ten tests); under 0.3 s. The world layer opens at 13.5.
+`PullFor` answers the open pull when the lookup names a closed one, and
+an Actions status reads with an absolute link (the eleven tests); under
+0.3 s. The world layer opens at 13.5.
 Don't: list without `page` and `limit`; read a body the plan does not
 carry (skip it); keep a row of a listing past the page.
 Size: at most 600 lines.
@@ -622,9 +639,11 @@ R/raw/<filename>?ref=<head>` but for `deleted`; a side's `404` absent;
 `TooLarge`), `Compare` (both comparisons; per file its sides at `before`
 and `after`; `contains_before` when the second's `total_commits` is 0;
 the commits from the first's rows), `File` (one raw read with `Range`),
-`Checks` (the combined status's pages until one comes short; per failing status whose
+`Checks` (the combined status's pages until one comes short; each
+status's `url` as 13.3's `Statuses`; per failing status whose
 `target_url` is a job link of the repository's `html_url`, 06's
-`header::job_link`, the run by `head_sha` and `run_number`, then its
+`header::job_link` (the link with `html_url`, or with its path alone,
+as v16.0.5 writes it), the run by `head_sha` and `run_number`, then its
 jobs; the job at the link's index, its `attempt`; any miss leaves `job`
 none), `Job` (the run, whose `commit_sha` must be the attempt's head;
 its jobs, one of which must have the attempt's id and attempt; the log
@@ -658,7 +677,8 @@ only the pull's read.
 Test shape: unit tests in `src/tests/contents.rs` and
 `src/tests/writes.rs`: `pull_files_at_another_head_fail_stale_reading_no_file`,
 `a_files_missing_side_is_absent_and_its_read_counted`,
-`checks_find_a_failing_jobs_run_and_attempt_from_its_link`,
+`checks_find_a_failing_jobs_run_and_attempt_from_its_link` (the
+failing status's link relative to the origin, as v16.0.5 writes it),
 `a_job_log_at_another_head_is_missing_job`,
 `creations_carry_the_key_marker_at_the_head_of_their_body`,
 `a_merge_sends_the_rows_style_and_reads_its_commit`,

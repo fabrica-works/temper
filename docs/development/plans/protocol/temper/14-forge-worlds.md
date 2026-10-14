@@ -85,8 +85,10 @@ facts as the component sees them.
   its answer encoded as Forgejo encodes it. Where a route needs what the
   fake's vocabulary does not read, the fake's domain grows that read:
   Actions' runs ... each job with its id and attempt; and the fake's CI
-  statuses link their jobs in Forgejo's shape, `<html_url>/actions/runs/<run
-  number>/jobs/<job index>`." "its protocol layer gives each the id the
+  statuses link their jobs in Forgejo's shape, relative to the origin,
+  `<the path of html_url>/actions/runs/<run number>/jobs/<job index>`,
+  with no `creator`, as Forgejo writes a status of its Actions." "its
+  protocol layer gives each the id the
   scenario names, and answers `/repositories/{id}` with its path, `sha1`
   as its object format and `squash` ... as its merge style. A commit the
   fake counts is a 40-digit id, its count big-endian in its first eight
@@ -179,8 +181,10 @@ facts as the component sees them.
   opens it (the protocol layer's), false where `NothingToMerge` is
   answered as the vocabulary says (the direct worlds' translation). Runs and jobs live in a new `src/actions.rs` (`api.rs` is at
   728 lines and stays under 800). A CI status's link is
-  `/<full name>/actions/runs/<number>/jobs/<index>`; the protocol layer
-  puts its `base` before it. The ids are 02.1's (`api::Setup.id`); the
+  `/<full name>/actions/runs/<number>/jobs/<index>`, which the protocol
+  layer writes as it is, relative to the origin as Forgejo v16.0.5
+  writes it (`Config.base` has no path), and a status the fake's CI
+  posted is written with `"creator":null`. The ids are 02.1's (`api::Setup.id`); the
   token table is the protocol layer's, not the domain's.
 - **The fake's protocol layer is shaped after skein's fake LLM provider:**
   a `Service` (the scenario's tables, the calls across connections, the
@@ -447,8 +451,10 @@ raw reads (`206` with `Content-Range`); a `Do` other than `squash`
 answered `405` with `failure::answer(MergeStyle)`; commit ids as 40
 digits with the count big-endian in the first eight bytes (an id with
 another byte set: `404`); user objects with logins from `Config.users`
-(`u<id>` for an id not there); `html_url` and job links behind
-`Config.base`.
+(`u<id>` for an id not there); `html_url` behind `Config.base`; a
+status's job link as the domain makes it, relative to the origin, and
+a status by the fake's CI user (`ci` of the domain's limits) with
+`"creator":null`, as Forgejo writes Actions' statuses.
 Needs: nothing beyond 14.2.
 Files: `testing/temper-fake-forge-protocol/{Cargo.toml, src/{lib.rs,
 service.rs, server.rs, routes.rs, answers.rs, errors.rs, tally.rs,
@@ -494,7 +500,10 @@ fake's domain behind it with `fake_config()` of
 `requests_are_counted_by_route_user_and_total`,
 `a_reset_closes_before_reading_and_a_timeout_drops_or_answers_500`,
 `deleting_a_missing_branch_answers_500_with_an_empty_body`,
-`a_pull_with_nothing_to_merge_is_opened_201`.
+`a_pull_with_nothing_to_merge_is_opened_201`,
+`a_ci_status_has_no_creator_and_a_link_relative_to_the_origin` (a
+failing CI status on a pushed commit, read by `GET
+R/commits/<sha>/status`: `"creator":null`, `"target_url":"/org/repo/actions/runs/1/jobs/0"`).
 Each under 20 ms. Joint, in `tests/engine/protocol-forge/tests/fake_protocol.rs`
 (13.5's world crate, with `src/pipe.rs`, 14.4's pipe, made here, and
 `src/joint.rs`: `Joint`, the component and this layer with the fake's
@@ -561,7 +570,7 @@ token is a `401`, a page is capped as Forgejo caps it, and the tally
 counts by route and user, a missing branch's deletion is a `500`, a
 pull with nothing to merge is opened, and through the component
 `PullFor` finds the open pull and `OpenPull` with nothing to merge
-writes nothing (the eight unit tests and the three joint ones); under
+writes nothing (the nine unit tests and the three joint ones); under
 0.5 s.
 Don't: keep state of a call past its reply; answer from the domain's
 store but through a call (a world's `inspect` is a world's); write a
@@ -932,7 +941,8 @@ pub mod fake_actions {
     // `api::Write::OpenPull` gains `pub opens_empty: bool`: true opens a head with no commit its
     // base lacks, as Forgejo does (the protocol layer's calls); false answers `NothingToMerge`.
     // `api::CheckSummary.link` is, for a CI status, `/<full name>/actions/runs/<number>/jobs/<index>`
-    // (the protocol layer puts its base before it), and empty for another user's status.
+    // (the protocol layer writes it as it is, relative to the origin, as Forgejo v16.0.5
+    // does), and empty for another user's status.
 }
 
 // temper_fake_forge_protocol (14.3, `testing/temper-fake-forge-protocol`, step code): Forgejo's

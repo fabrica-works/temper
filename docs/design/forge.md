@@ -179,7 +179,7 @@ first failure, but where a row says otherwise.
 | `Read::Pull { number }` | `GET R/pulls/<number>`; `GET R/commits/<head.sha>/status?page=1&limit=1` | `number`; `state`; `head.ref`, `base.ref`; `head.sha` as `commit`; `base.sha` as `base_commit`, none when empty; `merge_commit_sha` when `merged`; `mergeable`; `requested_reviewers[].id`; CI from the combined `state` and `total_count` |
 | `Read::PullFor { head, base }` | `GET R/pulls/<base>/<head>`; when it names a pull request that is not open, `GET R/pulls?state=open&sort=oldest&page=<n>&limit=<size>` from page 1, until a row has the head and base or a page comes short; then the status read, as `Pull`, of the pull request answered | the open pull request for the head and base, else the one the lookup named; as `Pull` |
 | `Read::Reviews { number, page }` | `GET R/pulls/<number>/reviews?page=<page>&limit=<size>` | submitted reviews, oldest first: `id`, `user.id`, `state` as the verdict, `commit_id`, `body` and its key, `submitted_at` as `at`, `official`, provenance and revision; `more` when the page came full |
-| `Read::Statuses { commit, page }` | `GET R/commits/<commit>/status?page=<page>&limit=<size>` | CI from `state` and `total_count`; each context's latest status: `creator.id`, `updated_at`, `context`, `status`, `description`, `target_url`, no job; `more` while the pages read fall short of `total_count` |
+| `Read::Statuses { commit, page }` | `GET R/commits/<commit>/status?page=<page>&limit=<size>` | CI from `state` and `total_count`; each context's latest status: `updated_at`, `context`, `status`, `description`, `target_url` as its link ("Links are absolute"), no job; `more` while the pages read fall short of `total_count` |
 | `Read::Remarks { number, review, page }` | `GET R/pulls/<number>/reviews/<review>/comments` (unpaged) | the `page`th slice of `<size>`, cut as it streams: `id`, `user.id`, `path`, `position` as `line`, `body`; `more` when a comment follows the slice |
 | `Read::Branch { branch }` | `GET R/branches/<branch>` | `commit.id` |
 | `Read::Branches` | `GET R/branches?page=<n>&limit=<size>`, from page 1 until a page comes short | every `name`; past the answer's bound, `TooLarge` |
@@ -241,12 +241,25 @@ Notes on the table:
   as a status on the commit it ran on, so CI is read from statuses
   alone, never from a history of runs.
 - **Job attempts.** An Actions status links to its job's page,
-  `<the repository's html_url>/actions/runs/<run number>/jobs/<job
-  index>` (13). The run's number is its `index_in_repo`, which the runs'
-  listing filters by (`run_number`); the job is the one at that index of
-  the run's jobs; its attempt is the job's `attempt`. A link of another
-  shape, or a run or a job not found, leaves the status's `job` none,
-  and the call answers all the same.
+  `<the path of the repository's html_url>/actions/runs/<run
+  number>/jobs/<job index>`, relative to the forge's origin, as v16.0.5
+  writes it (13); the same link with the whole `html_url` before it is
+  read the same way. The run's number is its `index_in_repo`, which the
+  runs' listing filters by (`run_number`); the job is the one at that
+  index of the run's jobs; its attempt is the job's `attempt`. A link of
+  another shape, one that starts `//` or names another scheme or host,
+  or a run or a job not found, leaves the status's `job` none, and the
+  call answers all the same.
+- **Links are absolute.** A status's link goes to the domain whole: one
+  relative to the forge's origin (a `target_url` that starts with one
+  `/`) gets the origin (scheme, host and port) of the repository's
+  `html_url` before it, so a brief or an agent reading it has a link
+  that opens; any other is carried as Forgejo wrote it.
+- **Who posted a status is not carried.** A status written by Actions
+  has no `creator` (13), and nothing in the domain reads a status's
+  poster: CI is read by context and state, and a gate's verdict temper
+  posts is for protection, which reads it by context
+  (`domain/forge.md`, 8.3). `api::Status` has no author.
 - **Contents of a pull request's files and of a comparison** are read
   file by file, two reads each, since the domain carries each changed
   file whole on both sides (`api::File`); the reads count in the call's
@@ -445,7 +458,8 @@ Mechanism only, bounded, and rebuilt by asking again:
   resolves the id again. At most `repositories` rows in all; when the
   table is full, the row used longest ago goes.
 - **Users:** a table of logins by user id, filled from every user object
-  an answer carries (`user`, `creator`, `requested_reviewers`, a
+  an answer carries (`user`, a status's `creator` when it is not `null`,
+  `requested_reviewers`, a
   collaborators' listing); an id the table does not hold is looked up
   with `GET /api/v1/users/search?uid=<id>&limit=1`, counted in the call,
   and a user not found fails the call as `Missing`. At most `users`
@@ -684,8 +698,9 @@ side of `temper-forge-forgejo`.
   job with its id and attempt; the oldest pull request for a head and
   base, open or not, and the open pull requests, oldest first, for
   `Read::PullFor`'s requests (3.2); and the fake's CI statuses link their
-  jobs in Forgejo's shape, `<html_url>/actions/runs/<run number>/jobs/<job
-  index>`.
+  jobs in Forgejo's shape, relative to the origin, `<the path of
+  html_url>/actions/runs/<run number>/jobs/<job index>`, with no
+  `creator`, as Forgejo writes a status of its Actions.
 - **Its names, Forgejo's shape.** The fake names repositories by their
   full name; its protocol layer gives each the id the scenario names,
   and answers `/repositories/{id}` with its path, `sha1` as its object
@@ -910,6 +925,11 @@ Observed on Forgejo v16.0.5 by `tools/forgejo-conformance`
   collaborator who is not an admin, and names the rule for an admin; a
   writer's read then goes to the listing, which answers it `403` (3.2,
   `Read::Protection`).
+- A status written by Actions has `creator` `null`, and its
+  `target_url` is relative to the origin:
+  `/fixture/specimen/actions/runs/1/jobs/0` for a repository whose
+  `html_url` is `http://127.0.0.1:3000/fixture/specimen`; the job's
+  index counts from 0 (3.2, "Job attempts").
 
 Observed on Forgejo v15.0.0 (`domain/forge.md`, 20.1 has the rest),
 each to confirm on v16.0.5:
@@ -952,8 +972,8 @@ it:
 - that `base.sha` is the base branch's tip when read;
 - a combined status with no status: its `state` and `total_count`; how
   `skipped` combines;
-- that Actions report each job as a status on its head; the shape of
-  that status's link, and whether it names an attempt; that
+- that Actions report each job as a status on its head; whether that
+  status's link names an attempt; that
   `run_number` is a run's `index_in_repo`; the order of a run's jobs;
   that a log read with `Range` answers `206`, and a raw file read too;
 - that an issue's comments and a pull request's reviews come oldest

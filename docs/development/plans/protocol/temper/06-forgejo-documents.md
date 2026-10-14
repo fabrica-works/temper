@@ -433,14 +433,26 @@ server.rs, server/files.rs, server/actions.rs, tests.rs}`;
 `tests/codecs/tests/forgejo_files.rs`.
 Shape: as the interface sketch. A `Raw` target keeps the file's slashes
 (`path::file`); its `ref` is the id's hex. `job_link` reads
-`<html_url>/actions/runs/<n>/jobs/<i>` and nothing longer, the link's
-prefix equal to `html_url`; any other shape is `None`. `retry_after` reads decimal
+`<prefix>/actions/runs/<n>/jobs/<i>` and nothing longer, its prefix
+either `html_url` whole or `html_url`'s path (from the first `/` after
+`://` and the host; `/fixture/specimen`), as v16.0.5 writes the link
+relative to the origin (forge.md, 3.2, "Job attempts"); a link that
+starts `//`, or names another scheme or host, and any other shape is
+`None`. `retry_after` reads decimal
 seconds, or an HTTP date less `date` (a date before it: zero).
 Test shape: unit tests in `src/tests.rs`:
 `x_hasmore_reads_true_or_false_only`,
 `a_content_range_reads_its_first_last_and_total`,
 `retry_after_reads_seconds_or_a_date_from_the_answers_date`,
-`a_job_link_of_another_shape_names_no_job`, each a table. World tests in
+`a_job_link_of_another_shape_names_no_job` (its table holds, for
+`html_url` `http://127.0.0.1:3000/fixture/specimen`:
+`/fixture/specimen/actions/runs/1/jobs/0` and
+`http://127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0` read as
+`(1, 0)`; `//127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0`,
+`http://other:3000/fixture/specimen/actions/runs/1/jobs/0`,
+`/other/specimen/actions/runs/1/jobs/0` and
+`/fixture/specimen/actions/runs/1/jobs/0/x` read as `None`), each a
+table. World tests in
 `tests/codecs/tests/forgejo_files.rs`, as 06.2's five, named
 `file_...` in place of `item_...`, over
 `pull-files-page-1`, `pull-files-page-2`, `compare`, `compare-reverse`,
@@ -1557,8 +1569,10 @@ pub mod header {
         unreachable!("sketch")
     }
 
-    /// An Actions status's link, `<html_url>/actions/runs/<run number>/jobs/<job index>`
-    /// (forge.md, 3.2, "Job attempts"): the two numbers, or `None` for a link of another shape.
+    /// An Actions status's link, `<html_url>/actions/runs/<run number>/jobs/<job index>`, or
+    /// the same after `html_url`'s path alone, relative to the origin as v16.0.5 writes it
+    /// (forge.md, 3.2, "Job attempts"): the two numbers, or `None` for a link of another shape,
+    /// one that starts `//`, or one of another scheme or host.
     #[must_use]
     pub fn job_link(target_url: &[u8], html_url: &[u8]) -> Option<(u64, u32)> {
         unreachable!("sketch")
