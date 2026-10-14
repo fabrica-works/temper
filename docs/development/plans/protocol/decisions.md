@@ -665,6 +665,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `worker_settings.rs`. A further shared helper ruling 130 needs, at
      most 20 lines, is the README's 20-line fix, with no question.
 
+131. **The forge component's small values fit the client's answers**
+     (temper 14.1, blocked 2026-10-14T12:13:36Z; plan defect). forge.md,
+     7 checks at start "for each listing, at least one of its largest
+     rows fits the client's `answer_bytes`, so no page size is 0", and
+     fixes no number: `string_bytes` "at least the forge's
+     `name_bytes`" (256), `body_bytes` "at least the client's `op_bytes`
+     with a marker" (`2 × 512 + 21` = 1,045). Session 13's table chose
+     `body_bytes` 65,536, `string_bytes` 1,024 and `inner` 64, which make
+     `Items`' largest row (`body + body/2 + string + inner × (string +
+     16) + Summary`, the implementer's reading of `limits::largest_row`)
+     about 166 KB, past the small client's `answer_bytes` 65,536 (ruling
+     113), so its page size is 0. Raising `answer_bytes` to 262,144
+     breaks jig's small store preset and still gives a page of 1. So the
+     component's small values fall, within forge.md's floors:
+     `string_bytes` the larger of 512 and `name_bytes`, `body_bytes` the
+     larger of 16,384 and `2 × op_bytes + 21`, `inner` 32; `Items`' row is
+     then about 42 KB. A body past 16,384 bytes reads as `Long` (forge.md,
+     3.3), as any body past `body_bytes` does. If a listing's page size is
+     still 0, `inner` halves until it is not, at least 8, and the report
+     names the values. The client's, the root's and the store's presets
+     are unchanged; a larger profile, later, raises them together.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

@@ -191,9 +191,9 @@ it into `temper-service` here: that is 14.1.
   | `body_bytes_in` | 16,777,216 |
   | `depth` | 16 |
   | `chunk` | 4,096 |
-  | `string_bytes` | the larger of 1,024 and `forge.name_bytes` |
-  | `body_bytes` | the larger of 65,536 and `2 × forge.client.op_bytes + 21` |
-  | `inner` | 64 |
+  | `string_bytes` | the larger of 512 and `forge.name_bytes` (ruling 131) |
+  | `body_bytes` | the larger of 16,384 and `2 × forge.client.op_bytes + 21` (ruling 131) |
+  | `inner` | 32 (ruling 131) |
   | `target_bytes` | 4,096 |
   | `repositories` | `forge.repositories` |
   | `users` | 256 |
