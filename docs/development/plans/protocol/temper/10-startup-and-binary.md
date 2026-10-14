@@ -297,7 +297,8 @@ engine` and `worker`, their problems under `engine` and `workers[0]`,
 `application::files`, each `at` from the root); `startup` (parse again;
 `check_files` as the reference's `:276`, each file at most its `max`;
 `resolve`; 08.1's `settings::Engine` and `settings::Worker` filled;
-08's engine layer made, 09.1b's `Worker::new` with `runtime`, 09.3's
+08's engine layer made, 09.1b's `Worker::new` with `runtime` and the
+`Files` `check_files` read (ruling 127), 09.3's
 crate-visible constructor joining them; jig's `Problems` from either
 taken in with `Problems::jig`); `API_TOKEN_BYTES`. `lib.rs` exports
 `startup::{named, startup, Named}`.

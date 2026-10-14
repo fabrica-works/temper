@@ -580,6 +580,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      106. Its Scope, Files, Test shape and Proof are unchanged. Session
      13 says so.
 
+127. **The worker's secret comes from the `Files` `Worker::new` takes**
+     (temper 09.1b, blocked 2026-10-14T10:16:19Z; plan defect). jig's
+     pinned `config::Worker.secret` is a file's path; 09.1b's sketch gave
+     `Worker::new(settings, agent, limits, runtime, seed)` no file's
+     bytes. 09.1b copies jig's reference `worker.rs`, whose
+     `Worker::new(config, agent, files: &Files, ...)` reads the secret
+     with `files.contents(&config.secret)` and checks it against
+     `limits.link.secret` (`testing/jig-test-service/src/worker.rs:60-68`
+     at the pin), its startup passing the files it read
+     (`startup.rs:600`); 08.1's `settings::Files` is that type, "the
+     private files jig's parts name, by path, as jig's reference takes
+     them", already in `settings::Engine`. So `Worker::new` takes
+     `files: &settings::Files` before `runtime`, as the reference does,
+     and 10.1b passes the files its `check_files` read; configuration.md,
+     6: a worker's secret is "Named by jig's parts", "Read by jig's
+     components". `settings::Worker` stays `{ jig, root, git }`
+     (decision 9), and no `Secret` is added to it. Sessions 09 and 10
+     say so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

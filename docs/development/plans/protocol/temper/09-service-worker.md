@@ -279,7 +279,12 @@ typed settings (decision 9: `settings::Worker { jig, root, git }`,
 where the reference parses jig's configuration, its checks returning `Problems` with the reference's
 paths; the link's credential with `temper_protocol_worker_wire::PAYLOAD_VERSION`
 in place of `payload: 1` (`worker.rs:95`), made by a crate-visible
-`credential(settings, secret) -> link::Credential`; agents spawned as
+`credential(settings, secret) -> link::Credential`, the secret
+resolved from the `files: &settings::Files` `Worker::new` takes (08.1's
+type), by `settings.jig.secret`, with the reference's two checks
+(`worker.rs:66-68`: not there `Unreadable`, past
+`settings.jig.limits.link.secret` `Bound`, each naming `secret`; decisions.md,
+ruling 127); agents spawned as
 the reference spawns them, the program and arguments from jig's worker
 part's `agent` (temper's binary, `agent <AGENT.json>`), environment
 empty; each `link::Request` through a crate-visible `Worker::link(now,
@@ -307,7 +312,8 @@ Shape: as the sketch's `worker` section, without `git`'s parts (09.2):
 `WorkerRuntime { root }` only, `refused()` always `None`.
 Test shape: step tests in `src/tests/worker.rs`, after jig's reference
 `src/tests/worker.rs`; fixtures gain `worker()` (a `Worker` from 08's
-settings fixture, root `Fd::new(9)`), `spawn(&mut Worker) -> (Token,
+settings fixture and a `Files` holding its secret's path, root
+`Fd::new(9)`), `spawn(&mut Worker) -> (Token,
 kernel::Spawn)` (copied from the reference's `:13-22`), `TEMPER =
 b"/opt/temper/bin/temper"`, `AGENT_JSON = b"/opt/temper/agent.json"`,
 `NOW`, `chat_assignment()` and `repository_assignment()` (each a
@@ -676,6 +682,9 @@ impl Worker {
         settings: &settings::Worker,
         agent: &settings::Agent,
         limits: &limits::Limits,
+        // The private files startup read; the worker's secret by
+        // `settings.jig.secret`, as the reference's (ruling 127).
+        files: &settings::Files,
         runtime: WorkerRuntime,
         seed: u64,
     ) -> Result<Worker, Problems> {
