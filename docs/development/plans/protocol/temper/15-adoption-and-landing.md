@@ -303,7 +303,10 @@ root passes the side beside the table; decisions.md, ruling 124);
 `Progress` and
 `Answered` kept for the page; adopted, the fields back to their
 defaults; out of date, `Adopt` disabled and a pending request left in
-the table. `temper-client-view`: `forge/page.rs`, `forge/bindings.rs`,
+the table, never sent: the root's `take` (`domain.rs`) pushes no
+`Request::Send` whose ask is `Ask::Forge` while the side is out of date,
+and the side shows its pending request as `Parked` (decisions.md,
+ruling 125). `temper-client-view`: `forge/page.rs`, `forge/bindings.rs`,
 `forge/words.rs` (the sketch's `view` module): the page after jig's
 frame (a level-1 heading, the fields in 4.4's order with their names, the
 three role choices, the two checks, the button disabled while pending or
@@ -314,7 +317,7 @@ its resources); the navigation slot's link; `decode` with typed input;
 4.7's KINDS words.
 Needs: nothing beyond 15.1a.
 Files: `crates/temper-client-domain/src/{forge.rs, forge/form.rs,
-route.rs, limits.rs, tests.rs, tests/form.rs, tests/fixtures.rs}`;
+route.rs, domain.rs (ruling 125), limits.rs, tests.rs, tests/form.rs, tests/fixtures.rs}`;
 `crates/temper-client-view/src/{root.rs, forge.rs, forge/page.rs,
 forge/bindings.rs, forge/words.rs, tests.rs, tests/forge_page.rs,
 tests/fixtures.rs}`; the root's `Action::Forge(forge::Act)`. Users of

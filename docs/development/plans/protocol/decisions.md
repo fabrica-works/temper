@@ -536,6 +536,33 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      sent scope is it. Its Size (550), its ten tests' names and its
      Proof are unchanged; no upstream edit or repin.
 
+125. **An out-of-date family's requests stay in the table, unsent**
+     (temper 15.1b, blocked 2026-10-14T09:46:45Z; plan defect, not
+     design). The design says what happens: jig's `protocol/client.md`,
+     9, at the pin, "A client outside a range sends nothing more of that
+     owner, shows that it is out of date and how to update ..., and
+     keeps what is pending in its small store; updated, it sends what is
+     pending under its keys"; temper's client.md, 4.4, "the button is
+     disabled, and a pending adoption stays in the small store". skein's
+     pinned `RequestTable` (`skein-lib/src/requests.rs`) parks by link
+     and scope only, not by owner, and 15.1b named no mechanism. So,
+     with no change to the table and no repin: the root's `take`
+     (`temper-client-domain/src/domain.rs`) pushes no `Request::Send`
+     whose ask is `Ask::Forge(_)` while the forge side is out of date
+     (the ask, not the owner, so a kept adoption is held too); the
+     attempt stays unanswered until the table parks it at a link or
+     party change and offers it again, and it is held again. The side
+     shows its pending request's progress as `Parked` while out of date.
+     Retention still retires it as unknown (jig's
+     `client/domain/root.md`, 4: "A request first sent longer ago than
+     that, less a margin, is never sent again"), the 4.7 row "unknown
+     past the retention". `domain.rs` joins 15.1b's Files;
+     `out_of_date_disables_adopt_and_keeps_the_pending_request` also
+     asserts that after the out-of-range hello and a link down and up,
+     the root's `take` pushes no forge `Send` and the table still holds
+     the request. No other test; 15.1b's Size and allowance (550, 1100,
+     its parts 15.1ba and 15.1bb summed) are unchanged.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
