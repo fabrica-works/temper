@@ -836,6 +836,11 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      read-back, Pipe and Joint). So 14.3 lands within 2400, its parts
      summed; past 2400 it asks. Its Scope, Test shape and Proof are
      unchanged, the nine HTTP and three joint tests among them.
+     At 2026-10-14T14:19:32Z 14.3d, complete with its proof passed (35
+     tests, the nine HTTP and three joint among them), counted 2452:
+     14.3d's 893 (`server.rs` 574, `service.rs` 161, `response.rs` 150, the
+     rest 8) on 1559. It lands at 2452, 14.3 closed; nothing more is
+     added under 14.3.
 
 ## For the user
 
