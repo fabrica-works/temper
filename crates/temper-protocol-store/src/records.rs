@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
 mod names;
+mod topics;
 const FITS: &str = "admitted fields fit the schema";
 
 /// Encode a supported family admitted by the domain; later families return none.
@@ -12,19 +13,19 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
     let value = match value {
         d::Stored::Repository(value) => w::Value::Repository(names::encode_adopted(value)),
         d::Stored::Hold(value) => w::Value::Hold(names::encode_hold(value)),
+        d::Stored::Names { task, resources } => w::Value::Names(topics::encode_names(*task, resources)),
+        d::Stored::Subscription(value) => w::Value::Subscription(topics::encode_subscriber(value)),
+        d::Stored::BranchHead(value) => w::Value::BranchHead(topics::encode_branch_head(value)),
+        d::Stored::PullState(value) => w::Value::PullState(topics::encode_pull_state(value)),
+        d::Stored::Ci(value) => w::Value::Ci(topics::encode_ci_state(value)),
+        d::Stored::Landed { commit, task } => w::Value::Landed(topics::encode_landed(*commit, *task)),
+        d::Stored::Release(value) => w::Value::Release(topics::encode_release(value)),
         d::Stored::Call { .. }
         | d::Stored::ProposedEffect(_)
         | d::Stored::Entry { .. }
         | d::Stored::Client(_)
         | d::Stored::Change(_)
-        | d::Stored::Issue(_)
-        | d::Stored::Names { .. }
-        | d::Stored::Subscription(_)
-        | d::Stored::BranchHead(_)
-        | d::Stored::PullState(_)
-        | d::Stored::Ci(_)
-        | d::Stored::Landed { .. }
-        | d::Stored::Release(_) => return None,
+        | d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
@@ -38,5 +39,18 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     Ok(match row.into_parts().value {
         w::Value::Repository(value) => d::Stored::Repository(names::decode_adopted(value, bounds)?),
         w::Value::Hold(value) => d::Stored::Hold(names::decode_hold(value, bounds)?),
+        w::Value::Names(value) => {
+            let w::NamesParts { task, resources } = value.into_parts();
+            d::Stored::Names { task, resources: topics::decode_names(resources, bounds)? }
+        }
+        w::Value::Subscription(value) => d::Stored::Subscription(topics::decode_subscriber(value)),
+        w::Value::BranchHead(value) => d::Stored::BranchHead(topics::decode_branch_head(value, bounds)?),
+        w::Value::PullState(value) => d::Stored::PullState(topics::decode_pull_state(value, bounds)?),
+        w::Value::Ci(value) => d::Stored::Ci(topics::decode_ci_state(value)),
+        w::Value::Landed(value) => {
+            let w::LandedParts { commit, task } = value.into_parts();
+            d::Stored::Landed { commit, task }
+        }
+        w::Value::Release(value) => d::Stored::Release(topics::decode_release(value, bounds)?),
     })
 }

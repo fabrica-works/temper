@@ -212,6 +212,48 @@ pub fn adopted(protection: top::Protection) -> top::Stored {
         },
     })
 }
+fn initial_rows(name: &top::Name) -> [(&'static str, top::Stored); 8] {
+    [
+        ("repository unknown", adopted(top::Protection::Unknown)),
+        ("repository absent", adopted(top::Protection::Absent)),
+        (
+            "repository rule",
+            adopted(top::Protection::Rule(client::api::Protection {
+                branch: Box::from(b"main".as_slice()),
+                contexts: Box::new([Box::from(b"test".as_slice()), Box::from(b"build".as_slice())]),
+                approvals: 2,
+                dismiss_stale: true,
+            })),
+        ),
+        (
+            "names",
+            top::Stored::Names {
+                task: 1,
+                resources: Box::new([
+                    name.clone(),
+                    top::Name { forge: 1, repository: 2, what: top::What::Repository },
+                    top::Name { forge: 1, repository: 2, what: top::What::Pull(3) },
+                    top::Name { forge: 1, repository: 2, what: top::What::Issue(4) },
+                ]),
+            },
+        ),
+        (
+            "branch head",
+            top::Stored::BranchHead(top::BranchHead { name: name.clone(), commit: [255; 32], owned: true }),
+        ),
+        (
+            "pull state",
+            top::Stored::PullState(top::PullState {
+                name: name.clone(),
+                head: [255; 32],
+                ci: client::api::Ci::Passed,
+                state: client::api::State::Closed,
+            }),
+        ),
+        ("ci", top::Stored::Ci(top::CiState { repository: REPO, head: [255; 32], status: client::api::Ci::Failed })),
+        ("landed", top::Stored::Landed { commit: [255; 32], task: u64::MAX }),
+    ]
+}
 fn add_holds(name: &top::Name, rows: &mut List<(&'static str, top::Stored)>) {
     for (label, writer, change) in [
         (
@@ -242,24 +284,62 @@ fn add_holds(name: &top::Name, rows: &mut List<(&'static str, top::Stored)>) {
         .expect("fixture rows fit");
     }
 }
+fn add_subscriptions(_name: &top::Name, rows: &mut List<(&'static str, top::Stored)>) {
+    for (label, topic) in [
+        ("landings", top::Topic::Landings { repository: REPO, branch: Box::from(b"main".as_slice()) }),
+        ("ci topic", top::Topic::Ci { repository: REPO, head: [255; 32] }),
+        ("pull", top::Topic::Pull { repository: REPO, number: 3 }),
+        ("participation", top::Topic::Participation { repository: REPO, number: 4 }),
+    ] {
+        rows.push((
+            label,
+            top::Stored::Subscription(top::Subscriber {
+                task: 1,
+                number: 2,
+                topic,
+                own_change: Some(3),
+                goal_tasks: Some(Box::new([1, 2, 3, 4, 5, 6, 7, 8])),
+                paths: Box::new([
+                    Box::from(b"a".as_slice()),
+                    Box::from(b"b".as_slice()),
+                    Box::from(b"c".as_slice()),
+                    Box::from(b"d".as_slice()),
+                ]),
+            }),
+        ))
+        .expect("fixture rows fit");
+    }
+}
+fn add_releases(name: &top::Name, rows: &mut List<(&'static str, top::Stored)>) {
+    for (label, ending) in [
+        ("done", top::ReleaseEnding::Done),
+        ("failed", top::ReleaseEnding::Failed),
+        ("cancelled", top::ReleaseEnding::Cancelled),
+    ] {
+        rows.push((
+            label,
+            top::Stored::Release(top::ReleaseRow {
+                task: 1,
+                root: 2,
+                ending,
+                close_pull: Some(3),
+                pending: Some((4, Some(name.clone()))),
+                failed: true,
+                effects_settled: true,
+                releasing: true,
+            }),
+        ))
+        .expect("fixture rows fit");
+    }
+}
 pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
     let name = named_branch();
-    let mut rows = List::with_capacity(6);
-    for row in [
-        ("repository unknown", adopted(top::Protection::Unknown)),
-        ("repository absent", adopted(top::Protection::Absent)),
-        (
-            "repository rule",
-            adopted(top::Protection::Rule(client::api::Protection {
-                branch: Box::from(b"main".as_slice()),
-                contexts: Box::new([Box::from(b"test".as_slice()), Box::from(b"build".as_slice())]),
-                approvals: 2,
-                dismiss_stale: true,
-            })),
-        ),
-    ] {
+    let mut rows = List::with_capacity(18);
+    for row in initial_rows(&name) {
         rows.push(row).expect("fixture rows fit");
     }
     add_holds(&name, &mut rows);
+    add_subscriptions(&name, &mut rows);
+    add_releases(&name, &mut rows);
     rows.into_boxed()
 }

@@ -52,6 +52,11 @@ pub fn bounds(forge: &temper_engine_domain_forge::Limits) -> Option<Bounds> {
         adopted_checks: forge.change_policy.gates,
         retargeted_before: forge.name_bytes,
         retargeted_after: forge.name_bytes,
+        names_resources: forge.resources_per_task,
+        landings_topic_branch: forge.name_bytes,
+        subscriber_goal_tasks_some: forge.issue_policy.plan_items,
+        subscriber_paths: forge.paths_per_subscription,
+        subscriber_paths_item: forge.name_bytes,
     };
     v1::check_limits(&limits).ok()?;
     Some(Bounds { limits, forge: *forge })

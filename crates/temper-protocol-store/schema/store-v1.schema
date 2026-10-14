@@ -28,5 +28,22 @@ record Retargeted { number: u64 before: bytes 4096 after: bytes 4096 }
 enum DriftChange { branch: BranchDrift, pull_closed: Number, retargeted: Retargeted }
 record Drift { at: u64 change: DriftChange }
 record Hold { name: Name task: u64 writer: option Writer drift: option Drift }
-enum Value { repository: Adopted, hold: Hold }
+# 04.2: family 4, Names.
+record Names { task: u64 resources: list 1024 Name }
+# 04.2: family 5, Subscription (forge::Subscriber).
+record LandingsTopic { repository: Repository branch: bytes 4096 }
+record CiTopic { repository: Repository head: fixed 32 }
+record NumberTopic { repository: Repository number: u64 }
+enum Topic { landings: LandingsTopic, ci: CiTopic, pull: NumberTopic, participation: NumberTopic }
+record Subscriber { task: u64 number: u64 topic: Topic own_change: option u64 goal_tasks: option list 65536 u64 paths: list 1024 bytes 4096 }
+# 04.2: families 6 to 9.
+record BranchHead { name: Name commit: fixed 32 owned: bool }
+record PullState { name: Name head: fixed 32 ci: Ci state: ItemState }
+record CiState { repository: Repository head: fixed 32 status: Ci }
+record Landed { commit: fixed 32 task: u64 }
+# 04.2: family 14, Release.
+enum ReleaseEnding { done, failed, cancelled }
+record PendingRelease { entry: u64 name: option Name }
+record ReleaseRow { task: u64 root: u64 ending: ReleaseEnding close_pull: option u64 pending_release: option PendingRelease failed: bool effects_settled: bool releasing: bool }
+enum Value { repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, release: ReleaseRow }
 versioned record Row { value: Value }
