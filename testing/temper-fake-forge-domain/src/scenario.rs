@@ -53,6 +53,19 @@ pub fn repository(domain: &mut Domain, config: &Config, setup: Setup) -> u64 {
     first
 }
 
+/// Adds an unborn repository: its default has no branch or commit yet.
+pub fn unborn_repository(domain: &mut Domain, config: &Config, setup: Setup) {
+    let name = setup.name.clone();
+    let made = domain.made;
+    let first = repository(domain, config, setup);
+    let id = domain.id(&name);
+    let repository = domain.repositories.get_mut(id).expect("the repository just added");
+    assert_eq!(repository.branches.remove(&*repository.default), Some(first), "fresh first branch");
+    repository.has.remove(&first);
+    drop(domain.commits.remove(&first));
+    domain.made = made;
+}
+
 /// Gives `user` the permission `permission` on `repository`.
 pub fn grant(domain: &mut Domain, repository: &[u8], user: u64, permission: Permission) {
     let id = domain.id(repository);
@@ -165,4 +178,21 @@ pub fn advance(
     repository.branches.insert(copy_of(branch), commit).expect("the branch is there");
     git::moved(domain, env, id, branch, Some(tip), commit, by);
     Ok(commit)
+}
+
+/// Git's commit-tree stores even an unchanged tree, without moving a branch.
+pub fn commit_tree(
+    domain: &mut Domain,
+    config: &Config,
+    parent: u64,
+    merging: Option<u64>,
+    files: Box<[File]>,
+    message: &[u8],
+) -> Result<u64, Error> {
+    if !domain.commits.contains_key(&parent) || !domain.commits.contains_key(&merging.unwrap_or(parent)) {
+        return Err(Error::Missing(What::Commit));
+    }
+    let tree = git::tree(&config.limits, files)?;
+    fits(message, message_limit(&config.limits)?)?;
+    git::store(domain, Object { parent: Some(parent), merge_parent: merging, tree, message: copy_of(message) })
 }

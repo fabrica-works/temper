@@ -17,6 +17,8 @@ pub struct Checked {
     pub committer: Author,
     pub author: Option<Author>,
     pub credential: Option<Credential>,
+    /// commit-tree's stdin, filled by the hosted program after admission.
+    pub message: Vec<u8>,
 }
 /// Usage is a normal git exit; a broken protocol rule fails the world.
 #[derive(Debug, PartialEq, Eq)]
@@ -113,7 +115,7 @@ pub fn check(spawn: &Spawn) -> Result<Checked, Refusal> {
     {
         return Err(Refusal::Broken("placeholder committer"));
     }
-    Ok(Checked { command, at: spawn.dir.clone(), home, committer, author, credential })
+    Ok(Checked { command, at: spawn.dir.clone(), home, committer, author, credential, message: Vec::new() })
 }
 fn read_credential(env: &mut BTreeMap<&[u8], &[u8]>, spawn: &Spawn) -> Result<Credential, Refusal> {
     if env.remove(b"GIT_CONFIG_COUNT".as_slice()) != Some(b"1".as_slice())
