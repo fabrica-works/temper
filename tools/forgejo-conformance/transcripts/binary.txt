@@ -1,0 +1,2 @@
+version forgejo version 16.0.5+gitea-1.22.0 (release name 16.0.5) built with GNU Make 4.4.1, go1.26.8 : bindata, timetzdata, sqlite, sqlite_unlock_notify
+sha256 2c548bf1bfa09a441a3a674b1dd4959d77576816ad50534c23496908a3ea5a19

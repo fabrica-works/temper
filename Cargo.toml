@@ -4,6 +4,7 @@
 resolver = "3"
 members = [
     "crates/temper-protocol-client-wire",
+    "tools/forgejo-conformance",
     "crates/temper-protocol-worker-wire",
     "tests/codecs",
     "crates/temper-protocol-store",
