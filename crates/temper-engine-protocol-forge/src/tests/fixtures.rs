@@ -349,6 +349,9 @@ impl Harness {
     }
 }
 pub fn ok(body: &[u8]) -> Box<[u8]> {
+    response(200, body)
+}
+pub fn response(code: u16, body: &[u8]) -> Box<[u8]> {
     let decimal = skein_lib::Decimal::of(u64::try_from(body.len()).expect("body length"));
     let mut out = skein_lib::Writer::new(
         body.len()
@@ -356,7 +359,9 @@ pub fn ok(body: &[u8]) -> Box<[u8]> {
             .saturating_add(decimal.as_bytes().len())
             .saturating_add(b"\r\nDate: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n".len()),
     );
-    out.put(b"HTTP/1.1 200 OK\r\nContent-Length: ").expect("head fits");
+    out.put(b"HTTP/1.1 ").expect("head fits");
+    out.put(skein_lib::Decimal::of(u64::from(code)).as_bytes()).expect("code fits");
+    out.put(b" OK\r\nContent-Length: ").expect("head fits");
     out.put(decimal.as_bytes()).expect("length fits");
     out.put(b"\r\nDate: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n").expect("date fits");
     out.put(body).expect("body fits");

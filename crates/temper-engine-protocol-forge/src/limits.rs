@@ -354,6 +354,8 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
             u64::from(s.client.calls).checked_mul(
                 u64::from(s.client.op_bytes)
                     .checked_mul(3)?
+                    .checked_add(u64::try_from(size_of::<crate::reads::Plan>()).ok()?)?
+                    .checked_add(u64::try_from(size_of::<crate::writes::Plan>()).ok()?)?
                     .checked_add(u64::from(s.client.answer_bytes))?
                     .checked_add(List::<temper_forge_forgejo::document::ChangedFile>::worst_case(s.client.rows)?)?
                     .checked_add(u64::from(s.client.rows).checked_mul(u64::from(l.string_bytes).checked_mul(2)?)?)?

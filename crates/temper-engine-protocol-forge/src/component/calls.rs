@@ -167,11 +167,8 @@ impl Component {
         let _old = self.holders.insert(token, call).expect("one holder per connection");
         let waiting = self.waiting.get_mut(id).expect("indexed call");
         waiting.connection = Some(token);
-        let read = match waiting.op.take().expect("waiting operation") {
-            api::Op::Read(read) => read,
-            api::Op::Write(_) => unreachable!("supported reads"),
-        };
-        let mut plan = Plan::new(waiting.repository, read, cap);
+        let op = waiting.op.take().expect("waiting operation");
+        let mut plan = Plan::new(waiting.repository, op, cap);
         let step = plan.begin(&env.limits, &self.shared, &mut self.tables);
         waiting.plan = Some(plan);
         match step {
@@ -340,6 +337,18 @@ fn supported(op: &api::Op) -> bool {
             | api::Read::Checks { .. }
             | api::Read::Job { .. },
         ) => true,
-        api::Op::Write(_) => false,
+        api::Op::Write(write) => match write {
+            api::Write::OpenPull { .. } | api::Write::SetReviewers { .. } | api::Write::Merge { .. } => false,
+            api::Write::CreateIssue { .. }
+            | api::Write::Post { .. }
+            | api::Write::Review { .. }
+            | api::Write::Edit { .. }
+            | api::Write::Close { .. }
+            | api::Write::Reopen { .. }
+            | api::Write::Update { .. }
+            | api::Write::Status { .. }
+            | api::Write::CreateBranch { .. }
+            | api::Write::DeleteBranch { .. } => true,
+        },
     }
 }

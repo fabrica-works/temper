@@ -18,6 +18,7 @@ mod reads;
 pub mod settings;
 pub mod start;
 pub mod tables;
+mod writes;
 pub use boundary::{Answered, Event, Request, StartRead, Stopped};
 pub use component::{Component, Diagnostics, MAX_OUT};
 pub use limits::{Limits, Shared, Unusable};

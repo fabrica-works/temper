@@ -2,6 +2,7 @@ mod connection;
 mod contents;
 mod fixtures;
 mod reads;
+mod writes;
 use crate::{
     StartRead, Stopped, conventions, marker,
     start::{self, Heard, Start},
