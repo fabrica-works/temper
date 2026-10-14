@@ -154,7 +154,7 @@ impl Clients {
                 })
     }
     pub fn down(&mut self, event: kit::Event) {
-        if let kit::Event::Close | kit::Event::Abort = &event {
+        if let kit::Event::Stop | kit::Event::Close | kit::Event::Abort = &event {
             self.closing = Some(());
         }
         if !self.closed {
