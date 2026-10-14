@@ -1520,6 +1520,7 @@ dependencies = [
  "skein-oauth",
  "skein-oauth-accounts",
  "skein-tls",
+ "skein-world",
  "smith-channel",
  "smith-charter",
  "smith-domain-run",

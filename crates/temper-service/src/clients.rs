@@ -42,7 +42,12 @@ fn invalid(what: What) -> Problems {
     problems
 }
 impl Clients {
-    pub fn new(config: &config::Engine, seeds: &Seeds, room: u32) -> Result<Self, Problems> {
+    pub fn new(
+        config: &config::Engine,
+        seeds: &Seeds,
+        room: u32,
+        journal: &root::JournalLimits,
+    ) -> Result<Self, Problems> {
         let config::Address::Addr(listener) = config.clients.listener else {
             return Err(invalid(What::Form));
         };
@@ -107,11 +112,11 @@ impl Clients {
             closing: None,
             starting: Some(()),
             early: Queue::with_capacity(room),
-            endings: Map::with_capacity(config.limits.journal.commits),
+            endings: Map::with_capacity(journal.commits),
             secret_owners: Map::with_capacity(room),
             next_secret: 1,
             durable: 0,
-            writes: config.limits.journal.writes,
+            writes: journal.writes,
         })
     }
     #[must_use]
@@ -148,6 +153,15 @@ impl Clients {
         if !self.closed {
             self.component.down(&self.env, event, &mut self.out);
             self.pending = true;
+        }
+    }
+    pub(crate) fn abort(&mut self, unstarted: bool) {
+        self.down(kit::Event::Abort);
+        if unstarted {
+            for _ in 0..self.io.len() {
+                let _request = self.io.pop();
+            }
+            self.closed = true;
         }
     }
     pub fn up(&mut self, event: io::Event) -> bool {
@@ -274,7 +288,7 @@ pub fn untag(mut event: io::Event) -> io::Event {
 }
 
 #[must_use]
-pub fn worst_case(limits: &kit::Limits, room: u32, journal: &skein_lib::JournalLimits) -> Option<u64> {
+pub fn worst_case(limits: &kit::Limits, room: u32, journal: &root::JournalLimits) -> Option<u64> {
     kit::worst_case(limits)?
         .checked_add(Queue::<kit::Request>::worst_case(room)?)?
         .checked_add(Queue::<io::Request>::worst_case(room)?)?

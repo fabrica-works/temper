@@ -398,6 +398,29 @@ pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
 }
 pub fn start_with_store(projects: &[(u32, u64)], stored: Option<crate::store::Store>) -> crate::Service {
     let mut settings = engine();
+    settings.jig.limits.core.tasks.tasks = 2;
+    settings.jig.limits.core.tasks.project_tasks = 2;
+    settings.jig.limits.core.tasks.tree_tasks = 2;
+    settings.jig.limits.core.tasks.batch = 1;
+    settings.jig.limits.core.tasks.holdings = 2;
+    settings.jig.limits.core.tasks.run_inbox = 2;
+    settings.jig.limits.core.people.people = 2;
+    settings.jig.limits.core.people.sign_ins = 2;
+    settings.jig.limits.core.people.pending = 2;
+    settings.jig.limits.core.people.waiters = 2;
+    settings.jig.limits.core.people.inbox_tasks = 4;
+    settings.jig.limits.core.fleet.workers = 2;
+    settings.jig.limits.core.fleet.attempts = 2;
+    settings.jig.limits.core.fleet.calls = 2;
+    settings.jig.limits.core.fleet.slots = 1;
+    settings.limits.root.journal.deliveries = 128;
+    settings.limits.root.journal.held = 384;
+    settings.limits.root.journal.writes = 2048;
+    settings.jig.limits.clients.connections = 2;
+    settings.jig.limits.clients.streams = 2;
+    settings.jig.limits.clients.watches_per_stream = 4;
+    settings.jig.limits.clients.exchanges = 4;
+    settings.jig.limits.clients.exchanges_per_client = 2;
     let first = settings.jig.projects.into_iter().next().unwrap();
     let mut configured = skein_lib::List::with_capacity(u32::try_from(projects.len()).unwrap());
     for (number, budget) in projects {
@@ -429,8 +452,10 @@ pub fn start_with_store(projects: &[(u32, u64)], stored: Option<crate::store::St
     service.engine.store = store;
     service
 }
+mod clients;
 pub fn turn(service: &mut crate::Service) {
     crate::iterate(service, skein_lib::Time::from_nanos(1), skein_lib::Wall::from_nanos(1));
+    clients::kernel(service);
 }
 pub fn restart(service: &mut crate::Service) {
     for _ in 0_u32..256 {
@@ -763,5 +788,5 @@ pub use worker::{
     one_repository, repository_assignment, spawn, worker, worker_agent, worker_files, worker_limits, worker_settings,
 };
 pub fn clients() -> crate::clients::Clients {
-    crate::clients::Clients::new(&engine().jig, &seeds(), 64).unwrap()
+    crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
 }

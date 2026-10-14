@@ -16,6 +16,7 @@ pub(crate) fn shutdown(engine: &mut Engine) {
     }
     engine.drain = Some(Drain { closing: false, busy: Queue::with_capacity(engine.events.capacity()) });
     engine.workers.down(engine.env.now, jig_protocol_engine_workers::Event::Stop, &mut engine.events);
+    engine.clients.down(jig_protocol_engine_clients::Event::Stop);
     engine.events.push(root::Event::Stop);
 }
 pub(crate) fn drained(engine: &mut Engine) {
@@ -26,6 +27,7 @@ pub(crate) fn drained(engine: &mut Engine) {
         return;
     }
     drain.closing = true;
+    engine.clients.down(jig_protocol_engine_clients::Event::Close);
     engine.workers.close(engine.env.now, &mut engine.events);
     if engine.accounts.is_some() {
         engine.step(root::Event::Account(jig_domain_accounts::Event::Close));
@@ -44,6 +46,8 @@ pub(crate) fn advance(engine: &mut Engine) {
     };
     if closed
         && engine.workers.closed()
+        && engine.clients.closed
+        && engine.clients.io.is_empty()
         && engine.store.idle()
         && engine.events.is_empty()
         && engine.requests.is_empty()

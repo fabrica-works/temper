@@ -132,6 +132,12 @@ impl Service {
                 .push((project.number, project.policy.period_spend))
                 .or(Err(start_problem(b"projects", What::Bound)))?;
         }
+        let client_room = max
+            .checked_add(1)
+            .expect("client pass headroom")
+            .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
+            .expect("client routing room");
+        let clients = clients::Clients::new(&settings.jig, seeds, client_room, &limits.journal)?;
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
@@ -148,8 +154,7 @@ impl Service {
                 config,
                 &limits,
                 store::Store::new(&limits, &store_limits),
-                accounts,
-                workers,
+                engine::Children { accounts, workers, clients },
                 values,
                 first_periods,
             ),
@@ -244,6 +249,8 @@ impl Service {
         self.end().is_some()
             && self.engine.store.closed()
             && self.engine.workers.closed()
+            && self.engine.clients.closed
+            && self.engine.clients.io.is_empty()
             && self.io.is_empty()
             && self.completions.is_empty()
             && self.submissions.is_empty()
@@ -266,6 +273,13 @@ impl Service {
             self.raw_submissions.push(self.engine.store.submitted.pop().expect("store submissions"));
         }
         if self.engine.store.opened || self.engine.end.is_some() {
+            for _ in 0..self.engine.clients.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                let request = self.engine.clients.io.pop().expect("client io requests");
+                io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
+            }
             for _ in 0..self.engine.workers.io.len() {
                 if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
                     break;
@@ -342,6 +356,13 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     }
     service.engine.abort_if_ended();
     service.route_components();
+    for _ in 0..service.engine.clients.links.len() {
+        if service.links.room() == 0 {
+            break;
+        }
+        let link = service.engine.clients.links.pop().expect("printed sign-in links");
+        service.links.push(link);
+    }
     service.kernel.publish(false, &mut service.raw_submissions, &mut service.submissions);
     if let Some(accounts) = &mut service.engine.accounts {
         service.kernel.publish(true, &mut accounts.submitted, &mut service.submissions);
@@ -350,7 +371,10 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
 }
 fn route_events(service: &mut Service) {
     for _ in 0..service.told.len() {
-        if !service.engine.workers.room() || service.engine.events.room() < jig_protocol_engine_workers::MAX_OUT_DOWN {
+        if !service.engine.workers.room()
+            || !service.engine.clients.room(1)
+            || service.engine.events.room() < engine::route_out()
+        {
             break;
         }
         if let Some(accounts) = &service.engine.accounts
@@ -385,6 +409,12 @@ fn route_events(service: &mut Service) {
             continue;
         }
         if let Some(owner) = owner
+            && clients::owns(owner)
+        {
+            if !service.engine.clients.up(event) {
+                service.engine.end = Some(End::Stopped(Stop::Listener));
+            }
+        } else if let Some(owner) = owner
             && accounts::owns(owner)
         {
             if let Some(accounts) = &mut service.engine.accounts {
@@ -431,6 +461,11 @@ fn memory(
     bytes = bytes.checked_add(workers::worst_case(
         settings,
         temper_engine_domain::max_out(root).checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
+    )?)?;
+    bytes = bytes.checked_add(clients::worst_case(
+        &settings.jig.limits.clients,
+        temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
+        &root.journal,
     )?)?;
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;

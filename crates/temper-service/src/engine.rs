@@ -10,6 +10,8 @@ pub(crate) struct Engine {
     pub(crate) store: crate::store::Store,
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
+    pub(crate) clients: crate::clients::Clients,
+    pub(crate) admission: Option<skein_lib::Token>,
     pub(crate) facts: u64,
     pub(crate) values: crate::values::Values,
     pub(crate) events: Queue<root::Event>,
@@ -25,16 +27,21 @@ pub(crate) struct Engine {
     aborted: Option<()>,
     max_out: u32,
 }
+pub(crate) struct Children {
+    pub(crate) accounts: Option<crate::accounts::Accounts>,
+    pub(crate) workers: crate::workers::Workers,
+    pub(crate) clients: crate::clients::Clients,
+}
 impl Engine {
     pub(crate) fn new(
         config: root::Config,
         limits: &root::Limits,
         store: crate::store::Store,
-        accounts: Option<crate::accounts::Accounts>,
-        workers: crate::workers::Workers,
+        children: Children,
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
+        let Children { accounts, workers, clients } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -48,6 +55,8 @@ impl Engine {
             store,
             accounts,
             workers,
+            clients,
+            admission: None,
             facts: 0,
             values,
             events: Queue::with_capacity(capacity.checked_mul(route_out()).expect("account event room")),
@@ -66,6 +75,8 @@ impl Engine {
     pub(crate) fn room(&self) -> bool {
         self.store.room()
             && self.workers.batch_room(self.max_out)
+            && self.clients.room(self.max_out)
+            && self.clients.commit_room()
             && self.events.room() >= self.max_out.checked_mul(route_out()).expect("translated root outputs")
             && match &self.drain {
                 Some(drain) => drain.busy.room() >= self.max_out,
@@ -77,9 +88,12 @@ impl Engine {
             }
     }
     pub(crate) fn step(&mut self, event: root::Event) {
+        let watcher = watcher(&event);
         if let Err(event) = root::try_step(&mut self.domain, &self.env, event) {
             self.pending = Some(Box::new(event));
             self.blocked = true;
+        } else {
+            self.admission = watcher;
         }
         self.drain_facts();
     }
@@ -97,6 +111,7 @@ impl Engine {
             next = crate::accounts::earliest(next, self.domain.next_deadline(&self.env));
             next = crate::accounts::earliest(next, self.values.accounts.next_expiry());
         }
+        next = crate::accounts::earliest(next, self.clients.next_deadline());
         crate::accounts::earliest(
             next,
             match &self.accounts {
@@ -106,7 +121,8 @@ impl Engine {
         )
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
-        let components = self.store.work_pending(now)
+        let components = (self.store.opened || self.end.is_some()) && self.clients.work_pending(now)
+            || self.store.work_pending(now)
             || (self.store.opened || self.end.is_some()) && self.workers.work_pending(now)
             || (self.store.opened || self.end.is_some())
                 && match &self.accounts {
@@ -136,6 +152,7 @@ impl Engine {
         {
             self.aborted = Some(());
             self.store.close();
+            self.clients.abort(!self.store.opened);
             self.workers.abort(self.env.now, &mut self.events);
             if let Some(accounts) = &mut self.accounts {
                 accounts.abort();
@@ -157,6 +174,21 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
     }
     engine.workers.iterate(now, &mut engine.events);
+    let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
+    engine.clients.starting = if open { None } else { Some(()) };
+    engine.clients.iterate(now, wall, &mut engine.events);
+    clients_pass(engine);
+    for _ in 0..engine.clients.early.len() {
+        if !engine.clients.room(1) || engine.events.room() == 0 {
+            break;
+        }
+        let event = engine.clients.early.pop().expect("staged client input");
+        if open {
+            engine.events.push(event);
+        } else if let root::Event::Party(value) = event {
+            engine.clients.not_ready(value);
+        }
+    }
     stop::advance(engine);
     if engine.end.is_some() {
         engine.abort_if_ended();
@@ -198,6 +230,14 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         engine.drain_facts();
     }
     release(engine);
+    clients_pass(engine);
+}
+fn clients_pass(engine: &mut Engine) {
+    engine.clients.advance(&mut engine.events);
+    if engine.end.is_none() {
+        engine.clients.secrets_step(&mut engine.store);
+    }
+    engine.clients.advance(&mut engine.events);
 }
 fn release(engine: &mut Engine) {
     engine.ready = true;
@@ -227,6 +267,9 @@ fn release(engine: &mut Engine) {
             engine.ready = false;
             break;
         }
+    }
+    if let Some(watcher) = engine.admission.take() {
+        engine.clients.down(jig_protocol_engine_clients::Event::Admitted { watcher });
     }
     engine.domain.reclaim();
     stop::advance(engine);
@@ -272,6 +315,9 @@ fn answer(engine: &mut Engine) {
     for _ in 0..engine.store.routed.len() {
         match engine.store.routed.pop().expect("store routing") {
             Up::Root(event) => {
+                if let root::Event::Store(root::StoreInput::Committed { number, .. }) = event.as_ref() {
+                    engine.clients.committed(*number);
+                }
                 if let root::Event::Store(root::StoreInput::Loaded { rows, .. }) = event.as_ref() {
                     for row in rows {
                         if row.key()
@@ -297,5 +343,26 @@ fn answer(engine: &mut Engine) {
 }
 
 pub(crate) fn route_out() -> u32 {
-    skein_oauth_accounts::MAX_OUT_DOWN.above.max(jig_protocol_engine_workers::MAX_OUT_DOWN)
+    skein_oauth_accounts::MAX_OUT_DOWN
+        .above
+        .max(jig_protocol_engine_workers::MAX_OUT_DOWN)
+        .max(jig_protocol_engine_clients::MAX_OUT_DOWN)
+}
+
+fn watcher(event: &root::Event) -> Option<skein_lib::Token> {
+    match event {
+        root::Event::Party(root::PartyInput::Watch { watcher, .. } | root::PartyInput::WatchRun { watcher, .. }) => {
+            Some(*watcher)
+        }
+        root::Event::Party(_)
+        | root::Event::Worker(_)
+        | root::Event::Store(_)
+        | root::Event::Account(_)
+        | root::Event::Forge(_)
+        | root::Event::Released(_)
+        | root::Event::Credential { .. }
+        | root::Event::Restart
+        | root::Event::Stop
+        | root::Event::Resume => None,
+    }
 }

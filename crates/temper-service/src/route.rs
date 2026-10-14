@@ -8,6 +8,9 @@ use temper_engine_domain_forge_client as client;
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
         root::Request::Store(request) => {
+            if let root::StoreRequest::Commit { number, writes } = &request {
+                engine.clients.commit(*number, writes);
+            }
             if !engine.store.down(request) {
                 stop::unavailable(engine, b"deployment");
             }
@@ -35,7 +38,16 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::Drained => stop::drained(engine),
         root::Request::Stop => stop::unavailable(engine, b"deployment"),
         root::Request::Worker(request) => worker(engine, request),
-        root::Request::Party(_) => stop::unavailable(engine, b"clients"),
+        root::Request::Party(request) => {
+            if let root::PartyRequest::WatchRefused { watcher, .. } = &request
+                && engine.admission == Some(*watcher)
+            {
+                engine.admission = None;
+            }
+            if let Some(event) = crate::clients::translation::to_component(request) {
+                engine.clients.down(event);
+            }
+        }
     }
 }
 
