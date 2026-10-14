@@ -16,6 +16,7 @@ pub(crate) mod durable {
     #[derive(Default)]
     pub struct Store {
         pub rows: BTreeMap<root::Key, root::Record>,
+        pub(crate) agent_records: Vec<super::agent::Record>,
         pub pending: VecDeque<Commit>,
         pub applied: u64,
         pub recovered: std::collections::BTreeSet<u64>,
@@ -91,17 +92,7 @@ pub(crate) mod durable {
             if let Op::Write { fd, bytes, from: 0, .. } = op
                 && self.path(*fd).is_some_and(|path| path.starts_with(b"store/"))
             {
-                let frames = frames(bytes);
-                let turn = frames.iter().any(|(_, ops)| {
-                    ops.iter().any(|op| match op {
-                        skein_kv::Op::Put { key, .. } => {
-                            matches!(keys::decode_own(key), Some(keys::Own::Transcript { .. }))
-                        }
-                        skein_kv::Op::Erase { .. } => false,
-                    })
-                });
                 self.events.push(Observed::Pending(bytes.to_vec()));
-                let _ = turn;
             }
         }
     }
@@ -125,15 +116,14 @@ pub(crate) mod durable {
                         file[at..at + bytes.len()].copy_from_slice(&bytes);
                     }
                     Observed::Pending(bytes) => {
-                        self.pending = frames(&bytes)
+                        self.pending = frames(&bytes, self.applied)
                             .into_iter()
-                            .filter(|(number, _)| *number > self.applied)
                             .map(|(number, ops)| self.commit(number, ops, limits, connector))
                             .collect();
                     }
                     Observed::Recovered(path) => {
                         if let Some(bytes) = self.files.get(&path) {
-                            self.recovered.extend(frames(bytes).into_iter().map(|(number, _)| number));
+                            self.recovered.extend(frames(bytes, 0).into_iter().map(|(number, _)| number));
                         }
                         committed.extend(self.durable(&path, limits, connector));
                     }
@@ -153,7 +143,7 @@ pub(crate) mod durable {
         ) -> Vec<Commit> {
             let mut committed = Vec::new();
             let Some(bytes) = self.files.get(path) else { return committed };
-            let frames = frames(bytes);
+            let frames = frames(bytes, self.applied);
             for (number, ops) in frames {
                 if number <= self.applied {
                     continue;
@@ -230,7 +220,7 @@ pub(crate) mod durable {
             Commit { number, writes }
         }
     }
-    fn frames(bytes: &[u8]) -> Vec<(u64, Box<[skein_kv::Op]>)> {
+    fn frames(bytes: &[u8], after: u64) -> Vec<(u64, Box<[skein_kv::Op]>)> {
         let mut reader = Reader::new(bytes);
         let mut frames = Vec::new();
         while reader.remaining() >= 26 {
@@ -248,47 +238,102 @@ pub(crate) mod durable {
             for _ in 0..count {
                 let kind = reader.u8().expect("write kind");
                 let len = reader.u32().expect("key length");
-                let key = reader.bytes(len).expect("key").into();
-                ops.push(match kind {
+                let key = reader.bytes(len).expect("key");
+                match kind {
                     1 => {
                         let len = reader.u32().expect("value length");
-                        skein_kv::Op::Put { key, value: reader.bytes(len).expect("value").into() }
+                        let value = reader.bytes(len).expect("value");
+                        if number > after {
+                            ops.push(skein_kv::Op::Put { key: key.into(), value: value.into() });
+                        }
                     }
-                    2 => skein_kv::Op::Erase { key },
+                    2 => {
+                        if number > after {
+                            ops.push(skein_kv::Op::Erase { key: key.into() });
+                        }
+                    }
                     _ => panic!("real KV write kind"),
-                });
+                }
             }
             assert_eq!((bytes.len() - reader.remaining() as usize), end, "whole frame operations");
             let expected = transcripts::frame::crc32c(&bytes[start..end]);
             assert_eq!(reader.u32(), Some(expected), "real KV frame checksum");
-            frames.push((number, ops.into_boxed_slice()));
+            if number > after {
+                frames.push((number, ops.into_boxed_slice()));
+            }
         }
         frames
     }
 }
 pub(crate) use durable::{Capture, Store};
 pub(crate) mod client;
+pub(crate) mod forge;
 mod agent {
     //! The worker's actual agent pipe bytes, decoded independently of its root.
-    use jig_conformance::referee::{Observed, Receipt};
+    use jig_conformance::referee::Observed;
     use skein_io::kernel::{Complete, Done, Op};
     use skein_lib::Reader;
     use std::collections::BTreeMap;
 
-    #[derive(Default)]
+    pub(crate) enum Record {
+        Start { task: u64, attempt: u64, workspace: Option<smith_channel::Workspace> },
+        Answer { task: u64, attempt: u64, result: smith_channel::RunResult },
+    }
+    impl std::fmt::Debug for Record {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Start { task, attempt, workspace } => f
+                    .debug_struct("Start")
+                    .field("task", task)
+                    .field("attempt", attempt)
+                    .field("workspace", workspace)
+                    .finish(),
+                Self::Answer { task, attempt, result } => f
+                    .debug_struct("Answer")
+                    .field("task", task)
+                    .field("attempt", attempt)
+                    .field("result", result)
+                    .finish(),
+            }
+        }
+    }
+
     pub(crate) struct Wire {
-        pipes: BTreeMap<i32, (bool, Vec<u8>)>,
-        attempt: u64,
+        pipes: BTreeMap<i32, (bool, i32, Vec<u8>)>,
+        limits: smith_channel::Limits,
+        store: std::rc::Rc<std::cell::RefCell<super::Store>>,
+        runs: BTreeMap<i32, (u64, u64)>,
         pub events: Vec<Observed>,
     }
     impl Wire {
+        pub(crate) fn new(store: std::rc::Rc<std::cell::RefCell<super::Store>>) -> Self {
+            Self {
+                pipes: BTreeMap::new(),
+                limits: crate::fixtures::agent_limits().channel.bodies,
+                store,
+                runs: BTreeMap::new(),
+                events: Vec::new(),
+            }
+        }
         pub fn complete(&mut self, complete: &Complete) {
             match (&complete.kind, &complete.result) {
                 (Op::Spawn { spawn }, Ok(Done::Spawned { .. }))
                     if spawn.program.as_ref() == b"/opt/temper/bin/temper" =>
                 {
+                    let identity = spawn
+                        .pipes
+                        .iter()
+                        .find(|pipe| pipe.child == 0)
+                        .expect("agent input pipe")
+                        .parent
+                        .expect("real agent input pipe")
+                        .raw();
+                    self.runs.remove(&identity);
                     for pipe in spawn.pipes.iter().filter(|pipe| pipe.child < 2) {
-                        self.pipes.insert(pipe.parent.expect("real agent pipe").raw(), (pipe.child == 0, Vec::new()));
+                        self.pipes.insert(
+                            pipe.parent.expect("real agent pipe").raw(),
+                            (pipe.child == 0, identity, Vec::new()),
+                        );
                     }
                 }
                 (Op::Write { fd, bytes, from, .. } | Op::PipeWrite { fd, bytes, from }, Ok(Done::Count(count))) => {
@@ -304,7 +349,7 @@ mod agent {
             }
         }
         fn bytes(&mut self, fd: i32, bytes: &[u8]) {
-            let Some((down, buffer)) = self.pipes.get_mut(&fd) else { return };
+            let Some((down, identity, buffer)) = self.pipes.get_mut(&fd) else { return };
             buffer.extend_from_slice(bytes);
             let mut frames = Vec::new();
             while buffer.len() >= 8 {
@@ -314,41 +359,78 @@ mod agent {
                 if buffer.len() < 8 + length {
                     break;
                 }
-                frames.push((*down, kind, buffer[8..8 + length].to_vec()));
+                frames.push((*down, *identity, kind, buffer[8..8 + length].to_vec()));
                 buffer.drain(..8 + length);
             }
-            for (down, kind, body) in frames {
-                self.frame(down, kind, &body);
+            for (down, identity, kind, body) in frames {
+                self.frame(down, identity, kind, &body);
             }
         }
-        fn frame(&mut self, down: bool, kind: u16, bytes: &[u8]) {
-            let limits = crate::fixtures::agent_limits().channel.bodies;
+        fn frame(&mut self, down: bool, identity_fd: i32, kind: u16, bytes: &[u8]) {
+            let limits = &self.limits;
             if down && kind == 0x0100 {
-                let start = smith_channel::Start::decode(&limits, &mut Reader::new(bytes)).expect("agent Start bytes");
-                assert_eq!(*start.identity(), Some(RUN_ID), "logical chat identity");
+                let start = smith_channel::Start::decode(limits, &mut Reader::new(bytes)).expect("agent Start bytes");
+                let store = self.store.borrow();
+                let proof = store
+                    .rows
+                    .values()
+                    .find_map(|row| match row {
+                        temper_engine_domain::Record::Core(jig_domain_core::Record::Core(
+                            jig_domain_core::CoreRecord::RunProof(proof),
+                        )) if proof.attempt == start.activation()
+                            && Some(identity(proof.task, proof.conversation)) == *start.identity() =>
+                        {
+                            Some(proof)
+                        }
+                        temper_engine_domain::Record::Core(_) | temper_engine_domain::Record::Forge { .. } => None,
+                    })
+                    .expect("agent identity names a durable claim");
+                self.runs.insert(identity_fd, (proof.task, start.activation()));
                 let charter =
                     smith_charter::Charter::decode(&smith_charter::CEILINGS, &mut Reader::new(start.charter()))
                         .expect("agent charter bytes");
-                self.attempt = start.activation();
                 self.events.push(Observed::Assigned {
-                    task: 1,
-                    attempt: self.attempt,
-                    conversation: 1,
+                    task: proof.task,
+                    attempt: start.activation(),
+                    conversation: proof.conversation,
                     resumed: !start.transcript().is_empty(),
                     budget: charter.budget().spend(),
                 });
+                let task = proof.task;
+                drop(store);
+                self.store.borrow_mut().agent_records.push(Record::Start {
+                    task,
+                    attempt: start.activation(),
+                    workspace: start.workspace().clone(),
+                });
             } else if !down && kind == 0x0109 {
-                let turn = smith_channel::Turn::decode(&limits, &mut Reader::new(bytes)).expect("agent Turn bytes");
-                self.events.push(Observed::Completion { task: 1, attempt: self.attempt, cumulative: turn.spent() });
-            } else if down && kind == 0x0103 {
-                let ack =
-                    smith_channel::Acknowledge::decode(&limits, &mut Reader::new(bytes)).expect("agent ACK bytes");
-                self.events.push(Observed::Released { requires: vec![Receipt::Turn(1, self.attempt, ack.number())] });
+                let (task, attempt) = *self.runs.get(&identity_fd).expect("turn after agent Start");
+                let turn = smith_channel::Turn::decode(limits, &mut Reader::new(bytes)).expect("agent Turn bytes");
+                self.events.push(Observed::Completion { task, attempt, cumulative: turn.spent() });
+            } else if !down && kind == 0x0110 {
+                let answer =
+                    smith_channel::Answer::decode(limits, &mut Reader::new(bytes)).expect("agent Answer bytes");
+                if matches!(answer.result(), smith_channel::RunResult::Failed(_) | smith_channel::RunResult::Refused(_))
+                {
+                    let (task, attempt) = *self.runs.get(&identity_fd).expect("answer after agent Start");
+                    self.store.borrow_mut().agent_records.push(Record::Answer {
+                        task,
+                        attempt,
+                        result: answer.result().clone(),
+                    });
+                }
             }
+            // The worker's agent ACK grants retention credit, not durable engine commitment.
+            // Commit prerequisites are checked on the client's actual released documents.
         }
     }
 
-    const RUN_ID: [u8; 16] = [245, 11, 125, 102, 96, 250, 0, 253, 157, 194, 14, 99, 169, 218, 74, 33];
+    fn identity(task: u64, conversation: u64) -> [u8; 16] {
+        let bytes =
+            [crate::fixtures::seeds().deployment.as_slice(), &task.to_be_bytes(), &conversation.to_be_bytes()].concat();
+        let digest = skein_io::digest::digest(&bytes);
+        [digest.0[0].to_be_bytes(), digest.0[1].to_be_bytes()].concat().try_into().expect("sixteen identity bytes")
+    }
 }
 use crate::world::Proc;
 pub(crate) use agent::Wire;
@@ -367,6 +449,7 @@ pub(crate) struct Referee {
     pub(crate) store: Rc<RefCell<Store>>,
     rules: rules::Referee,
     applied: u64,
+    committed: Store,
     agent_seen: usize,
     client_seen: usize,
     party: Option<u64>,
@@ -375,16 +458,41 @@ pub(crate) struct Referee {
     released: bool,
     done: Option<()>,
     drained: Option<()>,
+    forge: Rc<RefCell<forge::Forge>>,
+    story: crate::world::Story,
 }
 impl Referee {
-    pub(crate) fn new(controls: skein_world::Controls, store: Rc<RefCell<Store>>) -> Self {
-        let scope = rules::Scope {
+    pub(crate) fn new(
+        controls: skein_world::Controls,
+        store: Rc<RefCell<Store>>,
+        scenario: crate::world::Story,
+        forge: Rc<RefCell<forge::Forge>>,
+    ) -> Self {
+        let mut scope = rules::Scope {
             budget: 100,
             executors: BTreeSet::from([(0, 1)]),
             descendants: 8,
             depth: 8,
             ..rules::Scope::default()
         };
+        let mut implications = BTreeSet::new();
+        if !matches!(scenario, crate::world::Story::Chat { .. }) {
+            scope.tools = 3;
+            scope.depth = 3;
+            scope.executors.insert((1, 2));
+            for kind in [3, 11] {
+                scope.grants.push(rules::Grant {
+                    connector: 1,
+                    kind,
+                    pattern: rules::Pattern {
+                        base: vec![b"forge".to_vec(), b"127.0.0.1:3000".to_vec()],
+                        terminal: b"acme".to_vec(),
+                        open: true,
+                    },
+                });
+            }
+            implications.extend([(1, 3, 1), (1, 3, 2)]);
+        }
         let policy = rules::Policy {
             deployment: scope.clone(),
             projects: BTreeMap::from([(1, scope.clone())]),
@@ -392,7 +500,7 @@ impl Referee {
             projections: BTreeMap::new(),
             effect_accepters: BTreeSet::new(),
             requirements: Vec::new(),
-            implications: BTreeSet::new(),
+            implications,
             kinds: BTreeMap::new(),
             owned: Vec::new(),
             participating: BTreeSet::new(),
@@ -406,6 +514,7 @@ impl Referee {
             store,
             rules: rules::Referee::new(policy),
             applied: 0,
+            committed: Store::new(),
             agent_seen: 0,
             client_seen: 0,
             party: None,
@@ -414,6 +523,8 @@ impl Referee {
             released: false,
             done: None,
             drained: None,
+            forge,
+            story: scenario,
         }
     }
     fn say(&mut self, now: Time, event: rules::Observed) {
@@ -476,9 +587,16 @@ impl skein_world::Referee<Proc> for Referee {
         }
         let done = other.iter().all(|proc| match proc {
             Proc::Client(person) => person.is_empty(),
-            Proc::Service(_) | Proc::Agent(_) | Proc::Peer(_) | Proc::Git(_) | Proc::Forge(_) => true,
+            Proc::Service(_) | Proc::Agent(_) | Proc::Peer(_) | Proc::Git(_) | Proc::Shell(_) | Proc::Forge(_) => true,
         });
-        if self.done.is_none() && done && terminals(&self.store.borrow()) > 0 {
+        if crate::stories::adopted(&self.store.borrow().rows) > 0 {
+            self.forge.borrow_mut().adopted();
+        }
+        let complete = match self.story {
+            crate::world::Story::Chat { .. } => terminals(&self.store.borrow()) > 0,
+            crate::world::Story::Adopt | crate::world::Story::Merge => self.forge.borrow().complete(),
+        };
+        if self.done.is_none() && done && complete {
             self.controls.signal(0, skein_io::kernel::ServiceSignal::Terminate);
             self.done = Some(());
         }
@@ -487,22 +605,34 @@ impl skein_world::Referee<Proc> for Referee {
                 match proc {
                     Proc::Peer(peer) => peer.shutdown(),
                     Proc::Forge(forge) => forge.shutdown(),
-                    Proc::Service(_) | Proc::Agent(_) | Proc::Git(_) | Proc::Client(_) => {}
+                    Proc::Service(_) | Proc::Agent(_) | Proc::Git(_) | Proc::Shell(_) | Proc::Client(_) => {}
                 }
             }
         }
     }
     fn observe(&mut self, now: Time, procs: &[Proc]) {
+        self.forge.borrow_mut().observe(procs);
         let Proc::Service(service) = &procs[0] else { panic!("service first") };
         let store = self.store.borrow();
         for commit in &service.commits {
             if commit.number <= self.applied {
                 continue;
             }
-            let mut view = Store::new();
-            view.rows = service.rows_at(commit.number);
+            for write in &commit.writes {
+                match write {
+                    root::Write::Save(row) => {
+                        self.committed.rows.insert(row.key(), row.clone());
+                    }
+                    root::Write::Erase(key) => {
+                        self.committed.rows.remove(key);
+                    }
+                }
+            }
             self.rules
-                .observe(now.as_nanos(), rules::Observed::Durable { number: commit.number, snapshot: snapshot(&view) })
+                .observe(
+                    now.as_nanos(),
+                    rules::Observed::Durable { number: commit.number, snapshot: snapshot(&self.committed) },
+                )
                 .expect("durable conformance");
             self.applied = commit.number;
         }
@@ -540,15 +670,33 @@ impl skein_world::Referee<Proc> for Referee {
     fn overdue(&self, now: Time) -> Option<String> {
         (self.done.is_none() && now >= Time::from_nanos(10_000_000_000)).then(|| {
             format!(
-                "chat not complete: link {}, signed in {}, terminals {}",
+                "story not complete: link {}, signed in {}, terminals {}, tasks {:?}, agents {:?}, forge {:?}",
                 self.handed,
                 self.signed_in,
-                terminals(&self.store.borrow())
+                terminals(&self.store.borrow()),
+                self.store
+                    .borrow()
+                    .rows
+                    .values()
+                    .filter(|row| matches!(
+                        row,
+                        root::Record::Core(core::Record::Tasks(_) | core::Record::Core(core::CoreRecord::Call(_)))
+                    ))
+                    .collect::<Vec<_>>(),
+                self.store.borrow().agent_records,
+                self.store
+                    .borrow()
+                    .rows
+                    .values()
+                    .filter(|row| matches!(row, root::Record::Forge { .. }))
+                    .collect::<Vec<_>>()
             )
         })
     }
     fn passed(&self) -> bool {
-        self.done.is_some() && self.released && self.signed_in
+        self.done.is_some()
+            && self.signed_in
+            && (self.released || !matches!(self.story, crate::world::Story::Chat { .. }))
     }
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "the conformance receipts select committed client documents")]

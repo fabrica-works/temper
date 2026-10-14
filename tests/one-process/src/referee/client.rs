@@ -44,12 +44,12 @@ impl Wire {
                     .extend_from_slice(&bytes[*from as usize..(*from + *count) as usize]);
             }
             (Op::Recv { fd, buf }, Ok(Done::Count(count))) => {
-                let connection = self.connections.get_mut(&fd.raw()).expect("client sent HTTP request");
+                let connection = self.connections.entry(fd.raw()).or_default();
                 connection.incoming.extend_from_slice(&buf[..*count as usize]);
                 connection.progress(&mut self.received);
             }
-            (Op::Close { fd }, _) => {
-                self.connections.remove(&fd.raw());
+            (Op::Connect { .. }, Ok(Done::Fd(fd))) => {
+                self.connections.insert(fd.raw(), Connection::default());
             }
             _ => {}
         }
@@ -109,7 +109,7 @@ impl Connection {
                 let keyed =
                     wire::Keyed::decode(&limits.wire, &mut Reader::new(&self.sent[end + 4..])).expect("request bytes");
                 let value = wire::Answer::decode(&limits.wire, &mut Reader::new(bytes)).expect("answer bytes");
-                if matches!(value, wire::Answer::FinalAnswer(_)) {
+                if matches!(&value, wire::Answer::FinalAnswer(document) if document.owner() == &wire::Owner::Jig) {
                     let answer = translate::answers::answer(value, &limits).expect("jig answer document");
                     received.push(Received::Answer { key: *keyed.key(), answer });
                 }

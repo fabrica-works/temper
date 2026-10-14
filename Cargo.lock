@@ -2066,6 +2066,7 @@ dependencies = [
  "temper-engine-protocol-forge",
  "temper-engine-protocol-forge-world",
  "temper-engine-smith",
+ "temper-fake-checkout",
  "temper-fake-forge-domain",
  "temper-fake-forge-protocol",
  "temper-fake-git",

@@ -4,6 +4,11 @@ use jig_channel_world::fixtures as channel;
 use skein_lib::{Duration, List, Secret};
 pub const SEED: u64 = 7;
 pub const ANSWER: &[u8] = b"World answer";
+pub const BRANCH_HEAD: u64 = 2;
+pub const MOVED_BASE: u64 = 3;
+pub(crate) const MERGE_BRANCH: &[u8] = b"temper/1/c2";
+pub(crate) const PREPARED_REPOSITORY: &[u8] = b"workspaces/0/app";
+pub(crate) const AGENTS: u32 = 2;
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
     Settings { seed, config: skein_sim::Config::calm() }
@@ -16,7 +21,7 @@ pub(crate) fn document() -> Vec<u8> {
     value["workers"][0]["engine"] = serde_json::json!({"in_process":"workers"});
     value["workers"][0]["agent"] = serde_json::json!({"program":"/opt/temper/bin/temper","configuration":"/opt/temper/agent.json","arguments":["agent","/opt/temper/agent.json"]});
     value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 4.into();
-    value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 598.into();
+    value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 1024.into();
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["engine"]["connectors"] = serde_json::json!([1]);
     for (name, count) in [
@@ -36,6 +41,7 @@ pub(crate) fn document() -> Vec<u8> {
         "landing":{"deployment":[],"projects":[]},"charter":1,
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,"checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker","git":"/usr/bin/git"}]});
+    crate::stories::configure(&mut value);
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
@@ -60,6 +66,7 @@ pub(crate) fn agent() -> temper_service::settings::Agent {
     let limits = agent_limits();
     agent.host_limits =
         smith_local_service::profile::host_limits(&agent_profile(), &limits).expect("agent host limits");
+    agent.host_limits.agents = AGENTS;
     let channel = limits.channel;
     agent.limits = smith_host_protocol::Limits {
         bodies: channel.bodies,
@@ -71,7 +78,8 @@ pub(crate) fn agent() -> temper_service::settings::Agent {
         calls: agent.host_limits.calls,
     };
     agent.limits.channel.output_bytes = smith_host_protocol::output_bytes(&agent.limits).expect("host frames");
-    agent.bounds.message_bytes = 512;
+    agent.bounds.message_bytes = 1024;
+    agent.bounds.checks = Duration::from_secs(5);
     temper_service::settings::Agent {
         endpoints: agent.endpoints,
         limits: agent.limits,
@@ -83,12 +91,14 @@ pub(crate) fn agent_profile() -> smith_agent_service::profile::Profile {
     let mut profile = smith_agent_process_world::profile();
     profile.policy.host_tools =
         u32::try_from(temper_engine_smith::tools(Duration::from_secs(10)).len()).expect("tool count");
-    profile.declared.tool_payload = 600;
+    profile.declared.tool_payload = 1400;
     profile.declared.read_window = 256;
     profile.declared.conversations = 1;
     profile.declared.calls_per_response = 1;
+    profile.policy.check_timeout = Duration::from_secs(5);
     let hub = jig_protocol_config::profile(jig_protocol_config::Profile::Small).hub;
     profile.policy.inbox = hub.held.max(hub.inbox);
+    profile.policy.sections = 8;
     profile
 }
 pub(crate) fn agent_limits() -> smith_agent_service::Limits {
@@ -99,7 +109,7 @@ pub(crate) fn agent_limits() -> smith_agent_service::Limits {
 }
 pub(crate) fn agent_declarations() -> smith_agent_service::profile::Configuration {
     let mut declarations = smith_agent_process_world::declarations(0);
-    declarations.endpoints[0].models[0].output = 1024;
+    declarations.endpoints[0].models[0].output = 2048;
     declarations
 }
 pub(crate) fn agent_configuration() -> smith_agent_service::Config {

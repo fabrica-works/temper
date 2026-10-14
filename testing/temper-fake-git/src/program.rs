@@ -247,10 +247,8 @@ impl Git {
             (Pending::ParentAction(fd), _, Ok(Done::Nothing) | Err(k::Error::Exists)) => {
                 self.jobs.push_front(Job::Close(fd));
             }
-            (Pending::WriteOpen(path), _, Ok(Done::Fd(fd))) => {
-                self.owned.insert(fd);
-                let bytes = self.files.remove(&path).expect("pending write bytes");
-                self.jobs.push_front(Job::Truncate(fd, bytes));
+            (Pending::WriteOpen(path), kind, Ok(Done::Fd(fd))) => {
+                self.write_open(path, fd, matches!(kind, Op::Open { how: OpenHow::CreateNoFollow { .. }, .. }));
             }
             (Pending::Truncate(fd, bytes), _, Ok(Done::Nothing)) => {
                 self.jobs.push_front(if bytes.is_empty() { Job::Close(fd) } else { Job::Write(fd, bytes.into(), 0) });
@@ -276,6 +274,16 @@ impl Git {
             }
             (_, _, Err(error)) => self.failure(error),
             (_, _, Ok(_)) => panic!("kernel completion has the operation's shape"),
+        }
+    }
+    fn write_open(&mut self, path: Vec<u8>, fd: Fd, created: bool) {
+        self.owned.insert(fd);
+        let bytes = self.files.remove(&path).expect("pending write bytes");
+        if created {
+            self.jobs.push_front(Job::WriteOpen(path, bytes, true));
+            self.jobs.push_front(Job::Close(fd));
+        } else {
+            self.jobs.push_front(Job::Truncate(fd, bytes));
         }
     }
     fn failure(&mut self, error: k::Error) {

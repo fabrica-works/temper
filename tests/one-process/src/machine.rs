@@ -80,6 +80,20 @@ impl<H: Host> Host for SignalHost<H> {
 pub(crate) struct Machine(pub skein_fake_machine::Machine);
 impl skein_world::Machine for Machine {
     fn open_root(&mut self, path: &[u8]) -> Result<skein_sim::Handle, skein_io::kernel::Error> {
+        if path == b"agent" {
+            let worker = self.0.reopen_root(1);
+            // The parent has no workspace; repository runs adopt its prepared directory.
+            let root =
+                match self.0.open(worker, crate::fixtures::PREPARED_REPOSITORY, skein_fake_machine::How::Directory) {
+                    Ok(root) => {
+                        self.0.close(worker);
+                        root
+                    }
+                    Err(skein_fake_machine::Refusal::NotFound) => worker,
+                    Err(why) => panic!("prepared agent directory: {why:?}"),
+                };
+            return Ok(skein_sim::Handle::new(root.raw()));
+        }
         let index = match path {
             b"state" => 0,
             b"worker" => 1,

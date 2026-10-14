@@ -3,13 +3,14 @@ use crate::{
     fixtures, forge,
     machine::{self, Machine, SignalHost},
     referee::{self, Capture, Store, Wire},
+    stories,
 };
 use jig_fake_person::{Doing, Find, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
 use skein_shell::Host;
 use skein_world::{Inherited, Memory};
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use temper_shell_terminal::client::{NativeClient, Settings as ClientSettings, Start};
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
@@ -19,12 +20,22 @@ pub struct Settings {
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
     Chat { words: &'static [u8] },
+    Adopt,
+    Merge,
 }
 #[derive(Debug)]
 pub struct Outcome {
     pub verdict: skein_world::domain::Verdict,
     pub signed_in: u32,
     pub chats_answered: u32,
+    pub adopted: u32,
+    pub pushed: Vec<Pushed>,
+}
+#[derive(Debug)]
+pub struct Pushed {
+    pub branch: Box<[u8]>,
+    pub commit: u64,
+    pub parents: Vec<u64>,
 }
 thread_local! { static STORE: RefCell<Option<Rc<RefCell<Store>>>> = const { RefCell::new(None) }; }
 pub(crate) struct ServiceHost {
@@ -35,24 +46,6 @@ pub(crate) struct ServiceHost {
     pub(crate) wire: Wire,
     codec: jig_protocol_store::codec::Limits,
     families: temper_protocol_store::Bounds,
-}
-impl ServiceHost {
-    pub(crate) fn rows_at(&self, number: u64) -> BTreeMap<temper_engine_domain::Key, temper_engine_domain::Record> {
-        let mut rows = BTreeMap::new();
-        for commit in self.commits.iter().filter(|commit| commit.number <= number) {
-            for write in &commit.writes {
-                match write {
-                    temper_engine_domain::Write::Save(row) => {
-                        rows.insert(row.key(), row.clone());
-                    }
-                    temper_engine_domain::Write::Erase(key) => {
-                        rows.remove(key);
-                    }
-                }
-            }
-        }
-        rows
-    }
 }
 impl Host for ServiceHost {
     fn iterate(&mut self, now: Time, wall: Wall) {
@@ -95,6 +88,7 @@ pub(crate) enum Proc {
     Service(Box<ServiceHost>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
     Git(Box<temper_fake_git::Git>),
+    Shell(Box<stories::Shell>),
     Peer(Box<SignalHost<skein_fake_peers::llm::Peer>>),
     Forge(Box<forge::ForgeHost>),
     Client(Box<Person>),
@@ -105,6 +99,7 @@ impl Proc {
             Self::Service(h) => h.as_ref(),
             Self::Agent(h) => h.as_ref(),
             Self::Git(h) => h.as_ref(),
+            Self::Shell(h) => h.as_ref(),
             Self::Peer(h) => h.as_ref(),
             Self::Forge(h) => h.as_ref(),
             Self::Client(h) => h.as_ref(),
@@ -115,6 +110,7 @@ impl Proc {
             Self::Service(h) => h.as_mut(),
             Self::Agent(h) => h.as_mut(),
             Self::Git(h) => h.as_mut(),
+            Self::Shell(h) => h.as_mut(),
             Self::Peer(h) => h.as_mut(),
             Self::Forge(h) => h.as_mut(),
             Self::Client(h) => h.as_mut(),
@@ -168,23 +164,29 @@ pub(crate) struct Person {
     submissions: Queue<Submit>,
 }
 impl Person {
-    fn new(root: Fd, words: &[u8]) -> Self {
-        let steps = Box::new([
-            Step::Go {
-                address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations {
-                    project: None,
-                }),
-            },
-            Step::See { find: Find::named(jig_view::Role::TextArea, b"First words"), within: Duration::from_secs(5) },
-            Step::Type { find: Find::named(jig_view::Role::TextArea, b"First words"), words: words.into() },
-            Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
-            Step::See { find: Find::text(fixtures::ANSWER), within: Duration::from_secs(5) },
-        ]);
+    fn new(root: Fd, scenario: Story) -> Self {
+        let steps = match scenario {
+            Story::Chat { words } => vec![
+                Step::Go {
+                    address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations {
+                        project: None,
+                    }),
+                },
+                Step::See {
+                    find: Find::named(jig_view::Role::TextArea, b"First words"),
+                    within: Duration::from_secs(5),
+                },
+                Step::Type { find: Find::named(jig_view::Role::TextArea, b"First words"), words: words.into() },
+                Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
+                Step::See { find: Find::text(fixtures::ANSWER), within: Duration::from_secs(5) },
+            ],
+            Story::Adopt | Story::Merge => stories::person(),
+        };
         Self {
             wire: referee::client::Wire::default(),
             client: None,
             root: Some(root),
-            actor: jig_fake_person::Person::new(steps),
+            actor: jig_fake_person::Person::new(steps.into_boxed_slice()),
             wake: None,
             signed_in: 0,
             finished: false,
@@ -245,7 +247,7 @@ impl Host for Person {
                     self.finished = true;
                     client.close();
                 }
-                Next::Failed { step, why } => panic!("person step {step}: {why:?}; tree {:?}", client.tree()),
+                Next::Failed { step, why } => panic!("person step {step}: {why:?}"),
             }
             if self.actor.at() != before {
                 self.wake = Some(now);
@@ -307,7 +309,7 @@ fn service(inherited: &Inherited) -> Proc {
         capture,
         store: STORE.with(|store| store.borrow().as_ref().expect("world store").clone()),
         commits: Vec::new(),
-        wire: Wire::default(),
+        wire: Wire::new(STORE.with(|store| store.borrow().as_ref().expect("world store").clone())),
         codec: fixtures::codec(),
         families,
     }))
@@ -344,31 +346,39 @@ fn agent(_spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
 fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
     Proc::Git(Box::new(temper_fake_git::Git::new(spawn, inherited, forge::transport())))
 }
+fn shell(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
+    Proc::Shell(Box::new(stories::Shell::new(spawn, inherited)))
+}
 fn worker_root(_spawn: &skein_io::kernel::Spawn) -> Vec<skein_world::StartupRoot> {
     vec![skein_world::StartupRoot { name: b"worker".as_slice().into(), path: b"worker".as_slice().into() }]
 }
+fn agent_root(_spawn: &skein_io::kernel::Spawn) -> Vec<skein_world::StartupRoot> {
+    vec![skein_world::StartupRoot { name: b"worker".as_slice().into(), path: b"agent".as_slice().into() }]
+}
 #[must_use]
 pub fn run(settings: Settings, scenario: Story) -> Outcome {
-    let Story::Chat { words } = scenario;
+    stories::set(scenario);
     let mut disk = machine::fresh();
     let client = disk.reopen_root(2);
     let store = Rc::new(RefCell::new(Store::new()));
     STORE.with(|cell| {
         *cell.borrow_mut() = Some(store.clone());
     });
-    forge::set(Some(temper_fake_git::fixtures::scenario().transport));
+    let transport = stories::forge(scenario);
+    let observed_forge = Rc::new(RefCell::new(referee::forge::Forge::new(transport.clone(), scenario)));
+    forge::set(Some(transport.clone()));
     let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
-        referee::Referee::new(controls, store.clone())
+        referee::Referee::new(controls, store.clone(), scenario, observed_forge.clone())
     })
     .with_machine(Machine(disk));
     world.host_roots(
         skein_world::HostedProgram {
             program: b"/opt/temper/bin/temper".as_slice().into(),
             make: agent,
-            instances: 1,
+            instances: fixtures::AGENTS,
             operations: fixtures::agent_limits().routes + 3,
         },
-        worker_root,
+        agent_root,
     );
     world.host_roots(
         skein_world::HostedProgram {
@@ -379,6 +389,10 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         },
         worker_root,
     );
+    world.host_roots(
+        skein_world::HostedProgram { program: b"/bin/sh".as_slice().into(), make: shell, instances: 1, operations: 1 },
+        agent_root,
+    );
     world.spawn_restartable(
         vec![
             skein_world::StartupRoot { name: b"state".as_slice().into(), path: b"state".as_slice().into() },
@@ -386,8 +400,8 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         ],
         service,
     );
-    world.spawn_root(skein_sim::Handle::new(client.raw()), |root| Proc::Client(Box::new(Person::new(root, words))));
-    world.spawn(|| Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), None))));
+    world.spawn_root(skein_sim::Handle::new(client.raw()), |root| Proc::Client(Box::new(Person::new(root, scenario))));
+    world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
     world.spawn(|| Proc::Forge(Box::new(forge::ForgeHost::new())));
     let outcome = world.run();
     let signed_in = outcome
@@ -395,14 +409,16 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
         .iter()
         .filter_map(|proc| match proc {
             Proc::Client(person) => Some(person.signed_in),
-            Proc::Service(_) | Proc::Agent(_) | Proc::Git(_) | Proc::Peer(_) | Proc::Forge(_) => None,
+            Proc::Service(_) | Proc::Agent(_) | Proc::Git(_) | Proc::Shell(_) | Proc::Peer(_) | Proc::Forge(_) => None,
         })
         .sum();
     let chats_answered = referee::terminals(&store.borrow());
+    let adopted = stories::adopted(&store.borrow().rows);
+    let pushed = std::mem::take(&mut observed_forge.borrow_mut().pushed);
     assert!(outcome.procs.iter().all(Host::is_empty), "all processes drain");
     forge::set(None);
     STORE.with(|cell| {
         *cell.borrow_mut() = None;
     });
-    Outcome { verdict: skein_world::domain::Verdict::Passed, signed_in, chats_answered }
+    Outcome { verdict: skein_world::domain::Verdict::Passed, signed_in, chats_answered, adopted, pushed }
 }

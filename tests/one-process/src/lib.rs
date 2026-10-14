@@ -3,4 +3,5 @@ pub mod fixtures;
 mod forge;
 mod machine;
 mod referee;
+mod stories;
 pub mod world;

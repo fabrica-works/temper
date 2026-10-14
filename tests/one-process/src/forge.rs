@@ -166,7 +166,12 @@ impl ForgeHost {
             );
             while let Some(event) = connection.above.pop() {
                 match event {
-                    protocol::Event::Domain(event) => domain::step(&mut forge.domain, &domain_env, event, &mut replies),
+                    protocol::Event::Domain(event) => {
+                        domain::step(&mut forge.domain, &domain_env, event, &mut replies);
+                        while let Some(reply) = replies.pop() {
+                            forge.pending.push(reply);
+                        }
+                    }
                     protocol::Event::Close => self.requests.push(io::Request::Close { entity: connection.socket }),
                     protocol::Event::Closed => {}
                 }

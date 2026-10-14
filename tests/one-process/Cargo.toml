@@ -16,6 +16,7 @@ temper-engine-domain-forge.workspace = true
 temper-engine-protocol-forge.workspace = true
 temper-protocol-store.workspace = true
 temper-fake-git.workspace = true
+temper-fake-checkout.workspace = true
 temper-fake-forge-domain.workspace = true
 temper-fake-forge-protocol.workspace = true
 jig-channel-world.workspace = true
