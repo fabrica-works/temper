@@ -736,6 +736,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      forge with no roots is refused as `accounts.rs:82` refuses; a
      plaintext forge carries 0 and 0. Session 14 says so.
 
+134. **A native shell idle before it loaded is a refused directory**
+     (temper 16.3b, blocked 2026-10-14T12:35:21Z; plan defect). Session
+     16's default printed a line "on 12.1's `DirectoryRefused` notice";
+     at jig `d91a89c4`, `jig-shell-native`'s `files.rs:238-245` meets a
+     failed private open by marking the failure and closing its roots,
+     and `Shell::is_empty` also needs `closing`, so no notice reaches the
+     native client, which stalls (findings/jig-client.md, Discrepancy 4;
+     later.md's row). A malformed token or store file is met the same
+     way. So the native client reads a shell that has not loaded and
+     holds no work, deadline, submission or completion as
+     `DirectoryRefused`, closes it, and `temper open` prints `temper
+     open: DIRECTORY: refused (not a private directory of this user's,
+     or its records unreadable)` and exits 1: client.md, 6.1's exit 1,
+     with no cause the pin cannot tell apart. The terminal does not
+     check the directory itself (no second reading of what the shell
+     reads). One test, `a_refused_directory_exits_one_with_its_line`
+     (a directory with group bits set), joins 16.3's Test shape. Saying
+     why stays jig's (later.md).
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

@@ -970,8 +970,11 @@ pub mod limits {
 
 - **DIRECTORY refused by jig-shell-native,** which closes on a failed
   private open and says not why (findings/jig-client.md, Discrepancy 4;
-  later.md). Default: on 12.1's `DirectoryRefused` notice, `temper open:
-  DIRECTORY: not a private directory of this user's` and exit 1.
+  later.md). Decided by ruling 134: the pinned shell gives no notice,
+  so the native client reads a shell that is idle before it loaded as
+  `DirectoryRefused`, and `temper open` prints `temper open: DIRECTORY:
+  refused (not a private directory of this user's, or its records
+  unreadable)` and exits 1.
 - **The native client's notices and build count** (16.3's `Client`) if
   12.1's `NativeClient` lands without them. Default: 16.3 adds them to
   `src/client.rs` within 40 lines, named in its commit body.
