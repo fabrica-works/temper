@@ -29,6 +29,7 @@ pub enum Start {
 pub struct Seen {
     pub signed_in: u32,
     pub patches: u64,
+    pub builds: u64,
     pub facts: u32,
 }
 /// Notices belong to the caller; no secret enters the root.
@@ -36,6 +37,7 @@ pub struct Seen {
 pub enum Shown {
     Notice(route::Notice),
     SignInAsked,
+    Terminal(crate::terminal::Notice),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -64,6 +66,7 @@ pub struct NativeClient {
     signing: Queue<Signing>,
     seen: Seen,
     memory: u64,
+    loaded: bool,
 }
 impl NativeClient {
     /// Adopt the caller's private directory; validate a printed link before sending.
@@ -146,6 +149,7 @@ impl NativeClient {
             signing: Queue::with_capacity(limits::EXCHANGES),
             seen: Seen::default(),
             memory,
+            loaded: false,
         })
     }
     #[must_use]
@@ -207,12 +211,16 @@ impl NativeClient {
         }
     }
     fn event(&mut self, event: domain::Event) {
+        if let Some(notice) = crate::terminal::native::event(&event) {
+            self.notices.push(Shown::Terminal(notice));
+        }
         domain::step(&mut self.root, &self.env, event, &mut self.out);
         self.dirty = true;
     }
     fn start(&mut self) {
         if matches!(self.phase, Phase::WaitingLink | Phase::WaitingToken) {
             self.phase = Phase::Running;
+            self.notices.push(Shown::Terminal(crate::terminal::Notice::SignedIn));
             let capacity = self.kept.capacity();
             let kept = std::mem::replace(&mut self.kept, List::with_capacity(capacity));
             self.event(domain::Event::Start {
@@ -278,6 +286,7 @@ impl Host for NativeClient {
             return;
         }
         if let Some(records) = self.shell.loaded() {
+            self.loaded = true;
             let mut versions = List::with_capacity(2);
             for version in route::versions() {
                 versions.push(version).expect("two store owners fit");
@@ -293,6 +302,9 @@ impl Host for NativeClient {
             }
         }
         while let Some(signing) = self.shell.signing() {
+            if let Some(notice) = crate::terminal::native::signing(&signing, self.signing_out) {
+                self.notices.push(Shown::Terminal(notice));
+            }
             match &signing {
                 Signing::SignedIn { .. } => {
                     self.seen.signed_in = self.seen.signed_in.saturating_add(1);
@@ -313,6 +325,9 @@ impl Host for NativeClient {
             self.outputs();
         }
         while let Some(event) = self.shell.events().pop() {
+            if matches!(event, link::Event::WriteFailed) {
+                self.notices.push(Shown::Terminal(crate::terminal::Notice::StoreFailed));
+            }
             self.link.step(now, event, &mut self.linked);
             self.outputs();
         }
@@ -324,10 +339,22 @@ impl Host for NativeClient {
             self.link.fire(now, &mut self.linked);
             self.outputs();
             view::build(&mut self.view, &self.root, &mut self.patches);
+            if !self.patches.is_empty() {
+                self.seen.builds = self.seen.builds.saturating_add(1);
+            }
             while self.patches.pop().is_some() {
                 self.seen.patches = self.seen.patches.saturating_add(1);
             }
             self.dirty = false;
+        }
+        if !self.loaded
+            && !self.shell.work_pending(now)
+            && self.shell.next_deadline().is_none()
+            && self.shell.submissions().is_empty()
+            && self.shell.completions().is_empty()
+        {
+            self.notices.push(Shown::Terminal(crate::terminal::Notice::DirectoryRefused));
+            self.close();
         }
     }
     fn completions(&mut self) -> &mut Queue<Complete> {

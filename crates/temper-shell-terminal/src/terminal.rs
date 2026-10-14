@@ -5,6 +5,9 @@ use crate::{
 };
 use jig_view::{Act, NodeId, Tree};
 use skein_lib::{Duration, Queue, Secret, Time};
+pub(crate) mod native;
+mod run;
+pub use run::Terminal;
 
 /// The native client, or the machine world's script, as the terminal sees it.
 pub trait Client {
@@ -165,6 +168,11 @@ impl Loop {
             client.close();
         }
     }
+    /// Whether closing has started, so the host stops reading stdin.
+    #[must_use]
+    pub fn closing(&self) -> bool {
+        self.phase == Phase::Closing
+    }
     /// The client has iterated; consume notices and prepare the next output when free.
     pub fn iterate<C: Client>(&mut self, now: Time, client: &mut C) {
         if self.phase == Phase::Active {
@@ -254,8 +262,11 @@ impl Loop {
                 self.lines.push(join(&[b"temper: cannot write the small store in ", &self.directory, b"\n"]));
             }
             Notice::DirectoryRefused => {
-                self.failure =
-                    Some(join(&[b"temper open: ", &self.directory, b": not a private directory of this user's\n"]));
+                self.failure = Some(join(&[
+                    b"temper open: ",
+                    &self.directory,
+                    b": refused (not a private directory of this user's, or its records unreadable)\n",
+                ]));
                 self.close(client);
             }
         }
@@ -288,6 +299,18 @@ impl Loop {
         } else {
             None
         }
+    }
+    /// The renderer's envelope, line buffers and shell queue, excluding allocator overhead.
+    #[must_use]
+    pub fn worst_case(&self) -> Option<u64> {
+        let line = u64::try_from(self.directory.len().checked_add(160)?).ok()?;
+        render::worst_case(&self.bounds)?
+            .checked_mul(2)?
+            .checked_add(skein_lib::List::<u8>::worst_case(self.limits.line.checked_add(1)?)?)?
+            .checked_add(Queue::<Box<[u8]>>::worst_case(self.limits.lines)?)?
+            .checked_add(line.checked_mul(u64::from(self.limits.lines).checked_add(3)?)?)?
+            .checked_add(u64::try_from(self.frame.behind.len()).ok()?)?
+            .checked_add(u64::try_from(self.link.as_ref().map_or(0, |link| link.expose().len())).ok()?)
     }
 }
 fn join(parts: &[&[u8]]) -> Box<[u8]> {
