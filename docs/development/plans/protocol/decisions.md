@@ -767,6 +767,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      infrastructure. Whether `land` should report this race as 6 is a
      proposal for the retrospective (skein's kit).
 
+136. **The binary advertises raw message bytes, the domain keeps
+     rendered ones** (temper 10.4, blocked 2026-10-14T13:10:30Z; plan
+     defect). 10.4's first real-binary proof refused `workers[0].limits`:
+     `temper-worker-domain/src/limits.rs` checks `host.event_bytes +
+     SEPARATOR <= agent.message_bytes` (`:84`, `SEPARATOR` 2 at `:39`)
+     and `bounds.message_bytes <= host.event_bytes` (`:89`), while 10.3's
+     `agent()` (`crates/temper/src/lib.rs:134-175`), copied from jig's
+     reference, advertises `bounds.message_bytes =
+     limits.domain.run.message_bytes`, the rendered cap; smith renders a
+     message as its label, two bytes and its text. So no derived profile
+     could start; 09's and 10's fixtures set the three apart and hid it.
+     The hello's bound and the host's event bound are raw bytes, the
+     domain's `message_bytes` rendered ones, and both checks stay (a hello
+     must not promise more than the domain keeps). So the binary's
+     `agent()` advertises `run.message_bytes - SEPARATOR` (checked; a
+     profile where it underflows is refused naming the agent's
+     `message_bytes`), with smith's host limits as they are, and the
+     fixtures use raw and rendered values two bytes apart (the worker's
+     `hub.event_bytes` 598 beside `tool_payload` 600). Those lines in
+     `crates/temper/src/lib.rs` are in 10.4's Files, counted in its Size;
+     the check is 10.4's Proof, the real binary starting.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
