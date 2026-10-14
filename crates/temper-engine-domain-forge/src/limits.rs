@@ -142,7 +142,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<u64, crate::ReleaseRow>::worst_case(l.tasks)?)?
         .checked_add(u64::from(l.tasks).checked_mul(u64::from(l.name_bytes))?)?
         .checked_add(issue_payload(l)?)?
-        .checked_add(Map::<skein_lib::Token, crate::domain::PendingAdoption>::worst_case(l.adoptions)?)?
+        .checked_add(Map::<skein_lib::Token, crate::adoption::PendingAdoption>::worst_case(l.adoptions)?)?
         .checked_add(Map::<skein_lib::Token, crate::brief::BriefFetch>::worst_case(l.brief_sections)?)?
         .checked_add(Map::<skein_lib::Token, crate::BriefSource>::worst_case(l.brief_sections)?)?
         .checked_add(Map::<skein_lib::Token, crate::held::Pending>::worst_case(l.brief_sections)?)?

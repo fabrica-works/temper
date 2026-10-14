@@ -163,7 +163,11 @@ impl Driver {
     pub fn settle(&mut self) {
         for _ in 0..200 {
             self.advance(true);
-            if self.root.quiescent() && self.events.is_empty() && self.store.pending.is_empty() {
+            if self.root.quiescent()
+                && self.events.is_empty()
+                && self.store.pending.is_empty()
+                && self.forge.as_ref().is_none_or(crate::forge_stand::ForgeStand::quiescent)
+            {
                 return;
             }
         }

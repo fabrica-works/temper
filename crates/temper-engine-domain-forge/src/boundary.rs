@@ -129,7 +129,7 @@ pub struct Adoption {
     pub project: u32,
     /// Select this repository as the project's home if it has none yet.
     pub home: bool,
-    pub provider: client::api::Repository,
+    pub forge: u16,
     pub host: Box<[u8]>,
     pub owner: Box<[u8]>,
     pub name: Box<[u8]>,
@@ -521,7 +521,7 @@ pub enum Event {
     /// Release a section, including one still gathering.
     DropBrief { section: Token },
     /// Read current permissions, settings, protection and collaborators.
-    Adopt { reply_to: Token, adoption: Adoption },
+    Adopt { request: Token },
     /// Withdraw a just-adopted repository when its parent cannot commit the role seed.
     ForgetAdoption { repository: client::api::Repository, restore: Option<Repository> },
     /// Replace the resources this live task names.
@@ -608,6 +608,7 @@ pub enum Request {
     ApplicationPart {
         request: Token,
         adoption: Adoption,
+        repository: client::api::Repository,
     },
     ApplicationDone {
         request: Token,

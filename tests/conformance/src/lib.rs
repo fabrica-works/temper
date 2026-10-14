@@ -394,6 +394,9 @@ impl Application for Temper {
                 peers.requests.insert(call, *key);
                 peers.ask_bodies.insert(call, (*sign_in, *key, ask.clone()));
             }
+            engine::Event::Party(engine::PartyInput::Application { reply_to, key, .. }) => {
+                peers.requests.insert(destination(reply_to), *key);
+            }
             engine::Event::Worker(engine::WorkerInput::Link {
                 link: engine::Link::Up { up: host::LinkUp::Turn { run, attempt, turn }, .. },
                 ..
@@ -535,27 +538,24 @@ impl Application for Temper {
             if let Some(sign_in) = peers.sign_in {
                 if !peers.adopting {
                     peers.adopting = true;
-                    events.push(engine::Event::Party(engine::PartyInput::Ask {
+                    events.push(engine::Event::Party(engine::PartyInput::Application {
                         reply_to: ReplyTo::new(Token::new(91)),
                         sign_in,
                         key: [91; 16],
-                        ask: engine::adopt_repository_ask(
-                            forge::Adoption {
-                                project: 1,
-                                home: true,
-                                provider: temper_engine_forge_world::REPO,
-                                host: b"forge.example".as_slice().into(),
-                                owner: b"org".as_slice().into(),
-                                name: b"repo".as_slice().into(),
-                                prefix: b"temper/".as_slice().into(),
-                                role: forge::Role::Owned,
-                                landing: b"main".as_slice().into(),
-                                ci: true,
-                                checks: Box::new([]),
-                            },
-                            0,
-                        )
-                        .expect("adoption"),
+                        digest: [5; 32],
+                        request: forge::Adoption {
+                            project: 1,
+                            home: true,
+                            forge: temper_engine_forge_world::REPO.forge,
+                            host: b"forge.example".as_slice().into(),
+                            owner: b"org".as_slice().into(),
+                            name: b"repo".as_slice().into(),
+                            prefix: b"temper/".as_slice().into(),
+                            role: forge::Role::Owned,
+                            landing: b"main".as_slice().into(),
+                            ci: true,
+                            checks: Box::new([]),
+                        },
                     }));
                 }
                 if peers.adopted && !peers.chatted {
@@ -637,6 +637,14 @@ impl Application for Temper {
 fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
     let mut requires = Vec::new();
     match delivery {
+        root::Delivery::Application { to, outcome } => {
+            assert!(matches!(outcome, Some(forge::ApplicationOutcome::Adopted(_))));
+            let call = to.into_token().raw();
+            if let Some(key) = peers.requests.remove(&call) {
+                requires.push(r::Receipt::Party(1, key));
+            }
+            peers.adopted = true;
+        }
         root::Delivery::Assigned { channel, assignment } => link::assigned(peers, channel, assignment),
         root::Delivery::Link { down, .. } => requires = link::down(peers, Time::from_nanos(clock.now), down),
         root::Delivery::WebReply { to, reply } => {
@@ -658,13 +666,9 @@ fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
             {
                 requires.push(r::Receipt::Party(1, key));
             }
-            match reply {
-                people::Reply::SignedIn { sign_in, .. } => {
-                    peers.sign_in = Some(sign_in);
-                    requires.push(r::Receipt::SignIn(sign_in));
-                }
-                people::Reply::Outcome(people::Outcome::Adopted { .. }) => peers.adopted = true,
-                _ => {}
+            if let people::Reply::SignedIn { sign_in, .. } = reply {
+                peers.sign_in = Some(sign_in);
+                requires.push(r::Receipt::SignIn(sign_in));
             }
         }
         root::Delivery::Result { task, person, .. } => {

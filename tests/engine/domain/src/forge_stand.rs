@@ -22,6 +22,10 @@ impl Default for ForgeStand {
 
 impl ForgeStand {
     #[must_use]
+    pub fn quiescent(&self) -> bool {
+        self.pending.is_empty() && self.out.is_empty()
+    }
+    #[must_use]
     pub fn new() -> ForgeStand {
         let mut config = temper_engine_forge_world::fake_config();
         config.limits.repositories = 2;
@@ -70,10 +74,14 @@ impl ForgeStand {
         self.limits = *limits;
         self.calls = self.calls.checked_add(1).expect("stand calls bound");
         assert_eq!(repository.forge, 1);
-        let name: Box<[u8]> = match repository.repository {
-            2 => b"org/repo".as_slice().into(),
-            3 => b"org/private".as_slice().into(),
-            _ => panic!("stand repository is configured"),
+        let name: Box<[u8]> = if let Some(name) = translate::locate_name(&op) {
+            name
+        } else {
+            match repository.repository {
+                2 => b"org/repo".as_slice().into(),
+                3 => b"org/private".as_slice().into(),
+                _ => panic!("stand repository is configured"),
+            }
         };
         let raw = translate::op(&op, limits);
         assert!(self.pending.insert(call, op).is_none());

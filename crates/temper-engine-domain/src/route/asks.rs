@@ -75,17 +75,14 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             }
             None
         }
-        core::Ask::Adopt { request, project, adoption } => {
-            let parsed = if connector == domain.config.forge_connector {
-                forge_route::parse_adoption(project, adoption, connector)
-            } else {
-                None
-            };
-            match parsed {
-                Some(adoption) if domain.adoption_restore.len() < env.limits.forge.adoptions => {
-                    let previous = domain.forge.repository(adoption.provider).cloned();
+        core::Ask::Adopt { request, .. } => {
+            let located =
+                if connector == domain.config.forge_connector { domain.forge.applying(request) } else { None };
+            match located {
+                Some(repository) if domain.adoption_restore.len() < env.limits.forge.adoptions => {
+                    let previous = domain.forge.repository(repository).cloned();
                     assert!(domain.adoption_restore.insert(request, previous) == Ok(None), "one keyed adoption flight");
-                    domain.work.push(Work::Forge(forge::Event::Adopt { reply_to: request, adoption }));
+                    domain.work.push(Work::Forge(forge::Event::Adopt { request }));
                 }
                 Some(_) => domain.work.push(Work::People(people::Event::Decided {
                     request,
@@ -93,7 +90,7 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 })),
                 None => domain.work.push(Work::People(people::Event::Decided {
                     request,
-                    outcome: people::Outcome::Refused(people::Refusal::Unknown),
+                    outcome: people::Outcome::Refused(people::Refusal::NotOffered),
                 })),
             }
             None

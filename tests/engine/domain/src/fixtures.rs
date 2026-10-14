@@ -1,7 +1,6 @@
 //! The forge-backed direct driver's limits and adoption form values.
 use temper_engine_domain as engine;
 use temper_engine_domain_forge as forge;
-use temper_engine_domain_forge_client::api;
 
 #[must_use]
 pub fn forge_limits() -> engine::Limits {
@@ -18,7 +17,7 @@ pub fn adoption(forge: u16) -> forge::Adoption {
     forge::Adoption {
         project: 1,
         home: true,
-        provider: api::Repository { forge, repository: 2 },
+        forge,
         host: Box::from(&b"forge.example"[..]),
         owner: Box::from(&b"org"[..]),
         name: Box::from(&b"repo"[..]),

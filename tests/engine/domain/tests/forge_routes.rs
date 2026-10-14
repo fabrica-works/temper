@@ -26,7 +26,7 @@ struct World {
     fake_out: Queue<fake::Request>,
     pending: BTreeMap<Token, client::api::Op>,
     forge_calls: u32,
-    adopted: Vec<people::Outcome>,
+    adopted: Vec<forge_top::ApplicationOutcome>,
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
     answers: Vec<temper_engine_domain::CallAnswer>,
@@ -423,7 +423,10 @@ impl World {
                         )));
                         continue;
                     }
-                    let name: &[u8] = if repository == forge_world::REPO {
+                    let located = translate::locate_name(&op);
+                    let name: &[u8] = if let Some(name) = &located {
+                        name
+                    } else if repository == forge_world::REPO {
                         b"org/repo"
                     } else if repository == (client::api::Repository { forge: 1, repository: 3 }) {
                         b"org/extra"
@@ -473,10 +476,8 @@ impl World {
                             .expect("the world rendered every relayed answer");
                         self.answers.push(answer.clone());
                     }
-                    Delivery::WebReply { reply: people::Reply::Outcome(outcome), .. }
-                        if matches!(outcome, people::Outcome::Adopted { .. }) =>
-                    {
-                        self.adopted.push(outcome);
+                    Delivery::Application { outcome, .. } => {
+                        self.adopted.push(outcome.expect("retained application"));
                     }
                     _ => {}
                 },
@@ -605,33 +606,27 @@ impl World {
             },
         }));
         self.until(Until::SignedIn);
-        self.send(engine::Event::Party(engine::PartyInput::Ask {
+        self.send(engine::Event::Party(engine::PartyInput::Application {
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
-            ask: engine::adopt_repository_ask(
-                forge_top::Adoption {
-                    project: 1,
-                    home: true,
-                    provider: client::api::Repository {
-                        forge: forge_world::REPO.forge,
-                        repository: forge_world::REPO.repository,
-                    },
-                    host: Box::from(&b"forge.example"[..]),
-                    owner: Box::from(&b"org"[..]),
-                    name: Box::from(&b"repo"[..]),
-                    prefix: Box::from(&b"temper/"[..]),
-                    role: forge_top::Role::Owned,
-                    landing: Box::from(&b"main"[..]),
-                    ci,
-                    checks,
-                },
-                0,
-            )
-            .expect("forge adoption shape"),
+            digest: [5; 32],
+            request: forge_top::Adoption {
+                project: 1,
+                home: true,
+                forge: forge_world::REPO.forge,
+                host: Box::from(&b"forge.example"[..]),
+                owner: Box::from(&b"org"[..]),
+                name: Box::from(&b"repo"[..]),
+                prefix: Box::from(&b"temper/"[..]),
+                role: forge_top::Role::Owned,
+                landing: Box::from(&b"main"[..]),
+                ci,
+                checks,
+            },
         }));
         self.until(Until::Adopted);
-        assert!(matches!(self.adopted.as_slice(), [people::Outcome::Adopted { .. }]));
+        assert!(matches!(self.adopted.as_slice(), [forge_top::ApplicationOutcome::Adopted(_)]));
     }
 }
 
@@ -2000,140 +1995,6 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
 }
 
 #[test]
-#[expect(clippy::wildcard_enum_match_arm, reason = "the story selects persisted people rows")]
-fn a_repository_adopted_seeds_its_collaborators_into_roles() {
-    let mut world = World::new();
-    world.adopt();
-    let mut roles = None;
-    let mut people = BTreeMap::new();
-    for row in world.store.rows.values() {
-        match row {
-            Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Person { number, identity })) => {
-                let subject: [u8; 8] =
-                    identity.key.subject.as_ref().try_into().expect("forge subject is a user number");
-                people.insert(u64::from_be_bytes(subject), *number);
-            }
-            Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Roles {
-                project: 1,
-                holdings,
-            })) => {
-                roles = Some(holdings.clone());
-            }
-            _ => {}
-        }
-    }
-    let roles = roles.expect("durable project roles");
-    assert!(roles.contains(&people::Holding { person: people[&7], role: people::Role::Owner }));
-    assert!(roles.contains(&people::Holding { person: people[&1], role: people::Role::Maintainer }));
-    assert!(roles.contains(&people::Holding { person: people[&2], role: people::Role::Member }));
-}
-
-#[test]
-#[expect(clippy::wildcard_enum_match_arm, reason = "the story selects persisted people rows")]
-fn policy_maps_connector_permissions_to_seeded_roles_after_restart() {
-    let mut world = World::new();
-    world.until(Until::Ready);
-    world.send(engine::Event::Party(engine::PartyInput::SignedIn {
-        reply_to: ReplyTo::new(Token::new(90)),
-        identity: people::Identity {
-            key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-            login: Box::from(&b"owner"[..]),
-            name: Box::from(&b"Owner"[..]),
-        },
-    }));
-    world.until(Until::SignedIn);
-    world.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(94)),
-        sign_in: world.signed_in.expect("owner signed in"),
-        key: [94; 16],
-        ask: people::Ask::ChangePolicy {
-            project: 1,
-            change: people::PolicyChange::Permissions {
-                mappings: Box::new([
-                    people::PermissionRole { connector: 0, permission: 3, role: 3 },
-                    people::PermissionRole { connector: 0, permission: 2, role: 1 },
-                ]),
-            },
-        },
-    }));
-    world.until(Until::Ready);
-    assert!(
-        world.store.rows.contains_key(&Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)))),
-        "permission policy committed"
-    );
-    world.restart(false, false);
-    world.signed_in = None;
-    world.adopt();
-    let mut roles = None;
-    let mut people = BTreeMap::new();
-    for row in world.store.rows.values() {
-        match row {
-            Record::Core(jig_domain_core::Record::People(people::Stored::Person { number, identity })) => {
-                let subject: [u8; 8] =
-                    identity.key.subject.as_ref().try_into().expect("forge subject is a user number");
-                people.insert(u64::from_be_bytes(subject), *number);
-            }
-            Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project: 1, holdings })) => {
-                roles = Some(holdings.clone());
-            }
-            _ => {}
-        }
-    }
-    let roles = roles.expect("durable project roles");
-    assert!(roles.contains(&people::Holding { person: people[&7], role: people::Role::Owner }));
-    assert!(roles.contains(&people::Holding { person: people[&1], role: people::Role::Observer }));
-    assert!(roles.contains(&people::Holding { person: people[&2], role: people::Role::Maintainer }));
-}
-
-#[test]
-fn an_adoption_sent_twice_across_a_restart_is_made_once() {
-    let mut world = World::new();
-    world.adopt();
-    let first = world.adopted[0];
-    let calls = world.forge_calls;
-    world.restart(false, false);
-    world.until(Until::Ready);
-    world.signed_in = None;
-    world.send(engine::Event::Party(engine::PartyInput::SignedIn {
-        reply_to: ReplyTo::new(Token::new(92)),
-        identity: people::Identity {
-            key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-            login: Box::from(&b"owner"[..]),
-            name: Box::from(&b"Owner"[..]),
-        },
-    }));
-    world.until(Until::SignedIn);
-    world.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(93)),
-        sign_in: world.signed_in.expect("owner signed in again"),
-        key: [91; 16],
-        ask: engine::adopt_repository_ask(
-            forge_top::Adoption {
-                project: 1,
-                home: true,
-                provider: client::api::Repository {
-                    forge: forge_world::REPO.forge,
-                    repository: forge_world::REPO.repository,
-                },
-                host: Box::from(&b"forge.example"[..]),
-                owner: Box::from(&b"org"[..]),
-                name: Box::from(&b"repo"[..]),
-                prefix: Box::from(&b"temper/"[..]),
-                role: forge_top::Role::Owned,
-                landing: Box::from(&b"main"[..]),
-                ci: true,
-                checks: Box::new([]),
-            },
-            0,
-        )
-        .expect("forge adoption shape"),
-    }));
-    world.until(Until::Adopted);
-    assert_eq!(world.adopted, [first], "the committed answer replays after restart");
-    assert_eq!(world.forge_calls, calls, "a replay never asks the forge to adopt again");
-}
-
-#[test]
 fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     let mut world = World::configured(true, false);
     world.adopt();
@@ -2160,27 +2021,24 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         },
     );
     fake::grant(&mut world.fake, b"org/extra", 1, raw::Permission::Admin);
-    world.send(engine::Event::Party(engine::PartyInput::Ask {
+    world.send(engine::Event::Party(engine::PartyInput::Application {
         reply_to: ReplyTo::new(Token::new(98)),
         sign_in: world.signed_in.expect("owner session"),
         key: [98; 16],
-        ask: engine::adopt_repository_ask(
-            forge_top::Adoption {
-                project: 1,
-                home: false,
-                provider: client::api::Repository { forge: 1, repository: 3 },
-                host: Box::from(&b"forge.example"[..]),
-                owner: Box::from(&b"org"[..]),
-                name: Box::from(&b"extra"[..]),
-                prefix: Box::from(&b"temper/"[..]),
-                role: forge_top::Role::Owned,
-                landing: Box::from(&b"main"[..]),
-                ci: true,
-                checks: Box::new([]),
-            },
-            0,
-        )
-        .expect("forge adoption shape"),
+        digest: [5; 32],
+        request: forge_top::Adoption {
+            project: 1,
+            home: false,
+            forge: 1,
+            host: Box::from(&b"forge.example"[..]),
+            owner: Box::from(&b"org"[..]),
+            name: Box::from(&b"extra"[..]),
+            prefix: Box::from(&b"temper/"[..]),
+            role: forge_top::Role::Owned,
+            landing: Box::from(&b"main"[..]),
+            ci: true,
+            checks: Box::new([]),
+        },
     }));
     for _ in 0..100 {
         world.tick();
@@ -2189,7 +2047,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         }
     }
     assert!(
-        matches!(world.adopted.get(1), Some(people::Outcome::Adopted { .. })),
+        matches!(world.adopted.get(1), Some(forge_top::ApplicationOutcome::Adopted(_))),
         "second repository adopted: {:?}",
         world.adopted
     );

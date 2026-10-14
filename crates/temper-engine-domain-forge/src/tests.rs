@@ -244,7 +244,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     let request = Adoption {
         project: 5,
         home: true,
-        provider: REPO,
+        forge: REPO.forge,
         host: Box::from(&b"forge.example"[..]),
         owner: Box::from(&b"org"[..]),
         name: Box::from(&b"repo"[..]),
@@ -254,7 +254,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         ci: true,
         checks: Box::new([]),
     };
-    outputs(&mut d, Event::Adopt { reply_to: Token::new(4), adoption: request });
+    fixtures::begin_adoption(&mut d, Token::new(4), request);
     let sent = ready(&mut d);
     let (call, op) = match &sent[0] {
         Request::Call { call, op, .. } => (*call, op.clone()),
@@ -395,7 +395,7 @@ fn adoption_without_ci_refuses_an_empty_check_policy() {
     let request = Adoption {
         project: 5,
         home: true,
-        provider: REPO,
+        forge: REPO.forge,
         host: Box::from(&b"forge.example"[..]),
         owner: Box::from(&b"org"[..]),
         name: Box::from(&b"repo"[..]),
@@ -406,7 +406,7 @@ fn adoption_without_ci_refuses_an_empty_check_policy() {
         checks: Box::new([]),
     };
     assert_eq!(
-        outputs(&mut d, Event::Adopt { reply_to: Token::new(5), adoption: request }).as_ref(),
+        fixtures::begin_adoption(&mut d, Token::new(5), request).as_ref(),
         &[Request::Adopted { reply_to: Token::new(5), result: Err(client::api::Error::Refused) }]
     );
     assert!(ready(&mut d).is_empty());

@@ -3,6 +3,63 @@ use super::*;
 use jig_domain_people as people;
 
 #[test]
+fn an_adoption_locates_its_repository_before_any_other_read() {
+    let mut d = domain();
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(9),
+            retention: Duration::from_secs(60),
+            adoption: fixtures::adoption(),
+        },
+    );
+    let sent = ready(&mut d);
+    let [Request::Call { repository, op, .. }] = sent.as_ref() else { panic!("one locate call") };
+    assert_eq!(*repository, client::api::Repository { forge: 1, repository: 0 });
+    assert_eq!(
+        *op,
+        client::api::Op::Read(client::api::Read::Locate {
+            owner: Box::from(&b"org"[..]),
+            name: Box::from(&b"repo"[..]),
+        })
+    );
+}
+
+#[test]
+fn an_adoption_refuses_fields_outside_its_bounds_before_a_call() {
+    for field in 0_u8..5 {
+        for bytes in [&[][..], &[b'a'; 129][..]] {
+            let mut d = domain();
+            let mut request = fixtures::adoption();
+            match field {
+                0 => request.host = bytes.into(),
+                1 => request.owner = bytes.into(),
+                2 => request.name = bytes.into(),
+                3 => request.prefix = bytes.into(),
+                4 => request.landing = bytes.into(),
+                _ => panic!("field"),
+            }
+            outputs(
+                &mut d,
+                Event::Application {
+                    request: Token::new(4),
+                    token: Token::new(9),
+                    retention: Duration::from_secs(60),
+                    adoption: request,
+                },
+            );
+            assert_eq!(
+                d.application_outcome(Token::new(9)),
+                Some(&ApplicationOutcome::ForgeRefused(AdoptionRefusal::TooLarge)),
+                "field {field}"
+            );
+            assert!(ready(&mut d).is_empty());
+        }
+    }
+}
+
+#[test]
 fn a_core_refusal_is_kept_as_jigs_refusal() {
     let mut d = domain();
     outputs(
@@ -61,7 +118,7 @@ fn a_full_outcome_table_answers_the_application_again_busy() {
 fn a_kept_outcome_is_saved_with_the_end_of_its_retention() {
     let mut d = domain();
     let mut adoption = fixtures::adoption();
-    adoption.provider.forge = 9;
+    adoption.forge = 9;
     let requests = outputs(
         &mut d,
         Event::Application {

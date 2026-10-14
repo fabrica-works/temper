@@ -36,7 +36,11 @@ pub(crate) fn saved_tags(resources: &[tasks::SavedResource], connector: u16) -> 
 /// Build a generic people request from temper's forge repository options.
 /// The people child retains only the resource name, role and opaque options.
 #[must_use]
-pub fn adopt_repository_ask(adoption: forge::Adoption, connector: u16) -> Option<people::Ask> {
+pub fn adopt_repository_ask(
+    adoption: forge::Adoption,
+    repository: forge_client::api::Repository,
+    connector: u16,
+) -> Option<people::Ask> {
     let role = match adoption.role {
         forge::Role::Owned => people::ResourceRole::Owned,
         forge::Role::Fork => people::ResourceRole::Fork,
@@ -61,22 +65,14 @@ pub fn adopt_repository_ask(adoption: forge::Adoption, connector: u16) -> Option
             resource: people::ResourceName {
                 connector,
                 path: Box::new([
-                    Box::from(adoption.provider.forge.to_be_bytes()),
-                    Box::from(adoption.provider.repository.to_be_bytes()),
+                    Box::from(repository.forge.to_be_bytes()),
+                    Box::from(repository.repository.to_be_bytes()),
                 ]),
             },
             role,
             options: options.into_boxed(),
         },
     })
-}
-
-fn adoption_flag(value: &[u8]) -> Option<bool> {
-    match value {
-        [0] => Some(false),
-        [1] => Some(true),
-        _ => None,
-    }
 }
 
 fn permission_number(permission: forge_client::api::Permission) -> u16 {
@@ -97,51 +93,6 @@ fn seeded_role(domain: &Domain, project: u32, permission: forge_client::api::Per
         }
     }
     None
-}
-
-/// Decode the forge's own options after the people child has authorized the
-/// resource adoption. Malformed connector data refuses without a forge call.
-pub(crate) fn parse_adoption(project: u32, adoption: people::Adoption, connector: u16) -> Option<forge::Adoption> {
-    if adoption.resource.connector != connector || adoption.resource.path.len() != 2 || adoption.options.len() < 7 {
-        return None;
-    }
-    let forge_id = adoption.resource.path.first()?;
-    let repo_id = adoption.resource.path.get(1)?;
-    if forge_id.len() != 2 || repo_id.len() != 4 {
-        return None;
-    }
-    let forge = u16::from_be_bytes([*forge_id.first()?, *forge_id.get(1)?]);
-    let repository = u32::from_be_bytes([*repo_id.first()?, *repo_id.get(1)?, *repo_id.get(2)?, *repo_id.get(3)?]);
-    if forge == 0 || repository == 0 {
-        return None;
-    }
-    let home = adoption_flag(adoption.options.first()?)?;
-    let ci = adoption_flag(adoption.options.get(6)?)?;
-    let mut checks = List::with_capacity(u32::try_from(adoption.options.len().checked_sub(7)?).ok()?);
-    for option in adoption.options.get(7..)? {
-        if option.len() != 4 {
-            return None;
-        }
-        checks.push(u32::from_be_bytes([*option.first()?, *option.get(1)?, *option.get(2)?, *option.get(3)?])).ok()?;
-    }
-    let role = match adoption.role {
-        people::ResourceRole::Owned => forge::Role::Owned,
-        people::ResourceRole::Fork => forge::Role::Fork,
-        people::ResourceRole::Context => forge::Role::Context,
-    };
-    Some(forge::Adoption {
-        project,
-        home,
-        provider: forge_client::api::Repository { forge, repository },
-        host: adoption.options.get(1)?.clone(),
-        owner: adoption.options.get(2)?.clone(),
-        name: adoption.options.get(3)?.clone(),
-        prefix: adoption.options.get(4)?.clone(),
-        role,
-        landing: adoption.options.get(5)?.clone(),
-        ci,
-        checks: checks.into_boxed(),
-    })
 }
 
 fn append(out: &mut List<u8>, bytes: &[u8]) {
@@ -1968,8 +1919,8 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
-            forge::Request::ApplicationPart { request, adoption } => {
-                super::applications::part(domain, request, adoption);
+            forge::Request::ApplicationPart { request, adoption, repository } => {
+                super::applications::part(domain, request, adoption, repository);
             }
             forge::Request::ApplicationDone { request, token } => {
                 super::applications::finished(domain, request, Ok(token));

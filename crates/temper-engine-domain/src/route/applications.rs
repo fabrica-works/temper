@@ -42,8 +42,13 @@ pub(super) fn drop(domain: &mut Domain, owner: Token) {
     }
 }
 
-pub(super) fn part(domain: &mut Domain, request: Token, adoption: forge::Adoption) {
-    match forge_route::adopt_repository_ask(adoption, domain.config.forge_connector) {
+pub(super) fn part(
+    domain: &mut Domain,
+    request: Token,
+    adoption: forge::Adoption,
+    repository: temper_engine_domain_forge_client::api::Repository,
+) {
+    match forge_route::adopt_repository_ask(adoption, repository, domain.config.forge_connector) {
         Some(ask) => domain.work.push(Work::Core(core::Event::ApplicationPart { request, ask: Box::new(ask) })),
         None => domain.work.push(Work::Forge(forge::Event::ApplicationAnswered {
             request,

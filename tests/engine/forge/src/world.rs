@@ -178,12 +178,14 @@ impl World {
     }
 
     pub fn adopt_as(&mut self, role: top::Role) {
-        self.event(top::Event::Adopt {
-            reply_to: Token::new(100),
+        self.event(top::Event::Application {
+            request: Token::new(100),
+            token: Token::new(100),
+            retention: Duration::from_secs(60),
             adoption: top::Adoption {
                 project: 5,
                 home: role != top::Role::Context,
-                provider: REPO,
+                forge: REPO.forge,
                 host: Box::from(&b"forge.example"[..]),
                 owner: Box::from(&b"org"[..]),
                 name: Box::from(&b"repo"[..]),
@@ -407,9 +409,24 @@ impl World {
         for _ in 0..self.top_out.len() {
             let request = self.top_out.pop().expect("counted top output");
             match request {
-                top::Request::ApplicationPart { .. }
-                | top::Request::ApplicationDone { .. }
-                | top::Request::ApplicationAgain { .. } => panic!("connector world uses direct adoption"),
+                top::Request::ApplicationPart { request, .. } => {
+                    top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
+                }
+                top::Request::ApplicationDone { .. } => {}
+                top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
+                top::Request::Adopted { reply_to, result } => {
+                    let outcome = match &result {
+                        Ok(adopted) => jig_domain_people::Outcome::Adopted { project: adopted.repository.project },
+                        Err(_) => jig_domain_people::Outcome::Refused(jig_domain_people::Refusal::Unknown),
+                    };
+                    top::step(
+                        &mut self.top,
+                        &self.env,
+                        top::Event::ApplicationAnswered { request: reply_to, outcome },
+                        &mut self.top_out,
+                    );
+                    self.seen.push(top::Request::Adopted { reply_to, result }).expect("world output capacity");
+                }
                 top::Request::BriefClient { event } => {
                     top::step(&mut self.top, &self.env, top::Event::Client(event), &mut self.top_out);
                 }
@@ -442,7 +459,6 @@ impl World {
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
                 other @ (top::Request::Resource { .. }
-                | top::Request::Adopted { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }
                 | top::Request::Outcome { .. }
@@ -478,7 +494,8 @@ impl World {
     }
 
     fn submit(&mut self, call: Token, repository: client::api::Repository, op: client::api::Op) {
-        assert_eq!(repository, REPO);
+        assert_eq!(repository.forge, REPO.forge);
+        assert!(repository.repository == REPO.repository || repository.repository == 0);
         self.calls += 1;
         if let client::api::Op::Write(_) = op {
             self.writes += 1;
@@ -486,15 +503,11 @@ impl World {
         self.serial += 1;
         let token = Token::new(self.serial);
         let raw = translate::op(&op, &self.env.limits.client);
+        let name = translate::locate_name(&op).unwrap_or_else(|| Box::from(&b"org/repo"[..]));
         self.pending
             .insert(token, Pending { client: call, op, generation: self.generation })
             .expect("world call slots");
-        self.to_forge.push(forge::Event::Call {
-            reply_to: ReplyTo::new(token),
-            user: 1,
-            repository: Box::from(&b"org/repo"[..]),
-            op: raw,
-        });
+        self.to_forge.push(forge::Event::Call { reply_to: ReplyTo::new(token), user: 1, repository: name, op: raw });
     }
 
     fn take_forge(&mut self) {

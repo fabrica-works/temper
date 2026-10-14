@@ -163,6 +163,7 @@ impl FakeForge {
     }
     fn send(&mut self, clock: Clock, call: Token, op: api::Op, key: Option<SystemKey>, late: bool) {
         let native = translate::op(&op, &self.client_limits);
+        let name = translate::locate_name(&op).unwrap_or_else(|| b"org/repo".as_slice().into());
         let effect = match (&native, key) {
             (raw::Op::Write(write), Some(key)) => {
                 let count = self.seen.entry(key).or_default();
@@ -189,12 +190,7 @@ impl FakeForge {
         fake::step(
             &mut self.domain,
             &env,
-            fake::Event::Call {
-                reply_to: ReplyTo::new(fake_call),
-                user: 1,
-                repository: b"org/repo".as_slice().into(),
-                op: native,
-            },
+            fake::Event::Call { reply_to: ReplyTo::new(fake_call), user: 1, repository: name, op: native },
             &mut queue,
         );
         while let Some(request) = queue.pop() {

@@ -1,9 +1,106 @@
 //! The forge's keyed adoption through the root (domain/forge.md, 4).
+use jig_domain_people as people;
 use skein_lib::{ReplyTo, Token};
 use temper_engine_domain as engine;
 use temper_engine_domain::Delivery;
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_world::{direct::Driver, fixtures};
+
+#[test]
+fn an_adoption_of_a_repository_the_forge_lacks_is_refused_as_not_found() {
+    let mut driver = driver();
+    let mut request = fixtures::adoption(1);
+    request.name = Box::from(&b"none"[..]);
+    adopt(&mut driver, request, 95);
+    assert_eq!(outcomes(&driver), [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotFound))]);
+    assert_eq!(driver.forge.as_ref().expect("forge stand").calls, 1);
+}
+
+#[test]
+fn a_partys_own_adopt_ask_is_refused_as_not_offered() {
+    let mut driver = driver();
+    let ask = engine::adopt_repository_ask(
+        fixtures::adoption(1),
+        temper_engine_domain_forge_client::api::Repository { forge: 1, repository: 2 },
+        0,
+    )
+    .expect("adoption");
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(95)),
+        sign_in: driver.session(),
+        key: [95; 16],
+        ask,
+    }));
+    driver.settle();
+    assert!(driver.delivered.iter().any(|delivery| matches!(
+        delivery,
+        Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotOffered)), .. }
+    )));
+    assert_eq!(driver.forge.as_ref().expect("forge stand").calls, 0);
+}
+
+fn seeded_roles(driver: &Driver) -> (Box<[people::Holding]>, std::collections::BTreeMap<u64, u64>) {
+    let mut identities = std::collections::BTreeMap::new();
+    let mut roles = None;
+    for row in driver.store.rows.values() {
+        if let engine::Record::Core(jig_domain_core::Record::People(people::Stored::Person { number, identity })) = row
+        {
+            let subject: [u8; 8] = identity.key.subject.as_ref().try_into().expect("forge subject is a user number");
+            identities.insert(u64::from_be_bytes(subject), *number);
+        }
+        if let engine::Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project: 1, holdings })) =
+            row
+        {
+            roles = Some(holdings.clone());
+        }
+    }
+    (roles.expect("durable project roles"), identities)
+}
+
+#[test]
+fn a_repository_adopted_seeds_its_collaborators_into_roles() {
+    let mut driver = driver();
+    adopt(&mut driver, fixtures::adoption(1), 95);
+    let (roles, people) = seeded_roles(&driver);
+    assert!(roles.contains(&people::Holding { person: people[&7], role: people::Role::Owner }));
+    assert!(roles.contains(&people::Holding { person: people[&1], role: people::Role::Maintainer }));
+    assert!(roles.contains(&people::Holding { person: people[&2], role: people::Role::Member }));
+}
+
+#[test]
+fn policy_maps_connector_permissions_to_seeded_roles_after_restart() {
+    let mut driver = driver();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(94)),
+        sign_in: driver.session(),
+        key: [94; 16],
+        ask: people::Ask::ChangePolicy {
+            project: 1,
+            change: people::PolicyChange::Permissions {
+                mappings: Box::new([
+                    people::PermissionRole { connector: 0, permission: 3, role: 3 },
+                    people::PermissionRole { connector: 0, permission: 2, role: 1 },
+                ]),
+            },
+        },
+    }));
+    driver.settle();
+    assert!(
+        driver.store.rows.contains_key(&engine::Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)))),
+        "permission policy committed"
+    );
+    driver.root = engine::Domain::new(temper_engine_domain_world::walking::config(71), &driver.env.limits);
+    driver.delivered.clear();
+    driver.send(engine::Event::Restart);
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    adopt(&mut driver, fixtures::adoption(1), 95);
+    let (roles, people) = seeded_roles(&driver);
+    assert!(roles.contains(&people::Holding { person: people[&7], role: people::Role::Owner }));
+    assert!(roles.contains(&people::Holding { person: people[&1], role: people::Role::Observer }));
+    assert!(roles.contains(&people::Holding { person: people[&2], role: people::Role::Maintainer }));
+}
 
 fn driver() -> Driver {
     let mut driver = Driver::forge();
@@ -85,7 +182,6 @@ fn an_adoption_the_forge_user_may_not_read_is_refused_as_no_access() {
     let mut driver = driver();
     let mut request = fixtures::adoption(1);
     request.name = b"private".as_slice().into();
-    request.provider.repository = 3;
     adopt(&mut driver, request, 95);
     assert_eq!(outcomes(&driver), [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoAccess))]);
 }

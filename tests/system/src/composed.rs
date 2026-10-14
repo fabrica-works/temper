@@ -551,10 +551,13 @@ impl World {
         repository: temper_engine_domain_forge_client::api::Repository,
         op: &temper_engine_domain_forge_client::api::Op,
     ) {
-        assert_eq!(repository, temper_engine_forge_world::REPO);
+        assert_eq!(repository.forge, temper_engine_forge_world::REPO.forge);
+        assert!(repository.repository == 0 || repository == temper_engine_forge_world::REPO);
         self.forge.at(self.env.now);
         let client = &self.env.limits.forge.client;
-        let result = match self.forge.api(b"org/repo", 1, api::op(op, client)) {
+        let located = temper_engine_forge_world::translate::locate_name(op);
+        let name = located.as_deref().unwrap_or(b"org/repo");
+        let result = match self.forge.api(name, 1, api::op(op, client)) {
             Ok(answer) => Ok(api::answer(op, answer, client)),
             Err(error) => Err(api::error(
                 error,
@@ -569,6 +572,11 @@ impl World {
 
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
+            Delivery::Application { to, outcome } => {
+                assert_eq!(to.into_token(), ADOPTION);
+                assert!(matches!(outcome, Some(temper_engine_domain_forge::ApplicationOutcome::Adopted(_))));
+                self.adoption = Adoption::Adopted;
+            }
             Delivery::WebReply { to, reply } => self.web_reply(to.into_token(), reply),
             Delivery::Assigned { channel, assignment } => {
                 assert_eq!(channel, CHANNEL);
@@ -597,7 +605,6 @@ impl World {
             // A live notice to the requester, with no reply right.
             Delivery::Result { .. } => {}
             other @ (Delivery::Host(_)
-            | Delivery::Application { .. }
             | Delivery::Procedure { .. }
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }
@@ -615,11 +622,6 @@ impl World {
     }
 
     fn web_reply(&mut self, to: Token, reply: people::Reply) {
-        if to == ADOPTION {
-            assert!(matches!(reply, people::Reply::Outcome(people::Outcome::Adopted { .. })), "adopted: {reply:?}");
-            self.adoption = Adoption::Adopted;
-            return;
-        }
         let signed_in = matches!(reply, people::Reply::SignedIn { .. });
         let reply = match reply {
             people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
@@ -635,11 +637,12 @@ impl World {
         };
         self.party.reply(to.raw(), reply);
         if signed_in && self.adoption == Adoption::Pending {
-            self.root_events.push_back(engine::Event::Party(engine::PartyInput::Ask {
+            self.root_events.push_back(engine::Event::Party(engine::PartyInput::Application {
                 reply_to: ReplyTo::new(ADOPTION),
                 sign_in: self.party.sign_in.expect("authenticated party"),
                 key: [90; 16],
-                ask: adoption(),
+                digest: [5; 32],
+                request: adoption(),
             }));
         }
     }
@@ -723,24 +726,20 @@ impl World {
 }
 
 /// The owner's adoption of the forge's one repository.
-fn adoption() -> people::Ask {
-    engine::adopt_repository_ask(
-        temper_engine_domain_forge::Adoption {
-            project: 1,
-            home: true,
-            provider: temper_engine_forge_world::REPO,
-            host: Box::from(&b"forge.example"[..]),
-            owner: Box::from(&b"org"[..]),
-            name: Box::from(&b"repo"[..]),
-            prefix: Box::from(&b"temper/"[..]),
-            role: temper_engine_domain_forge::Role::Owned,
-            checks: Box::new([]),
-            ci: true,
-            landing: Box::from(&b"main"[..]),
-        },
-        0,
-    )
-    .expect("bounded adoption request")
+fn adoption() -> temper_engine_domain_forge::Adoption {
+    temper_engine_domain_forge::Adoption {
+        project: 1,
+        home: true,
+        forge: temper_engine_forge_world::REPO.forge,
+        host: Box::from(&b"forge.example"[..]),
+        owner: Box::from(&b"org"[..]),
+        name: Box::from(&b"repo"[..]),
+        prefix: Box::from(&b"temper/"[..]),
+        role: temper_engine_domain_forge::Role::Owned,
+        checks: Box::new([]),
+        ci: true,
+        landing: Box::from(&b"main"[..]),
+    }
 }
 
 /// Read access to the repository for the chat's role, and room for it.

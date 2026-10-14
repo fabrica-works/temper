@@ -25,7 +25,7 @@ struct World {
     fake_env: Env<fake::Config>,
     fake_out: Queue<fake::Request>,
     pending: BTreeMap<Token, client::api::Op>,
-    adopted: Vec<people::Outcome>,
+    adopted: Vec<forge_top::ApplicationOutcome>,
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
     answers: Vec<temper_engine_domain::CallAnswer>,
@@ -326,7 +326,10 @@ impl World {
                     self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
                 }
                 engine::Request::Forge { call, repository, op } => {
-                    let name: &[u8] = if repository == forge_world::REPO {
+                    let located = translate::locate_name(&op);
+                    let name: &[u8] = if let Some(name) = &located {
+                        name
+                    } else if repository == forge_world::REPO {
                         b"org/repo"
                     } else if repository == (client::api::Repository { forge: 1, repository: 3 }) {
                         b"org/extra"
@@ -366,10 +369,8 @@ impl World {
                             .expect("the world rendered every relayed answer");
                         self.answers.push(answer.clone());
                     }
-                    Delivery::WebReply { reply: people::Reply::Outcome(outcome), .. }
-                        if matches!(outcome, people::Outcome::Adopted { .. }) =>
-                    {
-                        self.adopted.push(outcome);
+                    Delivery::Application { outcome, .. } => {
+                        self.adopted.push(outcome.expect("retained application"));
                     }
                     _ => {}
                 },
@@ -474,33 +475,27 @@ impl World {
             },
         }));
         self.until(Until::SignedIn);
-        self.send(engine::Event::Party(engine::PartyInput::Ask {
+        self.send(engine::Event::Party(engine::PartyInput::Application {
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
-            ask: engine::adopt_repository_ask(
-                forge_top::Adoption {
-                    project: 1,
-                    home: true,
-                    provider: client::api::Repository {
-                        forge: forge_world::REPO.forge,
-                        repository: forge_world::REPO.repository,
-                    },
-                    host: Box::from(&b"forge.example"[..]),
-                    owner: Box::from(&b"org"[..]),
-                    name: Box::from(&b"repo"[..]),
-                    prefix: Box::from(&b"temper/"[..]),
-                    role: forge_top::Role::Owned,
-                    landing: Box::from(&b"main"[..]),
-                    ci: true,
-                    checks: Box::new([]),
-                },
-                0,
-            )
-            .expect("forge adoption shape"),
+            digest: [5; 32],
+            request: forge_top::Adoption {
+                project: 1,
+                home: true,
+                forge: forge_world::REPO.forge,
+                host: Box::from(&b"forge.example"[..]),
+                owner: Box::from(&b"org"[..]),
+                name: Box::from(&b"repo"[..]),
+                prefix: Box::from(&b"temper/"[..]),
+                role: forge_top::Role::Owned,
+                landing: Box::from(&b"main"[..]),
+                ci: true,
+                checks: Box::new([]),
+            },
         }));
         self.until(Until::Adopted);
-        assert!(matches!(self.adopted.as_slice(), [people::Outcome::Adopted { .. }]));
+        assert!(matches!(self.adopted.as_slice(), [forge_top::ApplicationOutcome::Adopted(_)]));
     }
 }
 

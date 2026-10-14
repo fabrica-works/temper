@@ -7,32 +7,10 @@ use temper_engine_domain_forge_client as client;
 use temper_engine_domain_forge_issues as issues;
 
 use crate::{
-    Adopted, Adoption, BranchHead, ChangeRow, CiState, Class, Event, Hold, IssueRow, Key, Kinds, Limits, Name, News,
-    Protection, PullState, ReleaseEnding, ReleaseRow, Repository, Request, RestartStage, Role, Stored, Subscriber,
-    Topic, What, Writer,
+    BranchHead, ChangeRow, CiState, Class, Event, Hold, IssueRow, Key, Kinds, Limits, Name, News, PullState,
+    ReleaseEnding, ReleaseRow, Repository, Request, RestartStage, Role, Stored, Subscriber, Topic, What, Writer,
 };
 use crate::{adoption, brief, held, topics};
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum AdoptionStage {
-    Permission,
-    Branches,
-    Settings,
-    Protection,
-    Collaborators(u32),
-}
-
-/// One admission read chain; only rows proven from current provider facts
-/// can become durable adopted repositories.
-#[derive(Debug)]
-pub(crate) struct PendingAdoption {
-    request: Adoption,
-    stage: AdoptionStage,
-    permission: Option<client::api::Permission>,
-    settings: Option<client::api::Settings>,
-    protection: Protection,
-    collaborators: List<client::api::Collaborator>,
-}
 
 /// One comparison in flight for a branch's observed tip move.
 #[derive(Debug)]
@@ -128,7 +106,7 @@ pub struct Domain {
     pub(crate) issues: Map<u64, IssueRow>,
     releases: Map<u64, ReleaseRow>,
     namespace: Box<[u8]>,
-    adoptions: Map<Token, PendingAdoption>,
+    pub(crate) adoptions: Map<Token, adoption::PendingAdoption>,
     pub(crate) application: adoption::State,
     pub(crate) writers: Map<u16, u64>,
     /// Each forge's git identity, the application credential its runs push
@@ -722,7 +700,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             d.brief_planned.remove(&section);
             held::drop_section(d, section);
         }
-        Event::Adopt { reply_to, adoption } => adopt(d, env, reply_to, adoption, out),
+        Event::Adopt { request } => adoption::adopt(d, env, request, out),
         Event::ForgetAdoption { repository, restore } => match restore {
             Some(previous) => {
                 d.repositories.insert(repository, previous.clone()).expect("restores an admitted repository");
@@ -925,7 +903,7 @@ fn drain(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 } else if d.brief_fetches.contains_key(&owner) {
                     brief::brief_answer(d, owner, result, out);
                 } else if d.adoptions.contains_key(&owner) {
-                    adoption_read(d, env, owner, result, out);
+                    adoption::adoption_read(d, env, owner, result, out);
                 } else if d.landings.contains_key(&owner) {
                     landing_read(d, owner, result, out);
                 } else if d.goal_file_reads.contains_key(&owner) {
@@ -1059,270 +1037,6 @@ fn valid_name(d: &Domain, l: &Limits, name: &Name) -> bool {
             bytes <= usize::try_from(l.name_bytes).expect("u32 fits usize")
         }
     }
-}
-
-fn adopt(d: &mut Domain, env: &Env<Limits>, reply_to: Token, request: Adoption, out: &mut Queue<Request>) {
-    let invalid = request.host.is_empty()
-        || request.owner.is_empty()
-        || request.name.is_empty()
-        || request.landing.is_empty()
-        || request.prefix.is_empty()
-        || request.host.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
-        || request.owner.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
-        || request.name.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
-        || request.landing.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
-        || request.prefix.len() > usize::try_from(env.limits.name_bytes).expect("u32 fits usize")
-        || d.adoptions.contains_key(&reply_to)
-        || d.adoptions.len() == env.limits.adoptions
-        || (!d.repositories.contains_key(&request.provider) && d.repositories.len() == env.limits.repositories);
-    if invalid {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::TooLarge));
-        return;
-    }
-    if let Some(existing) = d.repositories.get(&request.provider)
-        && existing.project != request.project
-        && request.role != Role::Context
-    {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
-        return;
-    }
-    if request.home && request.role == Role::Context {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
-        return;
-    }
-    if !request.ci && request.checks.is_empty() {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
-        return;
-    }
-    if request.checks.len() > usize::try_from(env.limits.change_policy.gates).expect("u32 fits usize")
-        || request.checks.contains(&0)
-    {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::TooLarge));
-        return;
-    }
-    for (index, check) in request.checks.iter().enumerate() {
-        if request.checks.get(..index).expect("index in checks").contains(check) {
-            adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
-            return;
-        }
-    }
-    if request.home {
-        for (_, existing) in &d.repositories {
-            if existing.project == request.project && existing.home && existing.provider != request.provider {
-                adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
-                return;
-            }
-        }
-    }
-    for (_, pending) in &d.adoptions {
-        if pending.request.provider == request.provider {
-            adoption::adopted(d, out, reply_to, Err(client::api::Error::Busy));
-            return;
-        }
-    }
-    let Some(author) = d.writers.get(&request.provider.forge) else {
-        adoption::adopted(d, out, reply_to, Err(client::api::Error::Forbidden));
-        return;
-    };
-    let repository = request.provider;
-    let pending = PendingAdoption {
-        request,
-        stage: AdoptionStage::Permission,
-        permission: None,
-        settings: None,
-        protection: Protection::Unknown,
-        collaborators: List::with_capacity(env.limits.collaborators),
-    };
-    d.adoptions.insert(reply_to, pending).expect("adoption capacity checked");
-    child(
-        d,
-        env,
-        client::Event::Read { owner: reply_to, repository, read: client::api::Read::Permission { user: *author } },
-        out,
-    );
-}
-
-fn owns_branch(d: &Domain, repository: client::api::Repository, branch: &[u8]) -> bool {
-    for (name, head) in &d.heads {
-        if head.owned
-            && name.forge == repository.forge
-            && name.repository == repository.repository
-            && crate::items::branch_matches(name, branch)
-        {
-            return true;
-        }
-    }
-    false
-}
-
-fn adoption_read(
-    d: &mut Domain,
-    env: &Env<Limits>,
-    owner: Token,
-    result: Result<client::api::Answer, client::api::Error>,
-    out: &mut Queue<Request>,
-) {
-    let Some(mut pending) = d.adoptions.remove(&owner) else { return };
-    let repository = pending.request.provider;
-    match pending.stage {
-        AdoptionStage::Permission => match result {
-            Ok(client::api::Answer::Permission(permission)) => {
-                if permission == client::api::Permission::None {
-                    adoption::adopted(d, out, owner, Err(client::api::Error::Forbidden));
-                    return;
-                }
-                pending.permission = Some(permission);
-                let check_prefix = pending.request.role != Role::Context;
-                pending.stage = if check_prefix { AdoptionStage::Branches } else { AdoptionStage::Settings };
-                d.adoptions.insert(owner, pending).expect("replaces read chain");
-                let read = if check_prefix { client::api::Read::Branches } else { client::api::Read::Settings };
-                child(d, env, client::Event::Read { owner, repository, read }, out);
-            }
-            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
-            Err(error) => adoption::adopted(d, out, owner, Err(error)),
-        },
-        AdoptionStage::Branches => match result {
-            Ok(client::api::Answer::Branches(branches)) => {
-                for branch in branches {
-                    if branch.starts_with(&pending.request.prefix) && !owns_branch(d, repository, &branch) {
-                        adoption::adopted(d, out, owner, Err(client::api::Error::Refused));
-                        return;
-                    }
-                }
-                pending.stage = AdoptionStage::Settings;
-                d.adoptions.insert(owner, pending).expect("replaces read chain");
-                child(d, env, client::Event::Read { owner, repository, read: client::api::Read::Settings }, out);
-            }
-            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
-            Err(error) => adoption::adopted(d, out, owner, Err(error)),
-        },
-        AdoptionStage::Settings => match result {
-            Ok(client::api::Answer::Settings(settings)) => {
-                pending.settings = Some(settings);
-                pending.stage = AdoptionStage::Protection;
-                let branch = pending.request.landing.clone();
-                d.adoptions.insert(owner, pending).expect("replaces read chain");
-                child(
-                    d,
-                    env,
-                    client::Event::Read { owner, repository, read: client::api::Read::Protection { branch } },
-                    out,
-                );
-            }
-            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
-            Err(error) => adoption::adopted(d, out, owner, Err(error)),
-        },
-        AdoptionStage::Protection => {
-            match result {
-                Ok(client::api::Answer::Protection(Some(protection))) => {
-                    pending.protection = Protection::Rule(protection);
-                }
-                Ok(client::api::Answer::Protection(None)) => pending.protection = Protection::Absent,
-                Err(client::api::Error::Forbidden) => pending.protection = Protection::Unknown,
-                Err(error) => {
-                    adoption::adopted(d, out, owner, Err(error));
-                    return;
-                }
-                Ok(_) => {
-                    adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer));
-                    return;
-                }
-            }
-            pending.stage = AdoptionStage::Collaborators(1);
-            d.adoptions.insert(owner, pending).expect("replaces read chain");
-            child(
-                d,
-                env,
-                client::Event::Read { owner, repository, read: client::api::Read::Collaborators { page: 1 } },
-                out,
-            );
-        }
-        AdoptionStage::Collaborators(page) => adoption_collaborators(d, env, owner, pending, page, result, out),
-    }
-}
-
-fn adoption_collaborators(
-    d: &mut Domain,
-    env: &Env<Limits>,
-    owner: Token,
-    mut pending: PendingAdoption,
-    page: u32,
-    result: Result<client::api::Answer, client::api::Error>,
-    out: &mut Queue<Request>,
-) {
-    let repository = pending.request.provider;
-    match result {
-        Ok(client::api::Answer::Collaborators { collaborators, more }) => {
-            for person in collaborators {
-                if pending.collaborators.push(person).is_err() {
-                    adoption::adopted(d, out, owner, Err(client::api::Error::TooLarge));
-                    return;
-                }
-            }
-            if more {
-                let Some(next) = page.checked_add(1) else {
-                    adoption::adopted(d, out, owner, Err(client::api::Error::TooLarge));
-                    return;
-                };
-                pending.stage = AdoptionStage::Collaborators(next);
-                d.adoptions.insert(owner, pending).expect("replaces read chain");
-                child(
-                    d,
-                    env,
-                    client::Event::Read { owner, repository, read: client::api::Read::Collaborators { page: next } },
-                    out,
-                );
-            } else {
-                finish_adoption(d, owner, pending, out);
-            }
-        }
-        Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
-        Err(error) => adoption::adopted(d, out, owner, Err(error)),
-    }
-}
-
-fn finish_adoption(d: &mut Domain, owner: Token, pending: PendingAdoption, out: &mut Queue<Request>) {
-    let Some(permission) = pending.permission else { unreachable!("permission read before collaborators") };
-    let Some(settings) = pending.settings else { unreachable!("settings read before collaborators") };
-    let writable = match permission {
-        client::api::Permission::Write | client::api::Permission::Admin => true,
-        client::api::Permission::None | client::api::Permission::Read => false,
-    } && pending.request.role != Role::Context;
-    let kinds = Kinds {
-        read: true,
-        push: writable,
-        open: writable,
-        land: writable && (settings.merge || settings.squash || settings.rebase),
-        review: writable,
-        status: writable,
-        comment: writable,
-        issue: writable,
-        branch: writable,
-    };
-    let request = pending.request;
-    let row = Repository {
-        project: request.project,
-        home: request.home,
-        provider: request.provider,
-        host: request.host,
-        owner: request.owner,
-        name: request.name,
-        prefix: request.prefix,
-        role: request.role,
-        ci: request.ci,
-        checks: request.checks,
-        kinds,
-        protection: pending.protection,
-        settings,
-    };
-    d.repositories.insert(row.provider, row.clone()).expect("adoption capacity checked");
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Repository(row.clone()) });
-    adoption::adopted(
-        d,
-        out,
-        owner,
-        Ok(Adopted { repository: row, collaborators: pending.collaborators.into_boxed() }),
-    );
 }
 
 fn to_client(name: &Name, l: &Limits) -> Option<client::Resource> {

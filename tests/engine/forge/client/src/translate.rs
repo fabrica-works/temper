@@ -515,3 +515,16 @@ fn byte_answer(asked: &client::Op, content: &[u8]) -> client::Answer {
         client::Op::Read(_) | client::Op::Write(_) => panic!("byte answer belongs to a bounded byte read"),
     }
 }
+
+/// A locate addresses the path it names rather than an already-known id.
+#[must_use]
+pub fn locate_name(op: &client::Op) -> Option<Box<[u8]>> {
+    if let client::Op::Read(client::Read::Locate { owner, name }) = op {
+        let mut path = owner.to_vec();
+        path.push(b'/');
+        path.extend_from_slice(name);
+        Some(path.into_boxed_slice())
+    } else {
+        None
+    }
+}
