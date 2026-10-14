@@ -1,0 +1,155 @@
+//! Client receipts decoded from the kernel's HTTP and SSE bytes.
+use jig_domain_client::contract as client;
+use jig_protocol_client_link::translate;
+use jig_protocol_client_wire::v7 as wire;
+use skein_io::kernel::{Complete, Done, Op};
+use skein_lib::{
+    Reader,
+    base64::{self, Alphabet},
+};
+use std::collections::BTreeMap;
+
+pub(crate) enum Received {
+    SignedIn(u64),
+    Answer { key: [u8; 16], answer: client::Answer },
+    Delivery(client::Delivery),
+    Read(client::ReadValue),
+}
+#[derive(Default)]
+struct Connection {
+    sent: Vec<u8>,
+    incoming: Vec<u8>,
+    remaining: Option<usize>,
+    chunked: bool,
+    header: bool,
+    body: Vec<u8>,
+    answered: bool,
+}
+#[derive(Default)]
+pub(crate) struct Wire {
+    connections: BTreeMap<i32, Connection>,
+    pub(crate) received: Vec<Received>,
+}
+fn mark(bytes: &[u8], marker: &[u8]) -> Option<usize> {
+    bytes.windows(marker.len()).position(|window| window == marker)
+}
+impl Wire {
+    pub(crate) fn complete(&mut self, complete: &Complete) {
+        match (&complete.kind, &complete.result) {
+            (Op::Send { fd, bytes, from }, Ok(Done::Count(count))) => {
+                self.connections
+                    .entry(fd.raw())
+                    .or_default()
+                    .sent
+                    .extend_from_slice(&bytes[*from as usize..(*from + *count) as usize]);
+            }
+            (Op::Recv { fd, buf }, Ok(Done::Count(count))) => {
+                let connection = self.connections.get_mut(&fd.raw()).expect("client sent HTTP request");
+                connection.incoming.extend_from_slice(&buf[..*count as usize]);
+                connection.progress(&mut self.received);
+            }
+            (Op::Close { fd }, _) => {
+                self.connections.remove(&fd.raw());
+            }
+            _ => {}
+        }
+    }
+}
+impl Connection {
+    fn progress(&mut self, received: &mut Vec<Received>) {
+        if !self.header {
+            let Some(end) = mark(&self.incoming, b"\r\n\r\n") else { return };
+            let header = std::str::from_utf8(&self.incoming[..end]).expect("HTTP response header");
+            assert!(header.starts_with("HTTP/1.1 200 "), "client response status");
+            for line in header.lines().skip(1) {
+                let (name, value) = line.split_once(':').expect("HTTP header field");
+                if name.eq_ignore_ascii_case("content-length") {
+                    self.remaining = Some(value.trim().parse().expect("HTTP body length"));
+                } else if name.eq_ignore_ascii_case("transfer-encoding") {
+                    assert_eq!(value.trim(), "chunked", "HTTP streaming framing");
+                    self.chunked = true;
+                }
+            }
+            self.incoming.drain(..end + 4);
+            self.header = true;
+        }
+        if self.chunked {
+            while let Some(end) = mark(&self.incoming, b"\r\n") {
+                let size = usize::from_str_radix(std::str::from_utf8(&self.incoming[..end]).expect("chunk size"), 16)
+                    .expect("hex chunk size");
+                if self.incoming.len() < end + size + 4 {
+                    break;
+                }
+                self.body.extend_from_slice(&self.incoming[end + 2..end + 2 + size]);
+                assert_eq!(&self.incoming[end + 2 + size..end + 4 + size], b"\r\n", "chunk ending");
+                self.incoming.drain(..end + size + 4);
+            }
+            self.stream(received);
+        } else if !self.answered && self.remaining.is_some_and(|size| self.incoming.len() >= size) {
+            let size = self.remaining.expect("length-framed reply");
+            self.answer(&self.incoming[..size], received);
+            self.answered = true;
+        }
+    }
+    fn answer(&self, bytes: &[u8], received: &mut Vec<Received>) {
+        let end = mark(&self.sent, b"\r\n\r\n").expect("sent request header");
+        let path = self.sent.split(|byte| *byte == b' ').nth(1).expect("request target");
+        let limits =
+            temper_shell_terminal::limits::link(&temper_shell_terminal::limits::native()).expect("native bounds");
+        match path {
+            b"/jig/v1/sign-in/link" => {
+                let wire::SignInAnswer::SignedIn(value) =
+                    wire::SignInAnswer::decode(&limits.wire, &mut Reader::new(bytes)).expect("sign-in reply bytes")
+                else {
+                    panic!("sign-in accepted")
+                };
+                received.push(Received::SignedIn(value.party()));
+            }
+            b"/jig/v1/request" => {
+                let keyed =
+                    wire::Keyed::decode(&limits.wire, &mut Reader::new(&self.sent[end + 4..])).expect("request bytes");
+                let value = wire::Answer::decode(&limits.wire, &mut Reader::new(bytes)).expect("answer bytes");
+                if matches!(value, wire::Answer::FinalAnswer(_)) {
+                    let answer = translate::answers::answer(value, &limits).expect("jig answer document");
+                    received.push(Received::Answer { key: *keyed.key(), answer });
+                }
+            }
+            b"/jig/v1/read" => {
+                if let wire::ReadAnswer::Value(value) =
+                    wire::ReadAnswer::decode(&limits.wire, &mut Reader::new(bytes)).expect("read reply bytes")
+                    && value.owner() == &wire::Owner::Jig
+                {
+                    received
+                        .push(Received::Read(translate::reads::value(value.record(), &limits).expect("read document")));
+                }
+            }
+            b"/jig/v1/watch" | b"/jig/v1/unwatch" | b"/jig/v1/stream-gone" => {}
+            _ => panic!("unobserved client request target"),
+        }
+    }
+    fn stream(&mut self, received: &mut Vec<Received>) {
+        let limits =
+            temper_shell_terminal::limits::link(&temper_shell_terminal::limits::native()).expect("native bounds");
+        while let Some(end) = mark(&self.body, b"\n\n") {
+            let event: Vec<_> = self.body.drain(..end + 2).collect();
+            let data: Vec<_> = event
+                .split(|byte| *byte == b'\n')
+                .filter_map(|line| line.strip_prefix(b"data: ").or_else(|| line.strip_prefix(b"data:")))
+                .flatten()
+                .copied()
+                .collect();
+            if data.is_empty() {
+                continue;
+            }
+            let decoded = base64::decode(Alphabet::Standard, &data, 16_777_216).expect("SSE record encoding");
+            if let wire::StreamEvent::Delivery(value) =
+                wire::StreamEvent::decode(&wire::CEILINGS, &mut Reader::new(&decoded)).expect("SSE record bytes")
+                && value.document().owner() == &wire::Owner::Jig
+            {
+                received.push(Received::Delivery(
+                    translate::watches::delivery(value.document().record(), &limits).expect("delivery document"),
+                ));
+            }
+        }
+    }
+}

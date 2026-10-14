@@ -2022,6 +2022,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-one-process-world"
+version = "0.0.0"
+dependencies = [
+ "jig-channel-world",
+ "jig-conformance",
+ "jig-core-world",
+ "jig-domain-client",
+ "jig-domain-core",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-fake-person",
+ "jig-protocol-client-link",
+ "jig-protocol-client-wire",
+ "jig-protocol-config",
+ "jig-protocol-store",
+ "jig-shell-native",
+ "jig-test-service",
+ "jig-view",
+ "serde_json",
+ "skein-fake-llm-domain",
+ "skein-fake-machine",
+ "skein-fake-peers",
+ "skein-io",
+ "skein-kv",
+ "skein-lib",
+ "skein-llm",
+ "skein-shell",
+ "skein-sim",
+ "skein-world",
+ "smith-agent-process-world",
+ "smith-agent-service",
+ "smith-agent-shell",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-host-protocol",
+ "smith-local-service",
+ "smith-protocol-llm",
+ "temper-client-domain",
+ "temper-engine-domain",
+ "temper-engine-domain-forge",
+ "temper-engine-protocol-forge",
+ "temper-engine-protocol-forge-world",
+ "temper-engine-smith",
+ "temper-fake-forge-domain",
+ "temper-fake-forge-protocol",
+ "temper-fake-git",
+ "temper-protocol-store",
+ "temper-service",
+ "temper-shell-terminal",
+]
+
+[[package]]
 name = "temper-protocol-client-wire"
 version = "0.0.0"
 dependencies = [
