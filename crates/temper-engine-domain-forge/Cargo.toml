@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
+jig-domain-people.workspace = true
 temper-engine-domain-forge-client.workspace = true
 temper-engine-domain-forge-change = { path = "../temper-engine-domain-forge-change" }
 temper-engine-domain-forge-issues = { path = "../temper-engine-domain-forge-issues" }

@@ -743,6 +743,7 @@ impl World {
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
+            | Delivery::Application { .. }
             | Delivery::WebReply { .. }
             | Delivery::Read { .. }
             | Delivery::ReadLoad { .. }

@@ -1,4 +1,5 @@
 //! Exhaustive child routing and synchronous handoffs (jig's domain/root.md, 5).
+mod applications;
 mod asks;
 pub(crate) mod escalation;
 pub(crate) mod forge_route;
@@ -50,6 +51,7 @@ pub(crate) use tools::relay_payload;
     reason = "one exhaustive input match keeps every input before a single decision close"
 )]
 pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+    assert!(domain.application.is_none(), "application value cleared in its admission step");
     assert!(domain.limits == env.limits, "root uses configured limits");
     assert!(out.room() >= max_out(&env.limits), "root output room reserved");
     if domain.journal.stopped() || domain.core.restart_failure().is_some() {
@@ -100,6 +102,9 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         }
         Event::Party(crate::PartyInput::SignedIn { reply_to, identity }) => {
             domain.work.push(Work::Core(core::Event::SignIn { reply_to, identity }));
+        }
+        Event::Party(crate::PartyInput::Application { reply_to, sign_in, key, digest, request }) => {
+            applications::start(domain, reply_to, sign_in, key, digest, request);
         }
         Event::Party(crate::PartyInput::Ask { reply_to, sign_in, key, ask }) => {
             domain.work.push(Work::People(people::Event::Ask { reply_to, sign_in, key, ask }));

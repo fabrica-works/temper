@@ -12,6 +12,7 @@ use crate::store::Store;
 use crate::walking::{config, limits};
 
 pub struct Driver {
+    pub forge: Option<crate::forge_stand::ForgeStand>,
     pub root: engine::Domain,
     pub env: Env<engine::Limits>,
     pub out: Queue<engine::Request>,
@@ -41,10 +42,17 @@ impl Driver {
     pub fn new(store: Store) -> Driver {
         Driver::configured(store, config(91), &limits())
     }
+    #[must_use]
+    pub fn forge() -> Driver {
+        let mut driver = Driver::configured(Store::new(), config(71), &crate::fixtures::forge_limits());
+        driver.forge = Some(crate::forge_stand::ForgeStand::new());
+        driver
+    }
 
     #[must_use]
     pub fn configured(store: Store, config: engine::Config, limits: &engine::Limits) -> Driver {
         Driver {
+            forge: None,
             root: engine::Domain::new(config, limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             out: Queue::with_capacity(engine::max_out(limits)),
@@ -112,8 +120,13 @@ impl Driver {
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
                 | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivered.push(delivery),
-                engine::Request::Forge { .. } => {
-                    panic!("root route fixture did not adopt forge")
+                engine::Request::Forge { call, repository, op } => {
+                    self.forge.as_mut().expect("root route fixture has a forge").call(
+                        call,
+                        repository,
+                        op,
+                        &self.env.limits.forge.client,
+                    );
                 }
                 engine::Request::Stop => self.stopped = true,
                 engine::Request::Worker(engine::WorkerRequest::Host(request)) => self.host_requests.push(request),
@@ -128,6 +141,9 @@ impl Driver {
     }
 
     pub fn advance(&mut self, apply: bool) {
+        if let Some(forge) = &mut self.forge {
+            self.events.extend(forge.replies());
+        }
         if !self.period_sent && self.root.ready() {
             self.period_sent = true;
             self.period();

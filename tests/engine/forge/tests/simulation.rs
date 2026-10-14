@@ -810,6 +810,9 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                 | top::Request::BriefReady { .. }
                 | top::Request::BriefSized { .. }
                 | top::Request::BriefTaken { .. }
+                | top::Request::ApplicationPart { .. }
+                | top::Request::ApplicationDone { .. }
+                | top::Request::ApplicationAgain { .. }
                 | top::Request::RestartDone { .. }
                 | top::Request::Call { .. } => {}
             }
@@ -1601,40 +1604,14 @@ fn goals_classify_landings_from_their_subtree_heads_and_planned_paths_after_rest
         let news: Vec<_> = world
             .seen()
             .iter()
-            .filter_map(|request| match request {
-                top::Request::News { task: goal, class, news: top::News::Landing { .. }, .. } if *goal == task => {
+            .filter_map(|request| {
+                if let top::Request::News { task: goal, class, news: top::News::Landing { .. }, .. } = request
+                    && *goal == task
+                {
                     Some(*class)
+                } else {
+                    None
                 }
-                top::Request::GoalTopic { .. }
-                | top::Request::GoalUntopic { .. }
-                | top::Request::BriefClient { .. }
-                | top::Request::BriefReady { .. }
-                | top::Request::BriefSized { .. }
-                | top::Request::BriefTaken { .. }
-                | top::Request::Resource { .. }
-                | top::Request::Adopted { .. }
-                | top::Request::Save { .. }
-                | top::Request::Erase { .. }
-                | top::Request::Taken { .. }
-                | top::Request::Refused { .. }
-                | top::Request::Outcome { .. }
-                | top::Request::NotMade { .. }
-                | top::Request::ContinueRelease { .. }
-                | top::Request::EffectsSettled { .. }
-                | top::Request::Released { .. }
-                | top::Request::Retained { .. }
-                | top::Request::ReleaseFailed { .. }
-                | top::Request::ProjectionEffect { .. }
-                | top::Request::WakeProcedure { .. }
-                | top::Request::ProjectAfter { .. }
-                | top::Request::ProjectionSettled { .. }
-                | top::Request::ProjectionFailed { .. }
-                | top::Request::ChangeDecision { .. }
-                | top::Request::News { .. }
-                | top::Request::Drift { .. }
-                | top::Request::Call { .. }
-                | top::Request::Read { .. }
-                | top::Request::RestartDone { .. } => None,
             })
             .collect();
         assert_eq!(news, [expected], "each goal receives one classified landing");

@@ -45,6 +45,7 @@ pub const LIMITS: top::Limits = top::Limits {
     output: 80,
     facts: 16,
     adoptions: 2,
+    applications: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,
@@ -406,6 +407,9 @@ impl World {
         for _ in 0..self.top_out.len() {
             let request = self.top_out.pop().expect("counted top output");
             match request {
+                top::Request::ApplicationPart { .. }
+                | top::Request::ApplicationDone { .. }
+                | top::Request::ApplicationAgain { .. } => panic!("connector world uses direct adoption"),
                 top::Request::BriefClient { event } => {
                     top::step(&mut self.top, &self.env, top::Event::Client(event), &mut self.top_out);
                 }

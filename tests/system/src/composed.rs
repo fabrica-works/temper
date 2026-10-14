@@ -597,6 +597,7 @@ impl World {
             // A live notice to the requester, with no reply right.
             Delivery::Result { .. } => {}
             other @ (Delivery::Host(_)
+            | Delivery::Application { .. }
             | Delivery::Procedure { .. }
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }

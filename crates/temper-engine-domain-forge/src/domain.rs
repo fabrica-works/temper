@@ -11,7 +11,7 @@ use crate::{
     Protection, PullState, ReleaseEnding, ReleaseRow, Repository, Request, RestartStage, Role, Stored, Subscriber,
     Topic, What, Writer,
 };
-use crate::{brief, held, topics};
+use crate::{adoption, brief, held, topics};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum AdoptionStage {
@@ -129,6 +129,7 @@ pub struct Domain {
     releases: Map<u64, ReleaseRow>,
     namespace: Box<[u8]>,
     adoptions: Map<Token, PendingAdoption>,
+    pub(crate) application: adoption::State,
     pub(crate) writers: Map<u16, u64>,
     /// Each forge's git identity, the application credential its runs push
     /// and fetch with (credentials.md).
@@ -334,6 +335,7 @@ impl Domain {
             releases: Map::with_capacity(l.tasks),
             namespace: config.namespace.clone(),
             adoptions: Map::with_capacity(l.adoptions),
+            application: adoption::State::new(l),
             capabilities: Map::with_capacity(l.repositories),
             writers,
             identities: credentials,
@@ -682,6 +684,10 @@ pub const fn max_out(l: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Application { request, token, retention, adoption } => {
+            adoption::start(d, env, request, token, retention, adoption, out);
+        }
+        Event::ApplicationAnswered { request, outcome } => adoption::answered(d, env, request, outcome, out),
         Event::ForgetProjection { goal } => {
             if let Some(row) = d.issues.get(&goal)
                 && row.pending.is_none()
@@ -1070,52 +1076,52 @@ fn adopt(d: &mut Domain, env: &Env<Limits>, reply_to: Token, request: Adoption, 
         || d.adoptions.len() == env.limits.adoptions
         || (!d.repositories.contains_key(&request.provider) && d.repositories.len() == env.limits.repositories);
     if invalid {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::TooLarge) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::TooLarge));
         return;
     }
     if let Some(existing) = d.repositories.get(&request.provider)
         && existing.project != request.project
         && request.role != Role::Context
     {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Refused) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
         return;
     }
     if request.home && request.role == Role::Context {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Refused) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
         return;
     }
     if !request.ci && request.checks.is_empty() {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Refused) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
         return;
     }
     if request.checks.len() > usize::try_from(env.limits.change_policy.gates).expect("u32 fits usize")
         || request.checks.contains(&0)
     {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::TooLarge) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::TooLarge));
         return;
     }
     for (index, check) in request.checks.iter().enumerate() {
         if request.checks.get(..index).expect("index in checks").contains(check) {
-            emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Refused) });
+            adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
             return;
         }
     }
     if request.home {
         for (_, existing) in &d.repositories {
             if existing.project == request.project && existing.home && existing.provider != request.provider {
-                emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Refused) });
+                adoption::adopted(d, out, reply_to, Err(client::api::Error::Refused));
                 return;
             }
         }
     }
     for (_, pending) in &d.adoptions {
         if pending.request.provider == request.provider {
-            emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Busy) });
+            adoption::adopted(d, out, reply_to, Err(client::api::Error::Busy));
             return;
         }
     }
     let Some(author) = d.writers.get(&request.provider.forge) else {
-        emit(out, Request::Adopted { reply_to, result: Err(client::api::Error::Forbidden) });
+        adoption::adopted(d, out, reply_to, Err(client::api::Error::Forbidden));
         return;
     };
     let repository = request.provider;
@@ -1162,7 +1168,7 @@ fn adoption_read(
         AdoptionStage::Permission => match result {
             Ok(client::api::Answer::Permission(permission)) => {
                 if permission == client::api::Permission::None {
-                    emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::Forbidden) });
+                    adoption::adopted(d, out, owner, Err(client::api::Error::Forbidden));
                     return;
                 }
                 pending.permission = Some(permission);
@@ -1172,14 +1178,14 @@ fn adoption_read(
                 let read = if check_prefix { client::api::Read::Branches } else { client::api::Read::Settings };
                 child(d, env, client::Event::Read { owner, repository, read }, out);
             }
-            Ok(_) => emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::InvalidAnswer) }),
-            Err(error) => emit(out, Request::Adopted { reply_to: owner, result: Err(error) }),
+            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
+            Err(error) => adoption::adopted(d, out, owner, Err(error)),
         },
         AdoptionStage::Branches => match result {
             Ok(client::api::Answer::Branches(branches)) => {
                 for branch in branches {
                     if branch.starts_with(&pending.request.prefix) && !owns_branch(d, repository, &branch) {
-                        emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::Refused) });
+                        adoption::adopted(d, out, owner, Err(client::api::Error::Refused));
                         return;
                     }
                 }
@@ -1187,8 +1193,8 @@ fn adoption_read(
                 d.adoptions.insert(owner, pending).expect("replaces read chain");
                 child(d, env, client::Event::Read { owner, repository, read: client::api::Read::Settings }, out);
             }
-            Ok(_) => emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::InvalidAnswer) }),
-            Err(error) => emit(out, Request::Adopted { reply_to: owner, result: Err(error) }),
+            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
+            Err(error) => adoption::adopted(d, out, owner, Err(error)),
         },
         AdoptionStage::Settings => match result {
             Ok(client::api::Answer::Settings(settings)) => {
@@ -1203,8 +1209,8 @@ fn adoption_read(
                     out,
                 );
             }
-            Ok(_) => emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::InvalidAnswer) }),
-            Err(error) => emit(out, Request::Adopted { reply_to: owner, result: Err(error) }),
+            Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
+            Err(error) => adoption::adopted(d, out, owner, Err(error)),
         },
         AdoptionStage::Protection => {
             match result {
@@ -1214,11 +1220,11 @@ fn adoption_read(
                 Ok(client::api::Answer::Protection(None)) => pending.protection = Protection::Absent,
                 Err(client::api::Error::Forbidden) => pending.protection = Protection::Unknown,
                 Err(error) => {
-                    emit(out, Request::Adopted { reply_to: owner, result: Err(error) });
+                    adoption::adopted(d, out, owner, Err(error));
                     return;
                 }
                 Ok(_) => {
-                    emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::InvalidAnswer) });
+                    adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer));
                     return;
                 }
             }
@@ -1249,13 +1255,13 @@ fn adoption_collaborators(
         Ok(client::api::Answer::Collaborators { collaborators, more }) => {
             for person in collaborators {
                 if pending.collaborators.push(person).is_err() {
-                    emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::TooLarge) });
+                    adoption::adopted(d, out, owner, Err(client::api::Error::TooLarge));
                     return;
                 }
             }
             if more {
                 let Some(next) = page.checked_add(1) else {
-                    emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::TooLarge) });
+                    adoption::adopted(d, out, owner, Err(client::api::Error::TooLarge));
                     return;
                 };
                 pending.stage = AdoptionStage::Collaborators(next);
@@ -1270,8 +1276,8 @@ fn adoption_collaborators(
                 finish_adoption(d, owner, pending, out);
             }
         }
-        Ok(_) => emit(out, Request::Adopted { reply_to: owner, result: Err(client::api::Error::InvalidAnswer) }),
-        Err(error) => emit(out, Request::Adopted { reply_to: owner, result: Err(error) }),
+        Ok(_) => adoption::adopted(d, out, owner, Err(client::api::Error::InvalidAnswer)),
+        Err(error) => adoption::adopted(d, out, owner, Err(error)),
     }
 }
 
@@ -1311,12 +1317,11 @@ fn finish_adoption(d: &mut Domain, owner: Token, pending: PendingAdoption, out: 
     };
     d.repositories.insert(row.provider, row.clone()).expect("adoption capacity checked");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Repository(row.clone()) });
-    emit(
+    adoption::adopted(
+        d,
         out,
-        Request::Adopted {
-            reply_to: owner,
-            result: Ok(Adopted { repository: row, collaborators: pending.collaborators.into_boxed() }),
-        },
+        owner,
+        Ok(Adopted { repository: row, collaborators: pending.collaborators.into_boxed() }),
     );
 }
 

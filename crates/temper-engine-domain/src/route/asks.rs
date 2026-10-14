@@ -34,9 +34,18 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             );
             None
         }
-        core::Ask::DropDocument { .. } | core::Ask::DropApplication { .. } => None,
-        core::Ask::Application { .. } | core::Ask::ApplicationPartAnswered { .. } => {
-            unreachable!("temper's root admits no application request")
+        core::Ask::DropDocument { .. } => None,
+        core::Ask::DropApplication { owner } => {
+            super::applications::drop(domain, owner);
+            None
+        }
+        core::Ask::Application { request, token, owner, retention, .. } => {
+            super::applications::admitted(domain, request, token, owner, retention);
+            None
+        }
+        core::Ask::ApplicationPartAnswered { request, outcome } => {
+            domain.work.push(Work::Forge(forge::Event::ApplicationAnswered { request, outcome }));
+            None
         }
         core::Ask::Effect(ask) => {
             forge_route::effect_ask(domain, env, connector, ask);

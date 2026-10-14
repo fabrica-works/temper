@@ -1968,6 +1968,15 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
+            forge::Request::ApplicationPart { request, adoption } => {
+                super::applications::part(domain, request, adoption);
+            }
+            forge::Request::ApplicationDone { request, token } => {
+                super::applications::finished(domain, request, Ok(token));
+            }
+            forge::Request::ApplicationAgain { request, why } => {
+                super::applications::finished(domain, request, Err(why));
+            }
             forge::Request::WakeProcedure { task } => {
                 domain.work.push(Work::Tasks(tasks::Event::WakeProcedure { task }));
             }

@@ -1,4 +1,6 @@
 use crate::*;
+mod adoption;
+mod fixtures;
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use temper_engine_domain_forge_client as client;
@@ -44,6 +46,7 @@ const LIMITS: Limits = Limits {
     output: 80,
     facts: 16,
     adoptions: 2,
+    applications: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,
@@ -283,6 +286,9 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::BriefSized { .. }
         | Request::EffectsSettled { .. }
         | Request::BriefTaken { .. }
+        | Request::ApplicationPart { .. }
+        | Request::ApplicationDone { .. }
+        | Request::ApplicationAgain { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
     assert_eq!(op, client::api::Op::Read(client::api::Read::Permission { user: 7 }));
@@ -328,6 +334,9 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::BriefSized { .. }
         | Request::EffectsSettled { .. }
         | Request::BriefTaken { .. }
+        | Request::ApplicationPart { .. }
+        | Request::ApplicationDone { .. }
+        | Request::ApplicationAgain { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
     assert!(
@@ -373,6 +382,9 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::BriefSized { .. }
         | Request::EffectsSettled { .. }
         | Request::BriefTaken { .. }
+        | Request::ApplicationPart { .. }
+        | Request::ApplicationDone { .. }
+        | Request::ApplicationAgain { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }
 }

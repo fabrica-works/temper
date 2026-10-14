@@ -336,6 +336,13 @@ pub enum WorkerInput {
 }
 #[derive(Debug)]
 pub enum PartyInput {
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        digest: [u8; 32],
+        request: forge::Adoption,
+    },
     StartRecurring {
         project: u32,
         authority: tasks::Authority,
@@ -621,7 +628,8 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Assigned { .. }
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
-        delivery @ (Delivery::WebReply { .. }
+        delivery @ (Delivery::Application { .. }
+        | Delivery::WebReply { .. }
         | Delivery::Read { .. }
         | Delivery::Document { .. }
         | Delivery::WatchEnded { .. }

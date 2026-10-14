@@ -22,6 +22,7 @@ pub struct Limits {
     pub output: u32,
     pub facts: u32,
     pub adoptions: u32,
+    pub applications: u32,
     pub collaborators: u32,
     pub landings: u32,
     /// Project judge tables retained beside committed policy.
@@ -53,6 +54,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         || l.queue_window == skein_lib::Duration::ZERO
         || l.output == 0
         || l.adoptions == 0
+        || l.applications == 0
         || l.collaborators == 0
         || l.landings == 0
         || l.brief_sections == 0
@@ -83,7 +85,8 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let criteria = u64::from(l.judge_criteria).checked_mul(u64::try_from(size_of::<Criterion>()).ok()?)?;
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
-    client::worst_case(&l.client)?
+    crate::adoption::worst_case(l)?
+        .checked_add(client::worst_case(&l.client)?)?
         .checked_add(Map::<client::api::Repository, Repository>::worst_case(l.repositories)?)?
         // Each forge's writer and git identity.
         .checked_add(Map::<u16, u64>::worst_case(l.repositories)?)?

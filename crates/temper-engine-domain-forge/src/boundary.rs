@@ -145,6 +145,59 @@ pub struct Adopted {
     pub repository: Repository,
     pub collaborators: Box<[client::api::Collaborator]>,
 }
+/// The connector's outcome, kept under the people child's application token.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ApplicationOutcome {
+    Adopted(AdoptedRepository),
+    CoreRefused(jig_domain_people::Refusal),
+    ForgeRefused(AdoptionRefusal),
+}
+/// The repository facts shown by the adoption's terminal (client.md, 4.6).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AdoptedRepository {
+    pub repository: client::api::Repository,
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub role: Role,
+    pub home: bool,
+    pub kinds: Kinds,
+    pub protection: Protection,
+}
+/// A forge refusal stated in the adoption form's vocabulary (client.md, 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AdoptionRefusal {
+    NoSuchForge,
+    NotFound,
+    NoAccess,
+    Refused,
+    InFlight,
+    TooLarge,
+    Unreachable,
+    InvalidAnswer,
+}
+/// Project a forge call's refusal into the adoption's terminal reason.
+#[must_use]
+pub const fn reason(error: client::api::Error) -> AdoptionRefusal {
+    match error {
+        client::api::Error::Missing => AdoptionRefusal::NotFound,
+        client::api::Error::Forbidden => AdoptionRefusal::NoAccess,
+        client::api::Error::Refused => AdoptionRefusal::Refused,
+        client::api::Error::Busy => AdoptionRefusal::InFlight,
+        client::api::Error::TooLarge | client::api::Error::Full => AdoptionRefusal::TooLarge,
+        client::api::Error::Unavailable | client::api::Error::Timeout | client::api::Error::RateLimited { .. } => {
+            AdoptionRefusal::Unreachable
+        }
+        client::api::Error::MissingJob
+        | client::api::Error::Empty
+        | client::api::Error::Exists
+        | client::api::Error::NothingToMerge
+        | client::api::Error::Closed
+        | client::api::Error::Stale
+        | client::api::Error::Conflict
+        | client::api::Error::Protected
+        | client::api::Error::InvalidAnswer => AdoptionRefusal::InvalidAnswer,
+    }
+}
 /// Exclusive write hold and its current writer.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Hold {
@@ -440,6 +493,10 @@ pub enum RestartStage {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Decide one core-admitted keyed adoption and keep its outcome.
+    Application { request: Token, token: Token, retention: skein_lib::Duration, adoption: Adoption },
+    /// The core's answer to the application's adoption part.
+    ApplicationAnswered { request: Token, outcome: jig_domain_people::Outcome },
     /// Drop a projection only after the core has settled its closing feed.
     ForgetProjection { goal: u64 },
     /// Keep a connector-owned section source while the core budgets its brief.
@@ -541,66 +598,170 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    ApplicationPart {
+        request: Token,
+        adoption: Adoption,
+    },
+    ApplicationDone {
+        request: Token,
+        token: Token,
+    },
+    ApplicationAgain {
+        request: Token,
+        why: jig_domain_people::Again,
+    },
     /// The connector has fresh news or a retry deadline for its procedure.
-    WakeProcedure { task: u64 },
+    WakeProcedure {
+        task: u64,
+    },
     /// Current role and hold admission for one named resource.
-    Resource { project: u32, name: Name, role: crate::Access, hold: crate::resources::HoldKind },
+    Resource {
+        project: u32,
+        name: Name,
+        role: crate::Access,
+        hold: crate::resources::HoldKind,
+    },
 
     /// Add a goal's topic through the core's durable task subscriptions.
-    GoalTopic { goal: u64, topic: Topic },
+    GoalTopic {
+        goal: u64,
+        topic: Topic,
+    },
     /// Remove a goal's CI topic after no change names that head.
-    GoalUntopic { goal: u64, topic: Topic },
+    GoalUntopic {
+        goal: u64,
+        topic: Topic,
+    },
     /// Feed the next bounded read of a forge section to this connector's client.
-    BriefClient { event: client::Event },
+    BriefClient {
+        event: client::Event,
+    },
     /// One connector-owned section is ready for the root to route to the brief.
-    BriefReady { owner: Token, read: BriefRead },
+    BriefReady {
+        owner: Token,
+        read: BriefRead,
+    },
     /// A held section has this rendered size, or its gather/cut failed.
-    BriefSized { section: Token, size: Option<u32> },
+    BriefSized {
+        section: Token,
+        size: Option<u32>,
+    },
     /// A held section transferred its rendered bytes to the root.
-    BriefTaken { section: Token, bytes: Option<Box<[u8]>> },
+    BriefTaken {
+        section: Token,
+        bytes: Option<Box<[u8]>>,
+    },
     /// Terminal result of a repository adoption, for the root's person route.
-    Adopted { reply_to: Token, result: Result<Adopted, client::api::Error> },
+    Adopted {
+        reply_to: Token,
+        result: Result<Adopted, client::api::Error>,
+    },
     /// Save one record atomically with the current decision, carrying the
     /// owner's post-commit entry and read-afresh handoffs without inspecting it.
-    Save { record: Stored, release: Option<u64>, read_afresh: Option<Name> },
+    Save {
+        record: Stored,
+        release: Option<u64>,
+        read_afresh: Option<Name>,
+    },
     /// Erase one record atomically with the current decision.
-    Erase { key: Key },
+    Erase {
+        key: Key,
+    },
     /// A resource is held or a writer slot is taken.
-    Taken { task: u64, resource: Name, by: u64 },
+    Taken {
+        task: u64,
+        resource: Name,
+        by: u64,
+    },
     /// A request exceeds the connector's configured bounds.
-    Refused { task: u64 },
+    Refused {
+        task: u64,
+    },
     /// An entry settled or remains uncertain; root routes the task's news.
-    Outcome { entry: u64, task: u64, outcome: client::Outcome },
+    Outcome {
+        entry: u64,
+        task: u64,
+        outcome: client::Outcome,
+    },
     /// A held entry settled as not made, by a person or its task's close.
-    NotMade { entry: u64, task: u64 },
+    NotMade {
+        entry: u64,
+        task: u64,
+    },
     /// A prior effect or release write settled; advance the closing task.
-    ContinueRelease { task: u64 },
+    ContinueRelease {
+        task: u64,
+    },
     /// All effects issued before resource cleanup have settled.
-    EffectsSettled { task: u64 },
+    EffectsSettled {
+        task: u64,
+    },
     /// All connector resources of a closing task are released.
-    Released { task: u64 },
+    Released {
+        task: u64,
+    },
     /// A failed task's resource remains held by its tree root until that root closes.
-    Retained { task: u64, root: u64, resource: Name },
+    Retained {
+        task: u64,
+        root: u64,
+        resource: Name,
+    },
     /// A cleanup effect failed and the closing task needs a person's decision.
-    ReleaseFailed { task: u64 },
+    ReleaseFailed {
+        task: u64,
+    },
     /// A connector-described projection candidate, awaiting core admission.
-    ProjectionEffect { row: IssueRow, entry: client::Entry, description: crate::ProjectionEffect },
+    ProjectionEffect {
+        row: IssueRow,
+        entry: client::Entry,
+        description: crate::ProjectionEffect,
+    },
     /// A projection has to wait until its interval or prior effect settles.
-    ProjectAfter { goal: u64, when: Option<skein_lib::Wall> },
+    ProjectAfter {
+        goal: u64,
+        when: Option<skein_lib::Wall>,
+    },
     /// The closed projection has no remaining desired write.
-    ProjectionSettled { goal: u64 },
+    ProjectionSettled {
+        goal: u64,
+    },
     /// A projection could not continue under current facts or limits.
-    ProjectionFailed { goal: u64 },
+    ProjectionFailed {
+        goal: u64,
+    },
     /// A change policy step and its checked effect entry, when any.
-    ChangeDecision { task: u64, decision: change::Decision, entry: Option<u64>, evidence: Option<ChangeEvidence> },
+    ChangeDecision {
+        task: u64,
+        decision: change::Decision,
+        entry: Option<u64>,
+        evidence: Option<ChangeEvidence>,
+    },
     /// Task-specific news with a connector classification.
-    News { task: u64, subscription: u64, topic: Topic, news: News, class: Class },
+    News {
+        task: u64,
+        subscription: u64,
+        topic: Topic,
+        news: News,
+        class: Class,
+    },
     /// Drift holds this task until a person releases it.
-    Drift { task: u64, resource: Name },
+    Drift {
+        task: u64,
+        resource: Name,
+    },
     /// A bounded provider call, released after preceding progress commits.
-    Call { call: Token, repository: client::api::Repository, op: client::api::Op },
+    Call {
+        call: Token,
+        repository: client::api::Repository,
+        op: client::api::Op,
+    },
     /// One bounded fresh connector read for a root worker tool.
-    Read { owner: Token, result: Result<client::api::Answer, client::api::Error> },
+    Read {
+        owner: Token,
+        result: Result<client::api::Answer, client::api::Error>,
+    },
     /// The requested restart phase finished; the root may request the next.
-    RestartDone { stage: RestartStage },
+    RestartDone {
+        stage: RestartStage,
+    },
 }

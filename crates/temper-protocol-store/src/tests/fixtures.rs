@@ -43,6 +43,7 @@ pub const LIMITS: top::Limits = top::Limits {
     output: 80,
     facts: 16,
     adoptions: 2,
+    applications: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,

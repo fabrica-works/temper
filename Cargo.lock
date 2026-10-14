@@ -996,6 +996,7 @@ dependencies = [
 name = "temper-engine-domain-forge"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-people",
  "skein-lib",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",

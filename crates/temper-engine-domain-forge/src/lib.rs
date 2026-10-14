@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 use alloc::boxed::Box;
+mod adoption;
 pub mod boundary;
 mod brief;
 mod capabilities;

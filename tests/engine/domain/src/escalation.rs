@@ -770,7 +770,8 @@ impl World {
                 .result(&self.store.rows, person, task, &words)
                 .expect("independent exact final report and funding"),
             Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
-            Delivery::WebReply { .. }
+            Delivery::Application { .. }
+            | Delivery::WebReply { .. }
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Read { .. }

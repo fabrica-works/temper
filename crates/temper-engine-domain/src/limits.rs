@@ -259,6 +259,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Owners price all retained semantic state. The remaining terms are
     // bounded transport continuations and simultaneously assembled envelopes.
     let mut bytes = core_bytes
+        .checked_add(u64::from(limits.forge.name_bytes).checked_mul(5)?)?
+        .checked_add(u64::from(limits.forge.change_policy.gates).checked_mul(4)?)?
+        .checked_add(
+            u64::from(limits.journal.held).checked_add(u64::from(limits.journal.deliveries))?.checked_mul(
+                u64::from(limits.forge.name_bytes)
+                    .checked_mul(2)?
+                    .checked_add(u64::from(limits.forge.client.answer_bytes))?,
+            )?,
+        )?
         .checked_add(forge_bytes)?
         .checked_add(crate::journal_worst_case(&limits.journal)?)?
         .checked_add(load_bytes)?

@@ -51,12 +51,21 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
+    Application {
+        to: ReplyTo,
+        outcome: Option<temper_engine_domain_forge::ApplicationOutcome>,
+    },
     /// Host protocol handoffs follow their prerequisite commits.
     Host(Box<crate::HostDelivery>),
     /// One record of the hub's link to a worker channel (jig's `domain/hosts.md`, 2).
-    Link { channel: Token, down: jig_domain_host::LinkDown },
+    Link {
+        channel: Token,
+        down: jig_domain_host::LinkDown,
+    },
     /// Release a committed connector entry to its client.
-    ForgeCommitted { entry: u64 },
+    ForgeCommitted {
+        entry: u64,
+    },
     /// One bounded connector call after all preceding progress commits.
     ForgeCall {
         call: Token,
@@ -65,9 +74,19 @@ pub enum Delivery {
     },
     /// Committed request to the connector that owns a procedure task. The owner steps against
     /// current facts and returns the fenced decision through the root.
-    Procedure { task: u64, step: u64, connector: u16, code: u32 },
+    Procedure {
+        task: u64,
+        step: u64,
+        connector: u16,
+        code: u32,
+    },
     /// Committed words presented to fleet only after their task row commits.
-    Relay { task: u64, attempt: u64, previous: Option<u64>, word: jig_domain_tasks::Word },
+    Relay {
+        task: u64,
+        attempt: u64,
+        previous: Option<u64>,
+        word: jig_domain_tasks::Word,
+    },
     /// Root internal historical read, released after preceding commit; consumed
     /// once by root and never exposed to the shell.
     ReadEscalationDecision {
@@ -90,15 +109,30 @@ pub enum Delivery {
         assignment: crate::Assignment,
     },
     /// Root to web: one terminal people reply, after the decision it names.
-    WebReply { to: ReplyTo, reply: people::Reply },
+    WebReply {
+        to: ReplyTo,
+        reply: people::Reply,
+    },
     /// One authenticated read's answer, after every preceding commit.
-    Read { reply: ReplyTo, answer: jig_domain_core::reads::Answer },
+    Read {
+        reply: ReplyTo,
+        answer: jig_domain_core::reads::Answer,
+    },
     /// A core read's store load, after every preceding commit.
-    ReadLoad { load: Token, range: Box<jig_domain_core::reads::Range> },
+    ReadLoad {
+        load: Token,
+        range: Box<jig_domain_core::reads::Range>,
+    },
     /// A watched subject's whole current document.
-    Document { watcher: Token, document: Box<jig_domain_core::documents::Document> },
+    Document {
+        watcher: Token,
+        document: Box<jig_domain_core::documents::Document>,
+    },
     /// A watch ended after every outstanding terminal.
-    WatchEnded { watcher: Token, why: jig_domain_views::End },
+    WatchEnded {
+        watcher: Token,
+        why: jig_domain_views::End,
+    },
     /// Every commit before the drain is durable.
     Drained,
     /// Root to worker: refuse its hello because of startup, shape or fleet admission; no attempt is
@@ -341,6 +375,7 @@ impl Decision {
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
+            | Delivery::Application { .. }
             | Delivery::WebReply { .. }
             | Delivery::Read { .. }
             | Delivery::ReadLoad { .. }

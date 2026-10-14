@@ -122,7 +122,14 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
             emit(decision, &env.limits, Delivery::WatchEnded { watcher, why });
         }
         core::Held::Drained => emit(decision, &env.limits, Delivery::Drained),
-        core::Held::ApplicationDelivery { .. } | core::Held::Applied { .. } => {
+        core::Held::Applied { to, token, .. } => {
+            emit(
+                decision,
+                &env.limits,
+                Delivery::Application { to, outcome: domain.forge.application_outcome(token).cloned() },
+            );
+        }
+        core::Held::ApplicationDelivery { .. } => {
             unreachable!("temper's forge serves no client document or application request")
         }
         core::Held::NotesWritten { .. } | core::Held::NotesDeleted { .. } => {
