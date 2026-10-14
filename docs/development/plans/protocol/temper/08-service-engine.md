@@ -705,7 +705,8 @@ Needs: nothing beyond 08.4.
 Files: `crates/temper-service/{Cargo.toml, src/{clients.rs,
 clients/translation.rs, engine.rs, route.rs, lib.rs, tests/clients.rs,
 tests/fixtures.rs}}`; `crates/temper-engine-domain/src/{boundary.rs,
-route.rs}` (`PartyInput::SignOut` and its routing: the questions); the
+route.rs}` (`PartyInput::SignOut` and its routing land in 11.3, ruling
+116; 08.5a translates jig's event to it); the
 workspace `Cargo.toml` (entries `jig-protocol-engine-clients`,
 `jig-protocol-client-wire`); `Cargo.lock` (the pins' three commands).
 Shape: `Clients` as the reference's `clients.rs`; `translation::to_root(
@@ -1291,7 +1292,8 @@ pub mod family {
   temper's root's `PartyInput` has no sign-out input (08.5a). Default:
   add `PartyInput::SignOut`, field for field, routed to the people child
   as the core takes it, in 08.5a's Files; add it and report it, do not
-  wait.
+  wait. 11.3 adds it first (ruling 116); 08.5a then translates
+  `people::Event::SignOut` to it.
 - **A continued `CoreRange::Turns` load** (08.2a): jig's transcript
   pages continue by an offset, the root's by a key. Default: the routing
   keeps each continued transcript load's offset beside the root's last

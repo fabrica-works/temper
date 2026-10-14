@@ -358,7 +358,11 @@ Needs: nothing beyond 11.2.
 Files: `tests/client/{Cargo.toml, src/{lib.rs, app.rs, front.rs,
 translate.rs, fixtures.rs}, tests/stories.rs}`; the workspace
 `Cargo.toml` (member; `[workspace.dependencies]` `jig-client-world`,
-`jig-fake-person`); `Cargo.lock` (the pins). The crate's lints table is
+`jig-fake-person`); `Cargo.lock` (the pins);
+`crates/temper-engine-domain/src/{boundary.rs, route.rs}`
+(`PartyInput::SignOut`, field for field with jig's
+`people::Event::SignOut`, routed to the people child as the core takes
+it, with one test of that routing; ruling 116). The crate's lints table is
 `tests/engine/domain/Cargo.toml`'s; clippy reads `tests/clippy.toml`.
 Shared hotspots: the workspace `Cargo.toml`, `Cargo.lock`. No existing
 type changes.

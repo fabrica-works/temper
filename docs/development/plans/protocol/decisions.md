@@ -402,6 +402,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `thread/resume` when the status is `notLoaded`, is skein's kit, a
      proposal for the retrospective.
 
+116. **`PartyInput::SignOut` lands in 11.3** (temper 11.3, blocked
+     2026-10-14T07:17:06Z; plan defect, cross-session). 11.3's joint
+     world copies ops's `Front`, whose `sign_out` sends
+     `people::Event::SignOut { reply_to, sign_in }`; temper's root has no
+     input for it. 08.5a's file already plans it ("add
+     `PartyInput::SignOut`, field for field, routed to the people child
+     as the core takes it"), but 08 is at 08.2a. So 11.3 adds the variant
+     and its routing in `crates/temper-engine-domain/src/{boundary.rs,
+     route.rs}`, with one test of the routing, and 08.5a translates
+     jig's event to it. Sessions 11 and 08 say so.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
