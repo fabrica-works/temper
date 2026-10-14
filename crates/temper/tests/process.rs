@@ -31,6 +31,43 @@ fn temper_open_signs_in_prints_the_inbox_and_exits_on_q() {
 }
 
 #[test]
+fn temper_open_adopts_a_repository_by_commands() {
+    let scratch = support::Scratch::new("temper_open_adopt");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    support::configuration(scratch.path(), &forgejo.forge());
+    let mut serve = support::serve(scratch.path());
+    let link = support::terminal::link(&mut serve, support::WITHIN);
+    let open = support::terminal::open(scratch.path(), &scratch.path().join("client"), link.as_ref());
+    let mut typist = support::terminal::Typist::new(open, serve, link);
+    typist.wait_for(b"== Inbox == Live", support::WITHIN);
+    typist.wait_for(b"All goals\n", support::WITHIN);
+    typist.wait_for(b"[4] Project 1\n", support::WITHIN);
+    typist.type_line(b"4");
+    typist.type_on(b"Adopt a repository", b"");
+    for (control, words, printed) in [
+        (b"Owner: (empty)".as_slice(), b"acme".as_slice(), b"Owner: acme".as_slice()),
+        (b"Name: (empty)", b"widget", b"Name: widget"),
+        (b"Landing branch: (empty)", b"main", b"Landing branch: main"),
+        (
+            b"Checks: gate numbers, separated by spaces or commas: (empty)",
+            b"1",
+            b"Checks: gate numbers, separated by spaces or commas: 1",
+        ),
+    ] {
+        typist.type_on(control, words);
+        typist.wait_for(printed, support::WITHIN);
+    }
+    typist.type_on(b"[x] It runs CI", b"");
+    typist.wait_for(b"[ ] It runs CI", support::WITHIN);
+    typist.type_on(b"Adopt", b"");
+    typist.wait_for(b"Adopted acme/widget on forge 1 as owned.", support::WITHIN);
+    typist.type_line(b"q");
+    assert_eq!(typist.exit(support::WITHIN), 0, "stderr: {}", typist.stderr());
+    forgejo.stop();
+    scratch.remove();
+}
+
+#[test]
 fn a_persons_change_lands_on_the_forge_and_is_found_after_a_restart() {
     let scratch = support::Scratch::new("landed");
     let forgejo = support::forgejo::Throwaway::start(&scratch);

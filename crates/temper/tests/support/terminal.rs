@@ -46,6 +46,25 @@ use std::os::unix::ffi::OsStrExt;
 enum Action {
     Wait(Vec<u8>),
     Type(Vec<u8>),
+    On { control: Vec<u8>, words: Vec<u8> },
+}
+fn typed_control(bytes: &[u8], control: &[u8], words: &[u8]) -> Option<Vec<u8>> {
+    for line in bytes.split(|byte| *byte == b'\n').rev().skip(1) {
+        let line = line.trim_ascii_start();
+        let Some(line) = line.strip_prefix(b"[") else { continue };
+        let Some(end) = line.iter().position(|byte| *byte == b']') else { continue };
+        if line.get(end + 2..) != Some(control) || !line[..end].iter().all(u8::is_ascii_digit) {
+            continue;
+        }
+        let mut typed = line[..end].to_vec();
+        if !words.is_empty() {
+            typed.push(b' ');
+            typed.extend_from_slice(words);
+        }
+        typed.push(b'\n');
+        return Some(typed);
+    }
+    None
 }
 struct Pipes {
     input: Option<Fd>,
@@ -116,6 +135,12 @@ impl Host for Pipes {
                     let Some(Action::Type(bytes)) = self.actions.pop_front() else { panic!("type action") };
                     self.typed = Some((bytes, 0));
                 }
+                Some(Action::On { control, words }) => {
+                    if let Some(bytes) = typed_control(&self.bytes, control, words) {
+                        self.actions.pop_front();
+                        self.typed = Some((bytes, 0));
+                    }
+                }
                 Some(Action::Wait(_)) | None => {}
             }
         }
@@ -155,6 +180,7 @@ impl Host for Pipes {
             || self.actions.front().is_some_and(|action| match action {
                 Action::Wait(words) => skein_lib::bytes::find(&self.bytes, words).is_some(),
                 Action::Type(_) => true,
+                Action::On { control, words } => typed_control(&self.bytes, control, words).is_some(),
             })
     }
     fn next_deadline(&self) -> Option<Time> {
@@ -293,6 +319,10 @@ impl Typist {
         let mut bytes = words.to_vec();
         bytes.push(b'\n');
         self.actions.push_back(Action::Type(bytes));
+    }
+    /// Type the number printed beside the last matching control, then its words.
+    pub fn type_on(&mut self, control: &[u8], words: &[u8]) {
+        self.actions.push_back(Action::On { control: control.to_vec(), words: words.to_vec() });
     }
     #[must_use]
     pub fn stderr(&self) -> String {

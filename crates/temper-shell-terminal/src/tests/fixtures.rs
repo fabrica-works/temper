@@ -114,6 +114,34 @@ pub fn frame() -> crate::render::Frame {
 pub fn golden(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/golden").join(format!("{name}.txt"))
 }
+pub fn adoption_form(filled: bool) -> client::forge::Form {
+    let mut form = client::forge::form(1);
+    form.confirmed = true;
+    form.served = client::forge::Served::Yes;
+    if filled {
+        for (field, text) in [
+            (client::forge::Text::Owner, b"acme".as_slice()),
+            (client::forge::Text::Name, b"shop"),
+            (client::forge::Text::Landing, b"main"),
+        ] {
+            form.texts[field.index()].text = text.into();
+        }
+    }
+    form
+}
+pub fn adoption_page(
+    form: &client::forge::Form,
+    words: &(jig_view::words::Words, temper_client_view::words::Words),
+) -> jig_view::Tree {
+    let limits = tree_limits();
+    let (jig, forge) = words;
+    let mut builder = jig_view::Builder::new(&limits);
+    synthetic_header(&mut builder, None, false);
+    let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
+    temper_client_view::forge::page::page(&mut builder, form, b"Project: Shop", forge, jig, &mut bindings);
+    builder.close();
+    visible(builder.finish())
+}
 pub fn visible(mut tree: jig_view::Tree) -> jig_view::Tree {
     let limits = tree_limits();
     jig_view::diff(
@@ -262,7 +290,7 @@ pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> j
 fn root_navigation(root: &mut client::Domain, limits: &client::Limits) {
     client::configure_navigation(root, client::navigation(limits)).expect("fixture navigation");
 }
-fn page_words() -> (jig_view::words::Words, temper_client_view::words::Words) {
+pub fn page_words() -> (jig_view::words::Words, temper_client_view::words::Words) {
     static WORDS: std::sync::OnceLock<(jig_view::words::Words, temper_client_view::words::Words)> =
         std::sync::OnceLock::new();
     WORDS

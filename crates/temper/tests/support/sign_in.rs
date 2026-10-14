@@ -230,6 +230,10 @@ struct Judge {
     running: bool,
     wake: Option<Time>,
 }
+fn llm_listening(procs: &[Process]) -> bool {
+    let Process::Llm(peer) = &procs[6] else { panic!("LLM peer") };
+    peer.address().is_some()
+}
 impl Referee<Process> for Judge {
     fn act(&mut self, _now: Time, procs: &mut [Process]) {
         let Process::Issuer(issuer) = &procs[2] else { panic!("issuer") };
@@ -237,7 +241,8 @@ impl Referee<Process> for Judge {
             let Process::Browser { active, .. } = &mut procs[3] else { panic!("browser") };
             *active = true;
         }
-        if procs[0].is_empty() && procs[1].is_empty() && procs[3].is_empty() {
+        if procs[0].is_empty() && procs[1].is_empty() && procs[3].is_empty() && (!self.running || llm_listening(procs))
+        {
             let mut finished = !self.running;
             if self.running {
                 let Process::Person { active, person } = &mut procs[5] else { panic!("person") };
@@ -261,7 +266,8 @@ impl Referee<Process> for Judge {
         self.settled = self.stopped && procs.iter().all(Host::is_empty);
         let ready = if self.running {
             let Process::Person { active, person } = &procs[5] else { panic!("person") };
-            !*active || (person.finished && person.client.as_ref().is_some_and(Host::is_empty))
+            (!*active && llm_listening(procs))
+                || (person.finished && person.client.as_ref().is_some_and(Host::is_empty))
         } else {
             true
         };

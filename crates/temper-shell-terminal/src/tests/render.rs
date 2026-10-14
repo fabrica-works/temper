@@ -3,6 +3,42 @@ use crate::render;
 use jig_view::{Role, State};
 
 #[test]
+fn each_adoption_form_state_prints_as_its_golden_file() {
+    use temper_client_domain::forge;
+    let words = fixtures::page_words();
+    let empty = fixtures::adoption_form(false);
+    let mut invalid = empty.clone();
+    for field in [forge::Text::Owner, forge::Text::Name, forge::Text::Landing] {
+        invalid.texts[field.index()].broken = Some(forge::Broken::Required);
+    }
+    let filled = fixtures::adoption_form(true);
+    let mut pending = filled.clone();
+    pending.pending = Some((skein_lib::Token::new(1), skein_lib::RequestProgress::Parked));
+    let mut adopted = filled.clone();
+    adopted.outcome = Some(forge::Answer::Adopted(fixtures::adopted(forge::Protection::Unknown)));
+    let mut not_found = filled.clone();
+    not_found.outcome = Some(forge::Answer::ForgeRefused(forge::Reason::NotFound));
+    let mut core = filled.clone();
+    core.outcome = Some(forge::Answer::CoreRefused(fixtures::role_refusal()));
+    let mut out_of_date = filled;
+    out_of_date.served = forge::Served::OutOfDate;
+    for (name, form) in [
+        ("adopt_empty", empty),
+        ("adopt_invalid", invalid),
+        ("adopt_pending", pending),
+        ("adopt_adopted", adopted),
+        ("adopt_refused_not_found", not_found),
+        ("adopt_refused_core", core),
+        ("adopt_out_of_date", out_of_date),
+    ] {
+        let tree = fixtures::adoption_page(&form, &words);
+        let print = render::print(&tree, &fixtures::frame(), &fixtures::bounds());
+        let golden = std::fs::read(fixtures::golden(name)).expect("adoption golden file");
+        assert_eq!(print.text.as_ref(), golden, "page {name}");
+    }
+}
+
+#[test]
 fn each_fixture_page_prints_as_its_golden_file() {
     for (name, tree) in [
         ("inbox", fixtures::inbox_page()),

@@ -1,0 +1,21 @@
+== Adopt a repository into Project: Shop == Live
+Frame:
+  * Signed in as Pat
+[1] Forge number: 1
+[2] Owner: acme
+[3] Name: shop
+Role:
+  [4] (*) Owned: temper pushes, opens pull requests and lands
+  [5] ( ) Fork: temper contributes through a fork
+  [6] ( ) Context: temper only reads
+[7] [x] Make it the project's home
+[8] Branch prefix: temper/
+[9] Landing branch: main
+[10] [x] It runs CI
+[11] Checks: gate numbers, separated by spaces or commas: (empty)
+[12] Adopt
+* Adopted acme/shop on forge 1 as owned.
+* It is the project's home.
+* temper may: read; open pull requests; review; comment; create and delete branches.
+* Branch protection could not be read.
+[13] See the project's resources
