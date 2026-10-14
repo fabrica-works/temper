@@ -13,10 +13,10 @@ skein-kv.workspace = true
 jig-protocol-store.workspace = true
 temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-client.workspace = true
+temper-engine-domain-forge-change.workspace = true
 
 [dev-dependencies]
 temper-engine-domain.workspace = true
-temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-issues.workspace = true
 jig-domain-core.workspace = true
 jig-domain-tasks.workspace = true

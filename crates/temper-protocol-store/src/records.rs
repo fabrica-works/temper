@@ -5,6 +5,7 @@ use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
 mod answers;
 mod api;
+mod change;
 mod client;
 #[cfg(test)]
 pub(crate) use api::encode_error;
@@ -30,7 +31,8 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
         d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
         d::Stored::Client(value) => w::Value::Client(client::encode(value)),
-        d::Stored::Change(_) | d::Stored::Issue(_) => return None,
+        d::Stored::Change(value) => w::Value::Change(Box::new(change::encode_change_row(value))),
+        d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
@@ -42,6 +44,7 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
 pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     let row = w::Row::decode(bounds.limits(), &mut Reader::new(bytes)).or(Err(Undecodable))?;
     Ok(match row.into_parts().value {
+        w::Value::Change(value) => d::Stored::Change(change::decode_change_row(*value)),
         w::Value::Client(value) => d::Stored::Client(client::decode(value, bounds)?),
         w::Value::Call(value) => entries::decode_call(value, bounds)?,
         w::Value::ProposedEffect(value) => d::Stored::ProposedEffect(entries::decode_proposed(value, bounds)?),
@@ -66,6 +69,16 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        gating_asked: forge.change_policy.gates,
+        change_gates: forge.change_policy.gates,
+        change_clean: forge.change_policy.clean_heads,
+        change_row_branch: forge.name_bytes,
+        change_row_base: forge.name_bytes,
+        change_row_title: forge.client.op_bytes,
+        change_row_body: forge.client.op_bytes,
+        change_row_verdicts: forge.change_policy.gates,
+        change_row_gate_remarks: forge.change_policy.gates,
+        gate_remark_words: forge.client.answer_bytes,
         live_branch_branch: forge.name_bytes,
         live_record_comments: forge.client.inbox,
         live_record_reviews: forge.client.inbox,

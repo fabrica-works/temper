@@ -664,3 +664,75 @@ pub fn client_rows() -> List<top::Stored> {
     }
     rows
 }
+
+pub fn change_row(state: temper_engine_domain_forge_change::State) -> top::ChangeRow {
+    use temper_engine_domain_forge_change::{
+        Change, Delegate, EffectResult, Freshness, Gate, GateKind, GateReport, Hold, Status,
+    };
+    top::ChangeRow {
+        task: 1,
+        repository: REPO,
+        branch: Box::new([2]),
+        base: Box::new([3]),
+        title: Box::new([4]),
+        body: Box::new([5]),
+        priority: -6,
+        change: Change {
+            task: 1,
+            state,
+            gates: Box::new([Gate {
+                number: 7,
+                kind: GateKind::Check,
+                blocking: true,
+                freshness: Freshness::Clean,
+                eager: true,
+            }]),
+            clean: Box::new([[8; 32], [9; 32]]),
+            repairs: 10,
+            resolutions: 11,
+            updates: 12,
+            since: skein_lib::Wall::from_nanos(13),
+            ready_since: Some(skein_lib::Wall::from_nanos(14)),
+            owns_turn: true,
+            last_head: Some([15; 32]),
+        },
+        pull: Some(16),
+        pending: Some(17),
+        effect: EffectResult::Made,
+        delegate: Some((18, Delegate::Gate { number: 19, head: [20; 32] })),
+        delegate_status: Status::Passed,
+        verdicts: Box::new([GateReport { number: 21, head: [22; 32], status: Status::Failed }]),
+        gate_remarks: Box::new([top::GateRemark { number: 23, head: [24; 32], words: Box::new([25]) }]),
+        drift: Some(Hold::BranchMoved),
+        base_repair: true,
+        queue_repair: Some(26),
+        queue_repairs: 27,
+    }
+}
+pub fn change_states() -> List<temper_engine_domain_forge_change::State> {
+    use temper_engine_domain_forge_change::{Hold, Repair, State};
+    let mut states = List::with_capacity(17);
+    for state in [
+        State::Producing { requested: true },
+        State::Opening { requested: false },
+        State::Recreating { head: [1; 32] },
+        State::Reopening { requested: true, retarget: false },
+        State::Checking { head: [2; 32] },
+        State::Gating { head: [3; 32], asked: Box::new([4, 5]) },
+        State::Queued { head: [6; 32], ready_since: skein_lib::Wall::from_nanos(7) },
+        State::First { head: [8; 32], ready_since: skein_lib::Wall::from_nanos(9) },
+        State::Updating { from: [10; 32], base: [11; 32], ready_since: skein_lib::Wall::from_nanos(12) },
+        State::Resolving { requested: true, base: [13; 32] },
+        State::Repairing { requested: true, why: Repair::Gate(14) },
+        State::Landing { head: [15; 32] },
+        State::Landed { merge: [16; 32] },
+        State::Repairing { requested: false, why: Repair::Ci },
+        State::Repairing { requested: true, why: Repair::Semantic },
+    ] {
+        states.push(state).expect("fixture room");
+    }
+    let held = State::Held { was: Box::new(State::Checking { head: [17; 32] }), why: Hold::Stalled };
+    states.push(held.clone()).expect("fixture room");
+    states.push(State::Held { was: Box::new(held), why: Hold::BranchMissing }).expect("fixture room");
+    states
+}

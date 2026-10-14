@@ -256,3 +256,64 @@ fn a_cached_summary_key_uses_the_answer_byte_bound() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     assert_eq!(records::decode(&bytes, &bounds), Ok(row));
 }
+
+#[test]
+fn a_change_in_each_state_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for state in &fixtures::change_states() {
+        let row = forge::Stored::Change(fixtures::change_row(state.clone()));
+        let bytes = records::encode(&row).expect("change row encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row), "{state:?}");
+    }
+}
+#[test]
+fn a_negative_priority_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for priority in [-1_i32, i32::MIN, 0_i32, i32::MAX] {
+        let mut row = fixtures::change_row(temper_engine_domain_forge_change::State::Landed { merge: [1; 32] });
+        row.priority = priority;
+        let row = forge::Stored::Change(row);
+        let bytes = records::encode(&row).expect("change row encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row), "{priority}");
+    }
+}
+#[test]
+fn eight_wrapping_holds_keep_their_order_at_the_schema_ceiling() {
+    use temper_engine_domain_forge_change::{Hold, State};
+    let mut state = State::Checking { head: [1; 32] };
+    for why in [
+        Hold::Stalled,
+        Hold::Repairs,
+        Hold::Resolutions,
+        Hold::Updates,
+        Hold::BranchMoved,
+        Hold::BranchMissing,
+        Hold::PullClosed,
+        Hold::Retargeted,
+    ] {
+        state = State::Held { was: Box::new(state), why };
+    }
+    let row = forge::Stored::Change(fixtures::change_row(state));
+    let bytes = records::encode(&row).expect("eight holds encoded");
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+}
+#[test]
+fn each_change_delegate_round_trips_unchanged() {
+    use temper_engine_domain_forge_change::{Delegate, Repair, State};
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for delegate in [
+        Delegate::Produce,
+        Delegate::Repair(Repair::Ci),
+        Delegate::Repair(Repair::Gate(1)),
+        Delegate::Repair(Repair::Semantic),
+        Delegate::Resolve { base: [2; 32] },
+        Delegate::Gate { number: 3, head: [4; 32] },
+    ] {
+        let mut row = fixtures::change_row(State::Checking { head: [5; 32] });
+        row.delegate = Some((6, delegate));
+        let row = forge::Stored::Change(row);
+        let bytes = records::encode(&row).expect("change delegate encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row), "{delegate:?}");
+    }
+}
