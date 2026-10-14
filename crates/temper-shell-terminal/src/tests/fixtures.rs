@@ -530,6 +530,50 @@ pub fn control_text() -> jig_view::Tree {
     builder.close();
     visible(builder.finish())
 }
+pub fn controls() -> (jig_view::Tree, crate::render::Numbers) {
+    let tree = visible(control_tree());
+    let numbers = crate::render::print(&tree, &frame(), &bounds()).numbers;
+    (tree, numbers)
+}
+pub fn control_tree() -> jig_view::Tree {
+    control_tree_with(None, true)
+}
+pub fn control_tree_with(check_state: Option<jig_view::State>, check_bound: bool) -> jig_view::Tree {
+    use jig_view::{Role, State};
+    let mut builder = jig_view::Builder::new(&tree_limits());
+    synthetic_header(&mut builder, Some(b"Controls"), false);
+    for (role, name) in [
+        (Role::Button, b"Button".as_slice()),
+        (Role::Link, b"Link"),
+        (Role::Tab, b"Tab"),
+        (Role::Check, b"Check"),
+        (Role::Choice, b"Choice"),
+        (Role::TextField, b"Field"),
+        (Role::TextArea, b"Area"),
+    ] {
+        builder.open(role);
+        builder.name(name);
+        if role != Role::Check || check_bound {
+            builder.bind(binding());
+        }
+        if role == Role::Check
+            && let Some(state) = check_state
+        {
+            builder.state(state);
+        }
+        if role == Role::TextField {
+            builder.state(State::SubmitsOnEnter);
+        }
+        builder.close();
+    }
+    builder.open(Role::Button);
+    builder.name(b"Disabled");
+    builder.bind(binding());
+    builder.state(State::Disabled);
+    builder.close();
+    builder.close();
+    builder.finish()
+}
 fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
     use contract::{Read, ReadValue};
     match what {
