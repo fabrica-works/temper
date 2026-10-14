@@ -199,7 +199,7 @@ impl Workers {
             }
             io::Event::Closed { .. } => {
                 if self.listener_closed(owner) {
-                    return true;
+                    return self.ending.is_some();
                 }
                 let _socket = self.sockets.remove(&owner);
                 self.down(now, kit::Event::Gone { connection: owner }, events);
@@ -518,4 +518,68 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
     };
     kit::worst_case(&limits)?;
     Some(limits)
+}
+
+/// Component, routing tables, endpoint names and transient application records.
+#[must_use]
+pub fn worst_case(settings: &crate::settings::Engine, room: u32) -> Option<u64> {
+    let limits = limits(settings)?;
+    let endpoints = u32::try_from(settings.jig.llm.endpoints.len()).ok()?;
+    let mut bytes = kit::worst_case(&limits)?
+        .checked_add(Queue::<io::Request>::worst_case(room)?)?
+        .checked_add(Map::<Token, Token>::worst_case(limits.workers.checked_add(limits.opening)?)?)?
+        .checked_add(List::<(Token, Option<Token>)>::worst_case(
+            u32::try_from(settings.jig.hosts.listener.len()).ok()?,
+        )?)?
+        .checked_add(List::<smith_protocol_channel::Endpoint>::worst_case(endpoints)?)?
+        .checked_add(List::<Forge>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
+        .checked_add(wire::worst_case_heap(&crate::translate::limits(&settings.limits)?)?)?;
+    for endpoint in &settings.jig.llm.endpoints {
+        bytes = bytes.checked_add(u64::try_from(endpoint.name.len()).ok()?)?;
+    }
+    for forge in &settings.forges {
+        bytes = bytes
+            .checked_add(u64::try_from(forge.git.len()).ok()?)?
+            .checked_add(u64::try_from(forge.api_token.expose().len()).ok()?)?;
+        if let config::Address::Host { name, .. } = &forge.api {
+            bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
+        }
+    }
+    Some(bytes)
+}
+
+impl Workers {
+    /// Construct checked channels from the service's typed settings.
+    pub fn configured(
+        settings: &mut crate::settings::Engine,
+        deployment: [u8; 16],
+        max: u32,
+    ) -> Result<Self, Problems> {
+        let worker_limits = limits(settings).ok_or(invalid(What::Bound))?;
+        let mut endpoints =
+            List::with_capacity(u32::try_from(settings.jig.llm.endpoints.len()).expect("endpoint count"));
+        for endpoint in &settings.jig.llm.endpoints {
+            endpoints
+                .push(smith_protocol_channel::Endpoint {
+                    name: endpoint.name.clone(),
+                    number: endpoint.number,
+                    account: endpoint.account,
+                    dialect: endpoint.dialect,
+                })
+                .expect("endpoint count");
+        }
+        let workers = Self::new(
+            &settings.jig,
+            &settings.files,
+            Encoding {
+                limits: crate::translate::limits(&settings.limits).ok_or(invalid(What::Bound))?,
+                endpoints: smith_protocol_channel::Endpoints::new(endpoints),
+                deployment,
+            },
+            ::core::mem::replace(&mut settings.forges, Box::new([])),
+            &worker_limits,
+            max.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN).expect("worker routing room"),
+        )?;
+        Ok(workers)
+    }
 }

@@ -15,6 +15,7 @@ pub(crate) fn shutdown(engine: &mut Engine) {
         return;
     }
     engine.drain = Some(Drain { closing: false, busy: Queue::with_capacity(engine.events.capacity()) });
+    engine.workers.down(engine.env.now, jig_protocol_engine_workers::Event::Stop, &mut engine.events);
     engine.events.push(root::Event::Stop);
 }
 pub(crate) fn drained(engine: &mut Engine) {
@@ -25,6 +26,7 @@ pub(crate) fn drained(engine: &mut Engine) {
         return;
     }
     drain.closing = true;
+    engine.workers.close(engine.env.now, &mut engine.events);
     if engine.accounts.is_some() {
         engine.step(root::Event::Account(jig_domain_accounts::Event::Close));
     }
@@ -40,7 +42,12 @@ pub(crate) fn advance(engine: &mut Engine) {
         Some(accounts) => accounts.is_empty(),
         None => true,
     };
-    if closed && engine.store.idle() && engine.events.is_empty() && engine.requests.is_empty() {
+    if closed
+        && engine.workers.closed()
+        && engine.store.idle()
+        && engine.events.is_empty()
+        && engine.requests.is_empty()
+    {
         engine.store.close();
         if engine.store.closed() {
             for _ in 0..drain.busy.len() {

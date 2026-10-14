@@ -393,6 +393,9 @@ pub fn started() -> crate::Service {
     started_with_projects(&[(1, 100)])
 }
 pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
+    start_with_store(projects, None)
+}
+pub fn start_with_store(projects: &[(u32, u64)], stored: Option<crate::store::Store>) -> crate::Service {
     let mut settings = engine();
     let first = settings.jig.projects.into_iter().next().unwrap();
     let mut configured = skein_lib::List::with_capacity(u32::try_from(projects.len()).unwrap());
@@ -406,15 +409,21 @@ pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
         configured.push(project).unwrap();
     }
     settings.jig.projects = configured.into_boxed();
-    settings.files.entries = skein_lib::List::with_capacity(2);
+    settings.files.entries = skein_lib::List::with_capacity(4);
     settings
         .files
         .entries
         .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
         .unwrap();
     settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
+    for worker in &settings.jig.hosts.workers {
+        settings.files.entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
+    }
     let root = limits::engine(&settings.jig.limits, &settings.limits).unwrap();
-    let store = memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store);
+    let store = match stored {
+        Some(store) => store,
+        None => memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store),
+    };
     let mut service = crate::Service::engine(settings, &seeds(), None).unwrap();
     service.engine.store = store;
     service

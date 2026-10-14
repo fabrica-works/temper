@@ -31,6 +31,7 @@ fn a_missing_identity_or_generation_keeps_its_grant_slot_empty() {
 fn identities_are_announced_before_the_restart() {
     let mut service = fixtures::started();
     service.engine.store.opened = true;
+    let _listen = service.engine.workers.io.pop().unwrap();
     assert_eq!(service.engine.domain.next_deadline(&service.engine.env), None);
     crate::engine::iterate(&mut service.engine, Time::ZERO, skein_lib::Wall::EPOCH);
     assert!(service.engine.credentials.is_empty());
@@ -343,4 +344,164 @@ fn an_assignment_that_cannot_encode_is_answered_invalid_through_the_link() {
             why: b"assignment cannot encode".as_slice().into(),
         }))
     );
+}
+
+fn settle_root(service: &mut crate::Service) -> Option<temper_engine_domain::Assignment> {
+    use temper_engine_domain as root;
+    let engine = &mut service.engine;
+    let mut assignment = None;
+    for _ in 0_u32..256 {
+        if let Some(event) = engine.events.pop() {
+            engine.step(event);
+        }
+        root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        if engine.requests.is_empty() {
+            engine.step(root::Event::Resume);
+            root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        }
+        for _ in 0..engine.requests.len() {
+            let request = engine.requests.pop().unwrap();
+            match request {
+                root::Request::Worker(root::WorkerRequest::Deliver(root::Delivery::Assigned {
+                    assignment: run,
+                    ..
+                })) => assignment = Some(run),
+                root::Request::Worker(root::WorkerRequest::Deliver(_)) | root::Request::Party(_) => {}
+                root::Request::Worker(_) => panic!("unexpected host tool request"),
+                request @ (root::Request::Store(_) | root::Request::Account(_) | root::Request::ToChild(_)) => {
+                    crate::route::request(engine, request);
+                }
+                root::Request::Forge { .. } | root::Request::Busy(_) | root::Request::Drained | root::Request::Stop => {
+                    panic!("unexpected chat request")
+                }
+            }
+        }
+        engine.store.iterate();
+        for _ in 0..engine.store.above.len() {
+            let event = engine.store.above.pop().unwrap();
+            crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+        }
+        for _ in 0..engine.store.routed.len() {
+            match engine.store.routed.pop().unwrap() {
+                crate::store::route::Up::Root(event) => engine.events.push(*event),
+                crate::store::route::Up::Ask(request) => engine.store.ask(request),
+            }
+        }
+        if let Some(accounts) = &mut engine.accounts {
+            accounts.iterate(engine.env.now, engine.env.wall, &mut engine.values, &mut engine.events);
+        }
+        engine.domain.reclaim();
+        if engine.domain.quiescent() && engine.events.is_empty() && engine.store.idle() {
+            return assignment;
+        }
+    }
+    panic!("chat settled");
+}
+fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
+    use temper_engine_domain as root;
+    let mut service = fixtures::ready();
+    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+        channel: Token::new(7),
+        link: root::Link::Hello(host::Hello {
+            slots: 1,
+            stop_bound: skein_lib::Duration::from_millis(100),
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+            bounds: host::Bounds {
+                models: Box::new([host::ModelBound { name: b"small".as_slice().into(), window: 8192, output: 1024 }]),
+                turns: 8,
+                spend: 1000,
+                time: skein_lib::Duration::from_secs(60),
+                waiting: skein_lib::Duration::from_secs(60),
+                checks: skein_lib::Duration::from_secs(1),
+                message_bytes: 512,
+                inbox: 8,
+                unacknowledged: 32,
+            },
+        }),
+    }));
+    settle_root(&mut service);
+    service.engine.step(root::Event::Party(root::PartyInput::SignedIn {
+        reply_to: skein_lib::ReplyTo::new(Token::new(100)),
+        identity: jig_domain_people::Identity {
+            key: jig_domain_people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },
+            login: b"owner".as_slice().into(),
+            name: b"Owner".as_slice().into(),
+        },
+    }));
+    settle_root(&mut service);
+    service.engine.step(root::Event::Party(root::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(Token::new(101)),
+        sign_in: 1,
+        key: [31; 16],
+        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
+    }));
+    let run = settle_root(&mut service).expect("chat assigned");
+    (service, run)
+}
+#[test]
+fn the_roots_facts_are_drained_and_counted_after_each_step() {
+    use temper_engine_domain as root;
+    let (mut service, run) = claimed_chat();
+    let preparation = root::Preparation::Missing { tag: 3, missing: root::Missing::Branch };
+    let up = host::LinkUp::Answer {
+        run: Token::new(run.task),
+        attempt: Token::new(run.attempt),
+        answer: host::Answer {
+            read: None,
+            refused: Box::new([]),
+            turns: 0,
+            spent: 1,
+            ending: host::Ending::Failed {
+                failure: host::Failure::Unprepared(host::Preparation::Permanent { resource: None }),
+                detail: Box::new([]),
+                work: host::Work { left: None, saved: None },
+            },
+        },
+    };
+    service.engine.step(root::Event::Worker(root::WorkerInput::Link {
+        channel: Token::new(7),
+        link: root::Link::Up {
+            up,
+            parts: root::Parts { saved: None, pushed: Box::new([]), preparation: Some(preparation) },
+        },
+    }));
+    settle_root(&mut service);
+    assert_eq!(service.engine.facts, 1);
+    assert_eq!(service.engine.domain.pop_fact(), None);
+    assert_eq!(service.engine.domain.facts_lost(), 0);
+    service.engine.step(root::Event::Resume);
+    assert_eq!(service.engine.facts, 1);
+}
+
+#[test]
+fn a_worker_assignment_uses_the_services_configured_forges() {
+    use temper_engine_domain as root;
+    let mut service = fixtures::started();
+    let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
+    assignment.workspace.repositories[0].provider.forge = 99;
+    crate::route::request(
+        &mut service.engine,
+        root::Request::Worker(root::WorkerRequest::Deliver(root::Delivery::Assigned {
+            channel: Token::new(8),
+            assignment,
+        })),
+    );
+    let Some(root::Event::Worker(root::WorkerInput::Link {
+        channel,
+        link: root::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, parts },
+    })) = service.engine.events.pop()
+    else {
+        panic!("worker assignment refused through its root input")
+    };
+    assert_eq!(channel, Token::new(8));
+    assert_eq!((run, attempt), (Token::new(7), Token::new(2)));
+    assert_eq!(
+        answer.ending,
+        host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+            why: b"assignment cannot encode".as_slice().into(),
+        }))
+    );
+    assert_eq!(parts, root::Parts::none());
+    assert_eq!(service.end(), None);
 }

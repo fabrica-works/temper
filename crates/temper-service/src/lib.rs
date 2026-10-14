@@ -124,6 +124,7 @@ impl Service {
                 .push((project.number, project.policy.period_spend))
                 .or(Err(start_problem(b"projects", What::Bound)))?;
         }
+        let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
             landing: settings.landing,
@@ -140,6 +141,7 @@ impl Service {
                 &limits,
                 store::Store::new(&limits, &store_limits),
                 accounts,
+                workers,
                 values,
                 first_periods,
             ),
@@ -233,6 +235,7 @@ impl Service {
     pub fn is_empty(&self) -> bool {
         self.end().is_some()
             && self.engine.store.closed()
+            && self.engine.workers.closed()
             && self.io.is_empty()
             && self.completions.is_empty()
             && self.submissions.is_empty()
@@ -253,6 +256,15 @@ impl Service {
                 break;
             }
             self.raw_submissions.push(self.engine.store.submitted.pop().expect("store submissions"));
+        }
+        if self.engine.store.opened || self.engine.end.is_some() {
+            for _ in 0..self.engine.workers.io.len() {
+                if self.raw_submissions.room() < io::MAX_OUT_DOWN.submissions || !self.io.takes() {
+                    break;
+                }
+                let request = self.engine.workers.io.pop().expect("worker io requests");
+                io::down(&mut self.io, &self.io_env, request, &mut self.raw_submissions);
+            }
         }
         if (self.engine.store.opened || self.engine.end.is_some())
             && let Some(accounts) = &mut self.engine.accounts
@@ -330,6 +342,9 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
 }
 fn route_events(service: &mut Service) {
     for _ in 0..service.told.len() {
+        if !service.engine.workers.room() || service.engine.events.room() < jig_protocol_engine_workers::MAX_OUT_DOWN {
+            break;
+        }
         if let Some(accounts) = &service.engine.accounts
             && !accounts.up_room()
         {
@@ -367,7 +382,7 @@ fn route_events(service: &mut Service) {
             if let Some(accounts) = &mut service.engine.accounts {
                 accounts.up(accounts::untag(event));
             }
-        } else {
+        } else if !service.engine.workers.up(service.io_env.now, event, &mut service.engine.events) {
             service.engine.end = Some(End::Stopped(Stop::Listener));
         }
     }
@@ -384,7 +399,7 @@ fn memory(
     operations: u32,
 ) -> Option<u64> {
     let payload = temper_engine_domain::worst_case(root)?;
-    let events = queue.checked_mul(skein_oauth_accounts::MAX_OUT_DOWN.above.max(1))?;
+    let events = queue.checked_mul(engine::route_out())?;
     let mut bytes = payload
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
         .checked_add(skein_io::worst_case(&settings.jig.limits.io)?)?
@@ -405,6 +420,10 @@ fn memory(
         .checked_add(u64::from(queue).checked_mul(u64::from(settings.jig.limits.io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (bool, Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<(bool, Token), Token>::worst_case(operations)?)?;
+    bytes = bytes.checked_add(workers::worst_case(
+        settings,
+        temper_engine_domain::max_out(root).checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
+    )?)?;
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;
     bytes = bytes

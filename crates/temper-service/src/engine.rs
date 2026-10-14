@@ -9,6 +9,8 @@ pub(crate) struct Engine {
     pub(crate) env: Env<root::Limits>,
     pub(crate) store: crate::store::Store,
     pub(crate) accounts: Option<crate::accounts::Accounts>,
+    pub(crate) workers: crate::workers::Workers,
+    pub(crate) facts: u64,
     pub(crate) values: crate::values::Values,
     pub(crate) events: Queue<root::Event>,
     pub(crate) requests: Queue<root::Request>,
@@ -29,6 +31,7 @@ impl Engine {
         limits: &root::Limits,
         store: crate::store::Store,
         accounts: Option<crate::accounts::Accounts>,
+        workers: crate::workers::Workers,
         values: crate::values::Values,
         first_periods: List<(u32, u64)>,
     ) -> Self {
@@ -44,10 +47,10 @@ impl Engine {
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             store,
             accounts,
+            workers,
+            facts: 0,
             values,
-            events: Queue::with_capacity(
-                capacity.checked_mul(skein_oauth_accounts::MAX_OUT_DOWN.above.max(1)).expect("account event room"),
-            ),
+            events: Queue::with_capacity(capacity.checked_mul(route_out()).expect("account event room")),
             requests: Queue::with_capacity(max_out),
             end: None,
             first_periods,
@@ -62,11 +65,8 @@ impl Engine {
     }
     pub(crate) fn room(&self) -> bool {
         self.store.room()
-            && self.events.room()
-                >= self
-                    .max_out
-                    .checked_mul(skein_oauth_accounts::MAX_OUT_DOWN.above.max(1))
-                    .expect("translated root outputs")
+            && self.workers.batch_room(self.max_out)
+            && self.events.room() >= self.max_out.checked_mul(route_out()).expect("translated root outputs")
             && match &self.drain {
                 Some(drain) => drain.busy.room() >= self.max_out,
                 None => true,
@@ -81,9 +81,18 @@ impl Engine {
             self.pending = Some(Box::new(event));
             self.blocked = true;
         }
+        self.drain_facts();
+    }
+    fn drain_facts(&mut self) {
+        for _ in 0..root::FACTS {
+            if self.domain.pop_fact().is_none() {
+                break;
+            }
+            self.facts = self.facts.saturating_add(1);
+        }
     }
     pub(crate) fn next_deadline(&self) -> Option<Time> {
-        let mut next = self.store.next_deadline();
+        let mut next = crate::accounts::earliest(self.store.next_deadline(), self.workers.next_deadline());
         if self.end.is_none() {
             next = crate::accounts::earliest(next, self.domain.next_deadline(&self.env));
             next = crate::accounts::earliest(next, self.values.accounts.next_expiry());
@@ -98,6 +107,7 @@ impl Engine {
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
         let components = self.store.work_pending(now)
+            || (self.store.opened || self.end.is_some()) && self.workers.work_pending(now)
             || (self.store.opened || self.end.is_some())
                 && match &self.accounts {
                     Some(accounts) => accounts.work_pending(now),
@@ -126,6 +136,7 @@ impl Engine {
         {
             self.aborted = Some(());
             self.store.close();
+            self.workers.abort(self.env.now, &mut self.events);
             if let Some(accounts) = &mut self.accounts {
                 accounts.abort();
             }
@@ -145,6 +156,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
     }
+    engine.workers.iterate(now, &mut engine.events);
     stop::advance(engine);
     if engine.end.is_some() {
         engine.abort_if_ended();
@@ -183,6 +195,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         && deadline <= now
     {
         root::fire(&mut engine.domain, &engine.env);
+        engine.drain_facts();
     }
     release(engine);
 }
@@ -194,6 +207,7 @@ fn release(engine: &mut Engine) {
             break;
         }
         root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        engine.drain_facts();
         if !engine.requests.is_empty() || engine.domain.quiescent() {
             engine.blocked = false;
         }
@@ -280,4 +294,8 @@ fn answer(engine: &mut Engine) {
             break;
         }
     }
+}
+
+pub(crate) fn route_out() -> u32 {
+    skein_oauth_accounts::MAX_OUT_DOWN.above.max(jig_protocol_engine_workers::MAX_OUT_DOWN)
 }

@@ -34,7 +34,52 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         }
         root::Request::Drained => stop::drained(engine),
         root::Request::Stop => stop::unavailable(engine, b"deployment"),
-        root::Request::Worker(_) => stop::unavailable(engine, b"workers"),
+        root::Request::Worker(request) => worker(engine, request),
         root::Request::Party(_) => stop::unavailable(engine, b"clients"),
+    }
+}
+
+fn worker(engine: &mut Engine, request: root::WorkerRequest) {
+    match request {
+        root::WorkerRequest::Host(_) | root::WorkerRequest::ReadResult { .. } => stop::unavailable(engine, b"workers"),
+        root::WorkerRequest::Deliver(delivery) => match delivery {
+            root::Delivery::Assigned { channel, assignment } => {
+                engine.workers.assignment(engine.env.now, channel, assignment, &engine.values, &mut engine.events);
+            }
+            root::Delivery::Link { channel, down } => {
+                engine.workers.send(engine.env.now, channel, down, &engine.values, &mut engine.events);
+            }
+            root::Delivery::TurnBusy { channel, task, attempt, turn } => engine.workers.down(
+                engine.env.now,
+                jig_protocol_engine_workers::Event::TurnBusy {
+                    channel,
+                    run: skein_lib::Token::new(task),
+                    attempt: skein_lib::Token::new(attempt),
+                    turn,
+                },
+                &mut engine.events,
+            ),
+            root::Delivery::Refuse { channel } => engine.workers.down(
+                engine.env.now,
+                jig_protocol_engine_workers::Event::NotAdmitted { channel, text: b"not admitted".as_slice().into() },
+                &mut engine.events,
+            ),
+            root::Delivery::Host(_)
+            | root::Delivery::Procedure { .. }
+            | root::Delivery::Application { .. }
+            | root::Delivery::WebReply { .. }
+            | root::Delivery::Read { .. }
+            | root::Delivery::Document { .. }
+            | root::Delivery::WatchEnded { .. }
+            | root::Delivery::Result { .. }
+            | root::Delivery::ForgeCommitted { .. }
+            | root::Delivery::ForgeCall { .. }
+            | root::Delivery::Relay { .. }
+            | root::Delivery::ReadEscalationDecision { .. }
+            | root::Delivery::Fleet(_)
+            | root::Delivery::ReadLoad { .. }
+            | root::Delivery::Load { .. }
+            | root::Delivery::Drained => stop::unavailable(engine, b"workers"),
+        },
     }
 }
