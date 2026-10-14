@@ -443,6 +443,20 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      came back to 51 GB, so the rule adds `kache gc` once when the
      store is past its cap.
 
+120. **A world-only increment may land the README's 20-line fix**
+     (temper 18.1, blocked 2026-10-14T08:35:59Z; plan defect; the second
+     after ruling 116's 11.3). On jig's real store, a goal's transcript
+     continuation fails: the root's `archive.rs:377-385` derives
+     `TaskTranscript.from` from the preceding page's last turn, so the
+     opening window (1,1) becomes (1,2), which jig's pinned
+     `transcripts/read.rs:605-619` answers `Unread`. store/README.md, 5:
+     "A root cursor is a key of the root's range, and names the jig
+     interval that holds it". The fix, about 6 lines, keeps the opening
+     window and carries `after` as the cursor. As a standing rule
+     (README), the README's "a fix the change, its Proof or the gate
+     needs, at most 20 lines" in an increment whose Size is world code
+     only counts against 20 production lines, with no question.
+
 119. **02.4 lands before 02.3** (temper 02.3, blocked
      2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
      conformance worlds' adoption to `PartyInput::Application`; after a

@@ -154,6 +154,8 @@ them wait on them.
   - a fix the change, its Proof or the gate needs, at most 20 lines, in
     any session's files, every test's name and expected value kept (a
     fixture's inputs may change so the test checks the same behaviour);
+    in an increment whose Size is world code only, those production
+    lines count against 20 (decisions.md, ruling 120);
   - an expected literal that prints a vocabulary the Shape renames, at
     most 10 lines in all, replaced by what the new code prints;
   - an expected value for the very case the Shape changes, at most 4
