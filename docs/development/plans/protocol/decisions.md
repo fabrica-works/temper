@@ -1180,7 +1180,9 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `stdout_bytes` 1,024. Step `temper-17.s1`, session 17's, before
      17.4; its session file is `temper/17-one-process.md`'s 17.s1.
      `reserve: 0` (`limits.rs:45`) is the profile's other zero, and stays:
-     forge.md makes reserved writes optional.
+     at 0 the forge client keeps no share of the rate for its keep and
+     slow calls, and refuses nothing
+     (`temper-engine-domain-forge-client/src/calls.rs:191`).
 
 ## For the user
 
