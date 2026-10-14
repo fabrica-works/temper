@@ -235,8 +235,6 @@ pub(crate) fn configure(value: &mut serde_json::Value) {
     }
     value["workers"][0]["slots"] = fixtures::AGENTS.into();
     value["workers"][0]["limits"]["overrides"]["hub.slots"] = fixtures::AGENTS.into();
-    value["application"]["limits"]["overrides"]["checkout.conflicts"] = 1.into();
-    value["application"]["limits"]["overrides"]["checkout.path_bytes"] = 64.into();
     let grants: Vec<_> = [3, 11]
         .into_iter()
         .map(|kind| {

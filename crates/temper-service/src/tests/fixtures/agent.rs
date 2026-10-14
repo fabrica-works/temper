@@ -8,8 +8,8 @@ pub fn agent() -> settings::Agent {
     let host_limits = smith_host_domain::Limits {
         agents: 1,
         directories: 1,
-        conflicts: 0,
-        path_bytes: 64,
+        conflicts: 4,
+        path_bytes: 255,
         name_bytes: 64,
         accounts: 2,
         charter_bytes: 65_536,

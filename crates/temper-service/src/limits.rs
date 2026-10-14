@@ -167,10 +167,10 @@ const CHECKOUT: checkout::Limits = checkout::Limits {
     name_bytes: 256,
     // Bytes in a commit message, from the checkout world fixture.
     message_bytes: 256,
-    // Conflicted paths per repository, from the checkout world fixture.
-    conflicts: 0,
-    // Bytes in one conflicted path, from the checkout world fixture.
-    path_bytes: 0,
+    // Conflicted paths per repository, from the checkout merges world.
+    conflicts: 4,
+    // Bytes per conflicted path: four NUL-terminated paths fit stdout_bytes 1,024.
+    path_bytes: 255,
     // Time for an operation reaching a forge, from the checkout world fixture.
     remote_timeout: Duration::from_secs(60),
     // Time for a local checkout operation, from the checkout world fixture.
