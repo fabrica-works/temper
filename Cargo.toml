@@ -50,6 +50,9 @@ publish = false
 
 [workspace.dependencies]
 temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }
+skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
+skein-llm = { git = "https://github.com/forgetic/skein.git" }
+smith-agent-process-world = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
 jig-channel-world = { git = "https://github.com/forgetic/jig.git" }

@@ -5,7 +5,7 @@
 # slow period is flagged SLOW as it runs.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/)"
+default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
 global-timeout = "15s"
 slow-timeout = { period = "3s" }
 
@@ -16,7 +16,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/)"
+default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
 global-timeout = "60s"
 slow-timeout = { period = "20s" }
 
@@ -26,3 +26,16 @@ slow-timeout = { period = "20s" }
 [profile.measure]
 global-timeout = "1h"
 slow-timeout = { period = "60s" }
+
+[profile.process]
+default-filter = "binary(=process)"
+global-timeout = "10m"
+test-threads = 1
+
+[profile.live]
+# The live binary arrives in 15.4. Name the two tiers, then exclude process,
+# so this selects live without naming a binary that cargo does not hold yet.
+default-filter = "binary(/^(process|live)$/) & not binary(=process)"
+global-timeout = "20m"
+test-threads = 1
+retries = 0

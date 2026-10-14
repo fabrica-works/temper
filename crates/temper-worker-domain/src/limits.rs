@@ -36,7 +36,7 @@ pub struct Limits {
 
 /// The bytes a message's sender and words take beyond themselves once smith
 /// renders them, its separator (smith's `smith-domain-run`, `rendered_bytes`).
-const SEPARATOR: u64 = 2;
+pub const SEPARATOR: u64 = 2;
 
 /// The bytes of a workstream key: the holding task's number, big-endian.
 const KEY: u32 = 8;

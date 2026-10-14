@@ -65,7 +65,7 @@ mod workspace;
 pub use boundary::{Encodable, Encoded, Event, Invalid, Request};
 pub use domain::{Domain, fire, resume, step};
 pub use facts::Fact;
-pub use limits::{Limits, max_out, worst_case};
+pub use limits::{Limits, SEPARATOR, max_out, worst_case};
 // The payloads are the children's: a parent may use its children's types.
 pub use jig_domain_host as host;
 pub use smith_host_domain as agent;

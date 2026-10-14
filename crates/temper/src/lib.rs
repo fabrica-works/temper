@@ -158,6 +158,12 @@ fn agent(configuration: &Path) -> Result<Agent, String> {
         }
     }
     let policy = configuration.profile.policy;
+    let message_bytes = limits
+        .domain
+        .run
+        .message_bytes
+        .checked_sub(u32::try_from(temper_worker_domain::SEPARATOR).expect("message separator fits u32"))
+        .ok_or("agent message_bytes: too small for the rendered separator")?;
     Ok(Agent {
         endpoints: configuration.service.channel_endpoints,
         limits: protocol,
@@ -169,7 +175,7 @@ fn agent(configuration: &Path) -> Result<Agent, String> {
             time: policy.max_time,
             waiting: policy.max_waiting,
             checks: policy.check_timeout,
-            message_bytes: limits.domain.run.message_bytes,
+            message_bytes,
             inbox: policy.inbox,
             unacknowledged: policy.unacknowledged,
         },
