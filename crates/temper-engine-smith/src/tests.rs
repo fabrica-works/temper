@@ -270,3 +270,15 @@ fn root_call_answers_become_bounded_smith_text_or_error() {
     assert!(denied.error());
     assert!(!denied.text().is_empty());
 }
+
+#[test]
+fn a_charter_resumes_when_its_policy_does_and_turns_are_kept() {
+    let mut assignment = assignment();
+    for (resume, turns, expected) in
+        [(false, false, false), (false, true, false), (true, false, false), (true, true, true)]
+    {
+        assignment.run.policy.resume = resume;
+        assignment.transcript = if turns { Box::new([b"turn".as_slice().into()]) } else { Box::new([]) };
+        assert_eq!(crate::charter(&assignment).resume, expected, "resume={resume}, turns={turns}");
+    }
+}

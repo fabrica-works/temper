@@ -24,7 +24,7 @@ mod start;
 pub use answers::answer;
 pub use calls::{call, tools};
 pub use finish::{ChangeResource, Terminal, result, turn};
-pub use start::{model, section, start};
+pub use start::{charter, model, section, start};
 
 fn decimal(bytes: &[u8]) -> Result<u64, Problem> {
     if bytes.is_empty() {

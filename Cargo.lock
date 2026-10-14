@@ -414,6 +414,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-engine-workers"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-codec",
+ "skein-io",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-store"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -451,6 +464,16 @@ dependencies = [
  "jig-domain-client",
  "skein-lib",
  "smith-transcript",
+]
+
+[[package]]
+name = "jig-protocol-worker-wire"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-channel",
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]
@@ -1445,7 +1468,9 @@ dependencies = [
  "jig-domain-tasks",
  "jig-protocol-accounts",
  "jig-protocol-config",
+ "jig-protocol-engine-workers",
  "jig-protocol-store",
+ "skein-codec",
  "skein-io",
  "skein-kv",
  "skein-lib",
@@ -1461,6 +1486,7 @@ dependencies = [
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
  "temper-protocol-store",
+ "temper-protocol-worker-wire",
  "temper-worker-domain-checkout",
 ]
 

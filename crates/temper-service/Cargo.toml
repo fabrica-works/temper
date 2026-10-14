@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
+skein-codec.workspace = true
+jig-protocol-engine-workers.workspace = true
+temper-protocol-worker-wire.workspace = true
 skein-io.workspace = true
 skein-oauth.workspace = true
 skein-tls.workspace = true

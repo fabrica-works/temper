@@ -71,38 +71,8 @@ pub fn start(
     host_run: Token,
     window: smith::Window,
 ) -> smith::Event {
-    let mut sections = List::with_capacity(assignment.sections.len().try_into().expect("bounded brief sections"));
-    for item in &assignment.sections {
-        sections.push(section(item)).expect("bounded brief sections");
-    }
-    let policy = &assignment.run.policy;
-    let mut models = List::with_capacity(policy.alternatives.len().try_into().expect("bounded model list"));
-    for candidate in &policy.alternatives {
-        models.push(model(candidate)).expect("bounded model list");
-    }
-    let outcome = contract(&assignment.run.contract);
-    let charter = run::Charter {
-        resume: policy.resume && transcript.is_some(),
-        waiting: policy.waiting,
-        instructions: policy.instructions.clone(),
-        brief: run::Brief { sections: sections.into_boxed() },
-        conventions: Some(run::Conventions {
-            guide: bytes::copy_of(b"AGENTS.md"),
-            checks: bytes::copy_of(b".temper/pre-pr"),
-        }),
-        grants: run::charter::Grants {
-            wait: true,
-            deliver: outcome.change.clone(),
-            tools: run::charter::Tools { inspect: policy.inspect, modify: policy.modify, shell: policy.shell },
-            agents: policy.agents,
-            host_tools: crate::tools(policy.call_timeout),
-        },
-        outcome,
-        budget: run::Budget { turns: policy.turns, spend: assignment.run.budget, time: policy.time },
-        reserve: run::charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
-        llm: model(&policy.model),
-        models: models.into_boxed(),
-    };
+    let mut charter = charter(assignment);
+    charter.resume = assignment.run.policy.resume && transcript.is_some();
     let mut messages = List::with_capacity(assignment.messages.len().try_into().expect("bounded start messages"));
     for word in &assignment.messages {
         let sender = match word.from {
@@ -140,6 +110,43 @@ pub fn start(
         // records; this typed system route has none to pass yet.
         answered: Box::new([]),
         grants: grants.into_boxed(),
+    }
+}
+
+/// The channel charter resumes only when policy allows and turns are kept.
+#[must_use]
+pub fn charter(assignment: &engine::Assignment) -> run::Charter {
+    let mut sections = List::with_capacity(assignment.sections.len().try_into().expect("bounded brief sections"));
+    for item in &assignment.sections {
+        sections.push(section(item)).expect("bounded brief sections");
+    }
+    let policy = &assignment.run.policy;
+    let mut models = List::with_capacity(policy.alternatives.len().try_into().expect("bounded model list"));
+    for candidate in &policy.alternatives {
+        models.push(model(candidate)).expect("bounded model list");
+    }
+    let outcome = contract(&assignment.run.contract);
+    run::Charter {
+        resume: policy.resume && !assignment.transcript.is_empty(),
+        waiting: policy.waiting,
+        instructions: policy.instructions.clone(),
+        brief: run::Brief { sections: sections.into_boxed() },
+        conventions: Some(run::Conventions {
+            guide: bytes::copy_of(b"AGENTS.md"),
+            checks: bytes::copy_of(b".temper/pre-pr"),
+        }),
+        grants: run::charter::Grants {
+            wait: true,
+            deliver: outcome.change.clone(),
+            tools: run::charter::Tools { inspect: policy.inspect, modify: policy.modify, shell: policy.shell },
+            agents: policy.agents,
+            host_tools: crate::tools(policy.call_timeout),
+        },
+        outcome,
+        budget: run::Budget { turns: policy.turns, spend: assignment.run.budget, time: policy.time },
+        reserve: run::charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
+        llm: model(&policy.model),
+        models: models.into_boxed(),
     }
 }
 

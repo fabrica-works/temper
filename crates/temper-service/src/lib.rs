@@ -10,6 +10,7 @@ mod tests;
 pub mod tokens;
 
 pub mod accounts;
+pub mod translate;
 pub mod values;
 pub use accounts::AccountsRuntime;
 mod engine;
@@ -98,10 +99,12 @@ impl Service {
                 max.checked_mul(6).expect("account routing room"),
             )?)
         };
-        let values = values::Values::new(
+        let mut values = values::Values::new(
             limits.accounts.accounts.checked_add(1).expect("numbered accounts"),
             settings.jig.limits.driver.client.document.token_bytes,
         );
+        let wire = translate::limits(&settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
+        values.fill(&settings.identities, &wire)?;
         let count = u32::try_from(settings.forges.len()).expect("configured forges");
         let mut writers = List::with_capacity(count);
         let mut identities = List::with_capacity(count);
@@ -400,6 +403,14 @@ fn memory(
         .checked_add(u64::from(queue).checked_mul(u64::from(settings.jig.limits.io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (bool, Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<(bool, Token), Token>::worst_case(operations)?)?;
+    let identities = u32::try_from(settings.identities.len()).ok()?;
+    let wire = translate::limits(&settings.limits)?;
+    bytes = bytes
+        .checked_add(Map::<u32, skein_lib::Secret>::worst_case(identities)?)?
+        .checked_add(List::<u32>::worst_case(identities)?)?
+        .checked_add(
+            u64::from(identities).checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
+        )?;
     if !settings.jig.llm.accounts.is_empty() {
         let mut driver = settings.jig.limits.driver;
         driver.accounts = root.accounts.accounts.checked_add(1)?;

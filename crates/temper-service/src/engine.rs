@@ -18,6 +18,7 @@ pub(crate) struct Engine {
     pub(crate) blocked: bool,
     pending: Option<Box<root::Event>>,
     begin: bool,
+    pub(crate) credentials: List<u32>,
     ready: bool,
     aborted: Option<()>,
     max_out: u32,
@@ -33,7 +34,12 @@ impl Engine {
     ) -> Self {
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
+        let mut credentials = List::with_capacity(values.identities.len());
+        for (number, _value) in &values.identities {
+            credentials.push(*number).expect("configured identities");
+        }
         Self {
+            credentials,
             domain: root::Domain::new(config, limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             store,
@@ -148,8 +154,19 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         return;
     }
     if engine.begin {
-        engine.begin = false;
-        engine.step(root::Event::Restart);
+        if engine.credentials.is_empty() {
+            engine.begin = false;
+            engine.step(root::Event::Restart);
+        } else {
+            let last = engine.credentials.len().checked_sub(1).expect("first credential");
+            let number = *engine.credentials.get(last).expect("configured identity");
+            engine.credentials.truncate(last);
+            engine.step(root::Event::Credential {
+                number,
+                generation: 1,
+                valid: skein_lib::Duration::from_nanos(u64::MAX),
+            });
+        }
     } else if !engine.blocked && engine.pending.is_some() {
         let event = engine.pending.take().expect("held input");
         engine.step(*event);

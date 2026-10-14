@@ -207,8 +207,15 @@ pub fn store_limits() -> (temper_engine_domain::Limits, jig_domain_core::Limits,
 
 pub fn memory_store() -> crate::store::Store {
     let (root, core, profile) = store_limits();
-    let limits = crate::store::limits(&root, &core, &root.forge, &profile).expect("checked store limits");
-    let mut store = crate::store::Store::new(&root, &limits);
+    memory_store_for(&root, &core, &profile)
+}
+fn memory_store_for(
+    root: &temper_engine_domain::Limits,
+    core: &jig_domain_core::Limits,
+    profile: &jig_protocol_store::Limits,
+) -> crate::store::Store {
+    let limits = crate::store::limits(root, core, &root.forge, profile).expect("checked store limits");
+    let mut store = crate::store::Store::new(root, &limits);
     store.component = jig_protocol_store::Store::over(
         &limits,
         temper_protocol_store::application(&root.forge).expect("application sizes"),
@@ -406,8 +413,10 @@ pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
         .push((b"charters/chat.txt".as_slice().into(), Secret::new(b"Answer briefly".as_slice().into())))
         .unwrap();
     settings.files.entries.push((b"accounts/chat.json".as_slice().into(), Secret::new(ACCOUNT.into()))).unwrap();
+    let root = limits::engine(&settings.jig.limits, &settings.limits).unwrap();
+    let store = memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store);
     let mut service = crate::Service::engine(settings, &seeds(), None).unwrap();
-    service.engine.store = memory_store();
+    service.engine.store = store;
     service
 }
 pub fn turn(service: &mut crate::Service) {
@@ -452,4 +461,66 @@ pub fn get(service: &mut crate::Service, key: jig_domain_core::Key) -> Option<ji
         engine.store.above.push(event);
     }
     panic!("store get answered")
+}
+
+pub fn wire_limits() -> temper_protocol_worker_wire::v1::Limits {
+    crate::translate::limits(&limits::profile(limits::Profile::Small)).unwrap()
+}
+pub fn repository(tag: u32, owner: &[u8], name: &[u8]) -> temper_engine_domain::ForgeRepository {
+    temper_engine_domain::ForgeRepository {
+        tag,
+        provider: temper_engine_domain_forge_client::api::Repository { forge: 1, repository: tag },
+        name: name.into(),
+        host: b"forge.example".as_slice().into(),
+        owner: owner.into(),
+        start: temper_engine_domain::ForgeStart::Base(b"main".as_slice().into()),
+        push: Some(b"temper/task-7".as_slice().into()),
+        identity: 1,
+    }
+}
+pub fn assignment_with(repository: temper_engine_domain::ForgeRepository) -> temper_engine_domain::Assignment {
+    let settings = engine();
+    let task = task_record(7);
+    temper_engine_domain::Assignment {
+        task: 7,
+        attempt: 2,
+        conversation: 2,
+        charter: 1,
+        run: Box::new(temper_engine_domain::RunCharter {
+            policy: settings.jig.charters[0].policy.clone(),
+            contract: task.contract,
+            authority: task.authority,
+            budget: 20,
+        }),
+        sections: Box::new([]),
+        messages: Box::new([]),
+        saved: Box::new([]),
+        workstream: 7,
+        workspace: temper_engine_domain::ForgeWorkspace { repositories: Box::new([repository]) },
+        transcript: Box::new([]),
+        answered: Box::new([]),
+        settled: Box::new([]),
+        grants: Box::new([]),
+    }
+}
+pub fn values_with_identity(number: u32, token: &[u8]) -> crate::values::Values {
+    let mut values = crate::values::Values::new(2, 4096);
+    values.identities = skein_lib::Map::with_capacity(1);
+    let mut identity = engine().identities.into_iter().next().unwrap();
+    identity.token = Secret::new(token.into());
+    let value = crate::translate::identity(&identity, &wire_limits()).unwrap();
+    values.identities.insert(number, value).unwrap();
+    values
+}
+pub fn application_grant(account: u32, generation: u64) -> jig_domain_host::Grant {
+    jig_domain_host::Grant {
+        table: jig_domain_host::GrantTable::Application,
+        account,
+        generation,
+        valid: skein_lib::Duration::from_secs(30),
+    }
+}
+pub fn decoded_identity(value: &Secret) -> temper_protocol_worker_wire::v1::Identity {
+    temper_protocol_worker_wire::v1::Identity::decode(&wire_limits(), &mut skein_lib::Reader::new(value.expose()))
+        .unwrap()
 }

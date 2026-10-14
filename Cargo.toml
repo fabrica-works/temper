@@ -121,6 +121,8 @@ temper-engine-domain-forge = { path = "crates/temper-engine-domain-forge" }
 jig-domain-views = { git = "https://github.com/forgetic/jig.git" }
 temper-worker-domain = { path = "crates/temper-worker-domain" }
 temper-worker-domain-checkout = { path = "crates/temper-worker-domain-checkout" }
+jig-protocol-engine-workers = { git = "https://github.com/forgetic/jig.git" }
+jig-protocol-worker-wire = { git = "https://github.com/forgetic/jig.git" }
 jig-domain-host = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-charter = { git = "https://github.com/forgetic/jig.git" }
 jig-core-world = { git = "https://github.com/forgetic/jig.git" }
