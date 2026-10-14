@@ -139,8 +139,12 @@ them wait on them.
   family's codec, an increment that changes a `Stored` variant or a
   value it holds changes the schema, the generated code and the
   translation in the same increment; the translation's build breaks
-  otherwise, which is the check. `STORE_VERSION` stays 1 in this plan
-  (no store of temper's exists yet).
+  otherwise, which is the check. Those files are in that increment's
+  Files: `crates/temper-protocol-store/{schema/*.schema,
+  src/generated/v1.rs, src/records/*.rs, src/tests/*.rs}` and its
+  goldens, the hand-written lines counted in its Size (decisions.md,
+  ruling 110). `STORE_VERSION` stays 1 in this plan (no store of
+  temper's exists yet).
 - **Edits outside an increment's Files** that are no question (jig's
   `jig-protocol` plan learned each, rulings 108 to 262; they replace
   development.md, 8.2's "it is in your session's own files" and "it

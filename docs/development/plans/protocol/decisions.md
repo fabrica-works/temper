@@ -302,6 +302,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      document, and 06.3's Proof counts eleven documents. forge.md, 3.4
      reads a `403` as `Forbidden` ("| `401`, `403` | `Forbidden` |").
 
+110. **The store's codec files are in the Files of an increment that
+     changes a stored value** (temper 02.1, blocked 2026-10-14T04:48:10Z;
+     cross-session scope). 02.1 adds `Answer::Located`, which
+     `Stored::Call` holds, so the README's "A durable record's codec
+     follows its record" already asks it to change "the schema, the
+     generated code and the translation in the same increment". Its
+     files were not named in any Files: they now are, in that README
+     rule, for every increment that changes a stored value (02.1, 02.4,
+     and any other). The hand-written lines count in its Size; the
+     schema, generated code and goldens do not.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
