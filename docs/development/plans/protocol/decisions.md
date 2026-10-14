@@ -956,7 +956,8 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `Fact::PreparationFailed { task, attempt, preparation }`
      (`temper-engine-domain/src/link.rs:224`; decision 3) of that run,
      then in the system or one-process world; the count of same-symptom
-     process failures starts again at the next named cause.
+     process failures starts again at the next named cause. Ruling 147
+     replaces this amendment's first read.
 
 146. **A produced change's result names the resource the worker and the
      forge settled** (temper 15.3, blocked 2026-10-14T16:54:15Z;
@@ -976,6 +977,62 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      one settled (the resource), more than one (refused as ambiguous),
      each under 20 ms. The parent chat's first `Invalid` stays to trace,
      under ruling 145.
+
+147. **15.3 finds its gate's refused preparation in a world on the
+     process configuration's limits, else in one marked process run**
+     (temper 15.3, blocked 2026-10-14T17:45:25Z; plan defect, in ruling
+     145's amendment). The amendment asked first for the run's
+     `Fact::PreparationFailed`, which cannot exist: `result_event`
+     (`temper-engine-domain/src/link.rs:250-254`) queues it only from a
+     worker's `Payload::Answer` whose parts name a preparation; the gate,
+     task 5, never claimed an attempt; and the service's `drain_facts`
+     (`temper-service/src/engine.rs:100-107`) counts the root's facts and
+     keeps none. That read goes. Proof 28's retained state shows task 5
+     Preparing, then BackingOff, three times, 0.41 to 0.49 s after each
+     start, its brief's gather 5 s: a refusal before claim, at one of
+     these sites:
+     - temper's root: `archive.rs`'s `transcript_failed`,
+       `begin_dependency_read` (its read table full) and
+       `dependency_failed`; `assemble.rs`'s `BriefAssembled { ready:
+       false }` (a connector section with no owner, or bytes other than
+       its size);
+     - jig's core at the pin (`jig-domain-core/src/routing/`):
+       `children.rs:68-74` (the brief child's `Failed` or `Refused`),
+       `run_preparation.rs`'s `plan_brief` (a part `read_brief_part`
+       refuses, against `brief.read_bytes`, `brief.brief_bytes` and
+       `brief_parts`), `brief_assembled` and `workspace_prepared` (no
+       context, no fresh attempt, the proofs' table full), and
+       `route_claim_refused`.
+
+     15.3 names the site by the first of these two means that shows it:
+     1. **The system world's gate story** (15.3's diagnostic of
+        `15.3-system-gate-gather-5s.log`, the gate Running in 0.086 s),
+        its engine limits built from the process tier's configuration by
+        `temper_service::limits::engine`, as startup builds them, in place
+        of the world's fixture limits, and its fake forge holding the
+        proof's pull (its files and its comparison). The site is read from
+        the world's domain state between steps, or from temporary
+        `eprintln!` lines at temper's sites above. At most three such
+        world runs; if none refuses the gate, the second means follows.
+     2. **One process run** through `heavy --gate`, with temporary
+        `eprintln!` lines (the task, the site, and at `assemble.rs` the
+        section's size and byte count) at temper's sites above and in
+        `route/now.rs`'s `Now::RunPreparationFailed` arm, which jig's
+        `brief_assembled` and `workspace_prepared` paths request and its
+        `plan_brief` and `children.rs` paths do not. It is the process run
+        aimed at this cause; its log is kept under `logs/temper-15/`.
+
+     No diagnostic line is committed, jig's checkout is never edited, and
+     no production observer is added. 15.3 then fixes the cause where it
+     is: temper's code within the README's 20-line fix, or the process
+     tier's configuration in its fixture. A fix in jig's core, past 20
+     production lines, or in the shipped configuration is a question
+     naming the site and its numbers. Unchanged: ruling 145's other fences
+     (a process proof once per change aimed at a named cause; a third
+     same-symptom failure is a question, counted from this cause), every
+     assertion and expected literal, the gate's script, boundary fields,
+     the pins, and rulings 144's and 146's fixes, landed as 15.3a
+     (`ead325c3`).
 
 ## For the user
 
