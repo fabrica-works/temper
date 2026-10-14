@@ -654,6 +654,16 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      expected values. The worker's operations come from its settings by
      the same function `Worker::operations` uses, made visible within
      the crate if needed, never copied. Session 10 says so.
+     At 2026-10-14T12:10:13Z 10.2 found that formula across two crates
+     (`Component::operations`, `temper-worker-protocol-git/src/component.rs:432`,
+     `limits.operations + 1`; `Worker::operations` adds 1): so
+     `temper-worker-protocol-git/src/limits.rs` gains `pub fn
+     operations(limits: &Limits) -> Option<u32>`, which
+     `Component::operations` calls, and `temper-service/src/worker_settings.rs`
+     a settings-only `operations`, which `Worker::operations` and startup
+     call; about 10 lines in `limits.rs`, `component.rs`, `worker.rs` and
+     `worker_settings.rs`. A further shared helper ruling 130 needs, at
+     most 20 lines, is the README's 20-line fix, with no question.
 
 ## For the user
 
