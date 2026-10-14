@@ -948,6 +948,15 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      naming its cause. The process proof runs again only after a change
      aimed at a named cause, once per change; a third failure on the
      same symptom is a question with the logs.
+     At 2026-10-14T17:30:54Z, after ruling 146, the third failure came:
+     the producer's change done and pull 1 opened, the gate's task
+     created and its preparation refused three times before any model
+     query (`logs/temper-15/15.3-trace-after-146.md`). 15.3 goes on
+     tracing the same way, first in the root's
+     `Fact::PreparationFailed { task, attempt, preparation }`
+     (`temper-engine-domain/src/link.rs:224`; decision 3) of that run,
+     then in the system or one-process world; the count of same-symptom
+     process failures starts again at the next named cause.
 
 146. **A produced change's result names the resource the worker and the
      forge settled** (temper 15.3, blocked 2026-10-14T16:54:15Z;
