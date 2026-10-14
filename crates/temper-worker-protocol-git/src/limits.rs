@@ -1,7 +1,8 @@
 //! Limits and counted payloads (git.md, section 8).
+use crate::{capped::Capped, operation::Operation, ring::ByteRing};
 use alloc::boxed::Box;
 use skein_io::kernel;
-use skein_lib::List;
+use skein_lib::{Id, List, Map, Slab, Token};
 use temper_worker_domain_checkout::{self as checkout, git};
 
 /// The component's configured bounds.
@@ -64,7 +65,7 @@ pub fn largest_output(checkout: &checkout::Limits) -> Option<u32> {
 }
 
 /// Argument/environment/message/output/path payloads and one sweep page.
-/// Process and file state containers are added with their implementations.
+/// File state containers are added with their implementation.
 #[must_use]
 pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
     let name = u64::from(checkout.name_bytes);
@@ -81,11 +82,22 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
         .checked_add(environment)?
         .checked_add(u64::from(checkout.message_bytes).checked_add(3)?)?
         .checked_add(paths)?;
-    for bytes in [limits.stdout_bytes, limits.stderr_bytes, limits.read_bytes] {
-        each = each.checked_add(u64::from(bytes))?;
-    }
+    each = each
+        .checked_add(Capped::worst_case(limits.stdout_bytes)?)?
+        .checked_add(ByteRing::worst_case(limits.stderr_bytes)?)?
+        // Growth or a tail copy can coexist with the invocation's held bytes.
+        .checked_add(u64::from(limits.stdout_bytes))?
+        .checked_add(u64::from(limits.stderr_bytes))?
+        .checked_add(u64::from(limits.read_bytes))?
+        // The operation, command, and emitted working directory own names too.
+        .checked_add(name.checked_mul(6)?)?
+        .checked_add(u64::from(checkout.message_bytes).checked_add(3)?)?
+        .checked_add(8192)?;
+    let capacity = limits.operations.checked_add(1)?;
+    let table = Slab::<Operation>::worst_case(capacity.checked_mul(2)?)?
+        .checked_add(Map::<Token, Id<Operation>>::worst_case(capacity)?)?;
     let page = List::<kernel::Entry>::worst_case(limits.sweep_entries)?.checked_add(u64::from(limits.sweep_bytes))?;
-    u64::from(limits.operations).checked_mul(each)?.checked_add(page)
+    u64::from(limits.operations.max(1)).checked_mul(each)?.checked_add(page)?.checked_add(table)
 }
 
 /// The most records one entry point emits, except abort.
@@ -96,4 +108,4 @@ pub struct MaxOut {
     pub kernel: u32,
 }
 /// One terminal, a spawn or kill and closes, and one file operation.
-pub const MAX_OUT: MaxOut = MaxOut { events: 1, io: 4, kernel: 1 };
+pub const MAX_OUT: MaxOut = MaxOut { events: 1, io: 5, kernel: 1 };

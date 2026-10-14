@@ -211,6 +211,7 @@ fn a_commit_is_authored_and_committed_as_the_identity() {
 }
 #[test]
 fn an_operation_naming_no_identity_commits_as_the_placeholder() {
+    let identity = fixtures::identity();
     for kind in [None, Some(git::Kind::Make), Some(git::Kind::CheckOut), Some(git::Kind::Merge)] {
         let environment = invocation::environment(fixtures::HOME, kind, None);
         let expected = [
@@ -228,6 +229,7 @@ fn an_operation_naming_no_identity_commits_as_the_placeholder() {
         for (actual, expected) in environment.iter().zip(expected) {
             assert_eq!(&**actual, expected, "{kind:?}");
         }
+        assert_eq!(invocation::environment(fixtures::HOME, kind, Some(&identity)), environment);
     }
 }
 #[test]

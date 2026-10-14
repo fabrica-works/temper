@@ -144,6 +144,10 @@ pub fn arguments(command: &Command) -> Box<[Box<[u8]>]> {
 /// Whole environment; no PATH or inherited variable reaches git.
 #[must_use]
 pub fn environment(home: &[u8], kind: Option<git::Kind>, identity: Option<&Identity>) -> Box<[Box<[u8]>]> {
+    let identity = match kind {
+        Some(git::Kind::Clone | git::Kind::Fetch | git::Kind::Create | git::Kind::Commit | git::Kind::Push) => identity,
+        None | Some(git::Kind::Make | git::Kind::CheckOut | git::Kind::Merge) => None,
+    };
     let mut out = List::with_capacity(14);
     let home = joined(&[b"HOME=", home]);
     words(
