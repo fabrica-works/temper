@@ -376,12 +376,13 @@ pub(crate) fn transcript_loaded(
         let Some(Some(Read::Transcript { .. })) = domain.archive_reads.get(Id::from_token(waiter)) else {
             unreachable!("transcript read survives its page")
         };
-        let from = match &after {
-            Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Turn { attempt, turn, .. })) => {
-                (*attempt, *turn)
-            }
-            Key::Core(_) | Key::Forge(_) => unreachable!("transcript pages end at a turn"),
-        };
+        let from = domain
+            .core
+            .transcripts
+            .get(&task)
+            .expect("live transcript preparation")
+            .window
+            .expect("transcript page belongs to its opening window");
         request_load(domain, waiter, Range::Core(crate::CoreRange::TaskTranscript { task, from }), Some(after), out);
         return;
     }

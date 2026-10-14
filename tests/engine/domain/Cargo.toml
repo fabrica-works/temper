@@ -1,6 +1,6 @@
 [package]
 name = "temper-engine-domain-world"
-description = "The engine root with an atomic ordered fake store"
+description = "The engine root with jig's real durable store"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,12 @@ publish.workspace = true
 
 [dependencies]
 skein-world.workspace = true
-jig-fake-store.workspace = true
+jig-test-store-files.workspace = true
+jig-protocol-store.workspace = true
+jig-protocol-config.workspace = true
+skein-kv.workspace = true
+temper-protocol-store.workspace = true
+temper-service.workspace = true
 skein-lib.workspace = true
 temper-engine-domain.workspace = true
 jig-domain-people.workspace = true

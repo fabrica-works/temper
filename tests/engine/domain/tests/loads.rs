@@ -51,7 +51,7 @@ fn each_page_has_one_terminal_and_reads_the_answered_commit() {
     let mut store = Store::new();
     for turn in 1..=4 {
         let row = row(turn, 1);
-        store.rows.insert(row.key(), row);
+        store.seed(Box::new([row]), Box::new([]));
     }
     let mut loads = Loads::new(&LIMITS);
     let mut out = Queue::with_capacity(1);
@@ -257,13 +257,13 @@ fn a_census_page_takes_repeated_owners_and_an_index_cursor() {
     let mut store = Store::new();
     for number in [5, 3] {
         let record = ended_record(number);
-        store.rows.insert(record.key(), record);
+        store.seed(Box::new([record]), Box::new([]));
     }
     for (party, position, task) in [(8, 1, 5), (8, 2, 5), (8, 3, 3), (4, 1, 3)] {
         let record = Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Result(
             jig_domain_tasks::ResultRow { party, position, task },
         )));
-        store.rows.insert(record.key(), record);
+        store.seed(Box::new([record]), Box::new([]));
     }
     let limits = Limits { bytes: 16_384, reply_bytes: 16_384, transcript_bytes: 16_384, ..LIMITS };
     let mut loads = Loads::new(&limits);
@@ -308,4 +308,15 @@ fn a_census_cursor_behind_its_start_is_out_of_order() {
         }
         loads::reclaim(&mut loads);
     }
+}
+
+#[test]
+fn a_forge_row_survives_the_real_store_byte_for_byte() {
+    let (driver, _) = temper_engine_domain_world::direct::Driver::chat();
+    let mut store = driver.store.fork();
+    assert_eq!(store.page(&Range::Forge, None, 8).0.len(), 0, "a chat's store holds no forge row");
+    let row = Record::Forge { row: Box::new(temper_engine_domain_forge::Stored::Landed { commit: [7; 32], task: 3 }) };
+    store.seed(Box::new([row.clone()]), Box::new([]));
+    let (rows, next) = store.page(&Range::Forge, None, 8);
+    assert_eq!((rows.as_ref(), next), ([row].as_slice(), None));
 }

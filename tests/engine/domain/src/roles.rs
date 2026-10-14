@@ -187,12 +187,12 @@ fn snapshot(settings: Settings) -> Store {
 /// outlives configuration: give it this story's request bits.
 fn story_policy(store: &mut Store, settings: Settings) {
     let policy_key = Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)));
-    let Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) =
-        store.rows.get_mut(&policy_key)
-    else {
+    let mut row = store.rows.get(&policy_key).expect("saved policy").clone();
+    let Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. })) = &mut row else {
         panic!("the first start saved project one's policy");
     };
     value.roles[0].requests = 1 | 4 | if settings.policy { 256 } else { 0 };
+    store.seed(Box::new([row]), Box::new([]));
 }
 
 impl World {

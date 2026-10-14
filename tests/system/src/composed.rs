@@ -20,7 +20,7 @@ use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use smith_agent_world::World as Agent;
 use smith_domain_run as run;
 use temper_engine_domain as engine;
-use temper_engine_domain::{Delivery, Key, Write};
+use temper_engine_domain::{Delivery, Key};
 use temper_engine_domain_world::protocol::Protocol;
 use temper_engine_domain_world::store::Store;
 use temper_engine_domain_world::walking;
@@ -381,8 +381,7 @@ impl World {
 
     /// Whether the store has commits not yet applied.
     fn committing(&self) -> bool {
-        let durable: &jig_fake_store::Store<Key, engine::Record> = &self.store;
-        !durable.pending.is_empty()
+        !self.store.pending.is_empty()
     }
 
     /// Resume a parked activation from concrete history whose bytes the
@@ -479,15 +478,8 @@ impl World {
         match request {
             engine::Request::ToChild(released) => self.root_events.push_back(engine::Event::Released(released)),
             engine::Request::Store(engine::StoreRequest::Commit { number, writes }) => {
-                let mut translated = Vec::with_capacity(writes.len());
-                for write in writes {
-                    translated.push(match write {
-                        Write::Save(row) => jig_fake_store::Write::Save { key: row.key(), row },
-                        Write::Erase(key) => jig_fake_store::Write::Erase(key),
-                    });
-                }
                 let delay = u32::try_from(self.seed % 3).expect("small seeded delay");
-                self.store.submit(number, translated.into_boxed_slice(), delay);
+                self.store.submit(number, writes, delay);
             }
             engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                 let (rows, next) = self.store.page(&range, after.as_ref(), most);

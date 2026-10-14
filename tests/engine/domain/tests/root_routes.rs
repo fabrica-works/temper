@@ -976,7 +976,7 @@ fn invalid_nonfinal_people_restore_page_stops_before_issuing_its_continuation() 
                 name: b"Same".as_slice().into(),
             },
         }));
-        store.rows.insert(record.key(), record);
+        store.seed(Box::new([record]), Box::new([]));
     }
     let mut driver = Driver::new(store);
     for _ in 0..30 {
@@ -1007,7 +1007,7 @@ fn invalid_nonfinal_task_restore_page_stops_before_issuing_its_continuation() {
     record.spec.words = vec![b'x'; 65].into_boxed_slice();
     record.phase = tasks::Phase::Waiting;
     let row = Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(Box::new(record))));
-    world.store.rows.insert(row.key(), row);
+    world.store.seed(Box::new([row]), Box::new([]));
     let mut driver = Driver::new(world.store);
     for _ in 0..60 {
         driver.advance(true);
@@ -1292,11 +1292,12 @@ fn new_note(description: &[u8], body: &[u8], author: notes::Author) -> engine::T
 
 #[test]
 fn a_new_runs_brief_carries_the_durable_note_index() {
-    let mut store = Store::new();
+    let mut driver = Driver::configured(Store::new(), note_config(), &limits());
+    driver.settle();
+    let mut store = driver.store;
     let scope = notes::Scope::Project { project: 1 };
-    store.rows.insert(
-        Key::Core(jig_domain_core::Key::Notes(notes::Key::Entry { name: 1 })),
-        Record::Core(jig_domain_core::Record::Notes(notes::Record::Entry(notes::Entry {
+    store.seed(
+        Box::new([Record::Core(jig_domain_core::Record::Notes(notes::Record::Entry(notes::Entry {
             name: 1,
             scope: scope.clone(),
             description: b"seeded hint".as_slice().into(),
@@ -1305,16 +1306,17 @@ fn a_new_runs_brief_carries_the_durable_note_index() {
             author: notes::Author::Task { task: 1, attempt: 1 },
             revision: 1,
             changed: Wall::EPOCH,
-        }))),
+        })))]),
+        Box::new([]),
     );
-    store.rows.insert(
-        Key::Core(jig_domain_core::Key::Notes(notes::Key::Line { scope: scope.clone(), name: 1 })),
-        Record::Core(jig_domain_core::Record::Notes(notes::Record::Line(notes::Line {
+    store.seed(
+        Box::new([Record::Core(jig_domain_core::Record::Notes(notes::Record::Line(notes::Line {
             scope,
             name: 1,
             description: b"seeded hint".as_slice().into(),
             revision: 1,
-        }))),
+        })))]),
+        Box::new([]),
     );
     let mut driver = Driver::configured(store, note_config(), &limits());
     hello(&mut driver);
@@ -2394,11 +2396,10 @@ fn calls_under_backpressure_are_handed_back_and_decided_once_on_retry() {
 fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
     let (driver, assignment) = running_fixture();
     for corruption in 0..5 {
-        let mut store = Store::new();
-        store.rows = driver.store.rows.clone();
+        let mut store = driver.store.fork();
+        let mut rows = store.rows.clone();
         let key = temper_engine_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(assignment.task)));
-        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = store.rows.get_mut(&key)
-        else {
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = rows.get_mut(&key) else {
             panic!("live task");
         };
         task.last_answer = Some(assignment.attempt);
@@ -2410,7 +2411,7 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
             jig_domain_core::CoreKey::RunProof(assignment.task),
         ));
         let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
-            store.rows.get_mut(&proof_key)
+            rows.get_mut(&proof_key)
         else {
             panic!("proof");
         };
@@ -2425,11 +2426,11 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
         });
         match corruption {
             0 => {
-                store.rows.remove(&proof_key);
+                rows.remove(&proof_key);
             }
             1 => {
                 let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
-                    store.rows.get_mut(&proof_key)
+                    rows.get_mut(&proof_key)
                 else {
                     panic!("proof");
                 };
@@ -2437,7 +2438,7 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
             }
             2 => {
                 let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
-                    store.rows.get_mut(&proof_key)
+                    rows.get_mut(&proof_key)
                 else {
                     panic!("proof");
                 };
@@ -2450,15 +2451,14 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
             }
             3 => {
                 let header = store.header();
-                let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) =
-                    store.rows.get_mut(&key)
+                let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = rows.get_mut(&key)
                 else {
                     panic!("task");
                 };
                 task.attempt = header.runs + 1;
                 task.last_answer = Some(task.attempt);
                 let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
-                    store.rows.get_mut(&proof_key)
+                    rows.get_mut(&proof_key)
                 else {
                     panic!("proof");
                 };
@@ -2466,7 +2466,7 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
             }
             4 => {
                 let Some(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof)))) =
-                    store.rows.get_mut(&proof_key)
+                    rows.get_mut(&proof_key)
                 else {
                     panic!("proof");
                 };
@@ -2474,6 +2474,8 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
             }
             _ => unreachable!(),
         }
+        let erases = store.rows.keys().filter(|key| !rows.contains_key(*key)).cloned().collect();
+        store.seed(rows.into_values().collect(), erases);
         let header = store.header();
         let before = store.rows.clone();
         let mut restarted = Driver::new(store);
@@ -2491,10 +2493,9 @@ fn invalid_current_proof_stops_before_any_restored_closing_effect_or_result() {
 fn root_restore_refuses_malformed_task_shapes() {
     let (driver, assignment) = running_fixture();
     for malformed in 0..3 {
-        let mut store = Store::new();
-        store.rows = driver.store.rows.clone();
-        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = store
-            .rows
+        let mut store = driver.store.fork();
+        let mut rows = store.rows.clone();
+        let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task)))) = rows
             .get_mut(&temper_engine_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(assignment.task))))
         else {
             panic!("task");
@@ -2505,6 +2506,8 @@ fn root_restore_refuses_malformed_task_shapes() {
             2 => task.contract = tasks::Contract::Verdict { choices: Box::new([]) },
             _ => unreachable!(),
         }
+        let erases = store.rows.keys().filter(|key| !rows.contains_key(*key)).cloned().collect();
+        store.seed(rows.into_values().collect(), erases);
         let before = store.rows.clone();
         let mut restarted = Driver::new(store);
         for _ in 0..100 {
@@ -2639,10 +2642,7 @@ fn held_waiting_store() -> Store {
     for _ in 0..300 {
         world.iterate();
         if world.store.rows.values().any(|row| matches!(row, Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) if matches!(task.escalation, tasks::Escalation::Waiting { .. }))) {
-            let mut snapshot = Store::new();
-            snapshot.applied = world.store.applied;
-            snapshot.rows = world.store.rows.clone();
-            return snapshot;
+            return world.store.fork();
         }
     }
     panic!("actual failure never committed Waiting");
@@ -2658,7 +2658,8 @@ fn release_rejudges_a_still_expired_deadline_and_escalates_the_new_hold() {
     let mut store = held_waiting_store();
     let mut task_number = 0;
     let mut requester = 0;
-    for row in store.rows.values_mut() {
+    let mut rows = store.rows.clone();
+    for row in rows.values_mut() {
         if let Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) = row {
             task_number = task.number;
             let tasks::Party::Person(person) = task.requester else { unreachable!() };
@@ -2684,6 +2685,7 @@ fn release_rejudges_a_still_expired_deadline_and_escalates_the_new_hold() {
             }
         })
         .expect("requester session");
+    store.seed(rows.into_values().collect(), Box::new([]));
     let mut driver = held_driver(store);
     driver.settle();
     driver.env.wall = Wall::from_nanos(1);
@@ -2743,7 +2745,8 @@ fn restored_waiting_rechecks_snapshot_membership_and_same_holder_changes_nothing
             None
         })
         .expect("person chat");
-    for row in store.rows.values_mut() {
+    let mut rows = store.rows.clone();
+    for row in rows.values_mut() {
         if let Record::Core(jig_domain_core::Record::People(people::Stored::Roles { holdings, .. })) = row {
             *holdings = holdings
                 .iter()
@@ -2753,6 +2756,7 @@ fn restored_waiting_rechecks_snapshot_membership_and_same_holder_changes_nothing
                 .into_boxed_slice();
         }
     }
+    store.seed(rows.into_values().collect(), Box::new([]));
     let mut changed = held_driver(store);
     changed.settle();
     assert!(!changed.stopped);
@@ -4151,8 +4155,7 @@ fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_the
     for (bounds, step) in
         [(task_bounds, jig_domain_core::RestartStep::LoadCore), (claim_bounds, jig_domain_core::RestartStep::AdoptRuns)]
     {
-        let mut store = Store::new();
-        store.rows = before.clone();
+        let store = driver.store.fork();
         let mut restarted = Driver::configured(store, sharing_config(91), &bounds);
         for _ in 0..100 {
             restarted.advance(true);

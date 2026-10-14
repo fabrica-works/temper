@@ -1287,9 +1287,12 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-fake-store",
  "jig-people-world",
+ "jig-protocol-config",
+ "jig-protocol-store",
  "jig-tasks-world",
+ "jig-test-store-files",
+ "skein-kv",
  "skein-lib",
  "skein-world",
  "smith-domain",
@@ -1302,6 +1305,8 @@ dependencies = [
  "temper-engine-domain-forge-client",
  "temper-engine-forge-world",
  "temper-fake-forge-domain",
+ "temper-protocol-store",
+ "temper-service",
 ]
 
 [[package]]
@@ -1472,7 +1477,6 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-fake-parties",
- "jig-fake-store",
  "skein-fake-checkout",
  "skein-fake-llm-domain",
  "skein-lib",

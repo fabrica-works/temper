@@ -126,7 +126,7 @@ fn a_parked_smith_run_resumes_from_the_prefix_restored_through_both_roots() {
 #[test]
 fn a_withheld_store_commit_holds_the_party_reply_and_worker_assignment() {
     let mut world = World::chat(916, report_script(false));
-    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.store.fault(temper_engine_domain_world::store::Fault::Hold { commits: 1 });
     for _ in 0..200 {
         world.tick();
     }
