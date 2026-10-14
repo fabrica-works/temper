@@ -1089,6 +1089,33 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      cause is, else a question. If this run names no branch either, 15.3
      makes no further run and asks, with both runs' logs.
 
+150. **15.3 marks the pull-files read's own sites once, then fixes with
+     a test below the process tier** (temper 15.3, blocked
+     2026-10-14T18:17:05Z; process). Ruling 149's run
+     (`logs/temper-15/149-process-diagnostic.log`, 31.4 s) named the
+     branch: for the gate, task 5, the forge's `brief_answer` ends at
+     `stage=Files` with `InvalidAnswer` and `BriefSized` is none, three
+     times, so jig's brief child fails the required Pull section
+     (`jig-domain-brief/src/orchestrated.rs:322-329`, then
+     `children.rs:68-74`). `BriefStage::Files` is the whole
+     `api::Read::PullFiles` operation of
+     `temper-engine-protocol-forge/src/contents.rs`, whose plan rereads
+     the pull, lists the files and reads each side, with about a dozen
+     `InvalidAnswer` returns. So 15.3 makes one more process run through
+     `heavy --gate`, with temporary `eprintln!` lines at `contents.rs`'s
+     `heard`, `row`, `done`, `next_side` and `side` returns of
+     `InvalidAnswer`, and at the domain client's operation and answer
+     check (`temper-engine-domain-forge-client/src/calls.rs`), each
+     printing its line number, the HTTP status, the document's or row's
+     kind, the presence and format checks, counts and byte sizes, never
+     a value. Then, the site named, 15.3 fixes it as ruling 147 says, and
+     adds one test in the fixed crate that meets the same answer below the
+     process tier (a document of the same shape, its values made up, the
+     test named for the behaviour), outside the 20 production lines; then
+     the process proof runs once. If this run names no site, 15.3 asks
+     with its log and makes no further run. Rulings 147's and 149's other
+     terms hold.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
