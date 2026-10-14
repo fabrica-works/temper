@@ -2,7 +2,7 @@ use super::{Encoded, Refusal};
 use crate::{
     decode::{
         Malformed, Step,
-        walk::{Kind, Move},
+        walk::{Kind, Move, Value},
     },
     document::{self, ApiSettings, Document, Repository, Row, User},
     id::ObjectFormat,
@@ -10,7 +10,7 @@ use crate::{
     path,
     request::{Method, Request},
 };
-use skein_json::{Token, tokenizer};
+use skein_json::tokenizer;
 use skein_lib::{Decimal, Writer};
 pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     let length = match request {
@@ -27,6 +27,12 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
             }
             size
         }
+        Request::Issues { .. }
+        | Request::Issue { .. }
+        | Request::Comments { .. }
+        | Request::Pull { .. }
+        | Request::PullFor { .. }
+        | Request::CombinedStatus { .. } => unreachable!("start encoder dispatch"),
     };
     if length > usize::try_from(limits.target_bytes).expect("u32 fits") {
         return Err(Refusal::TooLong);
@@ -63,6 +69,12 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
             }
             Ok(())
         }
+        Request::Issues { .. }
+        | Request::Issue { .. }
+        | Request::Comments { .. }
+        | Request::Pull { .. }
+        | Request::PullFor { .. }
+        | Request::CombinedStatus { .. } => unreachable!("start encoder dispatch"),
     }
 }
 #[derive(Debug)]
@@ -83,10 +95,10 @@ impl Start {
             ok: false,
         }
     }
-    pub(super) fn step(&mut self, movement: Move, parent: Option<Kind>, event: &tokenizer::Event) -> Step {
+    pub(super) fn step(&mut self, movement: Move, parent: Option<Kind>) -> Step {
         match movement {
             Move::Demand(demand) => Step::Demand(demand),
-            Move::Scalar { kind, key } => match self.scalar(kind, key, event) {
+            Move::Scalar { kind, key, value } => match self.scalar(kind, key, value) {
                 Ok(()) => Step::Demand(tokenizer::Request::Next),
                 Err(error) => Step::Malformed(error),
             },
@@ -99,9 +111,11 @@ impl Start {
                     let user = core::mem::replace(&mut self.user, document::user());
                     Step::Row(Row::User(user), tokenizer::Request::Next)
                 }
-                None | Some(Kind::User | Kind::Settings | Kind::Search) => Step::Demand(tokenizer::Request::Next),
+                None | Some(Kind::User | Kind::Settings | Kind::Search | Kind::Item(_)) => {
+                    Step::Demand(tokenizer::Request::Next)
+                }
             },
-            Move::End(Kind::Settings | Kind::Repository | Kind::Search | Kind::Users) => {
+            Move::End(Kind::Settings | Kind::Repository | Kind::Search | Kind::Users | Kind::Item(_)) => {
                 Step::Demand(tokenizer::Request::Next)
             }
             Move::Done => {
@@ -112,78 +126,61 @@ impl Start {
                         Document::Repository(core::mem::replace(&mut self.repo, document::repository()))
                     }
                     Kind::Search => Document::Search { ok: self.ok },
-                    Kind::Users => unreachable!("no standalone users answer"),
+                    Kind::Users | Kind::Item(_) => unreachable!("start decoder selection"),
                 };
                 Step::Done(document)
             }
         }
     }
-    fn scalar(&mut self, kind: Kind, key: &'static [u8], event: &tokenizer::Event) -> Result<(), Malformed> {
-        match event {
-            tokenizer::Event::Token(Token::Number(text)) => {
-                let number = crate::id::unsigned(text).ok_or(Malformed::Range { field: key })?;
-                match kind {
-                    Kind::User => self.user.id = number,
-                    Kind::Repository => self.repo.id = number,
-                    Kind::Settings => {
-                        let Ok(n) = u32::try_from(number) else {
-                            return Err(Malformed::Range { field: key });
-                        };
-                        match key {
-                            b"max_response_items" => self.settings.max_response_items = n,
-                            b"default_paging_num" => self.settings.default_paging_num = n,
-                            _ => unreachable!("settings table"),
-                        }
+    fn scalar(&mut self, kind: Kind, key: &'static [u8], value: Value) -> Result<(), Malformed> {
+        match value {
+            Value::Number(number) => match kind {
+                Kind::User => self.user.id = number,
+                Kind::Repository => self.repo.id = number,
+                Kind::Settings => {
+                    let Ok(n) = u32::try_from(number) else {
+                        return Err(Malformed::Range { field: key });
+                    };
+                    match key {
+                        b"max_response_items" => self.settings.max_response_items = n,
+                        b"default_paging_num" => self.settings.default_paging_num = n,
+                        _ => unreachable!("settings table"),
                     }
-                    Kind::Search | Kind::Users => unreachable!("number table"),
                 }
-            }
-            tokenizer::Event::Token(Token::String(text)) => match kind {
-                Kind::User => self.user.login.clone_from(text),
+                Kind::Search | Kind::Users | Kind::Item(_) => unreachable!("number table"),
+            },
+            Value::Text(text) => match kind {
+                Kind::User => self.user.login = text,
                 Kind::Repository => match key {
-                    b"name" => self.repo.name.clone_from(text),
-                    b"default_branch" => self.repo.default_branch.clone_from(text),
-                    b"html_url" => self.repo.html_url.clone_from(text),
+                    b"name" => self.repo.name = text,
+                    b"default_branch" => self.repo.default_branch = text,
+                    b"html_url" => self.repo.html_url = text,
                     b"object_format_name" => {
-                        self.repo.object_format = match &**text {
+                        self.repo.object_format = match &*text {
                             b"sha1" => ObjectFormat::Sha1,
                             b"sha256" => ObjectFormat::Sha256,
                             _ => return Err(Malformed::Value { field: key }),
                         }
                     }
                     b"default_merge_style" => {
-                        self.repo.default_merge_style = document::style(text).ok_or(Malformed::Value { field: key })?;
+                        self.repo.default_merge_style =
+                            document::style(&text).ok_or(Malformed::Value { field: key })?;
                     }
                     _ => unreachable!("repository string table"),
                 },
-                Kind::Settings | Kind::Search | Kind::Users => unreachable!("string table"),
+                Kind::Settings | Kind::Search | Kind::Users | Kind::Item(_) => unreachable!("string table"),
             },
-            tokenizer::Event::Token(Token::True | Token::False) => {
-                let value = event == &tokenizer::Event::Token(Token::True);
-                match kind {
-                    Kind::Search => self.ok = value,
-                    Kind::Repository => match key {
-                        b"allow_merge_commits" => self.repo.allow_merge_commits = value,
-                        b"allow_squash_merge" => self.repo.allow_squash_merge = value,
-                        b"allow_rebase" => self.repo.allow_rebase = value,
-                        _ => unreachable!("repository bool table"),
-                    },
-                    Kind::User | Kind::Settings | Kind::Users => unreachable!("boolean table"),
-                }
-            }
-            tokenizer::Event::Token(
-                Token::ObjectStart
-                | Token::ObjectEnd
-                | Token::ArrayStart
-                | Token::ArrayEnd
-                | Token::Key(_)
-                | Token::Null,
-            )
-            | tokenizer::Event::Long(_)
-            | tokenizer::Event::Skipped(_)
-            | tokenizer::Event::Done
-            | tokenizer::Event::Failed(_)
-            | tokenizer::Event::Closed => unreachable!("walker validates scalar types"),
+            Value::Boolean(value) => match kind {
+                Kind::Search => self.ok = value,
+                Kind::Repository => match key {
+                    b"allow_merge_commits" => self.repo.allow_merge_commits = value,
+                    b"allow_squash_merge" => self.repo.allow_squash_merge = value,
+                    b"allow_rebase" => self.repo.allow_rebase = value,
+                    _ => unreachable!("repository bool table"),
+                },
+                Kind::User | Kind::Settings | Kind::Users | Kind::Item(_) => unreachable!("boolean table"),
+            },
+            Value::Body(_) | Value::Time(_) | Value::Id(_) => unreachable!("start scalar table"),
         }
         Ok(())
     }

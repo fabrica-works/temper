@@ -17,11 +17,64 @@ pub struct Page {
     pub page: Option<u32>,
     pub limit: Option<u32>,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StateFilter {
+    Open,
+    Closed,
+    All,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum IssueKind {
+    Issues,
+    Pulls,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Sort {
+    LeastUpdate,
+    Other,
+}
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
     User,
     ApiSettings,
-    RepositoryById { id: u64 },
-    Repository { at: Repo },
-    UserSearch { uid: u64, limit: Option<u32> },
+    RepositoryById {
+        id: u64,
+    },
+    Repository {
+        at: Repo,
+    },
+    UserSearch {
+        uid: u64,
+        limit: Option<u32>,
+    },
+    Issues {
+        at: Repo,
+        state: Option<StateFilter>,
+        kind: Option<IssueKind>,
+        since: Option<skein_lib::Wall>,
+        sort: Option<Sort>,
+        page: Page,
+    },
+    Issue {
+        at: Repo,
+        number: u64,
+    },
+    Comments {
+        at: Repo,
+        number: u64,
+    },
+    Pull {
+        at: Repo,
+        number: u64,
+    },
+    PullFor {
+        at: Repo,
+        base: Box<[u8]>,
+        head: Box<[u8]>,
+    },
+    CombinedStatus {
+        at: Repo,
+        commit: crate::id::ObjectId,
+        page: Page,
+    },
 }

@@ -120,3 +120,47 @@ pub fn write(wall: Wall) -> [u8; 20] {
     }
     output
 }
+/// Reads IMF-fixdate, the only HTTP date syntax used by these documents.
+#[must_use]
+pub fn http_date(text: &[u8]) -> Option<Wall> {
+    if text.len() != 29
+        || text.get(3..5) != Some(b", ")
+        || text.get(7) != Some(&b' ')
+        || text.get(11) != Some(&b' ')
+        || text.get(16) != Some(&b' ')
+        || text.get(25..) != Some(b" GMT")
+    {
+        return None;
+    }
+    match text.get(..3)? {
+        b"Mon" | b"Tue" | b"Wed" | b"Thu" | b"Fri" | b"Sat" | b"Sun" => {}
+        _ => return None,
+    }
+    let month = match text.get(8..11)? {
+        b"Jan" => b"01",
+        b"Feb" => b"02",
+        b"Mar" => b"03",
+        b"Apr" => b"04",
+        b"May" => b"05",
+        b"Jun" => b"06",
+        b"Jul" => b"07",
+        b"Aug" => b"08",
+        b"Sep" => b"09",
+        b"Oct" => b"10",
+        b"Nov" => b"11",
+        b"Dec" => b"12",
+        _ => return None,
+    };
+    let mut date = *b"0000-00-00T00:00:00Z";
+    for (from, to, width) in [(12usize, 0usize, 4usize), (5, 8, 2), (17, 11, 8)] {
+        for (input, output) in
+            text.get(from..from.checked_add(width)?)?.iter().zip(date.get_mut(to..to.checked_add(width)?)?.iter_mut())
+        {
+            *output = *input;
+        }
+    }
+    for (output, input) in date.get_mut(5..7)?.iter_mut().zip(month.iter()) {
+        *output = *input;
+    }
+    read(&date)
+}

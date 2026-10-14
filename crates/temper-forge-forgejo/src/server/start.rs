@@ -59,7 +59,7 @@ fn query(pairs: &[Pair], key: &[u8]) -> Option<Box<[u8]>> {
     }
     None
 }
-fn user(json: &mut Encoder, user: &User) {
+pub(super) fn user(json: &mut Encoder, user: &User) {
     json.object_start();
     json.key(b"id");
     json.unsigned(user.id);
@@ -117,5 +117,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.boolean(*ok);
             json.object_end();
         }
+        Answer::Issues(_)
+        | Answer::Issue(_)
+        | Answer::Comments(_)
+        | Answer::Pull(_)
+        | Answer::CombinedStatus { .. } => unreachable!("start answer dispatch"),
     }
 }

@@ -44,6 +44,11 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::ApiSettings(value) => (Document::ApiSettings(value), vec![]),
         Answer::Repository(value) => (Document::Repository(value), vec![]),
         Answer::Search { ok, data } => (Document::Search { ok }, data.into_vec().into_iter().map(Row::User).collect()),
+        Answer::Issues(_)
+        | Answer::Issue(_)
+        | Answer::Comments(_)
+        | Answer::Pull(_)
+        | Answer::CombinedStatus { .. } => panic!("a start answer"),
     }
 }
 #[test]

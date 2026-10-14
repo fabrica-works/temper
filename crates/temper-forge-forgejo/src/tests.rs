@@ -144,3 +144,70 @@ fn target_bounds_and_malformed_escapes_are_refused_before_routing() {
         crate::server::Unrouted::NotFound
     );
 }
+#[test]
+fn a_comment_at_or_below_after_is_skipped_body_unread() {
+    let limits = fixtures::small();
+    let request = Request::Comments {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        number: 3,
+    };
+    let mut machine = client::decoder(&request, &limits).unwrap();
+    client::keep_after(&mut machine, 4);
+    let result=fixtures::decode(machine,br#"[{"id":4,"user":{"id":2,"login":"writer"},"body":"12345678901234567"},{"id":5,"user":{"id":2,"login":"writer"},"body":"new"}]"#,&limits);
+    assert_eq!(result.document, Ok(Document::Listed { skipped: 0 }));
+    assert_eq!(
+        result.rows.as_slice(),
+        &[crate::document::Row::Comment(crate::document::Comment {
+            id: 5,
+            user: crate::document::User { id: 2, login: Box::from(*b"writer") },
+            created_at: None,
+            updated_at: None,
+            body: Body::Kept(Box::from(*b"new"))
+        })]
+    );
+}
+#[test]
+fn a_cut_thread_counts_the_comments_it_skipped() {
+    let limits = fixtures::limits();
+    let request = Request::Comments {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        number: 3,
+    };
+    let machine = client::decoder(&request, &limits).unwrap();
+    let result=fixtures::decode_cut(machine,br#"[{"id":1,"user":{"id":2,"login":"writer"},"body":"first"},{"id":2,"body":"second"},{"id":3,"body":"third"}]"#,&limits,1);
+    assert_eq!(result.document, Ok(Document::Listed { skipped: 2 }));
+    assert_eq!(result.rows.len(), 1);
+}
+#[test]
+fn a_pull_request_object_makes_an_issue_a_pull_and_null_does_not() {
+    let limits = fixtures::limits();
+    for (suffix, pull) in [(b",\"pull_request\":{}".as_slice(), true), (b",\"pull_request\":null", false), (b"", false)]
+    {
+        let prefix=br#"{"number":1,"state":"open","user":{"id":1,"login":"fixture"},"labels":[],"updated_at":"2020-01-01T00:00:00Z","title":"title","body":"body""#;
+        let mut out = Writer::new(prefix.len().saturating_add(suffix.len()).saturating_add(1));
+        out.put(prefix).unwrap();
+        out.put(suffix).unwrap();
+        out.put(b"}").unwrap();
+        let bytes = out.finish();
+        let request = Request::Issue {
+            at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+            number: 1,
+        };
+        let machine = client::decoder(&request, &limits).unwrap();
+        let result = fixtures::decode(machine, &bytes, &limits);
+        let Document::Issue(value) = result.document.unwrap() else { panic!("an issue") };
+        assert_eq!(value.pull, pull, "{suffix:?}");
+    }
+}
+#[test]
+fn http_dates_read_imf_fixdate_and_nothing_else() {
+    for (text, expected) in [
+        (b"Wed, 01 Jan 2020 00:00:00 GMT".as_slice(), Some(Wall::from_nanos(1_577_836_800_000_000_000))),
+        (b"Sunday, 06-Nov-94 08:49:37 GMT", None),
+        (b"Sun Nov  6 08:49:37 1994", None),
+        (b"Wed, 32 Jan 2020 00:00:00 GMT", None),
+        (b"Wed, 01 Jan 2020 00:00:00 UTC", None),
+    ] {
+        assert_eq!(time::http_date(text), expected, "{text:?}");
+    }
+}

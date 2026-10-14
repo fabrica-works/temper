@@ -1,8 +1,26 @@
 //! Static object tables, required masks and a bounded container stack.
 use super::Malformed;
-use crate::limits::Limits;
+use crate::{document::Body, id::ObjectId, limits::Limits};
+use alloc::boxed::Box;
 use skein_json::{Token, tokenizer};
-use skein_lib::Stack;
+use skein_lib::{Stack, Wall};
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Item {
+    Issue,
+    Issues,
+    Comment,
+    Comments,
+    Pull,
+    Head,
+    Base,
+    Status,
+    Statuses,
+    Combined,
+    Label,
+    Labels,
+    Reviewers,
+    Presence,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Kind {
     User,
@@ -10,12 +28,16 @@ pub(crate) enum Kind {
     Repository,
     Search,
     Users,
+    Item(Item),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Read {
     Number,
     Text,
     Boolean,
+    Body,
+    Time,
+    Id { empty: bool },
     Object(Kind),
     Array(Kind),
 }
@@ -23,30 +45,129 @@ pub(crate) enum Read {
 pub(crate) struct Field {
     pub key: &'static [u8],
     pub read: Read,
+    pub required: bool,
+}
+const fn field(key: &'static [u8], read: Read) -> Field {
+    Field { key, read, required: true }
+}
+const fn optional(key: &'static [u8], read: Read) -> Field {
+    Field { key, read, required: false }
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
-        Kind::User => &[Field { key: b"id", read: Read::Number }, Field { key: b"login", read: Read::Text }],
-        Kind::Settings => &[
-            Field { key: b"max_response_items", read: Read::Number },
-            Field { key: b"default_paging_num", read: Read::Number },
-        ],
-        Kind::Repository => &[
-            Field { key: b"id", read: Read::Number },
-            Field { key: b"owner", read: Read::Object(Kind::User) },
-            Field { key: b"name", read: Read::Text },
-            Field { key: b"object_format_name", read: Read::Text },
-            Field { key: b"default_branch", read: Read::Text },
-            Field { key: b"default_merge_style", read: Read::Text },
-            Field { key: b"allow_merge_commits", read: Read::Boolean },
-            Field { key: b"allow_squash_merge", read: Read::Boolean },
-            Field { key: b"allow_rebase", read: Read::Boolean },
-            Field { key: b"html_url", read: Read::Text },
-        ],
-        Kind::Search => {
-            &[Field { key: b"data", read: Read::Array(Kind::Users) }, Field { key: b"ok", read: Read::Boolean }]
+        Kind::User => const { &[field(b"id", Read::Number), field(b"login", Read::Text)] },
+        Kind::Settings => {
+            const { &[field(b"max_response_items", Read::Number), field(b"default_paging_num", Read::Number)] }
         }
-        Kind::Users => &[],
+        Kind::Repository => {
+            const {
+                &[
+                    field(b"id", Read::Number),
+                    field(b"owner", Read::Object(Kind::User)),
+                    field(b"name", Read::Text),
+                    field(b"object_format_name", Read::Text),
+                    field(b"default_branch", Read::Text),
+                    field(b"default_merge_style", Read::Text),
+                    field(b"allow_merge_commits", Read::Boolean),
+                    field(b"allow_squash_merge", Read::Boolean),
+                    field(b"allow_rebase", Read::Boolean),
+                    field(b"html_url", Read::Text),
+                ]
+            }
+        }
+        Kind::Search => const { &[field(b"data", Read::Array(Kind::Users)), field(b"ok", Read::Boolean)] },
+        Kind::Item(Item::Issue) => {
+            const {
+                &[
+                    field(b"number", Read::Number),
+                    optional(b"pull_request", Read::Object(Kind::Item(Item::Presence))),
+                    field(b"state", Read::Text),
+                    field(b"user", Read::Object(Kind::User)),
+                    field(b"labels", Read::Array(Kind::Item(Item::Labels))),
+                    field(b"updated_at", Read::Time),
+                    field(b"title", Read::Text),
+                    field(b"body", Read::Body),
+                ]
+            }
+        }
+        Kind::Item(Item::Comment) => {
+            const {
+                &[
+                    field(b"id", Read::Number),
+                    field(b"user", Read::Object(Kind::User)),
+                    optional(b"created_at", Read::Time),
+                    optional(b"updated_at", Read::Time),
+                    field(b"body", Read::Body),
+                ]
+            }
+        }
+        Kind::Item(Item::Pull) => {
+            const {
+                &[
+                    field(b"number", Read::Number),
+                    field(b"state", Read::Text),
+                    field(b"head", Read::Object(Kind::Item(Item::Head))),
+                    field(b"base", Read::Object(Kind::Item(Item::Base))),
+                    field(b"merged", Read::Boolean),
+                    optional(b"merge_commit_sha", Read::Id { empty: false }),
+                    optional(b"merge_base", Read::Id { empty: false }),
+                    field(b"mergeable", Read::Boolean),
+                    field(b"requested_reviewers", Read::Array(Kind::Item(Item::Reviewers))),
+                ]
+            }
+        }
+        Kind::Item(Item::Head) => const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: false })] },
+        Kind::Item(Item::Base) => const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: true })] },
+        Kind::Item(Item::Status) => {
+            const {
+                &[
+                    field(b"creator", Read::Object(Kind::User)),
+                    field(b"updated_at", Read::Time),
+                    field(b"context", Read::Text),
+                    field(b"status", Read::Text),
+                    field(b"description", Read::Text),
+                    field(b"target_url", Read::Text),
+                ]
+            }
+        }
+        Kind::Item(Item::Combined) => {
+            const {
+                &[
+                    field(b"state", Read::Text),
+                    field(b"total_count", Read::Number),
+                    field(b"statuses", Read::Array(Kind::Item(Item::Statuses))),
+                ]
+            }
+        }
+        Kind::Item(Item::Label) => const { &[field(b"name", Read::Text)] },
+        Kind::Users
+        | Kind::Item(
+            Item::Issues | Item::Comments | Item::Statuses | Item::Labels | Item::Reviewers | Item::Presence,
+        ) => const { &[] },
+    }
+}
+fn element(kind: Kind) -> Option<Kind> {
+    match kind {
+        Kind::Users | Kind::Item(Item::Reviewers) => Some(Kind::User),
+        Kind::Item(Item::Issues) => Some(Kind::Item(Item::Issue)),
+        Kind::Item(Item::Comments) => Some(Kind::Item(Item::Comment)),
+        Kind::Item(Item::Statuses) => Some(Kind::Item(Item::Status)),
+        Kind::Item(Item::Labels) => Some(Kind::Item(Item::Label)),
+        Kind::User
+        | Kind::Settings
+        | Kind::Repository
+        | Kind::Search
+        | Kind::Item(
+            Item::Issue
+            | Item::Comment
+            | Item::Pull
+            | Item::Head
+            | Item::Base
+            | Item::Status
+            | Item::Combined
+            | Item::Label
+            | Item::Presence,
+        ) => None,
     }
 }
 #[derive(Debug)]
@@ -64,26 +185,49 @@ enum Want {
     Element,
     Done,
     Terminal,
+    Cut,
 }
 #[derive(Debug)]
 pub(crate) struct Walk {
     open: Stack<Frame>,
     want: Want,
+    skip_row: bool,
+    skipped: u32,
+}
+#[derive(Debug)]
+pub(crate) enum Value {
+    Number(u64),
+    Text(Box<[u8]>),
+    Boolean(bool),
+    Body(Body),
+    Time(Wall),
+    Id(Option<ObjectId>),
 }
 #[derive(Debug)]
 pub(crate) enum Move {
     Demand(tokenizer::Request),
-    Scalar { kind: Kind, key: &'static [u8] },
+    Scalar { kind: Kind, key: &'static [u8], value: Value },
     End(Kind),
     Done,
 }
 impl Walk {
+    pub(crate) fn skipped(&self) -> u32 {
+        self.skipped
+    }
     pub(crate) fn new(kind: Kind, limits: &Limits) -> Self {
-        Self { open: Stack::with_capacity(limits.json.depth), want: Want::Start(kind) }
+        Self { open: Stack::with_capacity(limits.json.depth), want: Want::Start(kind), skip_row: false, skipped: 0 }
     }
     pub(crate) fn parent(&self) -> Option<Kind> {
         let frame = self.open.top()?;
         Some(frame.kind)
+    }
+    pub(crate) fn skip_comment(&mut self) {
+        self.skip_row = true;
+    }
+    pub(crate) fn cut(&mut self) -> tokenizer::Request {
+        assert!(self.parent() == Some(Kind::Item(Item::Comments)), "cut at an unpaged thread's row boundary");
+        self.want = Want::Cut;
+        tokenizer::Request::Skip
     }
     pub(crate) fn step(&mut self, event: &tokenizer::Event, limits: &Limits) -> Result<Move, Malformed> {
         match event {
@@ -115,9 +259,23 @@ impl Walk {
                 if event == &tokenizer::Event::Token(Token::ArrayEnd) {
                     self.end()
                 } else {
-                    self.start(Kind::User, event)
+                    let kind = element(self.parent().expect("array element")).expect("array kind");
+                    self.start(kind, event)
                 }
             }
+            Want::Cut => match event {
+                tokenizer::Event::Token(Token::ArrayEnd) => self.end(),
+                tokenizer::Event::Skipped(_) => {
+                    self.skipped = self.skipped.saturating_add(1);
+                    self.want = Want::Cut;
+                    Ok(Move::Demand(tokenizer::Request::Skip))
+                }
+                tokenizer::Event::Token(_)
+                | tokenizer::Event::Long(_)
+                | tokenizer::Event::Done
+                | tokenizer::Event::Failed(_)
+                | tokenizer::Event::Closed => Err(Malformed::Shape { field: b"" }),
+            },
             Want::Done => {
                 if event == &tokenizer::Event::Done {
                     Ok(Move::Done)
@@ -129,27 +287,29 @@ impl Walk {
         }
     }
     fn start(&mut self, kind: Kind, event: &tokenizer::Event) -> Result<Move, Malformed> {
-        let expected = match kind {
-            Kind::Users => Token::ArrayStart,
-            Kind::User | Kind::Settings | Kind::Repository | Kind::Search => Token::ObjectStart,
-        };
+        let array = element(kind).is_some();
+        let expected = if array { Token::ArrayStart } else { Token::ObjectStart };
         if event != &tokenizer::Event::Token(expected) {
             return Err(Malformed::Shape { field: b"" });
         }
         if self.open.push(Frame { kind, touched: 0, seen: 0 }).is_err() {
             return Err(Malformed::Json(tokenizer::Error::TooDeep));
         }
-        self.want = match kind {
-            Kind::Users => Want::Element,
-            Kind::User | Kind::Settings | Kind::Repository | Kind::Search => Want::Key,
-        };
+        if kind == Kind::Item(Item::Comment) {
+            self.skip_row = false;
+        }
+        self.want = if array { Want::Element } else { Want::Key };
         Ok(Move::Demand(tokenizer::Request::Next))
     }
     fn key(&mut self, event: &tokenizer::Event, limits: &Limits) -> Result<Move, Malformed> {
         match event {
             tokenizer::Event::Token(Token::ObjectEnd) => self.end(),
             tokenizer::Event::Token(Token::Key(key)) => {
-                let frame = self.open.top_mut().expect("key inside an object");
+                let frame = self.open.top_mut().expect("key inside object");
+                if self.skip_row && frame.kind == Kind::Item(Item::Comment) {
+                    self.want = Want::Skip;
+                    return Ok(Move::Demand(tokenizer::Request::Skip));
+                }
                 for (index, field) in fields(frame.kind).iter().enumerate() {
                     if field.key == &**key {
                         let bit =
@@ -160,7 +320,8 @@ impl Walk {
                         frame.touched |= bit;
                         self.want = Want::Value { field: *field, bit };
                         let demand = match field.read {
-                            Read::Text => tokenizer::Request::Text(limits.string_bytes),
+                            Read::Text | Read::Time | Read::Id { .. } => tokenizer::Request::Text(limits.string_bytes),
+                            Read::Body => tokenizer::Request::Text(limits.body_bytes),
                             Read::Number | Read::Boolean | Read::Object(_) | Read::Array(_) => tokenizer::Request::Next,
                         };
                         return Ok(Move::Demand(demand));
@@ -187,59 +348,94 @@ impl Walk {
         }
     }
     fn value(&mut self, field: Field, bit: u64, event: &tokenizer::Event) -> Result<Move, Malformed> {
+        let frame = self.open.top_mut().expect("value inside object");
+        let kind = frame.kind;
         if event == &tokenizer::Event::Token(Token::Null) {
+            if field.key == b"statuses" {
+                frame.seen |= bit;
+            }
             self.want = Want::Key;
             return Ok(Move::Demand(tokenizer::Request::Next));
         }
-        let frame = self.open.top_mut().expect("value inside an object");
         frame.seen |= bit;
-        let kind = frame.kind;
         match field.read {
             Read::Object(child) | Read::Array(child) => match self.start(child, event) {
                 Ok(result) => Ok(result),
                 Err(Malformed::Shape { .. }) => Err(Malformed::Shape { field: field.key }),
                 Err(error) => Err(error),
             },
-            Read::Number | Read::Text | Read::Boolean => {
-                let actual = match event {
-                    tokenizer::Event::Token(Token::Number(_)) => Read::Number,
-                    tokenizer::Event::Token(Token::String(_)) => Read::Text,
-                    tokenizer::Event::Token(Token::True | Token::False) => Read::Boolean,
-                    tokenizer::Event::Long(_) => return Err(Malformed::TooLong { field: field.key }),
-                    tokenizer::Event::Token(
-                        Token::ObjectStart
-                        | Token::ObjectEnd
-                        | Token::ArrayStart
-                        | Token::ArrayEnd
-                        | Token::Key(_)
-                        | Token::Null,
-                    )
-                    | tokenizer::Event::Skipped(_)
-                    | tokenizer::Event::Done
-                    | tokenizer::Event::Failed(_)
-                    | tokenizer::Event::Closed => return Err(Malformed::Shape { field: field.key }),
-                };
-                if actual != field.read {
-                    return Err(Malformed::Shape { field: field.key });
-                }
+            Read::Number | Read::Text | Read::Boolean | Read::Body | Read::Time | Read::Id { .. } => {
+                let value = scalar(field, event)?;
                 self.want = Want::Key;
-                Ok(Move::Scalar { kind, key: field.key })
+                Ok(Move::Scalar { kind, key: field.key, value })
             }
         }
     }
     fn end(&mut self) -> Result<Move, Malformed> {
         let frame = self.open.pop().expect("container end");
-        for (index, field) in fields(frame.kind).iter().enumerate() {
-            let bit = 1u64.checked_shl(u32::try_from(index).expect("field index")).expect("field mask");
-            if frame.seen & bit == 0 {
-                return Err(Malformed::Missing { field: field.key });
+        if !(self.skip_row && frame.kind == Kind::Item(Item::Comment)) {
+            for (index, field) in fields(frame.kind).iter().enumerate() {
+                let bit = 1u64.checked_shl(u32::try_from(index).expect("field index")).expect("field mask");
+                if field.required && frame.seen & bit == 0 {
+                    return Err(Malformed::Missing { field: field.key });
+                }
             }
         }
         self.want = match self.parent() {
             None => Want::Done,
-            Some(Kind::Users) => Want::Element,
-            Some(Kind::User | Kind::Settings | Kind::Repository | Kind::Search) => Want::Key,
+            Some(kind) => {
+                if element(kind).is_some() {
+                    Want::Element
+                } else {
+                    Want::Key
+                }
+            }
         };
         Ok(Move::End(frame.kind))
+    }
+}
+fn scalar(field: Field, event: &tokenizer::Event) -> Result<Value, Malformed> {
+    let wrong = Malformed::Shape { field: field.key };
+    match event {
+        tokenizer::Event::Token(Token::Number(text)) => {
+            if field.read != Read::Number {
+                return Err(wrong);
+            }
+            Ok(Value::Number(crate::id::unsigned(text).ok_or(Malformed::Range { field: field.key })?))
+        }
+        tokenizer::Event::Token(Token::String(text)) => match field.read {
+            Read::Text => Ok(Value::Text(text.clone())),
+            Read::Body => Ok(Value::Body(Body::Kept(text.clone()))),
+            Read::Time => Ok(Value::Time(crate::time::read(text).ok_or(Malformed::Time { field: field.key })?)),
+            Read::Id { empty } => {
+                let value = if empty && text.is_empty() {
+                    None
+                } else {
+                    Some(crate::id::read(text).ok_or(Malformed::Id { field: field.key })?)
+                };
+                Ok(Value::Id(value))
+            }
+            Read::Number | Read::Boolean | Read::Object(_) | Read::Array(_) => Err(wrong),
+        },
+        tokenizer::Event::Token(Token::True | Token::False) => {
+            if field.read != Read::Boolean {
+                return Err(wrong);
+            }
+            Ok(Value::Boolean(event == &tokenizer::Event::Token(Token::True)))
+        }
+        tokenizer::Event::Long(length) => {
+            if field.read == Read::Body {
+                Ok(Value::Body(Body::Long(*length)))
+            } else {
+                Err(Malformed::TooLong { field: field.key })
+            }
+        }
+        tokenizer::Event::Token(
+            Token::ObjectStart | Token::ObjectEnd | Token::ArrayStart | Token::ArrayEnd | Token::Key(_) | Token::Null,
+        )
+        | tokenizer::Event::Skipped(_)
+        | tokenizer::Event::Done
+        | tokenizer::Event::Failed(_)
+        | tokenizer::Event::Closed => Err(wrong),
     }
 }

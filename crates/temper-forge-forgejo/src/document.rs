@@ -1,6 +1,7 @@
 //! Typed fields retained from Forgejo's answers.
-use super::id::ObjectFormat;
+use super::id::{ObjectFormat, ObjectId};
 use alloc::boxed::Box;
+use skein_lib::Wall;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Body {
     Kept(Box<[u8]>),
@@ -65,6 +66,9 @@ pub struct Repository {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Row {
     User(User),
+    Issue(Issue),
+    Comment(Comment),
+    Status(CommitStatus),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
@@ -72,6 +76,74 @@ pub enum Document {
     ApiSettings(ApiSettings),
     Repository(Repository),
     Search { ok: bool },
+    Listed { skipped: u32 },
+    Issue(Issue),
+    Pull(PullRequest),
+    CombinedStatus(CombinedStatus),
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum IssueState {
+    Open,
+    Closed,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Issue {
+    pub number: u64,
+    pub pull: bool,
+    pub state: IssueState,
+    pub user: User,
+    pub labels: Box<[Box<[u8]>]>,
+    pub updated_at: Wall,
+    pub title: Box<[u8]>,
+    pub body: Body,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Comment {
+    pub id: u64,
+    pub user: User,
+    pub created_at: Option<Wall>,
+    pub updated_at: Option<Wall>,
+    pub body: Body,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct PullBranch {
+    pub name: Box<[u8]>,
+    pub sha: Option<ObjectId>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct PullRequest {
+    pub number: u64,
+    pub state: IssueState,
+    pub head: PullBranch,
+    pub base: PullBranch,
+    pub merged: bool,
+    pub merge_commit_sha: Option<ObjectId>,
+    pub merge_base: Option<ObjectId>,
+    pub mergeable: bool,
+    pub requested_reviewers: Box<[User]>,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StatusState {
+    Pending,
+    Success,
+    Error,
+    Failure,
+    Warning,
+    Skipped,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct CombinedStatus {
+    pub state: Option<StatusState>,
+    pub total_count: u64,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct CommitStatus {
+    pub creator: User,
+    pub updated_at: Wall,
+    pub context: Box<[u8]>,
+    pub status: StatusState,
+    pub description: Box<[u8]>,
+    pub target_url: Box<[u8]>,
 }
 pub(crate) fn user() -> User {
     User { id: 0, login: Box::from([]) }

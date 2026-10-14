@@ -52,7 +52,13 @@ pub struct Decoded {
     pub rows: List<Row>,
     pub document: Result<Document, Malformed>,
 }
-pub fn decode(mut decoder: client::Decoder, body: &[u8], limits: &Limits) -> Decoded {
+pub fn decode(decoder: client::Decoder, body: &[u8], limits: &Limits) -> Decoded {
+    drive(decoder, body, limits, None)
+}
+pub fn decode_cut(decoder: client::Decoder, body: &[u8], limits: &Limits, after_rows: u32) -> Decoded {
+    drive(decoder, body, limits, Some(after_rows))
+}
+fn drive(mut decoder: client::Decoder, body: &[u8], limits: &Limits, cut_at: Option<u32>) -> Decoded {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.json };
     let mut tokenizer = tokenizer::Tokenizer::new(&limits.json);
     let mut above = Queue::with_capacity(1);
@@ -85,7 +91,7 @@ pub fn decode(mut decoder: client::Decoder, body: &[u8], limits: &Limits) -> Dec
                 Step::Demand(next) => demand = next,
                 Step::Row(row, next) => {
                     rows.push(row).expect("test rows");
-                    demand = next;
+                    demand = if cut_at == Some(rows.len()) { client::cut(&mut decoder) } else { next };
                 }
                 Step::Done(document) => return Decoded { rows, document: Ok(document) },
                 Step::Malformed(error) => return Decoded { rows, document: Err(error) },
