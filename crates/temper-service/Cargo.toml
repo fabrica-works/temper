@@ -45,6 +45,7 @@ temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-issues.workspace = true
 temper-worker-domain-checkout.workspace = true
 temper-worker-domain.workspace = true
+temper-worker-protocol-git.workspace = true
 
 [dev-dependencies]
 smith-transcript.workspace = true

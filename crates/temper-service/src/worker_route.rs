@@ -322,3 +322,84 @@ fn channel(event: smith_host_protocol::OpenEvent) -> Option<smith::Up> {
         | OpenEvent::Unsent { .. } => return None,
     })
 }
+
+/// Workspace items named by the assignment, decoded before entering the root.
+pub fn items(
+    assignment: &hub::Assignment,
+    parts: &[jig_protocol_worker_wire::Part],
+    limits: &temper_protocol_worker_wire::v1::Limits,
+) -> Result<crate::translate::Assigned, temper_worker_domain::wire::Undecodable> {
+    let Some(workspace) = &assignment.assignment.workspace else { return Ok(crate::translate::workspace(None)) };
+    let bytes = part(workspace.items, parts).ok_or(temper_worker_domain::wire::Undecodable)?;
+    let mut reader = Reader::new(bytes);
+    let items = temper_protocol_worker_wire::v1::Items::decode(limits, &mut reader)
+        .or(Err(temper_worker_domain::wire::Undecodable))?;
+    if !reader.is_empty() {
+        return Err(temper_worker_domain::wire::Undecodable);
+    }
+    Ok(crate::translate::workspace(Some(&items)))
+}
+fn part(token: Token, parts: &[jig_protocol_worker_wire::Part]) -> Option<&[u8]> {
+    for part in parts {
+        if part.token == token {
+            return Some(&part.bytes);
+        }
+    }
+    None
+}
+
+/// An application's granted value, decoded and checked once before being kept.
+#[must_use]
+pub fn identity(
+    value: &skein_lib::Secret,
+    limits: &temper_protocol_worker_wire::v1::Limits,
+) -> Option<temper_worker_protocol_git::Identity> {
+    let mut reader = Reader::new(value.expose());
+    let identity = temper_protocol_worker_wire::v1::Identity::decode(limits, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    crate::translate::value(&identity)
+}
+
+/// Parts only under tokens an answer names; refusals have no application parts.
+#[must_use]
+pub fn answer_parts(
+    answer: &hub::Answer,
+    work: &temper_worker_domain::wire::Work,
+    preparation: Option<&temper_worker_domain::wire::Preparation>,
+) -> Box<[jig_protocol_worker_wire::Part]> {
+    use jig_protocol_worker_wire::Part;
+    use temper_protocol_worker_wire as payload;
+    let (names, resource) = match &answer.ending {
+        hub::Ending::Refused(_) => return Box::new([]),
+        hub::Ending::Ended { work, .. } | hub::Ending::Parked { work } => (work, None),
+        hub::Ending::Failed { failure, work, .. } => {
+            let resource = match failure {
+                hub::Failure::Unprepared(hub::Preparation::Permanent { resource }) => *resource,
+                hub::Failure::Unprepared(hub::Preparation::Transient)
+                | hub::Failure::Run(_)
+                | hub::Failure::Agent(_)
+                | hub::Failure::Cancelled(_) => None,
+            };
+            (work, resource)
+        }
+    };
+    let mut parts = List::with_capacity(3);
+    let (left, saved) = crate::translate::work(work);
+    if let Some(token) = names.left {
+        parts.push(Part { token, bytes: payload::left(&left) }).expect("three parts");
+    }
+    if let Some(token) = names.saved
+        && let Some(saved) = saved
+    {
+        parts.push(Part { token, bytes: payload::saved(&saved) }).expect("three parts");
+    }
+    if let Some(token) = resource
+        && let Some(preparation) = preparation
+        && let Some(preparation) = crate::translate::preparation(preparation)
+    {
+        parts.push(Part { token, bytes: payload::preparation(&preparation) }).expect("three parts");
+    }
+    parts.into_boxed()
+}

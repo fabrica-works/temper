@@ -12,6 +12,7 @@ pub mod tokens;
 pub mod accounts;
 pub mod assignment;
 pub mod clients;
+pub mod identities;
 pub mod translate;
 pub mod values;
 pub mod worker_route;

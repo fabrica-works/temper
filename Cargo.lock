@@ -1524,6 +1524,7 @@ dependencies = [
  "temper-protocol-worker-wire",
  "temper-worker-domain",
  "temper-worker-domain-checkout",
+ "temper-worker-protocol-git",
 ]
 
 [[package]]
