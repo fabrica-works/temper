@@ -297,7 +297,10 @@ defaults (decision 23), dropped at `Left` (client.md, 3.4); each `Act`
 applied (a value past the client's field bound not taken, its field
 `Long`; any write clears a shown outcome); `Adopt` checks `broken` and
 sends nothing when a rule fails, else one `Request::Send` through the
-table with the project as its scope, at most one pending; `Progress` and
+table with the confirmed party as its scope, at most one pending, and
+nothing while no party is confirmed (`Confirmed { party }`, which the
+root passes the side beside the table; decisions.md, ruling 124);
+`Progress` and
 `Answered` kept for the page; adopted, the fields back to their
 defaults; out of date, `Adopt` disabled and a pending request left in
 the table. `temper-client-view`: `forge/page.rs`, `forge/bindings.rs`,
@@ -899,6 +902,9 @@ pub mod forge {
         Answered { request: Token, answer: Answer },
         /// The stream's hello for the family `FORGE`.
         Served { versions: VersionRange },
+        /// The party confirmed, or none: the scope of its requests
+        /// (ruling 124; jig's ops `infrastructure.rs:348-352`).
+        Confirmed { party: Option<u64> },
     }
 
     /// The requests 15.1b adds to 11.1's forge side.
@@ -906,7 +912,8 @@ pub mod forge {
     pub enum Request {
         /// Show the forge's address (the root wraps it).
         Show { address: Address },
-        /// One keyed request through the root's table; the project is its scope.
+        /// One keyed request through the root's table; the confirmed party
+        /// is its scope (ruling 124), the project in its `Ask`.
         Send { request: Token, scope: u64, ask: Ask },
     }
 

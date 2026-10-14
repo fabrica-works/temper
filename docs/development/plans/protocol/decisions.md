@@ -514,6 +514,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `None`, whatever the state says" (forge.md, 3.2) is the component's
      reading (13.3).
 
+124. **An adoption's scope is the confirmed party** (temper 15.1b,
+     blocked 2026-10-14T09:42:59Z; plan defect, not design). 15.1b
+     said "one `Request::Send` through the table with the project as
+     its scope"; no design text names the project. jig's
+     `client/domain/root.md`, 4, at the pin: "a scope per request: an
+     opaque number its asker gives, which `jig-domain-client` names: the
+     party the request is for. Only the requests of the party confirmed
+     are ever sent"; temper's client.md, 3.3 keeps it ("restored with
+     `Kept { scope }`, parked until their party is confirmed"). So the
+     forge side does as jig's ops sides do at the pin: the root passes
+     `jig_domain_client::Request::Confirmed { party }` to the side as
+     `forge::Event::Confirmed { party }`, beside `root.table.confirmed`
+     (ops `route.rs:193-196`); the side keeps it (`infrastructure.rs:348-352`);
+     `Adopt` sends `scope: party`, and nothing while no party is
+     confirmed (`infrastructure.rs:657-659`, `693-695`). The project
+     stays in the `Ask`'s `Adoption`. 15.1b's Files hold it
+     (`forge.rs`, `forge/form.rs`, `route.rs`); its fixture
+     `on_adoption_page` confirms a party, and
+     `adopt_sends_one_keyed_request_and_a_second_press_none` asserts the
+     sent scope is it. Its Size (550), its ten tests' names and its
+     Proof are unchanged; no upstream edit or repin.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
