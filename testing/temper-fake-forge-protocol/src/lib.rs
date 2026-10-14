@@ -6,6 +6,7 @@ pub mod answers;
 use alloc::boxed::Box;
 use skein_lib::{List, Secret};
 pub mod errors;
+pub mod response;
 pub mod routes;
 pub mod tally;
 pub use tally::{Route, Tally, route};
