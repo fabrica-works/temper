@@ -228,3 +228,119 @@ fn word(number: u64, from: jig_domain_tasks::Party, words: &[u8]) -> jig_domain_
 fn decoded_charter(bytes: &[u8]) -> smith_charter::v2::Charter {
     smith_charter::v2::Charter::decode(&smith_charter::CEILINGS, &mut skein_lib::Reader::new(bytes)).unwrap()
 }
+
+#[test]
+fn a_part_that_does_not_decode_gives_no_parts_and_is_counted() {
+    let mut workers = fixtures::workers();
+    let mut events = skein_lib::Queue::with_capacity(32);
+    for (bytes, expected) in [(b"".as_slice(), 1), (&[0, 0, 0, 1], 2)] {
+        let up = fixtures::answer(host::Ending::Ended {
+            outcome: Box::new([]),
+            work: host::Work { left: Some(Token::new(1)), saved: None },
+        });
+        workers.received(
+            Token::new(8),
+            up,
+            &[jig_protocol_worker_wire::Part { token: Token::new(1), bytes: bytes.into() }],
+            &mut events,
+        );
+        let Some(temper_engine_domain::Event::Worker(temper_engine_domain::WorkerInput::Link {
+            channel,
+            link: temper_engine_domain::Link::Up { parts, up },
+        })) = events.pop()
+        else {
+            panic!("answer reaches root")
+        };
+        assert_eq!(channel, Token::new(8), "{bytes:?}");
+        assert_eq!(parts, temper_engine_domain::Parts::none(), "{bytes:?}");
+        assert_eq!(
+            up,
+            fixtures::answer(host::Ending::Ended {
+                outcome: Box::new([]),
+                work: host::Work { left: Some(Token::new(1)), saved: None },
+            }),
+            "{bytes:?}"
+        );
+        assert_eq!(workers.bad_parts, expected, "{bytes:?}");
+    }
+}
+#[test]
+fn the_workers_listener_and_accepted_socket_have_their_own_prefixes() {
+    let mut workers = fixtures::workers();
+    let owner = Token::new(crate::tokens::WORKER_LISTENERS);
+    let mut events = skein_lib::Queue::with_capacity(32);
+    let Some(skein_io::Request::Listen { owner: requested, addr: addr @ skein_io::Addr::InProcess(_) }) =
+        workers.io.pop()
+    else {
+        panic!("configured in-process listener")
+    };
+    assert_eq!(requested, owner);
+    assert!(workers.up(Time::ZERO, skein_io::Event::Listening { owner, listener: Token::new(3), addr }, &mut events));
+    assert!(workers.opened());
+    assert!(workers.up(
+        Time::ZERO,
+        skein_io::Event::Accepted { owner, socket: Token::new(4), peer: addr },
+        &mut events
+    ));
+    let Some(skein_io::Request::Bind { socket, owner: connection }) = workers.io.pop() else {
+        panic!("accepted socket bound")
+    };
+    assert_eq!(socket, Token::new(4));
+    assert_eq!(connection, Token::new(crate::tokens::WORKER_CONNECTIONS + 1));
+    assert_eq!(workers.sockets.get(&connection), Some(&socket));
+}
+#[test]
+fn a_listener_that_opens_during_closing_is_closed_immediately() {
+    let mut workers = fixtures::workers();
+    let _listen = workers.io.pop().unwrap();
+    let mut events = skein_lib::Queue::with_capacity(32);
+    workers.close(Time::ZERO, &mut events);
+    assert!(workers.up(
+        Time::ZERO,
+        skein_io::Event::Listening {
+            owner: Token::new(crate::tokens::WORKER_LISTENERS),
+            listener: Token::new(3),
+            addr: skein_io::Addr::InProcess(skein_io::Name::new(b"workers").unwrap())
+        },
+        &mut events
+    ));
+    let Some(skein_io::Request::Close { entity }) = workers.io.pop() else { panic!("late listener close") };
+    assert_eq!(entity, Token::new(3));
+    assert!(!workers.closed());
+    assert!(workers.up(
+        Time::ZERO,
+        skein_io::Event::Closed { owner: Token::new(crate::tokens::WORKER_LISTENERS) },
+        &mut events
+    ));
+    assert!(workers.closed());
+}
+#[test]
+fn an_assignment_that_cannot_encode_is_answered_invalid_through_the_link() {
+    let mut workers = fixtures::workers();
+    let mut events = skein_lib::Queue::with_capacity(32);
+    let mut assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
+    assignment.workspace.repositories[0].provider.forge = 99;
+    workers.assignment(
+        Time::ZERO,
+        Token::new(8),
+        assignment,
+        &fixtures::values_with_identity(1, b"forge-token-1234"),
+        &mut events,
+    );
+    let Some(temper_engine_domain::Event::Worker(temper_engine_domain::WorkerInput::Link {
+        channel,
+        link: temper_engine_domain::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, parts },
+    })) = events.pop()
+    else {
+        panic!("invalid assignment answer")
+    };
+    assert_eq!(channel, Token::new(8));
+    assert_eq!((run, attempt), (Token::new(7), Token::new(2)));
+    assert_eq!(parts, temper_engine_domain::Parts::none());
+    assert_eq!(
+        answer.ending,
+        host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+            why: b"assignment cannot encode".as_slice().into(),
+        }))
+    );
+}

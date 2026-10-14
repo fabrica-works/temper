@@ -1496,6 +1496,7 @@ dependencies = [
  "jig-protocol-engine-workers",
  "jig-protocol-store",
  "jig-protocol-worker-wire",
+ "skein-channel",
  "skein-codec",
  "skein-io",
  "skein-kv",

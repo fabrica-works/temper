@@ -550,3 +550,16 @@ pub fn answer(ending: jig_domain_host::Ending) -> jig_domain_host::LinkUp {
         answer: jig_domain_host::Answer { read: None, refused: Box::new([]), turns: 0, spent: 0, ending },
     }
 }
+
+pub const WORKER_DIGEST: &[u8] = b"0000000000000000000000000000000000000000000000000000000000000000";
+pub fn workers() -> crate::workers::Workers {
+    let settings = engine();
+    let mut entries = skein_lib::List::with_capacity(2);
+    for worker in &settings.jig.hosts.workers {
+        entries.push((worker.digest.clone(), Secret::new(WORKER_DIGEST.into()))).unwrap();
+    }
+    let encoding = encoding(&settings);
+    let limits = crate::workers::limits(&settings).unwrap();
+    crate::workers::Workers::new(&settings.jig, &settings::Files { entries }, encoding, settings.forges, &limits, 256)
+        .unwrap()
+}
