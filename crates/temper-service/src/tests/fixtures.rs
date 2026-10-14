@@ -759,8 +759,8 @@ pub fn agent() -> settings::Agent {
 
 mod worker;
 pub use worker::{
-    assignment as worker_assignment, identity, one_repository, worker_agent, worker_files, worker_limits,
-    worker_settings,
+    AGENT_JSON, NOW, TEMPER, application_value, assignment as worker_assignment, chat_assignment, identity,
+    one_repository, repository_assignment, spawn, worker, worker_agent, worker_files, worker_limits, worker_settings,
 };
 pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64).unwrap()
