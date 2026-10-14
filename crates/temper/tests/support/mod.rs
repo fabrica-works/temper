@@ -1,6 +1,7 @@
 //! Shared configuration fixtures for startup and the process tier.
 pub mod terminal;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
+pub mod person;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub enum Forge {
@@ -54,7 +55,11 @@ pub fn configuration(directory: &Path, forge: &Forge) {
     value["engine"]["connectors"] = serde_json::json!([1]);
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
+    value["engine"]["limits"]["overrides"]["documents.rows"] = 2.into();
+    value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 128.into();
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
+    value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
+    value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
     value["application"] = serde_json::json!({
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:9"},"transport":"plaintext",
             "git":"http://127.0.0.1:9","api_token":"secrets/forge-1.api-token","user":42,"identity":1}],
@@ -214,6 +219,7 @@ impl Host for StdoutReader {
 enum Process {
     Binary(Box<Binary>),
     Stdout(Box<StdoutReader>),
+    Person(Box<person::Person>),
     Peer(Box<skein_fake_peers::llm::Peer>),
 }
 impl Process {
@@ -221,6 +227,7 @@ impl Process {
         match self {
             Self::Binary(x) => x.as_ref(),
             Self::Stdout(x) => x.as_ref(),
+            Self::Person(x) => x.as_ref(),
             Self::Peer(x) => x.as_ref(),
         }
     }
@@ -228,6 +235,7 @@ impl Process {
         match self {
             Self::Binary(x) => x.as_mut(),
             Self::Stdout(x) => x.as_mut(),
+            Self::Person(x) => x.as_mut(),
             Self::Peer(x) => x.as_mut(),
         }
     }
@@ -315,7 +323,12 @@ impl Referee<Process> for Judge {
         self.settled
     }
 }
-fn run(directory: &Path, signal: Signal, deadline: Duration, peer: Option<skein_fake_peers::llm::Peer>) -> Ended {
+fn run_signal(
+    directory: &Path,
+    signal: Signal,
+    deadline: Duration,
+    peer: Option<skein_fake_peers::llm::Peer>,
+) -> Ended {
     let clock = Clock::new();
     let mut binary = serve(directory);
     let streams = binary.take_streams().expect("binary pipes");
@@ -352,7 +365,122 @@ fn run(directory: &Path, signal: Signal, deadline: Duration, peer: Option<skein_
 }
 #[must_use]
 pub fn until_link_then(directory: &Path, signal: Signal, deadline: Duration) -> Ended {
-    run(directory, signal, deadline, None)
+    run_signal(directory, signal, deadline, None)
+}
+
+pub const ANSWER: &[u8] = b"Process answer";
+#[must_use]
+pub fn chat_script(answer: &[u8]) -> skein_fake_llm_domain::api::Script {
+    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+    let words = std::str::from_utf8(answer).expect("script answer text");
+    Script {
+        cue: Box::new([]),
+        turns: Box::new([Turn {
+            lines: Box::new([Line::Call {
+                name: Box::from(*b"finish"),
+                arguments: serde_json::to_vec(&serde_json::json!({"form":"report","text":words,"fields":{}}))
+                    .expect("report JSON")
+                    .into_boxed_slice(),
+            }]),
+            finish: Finish::ToolCalls,
+            tokens: 20,
+        }]),
+    }
+}
+pub struct Seen {
+    pub signed_in: u32,
+    pub finished: bool,
+    pub stderr: Vec<u8>,
+}
+struct ChatJudge {
+    ended: bool,
+    settled: bool,
+    deadline: Time,
+}
+impl Referee<Process> for ChatJudge {
+    fn act(&mut self, _now: Time, procs: &mut [Process]) {
+        let Process::Person(person) = &procs[1] else {
+            panic!("native person");
+        };
+        if !self.ended && person.finished && person.client.as_ref().is_some_and(Host::is_empty) {
+            let Process::Binary(binary) = &mut procs[0] else {
+                panic!("binary");
+            };
+            binary.signal(Signal::Kill);
+            for proc in procs {
+                if let Process::Peer(peer) = proc {
+                    peer.shutdown();
+                }
+            }
+            self.ended = true;
+        }
+    }
+    fn observe(&mut self, now: Time, procs: &[Process]) {
+        self.settled = self.ended && procs.iter().all(Host::is_empty);
+        let Process::Binary(binary) = &procs[0] else {
+            panic!("binary");
+        };
+        assert!(
+            binary.exit_status().is_none() || self.ended,
+            "temper serve failed: {}",
+            String::from_utf8_lossy(binary.stderr())
+        );
+        assert!(
+            now < self.deadline || self.settled,
+            "native chat did not settle: {}",
+            String::from_utf8_lossy(binary.stderr())
+        );
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        (!self.settled).then_some(self.deadline)
+    }
+    fn overdue(&self, now: Time) -> Option<String> {
+        (!self.settled && now >= self.deadline).then(|| "native person's chat did not finish and settle".into())
+    }
+    fn passed(&self) -> bool {
+        self.settled
+    }
+}
+pub fn run(
+    directory: &Path,
+    script: person::Script,
+    peer: Option<skein_fake_peers::llm::Peer>,
+    deadline: Duration,
+) -> Seen {
+    let clock = Clock::new();
+    let mut binary = serve(directory);
+    let streams = binary.take_streams().expect("binary pipes");
+    let mut fds = streams.descriptors();
+    let Streams::Pipes { input, output } = streams else {
+        panic!("pipes mode");
+    };
+    let root = skein_shell::open_root(directory).expect("client's parent root");
+    fds.push(root);
+    let mut world = real::World::new(ChatJudge {
+        ended: false,
+        settled: false,
+        deadline: clock.now().now.saturating_add(Duration::from_nanos(
+            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+        )),
+    });
+    world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
+    world.spawn_with_fds(fds, || Process::Person(Box::new(person::Person::new(root, input, output, script))));
+    if let Some(peer) = peer {
+        world.spawn(|| Process::Peer(Box::new(peer)));
+    }
+    let outcome = world.run(&clock, deadline);
+    assert!(outcome.procs.iter().all(Host::is_empty), "all real io settles");
+    let Process::Binary(binary) = &outcome.procs[0] else {
+        panic!("binary");
+    };
+    let Process::Person(person) = &outcome.procs[1] else {
+        panic!("native person");
+    };
+    Seen {
+        signed_in: person.client.as_ref().expect("native client").seen().signed_in,
+        finished: person.finished,
+        stderr: binary.stderr().to_vec(),
+    }
 }
 
 #[must_use]

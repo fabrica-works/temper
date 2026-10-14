@@ -257,6 +257,11 @@ fn release(engine: &mut Engine) {
             break;
         }
         root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        if engine.requests.is_empty() && !engine.blocked {
+            root::try_step(&mut engine.domain, &engine.env, root::Event::Resume).expect("owner continuation admitted");
+            engine.drain_facts();
+            root::release(&mut engine.domain, &engine.env, &mut engine.requests);
+        }
         engine.drain_facts();
         if !engine.requests.is_empty() || engine.domain.quiescent() {
             engine.blocked = false;

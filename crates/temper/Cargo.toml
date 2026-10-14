@@ -29,6 +29,13 @@ smith-local-service.workspace = true
 smith-host-protocol.workspace = true
 
 [dev-dependencies]
+temper-shell-terminal.workspace = true
+temper-client-domain.workspace = true
+jig-fake-person.workspace = true
+jig-view.workspace = true
+jig-domain-client.workspace = true
+jig-shell-native.workspace = true
+jig-protocol-config.workspace = true
 skein-world.workspace = true
 skein-fake-peers.workspace = true
 skein-fake-llm-domain.workspace = true

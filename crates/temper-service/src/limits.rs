@@ -272,6 +272,7 @@ pub fn engine(jig: &jig_protocol_config::Limits, limits: &Limits) -> Option<engi
         fleet: jig.core.fleet,
         accounts: jig.core.accounts,
         notes: jig.core.notes,
+        documents: jig.core.documents,
         call_records: jig.core.call_records,
         forge: limits.forge,
     };

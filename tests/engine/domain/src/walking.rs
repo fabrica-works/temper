@@ -114,6 +114,13 @@ pub fn limits() -> engine::Limits {
         + tasks.tasks
         + 6;
     engine::Limits {
+        documents: jig_domain_core::documents::DocumentLimits {
+            rows: 4,
+            text_bytes: 4_096,
+            chips: 4,
+            lines: 4,
+            versions: jig_domain_core::documents::Versions { minimum: 1, maximum: 1 },
+        },
         authority: authority_limits(),
         journal: JournalLimits {
             commits: 3,

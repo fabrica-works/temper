@@ -48,6 +48,8 @@ pub struct Limits {
     pub accounts: accounts::Limits,
     /// Bounded notes indexes and pages kept by the core.
     pub notes: notes::Limits,
+    /// Configured typed document construction bounds and served versions.
+    pub documents: jig_domain_core::documents::DocumentLimits,
     /// Forge connector subtree and its bounded outbox.
     pub forge: forge::Limits,
 }
@@ -93,15 +95,6 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
 pub const FILL_MARK: u64 = 268_435_456;
 /// The most owned bytes one authenticated store read brings (`small.rs`).
 pub const LOAD_BYTES: u64 = 65_536;
-/// Typed documents' construction bounds and served versions (`small.rs`, documents).
-pub const DOCUMENTS: jig_domain_core::documents::DocumentLimits = jig_domain_core::documents::DocumentLimits {
-    rows: 4,
-    text_bytes: 4_096,
-    chips: 4,
-    lines: 4,
-    versions: jig_domain_core::documents::Versions { minimum: 1, maximum: 1 },
-};
-
 /// Watches and live runs' provisional text, which temper keeps to jig's
 /// smallest profile until its clients watch more (`small.rs`, views).
 pub const VIEWS: views::Limits = views::Limits {
@@ -117,7 +110,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
     jig_domain_core::Limits {
         fill_mark: FILL_MARK,
         load_bytes: LOAD_BYTES,
-        documents: DOCUMENTS,
+        documents: limits.documents,
         connectors: 1,
         resume_bytes: limits.journal.transcript_bytes,
         run_bytes: limits.journal.run_bytes,
