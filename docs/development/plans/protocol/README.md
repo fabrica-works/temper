@@ -162,6 +162,11 @@ them wait on them.
     assertions, none loosened or removed;
   - a removed mechanism's tests, moved to its replacement or removed;
   - code that moved since the plan was written, followed to its file;
+  - the users of a type the Shape changes, edited to its new form with
+    no other change, every assertion, input, expected value and name
+    kept, in any number of lines (code-organization.md, 6: "it changes
+    the type in place, and its users in the same increment";
+    decisions.md, ruling 123);
   - the fixtures a Test shape names, in the crate's fixture module;
   - an item made visible within its own crate;
   - the session's own earlier code, replaced or extended: a file its

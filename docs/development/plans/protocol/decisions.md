@@ -478,6 +478,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      the plan's target only as far as `link::Limits::new` and
      `Limits::compose` accept, `rows` at most 32; no repin.
 
+123. **A changed type's users are in the increment's Files** (temper
+     18.2, blocked 2026-10-14T09:18:48Z; plan defect). 18.2's Shape
+     removes `observations::Record`'s wrapper; 29 uses of
+     `.map(|record| &record.0)` in `tests/conformance/src/stories.rs`
+     (14) and `src/scenarios.rs` (15) follow it, past the README's
+     20-line fix. code-organization.md, 6 already asks it: "it changes
+     the type in place, and its users in the same increment". As a
+     standing rule (README, edits outside Files), a type's users are
+     edited to its new form with no other change, in any number of
+     lines, every assertion, input, expected value and name kept.
+
 119. **02.4 lands before 02.3** (temper 02.3, blocked
      2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
      conformance worlds' adoption to `PartyInput::Application`; after a
