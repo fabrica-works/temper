@@ -1222,6 +1222,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      fix, outside 17.s1's Files, named in its commit body; every check,
      test name and expected value kept.
 
+156. **17.4 has three more typed diagnostic runs** (temper 17.4, blocked
+     2026-10-14T20:08:02Z; process). Ruling 148's five diagnostic runs,
+     which the unblock of 2026-10-14T18:58:31Z carried into 17.4, are
+     spent; after a power-loss cut the world's restarted service sends and
+     answers nothing (`logs/20261014T195559-0.log`), and the source trace
+     (`logs/temper-17/17.4-w76-source-trace.md`) leaves two branches: the
+     cut came before the native client's private save of its pending
+     request, or the restored table holds it under a scope or retention
+     that never sends it again. A world run is under 2 s and its
+     diagnostic is typed and printed only on failure. So 17.4 may make
+     three more diagnostic runs, each naming before it runs which branch
+     it tells apart; the first prints, on failure only, the request keys
+     sent before the cut, the private cache's table key, scope, write,
+     sync and rename completion, and the restored table's keys and
+     scopes. Past three, a question with their logs. A fault in the native
+     client (session 12's), the service or jig's shell is a question
+     naming its site, with no production edit. Ruling 148's other terms
+     hold.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
