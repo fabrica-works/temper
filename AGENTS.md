@@ -3,6 +3,10 @@
 - Before merging anything to main, run the checks in
   `docs/development/workflow.md`; main moves only when they all pass. A
   change to Markdown files only skips them (same document).
+- **A plan's run lands through skein's `land`,** which runs those checks,
+  `scripts/check.sh`, as its gate and pushes to `origin`'s `main`
+  (workflow.md, section 1). A change to Markdown files only lands with
+  `land --docs`. Outside a run, push only when the user asks.
 - The default test suite (unit tests and the worlds' focused tests under
   `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
   `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
