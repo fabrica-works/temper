@@ -1817,6 +1817,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-fake-git"
+version = "0.0.0"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "temper-worker-domain-checkout",
+ "temper-worker-protocol-git",
+]
+
+[[package]]
 name = "temper-forge-forgejo"
 version = "0.0.0"
 dependencies = [
