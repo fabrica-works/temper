@@ -910,6 +910,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      Forgejo's 200, not 201) under the README's 20-line fix. It lands as
      it is; session 14 ends.
 
+144. **A workspace's agent start carries one path per directory**
+     (temper 15.3, blocked 2026-10-14T16:08:21Z; cross-session scope, a
+     gap in 09's worker layer). domain/worker.md, 4.2: "Prepare the
+     workspace", then "Start an agent process with the charter"; pinned
+     smith's `translate.rs` (`encode_workspace`) refuses a start whose
+     `paths` do not match its directories one for one (`MissingValue`),
+     and `temper-service/src/worker.rs:664-670`'s `start_values` sends
+     `paths: Box::default()` always, so every workspace start went
+     `Unsent` and 15.3's story never reached its second model turn. So
+     the worker keeps `WorkerRuntime.path`, and `start_values` fills one
+     path per directory, in the start's directory order, as git.md,
+     4's layout names them (`<root>/workspaces/<token>/<repository>`,
+     the token the prepared directory's own); the retained path is
+     priced in the worker's worst case. Session 15 makes the fix within
+     15.3, outside its Files (09 has ended), at most 60 production lines
+     in `worker.rs` and its pricing, named in the commit body, with one
+     test, `a_workspace_start_carries_one_path_per_directory`. 15.3's
+     Proof is its check.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
