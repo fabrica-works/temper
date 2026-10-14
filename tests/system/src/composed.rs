@@ -577,8 +577,8 @@ impl World {
                 self.observed.assignments += 1;
                 let repositories = usize::from(self.adoption != Adoption::Without);
                 assert_eq!(assignment.workspace.repositories.len(), repositories);
-                let (hub, items) = link::assignment(&assignment);
-                self.worker_events.push_back(worker::Event::Assign { assignment: hub, items: Ok(items), save: None });
+                let (hub, items, save) = link::assignment(&assignment);
+                self.worker_events.push_back(worker::Event::Assign { assignment: hub, items: Ok(items), save });
                 self.assignment = Some(assignment);
             }
             Delivery::Link { channel, down } => {
@@ -669,7 +669,7 @@ impl World {
                     (ending, settled) => panic!("the worker's answer {ending:?} follows smith's {settled:?}"),
                 }
                 assert!(work.landed.is_empty() && work.saved.is_none(), "an inspecting run lands and saves nothing");
-                let parts = link::parts(work, preparation);
+                let parts = link::parts(&work, preparation);
                 self.up(engine::Link::Up { up: host::LinkUp::Answer { run, attempt, answer }, parts });
             }
             // The link cancels a relay's local wait at once.
@@ -703,7 +703,7 @@ impl World {
             worker::Request::Io { owner, op, .. } => {
                 self.observed.checkouts += 1;
                 self.forge.at(self.env.now);
-                let done = git::perform(&mut self.forge, &mut self.disk, op);
+                let done = git::perform(&mut self.forge, &mut self.disk, forge_operation(op));
                 self.worker_events.push_back(worker::Event::Done { owner, done });
                 let _moves = self.forge.moves();
             }
@@ -715,6 +715,23 @@ impl World {
     fn up(&mut self, link: engine::Link) {
         self.root_events.push_back(engine::Event::Worker(engine::WorkerInput::Link { channel: CHANNEL, link }));
     }
+}
+
+/// Map the service's git remote to the fake forge's repository name.
+fn forge_operation(mut op: worker::checkout::git::Op) -> worker::checkout::git::Op {
+    use worker::checkout::git::Op;
+    match &mut op {
+        Op::Clone { remote, .. } | Op::Fetch { remote, .. } | Op::Create { remote, .. } | Op::Push { remote, .. } => {
+            *remote = remote
+                .strip_prefix(link::GIT_BASE)
+                .and_then(|path| path.strip_prefix(b"/"))
+                .and_then(|path| path.strip_suffix(b".git"))
+                .expect("the world's configured git remote")
+                .into();
+        }
+        Op::Make { .. } | Op::CheckOut { .. } | Op::Merge { .. } | Op::Commit { .. } => {}
+    }
+    op
 }
 
 /// The owner's adoption of the forge's one repository.

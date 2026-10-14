@@ -14,29 +14,32 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
-use skein_lib::{Decimal, Reader, ReplyTo, Token};
-use smith_domain as smith;
+use skein_lib::{Decimal, Reader, Secret, Token};
 use smith_domain_run as run;
 use temper_engine_domain as engine;
-use temper_engine_domain_forge as forge;
+use temper_protocol_worker_wire::v1;
+use temper_service::{settings, translate};
 use temper_worker_domain::wire;
 use temper_worker_domain_world::protocol as worker_protocol;
 
-/// The hub's assignment for the engine's, with temper's workspace items
-/// beside it. The engine names no
-/// saved-work branch to save to (nor did `main`'s), so the hub saves nothing.
+pub const GIT_BASE: &[u8] = b"http://forge.test";
+
+/// The hub's assignment beside the service's workspace and saved-work branch.
 #[must_use]
-pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::Workspace) {
-    let workspace = if assignment.workspace.repositories.is_empty() {
-        None
-    } else {
-        // The root names the items itself (domain/worker.md, 4.1).
-        Some(host::Workspace { workstream: assignment.workstream, items: Token::new(0) })
-    };
-    let mut repositories = Vec::with_capacity(assignment.workspace.repositories.len());
-    for repository in &assignment.workspace.repositories {
-        repositories.push(self::repository(repository));
-    }
+pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::Workspace, Option<Box<[u8]>>) {
+    let forges = [settings::Forge {
+        number: temper_engine_forge_world::REPO.forge,
+        kind: settings::Kind::Forgejo,
+        api: jig_protocol_config::Address::Host { name: b"forge.test".as_slice().into(), port: 80 },
+        transport: settings::Transport::Plaintext,
+        git: GIT_BASE.into(),
+        api_token: Secret::new(Box::new([])),
+        user: 1,
+        identity: 1,
+    }];
+    let items = translate::items(assignment, &forges, &v1::CEILINGS).expect("world workspace fits the payload");
+    let (repositories, save) = translate::workspace(items.as_ref());
+    let workspace = items.map(|_| host::Workspace { workstream: assignment.workstream, items: Token::new(0) });
     let hub = host::Assignment {
         messages: messages(&assignment.messages),
         assignment: host::RunAssignment {
@@ -44,65 +47,22 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
             run: Token::new(assignment.task),
             attempt: Token::new(assignment.attempt),
             workspace,
-            save: false,
+            save: save.is_some(),
             charter: charter(assignment),
             grants: grants(&assignment.grants),
         },
         turns: assignment.transcript.clone(),
         answered: answered(&assignment.settled),
     };
-    (hub, wire::Workspace { repositories: repositories.into_boxed_slice() })
+    (hub, repositories, save)
 }
 
-/// temper's parts beside a worker's answer, as the engine takes them: the
-/// heads its pushes landed, and, when it saved, the repositories with saved
-/// work after it: those whose save landed, and those that started from saved
-/// work and whose save left that branch as it was. A permanent preparation
-/// names the repository by tag and what the forge lacks or refused.
+/// The worker's parts through the service's channel records, without bytes.
 #[must_use]
-pub fn parts(work: wire::Work, preparation: Option<wire::Preparation>) -> engine::Parts {
-    let mut pushed = Vec::with_capacity(work.landed.len());
-    for landed in &work.landed {
-        pushed.push(forge::Pushed { tag: landed.tag, commit: landed.commit });
-    }
-    let saved = match work.saved {
-        Some(repositories) => {
-            let mut tags = Vec::with_capacity(repositories.len());
-            for repository in &repositories {
-                if saved(&repository.landing, repository.from_saved) {
-                    tags.push(repository.tag);
-                }
-            }
-            Some(tags.into_boxed_slice())
-        }
-        None => None,
-    };
-    let preparation = match preparation {
-        Some(wire::Preparation::Missing { tag, missing }) => {
-            let missing = match missing {
-                wire::Missing::Repository => engine::Missing::Repository,
-                wire::Missing::Branch => engine::Missing::Branch,
-                wire::Missing::Commit => engine::Missing::Commit,
-            };
-            Some(engine::Preparation::Missing { tag, missing })
-        }
-        Some(wire::Preparation::Refused { tag }) => Some(engine::Preparation::Refused { tag }),
-        Some(wire::Preparation::Transient) | None => None,
-    };
-    engine::Parts { saved, pushed: pushed.into_boxed_slice(), preparation }
-}
-
-/// Whether a repository has saved work after a save that ended in `landing`.
-const fn saved(landing: &wire::Landing, from_saved: bool) -> bool {
-    match landing {
-        wire::Landing::Landed { .. } => true,
-        wire::Landing::Unchanged
-        | wire::Landing::Conflicted { .. }
-        | wire::Landing::Explained { .. }
-        | wire::Landing::Moved
-        | wire::Landing::Failed
-        | wire::Landing::Refused => from_saved,
-    }
+pub fn parts(work: &wire::Work, preparation: Option<wire::Preparation>) -> engine::Parts {
+    let (left, saved) = translate::work(work);
+    let preparation = preparation.as_ref().and_then(translate::preparation);
+    translate::parts(Some(left), saved, preparation)
 }
 
 /// A relayed call decoded into the engine's tool vocabulary: smith's call
@@ -154,10 +114,7 @@ fn identity(task: u64, conversation: u64) -> [u8; 16] {
 /// The engine's charter, smith's charter encoded: temper's translation, its
 /// conversation resumed when the charter resumes and turns are kept.
 fn charter(assignment: &engine::Assignment) -> Box<[u8]> {
-    let window = smith::Window { turns: 0, bytes: 0 };
-    let start = temper_engine_smith::start(assignment, None, None, ReplyTo::new(Token::new(0)), Token::new(0), window);
-    let smith::Event::Start { mut charter, .. } = start else { unreachable!("temper's translation starts a run") };
-    charter.resume = assignment.run.policy.resume && !assignment.transcript.is_empty();
+    let charter = temper_engine_smith::charter(assignment);
     smith_protocol_channel::encode_charter(&charter, &smith_charter::CEILINGS, &worker_protocol::endpoints())
         .expect("smith encodes the engine's charter")
 }
@@ -223,94 +180,5 @@ const fn delivery(outcome: core::DeliveryOutcome) -> host::DeliveryOutcome {
         core::DeliveryOutcome::Stale => host::DeliveryOutcome::Stale,
         core::DeliveryOutcome::Refused | core::DeliveryOutcome::Invalid => host::DeliveryOutcome::Refused,
         core::DeliveryOutcome::Failed => host::DeliveryOutcome::Failed,
-    }
-}
-
-/// A forge checkout as the worker's workspace takes it. The engine names no
-/// expected head for a writable branch, nor did `main`'s.
-fn repository(repository: &engine::ForgeRepository) -> wire::Repository {
-    let start = match &repository.start {
-        engine::ForgeStart::Base(branch) => wire::Start::Base { branch: branch.clone() },
-        engine::ForgeStart::Branch(branch) => wire::Start::Branch { branch: branch.clone() },
-        engine::ForgeStart::Saved(branch) => wire::Start::Saved { branch: branch.clone() },
-        engine::ForgeStart::Merge { branch, base } => wire::Start::Merge { branch: branch.clone(), base: *base },
-    };
-    let access = match &repository.push {
-        Some(push) => wire::Access::Writable { push: push.clone(), expected: None },
-        None => wire::Access::ReadOnly,
-    };
-    wire::Repository {
-        tag: repository.tag,
-        name: repository.name.clone(),
-        remote: [repository.owner.as_ref(), b"/", repository.name.as_ref()].concat().into_boxed_slice(),
-        start,
-        access,
-        identity: repository.identity,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_heads_a_run_landed_reach_the_engine_as_its_pushed_heads() {
-        let work = wire::Work { landed: Box::new([wire::Landed { tag: 3, commit: [7; 32] }]), saved: None };
-        let parts = parts(work, None);
-        assert_eq!(
-            parts,
-            engine::Parts {
-                saved: None,
-                pushed: Box::new([forge::Pushed { tag: 3, commit: [7; 32] }]),
-                preparation: None
-            }
-        );
-    }
-
-    #[test]
-    fn a_save_names_each_repository_with_saved_work_after_it() {
-        let saved = Box::new([
-            wire::SavedRepository { tag: 1, from_saved: false, landing: wire::Landing::Landed { commit: [9; 32] } },
-            wire::SavedRepository { tag: 2, from_saved: true, landing: wire::Landing::Unchanged },
-            wire::SavedRepository { tag: 3, from_saved: true, landing: wire::Landing::Failed },
-            wire::SavedRepository { tag: 4, from_saved: false, landing: wire::Landing::Unchanged },
-        ]);
-        let work = wire::Work { landed: Box::new([]), saved: Some(saved) };
-        let parts = parts(work, None);
-        assert_eq!(parts, engine::Parts { saved: Some(Box::new([1, 2, 3])), pushed: Box::new([]), preparation: None });
-    }
-
-    #[test]
-    fn a_permanent_preparation_reaches_the_engine_by_its_tag() {
-        let rows = [
-            (
-                wire::Preparation::Missing { tag: 4, missing: wire::Missing::Commit },
-                engine::Preparation::Missing { tag: 4, missing: engine::Missing::Commit },
-            ),
-            (
-                wire::Preparation::Missing { tag: 5, missing: wire::Missing::Branch },
-                engine::Preparation::Missing { tag: 5, missing: engine::Missing::Branch },
-            ),
-            (
-                wire::Preparation::Missing { tag: 6, missing: wire::Missing::Repository },
-                engine::Preparation::Missing { tag: 6, missing: engine::Missing::Repository },
-            ),
-            (wire::Preparation::Refused { tag: 7 }, engine::Preparation::Refused { tag: 7 }),
-        ];
-        for (preparation, expected) in rows {
-            let work = wire::Work { landed: Box::new([]), saved: None };
-            let parts = parts(work, Some(preparation));
-            assert_eq!(
-                parts,
-                engine::Parts { saved: None, pushed: Box::new([]), preparation: Some(expected) },
-                "{preparation:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_transient_preparation_reaches_the_engine_as_no_part() {
-        let work = wire::Work { landed: Box::new([]), saved: None };
-        assert_eq!(parts(work, Some(wire::Preparation::Transient)), engine::Parts::none());
     }
 }
