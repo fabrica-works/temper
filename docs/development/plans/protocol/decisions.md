@@ -334,6 +334,19 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      with `html_url`'s origin (forge.md, 3.2, 3.5, 9, 13; sessions 06.4,
      13.3, 13.4, 14).
 
+112. **Disk below 40 GB: the cache past its cap** (blocked
+     2026-10-14T05:08:02Z; infrastructure). `df -h ~/src` showed 38 GB
+     after the coordinator removed the finished sessions' `target/`.
+     `kache stats` showed its store at 40.9 GiB of a 23.3 GiB cap (176%),
+     its daemon reporting a version mismatch; its own eviction then
+     brought it to 20.9 GiB, and `kache gc` evicted nothing more. The
+     supervisor removed three idle `target/` directories outside the run
+     (`~/src/rust/temper/target`, `~/src/rust/tmp/plan/temper-protocol/target`,
+     `~/src/rust/tmp/plan/temper-sketches/target`). `df` then showed 53
+     GB, and new starts resumed. If disk falls below 40 GB again, the
+     coordinator runs `kache stats | head -1` once and names the store's
+     size in its block.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
