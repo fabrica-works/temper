@@ -234,6 +234,21 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      06.3, 06.5, 13.3, 13.4, 14.2, 14.3 and 14.5 say so; 05's
      `facts.txt` keeps its four `fails` lines as the record.
 
+105. **A fix a session's own "Done when" needs is no new step**
+     (temper 05.4, blocked 2026-10-14T04:33:15Z; plan defect). Session
+     05's check `git grep -nE 'Authorization: (token|Basic)
+     [0-9A-Za-z+/=]{20,}' -- tools` matched 05.4's test literal
+     `Basic d3JpdGVyOnNlY3JldA==` (`writer:secret`, no issued token).
+     The implementer shortened it to `writer:t` and landed it as
+     `2838a7a8`, test-only, under `Step: temper-05.4`. That stands. From
+     now: a fix that the session's own "Done when" needs, at most 20
+     lines, in that session's files, every test's name and expected
+     behaviour kept, lands under its last step's `Step:` trailer, with
+     the "Done when" item it serves named in the commit body; the
+     coordinator records it in that step's ledger note, and no step is
+     added. Anything larger, or outside the session's files, is a
+     question.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
