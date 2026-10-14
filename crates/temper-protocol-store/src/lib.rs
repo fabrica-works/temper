@@ -75,6 +75,7 @@ pub fn bounds(forge: &temper_engine_domain_forge::Limits) -> Option<Bounds> {
         subscriber_goal_tasks_some: forge.issue_policy.plan_items,
         subscriber_paths: forge.paths_per_subscription,
         subscriber_paths_item: forge.name_bytes,
+        ..records::limits(forge)?
     };
     v1::check_limits(&limits).ok()?;
     Some(Bounds { limits, forge: *forge })

@@ -392,3 +392,112 @@ pub fn conditions() -> [client::Condition; 4] {
         client::Condition::Review { head: [4; 32] },
     ]
 }
+
+pub fn errors() -> [(client::api::Error, u8); 18] {
+    use client::api::Error;
+    [
+        (Error::Unavailable, 0),
+        (Error::Timeout, 1),
+        (Error::RateLimited { after: Duration::from_secs(1) }, 2),
+        (Error::Forbidden, 3),
+        (Error::Missing, 4),
+        (Error::MissingJob, 5),
+        (Error::TooLarge, 6),
+        (Error::Empty, 7),
+        (Error::Full, 8),
+        (Error::Exists, 9),
+        (Error::NothingToMerge, 10),
+        (Error::Closed, 11),
+        (Error::Stale, 12),
+        (Error::Conflict, 13),
+        (Error::Protected, 14),
+        (Error::Refused, 15),
+        (Error::InvalidAnswer, 16),
+        (Error::Busy, 17),
+    ]
+}
+pub fn named_call(answer: top::CallPayload) -> top::Stored {
+    top::Stored::Call { key: top::NamedCall { task: 1, attempt: 2, completion: 3, position: 4 }, answer }
+}
+pub fn payloads() -> List<top::CallPayload> {
+    use client::{Made, Outcome};
+    let mut rows = List::with_capacity(80);
+    for made in [
+        Made::Created(1),
+        Made::Commented(2),
+        Made::Reviewed(3),
+        Made::Merged([4; 32]),
+        Made::Updated([5; 32]),
+        Made::Branch([6; 32]),
+        Made::Set,
+    ] {
+        for found in [false, true] {
+            rows.push(payload(Some(Outcome::Made { made, found }))).expect("fixture room");
+        }
+        rows.push(payload(Some(Outcome::Raced { made, why: client::api::Error::Stale }))).expect("fixture room");
+    }
+    for outcome in [
+        Some(Outcome::Failed(client::api::Error::Timeout)),
+        Some(Outcome::Uncertain),
+        Some(Outcome::Held),
+        Some(Outcome::Withdrawn),
+        None,
+    ] {
+        rows.push(payload(outcome)).expect("fixture room");
+    }
+    for (error, _) in errors() {
+        rows.push(top::CallPayload::Refused(error)).expect("fixture room");
+        rows.push(top::CallPayload::Read(Box::new(Err(error)))).expect("fixture room");
+    }
+    rows
+}
+fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
+    top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
+}
+pub fn answers_without_item_pieces() -> [client::api::Answer; 17] {
+    use client::api::{Answer, BranchCreation, Ci, JobAttempt, Permission, Protection, Pull, Settings, State};
+    [
+        Answer::Pull(Pull {
+            reviewers: Box::new([1, 2]),
+            number: 3,
+            state: State::Closed,
+            head: Box::new([4]),
+            base: Box::new([5]),
+            commit: [6; 32],
+            base_commit: Some([7; 32]),
+            merged: Some([8; 32]),
+            mergeable: true,
+            ci: Ci::Passed,
+        }),
+        Answer::Commit([9; 32]),
+        Answer::Branches(Box::new([Box::new([0, 255]), Box::new([1])])),
+        Answer::Job {
+            attempt: JobAttempt { head: [10; 32], run: 11, job: 12, attempt: 13 },
+            log: Box::new([14]),
+            truncated: true,
+        },
+        Answer::File { head: [15; 32], path: Box::new([16]), bytes: Box::new([17]), truncated: true },
+        Answer::Protection(Some(Protection {
+            branch: Box::new([18]),
+            contexts: Box::new([Box::new([19]), Box::new([])]),
+            approvals: 20,
+            dismiss_stale: true,
+        })),
+        Answer::Protection(None),
+        Answer::Settings(Settings { default_branch: Box::new([21]), merge: true, squash: false, rebase: true }),
+        Answer::Permission(Permission::None),
+        Answer::Permission(Permission::Admin),
+        Answer::Created(22),
+        Answer::Commented(23),
+        Answer::Reviewed(24),
+        Answer::Merged([25; 32]),
+        Answer::Branch(BranchCreation::Created),
+        Answer::Branch(BranchCreation::Exists),
+        Answer::Done,
+    ]
+}
+pub fn encoded(value: &crate::v1::Error) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measured error length"));
+    value.encode(&mut writer).expect("measured room");
+    writer.finish()
+}

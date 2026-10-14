@@ -99,3 +99,46 @@ fn outbox_decoding_refuses_fields_past_their_bounds() {
         assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable), "{name}");
     }
 }
+
+#[test]
+fn each_named_call_payload_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for payload in &fixtures::payloads() {
+        let row = fixtures::named_call(payload.clone());
+        let bytes = records::encode(&row).expect("named payload encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+    }
+    for answer in fixtures::answers_without_item_pieces() {
+        let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+        let bytes = records::encode(&row).expect("named read encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+    }
+}
+#[test]
+fn error_tags_are_numbered_as_the_schema_lists_them() {
+    for (error, tag) in fixtures::errors() {
+        let bytes = fixtures::encoded(&records::encode_error(error));
+        assert_eq!(bytes[0], tag, "{error:?}");
+    }
+}
+#[test]
+fn an_answer_piece_past_its_limit_fails_to_decode() {
+    let answer = temper_engine_domain_forge_client::api::Answer::Branches(Box::new([Box::new([0_u8; 4125])]));
+    let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+    let bytes = records::encode(&row).expect("schema ceiling admits piece");
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable));
+}
+#[test]
+fn a_full_answer_at_the_fixture_limits_fits_its_pieces() {
+    let mut branches = skein_lib::List::with_capacity(8);
+    for _ in 0_u32..8 {
+        let branch: Box<[u8]> = Box::new([0_u8; 496]);
+        branches.push(branch).expect("fixture rows");
+    }
+    let answer = temper_engine_domain_forge_client::api::Answer::Branches(branches.into_boxed());
+    let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+    let bytes = records::encode(&row).expect("answer at 4096 retained bytes fits");
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+}

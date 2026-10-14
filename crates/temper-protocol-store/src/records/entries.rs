@@ -1,4 +1,5 @@
 use super::{Bounds, FITS, Undecodable, api, names, w};
+use alloc::boxed::Box;
 use skein_lib::{Time, Wall};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_client as d;
@@ -130,4 +131,74 @@ pub(super) fn encode_proposed(value: &top::ProposedEffect) -> w::ProposedEffect 
 pub(super) fn decode_proposed(value: w::ProposedEffect, bounds: &Bounds) -> Result<top::ProposedEffect, Undecodable> {
     let w::ProposedEffectParts { number, resource, entry } = value.into_parts();
     Ok(top::ProposedEffect { number, resource: names::decode_what(resource, bounds)?, entry: decode_entry(entry) })
+}
+
+#[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
+fn encode_payload(value: &top::CallPayload) -> Option<w::CallPayload> {
+    Some(match value {
+        top::CallPayload::Effect { entry, deadline, outcome } => w::CallPayload::Effect(
+            w::CallEffect::new(
+                &w::CEILINGS,
+                w::CallEffectParts {
+                    entry: *entry,
+                    deadline: deadline.as_nanos(),
+                    outcome: match outcome {
+                        Some(value) => Some(api::encode_outcome(*value)),
+                        None => None,
+                    },
+                },
+            )
+            .expect(FITS),
+        ),
+        top::CallPayload::Refused(error) => w::CallPayload::Refused(
+            w::ErrorValue::new(&w::CEILINGS, w::ErrorValueParts { error: api::encode_error(*error) }).expect(FITS),
+        ),
+        top::CallPayload::Read(value) => {
+            let result = match value.as_ref() {
+                Ok(value) => w::ReadResult::Answer(Box::new(
+                    w::AnswerValue::new(&w::CEILINGS, w::AnswerValueParts { answer: super::answers::encode(value)? })
+                        .expect(FITS),
+                )),
+                Err(error) => w::ReadResult::Error(
+                    w::ErrorValue::new(&w::CEILINGS, w::ErrorValueParts { error: api::encode_error(*error) })
+                        .expect(FITS),
+                ),
+            };
+            w::CallPayload::Read(w::CallRead::new(&w::CEILINGS, w::CallReadParts { result }).expect(FITS))
+        }
+    })
+}
+#[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
+fn decode_payload(value: w::CallPayload, bounds: &Bounds) -> Result<top::CallPayload, Undecodable> {
+    Ok(match value {
+        w::CallPayload::Effect(value) => {
+            let w::CallEffectParts { entry, deadline, outcome } = value.into_parts();
+            top::CallPayload::Effect {
+                entry,
+                deadline: Wall::from_nanos(deadline),
+                outcome: match outcome {
+                    Some(value) => Some(api::decode_outcome(value)),
+                    None => None,
+                },
+            }
+        }
+        w::CallPayload::Refused(value) => top::CallPayload::Refused(api::decode_error(value.into_parts().error)),
+        w::CallPayload::Read(value) => top::CallPayload::Read(Box::new(match value.into_parts().result {
+            w::ReadResult::Answer(value) => Ok(super::answers::decode(value.into_parts().answer, bounds)?),
+            w::ReadResult::Error(value) => Err(api::decode_error(value.into_parts().error)),
+        })),
+    })
+}
+pub(super) fn encode_call(key: &top::NamedCall, answer: &top::CallPayload) -> Option<w::Call> {
+    let top::NamedCall { task, attempt, completion, position } = *key;
+    let key = w::NamedCall::new(&w::CEILINGS, w::NamedCallParts { task, attempt, completion, position }).expect(FITS);
+    Some(w::Call::new(&w::CEILINGS, w::CallParts { key, answer: encode_payload(answer)? }).expect(FITS))
+}
+pub(super) fn decode_call(value: w::Call, bounds: &Bounds) -> Result<top::Stored, Undecodable> {
+    let w::CallParts { key, answer } = value.into_parts();
+    let w::NamedCallParts { task, attempt, completion, position } = key.into_parts();
+    Ok(top::Stored::Call {
+        key: top::NamedCall { task, attempt, completion, position },
+        answer: decode_payload(answer, bounds)?,
+    })
 }

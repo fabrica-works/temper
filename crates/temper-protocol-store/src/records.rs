@@ -3,7 +3,10 @@ use crate::{Bounds, Undecodable, v1 as w};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
+mod answers;
 mod api;
+#[cfg(test)]
+pub(crate) use api::encode_error;
 mod entries;
 mod names;
 mod topics;
@@ -24,7 +27,8 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::Release(value) => w::Value::Release(topics::encode_release(value)),
         d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
-        d::Stored::Call { .. } | d::Stored::Client(_) | d::Stored::Change(_) | d::Stored::Issue(_) => return None,
+        d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)?),
+        d::Stored::Client(_) | d::Stored::Change(_) | d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("row length fits"));
@@ -36,6 +40,7 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
 pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
     let row = w::Row::decode(bounds.limits(), &mut Reader::new(bytes)).or(Err(Undecodable))?;
     Ok(match row.into_parts().value {
+        w::Value::Call(value) => entries::decode_call(value, bounds)?,
         w::Value::ProposedEffect(value) => d::Stored::ProposedEffect(entries::decode_proposed(value, bounds)?),
         w::Value::Entry(value) => entries::decode_entry_row(value),
         w::Value::Repository(value) => d::Stored::Repository(names::decode_adopted(value, bounds)?),
@@ -53,5 +58,18 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
             d::Stored::Landed { commit, task }
         }
         w::Value::Release(value) => d::Stored::Release(topics::decode_release(value, bounds)?),
+    })
+}
+
+pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
+    Some(w::Limits {
+        pull_reviewers: forge.client.rows,
+        pull_head: forge.client.answer_bytes,
+        pull_base: forge.client.answer_bytes,
+        job_answer_log: forge.client.answer_bytes,
+        file_answer_path: forge.client.answer_bytes,
+        file_answer_bytes: forge.client.answer_bytes,
+        branches_answer_branches: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        ..w::CEILINGS
     })
 }

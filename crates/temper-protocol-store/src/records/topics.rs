@@ -69,7 +69,7 @@ pub(super) fn decode_names(resources: List<w::Name>, bounds: &Bounds) -> Result<
     Ok(names.into_boxed())
 }
 
-fn encode_ci(value: api::Ci) -> w::Ci {
+pub(super) fn encode_ci(value: api::Ci) -> w::Ci {
     match value {
         api::Ci::None => w::Ci::None,
         api::Ci::Pending => w::Ci::Pending,
@@ -77,7 +77,7 @@ fn encode_ci(value: api::Ci) -> w::Ci {
         api::Ci::Failed => w::Ci::Failed,
     }
 }
-fn decode_ci(value: w::Ci) -> api::Ci {
+pub(super) fn decode_ci(value: w::Ci) -> api::Ci {
     match value {
         w::Ci::None => api::Ci::None,
         w::Ci::Pending => api::Ci::Pending,
@@ -86,13 +86,13 @@ fn decode_ci(value: w::Ci) -> api::Ci {
     }
 }
 
-fn encode_state(value: api::State) -> w::ItemState {
+pub(super) fn encode_state(value: api::State) -> w::ItemState {
     match value {
         api::State::Open => w::ItemState::Open,
         api::State::Closed => w::ItemState::Closed,
     }
 }
-fn decode_state(value: w::ItemState) -> api::State {
+pub(super) fn decode_state(value: w::ItemState) -> api::State {
     match value {
         w::ItemState::Open => api::State::Open,
         w::ItemState::Closed => api::State::Closed,

@@ -94,7 +94,7 @@ fn encode_protection(value: &d::Protection) -> w::RepositoryProtection {
         }
     }
 }
-fn decode_contexts(bytes: &[u8], bounds: &Bounds) -> Result<Box<[Box<[u8]>]>, Undecodable> {
+pub(super) fn decode_contexts(bytes: &[u8], bounds: &Bounds) -> Result<Box<[Box<[u8]>]>, Undecodable> {
     let mut reader = Reader::new(bytes);
     let mut contexts = List::with_capacity(bounds.forge().client.rows);
     for _ in 0..=bounds.forge().client.rows {

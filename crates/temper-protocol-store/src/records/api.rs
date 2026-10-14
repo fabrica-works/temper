@@ -1,6 +1,6 @@
 use super::{FITS, w};
 use skein_lib::List;
-use temper_engine_domain_forge_client::api as d;
+use temper_engine_domain_forge_client::{self as client, api as d};
 
 fn encode_verdict(value: d::Verdict) -> w::Verdict {
     match value {
@@ -163,4 +163,121 @@ fn encode_reviewers(values: &[u64]) -> List<u64> {
         result.push(*value).expect("same count");
     }
     result
+}
+
+pub(crate) fn encode_error(value: d::Error) -> w::Error {
+    match value {
+        d::Error::Unavailable => w::Error::Unavailable,
+        d::Error::Timeout => w::Error::Timeout,
+        d::Error::RateLimited { after } => {
+            w::Error::RateLimited(w::RateLimited::new(&w::CEILINGS, w::RateLimitedParts { after }).expect(FITS))
+        }
+        d::Error::Forbidden => w::Error::Forbidden,
+        d::Error::Missing => w::Error::Missing,
+        d::Error::MissingJob => w::Error::MissingJob,
+        d::Error::TooLarge => w::Error::TooLarge,
+        d::Error::Empty => w::Error::Empty,
+        d::Error::Full => w::Error::Full,
+        d::Error::Exists => w::Error::Exists,
+        d::Error::NothingToMerge => w::Error::NothingToMerge,
+        d::Error::Closed => w::Error::Closed,
+        d::Error::Stale => w::Error::Stale,
+        d::Error::Conflict => w::Error::Conflict,
+        d::Error::Protected => w::Error::Protected,
+        d::Error::Refused => w::Error::Refused,
+        d::Error::InvalidAnswer => w::Error::InvalidAnswer,
+        d::Error::Busy => w::Error::Busy,
+    }
+}
+pub(super) fn decode_error(value: w::Error) -> d::Error {
+    match value {
+        w::Error::Unavailable => d::Error::Unavailable,
+        w::Error::Timeout => d::Error::Timeout,
+        w::Error::RateLimited(value) => d::Error::RateLimited { after: value.after() },
+        w::Error::Forbidden => d::Error::Forbidden,
+        w::Error::Missing => d::Error::Missing,
+        w::Error::MissingJob => d::Error::MissingJob,
+        w::Error::TooLarge => d::Error::TooLarge,
+        w::Error::Empty => d::Error::Empty,
+        w::Error::Full => d::Error::Full,
+        w::Error::Exists => d::Error::Exists,
+        w::Error::NothingToMerge => d::Error::NothingToMerge,
+        w::Error::Closed => d::Error::Closed,
+        w::Error::Stale => d::Error::Stale,
+        w::Error::Conflict => d::Error::Conflict,
+        w::Error::Protected => d::Error::Protected,
+        w::Error::Refused => d::Error::Refused,
+        w::Error::InvalidAnswer => d::Error::InvalidAnswer,
+        w::Error::Busy => d::Error::Busy,
+    }
+}
+fn encode_made(value: client::Made) -> w::Made {
+    match value {
+        client::Made::Created(number) => {
+            w::Made::Created(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
+        }
+        client::Made::Commented(number) => {
+            w::Made::Commented(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
+        }
+        client::Made::Reviewed(number) => {
+            w::Made::Reviewed(w::Number::new(&w::CEILINGS, w::NumberParts { number }).expect(FITS))
+        }
+        client::Made::Merged(commit) => {
+            w::Made::Merged(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
+        }
+        client::Made::Updated(commit) => {
+            w::Made::Updated(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
+        }
+        client::Made::Branch(commit) => {
+            w::Made::Branch(w::Commit::new(&w::CEILINGS, w::CommitParts { commit }).expect(FITS))
+        }
+        client::Made::Set => w::Made::Set,
+    }
+}
+fn decode_made(value: w::Made) -> client::Made {
+    match value {
+        w::Made::Created(value) => client::Made::Created(value.into_parts().number),
+        w::Made::Commented(value) => client::Made::Commented(value.into_parts().number),
+        w::Made::Reviewed(value) => client::Made::Reviewed(value.into_parts().number),
+        w::Made::Merged(value) => client::Made::Merged(value.into_parts().commit),
+        w::Made::Updated(value) => client::Made::Updated(value.into_parts().commit),
+        w::Made::Branch(value) => client::Made::Branch(value.into_parts().commit),
+        w::Made::Set => client::Made::Set,
+    }
+}
+pub(super) fn encode_outcome(value: client::Outcome) -> w::Outcome {
+    match value {
+        client::Outcome::Made { made, found } => w::Outcome::Made(
+            w::OutcomeMade::new(&w::CEILINGS, w::OutcomeMadeParts { made: encode_made(made), found }).expect(FITS),
+        ),
+        client::Outcome::Failed(error) => w::Outcome::Failed(
+            w::ErrorValue::new(&w::CEILINGS, w::ErrorValueParts { error: encode_error(error) }).expect(FITS),
+        ),
+        client::Outcome::Raced { made, why } => w::Outcome::Raced(
+            w::OutcomeRaced::new(
+                &w::CEILINGS,
+                w::OutcomeRacedParts { made: encode_made(made), why: encode_error(why) },
+            )
+            .expect(FITS),
+        ),
+        client::Outcome::Uncertain => w::Outcome::Uncertain,
+        client::Outcome::Held => w::Outcome::Held,
+        client::Outcome::Withdrawn => w::Outcome::Withdrawn,
+    }
+}
+pub(super) fn decode_outcome(value: w::Outcome) -> client::Outcome {
+    match value {
+        w::Outcome::Made(value) => {
+            let w::OutcomeMadeParts { made, found } = value.into_parts();
+            client::Outcome::Made { made: decode_made(made), found }
+        }
+        w::Outcome::Failed(error) => client::Outcome::Failed(decode_error(error.into_parts().error)),
+        w::Outcome::Raced(value) => {
+            let w::OutcomeRacedParts { made, why } = value.into_parts();
+            client::Outcome::Raced { made: decode_made(made), why: decode_error(why) }
+        }
+        w::Outcome::Uncertain => client::Outcome::Uncertain,
+        w::Outcome::Held => client::Outcome::Held,
+        w::Outcome::Withdrawn => client::Outcome::Withdrawn,
+    }
 }

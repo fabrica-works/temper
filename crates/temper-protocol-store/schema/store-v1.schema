@@ -69,5 +69,32 @@ record Attempt { sent: u64 deadline: u64 wall: u64 expires: u64 }
 record Entry { number: u64 task: u64 repository: Repository effect: Effect start: option Position attempt: option Attempt failures: u32 }
 record EntryRow { entry: Entry held: bool }
 record ProposedEffect { number: u64 resource: What entry: Entry }
-enum Value { proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, release: ReleaseRow }
+
+# 04.3b: named effects, errors and reads without answer-item pieces.
+record RateLimited { after: duration }
+enum Error { unavailable, timeout, rate_limited: RateLimited, forbidden, missing, missing_job, too_large, empty, full, exists, nothing_to_merge, closed, stale, conflict, protected, refused, invalid_answer, busy }
+record ErrorValue { error: Error }
+enum Made { created: Number, commented: Number, reviewed: Number, merged: Commit, updated: Commit, branch: Commit, set }
+record OutcomeMade { made: Made found: bool }
+record OutcomeRaced { made: Made why: Error }
+enum Outcome { made: OutcomeMade, failed: ErrorValue, raced: OutcomeRaced, uncertain, held, withdrawn }
+enum Permission { none, read, write, admin }
+enum BranchCreation { created, exists }
+record Pull { reviewers: list 65536 u64 number: u64 state: ItemState head: bytes 1048576 base: bytes 1048576 commit: fixed 32 base_commit: option fixed 32 merged: option fixed 32 mergeable: bool ci: Ci }
+record JobAttempt { head: fixed 32 run: u64 job: u64 attempt: u32 }
+record JobAnswer { attempt: JobAttempt log: bytes 1048576 truncated: bool }
+record FileAnswer { head: fixed 32 path: bytes 1048576 bytes: bytes 1048576 truncated: bool }
+record BranchesAnswer { branches: bytes 2097152 }
+record ProtectionAnswer { protection: option Protection }
+record PermissionValue { permission: Permission }
+record BranchCreationValue { creation: BranchCreation }
+enum Answer { pull: Pull, commit: Commit, branches: BranchesAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done }
+record AnswerValue { answer: Answer }
+enum ReadResult { answer: boxed AnswerValue, error: ErrorValue }
+record CallRead { result: ReadResult }
+record CallEffect { entry: u64 deadline: u64 outcome: option Outcome }
+enum CallPayload { effect: CallEffect, refused: ErrorValue, read: CallRead }
+record NamedCall { task: u64 attempt: u64 completion: u32 position: u32 }
+record Call { key: NamedCall answer: CallPayload }
+enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, release: ReleaseRow }
 versioned record Row { value: Value }
