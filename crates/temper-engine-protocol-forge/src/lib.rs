@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod boundary;
 pub mod component;
 mod connection;
+mod contents;
 pub mod conventions;
 mod failure;
 pub mod grow;

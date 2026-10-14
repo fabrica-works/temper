@@ -64,7 +64,7 @@ pub(crate) fn answer(answer: &api::Answer, limit: u32) -> Result<u64, api::Error
                     .ok_or(api::Error::TooLarge)?;
             }
         }
-        api::Answer::Statuses { statuses, .. } => {
+        api::Answer::Statuses { statuses, .. } | api::Answer::Checks(statuses) => {
             total = rows(statuses.len(), size_of::<api::Status>(), limit)?;
             for status in statuses {
                 total = total
@@ -107,17 +107,35 @@ pub(crate) fn answer(answer: &api::Answer, limit: u32) -> Result<u64, api::Error
             total = rows(collaborators.len(), size_of::<api::Collaborator>(), limit)?;
         }
         api::Answer::Located { .. } | api::Answer::Commit(_) | api::Answer::Permission(_) => {}
-        api::Answer::PullFiles { .. }
-        | api::Answer::Compare { .. }
-        | api::Answer::Checks(_)
-        | api::Answer::Job { .. }
-        | api::Answer::File { .. }
-        | api::Answer::Created(_)
+        api::Answer::File { path, bytes, .. } => {
+            total = length(path).checked_add(length(bytes)).ok_or(api::Error::TooLarge)?;
+        }
+        api::Answer::Job { log, .. } => total = length(log),
+        api::Answer::PullFiles { files, .. } => total = files_size(files, limit)?,
+        api::Answer::Compare { files, commits, .. } => {
+            total = files_size(files, limit)?
+                .checked_add(rows(commits.len(), size_of::<api::Commit>(), limit)?)
+                .ok_or(api::Error::TooLarge)?;
+        }
+        api::Answer::Created(_)
         | api::Answer::Commented(_)
         | api::Answer::Reviewed(_)
         | api::Answer::Merged(_)
         | api::Answer::Branch(_)
         | api::Answer::Done => return Err(api::Error::InvalidAnswer),
+    }
+    Ok(total)
+}
+fn files_size(files: &[api::File], limit: u32) -> Result<u64, api::Error> {
+    let mut total = rows(files.len(), size_of::<api::File>(), limit)?;
+    for file in files {
+        total = total
+            .checked_add(length(&file.path))
+            .ok_or(api::Error::TooLarge)?
+            .checked_add(optional(file.before.as_deref()))
+            .ok_or(api::Error::TooLarge)?
+            .checked_add(optional(file.after.as_deref()))
+            .ok_or(api::Error::TooLarge)?;
     }
     Ok(total)
 }

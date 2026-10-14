@@ -238,6 +238,21 @@ impl Harness {
         }
         lines
     }
+    pub fn request_bytes(&self, forge: u16) -> Box<[u8]> {
+        let mut length = 0_usize;
+        for (_, peer) in &self.peers {
+            if peer.forge == forge {
+                length = length.checked_add(peer.wire.received.len()).expect("bounded requests");
+            }
+        }
+        let mut out = skein_lib::Writer::new(length);
+        for (_, peer) in &self.peers {
+            if peer.forge == forge {
+                out.put(&peer.wire.received).expect("requests measured");
+            }
+        }
+        out.finish()
+    }
     pub fn connections_opened(&self) -> u32 {
         self.opened
     }

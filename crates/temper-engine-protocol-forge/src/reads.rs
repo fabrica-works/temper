@@ -2,7 +2,7 @@
 use crate::{
     connection::{Body, Heard},
     limits::{self, Limits, Listing, Shared},
-    plan::Step,
+    plan::{Exchange, Step},
     reading,
     tables::{Repository, Tables},
 };
@@ -46,7 +46,8 @@ pub(crate) struct Plan {
     read: api::Read,
     stage: Stage,
     row: Option<Repository>,
-    request: Option<Request>,
+    request: Option<Exchange>,
+    contents: Option<crate::contents::Plan>,
     rows: Rows,
     item: Option<api::Summary>,
     pull: Option<d::PullRequest>,
@@ -70,6 +71,7 @@ impl Plan {
             stage: Stage::Read,
             row: None,
             request: None,
+            contents: None,
             rows: Rows::None,
             item: None,
             pull: None,
@@ -119,10 +121,10 @@ impl Plan {
         }
         self.initial(l, shared, tables)
     }
-    pub fn pending(&mut self) -> Option<Request> {
+    pub fn pending(&mut self) -> Option<Exchange> {
         self.request.take()
     }
-    pub fn set_pending(&mut self, request: Request) {
+    pub fn set_pending(&mut self, request: Exchange) {
         self.request = Some(request);
     }
     fn send(&mut self, request: Request) -> Step {
@@ -209,13 +211,21 @@ impl Plan {
                 Request::Collaborators { at, page: self.paged(Listing::Collaborators, page, l, shared) }
             }
             api::Read::Permission { user } => return Ok(self.permission(user, tables)),
-            api::Read::Locate { .. }
-            | api::Read::Settings
-            | api::Read::PullFiles { .. }
-            | api::Read::Compare { .. }
-            | api::Read::Checks { .. }
-            | api::Read::Job { .. }
-            | api::Read::File { .. } => return Err(api::Error::Unavailable),
+            read @ (api::Read::PullFiles { .. } | api::Read::Compare { .. } | api::Read::File { .. }) => {
+                let mut plan = crate::contents::Plan::new(
+                    read,
+                    self.row.as_ref().expect("resolved").clone(),
+                    l,
+                    shared,
+                    self.cap,
+                )?;
+                let step = plan.begin(shared)?;
+                self.contents = Some(plan);
+                return Ok(step);
+            }
+            api::Read::Locate { .. } | api::Read::Settings | api::Read::Checks { .. } | api::Read::Job { .. } => {
+                return Err(api::Error::Unavailable);
+            }
         };
         Ok(self.send(request))
     }
@@ -235,6 +245,12 @@ impl Plan {
     pub fn after(&self) -> u64 {
         self.after
     }
+    pub fn raw_room(&self, shared: &Shared) -> u32 {
+        match &self.contents {
+            Some(plan) => plan.raw_room(shared),
+            None => shared.client.answer_bytes,
+        }
+    }
     pub fn take_cut(&mut self) -> bool {
         core::mem::replace(&mut self.cut, false)
     }
@@ -245,6 +261,9 @@ impl Plan {
         shared: &Shared,
         tables: &mut Tables,
     ) -> Result<Option<Step>, api::Error> {
+        if let Some(plan) = &mut self.contents {
+            return plan.heard(heard, shared, self.repository, tables);
+        }
         match heard {
             Heard::Head { status, fields } => {
                 if status != 200 {
@@ -598,7 +617,7 @@ fn keep_row(row: &d::Row, forge: u16, tables: &mut Tables) {
         | d::Row::Job(_) => {}
     }
 }
-fn keep_document(document: &d::Document, forge: u16, tables: &mut Tables) {
+pub(crate) fn keep_document(document: &d::Document, forge: u16, tables: &mut Tables) {
     match document {
         d::Document::User(user) => keep_user(user, forge, tables),
         d::Document::Repository(repo) => keep_user(&repo.owner, forge, tables),

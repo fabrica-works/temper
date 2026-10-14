@@ -214,7 +214,8 @@ impl Component {
                     self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").pending();
                 if let Some(request) = request {
                     c.deadline = Some(self.waiting.get(id).expect("call").deadline);
-                    match c.start(env, self.settings.forges.get(at).expect("forge"), request, None) {
+                    c.raw_room(self.waiting.get(id).expect("call").plan.as_ref().expect("plan").raw_room(&self.shared));
+                    match c.start(env, self.settings.forges.get(at).expect("forge"), request.request, request.range) {
                         Ok(()) => {
                             c.keep_after(self.waiting.get(id).expect("call").plan.as_ref().expect("plan").after());
                         }
@@ -296,13 +297,7 @@ impl Component {
                     self.finish(call, id, Err(api::Error::Timeout), up);
                     return true;
                 }
-                self.waiting
-                    .get_mut(id)
-                    .expect("indexed call")
-                    .plan
-                    .as_mut()
-                    .expect("call plan")
-                    .set_pending(exchange.request);
+                self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").set_pending(exchange);
                 false
             }
             Step::Done(result) => {
@@ -338,15 +333,11 @@ fn supported(op: &api::Op) -> bool {
             | api::Read::Protection { .. }
             | api::Read::Settings
             | api::Read::Collaborators { .. }
-            | api::Read::Permission { .. },
-        ) => true,
-        api::Op::Write(_)
-        | api::Op::Read(
-            api::Read::PullFiles { .. }
+            | api::Read::Permission { .. }
+            | api::Read::PullFiles { .. }
             | api::Read::Compare { .. }
-            | api::Read::Checks { .. }
-            | api::Read::Job { .. }
             | api::Read::File { .. },
-        ) => false,
+        ) => true,
+        api::Op::Write(_) | api::Op::Read(api::Read::Checks { .. } | api::Read::Job { .. }) => false,
     }
 }

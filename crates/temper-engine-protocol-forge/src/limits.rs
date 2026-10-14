@@ -355,6 +355,11 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
                 u64::from(s.client.op_bytes)
                     .checked_mul(3)?
                     .checked_add(u64::from(s.client.answer_bytes))?
+                    .checked_add(List::<temper_forge_forgejo::document::ChangedFile>::worst_case(s.client.rows)?)?
+                    .checked_add(u64::from(s.client.rows).checked_mul(u64::from(l.string_bytes).checked_mul(2)?)?)?
+                    .checked_add(List::<api::File>::worst_case(s.client.rows)?)?
+                    .checked_add(List::<api::Commit>::worst_case(s.client.rows)?)?
+                    .checked_add(u64::from(l.string_bytes).checked_mul(4)?)?
                     .checked_add(u64::from(l.string_bytes).checked_mul(u64::from(l.inner).checked_add(5)?)?)?
                     .checked_add(
                         u64::from(l.inner)

@@ -189,7 +189,7 @@ impl Connection {
         self.request = Some(request);
         self.upload = encoded.body;
         self.uploaded = 0;
-        self.raw_max = range.unwrap_or(self.raw_cap.saturating_sub(1));
+        self.raw_max = range.unwrap_or(self.raw_cap);
         self.done = None;
         self.written = false;
         self.after = 0;
@@ -438,12 +438,12 @@ impl Connection {
             fields: Fields { date, retry_after, has_more, content_range, close },
         });
         let l = limits::documents(&env.limits);
-        if response.status == 401 || response.status == 403 {
+        let request = self.request.as_ref().expect("head belongs to a request");
+        if response.status == 401 || response.status == 403 || (response.status == 404 && raw_request(request)) {
             self.receive = Receiving::Empty;
             self.http_down(env, http::Request::Discard);
             return;
         }
-        let request = self.request.as_ref().expect("head belongs to a request");
         let decoder =
             if response.status >= 300 { Some(documents::error_decoder(&l)) } else { documents::decoder(request, &l) };
         match decoder {
@@ -595,7 +595,6 @@ impl Connection {
         }
     }
     /// The answer's remaining payload room, set by the holding plan before its raw read.
-    #[cfg_attr(not(test), expect(dead_code, reason = "13.4 supplies remaining answer room"))]
     pub fn raw_room(&mut self, room: u32) {
         self.raw_cap = room;
     }
