@@ -114,3 +114,261 @@ pub enum Unusable {
     /// The longest request head (target, `Host`, token, agent) past HTTP's `request`.
     Request { forge: u16 },
 }
+
+use crate::settings::{Settings, Transport};
+use alloc::boxed::Box;
+use core::mem::size_of;
+use skein_json::{tokenizer, writer};
+use temper_engine_domain_forge_client::api;
+/// Checks neighbours' agreements, stacked demands, then every configured forge.
+pub fn check(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unusable> {
+    for value in [
+        l.forges,
+        l.token_bytes,
+        l.connections,
+        l.head_bytes,
+        l.headers,
+        l.body_bytes_in,
+        l.depth,
+        l.chunk,
+        l.string_bytes,
+        l.body_bytes,
+        l.inner,
+        l.target_bytes,
+        l.repositories,
+        l.users,
+        l.tls.read,
+        l.tls.send,
+        l.tls.records,
+    ] {
+        if value == 0 {
+            return Err(Unusable::Zero);
+        }
+    }
+    for value in [l.deadline, l.idle, l.start_backoff, l.start_backoff_max] {
+        if value.as_nanos() == 0 {
+            return Err(Unusable::Zero);
+        }
+    }
+    if l.connections != s.client.calls {
+        return Err(Unusable::Connections { connections: l.connections, calls: s.client.calls });
+    }
+    if l.deadline > s.client.lifetime {
+        return Err(Unusable::Deadline { deadline: l.deadline, lifetime: s.client.lifetime });
+    }
+    let needed =
+        u64::from(s.client.op_bytes).checked_mul(2).ok_or(Unusable::Zero)?.checked_add(21).ok_or(Unusable::Zero)?;
+    if u64::from(l.body_bytes) < needed {
+        return Err(Unusable::BodyBytes { body_bytes: l.body_bytes, needed });
+    }
+    if l.string_bytes < s.name_bytes {
+        return Err(Unusable::StringBytes { string_bytes: l.string_bytes, name_bytes: s.name_bytes });
+    }
+    if l.repositories > s.repositories {
+        return Err(Unusable::Repositories { repositories: l.repositories, forge: s.repositories });
+    }
+    if let Err(problem) = documents::check(&documents(l)) {
+        return Err(Unusable::Documents(problem));
+    }
+    for listing in [
+        Listing::Items,
+        Listing::Reviews,
+        Listing::Statuses,
+        Listing::Remarks,
+        Listing::Branches,
+        Listing::Collaborators,
+        Listing::PullFiles,
+    ] {
+        if page_size(listing, u32::MAX, l, s) == 0 {
+            return Err(Unusable::PageSize { listing });
+        }
+    }
+    for tls in [true, false] {
+        let h = http(l, tls, &s.io);
+        let (stacked, read, send) = if tls {
+            (Stacked::HttpOverTls, l.tls.read, l.tls.send)
+        } else {
+            (Stacked::HttpOverIo, s.io.intake, s.io.output)
+        };
+        stack(stacked, skein_http::client::largest_read(&h), read)?;
+        stack(stacked, skein_http::client::largest_room(&h), send)?;
+    }
+    stack(Stacked::TlsOverIo, skein_tls::client::LARGEST_READ, s.io.intake)?;
+    stack(Stacked::TlsOverIo, skein_tls::client::largest_room(&l.tls), s.io.output)?;
+    stack(Stacked::JsonOverHttp, tokenizer::largest_demand(&documents(l).json), http(l, false, &s.io).read)?;
+    check_settings(l, s, settings)?;
+    worst_case(l, s, settings.forges.len()).ok_or(Unusable::Zero)?;
+    Ok(())
+}
+fn check_settings(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unusable> {
+    if settings.forges.len() > l.forges {
+        return Err(Unusable::Forges { forges: l.forges });
+    }
+    for (at, forge) in settings.forges.as_slice().iter().enumerate() {
+        for before in settings.forges.as_slice().get(..at).expect("prior forge positions") {
+            if before.number == forge.number {
+                return Err(Unusable::Duplicate { forge: forge.number });
+            }
+        }
+        if forge.token.is_empty() || forge.token.len() > usize::try_from(l.token_bytes).expect("u32 fits") {
+            return Err(Unusable::Token { forge: forge.number });
+        }
+        if forge.user == 0 {
+            return Err(Unusable::User { forge: forge.number });
+        }
+        let tls = match &forge.transport {
+            Transport::Plaintext => false,
+            Transport::Tls { .. } => true,
+        };
+        match forge.address {
+            skein_io::Addr::Ip(ip) => {
+                if !tls && !ip.ip().is_loopback() {
+                    return Err(Unusable::Address { forge: forge.number });
+                }
+            }
+            skein_io::Addr::InProcess(_) => return Err(Unusable::Address { forge: forge.number }),
+        }
+        // Longest method, target, seven fields and final empty line. Decimal lengths
+        // use u64's longest spelling; headers here reserve their complete framing.
+        let head = u64::from(l.target_bytes)
+            .checked_add(u64::try_from(forge.host.len()).ok().ok_or(Unusable::Zero)?)
+            .ok_or(Unusable::Zero)?;
+        let head = head
+            .checked_add(u64::try_from(forge.token.len()).ok().ok_or(Unusable::Zero)?)
+            .ok_or(Unusable::Zero)?
+            .checked_add(192)
+            .ok_or(Unusable::Zero)?;
+        if head > u64::from(http(l, tls, &s.io).request) {
+            return Err(Unusable::Request { forge: forge.number });
+        }
+    }
+    Ok(())
+}
+fn stack(stacked: Stacked, demand: u32, cap: u32) -> Result<(), Unusable> {
+    if demand > cap { Err(Unusable::Stack { stacked, demand, cap }) } else { Ok(()) }
+}
+/// A listing's largest fixed row and owned payloads, measured as the client measures them.
+#[must_use]
+pub fn page_size(listing: Listing, cap: u32, l: &Limits, s: &Shared) -> u32 {
+    let Some(row) = largest_row(listing, l) else {
+        return 0;
+    };
+    let room = u64::from(s.client.answer_bytes).checked_div(row).unwrap_or(0);
+    s.client.rows.min(cap).min(u32::try_from(room).unwrap_or(u32::MAX))
+}
+fn largest_row(listing: Listing, l: &Limits) -> Option<u64> {
+    let string = u64::from(l.string_bytes);
+    let body = u64::from(l.body_bytes);
+    let key = body / 2; // Every valid marker key is within the retained body's framing.
+    let (fixed, payload) = match listing {
+        Listing::Items => (
+            size_of::<api::Summary>(),
+            body.checked_add(key)?.checked_add(string)?.checked_add(
+                u64::from(l.inner).checked_mul(string.checked_add(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?)?,
+            )?,
+        ),
+        Listing::Reviews => (size_of::<api::Review>(), body.checked_add(key)?),
+        Listing::Statuses => (size_of::<api::Status>(), string.checked_mul(3)?),
+        Listing::Remarks => (size_of::<api::Remark>(), body.checked_add(string)?),
+        Listing::Branches => (size_of::<Box<[u8]>>(), string),
+        Listing::Collaborators => (size_of::<api::Collaborator>(), 0),
+        Listing::PullFiles => (size_of::<api::File>(), string.checked_add(body.checked_mul(2)?)?),
+    };
+    u64::try_from(fixed).ok()?.checked_add(payload)
+}
+/// Derived Forgejo document limits, with body strings capped independently of incoming bytes.
+#[must_use]
+pub fn documents(l: &Limits) -> documents::Limits {
+    documents::Limits {
+        json: tokenizer::Limits {
+            depth: l.depth,
+            string: l.body_bytes.max(l.string_bytes),
+            number: 32,
+            chunk: l.chunk,
+            length: l.body_bytes_in,
+        },
+        writer: writer::Limits { depth: l.depth, length: l.body_bytes_in },
+        string_bytes: l.string_bytes,
+        body_bytes: l.body_bytes,
+        inner: l.inner,
+        target_bytes: l.target_bytes,
+    }
+}
+/// The body stream's demands are chunked; heads use the stream's complete send cap.
+#[must_use]
+pub fn http(l: &Limits, tls: bool, io: &skein_io::Limits) -> skein_http::client::Limits {
+    skein_http::client::Limits {
+        request: if tls { l.tls.send } else { io.output },
+        head: l.head_bytes,
+        headers: l.headers,
+        read: l.chunk.max(5),
+        send: if tls { l.tls.send } else { io.output },
+    }
+}
+/// Conservative complete heap, pricing TLS on every connection because this interface
+/// knows the forge count, not their transports. Raw growth includes its doubling overlap.
+#[must_use]
+pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
+    use crate::{
+        boundary::Answered,
+        component::{Held, Waiting},
+        settings::Forge,
+        start::Start,
+        tables::{RepositoryEntry, UserEntry},
+    };
+    use skein_lib::{Id, Intake, List, Map, Queue, Slab, Token};
+    let docs = documents(l);
+    let raw = u64::from(s.client.answer_bytes).checked_mul(2)?;
+    // Conservatively covers the boxed decoder state and both builder/delivered
+    // rows: 32 scalar strings, two bodies, three lists of texts/users, and the
+    // walker's depth stack. These envelopes exceed every 06.x decoder's fields.
+    let inner = u64::from(l.string_bytes)
+        .checked_mul(3)?
+        .checked_add(u64::try_from(size_of::<temper_forge_forgejo::document::User>()).ok()?.checked_mul(2)?)?
+        .checked_add(u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_mul(2)?)?;
+    let decoder = u64::from(l.string_bytes)
+        .checked_mul(32)?
+        .checked_add(u64::from(l.inner).checked_mul(inner)?)?
+        .checked_add(u64::from(l.body_bytes).checked_mul(2)?)?
+        .checked_add(u64::from(l.depth).checked_mul(128)?)?
+        .checked_add(4096)?;
+    let socket = Intake::worst_case(s.io.intake)?
+        .checked_add(u64::from(s.io.receive))?
+        .checked_add(u64::from(s.io.output))?
+        .checked_add(Queue::<Box<[u8]>>::worst_case(s.io.sends)?)?;
+    let connection = skein_http::client::worst_case(&http(l, true, &s.io))?
+        .max(skein_http::client::worst_case(&http(l, false, &s.io))?)
+        .checked_add(skein_tls::client::worst_case(&l.tls)?)?
+        .checked_add(tokenizer::worst_case(&docs.json)?)?
+        .checked_add(decoder)?
+        .checked_add(raw)?
+        .checked_add(socket)?;
+    let calls = Slab::<Waiting>::worst_case(s.client.calls)?
+        .checked_add(Map::<Token, Id<Waiting>>::worst_case(s.client.calls)?)?
+        .checked_add(
+            u64::from(s.client.calls)
+                .checked_mul(u64::from(s.client.op_bytes).checked_add(u64::from(s.client.answer_bytes))?)?,
+        )?;
+    let held = Map::<Token, Held>::worst_case(s.client.calls)?
+        .checked_add(u64::from(s.client.calls).checked_mul(u64::from(s.client.answer_bytes))?)?;
+    let repositories = Map::<api::Repository, RepositoryEntry>::worst_case(l.repositories)?
+        .checked_add(u64::from(l.repositories).checked_mul(u64::from(l.string_bytes).checked_mul(3)?)?)?;
+    let users = Map::<(u16, u64), UserEntry>::worst_case(l.users)?
+        .checked_add(u64::from(l.users).checked_mul(u64::from(l.string_bytes))?)?;
+    let configured =
+        List::<Forge>::worst_case(l.forges)?.checked_add(List::<Start>::worst_case(l.forges)?)?.checked_add(
+            u64::from(forges).checked_mul(
+                u64::from(l.token_bytes)
+                    .checked_add(u64::from(l.tls.send.max(s.io.output)))?
+                    .checked_add(skein_tls::client::worst_case(&l.tls)?)?,
+            )?,
+        )?;
+    connection
+        .checked_mul(u64::from(l.connections))?
+        .checked_add(calls)?
+        .checked_add(held)?
+        .checked_add(repositories)?
+        .checked_add(users)?
+        .checked_add(configured)?
+        .checked_add(u64::try_from(size_of::<Answered>()).ok()?)
+}

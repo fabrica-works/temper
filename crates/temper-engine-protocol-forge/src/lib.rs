@@ -3,12 +3,15 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod boundary;
+pub mod component;
 pub mod conventions;
 pub mod limits;
 pub mod marker;
 pub mod settings;
 pub mod start;
+pub mod tables;
 pub use boundary::{Answered, Event, Request, StartRead, Stopped};
+pub use component::{Component, Diagnostics, MAX_OUT};
 pub use limits::{Limits, Shared, Unusable};
 pub use settings::Settings;
 #[cfg(test)]
