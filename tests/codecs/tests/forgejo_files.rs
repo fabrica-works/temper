@@ -212,7 +212,7 @@ fn file_transcript_mutations_are_malformed_naming_the_field() {
         let transcript = forgejo::transcript(case);
         let mut json: serde_json::Value = serde_json::from_slice(&transcript.body).expect("JSON");
         match mutation {
-            0 => json[0][field] = serde_json::json!("changed"),
+            0 => json[0][field] = serde_json::json!("unknown"),
             1 => json["commits"][0][field] = serde_json::json!("000000000000000000000000000000000000000"),
             2 => {
                 json.as_object_mut().expect("run").remove(field);

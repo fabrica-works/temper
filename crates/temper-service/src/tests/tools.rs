@@ -146,6 +146,33 @@ fn a_change_result_without_settled_resource_is_invalid() {
     let root::Event::Worker(root::WorkerInput::ResultRead { end, .. }) = event else { panic!("change read") };
     assert_eq!(end, jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Invalid));
 }
+
+#[test]
+fn a_change_result_keeps_the_settled_resource() {
+    let change = smith_domain_run::outcome::Declared::Change(smith_domain_run::outcome::Change {
+        fields: Box::new([smith_domain_run::outcome::Field {
+            name: b"body".as_slice().into(),
+            value: b"Changed".as_slice().into(),
+        }]),
+    });
+    let bytes = smith_protocol_channel::encode_result(&change, &smith_charter::CEILINGS).unwrap();
+    let resource = temper_engine_smith::ChangeResource { connector: 1, kind: 2, resource: 42 };
+    let event = crate::tools::result(Token::new(3), &bytes, Some(resource));
+    let root::Event::Worker(root::WorkerInput::ResultRead { payload, end }) = event else { panic!("change read") };
+    assert_eq!(payload, Token::new(3));
+    assert_eq!(
+        end,
+        jig_domain_tasks::End::Finished {
+            result: jig_domain_tasks::TaskResult::Change {
+                connector: 1,
+                kind: 2,
+                resource: 42,
+                words: b"Changed".as_slice().into(),
+            },
+            cancel_delegates: false,
+        }
+    );
+}
 #[test]
 fn each_settled_delivery_becomes_the_hubs_answer() {
     for (outcome, error, text) in [

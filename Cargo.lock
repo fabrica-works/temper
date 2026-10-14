@@ -1668,6 +1668,7 @@ dependencies = [
  "jig-domain-host",
  "jig-fake-person",
  "jig-protocol-config",
+ "jig-protocol-store",
  "jig-shell-native",
  "jig-view",
  "serde_json",
@@ -1693,9 +1694,12 @@ dependencies = [
  "smith-local-process-world",
  "smith-local-service",
  "temper-client-domain",
+ "temper-engine-domain",
  "temper-engine-protocol-forge",
+ "temper-protocol-store",
  "temper-service",
  "temper-shell-terminal",
+ "temper-throwaway-forgejo",
  "temper-worker-domain",
 ]
 

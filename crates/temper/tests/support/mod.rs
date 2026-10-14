@@ -3,18 +3,19 @@ pub mod configuration;
 pub mod sign_in;
 pub mod terminal;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
+pub mod forgejo;
 pub mod person;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
-pub enum Forge {
+pub enum Forge<'a> {
     Unreached,
+    Throwaway { api: std::net::SocketAddr, git: String, token: &'a str, user: u64 },
 }
 pub(super) fn write_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
-pub fn configuration(directory: &Path, forge: &Forge) {
-    let Forge::Unreached = forge;
+pub fn configuration(directory: &Path, forge: &Forge<'_>) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
     for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
         fs::create_dir(directory.join(name)).expect("deployment directory");
@@ -32,7 +33,9 @@ pub fn configuration(directory: &Path, forge: &Forge) {
     write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     let (agent, value) = configuration::documents(directory, env!("CARGO_BIN_EXE_temper"));
     write_private(&directory.join("agent.json"), &agent);
-    write_private(&directory.join("config.json"), &value);
+    let mut value: serde_json::Value = serde_json::from_slice(&value).expect("deployment JSON");
+    forgejo::configuration(directory, forge, &mut value);
+    write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
 }
 
 /// A case's scratch, retained if a test panics.
@@ -333,6 +336,8 @@ pub fn until_link_then(directory: &Path, signal: Signal, deadline: Duration) -> 
 }
 
 pub const ANSWER: &[u8] = b"Process answer";
+pub const EDIT: &[u8] = b"Changed by temper.\n";
+pub use forgejo::landing_scripts;
 #[must_use]
 pub fn chat_script(answer: &[u8]) -> skein_fake_llm_domain::api::Script {
     use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
@@ -356,17 +361,30 @@ pub struct Seen {
     pub finished: bool,
     pub stderr: Vec<u8>,
 }
-struct ChatJudge {
+struct ChatJudge<'a> {
     ended: bool,
     settled: bool,
     deadline: Time,
+    forge: Option<&'a forgejo::Throwaway>,
+    poll: Time,
+    merged: bool,
 }
-impl Referee<Process> for ChatJudge {
-    fn act(&mut self, _now: Time, procs: &mut [Process]) {
+impl Referee<Process> for ChatJudge<'_> {
+    fn act(&mut self, now: Time, procs: &mut [Process]) {
+        if !self.ended && now >= self.poll {
+            if let Some(forge) = self.forge {
+                self.merged = forge.merged_pull().is_some();
+            }
+            self.poll = now.saturating_add(Duration::from_secs(2));
+        }
         let Process::Person(person) = &procs[1] else {
             panic!("native person");
         };
-        if !self.ended && person.finished && person.client.as_ref().is_some_and(Host::is_empty) {
+        if !self.ended
+            && person.finished
+            && person.client.as_ref().is_some_and(Host::is_empty)
+            && (self.forge.is_none() || self.merged)
+        {
             let Process::Binary(binary) = &mut procs[0] else {
                 panic!("binary");
             };
@@ -384,6 +402,27 @@ impl Referee<Process> for ChatJudge {
         let Process::Binary(binary) = &procs[0] else {
             panic!("binary");
         };
+        let Process::Person(person) = &procs[1] else { panic!("native person") };
+        let queries = procs.iter().find_map(|proc| match proc {
+            Process::Peer(peer) => Some(
+                peer.observations()
+                    .iter()
+                    .filter(|observation| matches!(observation, skein_fake_peers::llm::Observation::Query { .. }))
+                    .count(),
+            ),
+            Process::Binary(_) | Process::Person(_) | Process::Stdout(_) => None,
+        });
+        assert!(
+            person.failed.is_none(),
+            "{}; fake queries: {queries:?}; forge: {}; temper serve stderr: {}",
+            person.failed.as_deref().unwrap_or("person finished"),
+            if person.failed.is_some() {
+                self.forge.map_or_else(|| "none".into(), forgejo::Throwaway::failure_state)
+            } else {
+                "person running".into()
+            },
+            String::from_utf8_lossy(binary.stderr())
+        );
         assert!(
             binary.exit_status().is_none() || self.ended,
             "temper serve failed: {}",
@@ -396,7 +435,11 @@ impl Referee<Process> for ChatJudge {
         );
     }
     fn next_deadline(&self) -> Option<Time> {
-        (!self.settled).then_some(self.deadline)
+        (!self.settled).then_some(if self.forge.is_some() && !self.ended {
+            self.poll.min(self.deadline)
+        } else {
+            self.deadline
+        })
     }
     fn overdue(&self, now: Time) -> Option<String> {
         (!self.settled && now >= self.deadline).then(|| "native person's chat did not finish and settle".into())
@@ -405,11 +448,30 @@ impl Referee<Process> for ChatJudge {
         self.settled
     }
 }
+#[must_use]
 pub fn run(
     directory: &Path,
     script: person::Script,
     peer: Option<skein_fake_peers::llm::Peer>,
     deadline: Duration,
+) -> Seen {
+    run_story(directory, script, peer, deadline, None)
+}
+#[must_use]
+pub fn run_until_landed(
+    directory: &Path,
+    script: person::Script,
+    peer: skein_fake_peers::llm::Peer,
+    forge: &forgejo::Throwaway,
+) -> Seen {
+    run_story(directory, script, Some(peer), Duration::from_secs(180), Some(forge))
+}
+fn run_story(
+    directory: &Path,
+    script: person::Script,
+    peer: Option<skein_fake_peers::llm::Peer>,
+    deadline: Duration,
+    forge: Option<&forgejo::Throwaway>,
 ) -> Seen {
     let clock = Clock::new();
     let mut binary = serve(directory);
@@ -423,6 +485,9 @@ pub fn run(
     let mut world = real::World::new(ChatJudge {
         ended: false,
         settled: false,
+        forge,
+        poll: clock.now().now,
+        merged: false,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
             deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
         )),

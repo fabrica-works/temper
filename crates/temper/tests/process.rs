@@ -31,18 +31,19 @@ fn temper_open_signs_in_prints_the_inbox_and_exits_on_q() {
 }
 
 #[test]
-fn the_binary_answers_a_chat_from_a_person_signed_in_by_its_link() {
-    let scratch = support::Scratch::new("chat");
-    support::configuration(scratch.path(), &support::Forge::Unreached);
-    let peer = support::fake_llm(Box::new([support::chat_script(support::ANSWER)]));
-    let seen = support::run(
-        scratch.path(),
-        support::person::answered_chat(b"Hello", support::ANSWER),
-        Some(peer),
-        Duration::from_secs(60),
-    );
-    assert_eq!(seen.signed_in, 1, "signed in once, by the printed link");
-    assert!(seen.finished, "the person saw the answer: {}", String::from_utf8_lossy(&seen.stderr));
+fn a_persons_change_lands_on_the_forge_and_is_found_after_a_restart() {
+    let scratch = support::Scratch::new("landed");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    support::configuration(scratch.path(), &forgejo.forge());
+    let peer = support::fake_llm(support::landing_scripts(support::ANSWER, &forgejo));
+    let first = support::run_until_landed(scratch.path(), support::person::adopt_and_change(&forgejo), peer, &forgejo);
+    assert_eq!((first.signed_in, first.finished), (1, true), "{}", String::from_utf8_lossy(&first.stderr));
+    let merged = forgejo.merged_pull().expect("the change's pull request is merged");
+    assert!(forgejo.main_readme().ends_with(support::EDIT), "main holds the agent's edit");
+    let second = support::run(scratch.path(), support::person::found(), None, Duration::from_secs(60));
+    assert!(second.finished, "the work is found after the restart");
+    assert_eq!(forgejo.merged_pull(), Some(merged), "the forge's state is unchanged by the restart");
+    forgejo.stop();
     scratch.remove();
 }
 

@@ -473,3 +473,26 @@ fn an_empty_or_non_json_error_body_has_no_message_document() {
         assert!(decoded.rows.is_empty());
     }
 }
+
+#[test]
+fn pull_files_decode_forgejos_changed_status_as_modified() {
+    use crate::document::{ChangedFile, FileStatus, Row};
+    let limits = fixtures::limits();
+    let request = Request::PullFiles {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        number: 7,
+        page: crate::request::Page { page: Some(1), limit: Some(1) },
+    };
+    let body = br#"[{"filename":"notes.md","status":"changed","additions":2,"deletions":1,"changes":3,"previous_filename":"","html_url":"http://127.0.0.1:3000/fixture/specimen/src/commit/head/notes.md","contents_url":"http://127.0.0.1:3000/api/v1/repos/fixture/specimen/contents/notes.md","raw_url":"http://127.0.0.1:3000/fixture/specimen/raw/commit/head/notes.md"}]"#;
+    let decoded = fixtures::decode(client::decoder(&request, &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Ok(Document::Listed { skipped: 0 }), "modified file list");
+    assert_eq!(
+        decoded.rows.as_slice(),
+        &[Row::File(ChangedFile {
+            filename: Box::from(*b"notes.md"),
+            previous_filename: Some(Box::from([])),
+            status: FileStatus::Modified,
+        })],
+        "Forgejo's changed file keeps both sides"
+    );
+}

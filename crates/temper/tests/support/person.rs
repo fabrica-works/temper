@@ -1,5 +1,5 @@
 //! A real native client driven by jig's finite semantic-tree script.
-use jig_fake_person::{Doing, Find, Next, Step, TreeFace};
+use jig_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
 use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::Host;
@@ -10,10 +10,12 @@ const CLOSE: Token = Token::new(u64::MAX - 1);
 /// The script is separate from the client's production composition.
 pub struct Script {
     steps: Box<[Step<Address>]>,
+    resume: bool,
 }
 #[must_use]
 pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     Script {
+        resume: false,
         steps: Box::new([
             Step::Go { address: Address::Jig(jig_domain_client::address::Address::Conversations { project: None }) },
             Step::See { find: Find::named(jig_view::Role::TextArea, b"First words"), within: Duration::from_secs(20) },
@@ -35,6 +37,8 @@ pub struct Person {
     bytes: Vec<u8>,
     wake: Option<Time>,
     pub finished: bool,
+    pub failed: Option<String>,
+    resume: bool,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
 }
@@ -59,6 +63,8 @@ impl Person {
             bytes: Vec::new(),
             wake: None,
             finished: false,
+            failed: None,
+            resume: script.resume,
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
         }
@@ -112,7 +118,7 @@ impl Person {
                     self.root.take().expect("client root"),
                     skein_shell::effective_user(),
                     7,
-                    Start::Link(link.into()),
+                    if self.resume { Start::Token } else { Start::Link(link.into()) },
                 )
                 .expect("printed sign-in link"),
             );
@@ -135,7 +141,8 @@ impl Person {
                     notice,
                     temper_shell_terminal::client::Shown::Notice(temper_shell_terminal::route::Notice::Fact(_))
                 ),
-                "native protocol fact: {notice:?}"
+                "native person step {} protocol fact: {notice:?}",
+                self.actor.at()
             );
             assert!(
                 !matches!(
@@ -148,7 +155,7 @@ impl Person {
             );
         }
         self.wake = None;
-        if client.started() && !self.finished {
+        if client.started() && !self.finished && self.failed.is_none() {
             let before = self.actor.at();
             match self.actor.next(&mut TreeFace::new(client.tree()), now) {
                 Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),
@@ -159,7 +166,9 @@ impl Person {
                     self.finished = true;
                     client.close();
                 }
-                Next::Failed { step, why } => panic!("native person step {step}: {why:?}; tree: {:?}", client.tree()),
+                Next::Failed { step, why } => {
+                    self.failed = Some(format!("native person step {step}: {why:?}"));
+                }
             }
             if self.actor.at() != before {
                 self.wake = Some(now);
@@ -215,5 +224,56 @@ impl Host for Person {
     }
     fn operations(&self) -> u32 {
         512
+    }
+}
+
+#[must_use]
+pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
+    use jig_view::Role;
+    let mut steps = answered_chat(b"Hello", super::ANSWER).steps.into_vec();
+    steps.extend([
+        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: Some(1) }) },
+        Step::See { find: Find::named(Role::Link, b"Adopt a repository"), within: super::WITHIN },
+        Step::Press { find: Find::named(Role::Link, b"Adopt a repository") },
+        Step::See { find: Find::named(Role::TextField, b"Owner"), within: super::WITHIN },
+        Step::Type { find: Find::named(Role::TextField, b"Owner"), words: b"acme".as_slice().into() },
+        Step::Type { find: Find::named(Role::TextField, b"Name"), words: b"widget".as_slice().into() },
+        Step::Type { find: Find::named(Role::TextField, b"Landing branch"), words: b"main".as_slice().into() },
+        Step::Press { find: Find::named(Role::Check, b"It runs CI") },
+        Step::Type {
+            find: Find::named(Role::TextField, b"Checks: gate numbers, separated by spaces or commas"),
+            words: b"1".as_slice().into(),
+        },
+        Step::Press { find: Find::named(Role::Button, b"Adopt") },
+        Step::See { find: Find::text(b"Adopted acme/widget on forge 1 as owned."), within: super::WITHIN },
+    ]);
+    steps.extend([
+        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Conversations { project: None }) },
+        Step::See { find: Find::named(Role::TextArea, b"First words"), within: super::WITHIN },
+        Step::Type {
+            find: Find::named(Role::TextArea, b"First words"),
+            words: b"@forge_chat Land a small change".as_slice().into(),
+        },
+        Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }) },
+        inbox_reply(b"Task 2:"),
+    ]);
+    Script { steps: steps.into_boxed_slice(), resume: false }
+}
+#[must_use]
+pub fn found() -> Script {
+    Script {
+        resume: true,
+        steps: Box::new([
+            Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }) },
+            inbox_reply(b"Task 2:"),
+        ]),
+    }
+}
+fn inbox_reply(task: &[u8]) -> Step<Address> {
+    Step::See {
+        find: Find::text(b"Reply message:")
+            .within(Box::new([Target::Role { role: jig_view::Role::Item, name: task.into() }])),
+        within: super::WITHIN,
     }
 }
