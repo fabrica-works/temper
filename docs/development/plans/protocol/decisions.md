@@ -1346,6 +1346,26 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      once; later proofs follow each newly named cause, counted by symptom
      as ruling 158 says. A cause in another session's file, or in
      production code past the README's 20-line fix, is a question.
+     At 2026-10-14T21:11:55Z the test passed alone (0.248 s); 16.6 named
+     the fake LLM's listener not yet ready, waited for it, and the whole
+     proof then passed the sign-in story.
+
+162. **16.6's typist presses the frame's project for its context only**
+     (temper 16.6, blocked 2026-10-14T21:11:55Z; plan defect). The
+     terminal starts at the inbox with no project, and the navigation's
+     adoption link shows only with a project chosen (client.md, 5.3:
+     "with no project chosen, the slot holds nothing"); the inbox's
+     project filter changes its rows, not the frame's project; jig's
+     frame button for project 1 opens its overview. 16.6's Scope reads
+     "The project's page its link opens is not waited for", its Test
+     shape "The project's page is not opened": the page the native client
+     cannot take (client.md, 5.4) must not be read or waited for. So the
+     typist presses the frame's project 1 button for the context only,
+     follows the navigation's adoption link at once without waiting for
+     the overview, and goes on as 16.6 says: the form, Adopt, "Adopted
+     acme/widget on forge 1 as owned.", `q`. If the refused overview
+     keeps the navigation's link from showing, that is a question with
+     the printed frames. The process proof then runs once.
 
 ## For the user
 
