@@ -236,7 +236,7 @@ fn checks(config: &Config, request: &Request, values: &[a::CheckSummary]) -> Res
             a::Check::Pending | a::Check::Passed => {}
         }
         rows.push(d::CommitStatus {
-            creator: if value.job.is_some() { None } else { Some(routes::user(config, value.status.author)) },
+            creator: if value.link.is_empty() { Some(routes::user(config, value.status.author)) } else { None },
             updated_at: Wall::from_nanos(value.status.at.as_nanos()),
             context: value.status.context.clone(),
             status: status(value.status.state),

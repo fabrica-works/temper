@@ -110,3 +110,50 @@ pub fn response(code: u16, body: &[u8]) -> Vec<u8> {
 pub fn branch() -> temper_engine_domain_forge_client::api::Op {
     api::Op::Read(api::Read::Branch { branch: Box::from(*b"main") })
 }
+
+/// The fake's HTTP and document bounds, matching the service's small profile.
+#[must_use]
+pub fn fake_limits() -> temper_fake_forge_protocol::Limits {
+    temper_fake_forge_protocol::Limits {
+        calls: 4,
+        connections: 4,
+        raw_bytes: 4096,
+        http: skein_http::server::Limits {
+            head: 4096,
+            headers: 16,
+            body: 16384,
+            read: 1024,
+            response: 4096,
+            send: 1024,
+        },
+        documents: temper_forge_forgejo::limits::Limits {
+            json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
+            writer: skein_json::writer::Limits { depth: 16, length: 65536 },
+            string_bytes: 512,
+            body_bytes: 16384,
+            inner: 32,
+            target_bytes: 4096,
+        },
+    }
+}
+/// The token's writer is user 1; the scenario's repository is id 2.
+#[must_use]
+pub fn protocol_config() -> temper_fake_forge_protocol::Config {
+    use temper_fake_forge_protocol::{Config, Faults, Repository};
+    let mut tokens = List::with_capacity(1);
+    tokens.push((Secret::new(Box::from(TOKEN)), 1)).expect("one token");
+    let mut users = List::with_capacity(2);
+    users.push((1, Box::from(b"engine".as_slice()))).expect("user");
+    users.push((2, Box::from(b"person".as_slice()))).expect("user");
+    let mut repositories = List::with_capacity(1);
+    repositories.push(Repository { id: 2, full: Box::from(b"org/repo".as_slice()), protected: None }).expect("repo");
+    Config {
+        base: Box::from(b"http://127.0.0.1:3000".as_slice()),
+        tokens,
+        users,
+        repositories,
+        max_response_items: 2,
+        default_paging_num: 30,
+        faults: Faults { reset: 0, drop: 0, server_error: 0 },
+    }
+}

@@ -52,3 +52,250 @@ pub fn limits() -> Limits {
 pub fn boxed(text: &[u8]) -> Box<[u8]> {
     bytes::copy_of(text)
 }
+
+use crate::{Event, Server, Service};
+use skein_lib::stream::{Down, Read, Up};
+use skein_lib::{Duration, Env, Intake, Queue, ReplyTo, Time, Token, Wall, Writer};
+use temper_fake_forge_domain::{self as fake, api as a};
+pub struct Harness {
+    pub service: Service,
+    pub domain: fake::Domain,
+    pub fake_env: Env<fake::Config>,
+    pub env: Env<Limits>,
+    pub server: Server,
+    pub above: Queue<Event>,
+    pub below: Queue<Down>,
+    pub domain_out: Queue<fake::Request>,
+    pub input: Intake,
+    pub demand: Option<(Read, u32)>,
+    pub output: List<u8>,
+    pub calls: u32,
+    pub closed: bool,
+}
+impl Harness {
+    pub fn new(config: Config) -> Self {
+        let limits = limits();
+        let fake_config = temper_engine_forge_world::fake_config();
+        let mut domain = fake::Domain::new(&fake_config, 3);
+        fake::repository(
+            &mut domain,
+            &fake_config,
+            a::Setup {
+                id: 2,
+                name: boxed(b"org/repo"),
+                default: boxed(b"main"),
+                tree: Box::from([]),
+                labels: Box::from([]),
+                checks: a::Checks {
+                    contexts: Box::new([boxed(b"build")]),
+                    latency_min: Duration::ZERO,
+                    latency_max: Duration::ZERO,
+                    silent: 0,
+                    passes: 0,
+                    reruns: 0,
+                    cue: None,
+                },
+                protection: None,
+                hooked: false,
+            },
+        );
+        fake::grant(&mut domain, b"org/repo", 1, a::Permission::Admin);
+        fake::grant(&mut domain, b"org/repo", 2, a::Permission::Write);
+        let mut h = Self {
+            service: Service::new(config, &limits, 3).expect("config"),
+            server: Server::new(Token::new(1), &limits).expect("server"),
+            domain,
+            fake_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fake_config },
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+            above: Queue::with_capacity(64),
+            below: Queue::with_capacity(64),
+            domain_out: Queue::with_capacity(fake::MAX_OUT),
+            input: Intake::with_capacity(65536),
+            demand: None,
+            output: List::with_capacity(65536),
+            calls: 0,
+            closed: false,
+        };
+        crate::start(&mut h.server, &mut h.service, &h.env, &mut h.above, &mut h.below);
+        h
+    }
+    pub fn request(&mut self, bytes: &[u8]) {
+        self.output.clear();
+        self.input.append(bytes).expect("request fits");
+    }
+    pub fn run(&mut self) {
+        for _ in 0..2048u32 {
+            self.fake_env.now = self.fake_env.now.saturating_add(Duration::from_millis(1));
+            self.env.now = fake::time(&self.fake_env.limits, self.fake_env.now);
+            self.env.wall = Wall::from_nanos(self.env.now.as_nanos());
+            crate::resume(&mut self.server, &mut self.service, &self.env, &mut self.above, &mut self.below);
+            while let Some(down) = self.below.pop() {
+                match down {
+                    Down::Demand { read: Read::Nothing, room: 0 } => {
+                        self.demand = None;
+                    }
+                    Down::Demand { read, room } => {
+                        assert!(self.demand.replace((read, room)).is_none(), "one demand");
+                    }
+                    Down::Send(bytes) => {
+                        for byte in bytes {
+                            self.output.push(byte).expect("response fits");
+                        }
+                    }
+                    Down::Finish => {}
+                }
+            }
+            if let Some((read, room)) = self.demand {
+                let up = if let Some(bytes) = self.input.meet(read) {
+                    Some(Up::Bytes(bytes))
+                } else if room > 0 {
+                    Some(Up::Room)
+                } else {
+                    None
+                };
+                if let Some(up) = up {
+                    self.demand = None;
+                    crate::up(&mut self.server, &mut self.service, &self.env, up, &mut self.above, &mut self.below);
+                }
+            }
+            while let Some(event) = self.above.pop() {
+                match event {
+                    Event::Domain(event) => {
+                        self.calls = self.calls.saturating_add(1);
+                        fake::step(&mut self.domain, &self.fake_env, event, &mut self.domain_out);
+                    }
+                    Event::Close => {
+                        self.closed = true;
+                        crate::closed(&mut self.server, &mut self.service, &self.env, &mut self.above, &mut self.below);
+                    }
+                    Event::Closed => {}
+                }
+            }
+            fake::fire(&mut self.domain, &self.fake_env, &mut self.domain_out);
+            while let Some(reply) = self.domain_out.pop() {
+                if let Ok((_, reply)) = self.service.target(reply) {
+                    crate::down(
+                        &mut self.server,
+                        &mut self.service,
+                        &self.env,
+                        reply,
+                        &mut self.above,
+                        &mut self.below,
+                    );
+                }
+            }
+            self.service.reclaim();
+            self.domain.reclaim();
+            if !self.server.has_work()
+                && self.above.is_empty()
+                && self.below.is_empty()
+                && self.input.is_empty()
+                && self.domain.next_deadline().is_none()
+            {
+                break;
+            }
+        }
+    }
+    pub fn service(&self) -> &Service {
+        &self.service
+    }
+    pub fn domain_calls(&self) -> u32 {
+        self.calls
+    }
+    pub fn status(&self) -> u16 {
+        let bytes = self.output.as_slice();
+        let digits = &bytes[9..12];
+        temper_forge_forgejo::id::unsigned(digits).expect("status").try_into().expect("u16")
+    }
+    pub fn head(&self) -> Box<[u8]> {
+        let out = self.output.as_slice();
+        boxed(&out[..bytes::find(out, b"\r\n\r\n").expect("head").saturating_add(4)])
+    }
+    pub fn body(&self) -> Box<[u8]> {
+        let out = self.output.as_slice();
+        boxed(&out[bytes::find(out, b"\r\n\r\n").expect("head").saturating_add(4)..])
+    }
+    pub fn call(&mut self, user: u64, op: a::Op) -> Result<a::Answer, a::Error> {
+        fake::step(
+            &mut self.domain,
+            &self.fake_env,
+            fake::Event::Call { reply_to: ReplyTo::new(Token::new(999)), user, repository: boxed(b"org/repo"), op },
+            &mut self.domain_out,
+        );
+        for _ in 0..1000u32 {
+            self.fake_env.now = self.fake_env.now.saturating_add(Duration::from_millis(1));
+            self.env.now = fake::time(&self.fake_env.limits, self.fake_env.now);
+            self.env.wall = Wall::from_nanos(self.env.now.as_nanos());
+            fake::fire(&mut self.domain, &self.fake_env, &mut self.domain_out);
+            while let Some(request) = self.domain_out.pop() {
+                if let fake::Request::Reply { to, result } = request {
+                    assert_eq!(to.into_token(), Token::new(999));
+                    self.domain.reclaim();
+                    return result;
+                }
+            }
+        }
+        panic!("direct reply")
+    }
+    pub fn ask(&mut self, method: &[u8], path: &[u8], body: &[u8]) {
+        let digits = skein_lib::Decimal::of(body.len().try_into().expect("length"));
+        let parts = [
+            method,
+            b" ",
+            path,
+            b" HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: token ",
+            TOKEN,
+            b"\r\nContent-Length: ",
+            digits.as_bytes(),
+            b"\r\n\r\n",
+            body,
+        ];
+        let mut length = 0usize;
+        for part in parts {
+            length = length.checked_add(part.len()).expect("request length");
+        }
+        let mut out = Writer::new(length);
+        for part in parts {
+            out.put(part).expect("request");
+        }
+        self.request(&out.finish());
+        self.run();
+    }
+    pub fn issue(&mut self, title: &[u8]) -> u64 {
+        let a::Answer::Created(number) = self
+            .call(
+                2,
+                a::Op::Write(a::Write::CreateIssue {
+                    title: boxed(title),
+                    body: boxed(b"body"),
+                    labels: Box::from([]),
+                }),
+            )
+            .expect("issue")
+        else {
+            panic!("created")
+        };
+        number
+    }
+    pub fn branch(&mut self, name: &[u8], at: u64) {
+        self.call(2, a::Op::Write(a::Write::CreateBranch { branch: boxed(name), commit: at })).expect("branch");
+    }
+    pub fn push(&mut self, branch: &[u8]) -> u64 {
+        let a::Answer::Commit(parent) =
+            self.call(2, a::Op::Read(a::Read::Branch { branch: boxed(b"main") })).expect("tip")
+        else {
+            panic!("tip")
+        };
+        let commit = fake::commit(
+            &mut self.domain,
+            &self.fake_env.limits,
+            parent,
+            Box::new([a::File { path: boxed(b"file"), content: boxed(b"content") }]),
+            b"message",
+        )
+        .expect("commit")
+        .expect("changed");
+        self.call(2, a::Op::Git(a::Git::Push { branch: boxed(branch), commit, expected: None })).expect("push");
+        commit
+    }
+}

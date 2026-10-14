@@ -269,10 +269,10 @@ fn document(config: &Config, request: &Request, select: &Select, answer: &Answer
                 for check in checks {
                     if check.status.context == *context {
                         return Ok(server::Answer::Status(d::CommitStatus {
-                            creator: if check.job.is_some() {
-                                None
-                            } else {
+                            creator: if check.link.is_empty() {
                                 Some(routes::user(config, check.status.author))
+                            } else {
+                                None
                             },
                             updated_at: skein_lib::Wall::from_nanos(check.status.at.as_nanos()),
                             context: check.status.context.clone(),
@@ -326,6 +326,7 @@ pub fn answer(
     select: &Select,
     answer: &Answer,
 ) -> Result<Reply, a::Error> {
+    bounded::answer(config, limits, answer).ok_or(a::Error::TooLarge)?;
     match answer {
         Answer::Done | Answer::Merged(_) => {
             return Ok(Reply { status: status(request), headers: Box::from([]), body: Box::from([]) });
@@ -545,4 +546,150 @@ fn branches(
         out.push(answers::branch(config, request, &branch.branch, branch.commit)).expect("page cap");
     }
     Ok(server::Answer::Branches(out.into_boxed()))
+}
+
+mod bounded {
+    //! Price a projection before it clones unpaged domain rows.
+    use crate::{Config, Limits};
+    use alloc::boxed::Box;
+    use temper_fake_forge_domain::api as a;
+    struct Budget {
+        left: usize,
+        user: usize,
+    }
+    impl Budget {
+        fn row(&mut self, bytes: usize) -> Option<()> {
+            self.left = self.left.checked_sub(bytes.checked_add(self.user)?.checked_add(256)?)?;
+            Some(())
+        }
+        fn names(&mut self, names: &[Box<[u8]>]) -> Option<()> {
+            for name in names {
+                self.left = self.left.checked_sub(name.len().checked_add(16)?)?;
+            }
+            Some(())
+        }
+        fn issue(&mut self, item: &a::Summary) -> Option<()> {
+            self.row(item.title.len().checked_add(item.body.len())?)?;
+            self.names(&item.labels)
+        }
+        fn pull(&mut self, pull: &a::Pull) -> Option<()> {
+            self.row(pull.head.len().checked_add(pull.base.len())?)?;
+            for _ in &pull.reviewers {
+                self.row(0)?;
+            }
+            for review in &pull.reviews {
+                self.row(review.body.len())?;
+            }
+            Some(())
+        }
+        fn files(&mut self, files: &[a::ChangedFile]) -> Option<()> {
+            for file in files {
+                self.row(file.path.len())?;
+            }
+            Some(())
+        }
+    }
+    /// The temporary document's arrays, text and user objects fit one encoded-answer budget.
+    pub fn answer(config: &Config, limits: &Limits, answer: &a::Answer) -> Option<()> {
+        let mut user = 21usize;
+        for (_, login) in &config.users {
+            user = user.max(login.len());
+        }
+        let mut budget = Budget { left: usize::try_from(limits.documents.writer.length).ok()?, user };
+        match answer {
+            a::Answer::Items { items, .. } => {
+                for item in items {
+                    budget.issue(item)?;
+                }
+            }
+            a::Answer::Item { item, .. } => budget.issue(item)?,
+            a::Answer::Comments(comments) => {
+                for comment in comments {
+                    budget.row(comment.body.len())?;
+                }
+            }
+            a::Answer::Comment { comment, .. } => budget.row(comment.body.len())?,
+            a::Answer::Pull(pull) => budget.pull(pull)?,
+            a::Answer::Pulls(pulls) => {
+                for pull in pulls {
+                    budget.pull(pull)?;
+                }
+            }
+            a::Answer::Checks(checks) => {
+                for check in checks {
+                    budget.row(
+                        check
+                            .status
+                            .context
+                            .len()
+                            .checked_add(check.description.len())?
+                            .checked_add(check.link.len())?,
+                    )?;
+                }
+            }
+            a::Answer::Protection(Some(protection)) => {
+                budget.row(protection.branch.len())?;
+                budget.names(&protection.contexts)?;
+            }
+            a::Answer::Settings(settings) => budget.row(
+                settings
+                    .default
+                    .len()
+                    .checked_add(config.base.len())?
+                    .checked_add(usize::try_from(limits.documents.target_bytes).ok()?)?,
+            )?,
+            a::Answer::Collaborators(users) => {
+                for _ in users {
+                    budget.row(0)?;
+                }
+            }
+            a::Answer::Runs(runs) => {
+                for _ in runs {
+                    budget.row(0)?;
+                }
+            }
+            a::Answer::Jobs(jobs) => {
+                for _ in jobs {
+                    budget.row(0)?;
+                }
+            }
+            a::Answer::PullFiles { files, .. } => budget.files(files)?,
+            a::Answer::Comparison { files, commits, .. } => {
+                budget.files(files)?;
+                for _ in commits {
+                    budget.row(0)?;
+                }
+            }
+            a::Answer::Cloned { branches, .. } => {
+                for branch in branches {
+                    budget.row(branch.branch.len())?;
+                }
+            }
+            a::Answer::File(bytes) => {
+                if bytes.len() > usize::try_from(limits.raw_bytes).ok()? {
+                    return None;
+                }
+            }
+            a::Answer::Protection(None)
+            | a::Answer::Located { .. }
+            | a::Answer::Permission(_)
+            | a::Answer::Run(_)
+            | a::Answer::Statuses(_)
+            | a::Answer::Dependencies(_)
+            | a::Answer::Labels(_)
+            | a::Answer::Commit(_)
+            | a::Answer::Tree(_)
+            | a::Answer::Pages { .. }
+            | a::Answer::Page(_)
+            | a::Answer::Created(_)
+            | a::Answer::Commented(_)
+            | a::Answer::Reviewed(_)
+            | a::Answer::Merged(_)
+            | a::Answer::Revision(_)
+            | a::Answer::Done
+            | a::Answer::Pushed(_)
+            | a::Answer::Branch(_) => {}
+        }
+        Some(())
+    }
 }

@@ -8,7 +8,11 @@ use skein_lib::{List, Secret};
 pub mod errors;
 pub mod response;
 pub mod routes;
+mod server;
+mod service;
 pub mod tally;
+pub use server::{Event, MAX_DOWN, MAX_UP, Server, close, closed, down, resume, start, up};
+pub use service::{Error, Service, worst_case};
 pub use tally::{Route, Tally, route};
 /// Caps owned by the protocol layer, in addition to the fake domain's.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
