@@ -14,11 +14,6 @@ const BRANCH: &[u8] = br#"{"name":"work","commit":{"id":"01000000000000000000000
 fn boxed(bytes: &[u8]) -> Box<[u8]> {
     Box::from(bytes)
 }
-fn known() -> Harness {
-    let mut h = Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
-    h
-}
 fn head() -> [u8; 32] {
     let mut bytes = [0; 32];
     bytes[0] = 1;
@@ -52,7 +47,7 @@ fn creation_rows() -> [CreationRow; 3] {
 #[test]
 fn creations_carry_the_key_marker_at_the_head_of_their_body() {
     for (name, write, request, body, expected) in creation_rows() {
-        let mut h = known();
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Write(write));
         h.run(Duration::from_millis(1));
         let written = h.request_bytes(fixtures::FORGE);
@@ -134,7 +129,7 @@ fn write_rows() -> [WriteRow; 7] {
 #[test]
 fn straightforward_writes_use_their_methods_and_literal_bodies() {
     for (name, write, request, json, code, body, expected) in write_rows() {
-        let mut h = known();
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Write(write));
         h.run(Duration::from_millis(1));
         let written = h.request_bytes(fixtures::FORGE);
@@ -219,7 +214,7 @@ fn failures_classify_by_status_call_and_message() {
 }
 #[test]
 fn a_branch_already_there_answers_exists_without_retry() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::CreateBranch { branch: boxed(b"work"), commit: head() }));
     h.answer(fixtures::FORGE, &fixtures::response(409, br#"{"message":"branch already exists"}"#));
     h.run(Duration::ZERO);
@@ -228,7 +223,7 @@ fn a_branch_already_there_answers_exists_without_retry() {
 }
 #[test]
 fn a_malformed_write_answer_is_timeout() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(
         1,
         fixtures::REPO,
@@ -247,7 +242,7 @@ fn write_refusals_read_only_known_entire_messages() {
         ("not JSON", b"arbitrary".as_slice(), Error::Refused),
     ];
     for (name, body, expected) in rows {
-        let mut h = known();
+        let mut h = fixtures::known();
         h.call(
             1,
             fixtures::REPO,
@@ -284,7 +279,7 @@ fn response(h: &mut Harness, code: u16, body: &[u8]) {
 }
 #[test]
 fn open_pull_with_nothing_to_merge_compares_and_writes_nothing() {
-    let mut h = known();
+    let mut h = fixtures::known();
     opening(&mut h);
     response(&mut h, 200, BRANCH);
     response(&mut h, 200, BRANCH);
@@ -299,7 +294,7 @@ fn open_pull_with_nothing_to_merge_compares_and_writes_nothing() {
 }
 #[test]
 fn open_pull_posts_only_after_its_comparison_has_commits() {
-    let mut h = known();
+    let mut h = fixtures::known();
     opening(&mut h);
     response(&mut h, 200, BRANCH);
     response(&mut h, 200, BRANCH);
@@ -323,7 +318,7 @@ fn opening_before_its_post_turns_uncertain_reads_into_unavailable() {
         ("unknown 4xx", 418, br#"{"message":"other"}"#.as_slice(), Error::Unavailable),
     ];
     for (name, code, body, expected) in rows {
-        let mut h = known();
+        let mut h = fixtures::known();
         opening(&mut h);
         response(&mut h, code, body);
         let answered = h.answered(1).expect("failed branch read");
@@ -333,7 +328,7 @@ fn opening_before_its_post_turns_uncertain_reads_into_unavailable() {
 #[test]
 fn openings_deadline_before_post_is_unavailable_after_post_timeout() {
     for (name, post, expected, cost) in [("before", false, Error::Unavailable, 1), ("after", true, Error::Timeout, 4)] {
-        let mut h = known();
+        let mut h = fixtures::known();
         opening(&mut h);
         if post {
             response(&mut h, 200, BRANCH);
@@ -347,7 +342,7 @@ fn openings_deadline_before_post_is_unavailable_after_post_timeout() {
 }
 #[test]
 fn a_merge_sends_the_rows_style_and_reads_its_commit() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
     h.run(Duration::ZERO);
     let written = h.request_bytes(fixtures::FORGE);
@@ -372,7 +367,7 @@ fn every_failure_of_a_merges_read_is_timeout() {
         ("unmerged", 200, PULL),
     ];
     for (name, code, body) in rows {
-        let mut h = known();
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
         response(&mut h, 200, b"");
         response(&mut h, code, body);
@@ -382,7 +377,7 @@ fn every_failure_of_a_merges_read_is_timeout() {
 }
 #[test]
 fn a_merge_style_refusal_drops_the_repository_row() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::Merge { number: 7, head: head() }));
     response(&mut h, 405, br#"{"message":"squash is not an allowed merge style for this repository"}"#);
     let answered = h.answered(1).expect("style refused");
@@ -393,7 +388,7 @@ fn a_merge_style_refusal_drops_the_repository_row() {
 }
 #[test]
 fn set_reviewers_looks_up_missing_ids_then_adds_and_removes_only_the_difference() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([2, 4]) }));
     response(&mut h, 200, REVIEWERS);
     assert!(bytes::find(&h.request_bytes(fixtures::FORGE), b"GET /api/v1/users/search?uid=4&limit=1 ").is_some());
@@ -409,7 +404,7 @@ fn set_reviewers_looks_up_missing_ids_then_adds_and_removes_only_the_difference(
 }
 #[test]
 fn set_reviewers_with_no_difference_writes_only_the_pull_read() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([2, 3]) }));
     response(&mut h, 200, REVIEWERS);
     let answered = h.answered(1).expect("reviewers unchanged");
@@ -420,7 +415,7 @@ fn set_reviewers_with_no_difference_writes_only_the_pull_read() {
 }
 #[test]
 fn a_missing_reviewer_fails_before_any_reviewer_write() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Write(Write::SetReviewers { number: 7, reviewers: Box::from([4]) }));
     response(&mut h, 200, PULL);
     response(&mut h, 200, br#"{"ok":true,"data":[]}"#);
@@ -441,7 +436,7 @@ fn write_answers_with_another_object_format_are_uncertain() {
         ("reviewers", Write::SetReviewers { number: 7, reviewers: Box::from([2]) }, 200, REVIEWERS),
     ];
     for (name, write, code, body) in rows {
-        let mut h = known();
+        let mut h = fixtures::known();
         let mut row = fixtures::specimen();
         row.object_format = temper_forge_forgejo::id::ObjectFormat::Sha256;
         h.known(fixtures::REPO, row);

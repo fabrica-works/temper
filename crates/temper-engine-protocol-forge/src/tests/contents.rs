@@ -16,8 +16,7 @@ const BASE: [u8; 32] = {
 const PULL: &[u8] = br#"{"number":1,"state":"open","head":{"repo_id":1,"ref":"work","sha":"0100000000000000000000000000000000000000"},"base":{"repo_id":1,"ref":"main","sha":"0300000000000000000000000000000000000000"},"merged":false,"merge_commit_sha":null,"merge_base":"0300000000000000000000000000000000000000","mergeable":true,"requested_reviewers":[]}"#;
 #[test]
 fn pull_files_at_another_head_fail_stale_reading_no_file() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::PullFiles { number: 1, head: [0; 32], page: 1 }));
     h.run(Duration::from_millis(1));
     let lines = h.request_lines(fixtures::FORGE).into_boxed();
@@ -29,8 +28,7 @@ fn pull_files_at_another_head_fail_stale_reading_no_file() {
 }
 #[test]
 fn a_files_missing_side_is_absent_and_its_read_counted() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::PullFiles { number: 1, head: HEAD, page: 1 }));
     h.answer(fixtures::FORGE, &fixtures::ok(PULL));
     h.answer(fixtures::FORGE, b"HTTP/1.1 200 OK\r\nContent-Length: 40\r\nX-HasMore: true\r\n\r\n[{\"filename\":\"one\",\"status\":\"modified\"}]");
@@ -66,8 +64,7 @@ fn a_files_missing_side_is_absent_and_its_read_counted() {
 #[test]
 fn pull_files_choose_added_deleted_and_renamed_sides() {
     for (name, document, first, file, cost) in side_cases() {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::PullFiles { number: 1, head: HEAD, page: 2 }));
         h.answer(fixtures::FORGE, &fixtures::ok(PULL));
         h.answer(fixtures::FORGE, &fixtures::ok(document));
@@ -117,8 +114,7 @@ fn side_cases() -> [SideCase; 3] {
 }
 #[test]
 fn comparisons_read_both_directions_and_both_file_sides() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Compare { before: BASE, after: HEAD }));
     h.answer(fixtures::FORGE, &fixtures::ok(br#"{"total_commits":1,"commits":[{"sha":"0100000000000000000000000000000000000000"}],"files":[{"filename":"file","status":"modified"}]}"#));
     h.answer(fixtures::FORGE, &fixtures::ok(br#"{"total_commits":0,"commits":[],"files":[]}"#));
@@ -154,8 +150,7 @@ fn file_reads_send_the_range_and_keep_only_the_requested_bytes() {
         ("long", &b"abcde"[..], 4, &b"Range: bytes=0-4\r\n"[..], &b"abcd"[..], true),
         ("empty", &b"x"[..], 0, &b"Range: bytes=0-0\r\n"[..], &b""[..], true),
     ] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::File { head: HEAD, path: Box::from(&b"a b/c"[..]), max_bytes: max }));
         h.run(Duration::from_millis(1));
         let request = h.request_bytes(fixtures::FORGE);
@@ -211,8 +206,7 @@ fn bounded_cases() -> [BoundedCase; 2] {
 }
 #[test]
 fn multiple_changed_files_each_advance_to_their_own_sides() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::PullFiles { number: 1, head: HEAD, page: 1 }));
     h.answer(fixtures::FORGE, &fixtures::ok(PULL));
     h.answer(
@@ -235,8 +229,7 @@ fn multiple_changed_files_each_advance_to_their_own_sides() {
 }
 #[test]
 fn file_reads_accept_partial_content_and_preserve_raw_bytes() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::File { head: HEAD, path: Box::from(&b"file"[..]), max_bytes: 2 }));
     h.answer(
         fixtures::FORGE,
@@ -323,8 +316,7 @@ fn failing(job: Option<JobAttempt>) -> Status {
 }
 #[test]
 fn checks_find_a_failing_jobs_run_and_attempt_from_its_link() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
     h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
     h.answer(fixtures::FORGE, &fixtures::ok(RUNS));
@@ -343,8 +335,7 @@ fn checks_leave_the_job_absent_when_the_run_or_index_is_missing() {
         ("no index", RUNS, Some(&br#"[{"id":9,"run_id":7,"attempt":1}]"#[..]), 3),
         ("other run", RUNS, Some(&br#"[{"id":9,"run_id":7,"attempt":1},{"id":10,"run_id":8,"attempt":3}]"#[..]), 3),
     ] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
         h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
         h.answer(fixtures::FORGE, &fixtures::ok(runs));
@@ -363,8 +354,7 @@ fn checks_leave_the_job_absent_when_the_run_or_index_is_missing() {
 #[test]
 fn checks_leave_the_job_absent_when_an_actions_lookup_answers_404() {
     for (name, runs, cost) in [("run lookup", None, 2), ("jobs lookup", Some(RUNS), 3)] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
         h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
         if let Some(runs) = runs {
@@ -382,8 +372,7 @@ fn checks_leave_the_job_absent_when_an_actions_lookup_answers_404() {
 }
 #[test]
 fn checks_read_every_status_page_until_one_comes_short() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
     h.answer(fixtures::FORGE, &fixtures::ok(br#"{"state":"success","total_count":2,"statuses":[{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"a","status":"success","description":"","target_url":""},{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"b","status":"pending","description":"","target_url":""}]}"#));
     h.answer(fixtures::FORGE, &fixtures::ok(br#"{"state":"","total_count":0,"statuses":[]}"#));
@@ -413,8 +402,7 @@ fn checks_read_every_status_page_until_one_comes_short() {
 }
 #[test]
 fn a_job_log_at_another_head_is_missing_job() {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
     h.run(Duration::from_millis(1));
     assert_eq!(
@@ -437,8 +425,7 @@ fn a_job_without_its_id_and_attempt_is_missing_job() {
         ("other attempt", &br#"[{"id":10,"run_id":7,"attempt":2}]"#[..]),
         ("other run", &br#"[{"id":10,"run_id":8,"attempt":3}]"#[..]),
     ] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         h.answer(fixtures::FORGE, &fixtures::ok(RUN));
         h.answer(fixtures::FORGE, &fixtures::ok(jobs));
@@ -450,8 +437,7 @@ fn a_job_without_its_id_and_attempt_is_missing_job() {
 #[test]
 fn a_job_read_answered_404_is_missing_job_at_each_exchange() {
     for (name, before, cost) in [("run", &[][..], 1), ("jobs", &[RUN][..], 2), ("log", &[RUN, JOBS][..], 3)] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         for document in before {
             h.answer(fixtures::FORGE, &fixtures::ok(document));
@@ -474,8 +460,7 @@ fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
             true,
         ),
     ] {
-        let mut h = fixtures::Harness::ready();
-        h.known(fixtures::REPO, fixtures::specimen());
+        let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         h.answer(fixtures::FORGE, &fixtures::ok(RUN));
         h.answer(fixtures::FORGE, &fixtures::ok(JOBS));

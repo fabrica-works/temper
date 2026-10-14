@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "tests/engine/protocol-forge",
     "crates/temper-shell-terminal",
     "tests/client",
     "crates/temper-client-view",

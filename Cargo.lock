@@ -1408,6 +1408,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-engine-protocol-forge-world"
+version = "0.0.0"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-tls",
+ "skein-world",
+ "temper-engine-domain-forge-client",
+ "temper-engine-protocol-forge",
+]
+
+[[package]]
 name = "temper-engine-smith"
 version = "0.0.0"
 dependencies = [

@@ -168,6 +168,9 @@ impl Component {
         let _old = self.holders.insert(token, call).expect("one holder per connection");
         let waiting = self.waiting.get_mut(id).expect("indexed call");
         waiting.connection = Some(token);
+        if waiting.plan.is_some() {
+            return true;
+        }
         let op = waiting.op.take().expect("waiting operation");
         let mut plan = Plan::new(waiting.repository, op, cap);
         let step = plan.begin(&env.limits, &self.shared, &mut self.tables);
@@ -285,19 +288,19 @@ impl Component {
     ) -> bool {
         match step {
             Step::Send(exchange) => {
+                self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").set_pending(exchange);
                 let token = self.waiting.get(id).expect("call").connection.expect("holder");
                 let c = self
                     .connection_slab
                     .get_mut(*self.connections.get(&token).expect("connection"))
                     .expect("connection");
                 if c.phase == Phase::Closed {
-                    c.close(true, io);
-                    let error =
-                        self.waiting.get(id).expect("call").plan.as_ref().expect("plan").error(api::Error::Timeout);
-                    self.finish(call, id, Err(error), up);
+                    c.close(false, io);
+                    let _holder = self.holders.remove(&token);
+                    self.waiting.get_mut(id).expect("call").connection = None;
+                    self.wake = Some(env.now);
                     return true;
                 }
-                self.waiting.get_mut(id).expect("indexed call").plan.as_mut().expect("call plan").set_pending(exchange);
                 false
             }
             Step::Done(result) => {

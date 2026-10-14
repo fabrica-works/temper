@@ -197,11 +197,6 @@ use skein_lib::Duration;
 const ISSUE: &[u8] = br#"{"number":1,"pull_request":null,"state":"open","user":{"id":2,"login":"writer"},"labels":[],"updated_at":"2020-01-01T00:00:01+05:30","title":"t","body":"b"}"#;
 const EMPTY_STATUS: &[u8] = br#"{"state":"","total_count":0,"statuses":null}"#;
 const SHA: [u8; 32] = [0; 32];
-fn known() -> fixtures::Harness {
-    let mut h = fixtures::Harness::ready();
-    h.known(fixtures::REPO, fixtures::specimen());
-    h
-}
 fn answer(h: &mut fixtures::Harness, body: &[u8]) {
     h.answer(fixtures::FORGE, &fixtures::ok_dated(body));
     h.run(Duration::ZERO);
@@ -231,7 +226,7 @@ fn listed(body: &[u8]) -> Box<[u8]> {
 }
 #[test]
 fn items_list_since_with_leastupdate_and_an_explicit_page() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Items { since: Time::ZERO, page: 1, kind: None }));
     answer(&mut h, &listed(ISSUE));
     last(&h, b"GET /api/v1/repos/fixture/specimen/issues?state=all&since=1970-01-01T00%3A00%3A00Z&sort=leastupdate&page=1&limit=2 HTTP/1.1");
@@ -294,7 +289,7 @@ fn a_call_without_a_kept_path_resolves_by_id_and_counts_it() {
 }
 #[test]
 fn a_pending_review_is_skipped_but_fills_the_page() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Reviews { number: 1, page: 1 }));
     answer(&mut h, br#"[{"id":1,"user":{"id":2,"login":"writer"},"state":"PENDING","commit_id":"0000000000000000000000000000000000000000","body":"","official":false,"dismissed":false},{"id":2,"user":{"id":2,"login":"writer"},"state":"REQUEST_REVIEW","commit_id":"0000000000000000000000000000000000000000","body":"","official":false,"dismissed":false}]"#);
     assert_eq!(h.answered(1).expect("reviews").result, Ok(Answer::Reviews { reviews: Box::from([]), more: true }));
@@ -302,7 +297,7 @@ fn a_pending_review_is_skipped_but_fills_the_page() {
 }
 #[test]
 fn statuses_say_more_while_pages_fall_short_of_total_count() {
-    let mut h = known();
+    let mut h = fixtures::known();
     for (name, page, total, expected_ci, expected) in [
         ("first", 1, br#"{"state":"pending","total_count":3,"statuses":[]}"#.as_slice(), api::Ci::Pending, true),
         ("later", 3, br#"{"state":"success","total_count":3,"statuses":[]}"#.as_slice(), api::Ci::Passed, false),
@@ -318,7 +313,7 @@ fn statuses_say_more_while_pages_fall_short_of_total_count() {
 }
 #[test]
 fn a_malformed_read_answer_is_invalid_and_closes_its_connection() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Branch { branch: Box::from(&b"main"[..]) }));
     answer(&mut h, b"{}");
     assert_eq!(h.answered(1).expect("malformed answer").result, Err(api::Error::InvalidAnswer));
@@ -355,7 +350,7 @@ fn expected_pull(number: u64, state: api::State) -> api::Pull {
 }
 #[test]
 fn pull_for_lists_open_pulls_when_the_lookup_names_a_closed_one() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::PullFor { head: Box::from(&b"work"[..]), base: Box::from(&b"main"[..]) }));
     answer(&mut h, &pull(12, b"closed", b"work"));
     last(&h, b"GET /api/v1/repos/fixture/specimen/pulls?state=open&sort=oldest&page=1&limit=2 HTTP/1.1");
@@ -367,7 +362,7 @@ fn pull_for_lists_open_pulls_when_the_lookup_names_a_closed_one() {
 }
 #[test]
 fn pull_for_answers_the_lookups_closed_pull_when_none_is_open() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::PullFor { head: Box::from(&b"work"[..]), base: Box::from(&b"main"[..]) }));
     answer(&mut h, &pull(12, b"closed", b"work"));
     answer(&mut h, &listed(&pull(9, b"open", b"other")));
@@ -377,7 +372,7 @@ fn pull_for_answers_the_lookups_closed_pull_when_none_is_open() {
 }
 
 fn revisions_from_bytes() {
-    let mut h = known();
+    let mut h = fixtures::known();
     let long = [b'x'; 1046];
     let rows = [
         (
@@ -497,7 +492,7 @@ fn the_running_answer_size_agrees_with_the_clients_measure() {
     }
 }
 fn actions_from_bytes() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Statuses { commit: SHA, page: 1 }));
     answer(&mut h, br#"{"state":"failure","total_count":1,"statuses":[{"creator":null,"updated_at":"1970-01-01T00:00:02Z","context":"build","status":"failure","description":"failed","target_url":"/fixture/specimen/actions/runs/1/jobs/0"}]}"#);
     assert_eq!(
@@ -529,7 +524,7 @@ fn branch(name: &[u8], rule: &[u8]) -> Box<[u8]> {
 }
 #[test]
 fn branches_read_each_explicit_page_until_one_comes_short() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Branches));
     answer(&mut h, &joined(&[b"[", &branch(b"main", b""), b",", &branch(b"work", b""), b"]"]));
     last(&h, b"GET /api/v1/repos/fixture/specimen/branches?page=2&limit=2 HTTP/1.1");
@@ -542,7 +537,7 @@ fn branches_read_each_explicit_page_until_one_comes_short() {
 }
 #[test]
 fn protection_checks_admin_access_even_when_no_rule_applies() {
-    let mut h = known();
+    let mut h = fixtures::known();
     for (name, call, rule, response, expected) in [
         ("no rule", 1, b"".as_slice(), b"[]".as_slice(), Ok(Answer::Protection(None))),
         ("effective rule", 2, b"main".as_slice(), br#"{"rule_name":"main","enable_status_check":true,"status_check_contexts":["build"],"required_approvals":2,"dismiss_stale_approvals":true}"#.as_slice(), Ok(Answer::Protection(Some(api::Protection { branch: Box::from(&b"main"[..]), contexts: Box::new([Box::from(&b"build"[..])]), approvals: 2, dismiss_stale: true })))),
@@ -559,7 +554,7 @@ fn protection_checks_admin_access_even_when_no_rule_applies() {
 }
 #[test]
 fn a_permission_resolves_its_user_and_reuses_the_kept_login() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Permission { user: 2 }));
     h.run(Duration::ZERO);
     last(&h, b"GET /api/v1/users/search?uid=2&limit=1 HTTP/1.1");
@@ -574,7 +569,7 @@ fn a_permission_resolves_its_user_and_reuses_the_kept_login() {
 }
 #[test]
 fn collaborators_read_each_listed_users_permission() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Collaborators { page: 1 }));
     answer(&mut h, br#"[{"id":2,"login":"writer"}]"#);
     answer(&mut h, PERMISSION);
@@ -602,7 +597,7 @@ fn locate_keeps_the_repository() {
 }
 #[test]
 fn settings_refresh_the_kept_repository() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(2, fixtures::REPO, Op::Read(Read::Settings));
     answer(&mut h, REPOSITORY);
     assert_eq!(
@@ -622,7 +617,7 @@ fn settings_refresh_the_kept_repository() {
 }
 #[test]
 fn remarks_select_the_requested_slice_and_cut_after_it() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Remarks { number: 1, review: 2, page: 2 }));
     let row = br#"{"id":3,"user":{"id":2,"login":"writer"},"path":"file","position":4,"body":"abc"}"#;
     answer(&mut h, &joined(&[b"[", row, b",", row, b",", row, b",", row, b",", row, b"]"]));
@@ -637,7 +632,7 @@ fn a_calls_deadline_distinguishes_connecting_from_a_written_request() {
     for (name, connect, error, cost) in
         [("connecting", false, api::Error::Unavailable, 0), ("written", true, api::Error::Timeout, 1)]
     {
-        let mut h = known();
+        let mut h = fixtures::known();
         h.run(Duration::from_secs(5));
         h.call(1, fixtures::REPO, Op::Read(Read::Settings));
         h.run(Duration::ZERO);
@@ -652,7 +647,7 @@ fn a_calls_deadline_distinguishes_connecting_from_a_written_request() {
 }
 #[test]
 fn closing_an_active_call_discards_it_and_ends_its_socket() {
-    let mut h = known();
+    let mut h = fixtures::known();
     h.call(1, fixtures::REPO, Op::Read(Read::Branch { branch: Box::from(&b"main"[..]) }));
     h.run(Duration::ZERO);
     h.send(crate::Request::Close);

@@ -531,6 +531,7 @@ impl Connection {
             decode::Step::Done(document) => {
                 self.done = Some(Body::Document(document));
             }
+            decode::Step::Malformed(decode::Malformed::Json(tokenizer::Error::Stream(_))) => self.failed(Failure::Seen),
             decode::Step::Malformed(error) => {
                 self.receive = Receiving::Empty;
                 self.phase = Phase::Closed;

@@ -460,3 +460,8 @@ impl ConnectionHarness {
         heard
     }
 }
+pub fn known() -> Harness {
+    let mut h = Harness::ready();
+    h.known(REPO, specimen());
+    h
+}
