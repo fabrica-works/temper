@@ -15,3 +15,4 @@ mod worker_parts;
 mod workers;
 
 mod clients;
+mod worker;

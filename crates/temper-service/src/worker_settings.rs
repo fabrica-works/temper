@@ -1,0 +1,193 @@
+//! The worker's checked construction bounds and payload sizes (protocol.md, 7).
+use crate::{limits, settings};
+use jig_protocol_config::{self as config, Path, Problems, What};
+use jig_protocol_worker_link as link;
+use skein_io as io;
+use skein_lib::{List, Map, Queue, Token};
+use smith_host_protocol as host;
+use temper_protocol_worker_wire::{self as payload, v1};
+use temper_worker_domain as root;
+
+/// Every queue and component bound established before constructing a worker.
+#[derive(Debug)]
+pub struct Prepared {
+    pub root: root::Limits,
+    pub link: link::Limits,
+    pub payload: v1::Limits,
+    pub room: u32,
+    pub lower: u32,
+    pub prefix: u64,
+    pub address: io::Addr,
+}
+
+pub(crate) fn problem(member: &[u8], what: What) -> Problems {
+    let mut problems = Problems::empty();
+    problems.push(Path::root().member(b"workers").child(config::Segment::Index(0)).member(member), what);
+    problems
+}
+
+/// Check the root, host adapter and link before any state is allocated.
+pub fn prepare(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> Result<Prepared, Problems> {
+    let address = match worker.jig.engine {
+        config::Address::Addr(address) => address,
+        config::Address::Host { .. } => return Err(problem(b"engine", What::Form)),
+    };
+    let domain_limits = root_limits(worker, agent, own);
+    root::worst_case(&domain_limits).ok_or(problem(b"limits", What::Bound))?;
+    host::Process::new(Token::new(0), &agent.limits, agent.host_limits.detail_bytes, agent.endpoints.clone())
+        .or(Err(problem(b"agent", What::Bound)))?;
+    let payload = payload_limits(&own.checkout).ok_or(problem(b"limits", What::Bound))?;
+    let link = link_limits(&worker.jig, &payload).ok_or(problem(b"limits", What::Bound))?;
+    link::worst_case(&link).ok_or(problem(b"limits", What::Bound))?;
+    let room = root::max_out(&domain_limits).checked_mul(2).ok_or(problem(b"limits", What::Bound))?;
+    let lower = room.checked_mul(link::MAX_OUT_DOWN).ok_or(problem(b"limits", What::Bound))?;
+    let prefix = crate::tokens::worker(0).ok_or(problem(b"slots", What::Bound))?;
+    worker.jig.slots.checked_mul(4).ok_or(problem(b"slots", What::Bound))?;
+    worker.jig.limits.core.accounts.accounts.checked_add(1).ok_or(problem(b"limits", What::Bound))?;
+    let credential = worker
+        .jig
+        .limits
+        .token
+        .checked_add(jig_protocol_accounts::ACCOUNT_ID_BYTES)
+        .ok_or(problem(b"limits", What::Bound))?
+        .checked_add(2)
+        .ok_or(problem(b"limits", What::Bound))?;
+    if credential > agent.limits.bodies.grant_value_credential {
+        return Err(problem(b"limits", What::Bound));
+    }
+    Ok(Prepared { root: domain_limits, link, payload, room, lower, prefix, address })
+}
+
+#[must_use]
+pub fn root_limits(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> root::Limits {
+    let mut host = worker.jig.limits.hub;
+    host.slots = worker.jig.slots;
+    root::Limits {
+        host,
+        checkout: own.checkout,
+        agent: agent.host_limits,
+        bounds: agent.bounds.clone(),
+        stop_bound: worker.jig.stop_bound,
+    }
+}
+
+/// The worker accepts repository and path bytes only up to its checkout limits.
+#[must_use]
+pub fn payload_limits(checkout: &temper_worker_domain_checkout::Limits) -> Option<v1::Limits> {
+    payload::limits(&payload::Bounds {
+        repositories: checkout.repositories,
+        name_bytes: checkout.name_bytes,
+        remote_bytes: checkout.name_bytes,
+        conflicts: checkout.conflicts,
+        path_bytes: checkout.path_bytes,
+        token_bytes: v1::CEILINGS.identity_token,
+        text_bytes: v1::CEILINGS.identity_name,
+    })
+}
+
+/// Jig's link profile, with every temper part priced by the generated codec.
+#[must_use]
+pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link::Limits> {
+    let jig = &worker.limits;
+    let core = jig.core;
+    let hub = jig.hub;
+    let profile = jig.link;
+    let ceilings = jig_protocol_worker_wire::CEILINGS;
+    let largest = payload::largest(payload)?;
+    let sizes = jig_protocol_worker_wire::sizes::Sizes {
+        charter: u32::try_from(hub.charter_bytes).ok()?,
+        transcript: u32::try_from(hub.transcript_bytes).ok()?,
+        turn: u32::try_from(hub.turn_bytes).ok()?,
+        message: core.tasks.message_bytes,
+        sender: ceilings.message_sender,
+        call_name: u32::try_from(core.fleet.call_name_bytes).ok()?,
+        tool_name: ceilings.call_tool,
+        call_input: core.call_answer_bytes,
+        answer: core.call_answer_bytes,
+        result: u32::try_from(hub.outcome_bytes).ok()?,
+        detail: hub.detail_bytes,
+        grant: jig.token.max(largest.grant),
+        account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
+        name: profile.name,
+        secret: profile.secret,
+        model_name: ceilings.model_bound_name,
+        items: largest.items,
+        left: largest.left,
+        saved: largest.saved,
+        evidence: u32::try_from(hub.delivery_evidence_bytes).ok()?,
+        resource: largest.resource,
+        slots: worker.slots,
+        calls: hub.run_calls,
+        turns: hub.turns,
+        inbox: core.tasks.run_inbox,
+        answered: core.call_records,
+        models: ceilings.bounds_models,
+        workstreams: core.fleet.workstreams,
+        accounts: core.accounts.accounts,
+        credentials: core.accounts.credentials,
+        facts: profile.facts,
+    };
+    Some(link::Limits {
+        sizes,
+        chunk: profile.chunk,
+        handshake: profile.handshake,
+        ping: profile.ping,
+        silence: profile.silence,
+        stall: profile.stall,
+        backoff: profile.backoff,
+        ceiling: profile.ceiling,
+        proved: profile.proved,
+        grace: worker.graces.grace,
+        busy: profile.busy,
+    })
+}
+
+/// The layer's owned queues, processes, values, root and io, as the reference prices them.
+#[must_use]
+pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> Option<u64> {
+    let prepared = prepare(worker, agent, own).ok()?;
+    let jig = &worker.jig;
+    let room = prepared.room;
+    let payload = smith_host_domain::worst_case(&agent.host_limits)?.checked_add(host::worst_case(&agent.limits)?)?;
+    let mut command =
+        u64::try_from(worker.root.len()).ok()?.checked_add(u64::try_from(jig.agent.program.len()).ok()?)?;
+    for argument in &jig.agent.arguments {
+        command = command.checked_add(u64::try_from(argument.len()).ok()?)?;
+    }
+    root::worst_case(&prepared.root)?
+        .checked_add(
+            host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
+                .checked_mul(u64::from(jig.slots))?,
+        )?
+        .checked_add(link::worst_case(&prepared.link)?)?
+        .checked_add(jig_protocol_accounts::table::worst_case(
+            jig.limits.core.accounts.accounts.checked_add(1)?,
+            jig.limits.token,
+        )?)?
+        .checked_add(crate::identities::identities_worst_case(
+            jig.limits.core.accounts.credentials,
+            payload::largest(&prepared.payload)?.grant,
+        )?)?
+        .checked_add(Queue::<root::Request>::worst_case(room)?)?
+        .checked_add(Queue::<root::Event>::worst_case(room)?)?
+        .checked_add(Queue::<host::ProcessEvent>::worst_case(room)?)?
+        .checked_add(Queue::<link::Request>::worst_case(link::MAX_OUT_DOWN)?)?
+        .checked_add(Queue::<io::Request>::worst_case(prepared.lower)?)?
+        .checked_add(Map::<Token, host::Process>::worst_case(jig.slots)?)?
+        .checked_add(Map::<Token, Token>::worst_case(jig.slots.checked_mul(5)?)?)?
+        .checked_add(List::<Token>::worst_case(jig.slots)?.checked_mul(6)?)?
+        .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
+        .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
+        .checked_add(command.checked_mul(u64::from(jig.slots).checked_add(1)?)?)?
+        .checked_add(skein_io::worst_case(&jig.limits.io)?)
+}
+
+/// The application's payload version is part of every worker's opening.
+#[must_use]
+pub fn credential(worker: &settings::Worker, secret: &[u8]) -> link::Credential {
+    link::Credential {
+        name: worker.jig.name.clone(),
+        secret: config::secret(secret.into()),
+        payload: payload::PAYLOAD_VERSION,
+    }
+}

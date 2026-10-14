@@ -16,6 +16,7 @@ pub mod identities;
 pub mod translate;
 pub mod values;
 pub mod worker_route;
+pub mod worker_settings;
 pub mod workers;
 pub use accounts::AccountsRuntime;
 mod engine;

@@ -46,6 +46,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-engine-clients = { git = "https://github.com/forgetic/jig.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
 temper-shell-terminal = { path = "crates/temper-shell-terminal" }

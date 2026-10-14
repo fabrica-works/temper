@@ -758,7 +758,10 @@ pub fn agent() -> settings::Agent {
 }
 
 mod worker;
-pub use worker::{assignment as worker_assignment, identity, one_repository};
+pub use worker::{
+    assignment as worker_assignment, identity, one_repository, worker_agent, worker_files, worker_limits,
+    worker_settings,
+};
 pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64).unwrap()
 }

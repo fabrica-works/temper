@@ -480,6 +480,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-worker-link"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-worker-wire",
+ "skein-channel",
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-worker-wire"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -1498,6 +1510,7 @@ dependencies = [
  "jig-protocol-engine-clients",
  "jig-protocol-engine-workers",
  "jig-protocol-store",
+ "jig-protocol-worker-link",
  "jig-protocol-worker-wire",
  "skein-channel",
  "skein-codec",
