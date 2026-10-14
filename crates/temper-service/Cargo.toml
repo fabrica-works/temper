@@ -1,0 +1,24 @@
+[package]
+name = "temper-service"
+description = "Temper's engine and worker protocol services"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+jig-protocol-config.workspace = true
+jig-domain-host.workspace = true
+smith-protocol-channel.workspace = true
+smith-host-protocol.workspace = true
+smith-host-domain.workspace = true
+temper-engine-domain.workspace = true
+temper-engine-domain-forge.workspace = true
+temper-engine-domain-forge-client.workspace = true
+temper-engine-domain-forge-change.workspace = true
+temper-engine-domain-forge-issues.workspace = true
+temper-worker-domain-checkout.workspace = true
+
+[lints]
+workspace = true

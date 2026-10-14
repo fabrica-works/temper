@@ -313,6 +313,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-config"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "jig-protocol-client-wire",
+ "jig-protocol-engine-clients",
+ "jig-protocol-store",
+ "skein-http",
+ "skein-io",
+ "skein-json",
+ "skein-kv",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-tls",
+]
+
+[[package]]
+name = "jig-protocol-engine-clients"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "jig-protocol-client-wire",
+ "jig-protocol-store",
+ "skein-codec",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-store"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -708,6 +757,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-oauth"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-oauth-accounts"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+dependencies = [
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-oauth",
+ "skein-tls",
+]
+
+[[package]]
 name = "skein-shell"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
@@ -835,6 +905,22 @@ source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee9
 dependencies = [
  "skein-lib",
  "smith-domain",
+]
+
+[[package]]
+name = "smith-host-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+dependencies = [
+ "skein-channel",
+ "skein-io",
+ "skein-lib",
+ "smith-channel",
+ "smith-charter",
+ "smith-domain",
+ "smith-host-domain",
+ "smith-protocol-channel",
+ "smith-transcript",
 ]
 
 [[package]]
@@ -1188,6 +1274,24 @@ version = "0.0.0"
 dependencies = [
  "skein-codec",
  "skein-lib",
+]
+
+[[package]]
+name = "temper-service"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-host",
+ "jig-protocol-config",
+ "skein-lib",
+ "smith-host-domain",
+ "smith-host-protocol",
+ "smith-protocol-channel",
+ "temper-engine-domain",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-change",
+ "temper-engine-domain-forge-client",
+ "temper-engine-domain-forge-issues",
+ "temper-worker-domain-checkout",
 ]
 
 [[package]]
