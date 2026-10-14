@@ -1302,6 +1302,29 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      world's time per phase once, and the change aimed at the largest
      brings the world within ruling 152's 2.0 s.
 
+160. **After a restart, a kept adoption is checked by its key and the
+     engine's record, not the form's sentence** (temper 17.4, blocked
+     2026-10-14T20:54:46Z as a design gap; the design answers it). Ruling
+     159's run shows the original key saved, restored, sent again and
+     answered once, one durable outcome, and no second press; the story
+     then fails waiting for the outcome's sentence on the form after the
+     restart. client.md, 3.3: "A kept adoption has no form to show it:
+     its answer goes to no child"; 3.4: "a client closed on the adoption
+     page opens at the inbox, and the form's values are not kept across
+     a restart". The unblock of 2026-10-14T20:25Z said "keep the
+     pending-at-cut assertion and its literal", meaning the assertion's
+     own words; it kept no sentence after a restart. So the power-loss
+     story's person waits for no form sentence after the restart; the
+     world checks the original key answered once (`adoptions_answered`)
+     and the engine's durable `Stored::Application`; the sentence is read
+     only where the press is answered in the same life. The cost (159's
+     phase times: formatting roots 1.36 s, searching them 0.98 s of the
+     adoption story's 3.23 s): the referee's secrets check formats
+     `Service::fmt_roots` at the end of each life, before each cut and at
+     the story's end, not after every step, and checks each store record
+     and agent environment as the world observes it, as before. 17.4's
+     Scope is unchanged.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
