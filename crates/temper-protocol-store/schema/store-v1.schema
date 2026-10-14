@@ -88,7 +88,17 @@ record BranchesAnswer { branches: bytes 2097152 }
 record ProtectionAnswer { protection: option Protection }
 record PermissionValue { permission: Permission }
 record BranchCreationValue { creation: BranchCreation }
-enum Answer { pull: Pull, commit: Commit, branches: BranchesAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done }
+
+# 04.3ca: item summaries, comments and reviews in answer pieces.
+enum Kind { issue, pull }
+enum Provenance { original, revised, unknown }
+record Summary { labels: bytes 2097152 number: u64 kind: Kind state: ItemState author: u64 key: option bytes 1048576 title: bytes 1048576 body: bytes 1048576 updated: u64 }
+record Comment { id: u64 provenance: Provenance author: u64 created: u64 revision: u64 key: option bytes 1048576 body: bytes 1048576 }
+record Review { id: u64 provenance: Provenance revision: u64 author: u64 verdict: Verdict commit: fixed 32 key: option bytes 1048576 body: bytes 1048576 at: u64 official: bool }
+record ItemsAnswer { items: bytes 2097152 more: bool now: u64 }
+record ItemAnswer { item: Summary comments: bytes 2097152 more: bool }
+record ReviewsAnswer { reviews: bytes 2097152 more: bool }
+enum Answer { items: ItemsAnswer, item: ItemAnswer, pull: Pull, reviews: ReviewsAnswer, commit: Commit, branches: BranchesAnswer, job: JobAnswer, file: FileAnswer, protection: ProtectionAnswer, settings: Settings, permission: PermissionValue, created: Number, commented: Number, reviewed: Number, merged: Commit, branch: BranchCreationValue, done }
 record AnswerValue { answer: Answer }
 enum ReadResult { answer: boxed AnswerValue, error: ErrorValue }
 record CallRead { result: ReadResult }

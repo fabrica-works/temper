@@ -281,3 +281,125 @@ pub(super) fn decode_outcome(value: w::Outcome) -> client::Outcome {
         w::Outcome::Withdrawn => client::Outcome::Withdrawn,
     }
 }
+
+fn encode_kind(value: d::Kind) -> w::Kind {
+    match value {
+        d::Kind::Issue => w::Kind::Issue,
+        d::Kind::Pull => w::Kind::Pull,
+    }
+}
+fn decode_kind(value: w::Kind) -> d::Kind {
+    match value {
+        w::Kind::Issue => d::Kind::Issue,
+        w::Kind::Pull => d::Kind::Pull,
+    }
+}
+fn encode_provenance(value: d::Provenance) -> w::Provenance {
+    match value {
+        d::Provenance::Original => w::Provenance::Original,
+        d::Provenance::Revised => w::Provenance::Revised,
+        d::Provenance::Unknown => w::Provenance::Unknown,
+    }
+}
+fn decode_provenance(value: w::Provenance) -> d::Provenance {
+    match value {
+        w::Provenance::Original => d::Provenance::Original,
+        w::Provenance::Revised => d::Provenance::Revised,
+        w::Provenance::Unknown => d::Provenance::Unknown,
+    }
+}
+pub(super) fn encode_summary(value: &d::Summary) -> w::Summary {
+    let d::Summary { labels, number, kind, state, author, key, title, body, updated } = value;
+    w::Summary::new(
+        &w::CEILINGS,
+        w::SummaryParts {
+            labels: super::names::encode_piece(labels),
+            number: *number,
+            kind: encode_kind(*kind),
+            state: super::topics::encode_state(*state),
+            author: *author,
+            key: key.clone(),
+            title: title.clone(),
+            body: body.clone(),
+            updated: updated.as_nanos(),
+        },
+    )
+    .expect(FITS)
+}
+pub(super) fn decode_summary(value: w::Summary, bounds: &super::Bounds) -> Result<d::Summary, super::Undecodable> {
+    let w::SummaryParts { labels, number, kind, state, author, key, title, body, updated } = value.into_parts();
+    Ok(d::Summary {
+        labels: super::names::decode_contexts(&labels, bounds)?,
+        number,
+        kind: decode_kind(kind),
+        state: super::topics::decode_state(state),
+        author,
+        key,
+        title,
+        body,
+        updated: skein_lib::Time::from_nanos(updated),
+    })
+}
+pub(super) fn encode_comment(value: &d::Comment) -> w::Comment {
+    let d::Comment { id, provenance, author, created, revision, key, body } = value;
+    w::Comment::new(
+        &w::CEILINGS,
+        w::CommentParts {
+            id: *id,
+            provenance: encode_provenance(*provenance),
+            author: *author,
+            created: created.as_nanos(),
+            revision: *revision,
+            key: key.clone(),
+            body: body.clone(),
+        },
+    )
+    .expect(FITS)
+}
+pub(super) fn decode_comment(value: w::Comment) -> d::Comment {
+    let w::CommentParts { id, provenance, author, created, revision, key, body } = value.into_parts();
+    d::Comment {
+        id,
+        provenance: decode_provenance(provenance),
+        author,
+        created: skein_lib::Time::from_nanos(created),
+        revision,
+        key,
+        body,
+    }
+}
+pub(super) fn encode_review(value: &d::Review) -> w::Review {
+    let d::Review { id, provenance, revision, author, verdict, commit, key, body, at, official } = value;
+    w::Review::new(
+        &w::CEILINGS,
+        w::ReviewParts {
+            id: *id,
+            provenance: encode_provenance(*provenance),
+            revision: *revision,
+            author: *author,
+            verdict: encode_verdict(*verdict),
+            commit: *commit,
+            key: key.clone(),
+            body: body.clone(),
+            at: at.as_nanos(),
+            official: *official,
+        },
+    )
+    .expect(FITS)
+}
+pub(super) fn decode_review(value: w::Review) -> d::Review {
+    let w::ReviewParts { id, provenance, revision, author, verdict, commit, key, body, at, official } =
+        value.into_parts();
+    d::Review {
+        id,
+        provenance: decode_provenance(provenance),
+        revision,
+        author,
+        verdict: decode_verdict(verdict),
+        commit,
+        key,
+        body,
+        at: skein_lib::Time::from_nanos(at),
+        official,
+    }
+}

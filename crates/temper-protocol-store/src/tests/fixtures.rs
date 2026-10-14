@@ -501,3 +501,70 @@ pub fn encoded(value: &crate::v1::Error) -> Box<[u8]> {
     value.encode(&mut writer).expect("measured room");
     writer.finish()
 }
+
+pub fn summary() -> client::api::Summary {
+    client::api::Summary {
+        labels: Box::new([Box::new([0, 255]), Box::new([1])]),
+        number: 2,
+        kind: client::api::Kind::Pull,
+        state: client::api::State::Closed,
+        author: 3,
+        key: Some(Box::new([4])),
+        title: Box::new([5]),
+        body: Box::new([6]),
+        updated: skein_lib::Time::from_nanos(7),
+    }
+}
+pub fn comment() -> client::api::Comment {
+    client::api::Comment {
+        id: 1,
+        provenance: client::api::Provenance::Revised,
+        author: 2,
+        created: skein_lib::Time::from_nanos(3),
+        revision: 4,
+        key: Some(Box::new([5])),
+        body: Box::new([6]),
+    }
+}
+pub fn review() -> client::api::Review {
+    client::api::Review {
+        id: 1,
+        provenance: client::api::Provenance::Unknown,
+        revision: 2,
+        author: 3,
+        verdict: client::api::Verdict::Comment,
+        commit: [4; 32],
+        key: Some(Box::new([5])),
+        body: Box::new([6]),
+        at: skein_lib::Time::from_nanos(7),
+        official: true,
+    }
+}
+pub fn item_answers() -> [client::api::Answer; 3] {
+    use client::api::Answer;
+    [
+        Answer::Items { items: Box::new([summary(), summary()]), more: true, now: skein_lib::Time::from_nanos(9) },
+        Answer::Item { item: summary(), comments: Box::new([comment(), comment()]), more: true },
+        Answer::Reviews { reviews: Box::new([review(), review()]), more: true },
+    ]
+}
+pub fn encoded_row(row: &crate::v1::Row) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).expect("measured row length"));
+    row.encode(&mut writer).expect("measured room");
+    writer.finish()
+}
+pub fn item_piece_row(items: Box<[u8]>) -> crate::v1::Row {
+    use crate::v1 as w;
+    let answer = w::Answer::Items(
+        w::ItemsAnswer::new(&w::CEILINGS, w::ItemsAnswerParts { items, more: false, now: 1 }).expect("piece ceiling"),
+    );
+    let result = w::ReadResult::Answer(Box::new(
+        w::AnswerValue::new(&w::CEILINGS, w::AnswerValueParts { answer }).expect("answer ceiling"),
+    ));
+    let answer =
+        w::CallPayload::Read(w::CallRead::new(&w::CEILINGS, w::CallReadParts { result }).expect("call ceiling"));
+    let key = w::NamedCall::new(&w::CEILINGS, w::NamedCallParts { task: 1, attempt: 2, completion: 3, position: 4 })
+        .expect("key ceiling");
+    let value = w::Value::Call(w::Call::new(&w::CEILINGS, w::CallParts { key, answer }).expect("row ceiling"));
+    w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("row ceiling")
+}

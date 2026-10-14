@@ -1,5 +1,7 @@
+use super::api;
 use super::{Bounds, FITS, Undecodable, names, topics, w};
-use skein_lib::List;
+use alloc::boxed::Box;
+use skein_lib::{List, Reader, Writer};
 use temper_engine_domain_forge_client::api as d;
 fn encode_permission(value: d::Permission) -> w::Permission {
     match value {
@@ -83,6 +85,31 @@ fn decode_job_attempt(value: w::JobAttempt) -> d::JobAttempt {
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
 pub(super) fn encode(value: &d::Answer) -> Option<w::Answer> {
     Some(match value {
+        d::Answer::Items { items, more, now } => w::Answer::Items(
+            w::ItemsAnswer::new(
+                &w::CEILINGS,
+                w::ItemsAnswerParts { items: encode_summaries(items), more: *more, now: now.as_nanos() },
+            )
+            .expect(FITS),
+        ),
+        d::Answer::Item { item, comments, more } => w::Answer::Item(
+            w::ItemAnswer::new(
+                &w::CEILINGS,
+                w::ItemAnswerParts {
+                    item: api::encode_summary(item),
+                    comments: encode_comments(comments),
+                    more: *more,
+                },
+            )
+            .expect(FITS),
+        ),
+        d::Answer::Reviews { reviews, more } => w::Answer::Reviews(
+            w::ReviewsAnswer::new(
+                &w::CEILINGS,
+                w::ReviewsAnswerParts { reviews: encode_reviews(reviews), more: *more },
+            )
+            .expect(FITS),
+        ),
         d::Answer::Pull(value) => w::Answer::Pull(encode_pull(value)),
         d::Answer::Commit(commit) => {
             w::Answer::Commit(w::Commit::new(&w::CEILINGS, w::CommitParts { commit: *commit }).expect(FITS))
@@ -142,10 +169,7 @@ pub(super) fn encode(value: &d::Answer) -> Option<w::Answer> {
             .expect(FITS),
         ),
         d::Answer::Done => w::Answer::Done,
-        d::Answer::Items { .. }
-        | d::Answer::Item { .. }
-        | d::Answer::Reviews { .. }
-        | d::Answer::Statuses { .. }
+        d::Answer::Statuses { .. }
         | d::Answer::Remarks { .. }
         | d::Answer::PullFiles { .. }
         | d::Answer::Compare { .. }
@@ -155,6 +179,22 @@ pub(super) fn encode(value: &d::Answer) -> Option<w::Answer> {
 }
 pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Undecodable> {
     Ok(match value {
+        w::Answer::Items(value) => {
+            let w::ItemsAnswerParts { items, more, now } = value.into_parts();
+            d::Answer::Items { items: decode_summaries(&items, bounds)?, more, now: skein_lib::Time::from_nanos(now) }
+        }
+        w::Answer::Item(value) => {
+            let w::ItemAnswerParts { item, comments, more } = value.into_parts();
+            d::Answer::Item {
+                item: api::decode_summary(item, bounds)?,
+                comments: decode_comments(&comments, bounds)?,
+                more,
+            }
+        }
+        w::Answer::Reviews(value) => {
+            let w::ReviewsAnswerParts { reviews, more } = value.into_parts();
+            d::Answer::Reviews { reviews: decode_reviews(&reviews, bounds)?, more }
+        }
         w::Answer::Pull(value) => d::Answer::Pull(decode_pull(value)),
         w::Answer::Commit(value) => d::Answer::Commit(value.into_parts().commit),
         w::Answer::Branches(value) => {
@@ -198,4 +238,98 @@ fn encode_protection(value: &d::Protection) -> w::Protection {
 fn decode_protection(value: w::Protection, bounds: &Bounds) -> Result<d::Protection, Undecodable> {
     let w::ProtectionParts { branch, contexts, approvals, dismiss_stale } = value.into_parts();
     Ok(d::Protection { branch, contexts: names::decode_contexts(&contexts, bounds)?, approvals, dismiss_stale })
+}
+
+fn encode_summaries(values: &[d::Summary]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_summary(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_summary(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_summaries(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Summary]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::Summary::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_summary(item, bounds)?;
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
+}
+fn encode_comments(values: &[d::Comment]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_comment(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_comment(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_comments(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Comment]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::Comment::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_comment(item);
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
+}
+fn encode_reviews(values: &[d::Review]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_review(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_review(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_reviews(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Review]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::Review::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_review(item);
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
 }

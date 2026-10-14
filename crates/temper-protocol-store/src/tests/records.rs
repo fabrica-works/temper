@@ -142,3 +142,42 @@ fn a_full_answer_at_the_fixture_limits_fits_its_pieces() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     assert_eq!(records::decode(&bytes, &bounds), Ok(row));
 }
+
+#[test]
+fn each_item_answer_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for answer in fixtures::item_answers() {
+        let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+        let bytes = records::encode(&row).expect("item answer encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+    }
+}
+#[test]
+fn malformed_answer_item_pieces_fail_to_decode() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    let cases: [(&str, Box<[u8]>); 3] = [
+        ("unfinished length", Box::new([0, 0, 0])),
+        ("item shorter than length", Box::new([0, 0, 0, 1])),
+        ("empty summary", Box::new([0, 0, 0, 0])),
+    ];
+    for (name, piece) in cases {
+        let row = fixtures::item_piece_row(piece);
+        assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable), "{name}");
+    }
+}
+#[test]
+fn answer_item_counts_past_rows_fail_to_decode() {
+    let mut items = skein_lib::List::with_capacity(9);
+    for _ in 0_u32..9 {
+        items.push(fixtures::summary()).expect("fixture room");
+    }
+    let answer = temper_engine_domain_forge_client::api::Answer::Items {
+        items: items.into_boxed(),
+        more: false,
+        now: skein_lib::Time::from_nanos(1),
+    };
+    let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+    let bytes = records::encode(&row).expect("schema ceiling admits count");
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable));
+}

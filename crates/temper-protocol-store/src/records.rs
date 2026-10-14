@@ -63,6 +63,17 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        summary_labels: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        summary_key_some: forge.client.answer_bytes,
+        summary_title: forge.client.answer_bytes,
+        summary_body: forge.client.answer_bytes,
+        comment_key_some: forge.client.answer_bytes,
+        comment_body: forge.client.answer_bytes,
+        review_key_some: forge.client.answer_bytes,
+        review_body: forge.client.answer_bytes,
+        items_answer_items: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        item_answer_comments: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        reviews_answer_reviews: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
         pull_reviewers: forge.client.rows,
         pull_head: forge.client.answer_bytes,
         pull_base: forge.client.answer_bytes,
