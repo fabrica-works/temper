@@ -121,6 +121,20 @@ real forge, and what stands between the `protocol` plan and it, is
   repins after smith's reliability plan
   (`~/src/rust/plans/reliability-plan/`, not versioned), which never
   edits temper.
+- **jig's client composition** (jig's `client/domain/view.md`, sections
+  3 to 5 and 15; `pages.md`, section 12; `root.md`, sections 7 and 15):
+  jig's pages as a library an application arranges, the tree's
+  landmarks and region names, owners in place of connectors in the view,
+  and jig's text shell, `jig-shell-text`. jig's client-composition plan
+  builds them and runs no repin, since the protocol plan holds temper's
+  pins. temper takes them in one repin, after the protocol plan, before
+  its first release on jig's client: `Owner::Side` becomes
+  `Owner::Application`, `Act::Drawing` and the new roles join its
+  matches, its own pages go inside a main landmark, its stories scope by
+  the banner and navigation landmarks, and its terminal's renderer and
+  command reader give way to `jig-shell-text`'s. More than a repin may
+  change, so it is a plan of its own (`draft/mvp.md`, section 6, which
+  then needs revising: it says jig leaves a text shell to applications).
 
 ## 4. Drafts
 
