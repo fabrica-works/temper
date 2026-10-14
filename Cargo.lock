@@ -1225,12 +1225,15 @@ dependencies = [
  "jig-test-domain",
  "jig-test-domain-client",
  "jig-view",
+ "skein-io",
  "skein-lib",
  "skein-world",
  "smith-transcript",
  "temper-client-domain",
  "temper-client-view",
  "temper-engine-domain",
+ "temper-engine-domain-forge",
+ "temper-engine-domain-forge-client",
  "temper-engine-domain-world",
 ]
 

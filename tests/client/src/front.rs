@@ -33,8 +33,37 @@ pub struct Joint {
 }
 impl Joint {
     #[must_use]
+    pub fn engine_adopted(&self, forge: u16, repository: u32) -> bool {
+        use temper_engine_domain_forge::{Key, Role, Stored};
+        let key = engine::Key::Forge(Key::Repository(temper_engine_domain_forge_client::api::Repository {
+            forge,
+            repository,
+        }));
+        let Some(engine::Record::Forge { row }) = self.engine.store.rows.get(&key) else { return false };
+        matches!(row.as_ref(), Stored::Repository(value) if value.project == 1 && value.role == Role::Owned)
+    }
+    #[must_use]
+    pub fn applications_admitted(&self) -> usize {
+        self.engine
+            .store
+            .rows
+            .values()
+            .filter(|record| {
+                matches!(record,
+                    engine::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer { ask, .. }))
+                    if matches!(ask.as_ref(), jig_domain_people::Ask::Application { .. })
+                )
+            })
+            .count()
+    }
+    #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
-        let mut engine = Driver::configured(Store::new(), walking::config(seed), &walking::limits());
+        let mut engine = Driver::with_repositories(
+            Store::new(),
+            walking::config(seed),
+            &temper_engine_domain_world::fixtures::forge_limits(),
+            fixtures::REPOSITORIES,
+        );
         engine.hello(Token::new(7));
         engine.settle();
         let last_commit = engine.store.header().commits;
@@ -115,8 +144,20 @@ impl Joint {
         }
     }
     fn packet(&mut self, request: engine::Request) {
-        if let Some(packet) = translate::incoming(&mut self.transport, request, &self.limits.jig) {
-            self.incoming(packet);
+        match translate::forge::incoming(&mut self.transport, request) {
+            Ok(Some((client, event))) => {
+                if self.lose_answers != 0 {
+                    self.lose_answers -= 1;
+                } else {
+                    self.callbacks.push((client, event));
+                }
+            }
+            Ok(None) => {}
+            Err(request) => {
+                if let Some(packet) = translate::incoming(&mut self.transport, *request, &self.limits.jig) {
+                    self.incoming(packet);
+                }
+            }
         }
     }
     fn settle(&mut self) {
@@ -131,7 +172,11 @@ impl Joint {
                 }
             }
             self.engine.advance(true);
-            if self.engine.root.quiescent() && self.engine.events.is_empty() && self.engine.store.pending.is_empty() {
+            if self.engine.root.quiescent()
+                && self.engine.events.is_empty()
+                && self.engine.store.pending.is_empty()
+                && self.engine.forge.as_ref().is_none_or(temper_engine_domain_world::forge_stand::ForgeStand::quiescent)
+            {
                 return;
             }
         }
@@ -247,7 +292,12 @@ impl Front<Temper> for Joint {
         match fault {
             FrontFault::Restart { offline } => {
                 let store = std::mem::replace(&mut self.engine.store, Store::new());
-                self.engine = Driver::configured(store, walking::config(self.seed), &walking::limits());
+                self.engine = Driver::with_repositories(
+                    store,
+                    walking::config(self.seed),
+                    &temper_engine_domain_world::fixtures::forge_limits(),
+                    fixtures::REPOSITORIES,
+                );
                 self.engine.settle();
                 self.reads = 0;
                 self.read_loads.clear();

@@ -11,6 +11,7 @@ pub struct ForgeStand {
     out: Queue<fake::Request>,
     pending: std::collections::BTreeMap<Token, api::Op>,
     limits: client::Limits,
+    repositories: std::collections::BTreeMap<u32, Box<[u8]>>,
     pub calls: u32,
 }
 
@@ -27,18 +28,26 @@ impl ForgeStand {
     }
     #[must_use]
     pub fn new() -> ForgeStand {
+        Self::with(&[(b"org", b"repo", 2), (b"org", b"private", 3)])
+    }
+    #[must_use]
+    pub fn with(repositories: &[(&[u8], &[u8], u32)]) -> ForgeStand {
         let mut config = temper_engine_forge_world::fake_config();
-        config.limits.repositories = 2;
+        config.limits.repositories = u32::try_from(repositories.len()).expect("bounded repositories");
         config.latency_min = skein_lib::Duration::ZERO;
         config.latency_max = skein_lib::Duration::ZERO;
         let mut domain = fake::Domain::new(&config, 71);
-        for (id, name) in [(2, b"org/repo".as_slice()), (3, b"org/private".as_slice())] {
+        let mut names = std::collections::BTreeMap::new();
+        for (owner, repository, id) in repositories {
+            let mut name = owner.to_vec();
+            name.push(b'/');
+            name.extend_from_slice(repository);
             fake::repository(
                 &mut domain,
                 &config,
                 raw::Setup {
-                    id,
-                    name: name.into(),
+                    id: *id,
+                    name: name.clone().into(),
                     default: b"main".as_slice().into(),
                     tree: Box::new([]),
                     labels: Box::new([]),
@@ -55,10 +64,14 @@ impl ForgeStand {
                     hooked: false,
                 },
             );
-        }
-        for (user, permission) in [(1, raw::Permission::Admin), (2, raw::Permission::Write), (7, raw::Permission::Read)]
-        {
-            fake::grant(&mut domain, b"org/repo", user, permission);
+            if name != b"org/private" {
+                for (user, permission) in
+                    [(1, raw::Permission::Admin), (2, raw::Permission::Write), (7, raw::Permission::Read)]
+                {
+                    fake::grant(&mut domain, &name, user, permission);
+                }
+            }
+            assert!(names.insert(*id, name.into_boxed_slice()).is_none());
         }
         ForgeStand {
             domain,
@@ -66,6 +79,7 @@ impl ForgeStand {
             out: Queue::with_capacity(fake::MAX_OUT),
             pending: std::collections::BTreeMap::new(),
             limits: crate::fixtures::forge_limits().forge.client,
+            repositories: names,
             calls: 0,
         }
     }
@@ -77,11 +91,7 @@ impl ForgeStand {
         let name: Box<[u8]> = if let Some(name) = translate::locate_name(&op) {
             name
         } else {
-            match repository.repository {
-                2 => b"org/repo".as_slice().into(),
-                3 => b"org/private".as_slice().into(),
-                _ => panic!("stand repository is configured"),
-            }
+            self.repositories.get(&repository.repository).expect("stand repository is configured").clone()
         };
         let raw = translate::op(&op, limits);
         assert!(self.pending.insert(call, op).is_none());

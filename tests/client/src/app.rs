@@ -139,12 +139,35 @@ impl App for Temper {
         }
     }
     fn seen(tree: &Tree) -> Vec<Seen> {
-        observe::jig_seen(tree)
+        let mut seen = observe::jig_seen(tree);
+        if adoption_page(tree) {
+            let mut state = jig_client_world::harness::CardSeen::Waiting;
+            for node in tree.nodes() {
+                if node.role == jig_view::Role::Button
+                    && node.name.as_deref() == Some(b"Adopt")
+                    && node.states.as_slice().contains(&jig_view::State::Disabled)
+                {
+                    state = jig_client_world::harness::CardSeen::Deciding;
+                }
+                if node.role == jig_view::Role::Alert
+                    || node.role == jig_view::Role::Status
+                        && node.name.as_deref().is_some_and(|name| {
+                            name.starts_with(b"Adopted ") || name.starts_with(b"It is not known whether ")
+                        })
+                {
+                    state = jig_client_world::harness::CardSeen::Done;
+                }
+            }
+            seen.push(Seen::Card { key: adoption_card(), state, revision: None });
+        }
+        seen
     }
     fn sent(request: &Request) -> Option<Sent> {
         let Request::Send { attempt, key, ask } = request else { return None };
         match ask {
-            domain::Ask::Forge(_) => None,
+            domain::Ask::Forge(_) => {
+                Some(Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None })
+            }
             domain::Ask::Jig(ask) => Some(observe::jig_sent(*attempt, *key, ask)),
         }
     }
@@ -168,6 +191,26 @@ impl App for Temper {
         }
     }
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
-        observe::jig_card(tree, node)
+        if adoption_page(tree)
+            && tree.nodes().iter().any(|value| {
+                value.id == node
+                    && value
+                        .binding
+                        .is_some_and(|binding| binding.owner == jig_view::Owner::Side { connector: fixtures::FORGE })
+            })
+        {
+            Some(adoption_card())
+        } else {
+            observe::jig_card(tree, node)
+        }
     }
+}
+fn adoption_card() -> CardKey {
+    CardKey(b"forge/adoption".to_vec())
+}
+fn adoption_page(tree: &Tree) -> bool {
+    tree.nodes().iter().any(|node| {
+        node.role == jig_view::Role::Heading { level: 1 }
+            && node.text.as_slice().iter().any(|run| run.text.starts_with(b"Adopt a repository into "))
+    })
 }

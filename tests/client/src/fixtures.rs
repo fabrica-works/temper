@@ -13,6 +13,8 @@ use temper_client_view as view;
 use temper_engine_domain as engine;
 use temper_engine_domain_world::direct::Driver;
 pub const FORGE: u16 = 0;
+pub const FORGE_HOST: &[u8] = b"forge.example";
+pub const REPOSITORIES: &[(&[u8], &[u8], u32)] = &[(b"acme", b"shop", 7), (b"acme", b"second", 8)];
 pub const PARTY: u64 = 1;
 pub const SEED: u64 = 1101;
 pub const WITHIN: Duration = Duration::from_secs(1);
@@ -249,4 +251,40 @@ pub fn read(
         return reads::Loaded::Busy;
     }
     reads::Loaded::Page { rows: Box::new([value]), next: None }
+}
+#[must_use]
+pub fn project() -> temper_client_domain::Address {
+    temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
+        project: 1,
+        section: jig_domain_client::address::ProjectSection::Overview,
+    })
+}
+#[must_use]
+pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<jig_fake_person::Step<temper_client_domain::Address>> {
+    use jig_fake_person::{Find, Step};
+    use jig_view::Role;
+    vec![
+        Step::See { find: Find::named(Role::Link, b"Adopt a repository"), within: WITHIN },
+        Step::Press { find: Find::named(Role::Link, b"Adopt a repository") },
+        Step::See { find: Find::named(Role::TextField, b"Owner"), within: WITHIN },
+        Step::Type { find: Find::named(Role::TextField, b"Owner"), words: owner.into() },
+        Step::Type { find: Find::named(Role::TextField, b"Name"), words: name.into() },
+        Step::Type { find: Find::named(Role::TextField, b"Landing branch"), words: b"main".as_slice().into() },
+        Step::Press { find: Find::named(Role::Button, b"Adopt") },
+    ]
+}
+#[must_use]
+pub fn adopt_then_open_resources(
+    owner: &[u8],
+    name: &[u8],
+) -> Vec<jig_fake_person::Step<temper_client_domain::Address>> {
+    use jig_fake_person::{Find, Step};
+    use jig_view::Role;
+    let mut steps = adopt(owner, name);
+    steps.extend([
+        Step::See { find: Find::text(b"Adopted acme/shop on forge 1 as owned."), within: WITHIN },
+        Step::Press { find: Find::named(Role::Link, b"See the project's resources") },
+        Step::See { find: Find::named(Role::Heading { level: 1 }, b"Project"), within: WITHIN },
+    ]);
+    steps
 }

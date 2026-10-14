@@ -71,6 +71,17 @@ impl Driver {
             period_sent: false,
         }
     }
+    #[must_use]
+    pub fn with_repositories(
+        store: Store,
+        config: engine::Config,
+        limits: &engine::Limits,
+        repositories: &[(&[u8], &[u8], u32)],
+    ) -> Driver {
+        let mut driver = Self::configured(store, config, limits);
+        driver.forge = Some(crate::forge_stand::ForgeStand::with(repositories));
+        driver
+    }
 
     /// Offer one input through admission; an input the journal cannot take
     /// is handed back to the world, which keeps it (jig's `domain/root.md`, 3).

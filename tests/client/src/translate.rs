@@ -11,6 +11,7 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use temper_client_domain::{self as client, Event, JigOut, Request};
 use temper_engine_domain::{self as engine, Delivery, PartyInput, PartyRequest};
+pub mod forge;
 
 /// Translate only party inputs the client protocol makes; other core work stays inside the engine.
 #[must_use]
@@ -119,7 +120,10 @@ pub fn request(
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
                 client::Ask::Jig(ask) => ask,
-                client::Ask::Forge(_) => return events,
+                client::Ask::Forge(ask) => {
+                    events.push(forge::request(transport, who, *attempt, *key, ask));
+                    return events;
+                }
             };
             let ask = wire::asks::ask(ask).expect("whole jig ask translates");
             let reply_to =
@@ -227,9 +231,9 @@ fn delivery_packet(
             .watch(watcher)
             .is_some()
             .then(|| packets::ended(transport, watcher, why).expect("original watch terminal")),
-        Delivery::Application { .. } => panic!("no client asked for an application"),
         // Jig has no separate live requester Result; the task document carries it.
-        Delivery::Result { .. }
+        Delivery::Application { .. }
+        | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
         | Delivery::ForgeCommitted { .. }
