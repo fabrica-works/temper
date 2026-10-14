@@ -85,8 +85,11 @@ profiles `process` and `live` (10.4).
 
 - **Codec crates** link `skein-lib` and `skein-codec`, and, for the store
   crate only, `skein-kv`, `jig-protocol-store` and
-  `temper-engine-domain-forge` (its translations' domain side). No codec
-  crate links an engine or worker root.
+  `temper-engine-domain-forge` (its translations' domain side), with the
+  forge's three children whose types `Stored` and `Key` hold,
+  `temper-engine-domain-forge-client`, `temper-engine-domain-forge-change`
+  and `temper-engine-domain-forge-issues` (decisions.md, ruling 101). No
+  codec crate links an engine or worker root.
 - **`temper-forge-forgejo`** links `skein-lib` and `skein-json` only: no
   temper domain type (forge.md, section 2).
 - **`temper-engine-protocol-forge`** links `skein-lib`, `skein-io`,

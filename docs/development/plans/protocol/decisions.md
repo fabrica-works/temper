@@ -179,6 +179,20 @@ the user's delegation (development.md, 2.2 and 10.4).
 The supervisor's rulings follow, numbered from 101 (development.md,
 10.4).
 
+101. **The store crate links the forge's three children** (temper 04.1,
+     blocked 2026-10-14T03:26:27Z; plan defect). `Stored` and `Key` hold
+     types of `temper-engine-domain-forge-client` (`api::Repository`,
+     `api::Commit`, `Key`, ...), `-change` (`Status`, `GateReport`, ...) and
+     `-issues` (`Projected`, `GoalView`), which the forge names through
+     private `use ... as client` aliases in `boundary.rs:6-8` and does not
+     re-export. `temper-protocol-store` lists all three in its
+     `[dependencies]`, with the workspace entries that exist at
+     `Cargo.toml:77-79`; it adds no `pub use` to the forge. They are
+     domain crates of one connector, not a root, so "no codec crate links
+     an engine or worker root" holds, and 04's check
+     (`grep -cE '^temper-(engine|worker)-domain[ .=]'`) still prints 0.
+     code-organization.md, section 3 and session 04 say so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

@@ -185,9 +185,12 @@ run it from 18.1.
 
 - "**Codec crates** link `skein-lib` and `skein-codec`, and, for the store
   crate only, `skein-kv`, `jig-protocol-store` and
-  `temper-engine-domain-forge` (its translations' domain side). No codec
-  crate links an engine or worker root." (code-organization.md, section
-  3) `temper-engine-domain` (for `Range::contains`), `jig-domain-core`
+  `temper-engine-domain-forge` (its translations' domain side), with the
+  forge's three children whose types `Stored` and `Key` hold,
+  `temper-engine-domain-forge-client`, `temper-engine-domain-forge-change`
+  and `temper-engine-domain-forge-issues` (decisions.md, ruling 101). No
+  codec crate links an engine or worker root." (code-organization.md,
+  section 3) `temper-engine-domain` (for `Range::contains`), `jig-domain-core`
   and `jig-domain-tasks` (core keys) are dev-dependencies only.
 - "No increment of this plan ... adds a field or predicate that its
   counterpart across a boundary lacks: a record mirrors its domain type
@@ -724,8 +727,9 @@ the same text. `v1` is a stand-in for the generated code.
 //! session file holds it) into `src/generated/v1.rs`, declared as `pub mod
 //! v1`; the `v1` module below is a stand-in for it. The keys are written
 //! out, not generated (store/README.md, section 3). The crate links
-//! `skein-lib`, `skein-codec`, `skein-kv`, `jig-protocol-store` and
-//! `temper-engine-domain-forge` only; the store's routing, which calls it,
+//! `skein-lib`, `skein-codec`, `skein-kv`, `jig-protocol-store`,
+//! `temper-engine-domain-forge` and its children `-client`, `-change` and
+//! `-issues` only (ruling 101); the store's routing, which calls it,
 //! is `temper-service`'s (08.2a). Until 04.4a (or 04.4b, when `Stored` has
 //! `Application`), `records::encode` returns `Option`, none for a family a
 //! later increment of 04 writes.
