@@ -386,6 +386,22 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      two operations, with no probe, and the promise holds where a
      collision would lose anything. Session 07 says so.
 
+115. **After a reboot, `plan resume` must load the coordinator's
+     thread** (2026-10-14; infrastructure). The machine rebooted for an
+     apt upgrade at about 05:26Z and was back at 06:56Z. `plan resume`
+     failed: `{"code":-32600,"message":"thread not found:
+     01a1386e-..."}`, "the Codex daemon did not start the coordinator's
+     turn". After a restart the daemon's `thread/read` answers the thread
+     with `"status":{"type":"notLoaded"}`, while `plan`'s `resume()`
+     (skein `scripts/dev/plan:812-818`) calls `thread/resume` only when
+     `thread/read` fails. The supervisor called `thread/resume` with
+     `plan`'s parameters (sandbox `danger-full-access`, approval
+     `never`); the thread read `idle`, and `plan resume` then started the
+     coordinator's turn (log.md, "Coordinator resumed,
+     2026-10-14T07:03:22Z"). The fix, `resume()` also calling
+     `thread/resume` when the status is `notLoaded`, is skein's kit, a
+     proposal for the retrospective.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`
