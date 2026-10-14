@@ -8,8 +8,7 @@ development.md, section 3.3).
 
 | Plan | State | Takes the design to | Where |
 |---|---|---|---|
-| web-implementation | done 2026-10-06 to W4; W5 to W10 ready | `web/` in `temper-web-domain` and `temper-web-view`. W1 to W4 are built: the two spines, the person and the client's world, the first slice. W5 to W10 are left: the joint world, inbox, conversation, task page, board, forge panels. The plan now requires translation to the real engine from the first increment and acceptance in the joint world | `docs/plans/web-implementation/` |
-| store plan | ready | `store/README.md` on skein-kv, S1 to S9. Written before jig's store part (jig's `README.md`, section 8) | `docs/design/store/plan.md` |
+| web-implementation | done 2026-10-06 to W4; W5 to W10 superseded 2026-10-14 | `web/` in `temper-web-domain` and `temper-web-view`, W1 to W4: the two spines, the person and the client's world, the first slice. W5 to W10 are never built: temper's client is jig's client with temper's client root (`client.md`), which retires both crates (`client.md`, section 9) | `docs/plans/web-implementation/` |
 
 The domain migration and jig extraction are complete; their plans and
 adopted drafts have been retired. jig is now a separate repository,
@@ -20,6 +19,10 @@ scenarios run through jig's conformance kit (`tests/conformance/README.md`),
 and the system world composes the engine, worker and real Smith agents
 (`tests/system/README.md`).
 
+The protocol layer is designed for standalone mode (`protocol.md`); the
+plan that builds it, `protocol`, is to be written. "protocol" in the
+table below names it.
+
 No plan is active. The designer marks plans active and done in this file
 (skein's development.md, sections 3.3 and 10.5).
 
@@ -27,51 +30,66 @@ No plan is active. The designer marks plans active and done in this file
 
 | Document | Built | Left |
 |---|---|---|
-| `agent-domain.md` | no | describes the legacy agent, deleted on 2026-10-07; superseded by smith and `domain/agent.md`; to be removed: not planned |
-| `channel.md` | no | `temper-channel` was deleted on 2026-10-07; skein's channel supersedes it, and the engine's channel is jig's (jig's `hosts.md`, section 10): not planned |
-| `credentials.md` | no | `temper-oauth` was deleted on 2026-10-07; skein's OAuth client supersedes it; secrets move to the store (`domain/README.md`, section 5): not planned |
-| `engine-domain.md` | no | the legacy engine, deleted on 2026-10-07 and superseded by `domain/`; still cited by the fake forge and the checkout; to be removed: not planned |
-| `forge.md` | no | `temper-forge-forgejo` was deleted on 2026-10-07; the Forgejo v16.0.5 protocol with the calls of `domain/forge.md`, section 17: not planned |
-| `llm.md` | partly | providers moved to smith and skein's LLM client; of temper's half, the engine tools' schemas and decoding are in `temper-engine-smith`, rendering in a protocol layer is not built: not planned |
-| `performance.md` | no | section 3's doubling buffer and `ByteRing` (no `ByteRing` in skein-lib); sections 4 to 6 wait for the protocol layer and a shell: not planned |
-| `protocol.md` | no | the protocol layer, deleted on 2026-10-07, with the revisions of `domain/README.md`, section 5: not planned |
-| `testing.md` | partly | the domain and system worlds stand; the conformance scenarios and composed engine/worker/Smith world are built; section 7 still describes deleted protocol worlds; section 9's tiers: not planned |
+| `agent-domain.md` | no | describes the legacy agent, superseded by smith and `domain/agent.md`; to be removed: not planned |
+| `channel.md` | no | all: temper's parts on jig's channel, the payload version, a git identity's value: protocol |
+| `client.md` | no | all: temper's client root and view over jig's, the forge's words and adoption form, the terminal shell: protocol; the browser (section 11): not planned, waits for jig's browser shell |
+| `configuration.md` | no | all but the `webhooks` member: protocol; `webhooks`: not planned |
+| `credentials.md` | no | all: protocol; the forge as people's sign-in provider: not planned |
+| `engine-domain.md` | no | the legacy engine, superseded by `domain/`; still cited by the fake forge and the checkout; to be removed: not planned |
+| `forge.md` | no | sections 1 to 4 and 6 to 13, Forgejo v16.0.5 polled, the fake forge's protocol layer, the cost checks through bytes: protocol; 5, webhooks, and 11, GitHub: not planned |
+| `git.md` | no | all: protocol; containment between hosts: not planned |
+| `llm.md` | partly | `temper-engine-smith` decodes and renders host tools and reads results; its place in the engine's routing: protocol |
+| `performance.md` | no | section 3's two containers: protocol; sections 5 and 6, measurements once `temper serve` runs: not planned |
+| `protocol.md` | no | standalone (sections 4 to 10, 12): protocol; between hosts (TLS, contained process trees, a worker-only process): not planned |
+| `testing.md` | partly | the domain and system worlds stand; section 2's tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer (4.2) and the fake git program (4.3): protocol |
 | `worker-domain.md` | no | the worker before jig's hub, superseded by `domain/worker.md` and jig's `hosts.md`; still cited by the worker's crates and worlds; to be removed: not planned |
-| `domain/README.md` | partly | the names and maps stand; section 5's revisions of the protocol documents are not made: not planned |
+| `domain/README.md` | yes | the names and maps stand; section 5 points at the protocol documents |
 | `domain/core.md` | yes | built in `jig-core` and its children under temper's root; the document still describes primitives owned by jig; to keep temper's application side and cite jig for the rest: not planned |
 | `domain/tasks.md` | yes | built as `jig-core-tasks`; the document still names temper's crates; to keep temper's application side and cite jig's `tasks.md` for the rest: not planned |
 | `domain/authority.md` | yes | built as `jig-core-authority`, landing rules translated to the forge's requirements; the same move: not planned |
 | `domain/connectors.md` | partly | the contract is in `jig-core` and the forge meets it; section 14's second connector, test environments: not planned |
-| `domain/engine.md` | partly | the root in jig's reference shape on `jig-core` and skein-lib's journal, notes in the store; section 14 below the domain and the configuration: not planned |
-| `domain/forge.md` | partly | the connector's four crates on the fake forge; sections 13 and 14 beyond the `Fork` role and participation news, and section 17's protocol: not planned |
-| `domain/people.md` | partly | `jig-core-people` and the root's routes; section 11, the web and signing in through the forge: not planned |
-| `domain/agent.md` | partly | the typed translation to smith (`temper-engine-smith`, `jig-charter`), the worker hosting smith, the system world; section 9's protocol tests and the charter's encoding: not planned |
-| `domain/worker.md` | partly | the worker root on jig's hub (`jig-domain-host`), the checkout and smith's host domain, with whole-worker worlds; section 11's contraction (a missing base branch created, a push with no expected head) and section 9 below the domain: not planned |
-| `store/` | no | the store over skein-kv (skein's `kv.md`): store plan; turns are still records keyed per turn, so even its S1 is not built |
-| `web/` | partly | W1 to W4 built; W5 to W10: web-implementation; the wire, the protocol layer and the shells: not planned |
+| `domain/engine.md` | partly | the root in jig's reference shape on `jig-core` and skein-lib's journal, notes in the store; 7.3's undecodable host call relayed with no commit, section 8's failed preparation in the attempt's failure detail, section 14 below the domain: protocol; section 16's saved work (the root names no saved-work branch in an assignment, so no run saves): not planned |
+| `domain/forge.md` | partly | the connector's four crates on the fake forge; section 4's adoption request, locate and the forge's host, and 17's protocol: protocol; sections 13 and 14 beyond the `Fork` role and participation news: not planned |
+| `domain/people.md` | partly | `jig-core-people` and the root's routes; section 11, signing in by the deployment's link: protocol; through the forge: not planned |
+| `domain/agent.md` | partly | the typed translation to smith (`temper-engine-smith`), the worker hosting smith, the system world; section 3's agent shell as temper's `agent` command, section 9's protocol tests and the charter's encoding: protocol |
+| `domain/worker.md` | partly | the worker root on jig's hub (`jig-domain-host`), the checkout and smith's host domain, with whole-worker worlds; section 9 below the domain, its parts naming repositories by tag: protocol; section 11's contraction (a missing base branch created, a push with no expected head): not planned |
+| `store/README.md` | no | all: temper's families on jig's store: protocol |
+| `web/` | partly | W1 to W4 built in `temper-web-domain` and `temper-web-view`, which `client.md` retires (protocol); `web/architecture.md`, the browser: not planned; `web/ux/`, the forge's family's pages: not planned |
 
 ## 3. Not planned
 
-- **What the reconciliation with jig `d91a89c4` left** (2026-10-14; the
-  repin and port of temper's domain onto jig's hub, core and charters,
-  `domain/worker.md`, 11): the forge serving client documents and
-  requests, answered as unknown (`domain/connectors.md`, 5.5); jig's
-  `Approval` contract for the forge's person gate, where temper keeps a
-  verdict; a run's live text; a calendar for periods
-  (`domain/authority.md`); a failed preparation's repository and reason,
-  which the worker sends and the engine does not take. They wait for the
-  protocol layer and the client.
-- **The protocol and io layers** (`protocol.md`, `channel.md`,
-  `credentials.md`, `forge.md`; `domain/engine.md`, section 14): temper
-  below the domain, deleted on 2026-10-07 to be planned afresh on
-  skein's channel, OAuth client, HTTP and JSON. They wait for jig's layers
-  below the domain (jig's `README.md`, section 12), which temper's compose.
-- **The tiers below the domain** (`testing.md`, section 9): protocol
-  worlds, simulated worlds and the real loop. They wait for the protocol
-  layers and a shell.
-- **Configuration** (`domain/engine.md`, section 14): rules, connectors'
-  addresses and tokens, LLM endpoints and prices, charters, seeded
-  projects. It waits for the protocol layer and `main`.
+- **What the reconciliation with jig `d91a89c4` left, and the protocol
+  design does not take** (`domain/worker.md`, 11): jig's `Approval`
+  contract for the forge's person gate, where temper keeps a verdict; a
+  run's live text (below); a calendar for periods (`domain/authority.md`;
+  `configuration.md`, section 11). The forge's client documents are the
+  item below; a failed preparation's repository and reason are the
+  protocol plan's (`domain/engine.md`, section 8).
+- **The forge's client documents and panels** (`client.md`, section 4;
+  `web/ux/forge.md`): panels, results, effects, outbox entries, holds, a
+  project's and the deployment's forge parts, answered as unknown until
+  then (jig's `domain/connectors.md`, 5.5). The first client has the
+  forge's words and its adoption form only. Waits for a plan of its own
+  after the protocol plan.
+- **After standalone** (`protocol.md`, section 12, "After
+  standalone"): between hosts
+  (TLS on the engine's listeners, a worker-only process, contained
+  process trees for agents and git), the forge's webhooks (`forge.md`,
+  section 5), the forge as people's sign-in provider (`domain/people.md`,
+  section 14), GitHub (`forge.md`, section 11). Wait for a deployment
+  beyond one person's machine, and for skein's TLS server side and
+  contained process trees (jig's `protocol/README.md`, section 10).
+- **The browser** (`web/architecture.md`; `client.md`, section 11):
+  temper's client in jig's browser shell. Waits for jig's browser shell
+  and the client's wasm32 builds (jig's STATUS.md, "Not planned").
+- **A run's live text in the client** (jig's `protocol/channel.md`, 6.4):
+  waits for smith's channel to carry it (jig's STATUS.md, "What jig asks
+  of smith, later"); until then runs show their activity, and their
+  words as each turn commits.
+- **jig's charter and tools translations** (`llm.md`, section 7):
+  temper's routing keeps `temper-engine-smith` for the charter, host
+  tools and results. Waits for the root's tools to be reconciled with
+  jig's core tool events.
 - **Documents of deleted code** (`engine-domain.md`, `agent-domain.md`,
   `worker-domain.md`): to be removed. They wait for the code citing them
   to be repointed to `domain/` and jig's documents.
@@ -86,9 +104,8 @@ No plan is active. The designer marks plans active and done in this file
   (`domain/forge.md`, sections 13 and 14): outside contributions
   triaged and reviewed, changes landed by others' merges, submissions
   from a fork. Not needed first; they wait for a project that wants them.
-- **Performance's fixes** (`performance.md`, sections 3 to 6): two
-  skein-lib containers before the first machine that joins pieces, copy
-  accounting with the protocol layer, allocator tuning once a shell runs.
+- **Performance's measurements** (`performance.md`, sections 5 and 6):
+  allocator tuning and the byte budget, once `temper serve` runs.
 - **smith's and skein's changed APIs** (smith's `host.md`, section 11):
   the typed agent face, smith's inline agent, removed modes. temper
   repins after smith's reliability plan
@@ -101,4 +118,3 @@ No plan is active. The designer marks plans active and done in this file
 |---|---|---|
 | `factory.md` | the software factory: write, prove and run planes, the lab, on jig and os | not adopted: discuss; its section 13 changes `qa.md` |
 | `qa.md` | continuous QA on a running build of main | not adopted: discuss; its order of building (section 8) waits for a running build |
-| `jig-protocol.md` | temper on jig's protocol layer: what moves to jig (store, channel, credentials, client), what stays temper's, the documents to revise, the domain to reconcile, temper's decisions | a design pass of temper's, after jig's protocol plan: revise the documents its section 4 names |

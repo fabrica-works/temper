@@ -465,7 +465,14 @@ and credentials `docs/design/credentials.md`'s.
   left on the forge, its saved work, a failed preparation's repository
   and reason, and a push's evidence travel typed beside jig's records in
   the domain, and as temper's bytes on the channel, under temper's
-  payload version (`docs/design/channel.md`).
+  payload version (`docs/design/channel.md`). The parts going up name
+  each repository by its deployment tag, never by its place in the
+  assignment, and each saved repository says whether it started from
+  saved work: the root keeps each run's items until the engine has its
+  answer, so the engine's protocol layer, which keeps no state, needs
+  nothing else to read them. A failed preparation's part goes for a
+  permanent failure only (4.3). Items that do not decode reach the root
+  as an assignment it refuses as an invalid start, naming them (4.1).
 - **Git:** each typed operation is a fixed sequence of git invocations,
   each a process of its own, under the operation's one deadline
   (`docs/design/git.md`, section 4), its output parsed into a typed outcome, and a commit named

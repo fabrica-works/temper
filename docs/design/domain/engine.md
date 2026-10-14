@@ -518,11 +518,13 @@ instead of an item's:
 - **Every start and adoption ends once:** answered, lost, withdrawn (the
   engine cancelled it), or refused (busy, a duplicate, or invalid).
 - **A failed preparation names its repository and why** (worker.md,
-  4.3): the worker sends them as temper's part beside the answer
-  (`docs/design/channel.md`, section 5), and the root puts them in words
-  into the attempt's failure detail, which people read on the task's
-  page. Whether the task tries again follows the answer's own class,
-  transient or permanent, as for any failure.
+  4.3): for a permanent failure, the worker sends the repository's tag
+  and the reason (what the forge lacks, or that it refused the identity)
+  as temper's part beside the answer (`docs/design/channel.md`, section
+  5), and the root puts them in words into the attempt's failure detail,
+  which people read on the task's page. Whether the task tries again
+  follows the answer's own class, transient or permanent, as for any
+  failure.
 - **Restarting** (section 6): the fleet adopts the claims the store
   names, then hears that the loading is done; a run a worker lists that
   no claim adopts is cancelled once a grace has passed.
