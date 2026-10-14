@@ -466,6 +466,18 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      Apache's 5 s `KeepAliveTimeout` default (forge.md, 7 and 8; session
      13, its limits table, 13.2).
 
+122. **The native client's limits rise only as far as the pin accepts**
+     (temper 12.1a, blocked 2026-10-14T08:49:46Z; plan defect). Session
+     12's `text` 4,096, `document_bytes` 1,048,576, `rows` 64, `watches`
+     16 are refused at jig `d91a89c4`: `link/limits.rs` copies `rows`
+     into wire fields whose ceiling is 32, and jig-view's
+     `Limits::compose` returns none with `text` 4,096 at every `rows`
+     from 64 to 2 (`logs/temper-12/12.1a-preset-diagnosis.log`).
+     configuration.md and client.md fix no number. So each starts from
+     jig's ops world's value, which jig's tests run with, and rises toward
+     the plan's target only as far as `link::Limits::new` and
+     `Limits::compose` accept, `rows` at most 32; no repin.
+
 119. **02.4 lands before 02.3** (temper 02.3, blocked
      2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
      conformance worlds' adoption to `PartyInput::Application`; after a

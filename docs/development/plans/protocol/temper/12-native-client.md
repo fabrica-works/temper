@@ -123,7 +123,12 @@ family's records in `route` are 15.1a's.
   where a person's use needs it: `text` 4,096, `document_bytes` 1,048,576,
   `rows` 64, `watches` 16; `EXCHANGES` 8, `DEADLINE` 30 s. Each must fit
   what the engine's small profile serves (jig's `clients` limits); 12.2's
-  story is the check.
+  story is the check. At jig's pin those raised values are refused
+  (`rows` past the wire's ceiling of 32, and jig-view's
+  `Limits::compose` refuses `text` 4,096), so each of the four rises from
+  ops's value toward the target only as far as `link::Limits::new` and
+  jig-view's `Limits::compose` accept, `rows` at most 32, its doc line
+  naming the bound that stopped it (decisions.md, ruling 122).
 - **The fake person is the process tier's** (`crates/temper/tests/support/person.rs`):
   a host owning the native client and `jig_fake_person::Person<temper_client_domain::Address>`,
   reading the binary's stdout for the link as jig's support's `Person`
