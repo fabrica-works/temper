@@ -40,6 +40,13 @@ pub struct Person {
 }
 impl Person {
     #[must_use]
+    pub fn with_link(root: Fd, input: Fd, output: Fd, script: Script, link: &[u8]) -> Self {
+        let mut person = Self::new(root, input, output, script);
+        person.bytes.extend_from_slice(link);
+        person.bytes.push(b'\n');
+        person
+    }
+    #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
         Self {
             client: None,

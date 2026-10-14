@@ -1,8 +1,8 @@
 //! A typist's commands and both binaries on the process tier's real ring.
-use super::{WITHIN, printed_link};
+use super::WITHIN;
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Signal, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
-use skein_shell::{Clock, Config, Host, Kernel, Wait};
+use skein_shell::{Clock, Host};
 use skein_world::{
     Referee,
     end_to_end::{Binary, Command, Mode, Streams},
@@ -26,32 +26,7 @@ impl AsRef<[u8]> for Link {
 pub fn link(serve: &mut Binary, within: Duration) -> Link {
     let streams = serve.take_streams().expect("serve pipes");
     let Streams::Pipes { output, .. } = streams else { panic!("serve uses pipes") };
-    let clock = Clock::new();
-    let deadline = clock.now().now.saturating_add(within);
-    let mut kernel = Kernel::open(Config { operations: 1 }).expect("link reader ring");
-    let mut complete = Queue::with_capacity(1);
-    let mut submit = Queue::with_capacity(1);
-    let mut bytes = Vec::new();
-    loop {
-        submit.push(Submit { op: READ, kind: Op::PipeRead { fd: output, buf: vec![0; 1024].into_boxed_slice() } });
-        loop {
-            assert!(clock.now().now < deadline, "serve prints a link within its deadline");
-            kernel.submit(&mut submit, Wait::Until(deadline));
-            kernel.reap(&mut complete);
-            if !complete.is_empty() {
-                break;
-            }
-        }
-        let complete = complete.pop().expect("read completed");
-        let Op::PipeRead { buf, .. } = complete.kind else { panic!("link read") };
-        let Done::Count(count) = complete.result.expect("link read succeeded") else { panic!("read count") };
-        assert_ne!(count, 0, "serve ended before its link");
-        bytes.extend_from_slice(&buf[..usize::try_from(count).expect("read count fits")]);
-        assert!(bytes.len() <= 65_536, "bounded service output");
-        if let Some(link) = printed_link(&bytes) {
-            return Link { bytes: link.to_vec(), streams };
-        }
-    }
+    Link { bytes: super::read_line(output, within), streams }
 }
 #[must_use]
 pub fn open(directory: &Path, private: &Path, link: &[u8]) -> Binary {

@@ -54,9 +54,14 @@ temper-fake-git = { path = "testing/temper-fake-git" }
 temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }
 skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
 skein-llm = { git = "https://github.com/forgetic/skein.git" }
+skein-llm-world = { git = "https://github.com/forgetic/skein.git" }
+skein-fake-llm-protocol = { git = "https://github.com/forgetic/skein.git" }
 smith-agent-process-world = { git = "https://github.com/forgetic/smith.git" }
 smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
+smith-local-process-world = { git = "https://github.com/forgetic/smith.git" }
+smith-agent-service = { git = "https://github.com/forgetic/smith.git" }
+smith-local-domain = { git = "https://github.com/forgetic/smith.git" }
 jig-channel-world = { git = "https://github.com/forgetic/jig.git" }
 skein-tls-world = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }

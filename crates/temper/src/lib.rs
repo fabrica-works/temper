@@ -17,9 +17,9 @@ use temper_service::{
 
 mod host;
 pub mod open;
+pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str =
-    "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -27,6 +27,7 @@ pub enum Command {
     Serve { configuration: PathBuf },
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
+    SignIn { arguments: Vec<OsString> },
 }
 fn prefixed(command: &str, why: &str) -> String {
     let mut lines = String::new();
@@ -43,6 +44,9 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
     let command = args.next().ok_or_else(usage)?;
     if command == "open" {
         return Ok(Command::Open { arguments: args.collect() });
+    }
+    if command == "sign-in" {
+        return Ok(Command::SignIn { arguments: args.collect() });
     }
     let configuration = args.next().ok_or_else(usage)?.into();
     if args.next().is_some() {
@@ -62,6 +66,7 @@ pub fn run(command: Command) -> Result<u8, String> {
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
+        Command::SignIn { arguments } => return Ok(sign_in::run(&arguments, &Clock::new())),
     };
     Ok(match exit {
         Exit::Code(code) => code,

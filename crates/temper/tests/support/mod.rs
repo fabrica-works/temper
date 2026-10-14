@@ -1,4 +1,6 @@
 //! Shared configuration fixtures for startup and the process tier.
+pub mod configuration;
+pub mod sign_in;
 pub mod terminal;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
 pub mod person;
@@ -7,7 +9,7 @@ use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 pub enum Forge {
     Unreached,
 }
-fn write_private(path: &Path, bytes: &[u8]) {
+pub(super) fn write_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
@@ -28,48 +30,9 @@ pub fn configuration(directory: &Path, forge: &Forge) {
     write_private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
     write_private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");
     write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
-    let agent = serde_json::json!({
-        "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":600,"read_window":256,
-            "conversations":1,"calls_per_response":1},
-            "policy":{"max_turns":5,"group_stop":10,"inbox":8,"unacknowledged":8}},
-        "endpoints":[{"name":"fake","number":0,"dialect":0,"account":1,"provider":"codex",
-            "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),
-            "identity":"plain","connect":1000,"handshake":1000,
-            "models":[{"name":"fake","window":1_048_576,"output":1024,"reasoning_item":64,"head":60000,"idle":30000}]}],
-        "environment":[]});
-    write_private(&directory.join("agent.json"), &serde_json::to_vec(&agent).expect("agent JSON"));
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&jig_channel_world::fixtures::engine_document()).expect("engine JSON");
-    value.as_object_mut().expect("whole object").remove("service");
-    let worker: serde_json::Value =
-        serde_json::from_slice(jig_channel_world::fixtures::WORKER_DOCUMENT).expect("worker JSON");
-    value["workers"] = worker["workers"].clone();
-    value["workers"][0]["engine"] = serde_json::json!({"in_process":"workers"});
-    value["workers"][0]["agent"]["program"] = env!("CARGO_BIN_EXE_temper").into();
-    value["workers"][0]["agent"]["configuration"] = directory.join("agent.json").to_str().expect("agent path").into();
-    value["workers"][0]["agent"]["arguments"] = serde_json::json!(["agent", directory.join("agent.json")]);
-    value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 4.into();
-    value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 598.into();
-    value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
-    value["engine"]["clients"]["listener"] = serde_json::json!({"socket":"127.0.0.1:0"});
-    value["engine"]["connectors"] = serde_json::json!([1]);
-    value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
-    value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
-    value["engine"]["limits"]["overrides"]["documents.rows"] = 2.into();
-    value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 128.into();
-    value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
-    value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
-    value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
-    value["application"] = serde_json::json!({
-        "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:9"},"transport":"plaintext",
-            "git":"http://127.0.0.1:9","api_token":"secrets/forge-1.api-token","user":42,"identity":1}],
-        "identities":[{"number":1,"token":"secrets/forge-1.git-token","login":"temper",
-            "author":{"name":"Temper","email":"temper@example.test"}}],
-        "landing":{"deployment":[],"projects":[]},"charter":1,
-        "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
-            "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
-        "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
-    write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+    let (agent, value) = configuration::documents(directory, env!("CARGO_BIN_EXE_temper"));
+    write_private(&directory.join("agent.json"), &agent);
+    write_private(&directory.join("config.json"), &value);
 }
 
 /// A case's scratch, retained if a test panics.
@@ -156,6 +119,17 @@ struct StdoutReader {
     submissions: Queue<Submit>,
 }
 impl StdoutReader {
+    fn new(input: Fd, output: Fd) -> Self {
+        Self {
+            input: Some(input),
+            output: Some(output),
+            reading: false,
+            closing: 0,
+            bytes: Vec::new(),
+            completions: Queue::with_capacity(8),
+            submissions: Queue::with_capacity(8),
+        }
+    }
     fn close(&mut self, fd: Fd) {
         self.closing += 1;
         self.submissions.push(Submit { op: CLOSE, kind: Op::Close { fd } });
@@ -343,17 +317,7 @@ fn run_signal(
         settled: false,
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
-    world.spawn_with_fds(fds, || {
-        Process::Stdout(Box::new(StdoutReader {
-            input: Some(input),
-            output: Some(output),
-            reading: false,
-            closing: 0,
-            bytes: Vec::new(),
-            completions: Queue::with_capacity(8),
-            submissions: Queue::with_capacity(8),
-        }))
-    });
+    world.spawn_with_fds(fds, || Process::Stdout(Box::new(StdoutReader::new(input, output))));
     if let Some(peer) = peer {
         world.spawn(|| Process::Peer(Box::new(peer)));
     }
@@ -487,4 +451,35 @@ pub fn run(
 pub fn private(path: &Path) -> bool {
     fs::symlink_metadata(path)
         .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o777 == 0o600)
+}
+
+/// One complete stdout line; the read finishes before the pipe changes hosts.
+#[must_use]
+pub fn read_line(output: Fd, within: Duration) -> Vec<u8> {
+    let clock = Clock::new();
+    let deadline = clock.now().now.saturating_add(within);
+    let mut kernel = skein_shell::Kernel::open(skein_shell::Config { operations: 1 }).expect("link reader ring");
+    let mut complete = Queue::with_capacity(1);
+    let mut submit = Queue::with_capacity(1);
+    let mut bytes = Vec::new();
+    loop {
+        submit.push(Submit { op: PIPE, kind: Op::PipeRead { fd: output, buf: vec![0; 1024].into_boxed_slice() } });
+        loop {
+            assert!(clock.now().now < deadline, "serve prints a link within its deadline");
+            kernel.submit(&mut submit, skein_shell::Wait::Until(deadline));
+            kernel.reap(&mut complete);
+            if !complete.is_empty() {
+                break;
+            }
+        }
+        let complete = complete.pop().expect("read completed");
+        let Op::PipeRead { buf, .. } = complete.kind else { panic!("link read") };
+        let Done::Count(count) = complete.result.expect("link read succeeded") else { panic!("read count") };
+        assert_ne!(count, 0, "serve ended before its link");
+        bytes.extend_from_slice(&buf[..usize::try_from(count).expect("read count fits")]);
+        assert!(bytes.len() <= 65_536, "bounded service output");
+        if let Some(link) = printed_link(&bytes) {
+            return link.to_vec();
+        }
+    }
 }
