@@ -357,12 +357,17 @@ Removes: nothing.
 ### 06.3 Reviews, statuses' pages, a review's comments, branches, protection, collaborators
 
 Scope: both sides of `Request::{Reviews, ReviewComments, Branch,
-Branches, Protection, Protections, Collaborators, Permission}`, and
-`CombinedStatus` read past its first page (`Read::Statuses`); the
+Branches, Protection, Protections, Collaborators, Permission, Pulls}`,
+and `CombinedStatus` read past its first page (`Read::Statuses`); the
 documents `ReviewState`, `Review`, `ReviewComment`, `Branch`,
 `BranchProtection`, `Permission`, `CollaboratorPermission`,
-`Row::{Review, ReviewComment, Branch, Protection}`,
-`Document::{Branch, Protection, Permission}` (forge.md, 3.2).
+`Row::{Review, ReviewComment, Branch, Protection, Pull}`,
+`Document::{Branch, Protection, Permission}` (forge.md, 3.2);
+`PullBranch` gains `repo_id: u64` (`head.repo_id`, `base.repo_id`).
+`Request::Pulls` is `GET R/pulls?state=open&sort=oldest&page&limit`,
+the open pull requests `Read::PullFor` reads when its lookup names a
+closed one (forge.md, 3.2, "A pull request for a head and base"); each
+element goes up as `Row::Pull(PullRequest)`, decoded as 06.2's pull.
 Needs: nothing beyond 06.2.
 Files: `crates/temper-forge-forgejo/src/{document.rs, request.rs,
 client.rs, client/reviews.rs, client/branches.rs, server.rs,
@@ -374,7 +379,15 @@ is `None`. A review's comments are a thread: `cut` applies to them as to
 Test shape: unit tests in `src/tests.rs`:
 `each_review_state_reads_from_forgejos_word` (a table of the five),
 `a_branch_naming_no_rule_has_no_protection_name`,
-`a_protection_with_inner_plus_one_contexts_is_past_its_bound`. World
+`a_protection_with_inner_plus_one_contexts_is_past_its_bound`,
+`open_pulls_rows_are_the_pull_transcripts_documents` (no case records
+the listing: the body of `pull`'s transcript and of `pull-merged`'s, in
+one JSON array, decode to two `Row::Pull`s equal to those cases'
+`Document::Pull`s, `repo_id` read on both sides; the server's encoding
+of the two decodes back unchanged; the request encodes as
+`GET /api/v1/repos/fixture/specimen/pulls?state=open&sort=oldest&page=1&limit=2`
+and routes back to itself; 14.5's `component-read-pull-for-open-after-closed`
+meets the real listing). World
 tests in `tests/codecs/tests/forgejo_reviews.rs`, as 06.2's five
 (`review_transcripts_decode_to_their_documents_and_rows`,
 `review_requests_encode_as_the_tool_sent_them`,
@@ -388,9 +401,11 @@ cases `reviews`, `statuses-page-2`, `review-comments`, `branch`,
 Proof: world, `heavy cargo nextest run -p temper-forge-forgejo -p
 temper-codecs-world`, run once: the twelve transcripts decode, both
 sides meet their requests, mutations are malformed naming their
-fields; under 2 s.
+fields, and the open pulls' listing decodes its rows as pulls; under 2 s.
 Don't: map `owner` to `admin` (13.3's mapping); read a review's
-comments by page (Forgejo does not page them).
+comments by page (Forgejo does not page them); filter the pulls'
+listing by head or base in the request (Forgejo has no such filter;
+13.3 compares each row).
 Size: at most 550 lines.
 Removes: nothing.
 
@@ -466,9 +481,11 @@ may come so) decodes to no message: the component reads its status
 alone. `failure::refusal` compares a message byte for byte with each
 known one, as the transcripts
 `merge-stale-head`, `update-conflict`, `merge-closed`, `merge-conflict`,
-`merge-protected`, `merge-style-refused`, `open-pull-no-changes` and
+`merge-protected`, `merge-style-refused` and
 `create-issue-empty-title` spell them; one no transcript shows is
-`None`.
+`None`. `open-pull-no-changes` is no refusal: v16.0.5 answered it `201`
+with the pull request opened (forge.md, 13), and it decodes as
+`Document::Pull` among the write cases; there is no `Refusal::NoChanges`.
 Test shape: unit tests in `src/tests.rs`:
 `a_write_whose_text_is_not_utf8_is_refused_before_encoding`,
 `an_edit_writes_only_the_fields_it_is_given`,
@@ -795,6 +812,8 @@ pub mod document {
     pub struct PullBranch {
         /// `ref`.
         pub name: Box<[u8]>,
+        /// `repo_id`: the repository the branch is in (06.3).
+        pub repo_id: u64,
         /// `sha`; an empty string is `None`.
         pub sha: Option<ObjectId>,
     }
@@ -1012,6 +1031,8 @@ pub mod document {
         Run(Run),
         /// An Actions job of a run's jobs.
         Job(Job),
+        /// A pull request of the open pull requests' listing (06.3).
+        Pull(PullRequest),
     }
 
     /// A decoded document: the whole of a single one, or a listing's own fields once its rows
@@ -1175,6 +1196,8 @@ pub mod request {
         Pull { at: Repo, number: u64 },
         /// `GET R/pulls/{base}/{head}` (06.2).
         PullFor { at: Repo, base: Box<[u8]>, head: Box<[u8]> },
+        /// `GET R/pulls?state=open&sort=oldest&page&limit`: the open pull requests (06.3).
+        Pulls { at: Repo, page: Page },
         /// `GET R/commits/{sha}/status?page&limit` (06.2).
         CombinedStatus { at: Repo, commit: ObjectId, page: Page },
         /// `GET R/pulls/{number}/reviews?page&limit` (06.3).
@@ -1552,8 +1575,6 @@ pub mod failure {
         HeadOutOfDate,
         /// `409` on an update: `merge failed because of conflict`.
         UpdateConflict,
-        /// `422` on opening a pull request: no changes between head and base.
-        NoChanges,
         /// `422` on a write whose title or body is empty.
         Empty,
     }

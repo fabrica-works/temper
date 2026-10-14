@@ -220,7 +220,7 @@ at a time on each (connectors.md, section 4):
 
 | Effect | What it is | Recovery class (jig's `connectors.md`, 4.3) | Found again after an uncertain failure |
 |---|---|---|---|
-| open a pull request | a creation: from a branch into its landing branch, with a title, a body and a key | conditional: only while no pull request for its branches is open; Forgejo keeps it, closed or not | by its branches: the newest pull request for them, open or not |
+| open a pull request | a creation: from a branch into its landing branch, with a title, a body and a key | conditional: only while no pull request for its branches is open; Forgejo keeps it, closed or not | by its branches: the pull request open for them, else the oldest |
 | edit a pull request's title or body | a set | idempotent | written again |
 | update a pull request from its base | a transition: the base's tip merged into its branch, by the forge | unrecoverable | its head contains the base tip it asked for |
 | merge a pull request | a transition, conditional on its exact head | conditional | merged, and at which commit |
@@ -244,7 +244,11 @@ at a time on each (connectors.md, section 4):
   is opened only while none is open for its branches, and Forgejo keeps
   every pull request, closed or not, so the state it leads to is always
   found: a first another hand closed is found closed, which is drift
-  (jig's `connectors.md`, section 11). A branch is created only while
+  (jig's `connectors.md`, section 11). A change opens one only when none
+  exists for its branches, open or closed, and reopens its own when it
+  was closed (8.5), so the oldest for its branches is the one it
+  follows; one another hand opened for them while that one is closed
+  is the open one, and is found first. A branch is created only while
   none of its name exists, but another hand can delete it, and then
   nothing shows it was made: its creation is unrecoverable. Every class
   rests on a copy landing within its write's lifetime, or never (jig's

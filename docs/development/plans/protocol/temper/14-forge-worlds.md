@@ -97,7 +97,13 @@ facts as the component sees them.
   `max_response_items`; a size without a page is ignored where Forgejo
   ignores it; an issue's comments, a review's comments and a comparison
   come unpaged; collaborators come without their permissions; a merge
-  answers with no body." "Faults move down ...: a call refused for the
+  answers with no body; the lookup `pulls/{base}/{head}` names the
+  oldest of several pull requests, open or not; a pull request whose
+  head adds nothing to its base is opened (`201`); deleting a branch
+  that is not there answers `500` with an empty body." The fake's domain
+  grows "the oldest pull request for a head and base, open or not, and
+  the open pull requests, oldest first, for `Read::PullFor`'s requests
+  (3.2)". "Faults move down ...: a call refused for the
   rate is a `429` with `Retry-After`; one failed before it is made is a
   refused connect or a reset before the request is read; one made and
   then timed out is a `5xx` or a dropped connection after the request was
@@ -163,7 +169,15 @@ facts as the component sees them.
   gains `merge_base`; new reads `Runs`, `Run`, `Jobs`, `Comments`; new
   writes `RequestReviewers`, `RemoveReviewers` (Forgejo's two routes;
   `SetReviewers` stays for the worlds that translate the client
-  directly). Runs and jobs live in a new `src/actions.rs` (`api.rs` is at
+  directly). For pull requests by head and base (forge.md, 3.2, "A pull
+  request for a head and base"): `Read::PullFor` answers the open one,
+  else the oldest (changed in place, as the forge client's vocabulary
+  now says); new reads `FirstPull { head, base }`, the oldest open or
+  not (Forgejo's lookup), and `OpenPulls { page, limit }`, the open pull
+  requests oldest first; `Write::OpenPull` gains `opens_empty: bool`,
+  true when a head that adds nothing to its base is opened as Forgejo
+  opens it (the protocol layer's), false where `NothingToMerge` is
+  answered as the vocabulary says (the direct worlds' translation). Runs and jobs live in a new `src/actions.rs` (`api.rs` is at
   728 lines and stays under 800). A CI status's link is
   `/<full name>/actions/runs/<number>/jobs/<index>`; the protocol layer
   puts its `base` before it. The ids are 02.1's (`api::Setup.id`); the
@@ -324,7 +338,16 @@ user who may read, not the pull's author; needs write permission, as
 `SetReviewers`); `Pull.merge_base` (the newest commit head and base
 share, `None` when they share none); `Read::Items.order`
 (`Order::LeastUpdated`, the order today, or `Order::NewestCreated`,
-Forgejo's default). Each new read and write needs the permission
+Forgejo's default); `Read::PullFor` the open pull for head and base,
+else the oldest (`store.rs:267`'s `newest_pull` becomes the oldest, and
+the open one is asked first; its doc in `api.rs` says so); `Read::FirstPull
+{ head, base }` (the oldest, open or not: `Answer::Pull`, or
+`Missing(Pull)`); `Read::OpenPulls { page, limit }` (open pull requests
+by number, the `page`th `limit` of them: `Answer::Pulls(Box<[Pull]>)`,
+each as `pulls::view` makes it); `Write::OpenPull.opens_empty` (true: a
+head with no commit its base lacks is opened, not `NothingToMerge`; a
+head branch that is the base branch stays `NothingToMerge`).
+Each new read and write needs the permission
 `domain.rs:499-531` gives its kind (reads: read; writes: write).
 Needs: nothing beyond 14.1.
 Files: `testing/temper-fake-forge-domain/src/{actions.rs (new), api.rs
@@ -334,7 +357,7 @@ store.rs, limits.rs, domain.rs, tests.rs (a `mod actions;` line; the
 tests/next.rs (the 4 `Read::Job` calls), tests/actions.rs (new)}`; the
 users of the changed shapes: `tests/engine/forge/client/src/translate.rs`
 (`:83` `order: LeastUpdated`; `:109` `Job { job: attempt.job, attempt:
-attempt.attempt, max_bytes }`), `tests/engine/forge/client/src/world.rs:169`,
+attempt.attempt, max_bytes }`; its `OpenPull` with `opens_empty: false`), `tests/engine/forge/client/src/world.rs:169`,
 `tests/fake-forge/tests/memory.rs:423`,
 `tests/engine/domain/tests/forge_routes.rs:2811` (one field each), the
 exhaustive matches of the fake's `Read`, `Write` and `Answer`
@@ -350,8 +373,13 @@ Test shape: unit tests in `src/tests/actions.rs`, on the crate's
 `a_rerun_context_answers_its_second_attempt`,
 `a_thread_is_one_read_oldest_first`,
 `reviewers_are_requested_and_removed_by_their_own_writes`,
-`items_come_newest_created_first_in_forgejos_default_order`. Each under
-20 ms. In `setup()`'s repository CI starts first on the pushed `work`
+`items_come_newest_created_first_in_forgejos_default_order`,
+`pull_for_answers_the_open_pull_before_an_older_closed_one` (pull 1 of
+`work` into `main` closed, pull 2 of the same opened: `PullFor` answers
+2, `FirstPull` answers 1, `OpenPulls { page: 1, limit: 2 }` answers 2
+alone), `an_empty_pull_opens_only_when_opens_empty` (a branch at
+`main`'s tip: `OpenPull` with `opens_empty: false` is `NothingToMerge`,
+with `true` is `Created`). Each under 20 ms. In `setup()`'s repository CI starts first on the pushed `work`
 (`ci::start` runs from `git.rs:374`, `pulls.rs:99` and `issues.rs:439`
 only), so `work`'s run is number 1. Reference test, in full:
 
@@ -380,8 +408,9 @@ Proof: unit, `heavy cargo nextest run -p temper-fake-forge-domain -p
 temper-engine-forge-client-world -p temper-engine-forge-world`, run
 once: a failing CI status links its run's number and its job's index,
 a run and its jobs are found as Forgejo's routes find them, a log is read
-by its job's id, and the forge connector worlds' stories pass with the
-changed `Job` read (the seven new tests and those worlds' suites); under
+by its job's id, a pull is found for its branches open first, and the
+forge connector worlds' stories pass with the changed `Job` and
+`PullFor` reads (the nine new tests and those worlds' suites); under
 3 s.
 Don't: let a link carry the protocol layer's base; draw runs' or jobs'
 ids from the seed (counters, so a seed replays); change a fake decision
@@ -404,7 +433,12 @@ from the tables; each other route as one domain `Call` by the token's
 user on the repository's full name (by id from `Config.repositories`,
 or by path), its reply encoded by 06's `server::encode` with Forgejo's
 statuses (the table below); Forgejo's quirks: the default order
-(`sort` other than `leastupdate`: `Order::NewestCreated`), the page cap
+(`sort` other than `leastupdate`: `Order::NewestCreated`), the lookup
+`pulls/{base}/{head}` by `FirstPull` (the oldest, open or not), the
+open pulls' listing by `OpenPulls`, `POST R/pulls` by `OpenPull` with
+`opens_empty: true` (a head that adds nothing to its base opened,
+`201`), a `DeleteBranch` its domain answers `Missing(Branch)` written
+`500` with an empty body, the page cap
 (`limit` at most `max_response_items`; a `limit` without a `page`
 ignored, `default_paging_num` in its place), the unpaged thread, review
 comments and comparison, collaborators without permissions, a merge
@@ -431,14 +465,14 @@ statuses:
 | Domain `Error` | Status, message |
 |---|---|
 | `Forbidden` | `403` |
-| `Missing(_)` | `404` |
+| `Missing(_)` | `404`; on `DeleteBranch`, `500` with an empty body |
 | `RateLimited { reset }` | `429`, `Retry-After` the seconds to `reset`, rounded up |
 | `Exists` | `409` (on `CreateBranch` and `OpenPull`) |
 | `Stale` | `409`, `failure::answer(HeadOutOfDate)` |
 | `Conflict` | `405` `MergeConflict` on a merge; `409` `UpdateConflict` on an update |
 | `Closed` | `405`, `MergeClosed` |
 | `Protected` | `405` `MergeProtected` on a merge; `403` on a deletion |
-| `NothingToMerge` | `422`, `NoChanges` |
+| `NothingToMerge` | `422`, no message (only a merge reaches it: an opening passes `opens_empty: true`) |
 | `Empty` | `422`, `Empty` |
 | `Full`, `TooLarge` | `413` |
 | `Refused`, `Circular` | `422` |
@@ -458,7 +492,9 @@ fake's domain behind it with `fake_config()` of
 `a_limit_without_a_page_takes_the_default_paging_num`,
 `a_merge_answers_200_with_no_body`,
 `requests_are_counted_by_route_user_and_total`,
-`a_reset_closes_before_reading_and_a_timeout_drops_or_answers_500`.
+`a_reset_closes_before_reading_and_a_timeout_drops_or_answers_500`,
+`deleting_a_missing_branch_answers_500_with_an_empty_body`,
+`a_pull_with_nothing_to_merge_is_opened_201`.
 Each under 20 ms. Joint, in `tests/engine/protocol-forge/tests/fake_protocol.rs`
 (13.5's world crate, with `src/pipe.rs`, 14.4's pipe, made here, and
 `src/joint.rs`: `Joint`, the component and this layer with the fake's
@@ -469,7 +505,20 @@ opened by user 2 through the domain's call), `call`, `run_for`,
 component, its forge's user 1, and this layer over one `Pipe`, no cut:
 the start reaches Ready with cap 2, a `Read::Items` answers the fake's
 issue at cost 2 (the repository resolved by id, then listed), the
-tally's total 4), under 0.1 s. Reference tests, in full:
+tally's total 4),
+`pull_for_answers_the_open_pull_when_the_lookup_names_a_closed_one`
+(user 2's pull request of `work` into `main` closed, then a second
+opened for them, through the domain's calls; `Read::PullFor { head:
+work, base: main }` answers the second, open, at cost 4: the repository
+resolved, the lookup naming the first, one page of `pulls?state=open`,
+the status read), and
+`opening_with_nothing_to_merge_writes_no_pull_request` (a branch `same`
+at `main`'s tip; `Write::OpenPull { head: same, base: main }` answers
+`Err(NothingToMerge)` at cost 4: the repository resolved, two branch
+reads, the comparison; the tally's `Route::OpenPull` 0, the fake holds
+no pull request), each under 0.1 s. Joint's helpers grow `branch(name,
+at)`, `pull(head, base)` and `close(number)`, each the domain's call by
+user 2. Reference tests, in full:
 
 ```rust
 #[test]
@@ -509,7 +558,10 @@ temper-engine-protocol-forge-world -E 'binary(fake_protocol) |
 package(temper-fake-forge-protocol)'`, run once: the component starts
 against the fake's bytes and lists an issue the fake holds, an unknown
 token is a `401`, a page is capped as Forgejo caps it, and the tally
-counts by route and user (the six unit tests and the joint one); under
+counts by route and user, a missing branch's deletion is a `500`, a
+pull with nothing to merge is opened, and through the component
+`PullFor` finds the open pull and `OpenPull` with nothing to merge
+writes nothing (the eight unit tests and the three joint ones); under
 0.5 s.
 Don't: keep state of a call past its reply; answer from the domain's
 store but through a call (a world's `inspect` is a world's); write a
@@ -654,7 +706,13 @@ Failure>`; `facts::replace_block(text: &str, prefix: &str, facts:
 `component-write-update`, `component-write-status`,
 `component-write-create-branch`, `component-write-delete-branch`,
 `component-keys-found-on-read-back`,
-`component-costs-equal-requests-sent` (37). A call's fact `holds` when
+`component-costs-equal-requests-sent`,
+`component-read-pull-for-open-after-closed` (a pull request of a branch
+into `main` closed, then a second opened for them, by plain requests:
+`PullFor` answers the second, open),
+`component-write-open-pull-no-changes` (a branch at `main`'s tip:
+`OpenPull` answers `NothingToMerge`, and a plain read of the
+repository's pull requests shows none of that branch) (39). A call's fact `holds` when
 it answers `Ok` with what the fixture holds (a write: and a read after it
 shows the effect), `fails <name>: <the Error or the answer seen>`
 otherwise; without `TEMPER_FORGEJO_RUNNER`, `component-read-checks` and
@@ -685,7 +743,7 @@ TEMPER_FORGEJO_RUNNER=$HOME/src/rust/tmp/temper/forgejo/runner-v12.13.2/forgejo-
 heavy --gate cargo run -p forgejo-conformance -- --component --scratch
 target/forgejo-conformance --out tools/forgejo-conformance`, run once:
 exit 0, and `grep -cE '^(holds|fails|unchecked) component-'
-tools/forgejo-conformance/facts.txt` prints 37; under 3 minutes. Each
+tools/forgejo-conformance/facts.txt` prints 39; under 3 minutes. Each
 `fails` line is reported to the coordinator as a block, kind design
 gap, quoting the line and forge.md's text it contradicts, unless the
 design names its fallback (README, "A design gap is a question").
@@ -843,9 +901,15 @@ pub mod fake_actions {
         Job { job: u64, attempt: u32, max_bytes: u32 },
         /// The item's whole thread, oldest first, unpaged as Forgejo's: `Answer::Comments`.
         Comments { number: u64 },
+        /// The oldest pull request of `head` into `base`, open or not, as Forgejo's lookup
+        /// names it: `Answer::Pull`, or `Missing(Pull)`.
+        FirstPull { head: Box<[u8]>, base: Box<[u8]> },
+        /// The open pull requests by number, the `page`th `limit` of them: `Answer::Pulls`.
+        OpenPulls { page: u32, limit: u32 },
     }
 
-    /// The answers 14.2 adds (`Comments(Box<[api::Comment]>)` beside these).
+    /// The answers 14.2 adds (`Comments(Box<[api::Comment]>)` and `OpenPulls`'
+    /// `Pulls(Box<[api::Pull]>)` beside these).
     #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum Answer {
         Runs(Box<[Run]>),
@@ -864,6 +928,9 @@ pub mod fake_actions {
     }
 
     // `api::Pull` gains `pub merge_base: Option<u64>`: the newest commit head and base share.
+    // `api::Read::PullFor` answers the open pull of `head` into `base`, else the oldest.
+    // `api::Write::OpenPull` gains `pub opens_empty: bool`: true opens a head with no commit its
+    // base lacks, as Forgejo does (the protocol layer's calls); false answers `NothingToMerge`.
     // `api::CheckSummary.link` is, for a CI status, `/<full name>/actions/runs/<number>/jobs/<index>`
     // (the protocol layer puts its base before it), and empty for another user's status.
 }
@@ -977,6 +1044,7 @@ pub mod temper_fake_forge_protocol {
         Comments,
         Pull,
         PullFor,
+        Pulls,
         CombinedStatus,
         Reviews,
         ReviewComments,
@@ -1302,7 +1370,7 @@ pub fn replace_block(text: &str, prefix: &str, facts: &[Fact]) -> String;
   'api::Error::Unavailable|Error::Unavailable.*cost: 0' --
   crates/temper-service/src ':!*tests*'` prints nothing.
 - The component's facts are recorded: `grep -cE '^(holds|fails|unchecked)
-  component-' tools/forgejo-conformance/facts.txt` prints 37, and each
+  component-' tools/forgejo-conformance/facts.txt` prints 39, and each
   `fails` line among them is named in a ruling of `decisions.md`.
 - The world keeps its share: `heavy --gate cargo nextest run -p
   temper-engine-protocol-forge-world --profile measure -j 1 -E 'not

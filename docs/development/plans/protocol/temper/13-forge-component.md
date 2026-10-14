@@ -88,7 +88,15 @@ it into `temper-service` here: that is 14.1.
   notes (keep-up listing, `sort=leastupdate`, unpaged comments, reviews
   mapped by state, CI, job attempts, contents read file by file, merges
   by the repository's `default_merge_style` and `head_commit_id`, "If
-  that read fails, the call answers `Timeout`").
+  that read fails, the call answers `Timeout`"). "A pull request for a
+  head and base": "`PullFor` answers the open one: the lookup's, or, when
+  the lookup names one closed or merged, the row of the open pull
+  requests' listing whose `head.ref`, `head.repo_id` and `base.ref` are
+  the call's head, its repository and its base ... With none open, it
+  answers the one the lookup named." "Opening compares first":
+  "`OpenPull` reads both branches and compares their commits before it
+  writes: a head with no commit its base lacks (`total_commits` 0 ...)
+  fails the call `NothingToMerge`, and nothing is written."
 - **Decoding** (3.3): bodies "kept whole within `body_bytes`. A longer
   one is carried empty, its key none, its provenance `Unknown`, and its
   revision made from its length"; revisions "the first eight bytes,
@@ -99,7 +107,11 @@ it into `temper-service` here: that is 14.1.
   before the first byte"; "an idle connection is closed before the
   forge's keep-alive timeout would close it"; "A call still waiting at
   its deadline is `Unavailable`; one in flight is a `Timeout`, and its
-  connection is aborted"; "Never `Busy`".
+  connection is aborted"; "Never `Busy`"; "Reads before a write":
+  "`OpenPull`'s reads come before its `POST` ...: what would be a
+  `Timeout` or an `InvalidAnswer` is `Unavailable`"; a branch deleted
+  that is not there answers `500`: "a `Timeout`, after which the
+  client's find reads the branch"
 - **What it keeps** (3.5): each forge's start ("`GET /api/v1/user`. An
   `id` other than the configured `user`, or a `401` or `403`, stops the
   engine ... Then `GET /api/v1/settings/api` ... asked again after
@@ -477,7 +489,14 @@ plan of exchanges (`plan.rs`, `reads.rs`), and temper's reading of the
 documents (`reading.rs`): `Items`, `Item` (06's `keep_after`, the
 comments kept until the next would pass `answer_bytes` or `rows`, then
 06's `cut`), `Pull` (the pull, then `commits/<head.sha>/status?page=1&limit=1`),
-`PullFor`, `Reviews` (`PENDING` and `REQUEST_REVIEW` skipped, counted
+`PullFor` (the lookup `GET R/pulls/<base>/<head>`; when the pull it
+names is not open, 06.3's `Request::Pulls`, `GET
+R/pulls?state=open&sort=oldest&page=<n>&limit=<size>` from page 1,
+until a row's `head.ref`, `head.repo_id` and `base.ref` are the call's
+head, the repository's id and its base, or a page comes short, the
+other rows skipped; then the status read of the pull answered: the open
+one, else the lookup's; each page in the cost), `Reviews` (`PENDING`
+and `REQUEST_REVIEW` skipped, counted
 towards a page coming full), `Statuses` (`more` while the pages read
 fall short of `total_count`), `Remarks` (the `page`th slice of the page
 size, cut as it streams), `Branch`, `Branches` (pages from 1 until one
@@ -502,10 +521,13 @@ and the path dropped; `3xx` `Unavailable` and the path dropped; `429`
 another `4xx` `InvalidAnswer`), written in `failure.rs` for reads only.
 Needs: 02.1's `api::Read::Locate` and `api::Answer::Located` on the
 forge client (if they are not on `origin/main` when 13.3 starts, the
-session waits for them).
+session waits for them); 06.3's `Request::Pulls` and `PullBranch::repo_id`.
 Files: `crates/temper-engine-protocol-forge/src/{plan.rs, reads.rs,
 reading.rs, failure.rs, component.rs, tables.rs, lib.rs, tests.rs,
-tests/fixtures.rs, tests/reads.rs}`.
+tests/fixtures.rs, tests/reads.rs}`;
+`crates/temper-engine-domain-forge-client/src/api.rs:64`, whose doc
+comment `/// Newest matching pull, open or closed.` becomes `/// The
+open matching pull, else the oldest.` (that line only).
 Shape: the sketch's `plan` and `reading`. A call's cost is the number of
 exchanges whose first byte was written. `Item`'s summary comes from
 `GET R/issues/<number>`, its comments from `GET R/issues/<number>/comments`;
@@ -527,6 +549,14 @@ Test shape: unit tests in `src/tests/reads.rs`; fixtures grow:
 `revisions_and_provenance_follow_the_body_and_its_times` (rows: equal
 times, a later update, a missing `updated_at`, a `Long` body),
 `a_malformed_read_answer_is_invalid_and_closes_its_connection`,
+`pull_for_lists_open_pulls_when_the_lookup_names_a_closed_one` (the
+lookup answers pull 12 closed; page 1 of the open pulls holds pull 9
+of another head and pull 13 of this head and base, and the match ends
+the listing; then the status read at 13's `head.sha`: `Answer::Pull`
+13, open, cost 3),
+`pull_for_answers_the_lookups_closed_pull_when_none_is_open` (pull 12
+closed; page 1 holds pull 9 alone, of another head, and comes short;
+the status read at 12's `head.sha`: `Answer::Pull` 12, closed, cost 3),
 `the_running_answer_size_agrees_with_the_clients_measure` (the answers of
 the other tests, each measured by `answer_bytes_unbounded`). Each under
 20 ms. Reference test, in full:
@@ -571,9 +601,10 @@ fn items_list_since_with_leastupdate_and_an_explicit_page() {
 Proof: unit, `heavy cargo nextest run -p temper-engine-protocol-forge -E
 'test(/reads::/)'`, run once: the keep-up listing goes out with
 `state=all`, `since`, `sort=leastupdate`, `page` and `limit`, a thread
-stops at the answer's bound, a missing path is resolved and counted, and
-a malformed answer is `InvalidAnswer` with its connection closed (the
-eight tests); under 0.3 s. The world layer opens at 13.5.
+stops at the answer's bound, a missing path is resolved and counted, a
+malformed answer is `InvalidAnswer` with its connection closed, and
+`PullFor` answers the open pull when the lookup names a closed one (the
+ten tests); under 0.3 s. The world layer opens at 13.5.
 Don't: list without `page` and `limit`; read a body the plan does not
 carry (skip it); keep a row of a listing past the page.
 Size: at most 600 lines.
@@ -599,12 +630,18 @@ none), `Job` (the run, whose `commit_sha` must be the attempt's head;
 its jobs, one of which must have the attempt's id and attempt; the log
 with `Range`; any miss or `404` `MissingJob`); the writes of 3.2
 (`CreateIssue`, `Post` and `Review` behind the key's marker;
-`OpenPull`; `Edit`, `Close`, `Reopen` by `PATCH`; `SetReviewers` (the
+`OpenPull` (`GET R/branches/<head>`, `GET R/branches/<base>`, `GET
+R/compare/<base's commit.id>...<head's commit.id>`, its
+`total_commits` alone kept: 0 fails `NothingToMerge` with no `POST`
+written; else `POST R/pulls`; a failure of the three reads that 3.4
+makes `Timeout` or `InvalidAnswer` is `Unavailable`, by
+`Asked::BeforeWrite`); `Edit`, `Close`, `Reopen` by `PATCH`; `SetReviewers` (the
 pull, then `POST` the missing logins and `DELETE` the extra ones);
 `Merge` (`Do` the row's `default_merge_style`, `head_commit_id`, then
 the pull's `merge_commit_sha`, a failed read after it `Timeout`);
 `Update` (`style=merge`); `Status`; `CreateBranch` (a `409`
-`Branch(Exists)`); `DeleteBranch` (a `404` `Missing`)); text that is not
+`Branch(Exists)`); `DeleteBranch` (a `404` `Missing`; v16.0.5's `500`
+for a branch not there is a `Timeout`, as every `5xx`)); text that is not
 UTF-8 `Refused` with nothing written (06's `client::Refusal::Text`);
 `failure::classify` for each row of 3.4, a `4xx` message read by 06's
 `failure::refusal`, an unknown message `Refused` on a write and
@@ -625,7 +662,12 @@ Test shape: unit tests in `src/tests/contents.rs` and
 `a_job_log_at_another_head_is_missing_job`,
 `creations_carry_the_key_marker_at_the_head_of_their_body`,
 `a_merge_sends_the_rows_style_and_reads_its_commit`,
-`failures_classify_by_status_call_and_message`,
+`open_pull_with_nothing_to_merge_compares_and_writes_nothing` (the two
+branches at one commit; the comparison answers `total_commits` 0:
+`Err(NothingToMerge)`, cost 3, no `POST` among the request lines),
+`failures_classify_by_status_call_and_message` (with one row more,
+`("a 5xx before opening's POST", Asked::BeforeWrite, 500, None, None,
+Error::Unavailable, Drop::Nothing)`; its array 12 rows),
 `text_that_is_not_utf8_is_refused_with_nothing_written`. Each under 20
 ms. Reference tests, in full:
 
@@ -680,12 +722,15 @@ Proof: unit, `heavy cargo nextest run -p temper-engine-protocol-forge -E
 'test(/contents::/) | test(/writes::/)'`, run once: a pull's files at
 another head read no file, a failing job's attempt is found from its
 link, creations carry their marker, a merge names the row's style and
-reads its commit, and each row of forge.md 3.4 above classifies as the
-table says (the eight tests); under 0.3 s. The world layer opens at
+reads its commit, an `OpenPull` with nothing to merge writes nothing,
+and each row of forge.md 3.4 above classifies as the table says (the
+nine tests); under 0.3 s. The world layer opens at
 13.5.
 Don't: guess a failure from a message no transcript pinned (06's
 `failure::refusal` answers `None`: the status rule applies); retry a
-write; send `Update` with another style than `merge`.
+write; send `Update` with another style than `merge`; read a `422` on
+`OpenPull`'s `POST` as `NothingToMerge` (v16.0.5 opens such a pull
+request; the comparison is the only path to `NothingToMerge`).
 Size: at most 600 lines.
 Removes: nothing.
 
@@ -1518,6 +1563,8 @@ pub mod temper_engine_protocol_forge {
             /// A write 3.4 names no row for.
             Write,
             OpenPull,
+            /// One of `OpenPull`'s reads before its `POST` (forge.md, 3.4, "Reads before a write").
+            BeforeWrite,
             Merge,
             Update,
             DeleteBranch,

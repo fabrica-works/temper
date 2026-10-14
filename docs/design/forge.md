@@ -177,7 +177,7 @@ first failure, but where a row says otherwise.
 | `Read::Items { since, page, kind }` | `GET R/issues?state=all&type=issues\|pulls&since=<since>&sort=leastupdate&page=<page>&limit=<size>`, `type` only with a kind | each row a `Summary` (3.3): `number`; a `pull_request` object makes it a pull; `state`; `user.id`; `labels[].name`, for display; `updated_at`; `title`; `body` and its key; `more` when the page came full; `now` from `Date` |
 | `Read::Item { number, after }` | `GET R/issues/<number>`; `GET R/issues/<number>/comments` (unpaged) | the issue as a `Summary`; its comments with ids above `after`, oldest first, as many as the answer holds (3.3): `id`, `user.id`, `created_at`, `body` and its key, its provenance and revision; `more` when one is left |
 | `Read::Pull { number }` | `GET R/pulls/<number>`; `GET R/commits/<head.sha>/status?page=1&limit=1` | `number`; `state`; `head.ref`, `base.ref`; `head.sha` as `commit`; `base.sha` as `base_commit`, none when empty; `merge_commit_sha` when `merged`; `mergeable`; `requested_reviewers[].id`; CI from the combined `state` and `total_count` |
-| `Read::PullFor { head, base }` | `GET R/pulls/<base>/<head>`; then the status read, as `Pull` | as `Pull` |
+| `Read::PullFor { head, base }` | `GET R/pulls/<base>/<head>`; when it names a pull request that is not open, `GET R/pulls?state=open&sort=oldest&page=<n>&limit=<size>` from page 1, until a row has the head and base or a page comes short; then the status read, as `Pull`, of the pull request answered | the open pull request for the head and base, else the one the lookup named; as `Pull` |
 | `Read::Reviews { number, page }` | `GET R/pulls/<number>/reviews?page=<page>&limit=<size>` | submitted reviews, oldest first: `id`, `user.id`, `state` as the verdict, `commit_id`, `body` and its key, `submitted_at` as `at`, `official`, provenance and revision; `more` when the page came full |
 | `Read::Statuses { commit, page }` | `GET R/commits/<commit>/status?page=<page>&limit=<size>` | CI from `state` and `total_count`; each context's latest status: `creator.id`, `updated_at`, `context`, `status`, `description`, `target_url`, no job; `more` while the pages read fall short of `total_count` |
 | `Read::Remarks { number, review, page }` | `GET R/pulls/<number>/reviews/<review>/comments` (unpaged) | the `page`th slice of `<size>`, cut as it streams: `id`, `user.id`, `path`, `position` as `line`, `body`; `more` when a comment follows the slice |
@@ -194,7 +194,7 @@ first failure, but where a row says otherwise.
 | `Read::Permission { user }` | `GET R/collaborators/<login>/permission` | `permission`: `none`, `read`, `write`, `admin`, and `owner` as `Admin` |
 | `Read::Locate { owner, name }` | `GET /api/v1/repos/<owner>/<name>` | `Located { repository }` from `id`; the repository's row kept (3.5) |
 | `Write::CreateIssue { key, title, body }` | `POST R/issues` `{title, body}`, the body behind the key's marker | `Created` from `number` |
-| `Write::OpenPull { title, body, head, base }` | `POST R/pulls` `{head, base, title, body}` | `Created` from `number` |
+| `Write::OpenPull { title, body, head, base }` | `GET R/branches/<head>`; `GET R/branches/<base>`; `GET R/compare/<base's commit.id>...<head's commit.id>`, of which only `total_commits` is kept; when it is 0, nothing more; else `POST R/pulls` `{head, base, title, body}` | `Created` from `number`; `NothingToMerge` when `total_commits` is 0, the pull request not written |
 | `Write::Post { number, key, body }` | `POST R/issues/<number>/comments` `{body}`, behind the key's marker | `Commented` from `id` |
 | `Write::Review { number, key, verdict, body }` | `POST R/pulls/<number>/reviews` `{event, body}`, `event` `APPROVED`, `REQUEST_CHANGES` or `COMMENT`, the body behind the key's marker | `Reviewed` from `id` |
 | `Write::Edit { number, title, body }` | `PATCH R/issues/<number>` `{title, body}`, each only when given | `Done` |
@@ -265,11 +265,35 @@ Notes on the table:
   reading the pull request (`domain/forge.md`, section 6).
 - **Updates** merge the base into the branch (`style=merge`), never a
   rebase (`domain/forge.md`, section 10).
+- **A pull request for a head and base.** Forgejo keeps at most one pull
+  request open for a head and a base. Its lookup, `pulls/{base}/{head}`,
+  names one of several, the oldest on v16.0.5 (13), and its listing has
+  no head or base filter. So `PullFor` answers the open one: the
+  lookup's, or, when the lookup names one closed or merged, the row of
+  the open pull requests' listing whose `head.ref`, `head.repo_id` and
+  `base.ref` are the call's head, its repository and its base, every
+  other row skipped as it streams. With none open, it answers the one
+  the lookup named. A change opens a pull request only when none exists
+  for its branches, and reopens it when it was closed (`domain/forge.md`,
+  sections 6 and 8.5), so the oldest is the one it follows, and the
+  listing is read only when that one is closed or merged, or another
+  hand opened one for its branches. Each page counts in the call's cost;
+  the call's deadline bounds them.
+- **Opening compares first.** Forgejo opens a pull request whose head
+  adds nothing to its base (13), which the forge client's vocabulary
+  refuses as `NothingToMerge` (`domain/forge.md`, section 6). So
+  `OpenPull` reads both branches and compares their commits before it
+  writes: a head with no commit its base lacks (`total_commits` 0, a
+  head equal to its base included) fails the call `NothingToMerge`, and
+  nothing is written. The three reads count in the call's cost, and fail
+  as 3.4 says for them. A base that moves to contain the head between
+  the comparison and the `POST` still gets a pull request with nothing
+  to merge; that window is the only way temper opens one.
 - **Keys.** `CreateIssue`, `Post` and `Review` write the key's marker,
   then the text (section 4). A pull request's key is its branches.
   `Edit` writes the title and body it is given.
 - **Several requests, one call.** `Item`, `Pull`, `PullFor`, `PullFiles`,
-  `Compare`, `Checks`, `Job`, `Protection`, `Collaborators`,
+  `Compare`, `Checks`, `Job`, `Protection`, `Collaborators`, `OpenPull`,
   `SetReviewers` and `Merge` make more than one; a path to resolve or a
   login to look up adds one (3.5). A `404` on a file's side, or on a
   failing status's run or job, ends nothing: it is an answer. The
@@ -345,7 +369,8 @@ such a request costs nothing.
 | `413` (Forgejo's quota) | `Full` |
 | `423` (the repository is archived) | `Forbidden` |
 | `409` on `OpenPull` (a pull request for the head and base is open) | `Exists` |
-| `422` on `OpenPull` with no changes between head and base | `NothingToMerge` |
+| `OpenPull`'s comparison counting no commit (`total_commits` 0): the pull request not written | `NothingToMerge` |
+| on `OpenPull`'s reads, before its `POST`: what this table makes a `Timeout` or an `InvalidAnswer` (the pull request was not written) | `Unavailable` |
 | `422` on a write whose title or body is empty | `Empty` |
 | `405` on `Merge` for a pull request merged or closed | `Closed` |
 | `405` on `Merge` for a conflict | `Conflict` |
@@ -374,7 +399,16 @@ such a request costs nothing.
 - **Not errors:** a `409` on `CreateBranch` is `Branch(Exists)`, which
   the client follows with a read of the branch; a `404` on
   `DeleteBranch` is `Missing`, which the client counts as the branch
-  gone (`domain/forge.md`, section 6).
+  gone (`domain/forge.md`, section 6). Forgejo v16.0.5 answers the
+  deletion of a branch that is not there `500` with an empty body (13):
+  a `Timeout`, after which the client's find reads the branch, and that
+  read's `404` is `Missing`, the branch gone.
+- **Reads before a write.** `OpenPull`'s reads come before its `POST`,
+  so a failure among them leaves the pull request provably not written:
+  what would be a `Timeout` or an `InvalidAnswer` is `Unavailable`, and
+  the client may send the call again. Their other failures are as the
+  table says (a `404`, a branch not there, `Missing`; a `429`
+  `RateLimited`; a `401` or a `403` `Forbidden`).
 - **The deadline.** Each call has the component's `deadline`, which
   configuration checks is at most the client's `lifetime`, so no byte of
   a write is sent past the time the client counts on. A call still
@@ -647,8 +681,10 @@ side of `temper-forge-forgejo`.
   runs, for `Read::Checks` and `Read::Job` (3.2), as a commit's run by
   its number (`actions/runs?head_sha&run_number`), a run by its id
   (`actions/runs/{id}`) and a run's jobs (`actions/runs/{id}/jobs`), each
-  job with its id and attempt; and the fake's CI statuses link their jobs
-  in Forgejo's shape, `<html_url>/actions/runs/<run number>/jobs/<job
+  job with its id and attempt; the oldest pull request for a head and
+  base, open or not, and the open pull requests, oldest first, for
+  `Read::PullFor`'s requests (3.2); and the fake's CI statuses link their
+  jobs in Forgejo's shape, `<html_url>/actions/runs/<run number>/jobs/<job
   index>`.
 - **Its names, Forgejo's shape.** The fake names repositories by their
   full name; its protocol layer gives each the id the scenario names,
@@ -662,8 +698,12 @@ side of `temper-forge-forgejo`.
   capped at the configured `max_response_items`; a size without a page
   is ignored where Forgejo ignores it; an issue's comments, a review's
   comments and a comparison come unpaged; collaborators come without
-  their permissions; a merge answers with no body. A client that leans on
-  Forgejo being better than it is fails in the fake first.
+  their permissions; a merge answers with no body; the lookup
+  `pulls/{base}/{head}` names the oldest of several pull requests, open
+  or not; a pull request whose head adds nothing to its base is opened
+  (`201`); deleting a branch that is not there answers `500` with an
+  empty body. A client that leans on Forgejo being better than it is
+  fails in the fake first.
 - **Faults move down** (testing.md, 4.2): a call refused for the rate is
   a `429` with `Retry-After`; one failed before it is made is a refused
   connect or a reset before the request is read; one made and then timed
@@ -855,6 +895,22 @@ From Forgejo v16.0.5's API description (its tagged
 - `GET /users/search` takes a `uid`; a collaborators' listing answers
   users only, so each one's permission is a read by login.
 
+Observed on Forgejo v16.0.5 by `tools/forgejo-conformance`
+(`facts.txt`), where the design leans on them:
+
+- The lookup `pulls/{base}/{head}` names the oldest of several pull
+  requests for a head and base: a closed one before a newer open one
+  (3.2, "A pull request for a head and base").
+- `POST R/pulls` whose head adds nothing to its base answers `201` and
+  opens the pull request; it is not refused (3.2, "Opening compares
+  first").
+- Deleting a branch that is not there answers `500` with an empty body,
+  not `404` (3.4).
+- A branch's `effective_branch_protection_name` is empty for a write
+  collaborator who is not an admin, and names the rule for an admin; a
+  writer's read then goes to the listing, which answers it `403` (3.2,
+  `Read::Protection`).
+
 Observed on Forgejo v15.0.0 (`domain/forge.md`, 20.1 has the rest),
 each to confirm on v16.0.5:
 
@@ -888,8 +944,11 @@ it:
   creation's, and an edit moves it (3.3);
 - that a body's line feed after the marker is kept as sent;
 - that `PATCH issues/{index}` edits a pull request's title and body;
-- which pull request `pulls/{base}/{head}` names when several did;
-  branch names with a slash in `branches/{branch}`;
+- branch names with a slash in `branches/{branch}`;
+- that the open pull requests' listing (`pulls?state=open&sort=oldest`)
+  pages with `page` and `limit`, and carries each row's `head.ref`,
+  `head.repo_id` and `base.ref` (3.2, "A pull request for a head and
+  base");
 - that `base.sha` is the base branch's tip when read;
 - a combined status with no status: its `state` and `total_count`; how
   `skipped` combines;
@@ -901,8 +960,9 @@ it:
   first, in id order; how a dismissed review shows, and what `position`
   a remark's line is;
 - every status and message of section 3.4, the merge's above all; that
-  `OpenPull` answers `409` for an open pull request and `422` for no
-  changes; that a moved repository's old path answers a redirect;
+  `OpenPull` answers `409` for an open pull request; that a comparison
+  of a commit with itself, or with its ancestor, counts `total_commits`
+  0; that a moved repository's old path answers a redirect;
 - what the API answers for a repository the API token cannot read, by
   path and by id (`404`, or `403`): it decides whether a locate reports
   such a repository not found or no access (client.md, 4.7), and whether
@@ -912,8 +972,6 @@ it:
   path (git.md, section 10), and the line git prints for a push a
   protected branch refuses, which git.md, 4.8 reads as a `[remote
   rejected]` whose reason ends in `declined`;
-- that `effective_branch_protection_name` names the rule that applies,
-  for a writer and for an admin;
 - the largest body Forgejo keeps on SQLite;
 - whether Forgejo limits the API's rate, and with which headers;
 - later, the webhook headers and payloads of every event of section 5,
