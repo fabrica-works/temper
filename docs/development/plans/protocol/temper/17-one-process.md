@@ -363,6 +363,29 @@ configuration document's defaults; a startup or worst-case check that
 now refuses the profile is a question naming the check and its numbers.
 Size: at most 10 production lines.
 
+### 17.s2 The referee and a two-turn chat
+
+A step not in the plan (decisions.md, ruling 154), after 17.s1, before
+ruling 152's measure and 17.4.
+Scope: name the cause of `Violation { promise: Commit, why: "outside
+delivery preceded its durable prerequisite: Turn(1, 1, 1)" }`
+(`src/referee.rs:420`) that 15.3's probe meets: the chat with one
+`read` before its text and wait (`~/src/rust/tmp/temper/protocol/logs/temper-15/151-world-two-turn-{world,fixtures}.rs`,
+`151-world-two-turn.log`, 0.150 s). A misreading by the referee is
+fixed in the referee; the probe then lands as a story in
+`tests/fuzzy_one_process.rs`, named for the behaviour, its reply
+asserted.
+Files: 17's own (ruling 108), `tests/fuzzy_one_process.rs`.
+Test shape: one story, at most 1 s; every existing assertion kept.
+Proof: joint, `heavy cargo nextest run -p temper-one-process-world
+--ignore-default-filter`, once; the gate.
+Don't: loosen a promise of the referee, or make the story pass by
+finishing the chat without its wait; edit production code: a turn the
+service delivers before it is durable is a question naming its site.
+Runs: at most five world runs, as ruling 148 says; past them, a
+question with their logs.
+Size: world code, at most 150 lines.
+
 ### 17.4 A drain, kills and power loss, and the secrets check
 
 Scope: the drain story: a signal mid-run drains the engine, the worker

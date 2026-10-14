@@ -1184,6 +1184,28 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      slow calls, and refuses nothing
      (`temper-engine-domain-forge-client/src/calls.rs:191`).
 
+154. **Session 17 explains its referee's stop on a two-turn chat: step
+     17.s2** (temper 15.3, blocked 2026-10-14T19:02:44Z; cross-session
+     scope). After ruling 151, 15.3's process proof merges the pull and
+     edits `main`, and the native person still misses "Change requested"
+     at step 20, though the stored transcript holds it, uncut, among the
+     last two activity rows (`logs/temper-15/151-result.md`). 15.3's cheap
+     probe, the one-process chat with one `read` before its text and wait
+     (`logs/temper-15/151-world-two-turn-{world,fixtures}.rs`), stops in
+     0.150 s at `tests/one-process/src/referee.rs:420`: `Violation {
+     promise: Commit, why: "outside delivery preceded its durable
+     prerequisite: Turn(1, 1, 1)" }` (`151-world-two-turn.log`). The
+     referee and its world are session 17's, and 17.3 already met one
+     observer error of this promise (a worker's acknowledgement taken for
+     durability, its report of 17:40:12Z). So session 17, after 17.s1 and
+     before ruling 152's measure, runs step `temper-17.s2`
+     (`temper/17-one-process.md`): it names the cause; a referee's
+     misreading is fixed there; a turn delivered before it is durable is
+     a production fault, and a question naming its site. Session 15 in
+     the meantime traces the native reply's delivery and read in source
+     and its retained states, with no run of the one-process world or the
+     process tier, until 17.s2 reports.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
