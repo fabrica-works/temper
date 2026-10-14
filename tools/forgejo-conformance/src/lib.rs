@@ -1,5 +1,6 @@
 //! Records format-faithful exchanges against an isolated Forgejo (forge.md, 10).
 mod cases;
+pub mod component;
 pub mod facts;
 mod fixture;
 pub mod mask;

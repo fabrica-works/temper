@@ -84,3 +84,31 @@ fn a_fact_read_from_a_case_compares_its_status_and_message() {
     exchange.status = 405;
     assert!(!crate::facts::matches(&exchange, 409, "head out of date"));
 }
+#[test]
+fn the_component_block_is_replaced_and_other_lines_kept() {
+    use crate::facts::{self, Fact, Outcome};
+    let facts = [Fact { name: "component-read-items", outcome: Outcome::Fails("TooLarge".to_owned()) }];
+    for (before, expected) in [
+        (
+            "# forgejo 16.0.5\n# runner none\nholds merge\nholds component-read-items\n",
+            "# forgejo 16.0.5\n# runner none\nholds merge\nfails component-read-items: TooLarge\n",
+        ),
+        (
+            "holds component-start-ready\nholds merge\nunchecked component-read-job: none\n",
+            "fails component-read-items: TooLarge\nholds merge\n",
+        ),
+        ("holds merge", "holds merge\nfails component-read-items: TooLarge\n"),
+    ] {
+        assert_eq!(facts::replace_block(before, "component-", &facts), expected, "{before}");
+    }
+}
+#[test]
+fn a_sent_request_is_counted_by_its_request_line() {
+    for (name, bytes, expected) in [
+        ("head", b"GET /api/v1/user HTTP/1.1\r\nAuthorization: token MASKED\r\n\r\n".as_slice(), 1),
+        ("body", b"{\"body\":\"GET /api/v1/user\"}", 0),
+        ("two heads", b"POST /api/v1/repos/a/b/issues HTTP/1.1\r\n\r\nGET /api/v1/user HTTP/1.1\r\n", 2),
+    ] {
+        assert_eq!(crate::component::hosted::sent_requests(bytes), expected, "{name}");
+    }
+}

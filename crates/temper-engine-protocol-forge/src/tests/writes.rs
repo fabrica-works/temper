@@ -25,6 +25,7 @@ fn creation_rows() -> [CreationRow; 3] {
             "issue",
             Write::CreateIssue { key: boxed(&[0xab, 0xff]), title: boxed(b"title"), body: boxed(b"body") },
             b"POST /api/v1/repos/fixture/specimen/issues ".as_slice(),
+            201,
             ISSUE,
             Answer::Created(7),
         ),
@@ -32,6 +33,7 @@ fn creation_rows() -> [CreationRow; 3] {
             "comment",
             Write::Post { number: 7, key: boxed(&[0xab, 0xff]), body: boxed(b"body") },
             b"POST /api/v1/repos/fixture/specimen/issues/7/comments ".as_slice(),
+            201,
             COMMENT,
             Answer::Commented(9),
         ),
@@ -39,6 +41,7 @@ fn creation_rows() -> [CreationRow; 3] {
             "review",
             Write::Review { number: 7, key: boxed(&[0xab, 0xff]), verdict: Verdict::Approve, body: boxed(b"body") },
             b"POST /api/v1/repos/fixture/specimen/pulls/7/reviews ".as_slice(),
+            200,
             REVIEW,
             Answer::Reviewed(11),
         ),
@@ -46,14 +49,14 @@ fn creation_rows() -> [CreationRow; 3] {
 }
 #[test]
 fn creations_carry_the_key_marker_at_the_head_of_their_body() {
-    for (name, write, request, body, expected) in creation_rows() {
+    for (name, write, request, code, body, expected) in creation_rows() {
         let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Write(write));
         h.run(Duration::from_millis(1));
         let written = h.request_bytes(fixtures::FORGE);
         assert!(bytes::find(&written, request).is_some(), "{name}: route");
         assert!(bytes::find(&written, br#""body":"<!-- temper:key abff -->\nbody""#).is_some(), "{name}: marked body");
-        h.answer(fixtures::FORGE, &fixtures::response(201, body));
+        h.answer(fixtures::FORGE, &fixtures::response(code, body));
         h.run(Duration::ZERO);
         let answered = h.answered(1).expect("creation answered");
         assert_eq!((answered.cost, &answered.result), (1, &Ok(expected)), "{name}");
@@ -254,7 +257,7 @@ fn write_refusals_read_only_known_entire_messages() {
         assert_eq!((answered.cost, &answered.result), (1, &Err(expected)), "{name}");
     }
 }
-type CreationRow = (&'static str, Write, &'static [u8], &'static [u8], Answer);
+type CreationRow = (&'static str, Write, &'static [u8], u16, &'static [u8], Answer);
 type WriteRow = (&'static str, Write, &'static [u8], &'static [u8], u16, &'static [u8], Answer);
 type FailureRow = (&'static str, Asked, u16, Option<Refusal>, Option<Duration>, Error, Drop);
 const PULL: &[u8] = br#"{"number":7,"state":"open","head":{"repo_id":1,"ref":"work","sha":"0100000000000000000000000000000000000000"},"base":{"repo_id":1,"ref":"main","sha":"0200000000000000000000000000000000000000"},"merged":false,"merge_commit_sha":null,"merge_base":"0200000000000000000000000000000000000000","mergeable":true,"requested_reviewers":[]}"#;

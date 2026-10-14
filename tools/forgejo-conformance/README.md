@@ -32,3 +32,10 @@ The runner registers with this instance only and executes two inline host
 shell jobs, one succeeding and one failing; no actions or containers are
 downloaded. Without a runner those facts remain unchecked. Webhook facts
 are left unchecked until webhooks are built.
+
+`--component` drives the forge component through real io sockets on the shell's
+ring against a fresh fixture. It replaces only the `component-` facts in
+`facts.txt`; it records no transcripts. The same runner setting exercises
+Checks and Job through the component; without it those two facts are unchecked.
+Start requests are counted separately from logical calls. Every call's cost
+is compared with the HTTP request lines counted from socket sends.

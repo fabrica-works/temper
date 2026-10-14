@@ -73,6 +73,12 @@ name = "forgejo-conformance"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "skein-tls",
+ "temper-engine-domain-forge-client",
+ "temper-engine-protocol-forge",
  "temper-throwaway-forgejo",
 ]
 

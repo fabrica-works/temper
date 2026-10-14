@@ -37,6 +37,13 @@ fn command(binary: &Path, scratch: &Path) -> Command {
     cmd
 }
 pub fn run(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) -> Result<(String, Vec<Fact>)> {
+    run_with(f, Some(out), mask, secrets)
+}
+pub fn component(f: &Fixture, secrets: &mut Secrets) -> Result<()> {
+    run_with(f, None, &mut Mask::new(f.instance.port()), secrets)?;
+    Ok(())
+}
+fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secrets) -> Result<(String, Vec<Fact>)> {
     let Some(binary) = std::env::var_os("TEMPER_FORGEJO_RUNNER") else {
         return Ok((
             "none".into(),
@@ -154,7 +161,7 @@ fn valid_link(link: &str) -> bool {
 }
 fn capture(
     f: &Fixture,
-    out: &Path,
+    out: Option<&Path>,
     mask: &mut Mask,
     secrets: &Secrets,
     name: &str,
@@ -166,7 +173,7 @@ fn capture(
     Ok(serde_json::from_slice(&response.body).unwrap_or(Value::Null))
 }
 fn record(
-    out: &Path,
+    out: Option<&Path>,
     mask: &mut Mask,
     secrets: &Secrets,
     name: &str,
@@ -175,7 +182,10 @@ fn record(
     write::check(name, &response.sent, &response.body, secrets)?;
     let request = mask::request(mask, response);
     let response = mask::response(mask, response);
-    write::case(out, name, &request, &response, secrets)
+    if let Some(out) = out {
+        write::case(out, name, &request, &response, secrets)?;
+    }
+    Ok(())
 }
 fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, String)> {
     let scratch = f.instance.scratch().join("runner");

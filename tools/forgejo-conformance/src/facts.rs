@@ -498,3 +498,29 @@ fn errors(out: &Path, facts: &mut Vec<Fact>) -> Result<()> {
     }
     Ok(())
 }
+/// Replaces only facts whose names begin with `prefix`, preserving every other line.
+#[must_use]
+pub fn replace_block(text: &str, prefix: &str, facts: &[Fact]) -> String {
+    let mut result = String::new();
+    let mut replaced = false;
+    for line in text.split_inclusive('\n') {
+        let mut words = line.split_whitespace();
+        let component = matches!(words.next(), Some("holds" | "fails" | "unchecked"))
+            && words.next().is_some_and(|name| name.starts_with(prefix));
+        if component {
+            if !replaced {
+                result.extend(facts.iter().map(Fact::line));
+                replaced = true;
+            }
+        } else {
+            result.push_str(line);
+        }
+    }
+    if !replaced {
+        if !result.is_empty() && !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.extend(facts.iter().map(Fact::line));
+    }
+    result
+}

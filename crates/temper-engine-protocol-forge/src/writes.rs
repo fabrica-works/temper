@@ -168,11 +168,10 @@ impl Plan {
             Stage::Write => {}
         }
         match self.write {
-            api::Write::Update { .. } | api::Write::Merge { .. } => 200,
+            api::Write::Update { .. } | api::Write::Merge { .. } | api::Write::Review { .. } => 200,
             api::Write::DeleteBranch { .. } => 204,
             api::Write::CreateIssue { .. }
             | api::Write::Post { .. }
-            | api::Write::Review { .. }
             | api::Write::Edit { .. }
             | api::Write::Close { .. }
             | api::Write::Reopen { .. }
