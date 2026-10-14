@@ -134,8 +134,8 @@ pub(super) fn decode_proposed(value: w::ProposedEffect, bounds: &Bounds) -> Resu
 }
 
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-fn encode_payload(value: &top::CallPayload) -> Option<w::CallPayload> {
-    Some(match value {
+fn encode_payload(value: &top::CallPayload) -> w::CallPayload {
+    match value {
         top::CallPayload::Effect { entry, deadline, outcome } => w::CallPayload::Effect(
             w::CallEffect::new(
                 &w::CEILINGS,
@@ -156,7 +156,7 @@ fn encode_payload(value: &top::CallPayload) -> Option<w::CallPayload> {
         top::CallPayload::Read(value) => {
             let result = match value.as_ref() {
                 Ok(value) => w::ReadResult::Answer(Box::new(
-                    w::AnswerValue::new(&w::CEILINGS, w::AnswerValueParts { answer: super::answers::encode(value)? })
+                    w::AnswerValue::new(&w::CEILINGS, w::AnswerValueParts { answer: super::answers::encode(value) })
                         .expect(FITS),
                 )),
                 Err(error) => w::ReadResult::Error(
@@ -166,7 +166,7 @@ fn encode_payload(value: &top::CallPayload) -> Option<w::CallPayload> {
             };
             w::CallPayload::Read(w::CallRead::new(&w::CEILINGS, w::CallReadParts { result }).expect(FITS))
         }
-    })
+    }
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
 fn decode_payload(value: w::CallPayload, bounds: &Bounds) -> Result<top::CallPayload, Undecodable> {
@@ -189,10 +189,10 @@ fn decode_payload(value: w::CallPayload, bounds: &Bounds) -> Result<top::CallPay
         })),
     })
 }
-pub(super) fn encode_call(key: &top::NamedCall, answer: &top::CallPayload) -> Option<w::Call> {
+pub(super) fn encode_call(key: &top::NamedCall, answer: &top::CallPayload) -> w::Call {
     let top::NamedCall { task, attempt, completion, position } = *key;
     let key = w::NamedCall::new(&w::CEILINGS, w::NamedCallParts { task, attempt, completion, position }).expect(FITS);
-    Some(w::Call::new(&w::CEILINGS, w::CallParts { key, answer: encode_payload(answer)? }).expect(FITS))
+    w::Call::new(&w::CEILINGS, w::CallParts { key, answer: encode_payload(answer) }).expect(FITS)
 }
 pub(super) fn decode_call(value: w::Call, bounds: &Bounds) -> Result<top::Stored, Undecodable> {
     let w::CallParts { key, answer } = value.into_parts();

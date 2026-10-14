@@ -403,3 +403,73 @@ pub(super) fn decode_review(value: w::Review) -> d::Review {
         official,
     }
 }
+
+#[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
+pub(super) fn encode_status(value: &d::Status) -> w::Status {
+    let d::Status { author, at, context, check, description, url, job } = value;
+    w::Status::new(
+        &w::CEILINGS,
+        w::StatusParts {
+            author: *author,
+            at: at.as_nanos(),
+            context: context.clone(),
+            verdict: encode_check(*check),
+            description: description.clone(),
+            url: url.clone(),
+            job: match job {
+                Some(value) => Some(super::answers::encode_job_attempt(value)),
+                None => None,
+            },
+        },
+    )
+    .expect(FITS)
+}
+#[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
+pub(super) fn decode_status(value: w::Status) -> d::Status {
+    let w::StatusParts { author, at, context, verdict, description, url, job } = value.into_parts();
+    d::Status {
+        author,
+        at: skein_lib::Time::from_nanos(at),
+        context,
+        check: decode_check(verdict),
+        description,
+        url,
+        job: match job {
+            Some(value) => Some(super::answers::decode_job_attempt(value)),
+            None => None,
+        },
+    }
+}
+pub(super) fn encode_remark(value: &d::Remark) -> w::Remark {
+    let d::Remark { id, author, path, line, body } = value;
+    w::Remark::new(
+        &w::CEILINGS,
+        w::RemarkParts { id: *id, author: *author, path: path.clone(), line: *line, body: body.clone() },
+    )
+    .expect(FITS)
+}
+pub(super) fn decode_remark(value: w::Remark) -> d::Remark {
+    let w::RemarkParts { id, author, path, line, body } = value.into_parts();
+    d::Remark { id, author, path, line, body }
+}
+pub(super) fn encode_file(value: &d::File) -> w::File {
+    let d::File { path, before, after } = value;
+    w::File::new(&w::CEILINGS, w::FileParts { path: path.clone(), before: before.clone(), after: after.clone() })
+        .expect(FITS)
+}
+pub(super) fn decode_file(value: w::File) -> d::File {
+    let w::FileParts { path, before, after } = value.into_parts();
+    d::File { path, before, after }
+}
+pub(super) fn encode_collaborator(value: &d::Collaborator) -> w::Collaborator {
+    let d::Collaborator { user, permission } = value;
+    w::Collaborator::new(
+        &w::CEILINGS,
+        w::CollaboratorParts { user: *user, permission: super::answers::encode_permission(*permission) },
+    )
+    .expect(FITS)
+}
+pub(super) fn decode_collaborator(value: w::Collaborator) -> d::Collaborator {
+    let w::CollaboratorParts { user, permission } = value.into_parts();
+    d::Collaborator { user, permission: super::answers::decode_permission(permission) }
+}

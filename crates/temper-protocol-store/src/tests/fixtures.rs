@@ -568,3 +568,54 @@ pub fn item_piece_row(items: Box<[u8]>) -> crate::v1::Row {
     let value = w::Value::Call(w::Call::new(&w::CEILINGS, w::CallParts { key, answer }).expect("row ceiling"));
     w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("row ceiling")
 }
+
+pub fn status() -> client::api::Status {
+    client::api::Status {
+        author: 1,
+        at: skein_lib::Time::from_nanos(2),
+        context: Box::new([3]),
+        check: client::api::Check::Passed,
+        description: Box::new([4]),
+        url: Box::new([5]),
+        job: Some(client::api::JobAttempt { head: [6; 32], run: 7, job: 8, attempt: 9 }),
+    }
+}
+pub fn file() -> client::api::File {
+    client::api::File { path: Box::new([1]), before: Some(Box::new([2])), after: Some(Box::new([3])) }
+}
+pub fn remaining_answers() -> [client::api::Answer; 6] {
+    use client::api::{Answer, Ci, Collaborator, Permission, Remark};
+    [
+        Answer::Statuses { ci: Ci::Failed, statuses: Box::new([status(), status()]), more: true },
+        Answer::Remarks {
+            remarks: Box::new([Remark { id: 1, author: 2, path: Box::new([3]), line: 4, body: Box::new([5]) }]),
+            more: true,
+        },
+        Answer::PullFiles {
+            head: [6; 32],
+            files: Box::new([
+                file(),
+                client::api::File { path: Box::new([7]), before: None, after: Some(Box::new([8])) },
+            ]),
+            more: true,
+        },
+        Answer::Compare {
+            before: [9; 32],
+            after: [10; 32],
+            contains_before: true,
+            files: Box::new([
+                file(),
+                client::api::File { path: Box::new([11]), before: Some(Box::new([12])), after: None },
+            ]),
+            commits: Box::new([[13; 32], [14; 32]]),
+        },
+        Answer::Checks(Box::new([status(), client::api::Status { job: None, ..status() }])),
+        Answer::Collaborators {
+            collaborators: Box::new([
+                Collaborator { user: 15, permission: Permission::Read },
+                Collaborator { user: 16, permission: Permission::Write },
+            ]),
+            more: true,
+        },
+    ]
+}

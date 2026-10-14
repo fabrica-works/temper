@@ -181,3 +181,40 @@ fn answer_item_counts_past_rows_fail_to_decode() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
     assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable));
 }
+
+#[test]
+fn each_remaining_answer_round_trips_unchanged() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    for answer in fixtures::remaining_answers() {
+        let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+        let bytes = records::encode(&row).expect("remaining answer encoded");
+        assert_eq!(records::decode(&bytes, &bounds), Ok(row));
+    }
+}
+#[test]
+fn fixed_answer_lists_past_their_counts_fail_to_decode() {
+    use temper_engine_domain_forge_client::api::{Answer, Collaborator, Permission};
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture limits fit");
+    let mut collaborators = skein_lib::List::with_capacity(9);
+    for user in 0_u64..9 {
+        collaborators.push(Collaborator { user, permission: Permission::Write }).expect("fixture room");
+    }
+    let cases = [
+        ("collaborators", Answer::Collaborators { collaborators: collaborators.into_boxed(), more: true }),
+        (
+            "commits",
+            Answer::Compare {
+                before: [1; 32],
+                after: [2; 32],
+                contains_before: false,
+                files: Box::new([]),
+                commits: Box::new([[3; 32]; 9]),
+            },
+        ),
+    ];
+    for (name, answer) in cases {
+        let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+        let bytes = records::encode(&row).expect("schema ceiling admits count");
+        assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable), "{name}");
+    }
+}

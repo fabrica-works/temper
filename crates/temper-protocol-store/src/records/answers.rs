@@ -3,7 +3,7 @@ use super::{Bounds, FITS, Undecodable, names, topics, w};
 use alloc::boxed::Box;
 use skein_lib::{List, Reader, Writer};
 use temper_engine_domain_forge_client::api as d;
-fn encode_permission(value: d::Permission) -> w::Permission {
+pub(super) fn encode_permission(value: d::Permission) -> w::Permission {
     match value {
         d::Permission::None => w::Permission::None,
         d::Permission::Read => w::Permission::Read,
@@ -11,7 +11,7 @@ fn encode_permission(value: d::Permission) -> w::Permission {
         d::Permission::Admin => w::Permission::Admin,
     }
 }
-fn decode_permission(value: w::Permission) -> d::Permission {
+pub(super) fn decode_permission(value: w::Permission) -> d::Permission {
     match value {
         w::Permission::None => d::Permission::None,
         w::Permission::Read => d::Permission::Read,
@@ -73,43 +73,34 @@ fn decode_pull(value: w::Pull) -> d::Pull {
         ci: topics::decode_ci(ci),
     }
 }
-fn encode_job_attempt(value: &d::JobAttempt) -> w::JobAttempt {
+pub(super) fn encode_job_attempt(value: &d::JobAttempt) -> w::JobAttempt {
     let d::JobAttempt { head, run, job, attempt } = value;
     w::JobAttempt::new(&w::CEILINGS, w::JobAttemptParts { head: *head, run: *run, job: *job, attempt: *attempt })
         .expect(FITS)
 }
-fn decode_job_attempt(value: w::JobAttempt) -> d::JobAttempt {
+pub(super) fn decode_job_attempt(value: w::JobAttempt) -> d::JobAttempt {
     let w::JobAttemptParts { head, run, job, attempt } = value.into_parts();
     d::JobAttempt { head, run, job, attempt }
 }
 #[expect(clippy::manual_map, reason = "step translations use explicit matches without closures")]
-pub(super) fn encode(value: &d::Answer) -> Option<w::Answer> {
-    Some(match value {
-        d::Answer::Items { items, more, now } => w::Answer::Items(
-            w::ItemsAnswer::new(
-                &w::CEILINGS,
-                w::ItemsAnswerParts { items: encode_summaries(items), more: *more, now: now.as_nanos() },
-            )
-            .expect(FITS),
-        ),
-        d::Answer::Item { item, comments, more } => w::Answer::Item(
-            w::ItemAnswer::new(
-                &w::CEILINGS,
-                w::ItemAnswerParts {
-                    item: api::encode_summary(item),
-                    comments: encode_comments(comments),
-                    more: *more,
-                },
-            )
-            .expect(FITS),
-        ),
-        d::Answer::Reviews { reviews, more } => w::Answer::Reviews(
-            w::ReviewsAnswer::new(
-                &w::CEILINGS,
-                w::ReviewsAnswerParts { reviews: encode_reviews(reviews), more: *more },
-            )
-            .expect(FITS),
-        ),
+pub(super) fn encode(value: &d::Answer) -> w::Answer {
+    match value {
+        d::Answer::Statuses { ci, statuses, more } => w::Answer::Statuses(encode_statuses_answer(*ci, statuses, *more)),
+        d::Answer::Remarks { remarks, more } => w::Answer::Remarks(encode_remarks_answer(remarks, *more)),
+        d::Answer::PullFiles { head, files, more } => {
+            w::Answer::PullFiles(encode_pull_files_answer(*head, files, *more))
+        }
+        d::Answer::Compare { before, after, contains_before, files, commits } => {
+            w::Answer::Compare(encode_compare_answer(*before, *after, *contains_before, files, commits))
+        }
+        d::Answer::Checks(statuses) => w::Answer::Checks(encode_checks_answer(statuses)),
+        d::Answer::Collaborators { collaborators, more } => {
+            w::Answer::Collaborators(encode_collaborators_answer(collaborators, *more))
+        }
+
+        d::Answer::Items { items, more, now } => w::Answer::Items(encode_items_answer(items, *more, *now)),
+        d::Answer::Item { item, comments, more } => w::Answer::Item(encode_item_answer(item, comments, *more)),
+        d::Answer::Reviews { reviews, more } => w::Answer::Reviews(encode_reviews_answer(reviews, *more)),
         d::Answer::Pull(value) => w::Answer::Pull(encode_pull(value)),
         d::Answer::Commit(commit) => {
             w::Answer::Commit(w::Commit::new(&w::CEILINGS, w::CommitParts { commit: *commit }).expect(FITS))
@@ -169,16 +160,41 @@ pub(super) fn encode(value: &d::Answer) -> Option<w::Answer> {
             .expect(FITS),
         ),
         d::Answer::Done => w::Answer::Done,
-        d::Answer::Statuses { .. }
-        | d::Answer::Remarks { .. }
-        | d::Answer::PullFiles { .. }
-        | d::Answer::Compare { .. }
-        | d::Answer::Checks(_)
-        | d::Answer::Collaborators { .. } => return None,
-    })
+    }
 }
 pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Undecodable> {
     Ok(match value {
+        w::Answer::Statuses(value) => {
+            let w::StatusesAnswerParts { ci, statuses, more } = value.into_parts();
+            d::Answer::Statuses { ci: topics::decode_ci(ci), statuses: decode_statuses(&statuses, bounds)?, more }
+        }
+        w::Answer::Remarks(value) => {
+            let w::RemarksAnswerParts { remarks, more } = value.into_parts();
+            d::Answer::Remarks { remarks: decode_remarks(&remarks, bounds)?, more }
+        }
+        w::Answer::PullFiles(value) => {
+            let w::PullFilesAnswerParts { head, files, more } = value.into_parts();
+            d::Answer::PullFiles { head, files: decode_files(&files, bounds)?, more }
+        }
+        w::Answer::Compare(value) => {
+            let w::CompareAnswerParts { before, after, contains_before, files, commits } = value.into_parts();
+            d::Answer::Compare {
+                before,
+                after,
+                contains_before,
+                files: decode_files(&files, bounds)?,
+                commits: commits.into_boxed(),
+            }
+        }
+        w::Answer::Checks(value) => {
+            let w::ChecksAnswerParts { statuses } = value.into_parts();
+            d::Answer::Checks(decode_statuses(&statuses, bounds)?)
+        }
+        w::Answer::Collaborators(value) => {
+            let w::CollaboratorsAnswerParts { collaborators, more } = value.into_parts();
+            d::Answer::Collaborators { collaborators: decode_collaborators(collaborators), more }
+        }
+
         w::Answer::Items(value) => {
             let w::ItemsAnswerParts { items, more, now } = value.into_parts();
             d::Answer::Items { items: decode_summaries(&items, bounds)?, more, now: skein_lib::Time::from_nanos(now) }
@@ -332,4 +348,179 @@ fn decode_reviews(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Review]>, Und
         values.push(value).or(Err(Undecodable))?;
     }
     Err(Undecodable)
+}
+
+fn encode_statuses(values: &[d::Status]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_status(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_status(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_statuses(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Status]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::Status::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_status(item);
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
+}
+fn encode_remarks(values: &[d::Remark]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_remark(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_remark(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_remarks(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::Remark]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::Remark::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_remark(item);
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
+}
+fn encode_files(values: &[d::File]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for value in values {
+        size = size
+            .checked_add(usize::try_from(api::encode_file(value).measure()).expect("item length fits"))
+            .expect("bounded piece")
+            .checked_add(4)
+            .expect("bounded piece");
+    }
+    let mut writer = Writer::new(size);
+    for value in values {
+        let item = api::encode_file(value);
+        let mut encoded = Writer::new(usize::try_from(item.measure()).expect("item length fits"));
+        item.encode(&mut encoded).expect("measured item room");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece room");
+    }
+    writer.finish()
+}
+fn decode_files(bytes: &[u8], bounds: &Bounds) -> Result<Box<[d::File]>, Undecodable> {
+    let mut reader = Reader::new(bytes);
+    let mut values = List::with_capacity(bounds.forge().client.rows);
+    for _ in 0..=bounds.forge().client.rows {
+        let Some(item) = skein_codec::piece::split(&mut reader).or(Err(Undecodable))? else {
+            return Ok(values.into_boxed());
+        };
+        let item = w::File::decode(bounds.limits(), &mut Reader::new(&item)).or(Err(Undecodable))?;
+        let value = api::decode_file(item);
+        values.push(value).or(Err(Undecodable))?;
+    }
+    Err(Undecodable)
+}
+fn encode_commits(values: &[d::Commit]) -> List<d::Commit> {
+    let mut result = List::with_capacity(u32::try_from(values.len()).expect("admitted count"));
+    for value in values {
+        result.push(*value).expect("same count");
+    }
+    result
+}
+fn encode_collaborators(values: &[d::Collaborator]) -> List<w::Collaborator> {
+    let mut result = List::with_capacity(u32::try_from(values.len()).expect("admitted count"));
+    for value in values {
+        let item = api::encode_collaborator(value);
+        result.push(item).expect("same count");
+    }
+    result
+}
+fn decode_collaborators(values: List<w::Collaborator>) -> Box<[d::Collaborator]> {
+    let mut result = List::with_capacity(values.len());
+    for value in values.into_boxed() {
+        let item = api::decode_collaborator(value);
+        result.push(item).expect("same count");
+    }
+    result.into_boxed()
+}
+
+fn encode_items_answer(items: &[d::Summary], more: bool, now: skein_lib::Time) -> w::ItemsAnswer {
+    w::ItemsAnswer::new(&w::CEILINGS, w::ItemsAnswerParts { items: encode_summaries(items), more, now: now.as_nanos() })
+        .expect(FITS)
+}
+fn encode_item_answer(item: &d::Summary, comments: &[d::Comment], more: bool) -> w::ItemAnswer {
+    w::ItemAnswer::new(
+        &w::CEILINGS,
+        w::ItemAnswerParts { item: api::encode_summary(item), comments: encode_comments(comments), more },
+    )
+    .expect(FITS)
+}
+fn encode_reviews_answer(reviews: &[d::Review], more: bool) -> w::ReviewsAnswer {
+    w::ReviewsAnswer::new(&w::CEILINGS, w::ReviewsAnswerParts { reviews: encode_reviews(reviews), more }).expect(FITS)
+}
+fn encode_statuses_answer(ci: d::Ci, statuses: &[d::Status], more: bool) -> w::StatusesAnswer {
+    w::StatusesAnswer::new(
+        &w::CEILINGS,
+        w::StatusesAnswerParts { ci: topics::encode_ci(ci), statuses: encode_statuses(statuses), more },
+    )
+    .expect(FITS)
+}
+fn encode_remarks_answer(remarks: &[d::Remark], more: bool) -> w::RemarksAnswer {
+    w::RemarksAnswer::new(&w::CEILINGS, w::RemarksAnswerParts { remarks: encode_remarks(remarks), more }).expect(FITS)
+}
+fn encode_pull_files_answer(head: d::Commit, files: &[d::File], more: bool) -> w::PullFilesAnswer {
+    w::PullFilesAnswer::new(&w::CEILINGS, w::PullFilesAnswerParts { head, files: encode_files(files), more })
+        .expect(FITS)
+}
+fn encode_compare_answer(
+    before: d::Commit,
+    after: d::Commit,
+    contains_before: bool,
+    files: &[d::File],
+    commits: &[d::Commit],
+) -> w::CompareAnswer {
+    w::CompareAnswer::new(
+        &w::CEILINGS,
+        w::CompareAnswerParts {
+            before,
+            after,
+            contains_before,
+            files: encode_files(files),
+            commits: encode_commits(commits),
+        },
+    )
+    .expect(FITS)
+}
+fn encode_checks_answer(statuses: &[d::Status]) -> w::ChecksAnswer {
+    w::ChecksAnswer::new(&w::CEILINGS, w::ChecksAnswerParts { statuses: encode_statuses(statuses) }).expect(FITS)
+}
+fn encode_collaborators_answer(collaborators: &[d::Collaborator], more: bool) -> w::CollaboratorsAnswer {
+    w::CollaboratorsAnswer::new(
+        &w::CEILINGS,
+        w::CollaboratorsAnswerParts { collaborators: encode_collaborators(collaborators), more },
+    )
+    .expect(FITS)
 }

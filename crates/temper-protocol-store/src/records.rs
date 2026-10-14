@@ -27,7 +27,7 @@ pub fn encode(value: &d::Stored) -> Option<Box<[u8]>> {
         d::Stored::Release(value) => w::Value::Release(topics::encode_release(value)),
         d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
-        d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)?),
+        d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
         d::Stored::Client(_) | d::Stored::Change(_) | d::Stored::Issue(_) => return None,
     };
     let row = w::Row::new(&w::CEILINGS, w::RowParts { value }).expect("admitted row fits the schema");
@@ -63,6 +63,21 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        status_context: forge.client.answer_bytes,
+        status_description: forge.client.answer_bytes,
+        status_url: forge.client.answer_bytes,
+        remark_path: forge.client.answer_bytes,
+        remark_body: forge.client.answer_bytes,
+        file_path: forge.client.answer_bytes,
+        file_before_some: forge.client.answer_bytes,
+        file_after_some: forge.client.answer_bytes,
+        statuses_answer_statuses: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        remarks_answer_remarks: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        pull_files_answer_files: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        compare_answer_files: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        compare_answer_commits: forge.client.rows,
+        checks_answer_statuses: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
+        collaborators_answer_collaborators: forge.client.rows,
         summary_labels: forge.client.answer_bytes.checked_add(forge.client.rows.checked_mul(4)?)?,
         summary_key_some: forge.client.answer_bytes,
         summary_title: forge.client.answer_bytes,
