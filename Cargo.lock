@@ -918,6 +918,7 @@ dependencies = [
  "skein-codegen",
  "skein-lib",
  "temper-protocol-client-wire",
+ "temper-protocol-store",
  "temper-protocol-worker-wire",
 ]
 
@@ -1123,6 +1124,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-protocol-store",
+ "skein-codec",
  "skein-kv",
  "skein-lib",
  "temper-engine-domain",

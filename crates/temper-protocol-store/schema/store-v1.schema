@@ -1,0 +1,32 @@
+family temper-store 1
+
+# 04.2: values the families share (store/README.md, 2 and 3).
+record Repository { forge: u16 repository: u32 }
+record Number { number: u64 }
+record Commit { commit: fixed 32 }
+# A branch's segments: one piece, each segment after its u32 length;
+# limit 4 x forge.name_bytes.
+record Segments { segments: bytes 65536 }
+enum What { repository, branch: Segments, pull: Number, issue: Number }
+record Name { forge: u16 repository: u32 what: What }
+enum ItemState { open, closed }
+enum Ci { none, pending, passed, failed }
+# The contexts: one piece; limit client.answer_bytes + 4 x client.rows.
+record Protection { branch: bytes 1048576 contexts: bytes 2097152 approvals: u32 dismiss_stale: bool }
+record Settings { default_branch: bytes 1048576 merge: bool squash: bool rebase: bool }
+
+# 04.2: family 2, Repository (forge::Repository).
+enum Role { owned, adopted, fork, context }
+record Kinds { read: bool push: bool open: bool land: bool review: bool status: bool comment: bool issue: bool branch: bool }
+enum RepositoryProtection { unknown, absent, rule: Protection }
+record Adopted { project: u32 home: bool provider: Repository host: bytes 4096 owner: bytes 4096 name: bytes 4096 prefix: bytes 4096 role: Role ci: bool checks: list 1024 u32 kinds: Kinds protection: RepositoryProtection settings: Settings }
+# 04.2: family 3, Hold.
+record RunWriter { task: u64 attempt: u64 }
+enum Writer { run: RunWriter, lost: RunWriter, entry: Number }
+record BranchDrift { expected: fixed 32 observed: option fixed 32 }
+record Retargeted { number: u64 before: bytes 4096 after: bytes 4096 }
+enum DriftChange { branch: BranchDrift, pull_closed: Number, retargeted: Retargeted }
+record Drift { at: u64 change: DriftChange }
+record Hold { name: Name task: u64 writer: option Writer drift: option Drift }
+enum Value { repository: Adopted, hold: Hold }
+versioned record Row { value: Value }

@@ -1,6 +1,7 @@
 use skein_lib::{Duration, List, Rng};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_client as client;
+pub const REPO: client::api::Repository = client::api::Repository { forge: 1, repository: 2 };
 
 const CLIENT: client::Limits = client::Limits {
     pending: 4,
@@ -174,4 +175,91 @@ pub fn within(interval: &skein_kv::Range, tagged: &[u8]) -> bool {
         None => Box::from([3]),
     };
     tagged >= start.as_ref() && tagged < end.as_ref()
+}
+
+pub fn named_branch() -> top::Name {
+    top::Name { forge: 1, repository: 2, what: top::What::Branch(Box::new([Box::from([0, 1, 255]), Box::from([1])])) }
+}
+pub fn adopted(protection: top::Protection) -> top::Stored {
+    top::Stored::Repository(top::Repository {
+        project: 3,
+        home: true,
+        provider: REPO,
+        host: Box::from(b"forge".as_slice()),
+        owner: Box::from(b"owner".as_slice()),
+        name: Box::from(b"repo".as_slice()),
+        prefix: Box::from(b"temper/".as_slice()),
+        role: top::Role::Owned,
+        ci: true,
+        checks: Box::new([1, 2, 3, 4, 5, 6, 7, 8]),
+        kinds: top::Kinds {
+            read: true,
+            push: true,
+            open: true,
+            land: true,
+            review: true,
+            status: true,
+            comment: true,
+            issue: true,
+            branch: true,
+        },
+        protection,
+        settings: client::api::Settings {
+            default_branch: Box::from(b"main".as_slice()),
+            merge: true,
+            squash: true,
+            rebase: true,
+        },
+    })
+}
+fn add_holds(name: &top::Name, rows: &mut List<(&'static str, top::Stored)>) {
+    for (label, writer, change) in [
+        (
+            "run branch",
+            top::Writer::Run { task: 1, attempt: 2 },
+            top::DriftChange::Branch { expected: [0; 32], observed: Some([255; 32]) },
+        ),
+        ("lost pull", top::Writer::Lost { task: 1, attempt: 2 }, top::DriftChange::PullClosed { number: 3 }),
+        (
+            "entry retargeted",
+            top::Writer::Entry(4),
+            top::DriftChange::Retargeted {
+                number: 3,
+                before: Box::from(b"main".as_slice()),
+                after: Box::from(b"next".as_slice()),
+            },
+        ),
+    ] {
+        rows.push((
+            label,
+            top::Stored::Hold(top::Hold {
+                name: name.clone(),
+                task: 1,
+                writer: Some(writer),
+                drift: Some(top::Drift { at: skein_lib::Wall::from_nanos(99), change }),
+            }),
+        ))
+        .expect("fixture rows fit");
+    }
+}
+pub fn names_holds_and_topics() -> Box<[(&'static str, top::Stored)]> {
+    let name = named_branch();
+    let mut rows = List::with_capacity(6);
+    for row in [
+        ("repository unknown", adopted(top::Protection::Unknown)),
+        ("repository absent", adopted(top::Protection::Absent)),
+        (
+            "repository rule",
+            adopted(top::Protection::Rule(client::api::Protection {
+                branch: Box::from(b"main".as_slice()),
+                contexts: Box::new([Box::from(b"test".as_slice()), Box::from(b"build".as_slice())]),
+                approvals: 2,
+                dismiss_stale: true,
+            })),
+        ),
+    ] {
+        rows.push(row).expect("fixture rows fit");
+    }
+    add_holds(&name, &mut rows);
+    rows.into_boxed()
 }
