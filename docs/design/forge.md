@@ -402,7 +402,7 @@ such a request costs nothing.
   connection kept alive that the forge closed just as a request went out
   may have been read: it is a `Timeout`. To make that rare, an idle
   connection is closed before the forge's keep-alive timeout would close
-  it.
+  it (`idle`, section 7).
 - **One status, several meanings.** Where Forgejo answers two failures
   with one status (`405` on a merge), the decoder reads its `message`
   into the failure; the messages are pinned by transcripts of Forgejo
@@ -609,9 +609,11 @@ configuration.md, section 7; their values in `temper-service`'s profile
   `op_bytes` with a marker (section 4);
 - `repositories`: the paths' table, at most the forge's `repositories`;
   `users`: the logins' table;
-- `deadline`: a call's, at most the client's `lifetime`;
-- `idle`: how long an idle connection is kept, below the forge's
-  keep-alive timeout;
+- `deadline`: a call's, at most the client's `lifetime`, and each of a
+  forge's start reads', from when it is asked;
+- `idle`: how long an idle connection is kept, below the keep-alive
+  timeout of whatever serves the forge's API (a reverse proxy before
+  Forgejo, when there is one) by more than a request's round trip;
 - `start_backoff`, `start_backoff_max`: a forge's start asked again;
 - what TLS, HTTP and JSON take as their own (skein's `tls.md`, `http.md`,
   `json.md`);
@@ -637,8 +639,8 @@ costs time, not memory.
 | State | Holds | Demand | Deadline | On |
 |---|---|---|---|---|
 | Closed | nothing | none | none | a call: Connecting |
-| Connecting | the call | none | connect | connected: Handshaking; failed: the call `Unavailable`, Closed |
-| Handshaking | the call, TLS | TLS's | handshake | done: Sending; failed: `Unavailable`, Closed |
+| Connecting | the call | none | the call's | connected: Handshaking; failed: the call `Unavailable`, Closed |
+| Handshaking | the call, TLS | TLS's | the call's | done: Sending; failed: `Unavailable`, Closed |
 | Sending | the call, its request | room | the call's | sent: Reading; a fault: `Timeout`, or `Unavailable` if nothing was written, Closed |
 | Reading | the call, the decoder | the head, then the body as the decoder demands | the call's | answered: the next step's Sending, or Idle with the answer up; a fault, a malformed answer or the deadline: as 3.4, Closed |
 | Idle | nothing | none | `idle` | a call to its forge: Sending; the deadline, the forge closing, or a call to another forge with no connection free: Closed |
@@ -646,6 +648,18 @@ costs time, not memory.
 Without TLS, Connecting goes to Sending. A connection the forge marked
 `Connection: close`, or one that read a raw body past `max_bytes`, goes
 to Closed after its answer, not to Idle.
+
+- **What holds a connection:** a call, or one of a forge's start reads
+  (3.5), which a connection of the forge's own holds where the table
+  says the call; a start read's failures go to its start, not to a
+  call.
+- **Deadlines are the holder's.** Connect and handshake have no limit
+  of their own: Connecting, Handshaking, Sending and Reading all wait
+  until the holder's deadline, the call's or the start read's, so no
+  exchange outlives what it serves. A start read's deadline is the
+  component's `deadline` from when the read is asked; one that passes
+  is a forge that cannot be reached, asked again after the start's
+  backoff (3.5).
 
 **A call:** Waiting for its forge's start (bounded by the client's
 `calls`); Resolving, when its repository has no path kept or a login is

@@ -198,15 +198,25 @@ it into `temper-service` here: that is 14.1.
   | `repositories` | `forge.repositories` |
   | `users` | 256 |
   | `deadline` | `forge.client.lifetime` |
-  | `idle` | 5 s |
+  | `idle` | 4 s |
   | `start_backoff`, `start_backoff_max` | 1 s, 60 s |
   | `tls` | `read` 16,384, `send` 16,384, `records` `skein_tls::client::MAX_RECORD` |
 
   `body_bytes` holds the largest body temper writes: a key of up to
   `op_bytes` gives a marker of `2 × op_bytes + 21` (forge.md, 4).
+  `idle` is 4 s: forge.md, 7 asks for it "below the keep-alive timeout of
+  whatever serves the forge's API (a reverse proxy before Forgejo, when
+  there is one) by more than a request's round trip", and 5 s, the
+  default of Apache httpd's `KeepAliveTimeout`, is the shortest such
+  default a deployment is likely to sit behind. A deployment behind a
+  shorter one sets `forge_component.idle_ms`. No fact of the
+  conformance tool checks it: the throwaway Forgejo has no proxy, and a
+  deployment's proxy is not the tool's to read.
 - **The start is a pure machine** (`start::heard`, the sketch's body),
   driven by 13.2 on a connection of each forge's own. A start read's
-  deadline is the component's `deadline` (a question, below).
+  deadline is the component's `deadline` from when the read is asked
+  (forge.md, 8, "Deadlines are the holder's"), and one that passes is
+  heard as unreachable: Waiting, asked again after the backoff.
 - **Tables:** repositories by `(forge, id)` (path, object format,
   `default_merge_style`, `html_url`), users by `(forge, id)` (login),
   each a `skein_lib::Map` with a use counter: the entry with the smallest
@@ -400,7 +410,10 @@ client, and per answer a skein-json tokenizer with 06's decoder (or a
 `Grow` for a raw body); io's `Connect`, then `Connecting`/`Connected`
 or `Failed`, its stream requests and events routed by the connection's
 token; deadlines (the holder's deadline while Connecting, Handshaking,
-Sending, Reading; `idle` while Idle), `Connection: close` and a raw body
+Sending, Reading: the call's, or a start read's, the component's
+`deadline` from when that read is asked, forge.md, 8, "Deadlines are the
+holder's"; no connect or handshake limit of its own; `idle` while Idle),
+`Connection: close` and a raw body
 past its cap going to Closed; failures as `connection::Failure`
 (`Unseen`: nothing written, or skein-http's `Error::Closed`; `Seen`:
 anything after). `begin` opens a connection per forge and runs its start
@@ -441,6 +454,10 @@ GMT`), `status(code) -> Vec<u8>` (no body), `user_ok()` (`ok` of
 `a_refused_token_emits_stopped_once_naming_the_forge`,
 `a_refused_connect_waits_its_backoff_and_connects_again`,
 `an_idle_connection_closes_at_idle`,
+`a_start_read_unanswered_at_its_deadline_waits_and_asks_again` (the
+connect answered, `GET /api/v1/user` sent and never answered: at the
+fixture's `deadline` the connection is aborted, the start is Waiting,
+and after `start_backoff` a new connection sends `GET /api/v1/user`),
 `a_connection_close_answer_ends_its_connection_after_it`,
 `a_reset_before_the_first_byte_is_unseen_and_after_it_seen` (rows: a
 reset before `Room` was granted for the head; a reset after the head was
@@ -472,8 +489,9 @@ fn the_start_reads_user_then_settings_on_one_connection() {
 Proof: unit, `heavy cargo nextest run -p temper-engine-protocol-forge -E
 'test(/connection::/)'`, run once: the start reads the user then the
 page cap on one connection, a refused token stops it once, a refused
-connect waits its backoff, an idle connection closes, and a reset tells
-`Unseen` from `Seen` by whether a byte went (the seven tests); under 0.3
+connect waits its backoff, an idle connection closes, a start read
+unanswered at its deadline waits and asks again, and a reset tells
+`Unseen` from `Seen` by whether a byte went (the eight tests); under 0.3
 s. The world layer opens at 13.5.
 Don't: retry a start read before its backoff; treat skein-http's
 `Truncated { answered: false }` on a reused connection as `Unseen`
@@ -1683,12 +1701,6 @@ pub fn case_bytes(case: &str) -> Vec<u8>;
 
 ## Questions to raise when reached
 
-- **A start read's deadline:** forge.md 8 arms "the call's" while
-  Sending and Reading, and the start's reads belong to no call; section
-  7 names no limit for them. Default: the component's `deadline`.
-- **Connect and handshake deadlines:** forge.md 8's table names
-  `connect` and `handshake`, which section 7 does not list. Default: the
-  holder's deadline (the call's, or a start read's).
 - **A `1xx` left over, a `2xx` other than the one a route answers, or a
   `3xx` to a start read:** forge.md 8 names `4xx`, `429`, `5xx`,
   unreachable and malformed only. Default: Waiting, asked again.
