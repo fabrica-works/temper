@@ -6,6 +6,7 @@ extern crate alloc;
 mod boundary;
 pub mod invocation;
 pub mod limits;
+pub mod output;
 #[cfg(test)]
 mod tests;
 

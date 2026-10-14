@@ -1299,6 +1299,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-worker-protocol-git-world"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+ "temper-worker-domain-checkout",
+ "temper-worker-protocol-git",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

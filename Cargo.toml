@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "tests/worker/protocol-git",
     "crates/temper-forge-forgejo",
     "crates/temper-worker-protocol-git",
     "crates/temper-protocol-client-wire",
@@ -43,6 +44,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-worker-protocol-git-world = { path = "tests/worker/protocol-git" }
 temper-forge-forgejo = { path = "crates/temper-forge-forgejo" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }
 temper-protocol-client-wire = { path = "crates/temper-protocol-client-wire" }
