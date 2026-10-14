@@ -324,7 +324,15 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `u64`), and the job link's shape (forge.md, 3.2 says
      `<html_url>/actions/runs/<n>/jobs/<i>`; v16.0.5 writes
      `/fixture/specimen/actions/runs/1/jobs/0`, relative to the origin),
-     are the designer's, in the run's `question.md` of this time.
+     are the designer's, in the run's `question.md` of this time. The
+     designer answered at 2026-10-14T05:04:58Z, landed in `b65b41ef`
+     ("Design: Actions statuses carry no author, and their links are
+     relative"): `api::Status` loses `author`, which nothing reads (13.3's
+     Files, with the store's codec by ruling 110); `job_link` reads the
+     prefix as `html_url` whole or its path, and refuses `//`, another
+     scheme or host; the component makes an origin-relative link absolute
+     with `html_url`'s origin (forge.md, 3.2, 3.5, 9, 13; sessions 06.4,
+     13.3, 13.4, 14).
 
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
