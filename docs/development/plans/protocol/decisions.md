@@ -356,7 +356,7 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      `forge.named_calls < call_records`,
      `journal.result_bytes < people.words`,
      `journal.transcript_bytes < row_bound`, and the journal's room for
-     deliveries). configuration.md, section 6 fixes no number ("Its
+     deliveries). configuration.md, section 7 fixes no number ("Its
      numbers are constants in `temper-service`'s limits module, each
      documented with what it bounds"). So the implementer's profile
      stands: root journal `{commits: 3, held: 1536, writes: 4096,
