@@ -27,7 +27,16 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
             }
             size
         }
-        Request::Issues { .. }
+        Request::Reviews { .. }
+        | Request::ReviewComments { .. }
+        | Request::Branch { .. }
+        | Request::Branches { .. }
+        | Request::Protection { .. }
+        | Request::Protections { .. }
+        | Request::Collaborators { .. }
+        | Request::Permission { .. }
+        | Request::Pulls { .. }
+        | Request::Issues { .. }
         | Request::Issue { .. }
         | Request::Comments { .. }
         | Request::Pull { .. }
@@ -69,7 +78,16 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
             }
             Ok(())
         }
-        Request::Issues { .. }
+        Request::Reviews { .. }
+        | Request::ReviewComments { .. }
+        | Request::Branch { .. }
+        | Request::Branches { .. }
+        | Request::Protection { .. }
+        | Request::Protections { .. }
+        | Request::Collaborators { .. }
+        | Request::Permission { .. }
+        | Request::Pulls { .. }
+        | Request::Issues { .. }
         | Request::Issue { .. }
         | Request::Comments { .. }
         | Request::Pull { .. }
@@ -111,13 +129,20 @@ impl Start {
                     let user = core::mem::replace(&mut self.user, document::user());
                     Step::Row(Row::User(user), tokenizer::Request::Next)
                 }
-                None | Some(Kind::User | Kind::Settings | Kind::Search | Kind::Item(_)) => {
-                    Step::Demand(tokenizer::Request::Next)
-                }
+                None
+                | Some(
+                    Kind::User | Kind::Settings | Kind::Search | Kind::Review(_) | Kind::Branch(_) | Kind::Item(_),
+                ) => Step::Demand(tokenizer::Request::Next),
             },
-            Move::End(Kind::Settings | Kind::Repository | Kind::Search | Kind::Users | Kind::Item(_)) => {
-                Step::Demand(tokenizer::Request::Next)
-            }
+            Move::End(
+                Kind::Settings
+                | Kind::Repository
+                | Kind::Search
+                | Kind::Users
+                | Kind::Review(_)
+                | Kind::Branch(_)
+                | Kind::Item(_),
+            ) => Step::Demand(tokenizer::Request::Next),
             Move::Done => {
                 let document = match self.kind {
                     Kind::User => Document::User(core::mem::replace(&mut self.user, document::user())),
@@ -126,7 +151,8 @@ impl Start {
                         Document::Repository(core::mem::replace(&mut self.repo, document::repository()))
                     }
                     Kind::Search => Document::Search { ok: self.ok },
-                    Kind::Users | Kind::Item(_) => unreachable!("start decoder selection"),
+                    Kind::Users => Document::Listed { skipped: 0 },
+                    Kind::Review(_) | Kind::Branch(_) | Kind::Item(_) => unreachable!("start decoder selection"),
                 };
                 Step::Done(document)
             }
@@ -147,7 +173,9 @@ impl Start {
                         _ => unreachable!("settings table"),
                     }
                 }
-                Kind::Search | Kind::Users | Kind::Item(_) => unreachable!("number table"),
+                Kind::Search | Kind::Users | Kind::Review(_) | Kind::Branch(_) | Kind::Item(_) => {
+                    unreachable!("number table")
+                }
             },
             Value::Text(text) => match kind {
                 Kind::User => self.user.login = text,
@@ -168,7 +196,9 @@ impl Start {
                     }
                     _ => unreachable!("repository string table"),
                 },
-                Kind::Settings | Kind::Search | Kind::Users | Kind::Item(_) => unreachable!("string table"),
+                Kind::Settings | Kind::Search | Kind::Users | Kind::Review(_) | Kind::Branch(_) | Kind::Item(_) => {
+                    unreachable!("string table")
+                }
             },
             Value::Boolean(value) => match kind {
                 Kind::Search => self.ok = value,
@@ -178,7 +208,9 @@ impl Start {
                     b"allow_rebase" => self.repo.allow_rebase = value,
                     _ => unreachable!("repository bool table"),
                 },
-                Kind::User | Kind::Settings | Kind::Users | Kind::Item(_) => unreachable!("boolean table"),
+                Kind::User | Kind::Settings | Kind::Users | Kind::Review(_) | Kind::Branch(_) | Kind::Item(_) => {
+                    unreachable!("boolean table")
+                }
             },
             Value::Body(_) | Value::Time(_) | Value::Id(_) => unreachable!("start scalar table"),
         }

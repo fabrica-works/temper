@@ -77,4 +77,41 @@ pub enum Request {
         commit: crate::id::ObjectId,
         page: Page,
     },
+    Reviews {
+        at: Repo,
+        number: u64,
+        page: Page,
+    },
+    ReviewComments {
+        at: Repo,
+        number: u64,
+        review: u64,
+    },
+    Branch {
+        at: Repo,
+        name: Box<[u8]>,
+    },
+    Branches {
+        at: Repo,
+        page: Page,
+    },
+    Protection {
+        at: Repo,
+        name: Box<[u8]>,
+    },
+    Protections {
+        at: Repo,
+    },
+    Collaborators {
+        at: Repo,
+        page: Page,
+    },
+    Permission {
+        at: Repo,
+        login: Box<[u8]>,
+    },
+    Pulls {
+        at: Repo,
+        page: Page,
+    },
 }

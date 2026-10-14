@@ -117,7 +117,16 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.boolean(*ok);
             json.object_end();
         }
-        Answer::Issues(_)
+        Answer::Reviews(_)
+        | Answer::ReviewComments(_)
+        | Answer::Branch(_)
+        | Answer::Branches(_)
+        | Answer::Protection(_)
+        | Answer::Protections(_)
+        | Answer::Collaborators(_)
+        | Answer::Permission(_)
+        | Answer::Pulls(_)
+        | Answer::Issues(_)
         | Answer::Issue(_)
         | Answer::Comments(_)
         | Answer::Pull(_)

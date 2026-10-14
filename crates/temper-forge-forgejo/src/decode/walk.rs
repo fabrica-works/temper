@@ -11,6 +11,7 @@ pub(crate) enum Item {
     Comment,
     Comments,
     Pull,
+    Pulls,
     Head,
     Base,
     Status,
@@ -29,6 +30,8 @@ pub(crate) enum Kind {
     Search,
     Users,
     Item(Item),
+    Review(crate::client::reviews::ReviewKind),
+    Branch(crate::client::branches::BranchKind),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Read {
@@ -55,6 +58,8 @@ const fn optional(key: &'static [u8], read: Read) -> Field {
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
+        Kind::Review(kind) => crate::client::reviews::fields(kind),
+        Kind::Branch(kind) => crate::client::branches::fields(kind),
         Kind::User => const { &[field(b"id", Read::Number), field(b"login", Read::Text)] },
         Kind::Settings => {
             const { &[field(b"max_response_items", Read::Number), field(b"default_paging_num", Read::Number)] }
@@ -116,8 +121,8 @@ fn fields(kind: Kind) -> &'static [Field] {
                 ]
             }
         }
-        Kind::Item(Item::Head) => const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: false })] },
-        Kind::Item(Item::Base) => const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: true })] },
+        Kind::Item(Item::Head) => pull_branch(false),
+        Kind::Item(Item::Base) => pull_branch(true),
         Kind::Item(Item::Status) => {
             const {
                 &[
@@ -142,12 +147,28 @@ fn fields(kind: Kind) -> &'static [Field] {
         Kind::Item(Item::Label) => const { &[field(b"name", Read::Text)] },
         Kind::Users
         | Kind::Item(
-            Item::Issues | Item::Comments | Item::Statuses | Item::Labels | Item::Reviewers | Item::Presence,
+            Item::Pulls
+            | Item::Issues
+            | Item::Comments
+            | Item::Statuses
+            | Item::Labels
+            | Item::Reviewers
+            | Item::Presence,
         ) => const { &[] },
+    }
+}
+fn pull_branch(empty: bool) -> &'static [Field] {
+    if empty {
+        const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: true }), field(b"repo_id", Read::Number)] }
+    } else {
+        const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: false }), field(b"repo_id", Read::Number)] }
     }
 }
 fn element(kind: Kind) -> Option<Kind> {
     match kind {
+        Kind::Review(kind) => crate::client::reviews::element(kind),
+        Kind::Branch(kind) => crate::client::branches::element(kind),
+        Kind::Item(Item::Pulls) => Some(Kind::Item(Item::Pull)),
         Kind::Users | Kind::Item(Item::Reviewers) => Some(Kind::User),
         Kind::Item(Item::Issues) => Some(Kind::Item(Item::Issue)),
         Kind::Item(Item::Comments) => Some(Kind::Item(Item::Comment)),
@@ -225,7 +246,11 @@ impl Walk {
         self.skip_row = true;
     }
     pub(crate) fn cut(&mut self) -> tokenizer::Request {
-        assert!(self.parent() == Some(Kind::Item(Item::Comments)), "cut at an unpaged thread's row boundary");
+        assert!(
+            self.parent() == Some(Kind::Item(Item::Comments))
+                || self.parent() == Some(Kind::Review(crate::client::reviews::ReviewKind::Comments)),
+            "cut at an unpaged thread's row boundary"
+        );
         self.want = Want::Cut;
         tokenizer::Request::Skip
     }
@@ -260,7 +285,13 @@ impl Walk {
                     self.end()
                 } else {
                     let kind = element(self.parent().expect("array element")).expect("array kind");
-                    self.start(kind, event)
+                    if kind == Kind::Branch(crate::client::branches::BranchKind::Context) {
+                        let value = scalar(field(b"status_check_contexts", Read::Text), event)?;
+                        self.want = Want::Element;
+                        Ok(Move::Scalar { kind, key: b"status_check_contexts", value })
+                    } else {
+                        self.start(kind, event)
+                    }
                 }
             }
             Want::Cut => match event {

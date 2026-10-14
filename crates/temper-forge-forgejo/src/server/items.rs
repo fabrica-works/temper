@@ -73,10 +73,10 @@ pub(super) fn query_value(pairs: &[Pair], key: &[u8]) -> Option<Box<[u8]>> {
     }
     None
 }
-fn number_value(text: &[u8]) -> Result<u64, Unrouted> {
+pub(super) fn number_value(text: &[u8]) -> Result<u64, Unrouted> {
     id::unsigned(text).ok_or(Unrouted::Malformed)
 }
-fn page(query: &[Pair]) -> Result<Page, Unrouted> {
+pub(super) fn page(query: &[Pair]) -> Result<Page, Unrouted> {
     let mut page = Page { page: None, limit: None };
     for key in [b"page".as_slice(), b"limit".as_slice()] {
         if let Some(value) = query_value(query, key) {
@@ -171,6 +171,8 @@ fn comment(json: &mut Encoder, value: &Comment) -> Result<(), writer::Refusal> {
 }
 fn branch(json: &mut Encoder, value: &PullBranch) {
     json.object_start();
+    json.key(b"repo_id");
+    json.unsigned(value.repo_id);
     json.key(b"ref");
     json.string(&value.name);
     json.key(b"sha");
@@ -197,37 +199,7 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.array_end();
         }
-        Answer::Pull(value) => {
-            json.object_start();
-            json.key(b"number");
-            json.unsigned(value.number);
-            json.key(b"state");
-            json.string(state(value.state));
-            json.key(b"head");
-            branch(json, &value.head);
-            json.key(b"base");
-            branch(json, &value.base);
-            json.key(b"merged");
-            json.boolean(value.merged);
-            for (key, id) in
-                [(b"merge_commit_sha".as_slice(), value.merge_commit_sha), (b"merge_base", value.merge_base)]
-            {
-                json.key(key);
-                match id {
-                    Some(id) => json.string(&id::write(&id)),
-                    None => json.null(),
-                }
-            }
-            json.key(b"mergeable");
-            json.boolean(value.mergeable);
-            json.key(b"requested_reviewers");
-            json.array_start();
-            for user in &value.requested_reviewers {
-                super::start::user(json, user);
-            }
-            json.array_end();
-            json.object_end();
-        }
+        Answer::Pull(value) => pull(json, value),
         Answer::CombinedStatus { state, sha, statuses } => {
             json.object_start();
             json.key(b"state");
@@ -267,9 +239,51 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.object_end();
         }
-        Answer::User(_) | Answer::ApiSettings(_) | Answer::Repository(_) | Answer::Search { .. } => {
+        Answer::Reviews(_)
+        | Answer::ReviewComments(_)
+        | Answer::Branch(_)
+        | Answer::Branches(_)
+        | Answer::Protection(_)
+        | Answer::Protections(_)
+        | Answer::Collaborators(_)
+        | Answer::Permission(_)
+        | Answer::Pulls(_)
+        | Answer::User(_)
+        | Answer::ApiSettings(_)
+        | Answer::Repository(_)
+        | Answer::Search { .. } => {
             unreachable!("item answer dispatch")
         }
     }
     Ok(())
+}
+
+pub(super) fn pull(json: &mut Encoder, value: &crate::document::PullRequest) {
+    json.object_start();
+    json.key(b"number");
+    json.unsigned(value.number);
+    json.key(b"state");
+    json.string(state(value.state));
+    json.key(b"head");
+    branch(json, &value.head);
+    json.key(b"base");
+    branch(json, &value.base);
+    json.key(b"merged");
+    json.boolean(value.merged);
+    for (key, id) in [(b"merge_commit_sha".as_slice(), value.merge_commit_sha), (b"merge_base", value.merge_base)] {
+        json.key(key);
+        match id {
+            Some(id) => json.string(&id::write(&id)),
+            None => json.null(),
+        }
+    }
+    json.key(b"mergeable");
+    json.boolean(value.mergeable);
+    json.key(b"requested_reviewers");
+    json.array_start();
+    for user in &value.requested_reviewers {
+        super::start::user(json, user);
+    }
+    json.array_end();
+    json.object_end();
 }

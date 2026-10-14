@@ -52,8 +52,8 @@ fn pull(merged: bool) -> PullRequest {
         PullRequest {
             number: 5,
             state: IssueState::Closed,
-            head: PullBranch { name: Box::from(*b"mergeable"), sha: Some(forgejo::sha(5)) },
-            base: PullBranch { name: Box::from(*b"landing"), sha: Some(forgejo::sha(7)) },
+            head: PullBranch { repo_id: 1, name: Box::from(*b"mergeable"), sha: Some(forgejo::sha(5)) },
+            base: PullBranch { repo_id: 1, name: Box::from(*b"landing"), sha: Some(forgejo::sha(7)) },
             merged: true,
             merge_commit_sha: Some(forgejo::sha(7)),
             merge_base: Some(forgejo::sha(1)),
@@ -64,8 +64,8 @@ fn pull(merged: bool) -> PullRequest {
         PullRequest {
             number: 1,
             state: IssueState::Open,
-            head: PullBranch { name: Box::from(*b"feature/slash"), sha: Some(forgejo::sha(4)) },
-            base: PullBranch { name: Box::from(*b"main"), sha: Some(forgejo::sha(3)) },
+            head: PullBranch { repo_id: 1, name: Box::from(*b"feature/slash"), sha: Some(forgejo::sha(4)) },
+            base: PullBranch { repo_id: 1, name: Box::from(*b"main"), sha: Some(forgejo::sha(3)) },
             merged: false,
             merge_commit_sha: None,
             merge_base: Some(forgejo::sha(6)),
@@ -158,7 +158,19 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::CombinedStatus { state, statuses, .. } => {
             (Document::CombinedStatus(state), statuses.into_vec().into_iter().map(Row::Status).collect())
         }
-        Answer::User(_) | Answer::ApiSettings(_) | Answer::Repository(_) | Answer::Search { .. } => {
+        Answer::Reviews(_)
+        | Answer::ReviewComments(_)
+        | Answer::Branch(_)
+        | Answer::Branches(_)
+        | Answer::Protection(_)
+        | Answer::Protections(_)
+        | Answer::Collaborators(_)
+        | Answer::Permission(_)
+        | Answer::Pulls(_)
+        | Answer::User(_)
+        | Answer::ApiSettings(_)
+        | Answer::Repository(_)
+        | Answer::Search { .. } => {
             panic!("an item answer")
         }
     }

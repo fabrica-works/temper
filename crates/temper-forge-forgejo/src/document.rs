@@ -69,6 +69,11 @@ pub enum Row {
     Issue(Issue),
     Comment(Comment),
     Status(CommitStatus),
+    Review(Review),
+    ReviewComment(ReviewComment),
+    Branch(Branch),
+    Protection(BranchProtection),
+    Pull(PullRequest),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
@@ -80,6 +85,9 @@ pub enum Document {
     Issue(Issue),
     Pull(PullRequest),
     CombinedStatus(CombinedStatus),
+    Branch(Branch),
+    Protection(BranchProtection),
+    Permission(CollaboratorPermission),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum IssueState {
@@ -107,6 +115,7 @@ pub struct Comment {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PullBranch {
+    pub repo_id: u64,
     pub name: Box<[u8]>,
     pub sha: Option<ObjectId>,
 }
@@ -182,4 +191,86 @@ pub(crate) fn style_text(style: MergeStyle) -> &'static [u8] {
         MergeStyle::FastForwardOnly => b"fast-forward-only",
         MergeStyle::ManuallyMerged => b"manually-merged",
     }
+}
+
+/// A review's `state` (06.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ReviewState {
+    /// `APPROVED`.
+    Approved,
+    /// `REQUEST_CHANGES`.
+    RequestChanges,
+    /// `COMMENT`.
+    Comment,
+    /// `PENDING`: not a review yet; 13 skips it.
+    Pending,
+    /// `REQUEST_REVIEW`: a request, not a review; 13 skips it.
+    RequestReview,
+}
+
+/// A pull request's review (06.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Review {
+    pub id: u64,
+    pub user: User,
+    pub state: ReviewState,
+    pub commit_id: ObjectId,
+    pub body: Body,
+    pub submitted_at: Option<Wall>,
+    pub updated_at: Option<Wall>,
+    pub official: bool,
+    pub dismissed: bool,
+}
+
+/// One comment of a review: a remark (06.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ReviewComment {
+    pub id: u64,
+    pub user: User,
+    pub path: Box<[u8]>,
+    pub position: u32,
+    pub body: Body,
+}
+
+/// A branch, alone or as a row of the branches' listing (06.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Branch {
+    pub name: Box<[u8]>,
+    /// `commit.id`.
+    pub commit: ObjectId,
+    /// An empty name is `None`: no rule applies.
+    pub effective_branch_protection_name: Option<Box<[u8]>>,
+}
+
+/// A branch protection rule (06.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct BranchProtection {
+    pub rule_name: Box<[u8]>,
+    pub enable_status_check: bool,
+    /// At most `Limits::inner`.
+    pub status_check_contexts: Box<[Box<[u8]>]>,
+    pub required_approvals: u32,
+    pub dismiss_stale_approvals: bool,
+}
+
+/// A collaborator's `permission` (06.3); `owner` is its own value, read as admin by 13.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Permission {
+    /// `none`.
+    None,
+    /// `read`.
+    Read,
+    /// `write`.
+    Write,
+    /// `admin`.
+    Admin,
+    /// `owner`.
+    Owner,
+}
+
+/// `GET R/collaborators/{login}/permission` (06.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct CollaboratorPermission {
+    pub permission: Permission,
+    pub user: User,
 }

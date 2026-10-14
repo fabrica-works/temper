@@ -211,3 +211,92 @@ fn http_dates_read_imf_fixdate_and_nothing_else() {
         assert_eq!(time::http_date(text), expected, "{text:?}");
     }
 }
+#[test]
+fn each_review_state_reads_from_forgejos_word() {
+    use crate::document::{ReviewState, Row};
+    let limits = fixtures::limits();
+    let request = Request::Reviews {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        number: 1,
+        page: crate::request::Page { page: Some(1), limit: Some(2) },
+    };
+    for (word, state) in [
+        (b"APPROVED".as_slice(), ReviewState::Approved),
+        (b"REQUEST_CHANGES", ReviewState::RequestChanges),
+        (b"COMMENT", ReviewState::Comment),
+        (b"PENDING", ReviewState::Pending),
+        (b"REQUEST_REVIEW", ReviewState::RequestReview),
+    ] {
+        let prefix = br#"[{"id":1,"user":{"id":2,"login":"writer"},"state":""#;
+        let suffix=br#"","commit_id":"0000000000000000000000000000000000000000","body":"","official":false,"dismissed":false}]"#;
+        let mut out = Writer::new(prefix.len() + word.len() + suffix.len());
+        out.put(prefix).unwrap();
+        out.put(word).unwrap();
+        out.put(suffix).unwrap();
+        let decoded = fixtures::decode(client::decoder(&request, &limits).unwrap(), &out.finish(), &limits);
+        let Row::Review(value) = &decoded.rows.as_slice()[0] else {
+            panic!("review row");
+        };
+        assert_eq!(value.state, state, "{word:?}");
+        assert_eq!(decoded.document, Ok(Document::Listed { skipped: 0 }));
+    }
+}
+
+#[test]
+fn a_branch_naming_no_rule_has_no_protection_name() {
+    let limits = fixtures::limits();
+    let request = Request::Branch {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        name: Box::from(*b"main"),
+    };
+    let decoded=fixtures::decode(client::decoder(&request,&limits).unwrap(),br#"{"name":"main","commit":{"id":"0000000000000000000000000000000000000003"},"effective_branch_protection_name":""}"#,&limits);
+    let Document::Branch(value) = decoded.document.unwrap() else {
+        panic!("branch");
+    };
+    assert_eq!(value.effective_branch_protection_name, None);
+}
+#[test]
+fn a_protection_with_inner_plus_one_contexts_is_past_its_bound() {
+    let mut limits = fixtures::limits();
+    limits.inner = 1;
+    let request = Request::Protection {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        name: Box::from(*b"main"),
+    };
+    for (body,valid) in [(br#"{"rule_name":"main","enable_status_check":true,"status_check_contexts":["test"],"required_approvals":1,"dismiss_stale_approvals":true}"#.as_slice(),true),(br#"{"rule_name":"main","enable_status_check":true,"status_check_contexts":["test","other"],"required_approvals":1,"dismiss_stale_approvals":true}"#,false)] {
+        let decoded=fixtures::decode(client::decoder(&request,&limits).unwrap(),body,&limits);
+        if valid { let Document::Protection(value)=decoded.document.unwrap() else { panic!("protection"); }; assert_eq!(value.status_check_contexts.as_ref(),&[Box::from(b"test".as_slice())]); } else { assert_eq!(decoded.document,Err(Malformed::Bound { field:b"status_check_contexts" })); }
+    }
+}
+#[test]
+fn permission_owner_reads_without_mapping_it_to_admin() {
+    let limits = fixtures::limits();
+    let request = Request::Permission {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        login: Box::from(*b"fixture"),
+    };
+    let decoded = fixtures::decode(
+        client::decoder(&request, &limits).unwrap(),
+        br#"{"permission":"owner","user":{"id":1,"login":"fixture"}}"#,
+        &limits,
+    );
+    assert_eq!(
+        decoded.document,
+        Ok(Document::Permission(crate::document::CollaboratorPermission {
+            permission: crate::document::Permission::Owner,
+            user: crate::document::User { id: 1, login: Box::from(*b"fixture") }
+        }))
+    );
+}
+#[test]
+fn a_cut_review_thread_counts_remaining_comments() {
+    let limits = fixtures::limits();
+    let request = Request::ReviewComments {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        number: 1,
+        review: 5,
+    };
+    let decoded=fixtures::decode_cut(client::decoder(&request,&limits).unwrap(),br#"[{"id":1,"user":{"id":1,"login":"fixture"},"path":"file.txt","position":1,"body":"first"},{"id":2},{"id":3}]"#,&limits,1);
+    assert_eq!(decoded.rows.len(), 1);
+    assert_eq!(decoded.document, Ok(Document::Listed { skipped: 2 }));
+}

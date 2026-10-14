@@ -9,38 +9,38 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, Writer};
 #[derive(Debug)]
-struct Target {
-    length: usize,
-    writer: Option<Writer>,
+pub(super) struct Target {
+    pub(super) length: usize,
+    pub(super) writer: Option<Writer>,
 }
 impl Target {
-    fn put(&mut self, bytes: &[u8]) {
+    pub(super) fn put(&mut self, bytes: &[u8]) {
         self.length = self.length.saturating_add(bytes.len());
         if let Some(out) = &mut self.writer {
             out.put(bytes).expect("measured target");
         }
     }
-    fn segment(&mut self, name: &[u8]) {
+    pub(super) fn segment(&mut self, name: &[u8]) {
         self.length = self.length.saturating_add(path::segment_length(name));
         if let Some(out) = &mut self.writer {
             path::segment(name, out).expect("measured segment");
         }
     }
-    fn repo(&mut self, at: &Repo) {
+    pub(super) fn repo(&mut self, at: &Repo) {
         self.put(b"/api/v1/repos/");
         self.segment(&at.owner);
         self.put(b"/");
         self.segment(&at.name);
     }
-    fn number(&mut self, number: u64) {
+    pub(super) fn number(&mut self, number: u64) {
         self.put(Decimal::of(number).as_bytes());
     }
-    fn numbered(&mut self, at: &Repo, path: &[u8], number: u64) {
+    pub(super) fn numbered(&mut self, at: &Repo, path: &[u8], number: u64) {
         self.repo(at);
         self.put(path);
         self.number(number);
     }
-    fn page(&mut self, page: Page, query: bool) {
+    pub(super) fn page(&mut self, page: Page, query: bool) {
         let mut has_query = query;
         if let Some(n) = page.page {
             self.put(if has_query { b"&page=" } else { b"?page=" });
@@ -121,7 +121,16 @@ fn target(request: &Request, out: &mut Target) {
             out.put(b"/status");
             out.page(*page, false);
         }
-        Request::User
+        Request::Reviews { .. }
+        | Request::ReviewComments { .. }
+        | Request::Branch { .. }
+        | Request::Branches { .. }
+        | Request::Protection { .. }
+        | Request::Protections { .. }
+        | Request::Collaborators { .. }
+        | Request::Permission { .. }
+        | Request::Pulls { .. }
+        | Request::User
         | Request::ApiSettings
         | Request::RepositoryById { .. }
         | Request::Repository { .. }
@@ -156,7 +165,7 @@ fn comment() -> Comment {
     Comment { id: 0, user: document::user(), created_at: None, updated_at: None, body: Body::Kept(Box::from([])) }
 }
 fn branch() -> PullBranch {
-    PullBranch { name: Box::from([]), sha: None }
+    PullBranch { repo_id: 0, name: Box::from([]), sha: None }
 }
 fn pull() -> PullRequest {
     PullRequest {
@@ -255,13 +264,16 @@ impl Items {
                     }
                     None
                     | Some(
-                        Kind::User
+                        Kind::Review(_)
+                        | Kind::Branch(_)
+                        | Kind::User
                         | Kind::Settings
                         | Kind::Repository
                         | Kind::Search
                         | Kind::Users
                         | Kind::Item(
-                            Item::Issues
+                            Item::Pulls
+                            | Item::Issues
                             | Item::Comments
                             | Item::Pull
                             | Item::Head
@@ -301,12 +313,15 @@ impl Items {
                 return Step::Row(Row::Status(value), skein_json::tokenizer::Request::Next);
             }
             Move::End(Kind::Item(Item::Pull)) => {
-                let reviewers = core::mem::replace(&mut self.reviewers, List::with_capacity(self.inner));
-                self.pull.requested_reviewers = reviewers.into_boxed();
+                self.finish_pull();
+                if self.root == Item::Pulls {
+                    return self.pull_row();
+                }
                 Ok(())
             }
             Move::End(Kind::Item(
-                Item::Issues
+                Item::Pulls
+                | Item::Issues
                 | Item::Comments
                 | Item::Head
                 | Item::Base
@@ -316,7 +331,9 @@ impl Items {
                 | Item::Labels
                 | Item::Reviewers,
             )) => Ok(()),
-            Move::End(Kind::Settings | Kind::Repository | Kind::Search | Kind::Users) => {
+            Move::End(
+                Kind::Review(_) | Kind::Branch(_) | Kind::Settings | Kind::Repository | Kind::Search | Kind::Users,
+            ) => {
                 unreachable!("item root selection")
             }
             Move::Done => return Step::Done(self.document(walk.skipped())),
@@ -326,12 +343,20 @@ impl Items {
             Err(error) => Step::Malformed(error),
         }
     }
+    fn pull_row(&mut self) -> Step {
+        let value = core::mem::replace(&mut self.pull, pull());
+        Step::Row(Row::Pull(value), skein_json::tokenizer::Request::Next)
+    }
+    fn finish_pull(&mut self) {
+        let reviewers = core::mem::replace(&mut self.reviewers, List::with_capacity(self.inner));
+        self.pull.requested_reviewers = reviewers.into_boxed();
+    }
     fn document(&mut self, skipped: u32) -> Document {
         match self.root {
             Item::Issue => Document::Issue(core::mem::replace(&mut self.issue, issue())),
             Item::Pull => Document::Pull(core::mem::replace(&mut self.pull, pull())),
             Item::Combined => Document::CombinedStatus(self.combined),
-            Item::Issues | Item::Comments => Document::Listed { skipped },
+            Item::Pulls | Item::Issues | Item::Comments => Document::Listed { skipped },
             Item::Comment
             | Item::Head
             | Item::Base
@@ -361,6 +386,13 @@ impl Items {
                     }
                 }
                 b"total_count" => self.combined.total_count = number,
+                b"repo_id" => {
+                    if kind == Kind::Item(Item::Head) {
+                        self.pull.head.repo_id = number;
+                    } else {
+                        self.pull.base.repo_id = number;
+                    }
+                }
                 _ => unreachable!("item numeric table"),
             },
             Value::Text(text) => match key {
