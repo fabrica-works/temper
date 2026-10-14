@@ -188,6 +188,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-domain-client"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-domain-core"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -924,6 +932,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "temper-client-domain"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "skein-lib",
 ]
 
 [[package]]
