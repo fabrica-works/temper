@@ -356,6 +356,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-client-link"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-client",
+ "jig-protocol-client-wire",
+ "jig-protocol-transcript",
+ "skein-codec",
+ "skein-http",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-client-wire"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
@@ -482,6 +495,18 @@ version = "0.0.0"
 source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
 dependencies = [
  "jig-domain-client",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-shell-native"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-protocol-client-link",
+ "jig-protocol-client-wire",
+ "skein-http",
+ "skein-io",
  "skein-lib",
 ]
 
@@ -1488,6 +1513,23 @@ dependencies = [
  "temper-protocol-store",
  "temper-protocol-worker-wire",
  "temper-worker-domain-checkout",
+]
+
+[[package]]
+name = "temper-shell-terminal"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-protocol-client-link",
+ "jig-shell-native",
+ "jig-view",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "temper-client-domain",
+ "temper-client-view",
+ "temper-protocol-client-wire",
 ]
 
 [[package]]

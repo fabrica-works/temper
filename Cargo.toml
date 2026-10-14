@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper-shell-terminal",
     "tests/client",
     "crates/temper-client-view",
     "crates/temper-client-domain",
@@ -45,6 +46,10 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+skein-shell = { git = "https://github.com/forgetic/skein.git" }
+temper-shell-terminal = { path = "crates/temper-shell-terminal" }
+jig-protocol-client-link = { git = "https://github.com/forgetic/jig.git" }
+jig-shell-native = { git = "https://github.com/forgetic/jig.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }
 skein-http = { git = "https://github.com/forgetic/skein.git" }
 temper-engine-protocol-forge = { path = "crates/temper-engine-protocol-forge" }
