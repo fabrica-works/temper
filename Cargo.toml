@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "testing/temper-fake-forge-protocol",
     "crates/temper",
     "tests/engine/protocol-forge",
     "crates/temper-shell-terminal",
@@ -48,6 +49,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }
 smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
 jig-channel-world = { git = "https://github.com/forgetic/jig.git" }

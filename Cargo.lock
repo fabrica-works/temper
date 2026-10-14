@@ -1784,6 +1784,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-fake-forge-protocol"
+version = "0.0.0"
+dependencies = [
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "temper-fake-forge-domain",
+ "temper-forge-forgejo",
+]
+
+[[package]]
 name = "temper-fake-forge-tests"
 version = "0.0.0"
 dependencies = [
