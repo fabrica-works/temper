@@ -1367,6 +1367,33 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      keeps the navigation's link from showing, that is a question with
      the printed frames. The process proof then runs once.
 
+163. **15.4's second live run, after a charter clarification** (temper
+     15.4, blocked 2026-10-14T21:29:25Z; process, the README's "Live
+     services"). The first live run (`logs/temper-15/w80-real-live-proof.log`;
+     5 completions, 849 s, exit 100) failed on the model's words: the
+     greeting chat answered, the parent delegated the coding task with
+     the right specification, and the coding task called `delegate`
+     again instead of reading, editing and finishing, then finished with
+     `form: failure`, "Delegation request was rejected because additional
+     authority must be proposed." (`w80-live-model-words.txt`); no
+     authentication or code fault. The README: "each further live run, at
+     most two, needs a supervisor's ruling, given only when the run failed
+     on the model's words rather than on the code". So one more live run
+     is granted, the plan's second of three (5 of 50 completions used),
+     after these, in order:
+     1. the process configuration's charter (`support::configuration`'s
+        `engine.charters[0]`, a fixture) gains one sentence: a task whose
+        contract is a change reads, edits and finishes with a change, and
+        delegates nothing. Temper's charter rendering in production is not
+        changed; a clarification that needs it is a question;
+     2. the stories against skein's fake LLM peer pass once, as the README
+        asks before a live run;
+     3. `scripts/proof-live.sh` once, within 25 completions and 900 s.
+
+     The model, the stories, the answer checks, the literals and the pins
+     are unchanged. A third live run needs another ruling, on the same
+     terms.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
