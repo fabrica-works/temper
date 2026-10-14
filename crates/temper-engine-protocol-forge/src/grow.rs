@@ -14,6 +14,12 @@ pub struct Grow {
 }
 
 impl Grow {
+    pub(crate) fn len(&self) -> u32 {
+        self.bytes.len()
+    }
+    pub(crate) fn room(&self) -> u32 {
+        self.cap.saturating_sub(self.bytes.len())
+    }
     /// Starts at `first` bytes (at most `cap`).
     #[must_use]
     pub fn new(first: u32, cap: u32) -> Grow {

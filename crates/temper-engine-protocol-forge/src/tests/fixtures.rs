@@ -104,6 +104,17 @@ pub struct Harness {
     pub up: Queue<Event>,
     pub io: Queue<skein_io::Request>,
     pub answers: skein_lib::Map<u64, Answered>,
+    pub peers: skein_lib::Map<skein_lib::Token, Peer>,
+    pub opened: u32,
+    pub stopped: Option<(u16, crate::Stopped)>,
+    pub closed: bool,
+}
+#[derive(Debug)]
+pub struct Peer {
+    forge: u16,
+    socket: skein_lib::Token,
+    wire: skein_world::stream::Wire,
+    connected: bool,
 }
 impl Harness {
     pub fn new(settings: Settings) -> Self {
@@ -117,8 +128,13 @@ impl Harness {
             up: Queue::with_capacity(32),
             io: Queue::with_capacity(32),
             answers: skein_lib::Map::with_capacity(32),
+            peers: skein_lib::Map::with_capacity(32),
+            opened: 0,
+            stopped: None,
+            closed: false,
         };
         h.component.begin(&h.env, &mut h.up, &mut h.io);
+        h.drain();
         h
     }
     pub fn call(&mut self, call: u64, repository: api::Repository, op: api::Op) {
@@ -130,6 +146,7 @@ impl Harness {
     pub fn run(&mut self, span: Duration) {
         self.env.now = self.env.now.saturating_add(span);
         self.component.fire(&self.env, &mut self.up, &mut self.io);
+        self.drain();
         self.component.reclaim();
         for _ in 0..self.up.len() {
             match self.up.pop().expect("queued event") {
@@ -137,7 +154,14 @@ impl Harness {
                     assert!(self.answered(answer.call.raw()).is_none(), "one terminal per call");
                     drop(self.answers.insert(answer.call.raw(), answer).expect("fixture answers fit"));
                 }
-                Event::Stopped { .. } | Event::Closed => unreachable!("run collects call answers only"),
+                Event::Stopped { forge, why } => {
+                    assert!(self.stopped.is_none(), "start stopped once");
+                    self.stopped = Some((forge, why));
+                }
+                Event::Closed => {
+                    assert!(!self.closed, "closed once");
+                    self.closed = true;
+                }
             }
         }
     }
@@ -147,6 +171,184 @@ impl Harness {
     pub fn start(&self, forge: u16) -> Start {
         self.component.start(forge).expect("fixture forge configured")
     }
+    fn newest(&self, forge: u16) -> skein_lib::Token {
+        let mut found = None;
+        for (owner, peer) in &self.peers {
+            if peer.forge == forge {
+                found = Some(*owner);
+            }
+        }
+        found.expect("forge has a connection")
+    }
+    fn owners(&self) -> List<skein_lib::Token> {
+        let mut owners = List::with_capacity(32);
+        for (owner, _) in &self.peers {
+            owners.push(*owner).expect("fixture peers fit");
+        }
+        owners
+    }
+    fn event(&mut self, event: skein_io::Event) {
+        self.component.up(&self.env, event, &mut self.up, &mut self.io);
+    }
+    pub fn connected(&mut self, forge: u16) {
+        let owner = self.newest(forge);
+        self.peers.get_mut(&owner).expect("registered connect").connected = true;
+        self.event(skein_io::Event::Connected { owner });
+        self.drain();
+    }
+    pub fn refuse(&mut self, forge: u16) {
+        let owner = self.newest(forge);
+        self.event(skein_io::Event::Failed { owner, error: skein_io::Error::Refused });
+        self.event(skein_io::Event::Closed { owner });
+        drop(self.peers.remove(&owner));
+        self.drain();
+    }
+    pub fn answer(&mut self, forge: u16, bytes: &[u8]) {
+        let owner = self.newest(forge);
+        self.peers.get_mut(&owner).expect("registered connect").wire.write(bytes);
+        self.drain();
+    }
+    pub fn reset(&mut self, forge: u16) {
+        let owner = self.newest(forge);
+        self.event(skein_io::Event::Stream {
+            owner,
+            up: skein_lib::stream::Up::Failed(skein_lib::stream::Fault::Reset),
+        });
+        self.drain();
+    }
+    pub fn request_lines(&self, forge: u16) -> List<Box<[u8]>> {
+        let mut lines = List::with_capacity(16);
+        for (_, peer) in &self.peers {
+            if peer.forge != forge {
+                continue;
+            }
+            let mut start = 0;
+            for (at, byte) in peer.wire.received.iter().enumerate() {
+                if *byte == b'\n' {
+                    let line = peer.wire.received.get(start..at).expect("line positions");
+                    if line.starts_with(b"GET ") {
+                        lines.push(Box::from(line.strip_suffix(b"\r").unwrap_or(line))).expect("fixture lines fit");
+                    }
+                    start = at.saturating_add(1);
+                }
+            }
+        }
+        lines
+    }
+    pub fn connections_opened(&self) -> u32 {
+        self.opened
+    }
+    pub fn stopped(&self) -> Option<(u16, crate::Stopped)> {
+        self.stopped
+    }
+    pub fn ready() -> Self {
+        let mut h = Self::new(settings());
+        h.connected(FORGE);
+        h.answer(FORGE, &user_ok());
+        h.answer(FORGE, &settings_ok());
+        h
+    }
+    fn drain(&mut self) {
+        for _ in 0..1024_u32 {
+            for _ in 0..self.io.len() {
+                match self.io.pop().expect("queued request") {
+                    skein_io::Request::Connect { owner, .. } => {
+                        self.opened = self.opened.saturating_add(1);
+                        let socket = skein_lib::Token::new(owner.raw().saturating_add(100));
+                        drop(
+                            self.peers
+                                .insert(
+                                    owner,
+                                    Peer {
+                                        forge: FORGE,
+                                        socket,
+                                        wire: skein_world::stream::Wire::new(owner.raw()),
+                                        connected: false,
+                                    },
+                                )
+                                .expect("fixture peers fit"),
+                        );
+                        self.event(skein_io::Event::Connecting { owner, socket });
+                    }
+                    skein_io::Request::Stream { stream, down } => {
+                        for owner in self.owners().into_boxed() {
+                            let peer = self.peers.get_mut(&owner).expect("fixture peer");
+                            if peer.socket == stream {
+                                peer.wire.take(down);
+                                break;
+                            }
+                        }
+                    }
+                    skein_io::Request::Close { entity } | skein_io::Request::Abort { entity } => {
+                        let mut owner = None;
+                        for (token, peer) in &self.peers {
+                            if peer.socket == entity {
+                                owner = Some(*token);
+                                break;
+                            }
+                        }
+                        if let Some(owner) = owner {
+                            self.event(skein_io::Event::Closed { owner });
+                            drop(self.peers.remove(&owner));
+                        }
+                    }
+                    skein_io::Request::Listen { .. }
+                    | skein_io::Request::Bind { .. }
+                    | skein_io::Request::Reject { .. }
+                    | skein_io::Request::Output { .. }
+                    | skein_io::Request::Spawn { .. }
+                    | skein_io::Request::Signal { .. }
+                    | skein_io::Request::Usage { .. }
+                    | skein_io::Request::Window { .. } => unreachable!("forge only uses sockets"),
+                }
+            }
+            let mut events = List::with_capacity(32);
+            for owner in self.owners().into_boxed() {
+                let peer = self.peers.get_mut(&owner).expect("fixture peer");
+                if peer.connected
+                    && let Some(up) = peer.wire.answer()
+                {
+                    events.push(skein_io::Event::Stream { owner, up }).expect("fixture events fit");
+                }
+            }
+            for event in events.into_boxed() {
+                self.event(event);
+            }
+        }
+    }
+}
+pub fn ok(body: &[u8]) -> Box<[u8]> {
+    let decimal = skein_lib::Decimal::of(u64::try_from(body.len()).expect("body length"));
+    let mut out = skein_lib::Writer::new(
+        body.len()
+            .saturating_add(b"HTTP/1.1 200 OK\r\nContent-Length: ".len())
+            .saturating_add(decimal.as_bytes().len())
+            .saturating_add(b"\r\nDate: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n".len()),
+    );
+    out.put(b"HTTP/1.1 200 OK\r\nContent-Length: ").expect("head fits");
+    out.put(decimal.as_bytes()).expect("length fits");
+    out.put(b"\r\nDate: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n").expect("date fits");
+    out.put(body).expect("body fits");
+    out.finish()
+}
+pub fn status(code: u16) -> Box<[u8]> {
+    let decimal = skein_lib::Decimal::of(u64::from(code));
+    let mut out = skein_lib::Writer::new(
+        b"HTTP/1.1 "
+            .len()
+            .saturating_add(decimal.as_bytes().len())
+            .saturating_add(b" Refused\r\nContent-Length: 0\r\n\r\n".len()),
+    );
+    out.put(b"HTTP/1.1 ").expect("head fits");
+    out.put(skein_lib::Decimal::of(u64::from(code)).as_bytes()).expect("code fits");
+    out.put(b" Refused\r\nContent-Length: 0\r\n\r\n").expect("head fits");
+    out.finish()
+}
+pub fn user_ok() -> Box<[u8]> {
+    ok(b"{\"id\":2,\"login\":\"writer\"}")
+}
+pub fn settings_ok() -> Box<[u8]> {
+    ok(b"{\"max_response_items\":2,\"default_paging_num\":30}")
 }
 pub fn specimen() -> crate::tables::Repository {
     crate::tables::Repository {
@@ -165,6 +367,7 @@ pub struct ConnectionHarness {
     pub env: Env<Limits>,
     pub forge: Forge,
     pub io: Queue<skein_io::Request>,
+    pub sent: Box<[u8]>,
 }
 impl ConnectionHarness {
     pub fn new() -> Self {
@@ -175,31 +378,21 @@ impl ConnectionHarness {
         connection.socket = Some(skein_lib::Token::new(100));
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
         connection.connect(&env);
-        Self { connection, env, forge, io: Queue::with_capacity(32) }
+        Self { connection, env, forge, io: Queue::with_capacity(32), sent: Box::from([]) }
     }
     pub fn pump(&mut self) {
         self.connection.pump(&self.env, &mut self.io, 16);
     }
     pub fn answer(&mut self, response: &[u8]) -> List<crate::connection::Heard> {
-        let mut intake = skein_lib::Intake::with_capacity(4096);
-        intake.append(response).expect("fixture response fits");
+        let mut wire = skein_world::stream::Wire::new(1);
+        let mut written = false;
         let mut heard = List::with_capacity(16);
         for _ in 0_u32..1024 {
             self.pump();
             for _ in 0..self.io.len() {
                 let request = self.io.pop().expect("queued io request");
                 match request {
-                    skein_io::Request::Stream { down: skein_lib::stream::Down::Demand { read, room }, .. } => {
-                        if room > 0 {
-                            self.connection.stream(&self.env, skein_lib::stream::Up::Room);
-                        } else if let Some(piece) = intake.meet(read) {
-                            self.connection.stream(&self.env, skein_lib::stream::Up::Bytes(piece));
-                        }
-                    }
-                    skein_io::Request::Stream {
-                        down: skein_lib::stream::Down::Send(_) | skein_lib::stream::Down::Finish,
-                        ..
-                    } => {}
+                    skein_io::Request::Stream { down, .. } => wire.take(down),
                     skein_io::Request::Listen { .. }
                     | skein_io::Request::Connect { .. }
                     | skein_io::Request::Bind { .. }
@@ -213,13 +406,18 @@ impl ConnectionHarness {
                     | skein_io::Request::Abort { .. } => unreachable!("one connection emits stream requests"),
                 }
             }
+            if !written && self.connection.phase == crate::connection::Phase::Reading {
+                wire.write(response);
+                written = true;
+            }
+            if let Some(event) = wire.answer() {
+                self.connection.stream(&self.env, event);
+            }
             if let Some(event) = self.connection.heard() {
                 heard.push(event).expect("fixture events fit");
             }
-            if !self.connection.ready() {
-                break;
-            }
         }
+        self.sent = Box::from(wire.received.as_slice());
         heard
     }
 }

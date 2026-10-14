@@ -368,7 +368,9 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         )?;
     connection
         .checked_mul(u64::from(l.connections))?
+        .checked_add(Map::<Token, Id<crate::connection::Connection>>::worst_case(l.connections)?)?
         .checked_add(Slab::<crate::connection::Connection>::worst_case(l.connections)?)?
+        .checked_add(List::<Option<Token>>::worst_case(l.forges)?)?
         .checked_add(calls)?
         .checked_add(held)?
         .checked_add(repositories)?

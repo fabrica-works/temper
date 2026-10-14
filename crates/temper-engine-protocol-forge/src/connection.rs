@@ -1,4 +1,4 @@
-//! Forge connection connection (forge.md, sections 3 and 8).
+//! Forge connection (forge.md, sections 3 and 8).
 use alloc::boxed::Box;
 use skein_lib::{Duration, Wall};
 use temper_forge_forgejo::{decode, document, header};
@@ -69,6 +69,7 @@ pub enum Heard {
 }
 
 use crate::{
+    grow::Grow,
     limits::{self, Limits, Shared},
     settings::{Forge, Transport},
 };
@@ -76,13 +77,14 @@ use skein_http::client as http;
 use skein_json::tokenizer;
 use skein_lib::{
     Env, List, Queue, Time, Token, Writer, bytes,
-    stream::{Down, Up},
+    stream::{Down, Read, Up},
 };
 use temper_forge_forgejo::{client as documents, request};
 /// One exchange's response body state.
 #[derive(Debug)]
 enum Receiving {
     Json(documents::Decoder),
+    Raw { grow: Grow, max: u32, remaining: Option<u64> },
     Empty,
 }
 /// One connection's machines, socket identity, request and pending output.
@@ -108,6 +110,10 @@ pub(crate) struct Connection {
     receive: Receiving,
     done: Option<Body>,
     after: u64,
+    upload: Option<Box<[u8]>>,
+    uploaded: u32,
+    raw_max: u32,
+    raw_cap: u32,
 }
 impl Connection {
     pub fn new(forge: &Forge, l: &Limits, shared: Shared, deadline: Time) -> Self {
@@ -139,6 +145,10 @@ impl Connection {
             receive: Receiving::Empty,
             done: None,
             after: 0,
+            upload: None,
+            uploaded: 0,
+            raw_max: 0,
+            raw_cap: shared.client.answer_bytes,
         }
     }
     pub fn start(
@@ -149,9 +159,6 @@ impl Connection {
         range: Option<u32>,
     ) -> Result<(), documents::Refusal> {
         let encoded = documents::encode(&request, &limits::documents(&env.limits))?;
-        if encoded.body.is_some() {
-            return Err(documents::Refusal::TooLong);
-        }
         let mut headers = List::with_capacity(5);
         headers.push(field(b"Host", &forge.host)).expect("five header fields");
         let mut auth = Writer::new(forge.token.len().saturating_add(6));
@@ -161,6 +168,13 @@ impl Connection {
             .push(skein_http::Header { name: Box::from(&b"Authorization"[..]), value: auth.finish() })
             .expect("five header fields");
         headers.push(field(b"User-Agent", crate::conventions::USER_AGENT.as_bytes())).expect("five header fields");
+        let body = match &encoded.body {
+            Some(body) => {
+                headers.push(field(b"Content-Type", b"application/json")).expect("five header fields");
+                http::Body::Length(u64::try_from(body.len()).expect("bounded body"))
+            }
+            None => http::Body::None,
+        };
         if let Some(max) = range {
             let decimal = skein_lib::Decimal::of(u64::from(max));
             let mut value = Writer::new(decimal.as_bytes().len().saturating_add(8));
@@ -171,6 +185,9 @@ impl Connection {
                 .expect("five header fields");
         }
         self.request = Some(request);
+        self.upload = encoded.body;
+        self.uploaded = 0;
+        self.raw_max = range.unwrap_or(self.raw_cap.saturating_sub(1));
         self.done = None;
         self.written = false;
         self.after = 0;
@@ -187,10 +204,16 @@ impl Connection {
                 method,
                 target: encoded.target,
                 headers: headers.into_boxed(),
-                body: http::Body::None,
+                body,
                 close: false,
             }),
         );
+        if self.upload.is_some() {
+            self.http_down(
+                env,
+                http::Request::Upload(Down::Demand { read: Read::Nothing, room: self.http_env(env).limits.send }),
+            );
+        }
         Ok(())
     }
     pub fn connect(&mut self, env: &Env<Limits>) {
@@ -208,7 +231,6 @@ impl Connection {
             }
             None => {
                 self.phase = Phase::Idle;
-                self.deadline = None;
             }
         }
     }
@@ -293,7 +315,7 @@ impl Connection {
             && self.request.is_some()
         {
             self.written = true;
-            self.phase = Phase::Reading;
+            self.phase = if self.upload.is_some() { Phase::Sending { written: true } } else { Phase::Reading };
         }
         if let Some(socket) = self.socket {
             io.push(skein_io::Request::Stream { stream: socket, down });
@@ -303,7 +325,6 @@ impl Connection {
         match event {
             skein_tls::client::Event::Ready(_) => {
                 self.phase = Phase::Idle;
-                self.deadline = None;
             }
             skein_tls::client::Event::Stream(event) => {
                 let h = self.http_env(env);
@@ -326,16 +347,37 @@ impl Connection {
                 Receiving::Empty => {
                     drop(event);
                 }
+                Receiving::Raw { grow, max, remaining } => match event {
+                    Up::Bytes(piece) => {
+                        if let Some(left) = remaining {
+                            *left = left.saturating_sub(u64::try_from(piece.len()).expect("bounded piece"));
+                        }
+                        let more = grow.write(&piece).is_err() || grow.len() > *max;
+                        if more {
+                            let Receiving::Raw { grow, .. } = core::mem::replace(&mut self.receive, Receiving::Empty)
+                            else {
+                                unreachable!("raw body")
+                            };
+                            self.heard.push(Heard::Done(Body::Raw { more: true, bytes: grow.finish() }));
+                            self.phase = Phase::Closed;
+                            self.deadline = None;
+                        } else {
+                            self.raw_demand(env);
+                        }
+                    }
+                    Up::End => {}
+                    Up::Failed(_) => self.failed(Failure::Seen),
+                    Up::Room => unreachable!("raw bodies only read"),
+                },
             },
-            http::Event::Upload(event) => {
-                drop(event);
-            }
+            http::Event::Upload(event) => self.upload(env, event),
             http::Event::Done(reuse) => {
                 let done = match core::mem::replace(&mut self.receive, Receiving::Empty) {
                     Receiving::Json(_) => {
                         self.done.take().unwrap_or(Body::Malformed(decode::Malformed::Missing { field: b"" }))
                     }
                     Receiving::Empty => self.done.take().unwrap_or(Body::Empty),
+                    Receiving::Raw { grow, max, .. } => Body::Raw { more: grow.len() > max, bytes: grow.finish() },
                 };
                 let close = reuse == http::Reuse::Close
                     || match &done {
@@ -344,6 +386,7 @@ impl Connection {
                     };
                 self.heard.push(Heard::Done(done));
                 self.request = None;
+                self.upload = None;
                 self.phase = if close { Phase::Closed } else { Phase::Idle };
                 self.deadline = if close { None } else { Some(env.now.saturating_add(env.limits.idle)) };
             }
@@ -391,11 +434,7 @@ impl Connection {
             fields: Fields { date, retry_after, has_more, content_range, close },
         });
         let l = limits::documents(&env.limits);
-        if response.status == 401
-            || response.status == 403
-            || response.framing == http::Framing::Empty
-            || response.framing == http::Framing::Length(0)
-        {
+        if response.status == 401 || response.status == 403 {
             self.receive = Receiving::Empty;
             self.http_down(env, http::Request::Discard);
             return;
@@ -411,9 +450,67 @@ impl Connection {
                 self.json_down(env, tokenizer::Request::Next);
             }
             None => {
-                self.receive = Receiving::Empty;
-                self.http_down(env, http::Request::Discard);
+                if let request::Request::Raw { .. } | request::Request::JobLog { .. } = request {
+                    let cap = self.raw_max.saturating_add(1).min(self.raw_cap);
+                    self.receive = Receiving::Raw {
+                        grow: Grow::new(env.limits.chunk, cap),
+                        max: self.raw_max,
+                        remaining: match response.framing {
+                            http::Framing::Length(length) => Some(length),
+                            http::Framing::Empty => Some(0),
+                            http::Framing::Chunked | http::Framing::UntilEnd => None,
+                        },
+                    };
+                    self.raw_demand(env);
+                } else {
+                    self.receive = Receiving::Empty;
+                    self.http_down(env, http::Request::Discard);
+                }
             }
+        }
+    }
+    fn raw_demand(&mut self, env: &Env<Limits>) {
+        let Receiving::Raw { grow, remaining, .. } = &self.receive else {
+            return;
+        };
+        let count = match remaining {
+            Some(left) => grow.room().min(env.limits.chunk).min(u32::try_from(*left).unwrap_or(u32::MAX)).max(1),
+            None => 1,
+        };
+        self.http_down(env, http::Request::Body(Down::Demand { read: Read::Fill(count), room: 0 }));
+    }
+    fn upload(&mut self, env: &Env<Limits>, event: Up) {
+        match event {
+            Up::Room => {
+                let Some(body) = &self.upload else {
+                    return;
+                };
+                let start = usize::try_from(self.uploaded).expect("bounded position");
+                let end = body
+                    .len()
+                    .min(start.saturating_add(usize::try_from(self.http_env(env).limits.send).expect("send fits")));
+                let piece = bytes::copy_of(body.get(start..end).expect("bounded position"));
+                self.uploaded = u32::try_from(end).expect("bounded body");
+                let finished = end == body.len();
+                self.http_down(env, http::Request::Upload(Down::Send(piece)));
+                if finished {
+                    self.upload = None;
+                    self.phase = Phase::Reading;
+                    self.http_down(env, http::Request::Upload(Down::Finish));
+                } else {
+                    self.http_down(
+                        env,
+                        http::Request::Upload(Down::Demand {
+                            read: Read::Nothing,
+                            room: self.http_env(env).limits.send,
+                        }),
+                    );
+                }
+            }
+            Up::Failed(_) | Up::End => {
+                self.upload = None;
+            }
+            Up::Bytes(_) => unreachable!("uploads only write"),
         }
     }
     fn json_event(&mut self, env: &Env<Limits>, event: tokenizer::Event) {
@@ -449,14 +546,21 @@ impl Connection {
     pub fn timeout(&mut self) {
         self.failed(if self.written { Failure::Seen } else { Failure::Unseen });
     }
+    pub fn in_flight(&self) -> bool {
+        self.request.is_some()
+            || match self.phase {
+                Phase::Connecting | Phase::Handshaking => true,
+                Phase::Closed | Phase::Sending { .. } | Phase::Reading | Phase::Idle => false,
+            }
+    }
     pub fn close(&mut self, abort: bool, io: &mut Queue<skein_io::Request>) {
         if self.closing {
             return;
         }
-        self.closing = true;
         self.phase = Phase::Closed;
         self.deadline = None;
         if let Some(socket) = self.socket {
+            self.closing = true;
             io.push(if abort {
                 skein_io::Request::Abort { entity: socket }
             } else {
@@ -479,12 +583,19 @@ impl Connection {
             || !self.json_down.is_empty()
             || !self.heard.is_empty()
     }
+    #[expect(dead_code, reason = "13.3 supplies listing cursors")]
     pub fn keep_after(&mut self, after: u64) {
         self.after = after;
         if let Receiving::Json(decoder) = &mut self.receive {
             documents::keep_after(decoder, after);
         }
     }
+    /// The answer's remaining payload room, set by the holding plan before its raw read.
+    #[cfg_attr(not(test), expect(dead_code, reason = "13.4 supplies remaining answer room"))]
+    pub fn raw_room(&mut self, room: u32) {
+        self.raw_cap = room;
+    }
+    #[expect(dead_code, reason = "13.3 cuts bounded listings")]
     pub fn cut(&mut self, env: &Env<Limits>) {
         if let Receiving::Json(decoder) = &mut self.receive {
             let request = documents::cut(decoder);

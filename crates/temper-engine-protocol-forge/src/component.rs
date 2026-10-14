@@ -1,8 +1,10 @@
 //! Waiting calls and returned answers (forge.md, sections 2 and 8).
 use crate::{
     boundary::{Answered, Event, Request},
+    connection::{Body, Connection, Failure, Heard, Phase},
     limits::{self, Limits, Shared, Unusable},
     settings::Settings,
+    start,
     start::Start,
     tables::Tables,
 };
@@ -45,13 +47,22 @@ pub struct Component {
     held: Map<Token, Held>,
     closed: bool,
     diagnostics: Diagnostics,
+    shared: Shared,
+    connections: Map<Token, Id<Connection>>,
+    connection_slab: Slab<Connection>,
+    start_tokens: List<Option<Token>>,
+    next_token: u64,
+    wake: Option<Time>,
+    ended: bool,
 }
 impl Component {
     pub fn new(settings: Settings, limits: &Limits, shared: &Shared) -> Result<Self, Unusable> {
         limits::check(limits, shared, &settings)?;
         let mut starts = List::with_capacity(limits.forges);
+        let mut start_tokens = List::with_capacity(limits.forges);
         for _ in &settings.forges {
             starts.push(Start::Checking { next: limits.start_backoff }).expect("checked forge count");
+            start_tokens.push(None).expect("checked forge count");
         }
         Ok(Self {
             settings,
@@ -62,23 +73,31 @@ impl Component {
             held: Map::with_capacity(shared.client.calls),
             closed: false,
             diagnostics: Diagnostics { long_bodies: 0, malformed: 0 },
+            shared: *shared,
+            connections: Map::with_capacity(limits.connections),
+            connection_slab: Slab::with_capacity(limits.connections),
+            start_tokens,
+            next_token: 1,
+            wake: None,
+            ended: false,
         })
     }
-    /// Starts each forge's pure check; connections arrive in 13.2.
-    pub fn begin(&mut self, env: &Env<Limits>, _up: &mut Queue<Event>, _io: &mut Queue<skein_io::Request>) {
+    /// Opens each forge's start, within the connection and output bounds.
+    pub fn begin(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>) {
         if self.closed {
             return;
         }
         for at in 0..self.starts.len() {
             *self.starts.get_mut(at).expect("configured start") = Start::Checking { next: env.limits.start_backoff };
         }
+        self.drive(env, up, io, MAX_OUT.above);
     }
     pub fn down(
         &mut self,
         env: &Env<Limits>,
         request: Request,
         up: &mut Queue<Event>,
-        _io: &mut Queue<skein_io::Request>,
+        io: &mut Queue<skein_io::Request>,
     ) {
         if self.closed {
             return;
@@ -134,24 +153,80 @@ impl Component {
                 }
                 self.held = Map::with_capacity(self.held.capacity());
                 self.closed = true;
-                up.push(Event::Closed);
+                self.drive(env, up, io, MAX_OUT.above);
             }
         }
     }
-    /// No connection exists until 13.2; late io events have no effect.
+    /// Routes io by this component's connection owner; stale owners are inert.
     pub fn up(
         &mut self,
-        _env: &Env<Limits>,
+        env: &Env<Limits>,
         event: skein_io::Event,
-        _up: &mut Queue<Event>,
-        _io: &mut Queue<skein_io::Request>,
+        up: &mut Queue<Event>,
+        io: &mut Queue<skein_io::Request>,
     ) {
-        drop(event);
+        match event {
+            skein_io::Event::Connecting { owner, socket } => {
+                if let Some(id) = self.connections.get(&owner)
+                    && let Some(c) = self.connection_slab.get_mut(*id)
+                {
+                    c.socket = Some(socket);
+                }
+            }
+            skein_io::Event::Connected { owner } => {
+                if let Some(id) = self.connections.get(&owner)
+                    && let Some(c) = self.connection_slab.get_mut(*id)
+                    && !c.closing
+                {
+                    c.connect(env);
+                }
+            }
+            skein_io::Event::Stream { owner, up } => {
+                if let Some(id) = self.connections.get(&owner)
+                    && let Some(c) = self.connection_slab.get_mut(*id)
+                {
+                    c.stream(env, up);
+                }
+            }
+            skein_io::Event::Failed { owner, .. } => {
+                if let Some(id) = self.connections.get(&owner)
+                    && let Some(c) = self.connection_slab.get_mut(*id)
+                {
+                    c.failed(Failure::Unseen);
+                }
+            }
+            skein_io::Event::Closed { owner } => {
+                if let Some(id) = self.connections.remove(&owner) {
+                    let closing = self.connection_slab.get(id).expect("indexed connection").closing;
+                    self.connection_slab.retire(id);
+                    for at in 0..self.start_tokens.len() {
+                        if self.start_tokens.get(at) == Some(&Some(owner)) {
+                            *self.start_tokens.get_mut(at).expect("configured forge") = None;
+                            if !self.closed && !closing {
+                                self.start_heard(at, start::Heard::Unanswered, env, up);
+                            }
+                        }
+                    }
+                }
+            }
+            skein_io::Event::Listening { .. }
+            | skein_io::Event::Accepted { .. }
+            | skein_io::Event::Output { .. }
+            | skein_io::Event::Spawned { .. }
+            | skein_io::Event::Exited { .. }
+            | skein_io::Event::Usage { .. }
+            | skein_io::Event::Resized
+            | skein_io::Event::Window { .. }
+            | skein_io::Event::Shutdown { .. } => {}
+        }
+        self.drive(env, up, io, MAX_OUT.above);
     }
-    pub fn fire(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, _io: &mut Queue<skein_io::Request>) {
+    pub fn fire(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>) {
         if self.closed {
+            self.drive(env, up, io, MAX_OUT.above);
             return;
         }
+        let above = up.len();
         for _ in 0..MAX_OUT.above {
             let mut next = None;
             for (call, id) in &self.calls {
@@ -167,10 +242,28 @@ impl Component {
             let _removed: Option<Id<Waiting>> = self.calls.remove(&call);
             up.push(Event::Answered(Answered { call, cost: 0, result: Err(api::Error::Unavailable) }));
         }
+        self.drive(env, up, io, MAX_OUT.above.saturating_sub(up.len().saturating_sub(above)));
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        let mut earliest = None;
+        let mut earliest = self.wake;
+        for (_, id) in &self.connections {
+            let c = self.connection_slab.get(*id).expect("indexed connection");
+            if let Some(time) = c.deadline
+                && (earliest.is_none() || Some(time) < earliest)
+            {
+                earliest = Some(time);
+            }
+        }
+        if !self.closed {
+            for state in &self.starts {
+                if let Start::Waiting { until, .. } = state
+                    && (earliest.is_none() || Some(*until) < earliest)
+                {
+                    earliest = Some(*until);
+                }
+            }
+        }
         for (_, id) in &self.calls {
             let time = self.waiting.get(*id).expect("indexed live call").deadline;
             if earliest.is_none() || Some(time) < earliest {
@@ -179,12 +272,146 @@ impl Component {
         }
         earliest
     }
+    fn start_heard(&mut self, at: u32, heard: start::Heard, env: &Env<Limits>, up: &mut Queue<Event>) {
+        let forge = self.settings.forges.get(at).expect("configured forge");
+        let state = self.starts.get_mut(at).expect("configured start");
+        let previous = *state;
+        *state = start::heard(previous, heard, forge.user, env.now, &env.limits);
+        if let Start::Settings { .. } = *state
+            && *state != previous
+            && let Some(Some(token)) = self.start_tokens.get(at)
+            && let Some(id) = self.connections.get(token)
+            && let Some(c) = self.connection_slab.get_mut(*id)
+        {
+            c.deadline = Some(env.now.saturating_add(env.limits.deadline));
+        }
+        if let Start::Stopped(reason) = *state
+            && *state != previous
+        {
+            up.push(Event::Stopped { forge: forge.number, why: reason });
+        }
+    }
+    fn drive(&mut self, env: &Env<Limits>, up: &mut Queue<Event>, io: &mut Queue<skein_io::Request>, above_room: u32) {
+        let below = io.len();
+        let above = up.len();
+        self.wake = None;
+        for at in 0..self.starts.len() {
+            if io.len().saturating_sub(below) >= MAX_OUT.below || up.len().saturating_sub(above) >= above_room {
+                self.wake = Some(env.now);
+                break;
+            }
+            let state = self.starts.get_mut(at).expect("configured start");
+            if let Start::Waiting { until, next } = *state
+                && until <= env.now
+                && !self.closed
+            {
+                *state = Start::Checking { next };
+            }
+            let mut token = *self.start_tokens.get(at).expect("configured slot");
+            if !self.closed
+                && token.is_none()
+                && start_request(*state).is_some()
+                && self.connections.len() < self.connections.capacity()
+            {
+                token = Some(self.open_start(at, env, io));
+            }
+            let Some(token) = token else {
+                continue;
+            };
+            for _ in 0..64_u32 {
+                if io.len().saturating_sub(below) >= MAX_OUT.below || up.len().saturating_sub(above) >= above_room {
+                    self.wake = Some(env.now);
+                    break;
+                }
+                let c = self
+                    .connection_slab
+                    .get_mut(*self.connections.get(&token).expect("indexed token"))
+                    .expect("indexed connection");
+                if self.closed {
+                    c.close(c.in_flight(), io);
+                    break;
+                }
+                let state = *self.starts.get(at).expect("configured start");
+                if let Some(deadline) = c.deadline
+                    && deadline <= env.now
+                {
+                    if c.phase == Phase::Idle
+                        && let Start::Ready { .. } = state
+                    {
+                        c.close(false, io);
+                        break;
+                    }
+                    c.timeout();
+                }
+                if c.phase == Phase::Idle
+                    && let Some(request) = start_request(state)
+                {
+                    c.start(env, self.settings.forges.get(at).expect("configured forge"), request, None)
+                        .expect("checked start request");
+                }
+                c.pump(env, io, MAX_OUT.below.saturating_sub(io.len().saturating_sub(below)).saturating_sub(1));
+                if let Some(heard) = c.heard() {
+                    let heard = match heard {
+                        Heard::Head { status, fields } if status != 200 => {
+                            Some(start::Heard::Status { status, retry: fields.retry_after })
+                        }
+                        Heard::Done(Body::Document(temper_forge_forgejo::document::Document::User(user))) => {
+                            Some(start::Heard::User { id: user.id })
+                        }
+                        Heard::Done(Body::Document(temper_forge_forgejo::document::Document::ApiSettings(
+                            settings,
+                        ))) => Some(start::Heard::ApiSettings { max_response_items: settings.max_response_items }),
+                        Heard::Done(_) | Heard::Failed(_) => Some(start::Heard::Unanswered),
+                        Heard::Head { .. } | Heard::Row(_) => None,
+                    };
+                    if let Some(heard) = heard {
+                        self.start_heard(at, heard, env, up);
+                    }
+                    let c = self
+                        .connection_slab
+                        .get_mut(*self.connections.get(&token).expect("indexed token"))
+                        .expect("indexed connection");
+                    if let Some(Start::Waiting { .. } | Start::Stopped(_)) = self.starts.get(at) {
+                        c.close(true, io);
+                    }
+                    continue;
+                }
+                if c.phase == Phase::Closed {
+                    c.close(c.in_flight(), io);
+                }
+                if !c.ready() {
+                    break;
+                }
+                self.wake = Some(env.now);
+            }
+        }
+        if self.closed && self.connections.is_empty() && !self.ended {
+            self.ended = true;
+            up.push(Event::Closed);
+        }
+    }
+    fn open_start(&mut self, at: u32, env: &Env<Limits>, io: &mut Queue<skein_io::Request>) -> Token {
+        let owner = Token::new(self.next_token);
+        self.next_token = self.next_token.checked_add(1).expect("connection token space");
+        assert!(self.next_token < 1_u64.checked_shl(60).expect("token prefix"), "connection token prefix");
+        let forge = self.settings.forges.get(at).expect("configured forge");
+        self.connection_slab.reclaim();
+        let id = self
+            .connection_slab
+            .insert(Connection::new(forge, &env.limits, self.shared, env.now.saturating_add(env.limits.deadline)))
+            .expect("free connection slot");
+        let _previous = self.connections.insert(owner, id).expect("connection index has room");
+        io.push(skein_io::Request::Connect { owner, addr: forge.address });
+        *self.start_tokens.get_mut(at).expect("configured slot") = Some(owner);
+        owner
+    }
     #[must_use]
     pub fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
     }
     pub fn reclaim(&mut self) {
         self.waiting.reclaim();
+        self.connection_slab.reclaim();
     }
     /// The bounded resolution tables owned by this component.
     pub fn tables(&mut self) -> &mut Tables {
@@ -199,5 +426,13 @@ impl Component {
             }
         }
         None
+    }
+}
+
+fn start_request(state: Start) -> Option<temper_forge_forgejo::request::Request> {
+    match state {
+        Start::Checking { .. } => Some(temper_forge_forgejo::request::Request::User),
+        Start::Settings { .. } => Some(temper_forge_forgejo::request::Request::ApiSettings),
+        Start::Waiting { .. } | Start::Ready { .. } | Start::Stopped(_) => None,
     }
 }

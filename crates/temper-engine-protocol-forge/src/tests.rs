@@ -162,7 +162,7 @@ fn a_call_waiting_for_its_forge_is_unavailable_at_its_deadline() {
     );
     h.run(Duration::from_secs(1));
     assert_eq!(h.answers.len(), 1, "answered once");
-    assert_eq!(h.component.next_deadline(), None, "nothing waiting");
+    assert_eq!(h.component.next_deadline(), Some(Time::from_nanos(21_000_000_000)), "only the new start waits");
     assert_eq!(h.io.len(), 0, "nothing sent");
 }
 
@@ -210,10 +210,9 @@ fn refused_answers_are_offered_once_and_returned_answers_stay_until_close() {
     h.send(Request::Offer);
     assert_eq!(h.up.len(), 0, "returned answer never offered");
     h.send(Request::Close);
-    assert_eq!(h.up.len(), 1, "only closed emitted");
-    let Some(Event::Closed) = h.up.pop() else {
-        unreachable!("close terminal");
-    };
+    assert_eq!(h.up.len(), 0, "connections close before the terminal");
+    h.run(Duration::ZERO);
+    assert!(h.closed, "closed emitted after io closed");
     h.send(Request::Offer);
     h.send(Request::Close);
     assert_eq!(h.up.len(), 0, "nothing after closed");
@@ -224,10 +223,9 @@ fn closing_waiting_calls_emits_only_the_close_terminal() {
     let mut h = fixtures::Harness::new(fixtures::settings());
     h.call(1, fixtures::REPO, api::Op::Read(api::Read::Settings));
     h.send(Request::Close);
-    assert_eq!(h.up.len(), 1, "close emits one event");
-    let Some(Event::Closed) = h.up.pop() else {
-        unreachable!("close terminal");
-    };
+    assert_eq!(h.up.len(), 0, "close waits for io");
+    h.run(Duration::ZERO);
+    assert!(h.closed, "close terminal after last socket");
     h.run(Duration::from_secs(20));
     assert_eq!(h.answered(1), None, "no call answer after root stopped");
     assert_eq!(h.component.next_deadline(), None, "no live deadlines");
@@ -325,7 +323,7 @@ fn many_due_calls_keep_the_timer_output_bound() {
     }
     for (name, span, count, deadline) in [
         ("first batch", Duration::from_secs(10), 16, Some(Time::from_nanos(10_000_000_000))),
-        ("rest", Duration::ZERO, 20, None),
+        ("rest", Duration::ZERO, 20, Some(Time::from_nanos(11_000_000_000))),
     ] {
         h.run(span);
         assert_eq!(h.answers.len(), count, "{name}: calls ended");
