@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/temper-client-view",
     "crates/temper-client-domain",
     "crates/temper-service",
     "tests/worker/protocol-git",
@@ -46,6 +47,8 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-client-view = { path = "crates/temper-client-view" }
+jig-view = { git = "https://github.com/forgetic/jig.git" }
 temper-client-domain = { path = "crates/temper-client-domain" }
 jig-domain-client = { git = "https://github.com/forgetic/jig.git" }
 temper-service = { path = "crates/temper-service" }

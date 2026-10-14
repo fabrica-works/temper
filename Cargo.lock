@@ -481,6 +481,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-view"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+dependencies = [
+ "jig-domain-client",
+ "skein-lib",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1026,6 +1035,16 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
+]
+
+[[package]]
+name = "temper-client-view"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-view",
+ "skein-lib",
+ "temper-client-domain",
 ]
 
 [[package]]

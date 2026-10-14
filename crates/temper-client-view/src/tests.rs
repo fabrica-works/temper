@@ -1,0 +1,114 @@
+mod fixtures;
+use jig_domain_client::contract::{Part, PartScope};
+use jig_view::Role;
+
+#[test]
+fn each_resource_path_shape_says_its_words() {
+    let words = fixtures::words();
+    let rows: [(&[&[u8]], &[u8]); 9] = [
+        (&[b"forge", b"forge.example", b"acme", b"shop"], b"acme/shop on forge.example"),
+        (
+            &[b"forge", b"forge.example", b"acme", b"shop", b"branch", b"temper", b"7"],
+            b"branch temper/7 of acme/shop on forge.example",
+        ),
+        (
+            &[b"forge", b"forge.example", b"acme", b"shop", b"pull", b"12"],
+            b"pull request #12 of acme/shop on forge.example",
+        ),
+        (&[b"forge", b"forge.example", b"acme", b"shop", b"issue", b"3"], b"issue #3 of acme/shop on forge.example"),
+        (&[&[0, 1], &[0, 0, 0, 42]], b"repository 42 on forge 1"),
+        (&[b"elsewhere", b"x"], b"elsewhere/x"),
+        (&[b"forge", b"host", b"owner", b"name", b"branch"], b"forge/host/owner/name/branch"),
+        (&[b"forge", b"host", b"owner", b"name", b"pull", b"x", b"y"], b"forge/host/owner/name/pull/x/y"),
+        (&[], b""),
+    ];
+    for (path, said) in rows {
+        assert_eq!(&*fixtures::owner_part_text(&words, path), said, "path {path:?}");
+        let part = Part::Resource { connector: fixtures::FORGE, path: fixtures::path(path) };
+        assert_eq!(&*fixtures::part_text(&words, part, true), said, "held path {path:?}");
+    }
+}
+#[test]
+fn each_numbered_kind_says_its_words_and_others_kind_n() {
+    let words = fixtures::words();
+    let rows: [(u16, &[u8]); 17] = [
+        (1, b"read"),
+        (2, b"push"),
+        (3, b"open a pull request"),
+        (4, b"merge a pull request"),
+        (5, b"post a review"),
+        (6, b"set a commit status"),
+        (7, b"post a comment"),
+        (8, b"create an issue"),
+        (9, b"create a branch"),
+        (10, b"edit a pull request"),
+        (11, b"update a pull request from its base"),
+        (12, b"close or reopen a pull request"),
+        (13, b"edit, close or reopen an issue"),
+        (14, b"set reviewers"),
+        (15, b"delete a branch"),
+        (0, b"kind 0"),
+        (16, b"kind 16"),
+    ];
+    for (kind, said) in rows {
+        assert_eq!(
+            &*fixtures::part_text(&words, Part::Kind { connector: fixtures::FORGE, kind }, true),
+            said,
+            "kind {kind}"
+        );
+    }
+}
+#[test]
+fn a_part_needing_a_document_says_shown_on_the_forge() {
+    use jig_domain_client::contract::ProposalKey;
+    let words = fixtures::words();
+    let connector = fixtures::FORGE;
+    let parts = [
+        Part::Panel { connector, task: 1 },
+        Part::Result { connector, task: 1 },
+        Part::Effect {
+            connector,
+            proposal: ProposalKey { proposer: jig_domain_client::contract::Proposer::Task(1), number: 1 },
+        },
+        Part::OwnerEffect { connector, proposal: 1 },
+        Part::Outbox { connector, scope: PartScope::Project(fixtures::PROJECT), entry: 1 },
+        Part::Hold { connector, task: 1 },
+        Part::Project { connector, project: fixtures::PROJECT },
+        Part::Deployment { connector },
+    ];
+    for part in parts {
+        let tree = fixtures::part_tree(&words, part.clone(), true);
+        assert_eq!(&*fixtures::text(&tree), b"Shown on the forge.", "part {part:?}");
+        assert_eq!(tree.nodes().first().expect("paragraph present").role, Role::Paragraph, "part {part:?}");
+    }
+}
+#[test]
+fn a_part_the_side_does_not_hold_says_it_cannot_be_shown() {
+    let words = fixtures::words();
+    let part = Part::Connector { connector: fixtures::FORGE };
+    assert_eq!(&*fixtures::part_text(&words, part.clone(), false), b"Cannot show this part.");
+    assert_eq!(&*fixtures::part_text(&words, part, true), b"forge");
+}
+#[test]
+fn the_navigation_slot_is_spliced_with_no_child() {
+    let view = fixtures::built(fixtures::FORGE);
+    let mut found = 0_u32;
+    for node in view.tree().nodes() {
+        if node.slot == Some(crate::forge::nav(fixtures::FORGE)) {
+            found += 1;
+            assert_eq!(node.size, 1, "navigation slot has no child");
+        }
+    }
+    assert_eq!(found, 1);
+}
+#[test]
+fn a_slot_of_another_connector_says_it_cannot_be_shown() {
+    let view = fixtures::built(fixtures::OTHER);
+    let mut found = 0_u32;
+    for node in view.tree().nodes() {
+        if node.role == Role::Status && node.name.as_deref() == Some(b"Cannot show this part.".as_slice()) {
+            found += 1;
+        }
+    }
+    assert_eq!(found, 1);
+}
