@@ -599,6 +599,26 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      (decision 9), and no `Secret` is added to it. Sessions 09 and 10
      say so.
 
+128. **New starts hold below 30 GB of disk on x1** (blocked
+     2026-10-14T10:39:14Z; infrastructure; the fifth disk block, after
+     rulings 112 and 118 and the unblocks of 08:29Z and 10:20Z). At
+     10:40Z `du -sh --total ~/.cache/kache wt/*/target` printed 47G:
+     kache 21G (its store 27.9 GiB before the coordinator's `kache gc`,
+     a cap of 23.3 GiB), session 08's `target/` 15G and 09's 12G,
+     beyond development.md, 11.4's "1 to 8 GB"; the rest of the volume
+     holds about 69 GB that is not the run's. With three sessions built
+     out, `df -h ~/src` shows 38 to 44 GB, so the 40 GB hold blocked
+     every 20 to 60 minutes with nothing idle left to remove. A session
+     that ends frees its `target/` (12 to 15 GB) before the next starts;
+     a start at 30 GB, its `target/` grown to 15 GB and kache past its
+     cap by 5 GB, leaves about 10 GB above the stop at 15 GB. So, for
+     this plan on x1, 30 GB replaces 40 GB in development.md, 11.4's
+     hold and in ruling 118's rule (README); the stop at 15 GB, the
+     memory bounds, three sessions at once and kache's cap are
+     unchanged. That x1's run leaves too little disk for three sessions'
+     `target/`, and that 11.4's 1 to 8 GB is now 12 to 15 GB in temper,
+     is a proposal for the retrospective.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

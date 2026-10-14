@@ -72,8 +72,9 @@ them wait on them.
 
 - **At most three sessions run at once** on this machine (`x1`: 8 cores,
   15 GB, about 8 GB free; pueue's gate lane 1, build lane 2). The
-  coordinator holds new starts below 6 GB of memory or 40 GB of disk
-  (development.md, 11.4).
+  coordinator holds new starts below 6 GB of memory or 30 GB of disk
+  (development.md, 11.4's 40 GB lowered for x1 by decisions.md, ruling
+  128).
 - **At the start,** seven sessions need nothing: 01, 02, 03, 04, 05,
   07 and 11.
 - **When slots are short, start first** the sessions others wait on, in
@@ -216,11 +217,12 @@ them wait on them.
   (`sha256sum -c forgejo-runner-12.13.2-linux-amd64.sha256` in its
   directory). Nothing else is a Forgejo of this plan (code-organization.md,
   section 6).
-- **Disk below 40 GB** (decisions.md, ruling 118): the coordinator
-  removes the `target/` of sessions not running (development.md, 11.4),
-  runs `kache stats | head -1` once and, when the store is past its cap,
-  `kache gc` once, and logs them; it writes `blocked.md` only if `df -h
-  ~/src` still shows less than 40 GB.
+- **Disk below 30 GB** (decisions.md, rulings 118 and 128): the
+  coordinator holds new starts, removes the `target/` of sessions not
+  running (development.md, 11.4), runs `kache stats | head -1` once and,
+  when the store is past its cap, `kache gc` once, and logs them; it
+  writes `blocked.md` only if `df -h ~/src` still shows less than 30 GB.
+  Below 15 GB it stops the line (development.md, 11.4, unchanged).
 - **The process and live tiers run only where a Proof line or "Done
   when" says,** through `heavy --gate`, once; never in the gate.
 - **A Proof's time bound** is the time nextest's `Summary [ N s]` line
