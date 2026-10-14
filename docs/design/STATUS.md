@@ -48,7 +48,7 @@ No plan is active. The designer marks plans active and done in this file
 | `domain/tasks.md` | yes | built as `jig-core-tasks`; the document still names temper's crates; to keep temper's application side and cite jig's `tasks.md` for the rest: not planned |
 | `domain/authority.md` | yes | built as `jig-core-authority`, landing rules translated to the forge's requirements; the same move: not planned |
 | `domain/connectors.md` | partly | the contract is in `jig-core` and the forge meets it; section 14's second connector, test environments: not planned |
-| `domain/engine.md` | partly | the root in jig's reference shape on `jig-core` and skein-lib's journal, notes in the store; 7.3's undecodable host call relayed with no commit, section 8's failed preparation in the attempt's failure detail, section 14 below the domain: protocol; section 16's saved work (the root names no saved-work branch in an assignment, so no run saves): not planned |
+| `domain/engine.md` | partly | the root in jig's reference shape on `jig-core` and skein-lib's journal, notes in the store; 7.3's undecodable host call relayed with no commit, section 8's failed preparation reported as a fact of the attempt, section 14 below the domain: protocol; section 16's saved work (the root names no saved-work branch in an assignment, so no run saves): not planned |
 | `domain/forge.md` | partly | the connector's four crates on the fake forge; section 4's adoption request, locate and the forge's host, and 17's protocol: protocol; sections 13 and 14 beyond the `Fork` role and participation news: not planned |
 | `domain/people.md` | partly | `jig-core-people` and the root's routes; section 11, signing in by the deployment's link: protocol; through the forge: not planned |
 | `domain/agent.md` | partly | the typed translation to smith (`temper-engine-smith`), the worker hosting smith, the system world; section 3's agent shell as temper's `agent` command, section 9's protocol tests and the charter's encoding: protocol |
@@ -82,6 +82,12 @@ No plan is active. The designer marks plans active and done in this file
 - **The browser** (`web/architecture.md`; `client.md`, section 11):
   temper's client in jig's browser shell. Waits for jig's browser shell
   and the client's wasm32 builds (jig's STATUS.md, "Not planned").
+- **A failed preparation's words on the task's page**
+  (`domain/engine.md`, section 8): the root reports a permanent
+  preparation's repository and reason as a fact of the attempt; people
+  read them on the task's page once jig's core keeps an attempt's
+  failure detail, which its answer's end, a class only, does not at
+  temper's pinned revision.
 - **A run's live text in the client** (jig's `protocol/channel.md`, 6.4):
   waits for smith's channel to carry it (jig's STATUS.md, "What jig asks
   of smith, later"); until then runs show their activity, and their

@@ -464,7 +464,10 @@ created for a base).
 
 **The fake git program,** `testing/temper-fake-git`, is git as the
 machine runs it below the git component: a program on skein's fake
-machine whose protocol is its command line.
+machine whose protocol is its command line. skein's fake machine runs
+no program of an application's, so it is a program hosted by skein's
+world harness (its `HostedProgram`, spawned by name), acting on the
+fake machine's files.
 
 - **What it takes:** the invocations of git.md, section 4, with their
   settings (git.md, section 3) and their environment (git.md, section 5),

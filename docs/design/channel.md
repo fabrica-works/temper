@@ -41,7 +41,7 @@ What is open is listed in section 10.
   repository's remote from its forge's `git` base, its owner and its
   name, so workers need no forge configuration (section 4).
 - **A failed preparation reaches the engine's root:** `Parts` carries
-  `preparation`, which the root records as the attempt's failure detail
+  `preparation`, which the root reports as a fact of the attempt
   (`domain/engine.md`, section 8), a domain change this design owns.
 - **Translation is small total functions** in the routing, exhaustive
   both ways, holding no state. The composed system world calls the same
@@ -205,8 +205,8 @@ enum   Missing          { repository, branch, commit }
     saved work and whose save left that branch as it was;
   - `preparation`: from `missing`, the repository's tag and what the
     forge lacks; from `refused`, its tag and that the forge refused the
-    identity. The root puts them in words in the attempt's failure
-    detail (`domain/engine.md`, section 8).
+    identity. The root reports them as a fact of the attempt
+    (`domain/engine.md`, section 8).
 
 ## 6. A git identity's value
 
@@ -233,8 +233,9 @@ record Identity { token: secret  login: text  name: text  email: text }
   each operation that names it (git.md, sections 2 and 5). A value that
   does not decode, or breaks a field's rule, is dropped and counted; an
   operation that needs it fails `Broken`.
-- **Shown nowhere.** The record's `Debug` shows lengths only (skein-lib's
-  `Secret`); no root, fact, store record or log holds it.
+- **Shown nowhere.** The record's `Debug` shows the token's length only
+  (skein-lib's `Secret`, the schema's `secret`); the login and the author
+  are not secret. No root, fact, store record or log holds the value.
 - **Its size** must fit jig's bound on a grant's value (section 8), which
   configuration checks for every identity at start.
 

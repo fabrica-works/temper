@@ -117,7 +117,12 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   temper may do there (below) before the core commits the adoption
   (jig's `domain/connectors.md`, section 12). Its outcome is the
   adoption's: adopted, refused by the core with jig's reasons, or
-  refused by the forge with the connector's.
+  refused by the forge with the connector's. The connector keeps it
+  durably under the people child's token until its retention ends, to
+  give again when the request is sent again, as a
+  connector keeps every keyed request's outcome (jig's
+  `domain/connectors.md`, section 5; `docs/design/store/README.md`,
+  section 2).
 - **The forge's host** in a repository's resource path, and in what a
   person reads of it, is the forge's as configured: the host of its `git`
   base, with `:port` when it names one (`docs/design/configuration.md`,

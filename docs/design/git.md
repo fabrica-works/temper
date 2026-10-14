@@ -178,7 +178,9 @@ section 3 writes them. The settings of section 3 precede each command.
 `Make { workspace }`: the workspace's directory, empty.
 
 1. `Rename` `workspaces/<token>` to `trash/<n>`, `<n>` the component's
-   next serial number in decimal. A workspace that does not exist is
+   next serial number in decimal, counted from a number the component
+   draws from its seed at each start, so a name an earlier start left in
+   `trash` is not taken again. A workspace that does not exist is
    nothing to move.
 2. `MakeDirectory` `workspaces/<token>`, mode 0o700.
 
@@ -203,7 +205,7 @@ Every directory it lists is at most two levels below the worker's root,
 so the sweep holds one page, whatever the depth of the tree.
 Nothing is followed through a link. What is left at shutdown is swept
 after the next start. A sweep's failure is counted and the entry is left
-for the next pass.
+for the next pass, which starts at the next `Make` or the next start.
 
 ### 4.2 Clone
 
@@ -531,7 +533,7 @@ overridable under `git_component.` (configuration.md, section 7):
 | `stdout_bytes` | stdout kept per invocation | at least the largest output section 4 reads under the checkout's limits: the unmerged list (`conflicts` paths of `path_bytes`, each with its NUL), a push's status lines |
 | `stderr_bytes` | the stderr tail kept per invocation | at least `PushDiagnostic::CAPACITY` |
 | `read_bytes` | one read of Commit's scan | above 0 |
-| `sweep_entries`, `sweep_bytes` | one page of the sweep's listing: entries, and bytes of names | above 0 |
+| `sweep_entries`, `sweep_bytes` | one page of the sweep's listing: entries, and bytes of names | above 0; `sweep_bytes` at least 255, the longest name io lists (skein's `io.md`, section 5) |
 
 The start is refused, naming the limit, when a rule does not hold. The
 component has no deadline of its own: an operation's is the domain's,

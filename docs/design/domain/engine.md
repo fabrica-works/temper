@@ -521,10 +521,13 @@ instead of an item's:
   4.3): for a permanent failure, the worker sends the repository's tag
   and the reason (what the forge lacks, or that it refused the identity)
   as temper's part beside the answer (`docs/design/channel.md`, section
-  5), and the root puts them in words into the attempt's failure detail,
-  which people read on the task's page. Whether the task tries again
-  follows the answer's own class, transient or permanent, as for any
-  failure.
+  5), and the root reports them as a fact of the attempt: its task, its
+  attempt, the repository's tag and the reason. jig's core keeps no
+  failure detail for an attempt at temper's pinned revision (its
+  answer's end is a class only), so people read the reason on the task's
+  page once it does (`docs/design/STATUS.md`, "Not planned"). Whether
+  the task tries again follows the answer's own class, transient or
+  permanent, as for any failure.
 - **Restarting** (section 6): the fleet adopts the claims the store
   names, then hears that the loading is done; a run a worker lists that
   no claim adopts is cancelled once a grace has passed.

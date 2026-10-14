@@ -585,6 +585,7 @@ print limits are derived from them (6.8).
   | item, tree item | `- ` before its first line, its other lines indented |
   | table | one line per row |
   | row | its cells' texts joined by ` \| ` |
+  | cell | its text, as its row joins it; a cell outside a row, its text on a line of its own |
   | term | its text, then `:` |
   | description | its text, indented |
   | button, tab | `[n] NAME` |
@@ -593,7 +594,7 @@ print limits are derived from them (6.8).
   | choice group, tabs, log | `NAME:` and its children indented, a log's entries oldest first |
   | choice | `[n] (*) TEXT` when selected, `[n] ( ) TEXT` otherwise |
   | check | `[n] [x] NAME` when pressed or selected, `[n] [ ] NAME` otherwise |
-  | status | `* TEXT` |
+  | status | `* TEXT`; a status with no text (jig's slot that is loading or cannot be shown) prints its name |
   | alert | `! TEXT` |
   | progress | `NAME: TEXT` |
   | code | each line of its text, indented four spaces more |

@@ -17,9 +17,9 @@ What is open is listed in section 7.
   under the application's tag, in the same commits (jig's
   `protocol/store.md`, section 12).
 - **One family per forge record.** Each variant of the forge connector's
-  `Stored` is a family. Nothing else of temper's is stored: temper has
-  no index of its own and no secret record; the core's records, people's
-  and tasks' are jig's.
+  `Stored` is a family, a keyed adoption's outcome among them. Nothing
+  else of temper's is stored: temper has no index of its own and no
+  secret record; the core's records, people's and tasks' are jig's.
 - **Keys sort as the forge's keys do:** a family byte in the variants'
   order, then the key's fields by jig's key rule; a property test holds
   each encoder to the derived order (section 3).
@@ -74,6 +74,7 @@ section 7).
 | 12 | `Change` | `Change(u64)`: the task | a change procedure's state | `changes` |
 | 13 | `Issue` | `Issue(u64)`: the goal | a goal's issue projection | `issues` |
 | 14 | `Release` | `Release(u64)`: the task | a closing task's release | `tasks` |
+| 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, kept until its retention ends (jig's `domain/connectors.md`, section 5: a connector keeps its keyed requests' outcomes durably) | `applications` |
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
