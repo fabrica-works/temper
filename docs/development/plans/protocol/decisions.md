@@ -223,8 +223,16 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      Two are the designer's, in the run's `question.md` of this time:
      `fails pull-for-names-the-newest-of-several: 12` (the direct lookup
      names the oldest, closed pull) and `fails open-pull-no-changes-is-422:
-     HTTP 201: null` (Forgejo creates a pull with no changes). Their
-     answer is recorded here when it lands.
+     HTTP 201: null` (Forgejo creates a pull with no changes). The
+     designer answered at 2026-10-14T04:27:56Z, landed in `ba448afd`
+     ("Design: PullFor finds the open pull; OpenPull compares first"):
+     `PullFor` answers the open pull request for the head and base, from
+     the open listing when the lookup names a closed one, else the one
+     the lookup named; `OpenPull` compares the branches' commits first
+     and answers `NothingToMerge` with nothing written when
+     `total_commits` is 0. forge.md, 3.2, 3.4, 9 and 13, and sessions
+     06.3, 06.5, 13.3, 13.4, 14.2, 14.3 and 14.5 say so; 05's
+     `facts.txt` keeps its four `fails` lines as the record.
 
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
