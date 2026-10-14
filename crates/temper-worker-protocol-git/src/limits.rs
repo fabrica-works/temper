@@ -15,6 +15,11 @@ pub struct Limits {
     pub sweep_entries: u32,
     pub sweep_bytes: u32,
 }
+/// Foreground operations and the background filesystem task.
+#[must_use]
+pub fn operations(limits: &Limits) -> Option<u32> {
+    limits.operations.checked_add(1)
+}
 
 /// The rule that refuses startup, named under `git_component`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

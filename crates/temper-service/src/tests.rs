@@ -18,6 +18,7 @@ mod clients;
 mod worker;
 mod worker_git;
 
+mod checks;
 mod family;
 mod startup;
 mod system;

@@ -430,7 +430,12 @@ impl Component {
     }
     #[must_use]
     pub fn operations(&self) -> u32 {
-        self.limits.operations.checked_add(1).expect("validated operation count")
+        limits::operations(&self.limits).expect("validated operation count")
+    }
+    /// The configured component bounds used to price its parent layer.
+    #[must_use]
+    pub fn limits(&self) -> &Limits {
+        &self.limits
     }
     /// Reclaim retired state after the loop's down pass.
     pub fn reclaim(&mut self) {

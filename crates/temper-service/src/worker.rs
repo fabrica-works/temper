@@ -646,7 +646,7 @@ impl Worker {
     }
     #[must_use]
     pub fn operations(&self) -> u32 {
-        self.git.component.operations().checked_add(1).expect("checked worker operations")
+        worker_settings::operations(self.git.component.limits()).expect("checked worker operations")
     }
 }
 fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Values> {

@@ -8,6 +8,11 @@ use smith_host_protocol as host;
 use temper_protocol_worker_wire::{self as payload, v1};
 use temper_worker_domain as root;
 
+/// Git's operations and the worker root's close.
+pub(crate) fn operations(git: &temper_worker_protocol_git::Limits) -> Option<u32> {
+    temper_worker_protocol_git::limits::operations(git)?.checked_add(1)
+}
+
 /// Every queue and component bound established before constructing a worker.
 #[derive(Debug)]
 pub struct Prepared {

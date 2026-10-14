@@ -1,5 +1,6 @@
 //! The whole standalone document and its checked startup (configuration.md, 2).
 pub(crate) mod application;
+pub(crate) mod checks;
 mod problems;
 use crate::{AccountsRuntime, Service, Worker, WorkerRuntime, settings};
 use alloc::boxed::Box;
@@ -88,16 +89,29 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
         return Err(problems);
     }
     let application = application.expect("required application checked");
-    if workers.len() != 1 {
-        problems.push(root.member(b"workers"), What::Standalone);
-    }
-    if usize::try_from(workers.len()).expect("bounded workers") != application.workers.len() {
+    let workers = workers.into_boxed();
+    checks::standalone(engine.as_ref().expect("required engine checked"), &workers, &mut problems);
+    if workers.len() != application.workers.len() {
         problems.push(root.member(b"application").member(b"workers"), What::Jig(config::What::Bound));
+    }
+    checks::limits(&application.limits, &application.limits.git_component, &mut problems);
+    let mut base = 0;
+    for forge in &application.forges {
+        base = base.max(u64::try_from(forge.git.len()).expect("bounded git base"));
+    }
+    checks::names(checks::remote(base, application.limits.forge.name_bytes), &application.limits, &mut problems);
+    if let Some(worker) = workers.first() {
+        checks::sockets(
+            engine.as_ref().expect("required engine checked"),
+            worker,
+            &application.limits.git_component,
+            &mut problems,
+        );
     }
     if !problems.is_empty() {
         return Err(problems);
     }
-    Ok(Parsed { engine: engine.expect("required engine checked"), workers: workers.into_boxed(), application })
+    Ok(Parsed { engine: engine.expect("required engine checked"), workers, application })
 }
 fn all_files(parsed: &Parsed) -> Box<[config::File]> {
     let engine = config::files(&parsed.engine);
@@ -164,6 +178,31 @@ pub fn startup(
         return Err(problems);
     }
     let resolved = resolved.expect("resolved files checked");
+    let own = &parsed.application.limits;
+    let remote = u32::try_from(checks::longest_remote(&resolved.forges, own.forge.name_bytes).unwrap_or(u64::MAX)).ok();
+    let engine_bounds = temper_protocol_worker_wire::Bounds {
+        repositories: own.forge.resources_per_task,
+        name_bytes: own.forge.name_bytes,
+        remote_bytes: remote.unwrap_or(u32::MAX),
+        conflicts: own.checkout.conflicts,
+        path_bytes: own.checkout.path_bytes,
+        token_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_token,
+        text_bytes: temper_protocol_worker_wire::v1::CEILINGS.identity_name,
+    };
+    let worker_bounds = temper_protocol_worker_wire::Bounds {
+        repositories: own.checkout.repositories,
+        name_bytes: own.checkout.name_bytes,
+        remote_bytes: own.checkout.name_bytes,
+        ..engine_bounds
+    };
+    checks::channel(&engine_bounds, &worker_bounds, &resolved.forges, own, &mut problems);
+    if let Some(wire) = crate::translate::limits(own) {
+        checks::identities(&resolved.identities, &wire, &mut problems);
+    }
+    checks::agent(&parsed.engine, agent, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
     let worker = parsed.workers.into_iter().next().expect("one worker checked");
     let own = parsed.application.workers.into_iter().next().expect("one application worker checked");
     let worker = settings::Worker { jig: worker, root: own.root, git: own.git };
@@ -172,10 +211,8 @@ pub fn startup(
     }
     let bytes = crate::worker_worst_case(&worker, agent, &parsed.application.limits)
         .ok_or(problem(indexed(0).member(b"memory_bytes"), What::Jig(config::What::Bound)))?;
-    let worker = match Worker::new(&worker, agent, &parsed.application.limits, files, runtime, seeds.seed) {
-        Ok(worker) => worker,
-        Err(found) => return Err(Problems::jig(found, &Path::root())),
-    };
+    let worker_operations = crate::worker_settings::operations(&parsed.application.limits.git_component)
+        .ok_or(problem(indexed(0).member(b"limits"), What::Jig(config::What::Bound)))?;
     let engine = settings::Engine {
         jig: parsed.engine,
         files: settings::Files { entries: files.entries.clone() },
@@ -185,7 +222,38 @@ pub fn startup(
         charter: parsed.application.charter,
         limits: parsed.application.limits,
     };
-    match Service::new(engine, seeds, accounts, forges, Some(worker), bytes) {
+    let root = crate::limits::engine(&engine.jig.limits, &engine.limits)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
+    let store = crate::store::limits(&root, &engine.jig.limits.core, &root.forge, &engine.jig.limits.store)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))?;
+    let io = checks::process_io(&engine.jig.limits.io, Some(&worker.jig.limits.io)).ok_or(problem(
+        Path::root().member(b"engine").member(b"limits").member(b"io"),
+        What::Jig(config::What::Bound),
+    ))?;
+    let engine_bytes = match crate::system::startup_worst_case(
+        &engine,
+        &root,
+        &store,
+        accounts.as_ref(),
+        worker_operations,
+        &io,
+        match crate::forge::roots(&engine, &forges) {
+            Ok(bytes) => bytes,
+            Err(found) => return Err(Problems::jig(found, &Path::root())),
+        },
+    ) {
+        Ok(bytes) => bytes,
+        Err(found) => return Err(Problems::jig(found, &Path::root())),
+    };
+    checks::memory(engine_bytes, engine.jig.memory, bytes, worker.jig.memory, &mut problems);
+    if !problems.is_empty() {
+        return Err(problems);
+    }
+    let worker = match Worker::new(&worker, agent, &engine.limits, files, runtime, seeds.seed) {
+        Ok(worker) => worker,
+        Err(found) => return Err(Problems::jig(found, &Path::root())),
+    };
+    match Service::new(engine, seeds, accounts, forges, Some(worker), bytes, io) {
         Ok(service) => Ok(service),
         Err(found) => Err(Problems::jig(found, &Path::root())),
     }

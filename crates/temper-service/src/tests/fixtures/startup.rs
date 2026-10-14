@@ -24,7 +24,7 @@ pub fn document() -> Box<[u8]> {
 "agent":{"program":"/opt/temper/bin/temper","configuration":"/opt/temper/agent.json","arguments":["agent","/opt/temper/agent.json"]},
 "limits":{"profile":"small","overrides":{"hub.slots":1,"hub.run_calls":1,"tasks.message_bytes":512,"people.words":512,"core.call_answer_bytes":2048}},
 "memory_bytes":1152921504606846976}],"application":"#);
-    document.extend_from_slice(APPLICATION);
+    document.extend_from_slice(core::str::from_utf8(APPLICATION).unwrap().replace("\"overrides\":{}", "\"overrides\":{\"checkout.name_bytes\":600,\"checkout.repositories\":4,\"git_component.stdout_bytes\":2048}").as_bytes());
     document.extend_from_slice(b"}");
     document.into_boxed_slice()
 }
@@ -68,12 +68,75 @@ pub fn worker_runtime() -> crate::WorkerRuntime {
 pub fn startup_agent() -> settings::Agent {
     let mut agent = super::agent();
     let hub = jig_protocol_config::profile(jig_protocol_config::Profile::Small).hub;
-    agent.host_limits.directories = 3;
-    agent.host_limits.name_bytes = 256;
+    agent.host_limits.directories = 4;
+    agent.host_limits.name_bytes = 600;
     agent.host_limits.accounts = hub.accounts;
     agent.host_limits.messages = hub.held.max(hub.inbox);
     agent.host_limits.call_bytes = 256;
     agent.host_limits.message_bytes = 65_538;
     agent.bounds.message_bytes = 512;
     agent
+}
+
+/// Replace a member, including indexed lists, in a parsed configuration.
+pub fn with(input: &[u8], path: &[u8], json: &[u8]) -> Box<[u8]> {
+    use jig_protocol_config::{self as config, read};
+    let document =
+        config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 }).unwrap();
+    let mut at = 0;
+    for member in core::str::from_utf8(path).unwrap().split('.') {
+        let (member, index) = match member.split_once('[') {
+            Some((member, index)) => (member, Some(index.trim_end_matches(']').parse::<usize>().unwrap())),
+            None => (member, None),
+        };
+        at = read::Object::new(&document, at).unwrap().member(&document, member.as_bytes()).unwrap();
+        if let Some(index) = index {
+            at = *read::list(&document, at, 16_384).unwrap().get(u32::try_from(index).unwrap()).unwrap();
+        }
+    }
+    let after = read::after(&document, at).unwrap();
+    let mut token = 0;
+    let mut start = None;
+    let mut end = None;
+    let mut offset = 0_usize;
+    // Compact tokens hold decoded text offsets, so recover their raw spans.
+    while offset < input.len() {
+        let byte = input[offset];
+        if byte.is_ascii_whitespace() || byte == b',' || byte == b':' {
+            offset = offset.checked_add(1).unwrap();
+            continue;
+        }
+        if token == at {
+            start = Some(offset);
+        }
+        if token == after {
+            end = Some(offset);
+            break;
+        }
+        if byte == b'"' {
+            offset = offset.checked_add(1).unwrap();
+            while input[offset] != b'"' {
+                if input[offset] == b'\\' {
+                    offset = offset.checked_add(1).unwrap();
+                }
+                offset = offset.checked_add(1).unwrap();
+            }
+            offset = offset.checked_add(1).unwrap();
+        } else if b"{}[]".contains(&byte) {
+            offset = offset.checked_add(1).unwrap();
+        } else {
+            while offset < input.len() && !b",:}] \n\r\t".contains(&input[offset]) {
+                offset = offset.checked_add(1).unwrap();
+            }
+        }
+        token = token.checked_add(1).unwrap();
+        if token == after {
+            end = Some(offset);
+            break;
+        }
+    }
+    let mut result = input[..start.unwrap()].to_vec();
+    result.extend_from_slice(json);
+    result.extend_from_slice(&input[end.unwrap_or(input.len())..]);
+    result.into_boxed_slice()
 }

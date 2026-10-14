@@ -35,7 +35,8 @@ impl Service {
         accounts: Option<AccountsRuntime>,
         forges: List<crate::ForgeRuntime>,
     ) -> Result<Self, Problems> {
-        Self::new(settings, seeds, accounts, forges, None, 0)
+        let io = settings.jig.limits.io;
+        Self::new(settings, seeds, accounts, forges, None, 0, io)
     }
     /// Join the configured engine and worker in one io, with their checked memory envelopes.
     pub(crate) fn new(
@@ -45,12 +46,10 @@ impl Service {
         forges: List<crate::ForgeRuntime>,
         worker: Option<Worker>,
         worker_bytes: u64,
+        io_limits: io::Limits,
     ) -> Result<Self, Problems> {
         let limits =
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
-        if temper_engine_domain::worst_case(&limits).is_none() {
-            return Err(start_problem(b"limits", What::Bound));
-        }
         let (forge_settings, forge_roots) = crate::forge::prepare(&settings, forges)?;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         read_charters(&mut settings)?;
@@ -58,24 +57,27 @@ impl Service {
             .ok_or(start_problem(b"limits", What::Bound))?;
         let max = temper_engine_domain::max_out(&limits);
         let queue = max.checked_mul(2).ok_or(start_problem(b"limits", What::Bound))?;
-        let operations = io::operations(&settings.jig.limits.io)
-            .ok_or(start_problem(b"limits", What::Bound))?
-            .checked_add(queue.checked_mul(4).ok_or(start_problem(b"limits", What::Bound))?)
-            .ok_or(start_problem(b"limits", What::Bound))?
-            .checked_add(match &worker {
-                Some(worker) => worker.operations(),
-                None => 0,
-            })
-            .ok_or(start_problem(b"limits", What::Bound))?;
-        let bytes = memory(&settings, &limits, &store_limits, accounts.as_ref(), queue, operations)
-            .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-        let bytes = bytes.checked_add(forge_roots).ok_or(start_problem(b"memory_bytes", What::Bound))?;
+        let worker_operations = match &worker {
+            Some(worker) => worker.operations(),
+            None => 0,
+        };
+        let operations =
+            startup_operations(&io_limits, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
+        let bytes = startup_worst_case(
+            &settings,
+            &limits,
+            &store_limits,
+            accounts.as_ref(),
+            worker_operations,
+            &io_limits,
+            forge_roots,
+        )?;
+
         if let Err(what) =
             jig_protocol_config::fits(settings.jig.memory, &[jig_protocol_config::Share { name: b"service", bytes }])
         {
             return Err(start_problem(b"memory_bytes", what));
         }
-        let io_limits = settings.jig.limits.io;
         let accounts = if settings.jig.llm.accounts.is_empty() {
             None
         } else {
@@ -519,6 +521,24 @@ fn route_events(service: &mut Service) {
 
 // A conservative payload envelope uses the root's admitted footprint per held
 // event/page: each payload is a bounded part of that root (programming-model.md, 6).
+pub(crate) fn startup_worst_case(
+    settings: &settings::Engine,
+    root: &temper_engine_domain::Limits,
+    store: &jig_protocol_store::Limits,
+    runtime: Option<&AccountsRuntime>,
+    worker_operations: u32,
+    io: &io::Limits,
+    forge_roots: u64,
+) -> Result<u64, Problems> {
+    let queue = temper_engine_domain::max_out(root).checked_mul(2).ok_or(start_problem(b"limits", What::Bound))?;
+    let operations = startup_operations(io, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
+    let bytes = memory(settings, root, store, runtime, queue, operations, io)
+        .ok_or(start_problem(b"memory_bytes", What::Bound))?;
+    bytes.checked_add(forge_roots).ok_or(start_problem(b"memory_bytes", What::Bound))
+}
+fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
+    io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)
+}
 fn memory(
     settings: &settings::Engine,
     root: &temper_engine_domain::Limits,
@@ -526,12 +546,13 @@ fn memory(
     runtime: Option<&AccountsRuntime>,
     queue: u32,
     operations: u32,
+    io: &io::Limits,
 ) -> Option<u64> {
     let payload = temper_engine_domain::worst_case(root)?;
     let events = queue.checked_mul(engine::route_out())?;
     let mut bytes = payload
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
-        .checked_add(skein_io::worst_case(&settings.jig.limits.io)?)?
+        .checked_add(skein_io::worst_case(io)?)?
         .checked_add(store::worst_case(root, store)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
             root.accounts.accounts.checked_add(1)?,
@@ -545,7 +566,7 @@ fn memory(
         .checked_add(Queue::<Submit>::worst_case(queue)?.checked_mul(2)?)?
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
-        .checked_add(u64::from(queue).checked_mul(u64::from(settings.jig.limits.io.output).checked_add(512)?)?)?
+        .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (bool, Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<(bool, Token), Token>::worst_case(operations)?)?;
     bytes = bytes.checked_add(workers::worst_case(

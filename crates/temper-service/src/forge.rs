@@ -275,9 +275,28 @@ pub(crate) fn prepare(
     config: &settings::Engine,
     runtime: List<ForgeRuntime>,
 ) -> Result<(kit::settings::Settings, u64), Problems> {
+    let mut found = Problems::empty();
+    let bytes = match roots(config, &runtime) {
+        Ok(bytes) => bytes,
+        Err(problems) => {
+            found = problems;
+            0
+        }
+    };
+    let prepared = settings(&config.forges, runtime, &mut found).ok_or(found)?;
+    if let Err(why) =
+        kit::limits::check(&config.limits.forge_component, &shared(&config.limits, &config.jig.limits.io), &prepared)
+    {
+        let mut found = Problems::empty();
+        problems(indexed(why, &config.forges), &mut found);
+        return Err(found);
+    }
+    Ok((prepared, bytes))
+}
+pub(crate) fn roots(config: &settings::Engine, runtime: &List<ForgeRuntime>) -> Result<u64, Problems> {
     let mut bytes = 0_u64;
     let mut found = Problems::empty();
-    for endpoint in &runtime {
+    for endpoint in runtime {
         if let kit::settings::Transport::Tls { .. } = endpoint.transport {
             let mut index = 0_u32;
             for (at, forge) in config.forges.iter().enumerate() {
@@ -301,15 +320,7 @@ pub(crate) fn prepare(
             }
         }
     }
-    let prepared = settings(&config.forges, runtime, &mut found).ok_or(found)?;
-    if let Err(why) =
-        kit::limits::check(&config.limits.forge_component, &shared(&config.limits, &config.jig.limits.io), &prepared)
-    {
-        let mut found = Problems::empty();
-        problems(indexed(why, &config.forges), &mut found);
-        return Err(found);
-    }
-    Ok((prepared, bytes))
+    if found.is_empty() { Ok(bytes) } else { Err(found) }
 }
 
 pub(crate) fn config(settings: &settings::Engine, deployment: [u8; 16]) -> (client::Config, Box<[forge::GitIdentity]>) {

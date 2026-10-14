@@ -462,7 +462,10 @@ fn start_with_worker(
         Some(store) => store,
         None => memory_store_for(&root, &settings.jig.limits.core, &settings.jig.limits.store),
     };
-    let mut service = crate::Service::new(settings, &seeds(), None, forge_runtime(), worker, worker_bytes).unwrap();
+    let worker_io = if worker.is_some() { Some(worker_settings().jig.limits.io) } else { None };
+    let io = crate::startup::checks::process_io(&settings.jig.limits.io, worker_io.as_ref()).unwrap();
+    let mut service = crate::Service::new(settings, &seeds(), None, forge_runtime(), worker, worker_bytes, io).unwrap();
+
     service.engine.store = store;
     service
 }
@@ -732,7 +735,7 @@ pub fn clients() -> crate::clients::Clients {
     crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
 }
 mod startup;
-pub use startup::{APPLICATION, document, files, parsed, startup_agent, without, worker_runtime};
+pub use startup::{APPLICATION, document, files, parsed, startup_agent, with, without, worker_runtime};
 pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
     let mut runtime = skein_lib::List::with_capacity(1);
     runtime
