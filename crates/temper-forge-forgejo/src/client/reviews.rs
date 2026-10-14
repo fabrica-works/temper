@@ -116,7 +116,14 @@ fn target(request: &Request, out: &mut Target) {
             out.put(b"/pulls?state=open&sort=oldest");
             out.page(*page, true);
         }
-        Request::User
+        Request::PullFiles { .. }
+        | Request::Compare { .. }
+        | Request::Raw { .. }
+        | Request::Runs { .. }
+        | Request::Run { .. }
+        | Request::Jobs { .. }
+        | Request::JobLog { .. }
+        | Request::User
         | Request::ApiSettings
         | Request::RepositoryById { .. }
         | Request::Repository { .. }
@@ -194,7 +201,14 @@ impl Reviews {
                 ReviewKind::Reviews | ReviewKind::Comments => Ok(()),
             },
             Move::End(
-                Kind::Settings | Kind::Repository | Kind::Search | Kind::Users | Kind::Item(_) | Kind::Branch(_),
+                Kind::Settings
+                | Kind::Repository
+                | Kind::Search
+                | Kind::Users
+                | Kind::File(_)
+                | Kind::Action(_)
+                | Kind::Item(_)
+                | Kind::Branch(_),
             ) => unreachable!("review tables"),
             Move::Done => return Step::Done(Document::Listed { skipped: walk.skipped() }),
         };

@@ -300,3 +300,84 @@ fn a_cut_review_thread_counts_remaining_comments() {
     assert_eq!(decoded.rows.len(), 1);
     assert_eq!(decoded.document, Ok(Document::Listed { skipped: 2 }));
 }
+#[test]
+fn x_hasmore_reads_true_or_false_only() {
+    for (text, expected) in [
+        (b"true".as_slice(), Some(true)),
+        (b"false", Some(false)),
+        (b"True", None),
+        (b"1", None),
+        (b"", None),
+        (b"false ", None),
+    ] {
+        assert_eq!(crate::header::has_more(text), expected, "{text:?}");
+    }
+}
+#[test]
+fn a_content_range_reads_its_first_last_and_total() {
+    use crate::header::{ContentRange, content_range};
+    for (text, expected) in [
+        (b"bytes 0-3/7".as_slice(), Some(ContentRange { first: 0, last: 3, total: Some(7) })),
+        (b"bytes 4-6/*", Some(ContentRange { first: 4, last: 6, total: None })),
+        (b"bytes 3-0/7", None),
+        (b"bytes 0-7/7", None),
+        (b"bytes */7", None),
+        (b"bytes 0-1/2 ", None),
+        (b"items 0-1/2", None),
+        (b"bytes 0--1/2", None),
+    ] {
+        assert_eq!(content_range(text), expected, "{text:?}");
+    }
+}
+#[test]
+fn retry_after_reads_seconds_or_a_date_from_the_answers_date() {
+    use skein_lib::Duration;
+    let date = Wall::from_nanos(1_577_836_800_000_000_000);
+    for (text, expected) in [
+        (b"10".as_slice(), Some(Duration::from_secs(10))),
+        (b"0", Some(Duration::ZERO)),
+        (b"Wed, 01 Jan 2020 00:00:05 GMT", Some(Duration::from_secs(5))),
+        (b"Tue, 31 Dec 2019 23:59:59 GMT", Some(Duration::ZERO)),
+        (b"-1", None),
+        (b"18446744073709551615", None),
+        (b"1.5", None),
+    ] {
+        assert_eq!(crate::header::retry_after(text, date), expected, "{text:?}");
+    }
+}
+#[test]
+fn raw_file_targets_keep_slashes_and_encode_each_other_byte() {
+    let request = Request::Raw {
+        at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+        path: Box::from(*b"docs/a b.md"),
+        reference: id::read(&[b'0'; 40]).unwrap(),
+    };
+    let limits = fixtures::limits();
+    let encoded = client::encode(&request, &limits).unwrap();
+    assert_eq!(
+        &*encoded.target,
+        b"/api/v1/repos/fixture/specimen/raw/docs/a%20b.md?ref=0000000000000000000000000000000000000000"
+    );
+    let crate::server::Route::Ready(routed) = crate::server::route(encoded.method, &encoded.target, &limits).unwrap();
+    assert_eq!(routed, request);
+    assert!(client::decoder(&request, &limits).is_none());
+}
+#[test]
+fn a_job_link_of_another_shape_names_no_job() {
+    let repository = b"http://127.0.0.1:3000/fixture/specimen";
+    for (link, expected) in [
+        (b"/fixture/specimen/actions/runs/1/jobs/0".as_slice(), Some((1, 0))),
+        (b"http://127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0", Some((1, 0))),
+        (b"//127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0", None),
+        (b"http://other:3000/fixture/specimen/actions/runs/1/jobs/0", None),
+        (b"/other/specimen/actions/runs/1/jobs/0", None),
+        (b"/fixture/specimen/actions/runs/1/jobs/0/x", None),
+        (b"https://127.0.0.1:3000/fixture/specimen/actions/runs/1/jobs/0", None),
+        (b"/fixture/specimen/actions/runs/1/jobs/4294967296", None),
+        (b"/fixture/specimen/actions/runs/18446744073709551616/jobs/0", None),
+        (b"/fixture/specimen/actions/runs/1/jobs/0?other=1", None),
+        (b"/fixture/specimen/actions/runs/1/jobs/-1", None),
+    ] {
+        assert_eq!(crate::header::job_link(link, repository), expected, "{link:?}");
+    }
+}

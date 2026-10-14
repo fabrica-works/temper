@@ -74,6 +74,10 @@ pub enum Row {
     Branch(Branch),
     Protection(BranchProtection),
     Pull(PullRequest),
+    File(ChangedFile),
+    Commit(ObjectId),
+    Run(Run),
+    Job(Job),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
@@ -88,6 +92,9 @@ pub enum Document {
     Branch(Branch),
     Protection(BranchProtection),
     Permission(CollaboratorPermission),
+    Compare(Compare),
+    Runs { total_count: u64 },
+    Run(Run),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum IssueState {
@@ -147,7 +154,8 @@ pub struct CombinedStatus {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct CommitStatus {
-    pub creator: User,
+    /// None for an Actions status whose creator is null (ruling 111).
+    pub creator: Option<User>,
     pub updated_at: Wall,
     pub context: Box<[u8]>,
     pub status: StatusState,
@@ -273,4 +281,49 @@ pub enum Permission {
 pub struct CollaboratorPermission {
     pub permission: Permission,
     pub user: User,
+}
+
+/// A changed file's `status` (06.4), as the transcripts spell them.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum FileStatus {
+    /// `added`: no side before.
+    Added,
+    /// A deletion, as the transcripts spell it: no side after.
+    Deleted,
+    /// `modified`.
+    Modified,
+    /// `renamed`: the side before at `previous_filename`.
+    Renamed,
+    /// `copied`.
+    Copied,
+}
+
+/// A pull request's or a comparison's changed file (06.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ChangedFile {
+    pub filename: Box<[u8]>,
+    pub previous_filename: Option<Box<[u8]>>,
+    pub status: FileStatus,
+}
+
+/// A comparison's own field; its `commits[].sha` and `files` come as rows (06.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Compare {
+    pub total_commits: u64,
+}
+
+/// An Actions run (06.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Run {
+    pub id: u64,
+    pub index_in_repo: u64,
+    pub commit_sha: ObjectId,
+}
+
+/// An Actions job of a run (06.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Job {
+    pub id: u64,
+    pub run_id: u64,
+    pub attempt: u32,
 }

@@ -9,8 +9,12 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_json::tokenizer;
+pub(crate) mod actions;
 pub(crate) mod branches;
+pub(crate) mod files;
 mod items;
+use actions::ActionKind;
+use files::FileKind;
 pub(crate) mod reviews;
 use branches::BranchKind;
 use reviews::ReviewKind;
@@ -28,6 +32,13 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
+        Request::PullFiles { .. }
+        | Request::Compare { .. }
+        | Request::Raw { .. }
+        | Request::Runs { .. }
+        | Request::Run { .. }
+        | Request::Jobs { .. }
+        | Request::JobLog { .. } => files::encode(request, limits),
         Request::Reviews { .. }
         | Request::ReviewComments { .. }
         | Request::Branch { .. }
@@ -59,12 +70,20 @@ pub struct Decoder {
 enum DecoderState {
     Start(start::Start),
     Items(Box<items::Items>),
+    Files(Box<files::Files>),
+    Actions(actions::Actions),
     Reviews(Box<reviews::Reviews>),
     Branches(Box<branches::Branches>),
 }
 #[must_use]
 pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
     let kind = match request {
+        Request::Raw { .. } | Request::JobLog { .. } => return None,
+        Request::PullFiles { .. } => Kind::File(FileKind::Files),
+        Request::Compare { .. } => Kind::File(FileKind::Compare),
+        Request::Runs { .. } => Kind::Action(ActionKind::Listing),
+        Request::Run { .. } => Kind::Action(ActionKind::Run),
+        Request::Jobs { .. } => Kind::Action(ActionKind::Jobs),
         Request::Reviews { .. } => Kind::Review(ReviewKind::Reviews),
         Request::ReviewComments { .. } => Kind::Review(ReviewKind::Comments),
         Request::Branch { .. } => Kind::Branch(BranchKind::Branch),
@@ -85,6 +104,8 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
+        Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
+        Kind::Action(kind) => DecoderState::Actions(actions::Actions::new(kind)),
         Kind::Review(_) => DecoderState::Reviews(Box::new(reviews::Reviews::new())),
         Kind::Branch(kind) => DecoderState::Branches(Box::new(branches::Branches::new(kind, limits))),
         Kind::Item(item) => DecoderState::Items(Box::new(items::Items::new(item, limits))),
@@ -102,6 +123,8 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
+            DecoderState::Files(state) => state.step(movement, &decoder.walk),
+            DecoderState::Actions(state) => state.step(movement, &decoder.walk),
             DecoderState::Start(state) => state.step(movement, decoder.walk.parent()),
             DecoderState::Reviews(state) => state.step(movement, &decoder.walk),
             DecoderState::Branches(state) => state.step(movement, &decoder.walk, limits),
@@ -113,7 +136,11 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
 pub fn keep_after(decoder: &mut Decoder, after: u64) {
     match &mut decoder.state {
         DecoderState::Items(state) => state.keep_after(after),
-        DecoderState::Start(_) | DecoderState::Reviews(_) | DecoderState::Branches(_) => {}
+        DecoderState::Files(_)
+        | DecoderState::Actions(_)
+        | DecoderState::Start(_)
+        | DecoderState::Reviews(_)
+        | DecoderState::Branches(_) => {}
     }
 }
 /// Stops emitting rows from an unpaged thread and counts its remaining elements.

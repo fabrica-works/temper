@@ -9,7 +9,9 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_json::writer;
+mod actions;
 mod branches;
+mod files;
 mod items;
 mod reviews;
 mod start;
@@ -27,7 +29,13 @@ pub fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Un
     match start::route(method, target, limits) {
         Err(Unrouted::NotFound) => match reviews::route(method, target, limits) {
             Err(Unrouted::NotFound) => match branches::route(method, target, limits) {
-                Err(Unrouted::NotFound) => items::route(method, target, limits),
+                Err(Unrouted::NotFound) => match files::route(method, target, limits) {
+                    Err(Unrouted::NotFound) => match actions::route(method, target, limits) {
+                        Err(Unrouted::NotFound) => items::route(method, target, limits),
+                        other => other,
+                    },
+                    other => other,
+                },
                 other => other,
             },
             other => other,
@@ -40,11 +48,26 @@ pub enum Answer {
     User(User),
     ApiSettings(ApiSettings),
     Repository(Repository),
-    Search { ok: bool, data: Box<[User]> },
+    Search {
+        ok: bool,
+        data: Box<[User]>,
+    },
     Issues(Box<[Issue]>),
     Issue(Issue),
     Comments(Box<[Comment]>),
     Pull(PullRequest),
+    Files(Box<[crate::document::ChangedFile]>),
+    Compare {
+        compare: crate::document::Compare,
+        commits: Box<[crate::id::ObjectId]>,
+        files: Box<[crate::document::ChangedFile]>,
+    },
+    Runs {
+        total_count: u64,
+        runs: Box<[crate::document::Run]>,
+    },
+    Run(crate::document::Run),
+    Jobs(Box<[crate::document::Job]>),
     Pulls(Box<[PullRequest]>),
     Reviews(Box<[Review]>),
     ReviewComments(Box<[ReviewComment]>),
@@ -54,7 +77,11 @@ pub enum Answer {
     Protections(Box<[BranchProtection]>),
     Collaborators(Box<[User]>),
     Permission(CollaboratorPermission),
-    CombinedStatus { state: CombinedStatus, sha: Option<crate::id::ObjectId>, statuses: Box<[CommitStatus]> },
+    CombinedStatus {
+        state: CombinedStatus,
+        sha: Option<crate::id::ObjectId>,
+        statuses: Box<[CommitStatus]>,
+    },
 }
 pub fn encode(answer: &Answer, limits: &Limits) -> Result<Box<[u8]>, writer::Refusal> {
     let mut measure = writer::Encoder::measure(&limits.writer);
@@ -66,6 +93,14 @@ pub fn encode(answer: &Answer, limits: &Limits) -> Result<Box<[u8]>, writer::Ref
 }
 fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refusal> {
     match answer {
+        Answer::Files(_) | Answer::Compare { .. } => {
+            files::write(json, answer);
+            Ok(())
+        }
+        Answer::Runs { .. } | Answer::Run(_) | Answer::Jobs(_) => {
+            actions::write(json, answer);
+            Ok(())
+        }
         Answer::Pulls(_) | Answer::Reviews(_) | Answer::ReviewComments(_) => reviews::write(json, answer),
         Answer::Branch(_)
         | Answer::Branches(_)

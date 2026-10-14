@@ -125,7 +125,7 @@ fn cases() -> Vec<(&'static str, Request, Answer)> {
                 state: CombinedStatus { state: Some(StatusState::Pending), total_count: 1 },
                 sha: Some(forgejo::sha(4)),
                 statuses: Box::from([CommitStatus {
-                    creator: user(2),
+                    creator: Some(user(2)),
                     updated_at: Wall::from_nanos(1_577_817_005_000_000_000),
                     context: Box::from(*b"fixture/other"),
                     status: StatusState::Pending,
@@ -158,7 +158,12 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::CombinedStatus { state, statuses, .. } => {
             (Document::CombinedStatus(state), statuses.into_vec().into_iter().map(Row::Status).collect())
         }
-        Answer::Reviews(_)
+        Answer::Files(_)
+        | Answer::Compare { .. }
+        | Answer::Runs { .. }
+        | Answer::Run(_)
+        | Answer::Jobs(_)
+        | Answer::Reviews(_)
         | Answer::ReviewComments(_)
         | Answer::Branch(_)
         | Answer::Branches(_)

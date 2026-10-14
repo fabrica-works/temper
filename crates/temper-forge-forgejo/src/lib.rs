@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod client;
 pub mod decode;
 pub mod document;
+pub mod header;
 pub mod id;
 pub mod limits;
 pub mod path;

@@ -117,7 +117,12 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.boolean(*ok);
             json.object_end();
         }
-        Answer::Reviews(_)
+        Answer::Files(_)
+        | Answer::Compare { .. }
+        | Answer::Runs { .. }
+        | Answer::Run(_)
+        | Answer::Jobs(_)
+        | Answer::Reviews(_)
         | Answer::ReviewComments(_)
         | Answer::Branch(_)
         | Answer::Branches(_)

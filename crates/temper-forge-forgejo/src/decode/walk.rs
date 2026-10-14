@@ -29,6 +29,8 @@ pub(crate) enum Kind {
     Repository,
     Search,
     Users,
+    File(crate::client::files::FileKind),
+    Action(crate::client::actions::ActionKind),
     Item(Item),
     Review(crate::client::reviews::ReviewKind),
     Branch(crate::client::branches::BranchKind),
@@ -58,12 +60,12 @@ const fn optional(key: &'static [u8], read: Read) -> Field {
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
+        Kind::File(kind) => crate::client::files::fields(kind),
+        Kind::Action(kind) => crate::client::actions::fields(kind),
         Kind::Review(kind) => crate::client::reviews::fields(kind),
         Kind::Branch(kind) => crate::client::branches::fields(kind),
         Kind::User => const { &[field(b"id", Read::Number), field(b"login", Read::Text)] },
-        Kind::Settings => {
-            const { &[field(b"max_response_items", Read::Number), field(b"default_paging_num", Read::Number)] }
-        }
+        Kind::Settings => settings_fields(),
         Kind::Repository => {
             const {
                 &[
@@ -157,6 +159,9 @@ fn fields(kind: Kind) -> &'static [Field] {
         ) => const { &[] },
     }
 }
+fn settings_fields() -> &'static [Field] {
+    const { &[field(b"max_response_items", Read::Number), field(b"default_paging_num", Read::Number)] }
+}
 fn pull_branch(empty: bool) -> &'static [Field] {
     if empty {
         const { &[field(b"ref", Read::Text), field(b"sha", Read::Id { empty: true }), field(b"repo_id", Read::Number)] }
@@ -166,6 +171,8 @@ fn pull_branch(empty: bool) -> &'static [Field] {
 }
 fn element(kind: Kind) -> Option<Kind> {
     match kind {
+        Kind::File(kind) => crate::client::files::element(kind),
+        Kind::Action(kind) => crate::client::actions::element(kind),
         Kind::Review(kind) => crate::client::reviews::element(kind),
         Kind::Branch(kind) => crate::client::branches::element(kind),
         Kind::Item(Item::Pulls) => Some(Kind::Item(Item::Pull)),
@@ -382,7 +389,7 @@ impl Walk {
         let frame = self.open.top_mut().expect("value inside object");
         let kind = frame.kind;
         if event == &tokenizer::Event::Token(Token::Null) {
-            if field.key == b"statuses" {
+            if field.key == b"statuses" || field.key == b"creator" {
                 frame.seen |= bit;
             }
             self.want = Want::Key;

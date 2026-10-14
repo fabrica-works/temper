@@ -222,7 +222,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
                 for value in statuses {
                     json.object_start();
                     json.key(b"creator");
-                    super::start::user(json, &value.creator);
+                    match &value.creator {
+                        Some(user) => super::start::user(json, user),
+                        None => json.null(),
+                    }
                     json.key(b"updated_at");
                     json.string(&time::write(value.updated_at));
                     json.key(b"context");
@@ -239,7 +242,12 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.object_end();
         }
-        Answer::Reviews(_)
+        Answer::Files(_)
+        | Answer::Compare { .. }
+        | Answer::Runs { .. }
+        | Answer::Run(_)
+        | Answer::Jobs(_)
+        | Answer::Reviews(_)
         | Answer::ReviewComments(_)
         | Answer::Branch(_)
         | Answer::Branches(_)

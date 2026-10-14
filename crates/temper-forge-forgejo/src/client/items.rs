@@ -26,6 +26,18 @@ impl Target {
             path::segment(name, out).expect("measured segment");
         }
     }
+    pub(super) fn file(&mut self, path: &[u8]) {
+        for byte in path {
+            self.length = self.length.saturating_add(if *byte == b'/' {
+                1
+            } else {
+                path::segment_length(core::slice::from_ref(byte))
+            });
+        }
+        if let Some(out) = &mut self.writer {
+            path::file(path, out).expect("measured file path");
+        }
+    }
     pub(super) fn repo(&mut self, at: &Repo) {
         self.put(b"/api/v1/repos/");
         self.segment(&at.owner);
@@ -130,6 +142,13 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Collaborators { .. }
         | Request::Permission { .. }
         | Request::Pulls { .. }
+        | Request::PullFiles { .. }
+        | Request::Compare { .. }
+        | Request::Raw { .. }
+        | Request::Runs { .. }
+        | Request::Run { .. }
+        | Request::Jobs { .. }
+        | Request::JobLog { .. }
         | Request::User
         | Request::ApiSettings
         | Request::RepositoryById { .. }
@@ -182,7 +201,7 @@ fn pull() -> PullRequest {
 }
 fn status() -> CommitStatus {
     CommitStatus {
-        creator: document::user(),
+        creator: None,
         updated_at: Wall::EPOCH,
         context: Box::from([]),
         status: StatusState::Pending,
@@ -251,43 +270,7 @@ impl Items {
                 }
                 result
             }
-            Move::End(Kind::User) => {
-                let user = core::mem::replace(&mut self.user, document::user());
-                match walk.parent() {
-                    Some(Kind::Item(Item::Issue)) => self.issue.user = user,
-                    Some(Kind::Item(Item::Comment)) => self.comment.user = user,
-                    Some(Kind::Item(Item::Status)) => self.status.creator = user,
-                    Some(Kind::Item(Item::Reviewers)) => {
-                        if self.reviewers.push(user).is_err() {
-                            return Step::Malformed(Malformed::Bound { field: b"requested_reviewers" });
-                        }
-                    }
-                    None
-                    | Some(
-                        Kind::Review(_)
-                        | Kind::Branch(_)
-                        | Kind::User
-                        | Kind::Settings
-                        | Kind::Repository
-                        | Kind::Search
-                        | Kind::Users
-                        | Kind::Item(
-                            Item::Pulls
-                            | Item::Issues
-                            | Item::Comments
-                            | Item::Pull
-                            | Item::Head
-                            | Item::Base
-                            | Item::Statuses
-                            | Item::Combined
-                            | Item::Label
-                            | Item::Labels
-                            | Item::Presence,
-                        ),
-                    ) => unreachable!("item user table"),
-                }
-                Ok(())
-            }
+            Move::End(Kind::User) => self.finish_user(walk),
             Move::End(Kind::Item(Item::Presence)) => {
                 self.issue.pull = true;
                 Ok(())
@@ -332,7 +315,14 @@ impl Items {
                 | Item::Reviewers,
             )) => Ok(()),
             Move::End(
-                Kind::Review(_) | Kind::Branch(_) | Kind::Settings | Kind::Repository | Kind::Search | Kind::Users,
+                Kind::File(_)
+                | Kind::Action(_)
+                | Kind::Review(_)
+                | Kind::Branch(_)
+                | Kind::Settings
+                | Kind::Repository
+                | Kind::Search
+                | Kind::Users,
             ) => {
                 unreachable!("item root selection")
             }
@@ -342,6 +332,45 @@ impl Items {
             Ok(()) => Step::Demand(skein_json::tokenizer::Request::Next),
             Err(error) => Step::Malformed(error),
         }
+    }
+    fn finish_user(&mut self, walk: &Walk) -> Result<(), Malformed> {
+        let user = core::mem::replace(&mut self.user, document::user());
+        match walk.parent() {
+            Some(Kind::Item(Item::Issue)) => self.issue.user = user,
+            Some(Kind::Item(Item::Comment)) => self.comment.user = user,
+            Some(Kind::Item(Item::Status)) => self.status.creator = Some(user),
+            Some(Kind::Item(Item::Reviewers)) => {
+                if self.reviewers.push(user).is_err() {
+                    return Err(Malformed::Bound { field: b"requested_reviewers" });
+                }
+            }
+            None
+            | Some(
+                Kind::File(_)
+                | Kind::Action(_)
+                | Kind::Review(_)
+                | Kind::Branch(_)
+                | Kind::User
+                | Kind::Settings
+                | Kind::Repository
+                | Kind::Search
+                | Kind::Users
+                | Kind::Item(
+                    Item::Pulls
+                    | Item::Issues
+                    | Item::Comments
+                    | Item::Pull
+                    | Item::Head
+                    | Item::Base
+                    | Item::Statuses
+                    | Item::Combined
+                    | Item::Label
+                    | Item::Labels
+                    | Item::Presence,
+                ),
+            ) => unreachable!("item user table"),
+        }
+        Ok(())
     }
     fn pull_row(&mut self) -> Step {
         let value = core::mem::replace(&mut self.pull, pull());

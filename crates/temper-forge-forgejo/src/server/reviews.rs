@@ -119,7 +119,12 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
             }
             json.array_end();
         }
-        Answer::User(_)
+        Answer::Files(_)
+        | Answer::Compare { .. }
+        | Answer::Runs { .. }
+        | Answer::Run(_)
+        | Answer::Jobs(_)
+        | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)
         | Answer::Search { .. }

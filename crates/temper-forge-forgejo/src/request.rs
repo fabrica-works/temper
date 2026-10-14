@@ -114,4 +114,38 @@ pub enum Request {
         at: Repo,
         page: Page,
     },
+    PullFiles {
+        at: Repo,
+        number: u64,
+        page: Page,
+    },
+    Compare {
+        at: Repo,
+        before: crate::id::ObjectId,
+        after: crate::id::ObjectId,
+    },
+    Raw {
+        at: Repo,
+        path: Box<[u8]>,
+        reference: crate::id::ObjectId,
+    },
+    Runs {
+        at: Repo,
+        head_sha: crate::id::ObjectId,
+        run_number: u64,
+        page: Page,
+    },
+    Run {
+        at: Repo,
+        run: u64,
+    },
+    Jobs {
+        at: Repo,
+        run: u64,
+    },
+    JobLog {
+        at: Repo,
+        job: u64,
+        attempt: u32,
+    },
 }

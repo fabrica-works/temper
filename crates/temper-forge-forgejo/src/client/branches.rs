@@ -153,7 +153,14 @@ impl Branches {
                 ),
             ) => Ok(()),
             Move::End(
-                Kind::Settings | Kind::Repository | Kind::Search | Kind::Users | Kind::Item(_) | Kind::Review(_),
+                Kind::Settings
+                | Kind::Repository
+                | Kind::Search
+                | Kind::Users
+                | Kind::File(_)
+                | Kind::Action(_)
+                | Kind::Item(_)
+                | Kind::Review(_),
             ) => unreachable!("branch tables"),
             Move::Done => {
                 return Step::Done(match self.root {
