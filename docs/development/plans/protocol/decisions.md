@@ -427,6 +427,17 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      the engine world's fake census join 08.2a, whose Size is at most
      570 (store/README.md, 5; session 08).
 
+118. **Disk below 40 GB, the second time** (blocked 2026-10-14T07:50:47Z;
+     infrastructure). `kache stats` showed its store at 34.7 GiB of its
+     23.3 GiB cap (149%); the coordinator removed finished sessions'
+     `target/` and disk came back to 50 GB; by 07:52Z the daemon had
+     evicted to 20.9 GiB (90%), its version mismatch of ruling 112 gone.
+     kache keeps its cap, late: between its passes it overshoots by 11 to
+     17 GiB. As a standing rule (README, Rules), below 40 GB the
+     coordinator removes the `target/` of sessions not running, logs
+     `kache stats | head -1`, and blocks only if disk stays below 40 GB.
+     kache's late eviction is a proposal for the retrospective.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

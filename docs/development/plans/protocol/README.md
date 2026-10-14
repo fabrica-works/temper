@@ -209,6 +209,10 @@ them wait on them.
   (`sha256sum -c forgejo-runner-12.13.2-linux-amd64.sha256` in its
   directory). Nothing else is a Forgejo of this plan (code-organization.md,
   section 6).
+- **Disk below 40 GB** (decisions.md, ruling 118): the coordinator
+  removes the `target/` of sessions not running (development.md, 11.4),
+  runs `kache stats | head -1` once, and logs both; it writes
+  `blocked.md` only if `df -h ~/src` still shows less than 40 GB.
 - **The process and live tiers run only where a Proof line or "Done
   when" says,** through `heavy --gate`, once; never in the gate.
 - **A Proof's time bound** is the time nextest's `Summary [ N s]` line
