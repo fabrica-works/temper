@@ -40,7 +40,7 @@ pub fn limits() -> Limits {
             },
             heartbeat: Duration::from_millis(100),
         },
-        forge: forge::Limits { parts: 8 },
+        forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
         table: RequestLimits {
             requests: 4,
             bytes: 262_144,
@@ -110,7 +110,7 @@ pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[
     text(&builder.finish())
 }
 pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> jig_view::Tree {
-    let limits = forge::Limits { parts: 1 };
+    let limits = forge::Limits { parts: 1, field_bytes: 256, checks: 8 };
     let mut side = forge::Side::new(&limits, forge::Config { connector: FORGE, version: 1 });
     if held {
         forge::step(

@@ -17,7 +17,7 @@ pub(crate) fn jig(root: &mut Domain, env: &Env<Limits>, event: jig_domain_client
 pub(crate) fn forge(root: &mut Domain, env: &Env<Limits>, event: forge::Event, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     forge::step(&mut root.forge, &Env { now: env.now, wall: env.wall, limits: env.limits.forge }, event, &mut child);
-    route_forge(&mut child, out);
+    route_forge(root, env, &mut child, out);
 }
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
@@ -65,6 +65,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
+            Action::Forge(act) => forge(root, env, forge::Event::Act { act }, out),
             Action::Jig(act) => jig(root, env, jig_domain_client::Event::Act { act }, out),
         },
         Event::Answer { attempt, envelope, answer } => {
@@ -137,6 +138,7 @@ pub(crate) fn route_jig(
                 });
             }
             jig_domain_client::Request::Confirmed { party } => {
+                forge(root, env, forge::Event::Confirmed { party }, out);
                 root.table.confirmed(party);
             }
             jig_domain_client::Request::Retention { retention } => root.table.retention(retention),
@@ -149,9 +151,20 @@ pub(crate) fn route_jig(
         }
     }
 }
-pub(crate) fn route_forge(child: &mut Queue<forge::Request>, out: &mut Queue<Request>) {
+pub(crate) fn route_forge(
+    root: &mut Domain,
+    env: &Env<Limits>,
+    child: &mut Queue<forge::Request>,
+    out: &mut Queue<Request>,
+) {
     for _ in 0..child.len() {
         match child.pop().expect("counted forge output") {
+            forge::Request::Show { address } => {
+                out.push(Request::Show { address: Address::Forge(address), replace: false });
+            }
+            forge::Request::Send { request, scope, ask } => {
+                crate::domain::ask(root, env, Owner::Forge(request), scope, Ask::Forge(ask), out);
+            }
             forge::Request::Fact { fact: forge::Fact::Full } => out.push(Request::Fact { fact: Fact::PartsFull }),
         }
     }
@@ -164,7 +177,7 @@ pub(crate) fn progress(
     out: &mut Queue<Request>,
 ) {
     match owner {
-        Owner::Forge(_) => {}
+        Owner::Forge(request) => forge(root, env, forge::Event::Progress { request, progress }, out),
         Owner::Jig(request) => {
             let progress = match progress {
                 RequestProgress::InFlight => jig_domain_client::intents::Progress::InFlight,

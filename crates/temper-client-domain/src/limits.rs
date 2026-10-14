@@ -29,6 +29,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let mut total = jig_domain_client::worst_case(&limits.jig)?;
     total = total.checked_add(skein_lib::Map::<u64, u32>::worst_case(limits.table.requests)?)?;
     total = total.checked_add(forge::worst_case(&limits.forge)?)?;
+    // A shown outcome may carry a protection rule or a whole core refusal.
+    total = total.checked_add(limits.jig.document_bytes)?;
     // Held parts and the PartsLeft survivor list each own their part payloads.
     total = total.checked_add(u64::from(limits.forge.parts).checked_mul(limits.jig.document_bytes)?.checked_mul(2)?)?;
     total = total.checked_add(RequestTable::<Owner, Ask>::worst_case(&limits.table)?)?;

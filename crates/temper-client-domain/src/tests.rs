@@ -1,17 +1,18 @@
 mod fixtures;
-use crate::{Address, Ask, Event, Fact, JigOut, Request, forge, store::Record};
+mod form;
+use crate::{Address, Ask, Event, Fact, Request, forge, store::Record};
+use jig_domain_client::boundary::Offset;
 use jig_domain_client::{
-    boundary::Offset,
     contract::{self, Part, PartScope},
     pages::navigation::Destination,
 };
-use skein_lib::{List, Queue, RequestRecord, Token};
+use skein_lib::{List, Queue, RequestRecord};
 
 #[test]
 fn the_forge_address_goes_to_the_forge_side() {
     let limits = fixtures::limits();
     let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
-    start(&mut root, List::with_capacity(0));
+    fixtures::start(&mut root, List::with_capacity(0));
     let address = forge::Address::Adopt { project: fixtures::PROJECT };
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::step(
@@ -39,52 +40,6 @@ fn a_family_hello_outside_the_version_makes_the_side_out_of_date() {
     }
 }
 
-fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
-    let limits = fixtures::limits();
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::step(
-        root,
-        &fixtures::env(&limits),
-        Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
-            kept,
-            offset: Offset { minutes: 0 },
-        },
-        &mut out,
-    );
-    let mut frame = None;
-    for _ in 0..out.len() {
-        match out.pop().expect("counted output") {
-            Request::Jig(JigOut::Open { watch, subject }) => match subject {
-                contract::Subject::Frame => frame = Some(watch),
-                contract::Subject::Inbox { .. }
-                | contract::Subject::Task { .. }
-                | contract::Subject::Conversations
-                | contract::Subject::Tree { .. }
-                | contract::Subject::Chips { .. }
-                | contract::Subject::Goals { .. }
-                | contract::Subject::Tasks { .. }
-                | contract::Subject::Run { .. }
-                | contract::Subject::Deployment => {}
-            },
-            Request::Jig(
-                JigOut::Read { .. }
-                | JigOut::Continue { .. }
-                | JigOut::Close { .. }
-                | JigOut::Answered { .. }
-                | JigOut::Unknown { .. },
-            )
-            | Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Send { .. }
-            | Request::Show { .. }
-            | Request::SignIn { .. }
-            | Request::SignOut
-            | Request::Fact { .. } => {}
-        }
-    }
-    frame.expect("start opens a frame watch")
-}
 fn kept(version: u16) -> List<Record> {
     let mut records = List::with_capacity(3);
     for (key, scope) in [(1, 7), (2, 7), (3, 8)] {
@@ -101,17 +56,6 @@ fn kept(version: u16) -> List<Record> {
             .expect("kept fixtures fit");
     }
     records
-}
-fn confirm(root: &mut crate::Domain, watch: Token, party: u64, out: &mut Queue<Request>) {
-    let limits = fixtures::limits();
-    let env = fixtures::env(&limits);
-    crate::step(
-        root,
-        &env,
-        Event::Jig(jig_domain_client::Event::Hello { versions: contract::VersionRange { first: 7, last: 7 } }),
-        out,
-    );
-    crate::step(root, &env, Event::Jig(jig_domain_client::Event::Watch { watch, event: fixtures::frame(party) }), out);
 }
 #[test]
 fn a_part_of_the_forges_number_is_held_by_its_side() {
@@ -179,11 +123,11 @@ fn kept_requests_are_restored_parked_and_counted_per_scope() {
     let limits = fixtures::limits();
     let env = fixtures::env(&limits);
     let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
-    let watch = start(&mut root, kept(crate::store::VERSION));
+    let watch = fixtures::start(&mut root, kept(crate::store::VERSION));
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::take(&mut root, &env, &mut out);
     assert!(out.is_empty(), "kept work starts parked");
-    confirm(&mut root, watch, 9, &mut out);
+    fixtures::confirm(&mut root, watch, 9, &mut out);
     assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
     out = Queue::with_capacity(crate::max_out(&limits));
     for (scope, expected) in [(7, 2), (8, 1)] {

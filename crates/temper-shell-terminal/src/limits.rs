@@ -57,7 +57,7 @@ pub fn native() -> Limits {
                 },
                 heartbeat: Duration::from_secs(30), // Quiet stream before Offline.
             },
-            forge: client::forge::Limits { parts: 16 }, // Forge parts in slots.
+            forge: client::forge::Limits { parts: 16, field_bytes: 256, checks: 8 }, // Forge parts in slots.
             table: RequestLimits {
                 requests: 16,                   // Durable keyed requests.
                 bytes: 16_777_216,              // Whole request-table payload bytes.

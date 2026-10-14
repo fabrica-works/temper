@@ -52,7 +52,7 @@ pub fn domain_limits() -> Limits {
             },
             heartbeat: Duration::from_millis(100),
         },
-        forge: forge::Limits { parts: 8 },
+        forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
         table: RequestLimits {
             requests: 4,
             bytes: 262_144,

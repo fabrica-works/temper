@@ -135,6 +135,7 @@ impl App for Temper {
             | Event::Jig(_)
             | Event::Forge(_)
             | Event::SignedOut => false,
+            Event::Act { action: Action::Forge(_) } => true,
         }
     }
     fn seen(tree: &Tree) -> Vec<Seen> {

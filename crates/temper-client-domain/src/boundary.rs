@@ -22,6 +22,7 @@ pub enum Answered {
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
+    Forge(crate::forge::Act),
     Jig(jig_domain_client::action::Act),
 }
 /// One external fact or act for the root to route.

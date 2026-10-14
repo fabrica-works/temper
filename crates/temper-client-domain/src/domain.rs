@@ -62,6 +62,10 @@ pub fn next_deadline(root: &Domain) -> Option<Time> {
 }
 /// Iterate's table phase: emit stores before sends, report progress, reclaim.
 pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let forge_out_of_date = match root.forge.served() {
+        forge::Served::OutOfDate => true,
+        forge::Served::Unknown | forge::Served::Yes => false,
+    };
     {
         let mut cursor = root.table.take(env.now, env.wall);
         for _ in 0..env.limits.table.out {
@@ -70,9 +74,14 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     record: Record::Table { version: crate::store::VERSION, record: record.clone() },
                 }),
                 Some(RequestOut::Erase(key)) => out.push(Request::Erase { key: Key::Table(key) }),
-                Some(RequestOut::Send { attempt, key, request }) => {
-                    out.push(Request::Send { attempt, key, ask: request.clone() });
-                }
+                Some(RequestOut::Send { attempt, key, request }) => match request {
+                    Ask::Jig(_) => out.push(Request::Send { attempt, key, ask: request.clone() }),
+                    Ask::Forge(_) => {
+                        if !forge_out_of_date {
+                            out.push(Request::Send { attempt, key, ask: request.clone() });
+                        }
+                    }
+                },
                 None => break,
             }
         }
@@ -109,9 +118,12 @@ pub(crate) fn answered(
                     out.push(Request::Fact { fact: Fact::InvalidAnswer });
                 }
             },
-            Owner::Forge(_) => {
-                out.push(Request::Fact { fact: Fact::InvalidAnswer });
-            }
+            Owner::Forge(request) => match answer {
+                Some(crate::Answered::Forge(answer)) => {
+                    route::forge(root, env, forge::Event::Answered { request, answer }, out);
+                }
+                Some(crate::Answered::Jig(_)) | None => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
+            },
             Owner::Kept { scope } => {
                 out.push(Request::Fact { fact: Fact::KeptAnswered });
                 route::jig(root, env, jig_domain_client::Event::KeptGone { scope }, out);
