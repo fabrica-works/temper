@@ -437,6 +437,11 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      coordinator removes the `target/` of sessions not running, logs
      `kache stats | head -1`, and blocks only if disk stays below 40 GB.
      kache's late eviction is a proposal for the retrospective.
+     At 2026-10-14T08:28:33Z disk was 37.6 GB again, the store 37.6 GiB
+     (161%), no idle `target/` left; the supervisor's `kache gc`
+     printed "Evicted 2890 entries to stay under size limit" and disk
+     came back to 51 GB, so the rule adds `kache gc` once when the
+     store is past its cap.
 
 119. **02.4 lands before 02.3** (temper 02.3, blocked
      2026-10-14T07:52:40Z; plan defect, order). 02.3 moves the
