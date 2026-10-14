@@ -1263,6 +1263,22 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      presses Adopt once it is enabled, its pending-at-cut assertion kept,
      with no second press standing in for the replay.
 
+158. **Ruling 145 counts failures by symptom** (temper 15.3, blocked
+     2026-10-14T20:40:44Z; process). After the designer's answer
+     (`318a21ba`), 15.3's three process proofs each stopped at a
+     different place, each after a change aimed at the cause the run
+     before named: the navigation's context (39.8 s), a fresh sign-in
+     after the restart answered `NotReady` (28.6 s), and the returning
+     person's inbox expecting task 1's entry, which the script before the
+     kill never made (60.6 s; `logs/temper-15/w77-third-result.md`).
+     Ruling 145's "a third failure on the same symptom is a question"
+     counts failures of one symptom: three symptoms, each named, are
+     three counts of one. So 15.3 runs the process proof once more, with
+     `found` checking the same task 2 entry with the saved token, and from
+     now on runs it once after each change aimed at a newly named cause
+     without asking; a symptom met a third time is still a question with
+     the logs. Every assertion, expected literal and limit stays.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
