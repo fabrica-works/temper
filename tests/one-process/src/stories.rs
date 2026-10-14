@@ -63,6 +63,9 @@ fn call(name: &[u8], arguments: &[u8]) -> Turn {
     }
 }
 pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
+    if matches!(story, Story::ChatReadThenWait { .. }) {
+        return fixtures::read_then_wait_provider();
+    }
     if matches!(story, Story::Chat { .. }) {
         return fixtures::provider();
     }
@@ -230,6 +233,10 @@ pub(crate) fn adopted(rows: &BTreeMap<root::Key, root::Record>) -> u32 {
     )).count()).expect("adopted repositories")
 }
 pub(crate) fn configure(value: &mut serde_json::Value) {
+    if STORY.with(|slot| matches!(slot.get(), Story::ChatReadThenWait { .. })) {
+        value["engine"]["charters"][0]["waiting_ms"] = 1000.into();
+        return;
+    }
     if STORY.with(|slot| matches!(slot.get(), Story::Chat { .. })) {
         return;
     }

@@ -476,7 +476,7 @@ impl Referee {
             ..rules::Scope::default()
         };
         let mut implications = BTreeSet::new();
-        if !matches!(scenario, crate::world::Story::Chat { .. }) {
+        if matches!(scenario, crate::world::Story::Adopt | crate::world::Story::Merge) {
             scope.tools = 3;
             scope.depth = 3;
             scope.executors.insert((1, 2));
@@ -533,6 +533,14 @@ impl Referee {
 }
 pub(crate) fn terminals(store: &Store) -> u32 {
     u32::try_from(store.rows.values().filter(|row| matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Terminal(terminal))) if matches!(terminal.end, jig_domain_tasks::End::Finished { .. }))).count()).expect("fixture terminals")
+}
+pub(crate) fn chat_waited(store: &Store) -> bool {
+    store.rows.values().any(|row| {
+        matches!(row,
+            root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
+                if task.number == 1 && task.phase == jig_domain_tasks::Phase::Active(jig_domain_tasks::Active::Idle)
+        )
+    }) && snapshot(store).receipts.contains(&rules::Receipt::Turn(1, 1, 2))
 }
 #[expect(
     clippy::wildcard_enum_match_arm,
@@ -594,6 +602,7 @@ impl skein_world::Referee<Proc> for Referee {
         }
         let complete = match self.story {
             crate::world::Story::Chat { .. } => terminals(&self.store.borrow()) > 0,
+            crate::world::Story::ChatReadThenWait { .. } => chat_waited(&self.store.borrow()),
             crate::world::Story::Adopt | crate::world::Story::Merge => self.forge.borrow().complete(),
         };
         if self.done.is_none() && done && complete {
@@ -696,7 +705,7 @@ impl skein_world::Referee<Proc> for Referee {
     fn passed(&self) -> bool {
         self.done.is_some()
             && self.signed_in
-            && (self.released || !matches!(self.story, crate::world::Story::Chat { .. }))
+            && (self.released || matches!(self.story, crate::world::Story::Adopt | crate::world::Story::Merge))
     }
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "the conformance receipts select committed client documents")]

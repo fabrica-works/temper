@@ -20,6 +20,7 @@ pub struct Settings {
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
     Chat { words: &'static [u8] },
+    ChatReadThenWait { words: &'static [u8] },
     Adopt,
     Merge,
 }
@@ -166,7 +167,7 @@ pub(crate) struct Person {
 impl Person {
     fn new(root: Fd, scenario: Story) -> Self {
         let steps = match scenario {
-            Story::Chat { words } => vec![
+            Story::Chat { words } | Story::ChatReadThenWait { words } => vec![
                 Step::Go {
                     address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations {
                         project: None,
@@ -412,7 +413,11 @@ pub fn run(settings: Settings, scenario: Story) -> Outcome {
             Proc::Service(_) | Proc::Agent(_) | Proc::Git(_) | Proc::Shell(_) | Proc::Peer(_) | Proc::Forge(_) => None,
         })
         .sum();
-    let chats_answered = referee::terminals(&store.borrow());
+    let chats_answered = if matches!(scenario, Story::ChatReadThenWait { .. }) {
+        u32::from(referee::chat_waited(&store.borrow()))
+    } else {
+        referee::terminals(&store.borrow())
+    };
     let adopted = stories::adopted(&store.borrow().rows);
     let pushed = std::mem::take(&mut observed_forge.borrow_mut().pushed);
     assert!(outcome.procs.iter().all(Host::is_empty), "all processes drain");

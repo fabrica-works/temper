@@ -157,6 +157,34 @@ pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
         Duration::ZERO,
     )
 }
+pub(crate) fn read_then_wait_provider() -> skein_fake_peers::llm::Peer {
+    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+    smith_agent_process_world::fake::configured(
+        Box::new([Script {
+            cue: Box::default(),
+            turns: Box::new([
+                Turn {
+                    lines: Box::new([Line::Call {
+                        name: b"read".as_slice().into(),
+                        arguments: br#"{"path":"README.md"}"#.as_slice().into(),
+                    }]),
+                    finish: Finish::ToolCalls,
+                    tokens: 20,
+                },
+                Turn {
+                    lines: Box::new([
+                        Line::Text { text: ANSWER.into() },
+                        Line::Call { name: b"wait".as_slice().into(), arguments: b"{}".as_slice().into() },
+                    ]),
+                    finish: Finish::ToolCalls,
+                    tokens: 20,
+                },
+            ]),
+        }]),
+        skein_llm::Credential { access_token: channel::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        Duration::ZERO,
+    )
+}
 pub(crate) fn codec() -> jig_protocol_store::codec::Limits {
     let bytes = document();
     let size = u32::try_from(bytes.len()).expect("fixture document");
