@@ -5,5 +5,6 @@ pub mod command;
 pub mod limits;
 pub mod render;
 pub mod route;
+pub mod terminal;
 #[cfg(test)]
 mod tests;

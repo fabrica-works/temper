@@ -159,3 +159,24 @@ pub fn shell(limits: &Limits) -> Option<u64> {
     let connections = u64::from(limits.connections.exchanges.checked_add(1)?);
     skein_io::worst_case(&limits.io)?.checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)
 }
+/// The terminal's own fixed bounds, independent of configuration.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Terminal {
+    pub line: u32,
+    pub read: u32,
+    pub interval: skein_lib::Duration,
+    pub lines: u32,
+    pub first: skein_lib::Duration,
+    pub most: skein_lib::Duration,
+}
+#[must_use]
+pub const fn terminal() -> Terminal {
+    Terminal {
+        line: 4096,
+        read: 4096,
+        interval: skein_lib::Duration::from_secs(1),
+        lines: 32,
+        first: skein_lib::Duration::from_millis(250),
+        most: skein_lib::Duration::from_secs(8),
+    }
+}
