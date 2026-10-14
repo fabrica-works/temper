@@ -3,7 +3,7 @@
 Provisional, 2026-10-05, revised 2026-10-14. What temper keeps in jig's
 store, and how: its families, the forge's records, under the
 application's tag; their keys, their records and temper's store
-version; and the restart's interval. The store itself is jig's:
+version; and the restart's ranges. The store itself is jig's:
 `jig-protocol-store`, skein's key-value store in the engine's process,
 with transcripts as files and secrets in a second store, whose design
 this document cites as jig's `protocol/store.md`. temper's part is the
@@ -29,6 +29,10 @@ What is open is listed in section 7.
 - **All live.** The forge's restart step restores every family of
   temper's as one interval, the root's `Range::Forge`; nothing of
   temper's is loaded on demand (section 5).
+- **The core's restart ranges are jig's:** the root's core ranges are
+  asked as jig's coarser ones and filtered, and its census takes jig's
+  index walk as it comes, an ended task per index row, its cursor the
+  index row's key (section 5).
 - **Sized from limits.** The largest key and record follow from the
   forge's limits, and jig's component checks them with its own at start
   (section 4).
@@ -174,6 +178,32 @@ section 7).
   generated keys of both (section 6).
 - **Nothing else is read:** no load, get or party's read of temper's
   families follows the restart.
+- **The core's ranges are jig's, filtered.** jig's restart ranges
+  (jig's `protocol/store.md`, 4.3 and 7.2) are coarser than the root's
+  core ranges, so the routing asks for the jig ranges that hold a root
+  range and keeps each row the root's range admits: `CoreRange::Tasks`,
+  the tasks child's live families with the goals' projections, which
+  are core rows, is jig's `[Core, Tasks]`, in that order, which is also
+  the keys' order; `CoreRange::{Calls, RunProofs}` are jig's `[Core]`.
+  A root cursor is a key of the root's range, and names the jig
+  interval that holds it. A page whose rows the filter all drops, while
+  jig's walk goes on, is asked again from jig's cursor before the root
+  hears of it, so a page that goes on keeps a row, and its cursor is the
+  last key kept.
+- **The census is jig's index walk.** `Range::Census` is jig's census
+  (jig's `protocol/store.md`, 7.2 and 7.4): its index rows walked in
+  order (the conversations' index, `ConversationOldest`, then each
+  party's unread results, `Result`, parties in the census's order, each
+  interval by key), and each joined to the ended task it names. So a
+  page's rows are ended tasks in the walk's order, the same task once
+  for each index row that names it, and its cursor is the key of the
+  last index row walked, not a row's key. The root checks that each row
+  is an ended task and that the cursor is an index key the census
+  admits, past the page's start in the walk's order; a page may hold no
+  row and go on. It neither orders nor dedupes the rows: jig's core
+  restores them as they come, keeping per party how far it has read, as
+  jig's reference root hands them. A cut census page stops the restart,
+  as every cut restart page does.
 
 ## 6. Testing
 

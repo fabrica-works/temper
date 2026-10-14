@@ -139,13 +139,17 @@ startup that builds the settings from configuration's bytes.
 - **No `service.components` member:** temper's engine always makes the
   accounts', workers' and clients' components (findings/jig-service.md,
   Discrepancy 4).
-- **The store's routing maps the root's ranges** (08.2a): `Range::Forge`
-  to `Restore::Application([interval()])`; `CoreRange::{Deployment,
-  People, Tasks}` to `Restore::Jig([RestoreRange::Deployment])`,
-  `[People]`, `[Tasks]`; `CoreRange::{Calls, RunProofs}` to
-  `Restore::Jig([RestoreRange::Core])`, keeping each row
-  `Range::contains` admits; `Range::Census(census)` to
-  `Restore::Jig([Census(census)])`; `CoreRange::{TaskResult,
+- **The store's routing maps the root's ranges** (08.2a; store/README.md,
+  5, "The core's ranges are jig's, filtered" and "The census is jig's
+  index walk"): `Range::Forge` to `Restore::Application([interval()])`;
+  `CoreRange::{Deployment, People}` to
+  `Restore::Jig([RestoreRange::Deployment])`, `[People]`;
+  `CoreRange::Tasks` to `Restore::Jig([RestoreRange::Core,
+  RestoreRange::Tasks])` (its projections are core rows) and
+  `CoreRange::{Calls, RunProofs}` to `Restore::Jig([RestoreRange::Core])`,
+  each keeping the rows `Range::contains` admits; `Range::Census(census)`
+  to `Restore::Jig([Census(census)])`, its rows in jig's walk order,
+  none dropped; `CoreRange::{TaskResult,
   ProposalDecision, EscalationDecision}` to `Get::Jig` of their one key;
   `CoreRange::TaskTranscript { task, from }` to
   `TranscriptRead::Window { task, attempt, turn, after }`;
@@ -153,11 +157,20 @@ startup that builds the settings from configuration's bytes.
   backwards: false, after }`, keeping the attempt's turns;
   `CoreRange::Notes(range)` to `Load::Notes(range)`; `StoreRequest::Read`
   to `Request::Read`. A root cursor (`after: Some(key)`) becomes jig's
-  `Cursor { interval: 0, after }` with the tagged key: jig's key encoder
+  `Cursor { interval, after }` with the tagged key: jig's key encoder
   for a core key, `jig_protocol_store::keys::application` of temper's for
-  a forge key (findings/jig-components.md, Discrepancy 4). A page keeps
-  the longest prefix within the root's `most` rows and `bytes` decoded
-  bytes, its `next` the last key kept.
+  a forge key (findings/jig-components.md, Discrepancy 4); `interval` is
+  the place, in the request's list of jig's intervals, of the one that
+  holds the key (for `[Core, Tasks]`, 0 for a `Key::Core`, 1 for a
+  `Key::Tasks`; 0 for every other one-interval range), and for the
+  census `temper_engine_domain::census_interval(census, key)`. A page
+  keeps the longest prefix within the root's `most` rows and `bytes`
+  decoded bytes, its `next` the last key kept; a filtered page that
+  keeps no row while jig's page has a cursor is asked again from that
+  cursor, with the same bounds, before the root hears of it. A census
+  page's `next` is jig's cursor's `after` decoded by
+  `jig_protocol_store::keys::decode`: the last index row's key, which
+  the root checks (08.2a's root part).
 - **The root's deadlines.** temper's root reports none
   (`temper_engine_domain` has `fire` but no `next_deadline`): 08.2d adds
   `Domain::next_deadline(&self, env) -> Option<Time>` in a new
@@ -294,12 +307,32 @@ Scope: `store::route` (public, for 18.1's world driver): the root's
 `StoreRequest`s into jig's store component's `Request`s, and its
 `Event`s into root events, with temper's families encoded and decoded by
 `temper-protocol-store` (store/README.md, 5; the choices' range table).
+The root's part, for the census (store/README.md, 5, "The census is
+jig's index walk"): `temper_engine_domain::census_interval(census:
+&jig_domain_core::Census, key: &jig_domain_core::Key) -> Option<u32>`
+in `store.rs` (0 for a `ConversationOldest` key; 1 and the party's place
+in `census.results` for a `Result` key `census.admits`; none for any
+other key), and `Range::Census`'s doc saying the walk's order, the
+repeats and the index-key cursor; `loads.rs` for `Range::Census` only:
+`begin` takes an `after` that `census_interval` places (not
+`Range::contains`), and `check` keeps its row check (each row
+`Range::contains`, an ended task), drops the order check among rows,
+and takes a `next` that `census_interval` places, its `(interval, key)`
+above `after`'s, with or without rows; every other range's checks stay
+as they are. The engine domain world's fake census
+(`tests/engine/domain/src/store.rs:101-134`) walks as jig's does: the
+`ConversationOldest` rows by key, then each party's `Result` rows past
+its `after`, parties in the census's order, from the cursor's interval
+and key; each joined to its `Ended` row, at most `most` index rows, its
+`next` the last index row's key while rows remain.
 Needs: nothing beyond 08.1.
 Files: `crates/temper-service/{Cargo.toml, src/{lib.rs, store.rs,
 store/route.rs, store/ranges.rs, tests/store_route.rs,
 tests/fixtures.rs}}` (`store.rs` declares the module only); the workspace
 `Cargo.toml` (entries `temper-protocol-store`, `jig-protocol-store`,
-`skein-kv`).
+`skein-kv`); the root's part: `crates/temper-engine-domain/src/{store.rs,
+loads.rs, lib.rs}` (`lib.rs`'s `pub use store::{..}` adds `census_interval`),
+`tests/engine/domain/src/store.rs` and `tests/engine/domain/tests/loads.rs`.
 Shape: the sketch's `store_route` (`temper_service::store::route`). A
 commit's `Write::Save(Record::Core(row))` is `Write::Save(row)`,
 `Write::Erase(Key::Core(key))` `Write::Erase(key)`,
@@ -312,12 +345,26 @@ a `Corrupt` and an `OpenRefused` end the store's use as the reference's
 up as `Record::Core`; transcripts' turns as `Record::Core` turn rows.
 Test shape: `src/tests/store_route.rs`. Tests:
 `each_root_range_asks_the_store_as_the_table_maps_it` (one row per
-`CoreRange`, `Census` and `Forge`), `a_forge_commit_puts_its_encoded_key_and_row`,
+`CoreRange`, `Census` and `Forge`; `Tasks` as `[Core, Tasks]`),
+`a_task_page_keeps_projections_then_live_tasks_and_drops_calls`,
+`a_filtered_page_that_keeps_nothing_asks_again_from_jigs_cursor`,
+`a_census_cursor_is_its_index_rows_key_and_interval` (a root `after` of
+a party's `Result` key asks jig from `Cursor { interval: 1 + its place,
+after }`; jig's cursor comes back to the root as that key, rows in jig's
+order with a repeated owner),
+`a_forge_commit_puts_its_encoded_key_and_row`,
 `a_forge_page_reaches_the_root_decoded_with_its_last_key`,
 `a_continued_forge_load_asks_from_its_tagged_cursor`,
 `a_page_keeps_the_longest_prefix_within_the_roots_bounds`,
-`a_row_that_does_not_decode_stops_the_engine`. Ceilings: each under 20
-ms. Reference test, in full:
+`a_row_that_does_not_decode_stops_the_engine`. The root's part, in
+`tests/engine/domain/tests/loads.rs`:
+`a_census_page_takes_repeated_owners_and_an_index_cursor` (rows of the
+`Ended` tasks 5, 5 and 3, repeated and descending, and a `Result` key as
+`next`: `Loaded`, the three rows kept) and
+`a_census_cursor_behind_its_start_is_out_of_order` (a `next` of an
+earlier interval than `after`'s: `Failure::Order`); the engine domain
+world's suite passes with the fake's census walk. Ceilings: each under
+20 ms. Reference test, in full:
 
 ```rust
 #[test]
@@ -345,10 +392,17 @@ fn a_continued_forge_load_asks_from_its_tagged_cursor() {
 Proof: unit, `heavy cargo nextest run -p temper-service -E
 'test(/store_route/)'`, run once: each root range asks the store as the
 table maps it, a forge commit puts its encoded row, a page reaches the
-root decoded within its bounds, and a bad row stops the engine; under 1 s.
+root decoded within its bounds, a filtered page goes on, the census's
+cursor is its index row's, and a bad row stops the engine; and `heavy
+cargo nextest run -p temper-engine-domain -p temper-engine-domain-world`,
+run once: the root takes a census page as jig walks it, and the engine
+domain world's stories pass; under 1 s and the world's budget.
 Don't: decode a row without checking its key against its record;
-restore a core range as an application interval.
-Size: at most 450 lines.
+restore a core range as an application interval; order or dedupe the
+census's rows, in the routing or the root (jig's core keeps its own
+marks); change a load check of any range but `Range::Census`.
+Size: at most 570 lines: 450 for the routing, 120 for the root's part
+and the fake's census.
 Removes: nothing.
 
 ### 08.2b The store's driver
