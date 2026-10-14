@@ -347,6 +347,27 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      coordinator runs `kache stats | head -1` once and names the store's
      size in its block.
 
+113. **The small profile's numbers pass every worst case** (temper 08.1,
+     blocked 2026-10-14T05:18:05Z; plan defect). 08.1 takes `small`'s
+     constants from the engine worlds' fixtures, with `name_bytes` 256
+     and the client's `answer_bytes` 65,536, beside jig's small children;
+     the root's worst case refuses that mix
+     (`temper-engine-domain/src/limits.rs:233-243`:
+     `forge.named_calls < call_records`,
+     `journal.result_bytes < people.words`,
+     `journal.transcript_bytes < row_bound`, and the journal's room for
+     deliveries). configuration.md, section 6 fixes no number ("Its
+     numbers are constants in `temper-service`'s limits module, each
+     documented with what it bounds"). So the implementer's profile
+     stands: root journal `{commits: 3, held: 1536, writes: 4096,
+     deliveries: 512, transcript_bytes: 65536, result_bytes: 2048,
+     run_bytes: 16384}`, root loads `{loads: 2, rows: 1, bytes: 65536,
+     reply_bytes: 65536, transcript_bytes: 65536}`, `forge.named_calls`
+     32, the other fixture values kept; each raised constant's doc line
+     names the check that needs it, and
+     `the_small_profile_passes_each_domains_worst_case` is the check.
+     Tighter numbers wait for startup's memory measure.
+
 104. **A combined status with no status** (temper 06.2, blocked
      2026-10-14T04:16:35Z; plan defect). Forgejo v16.0.5 answers
      `{"state":"","sha":"","total_count":0,"statuses":null,...}`

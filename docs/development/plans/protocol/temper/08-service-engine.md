@@ -239,7 +239,9 @@ git }` are defined here, for 09; the checkout's limits are
 `tests/engine/forge`'s fixtures run with (`tests/engine/forge/src/world.rs:8-72`
 for the forge's), each with a doc line on what it bounds, `name_bytes`
 256 and the client's `answer_bytes` 65,536; a quantity jig's small
-profile also sets cites it. `apply` matches the dotted name byte for
+profile also sets cites it. Where those values fail a domain's worst case
+beside jig's small children, the constant is raised to the value the
+worst case needs, and its doc line names that check (ruling 113). `apply` matches the dotted name byte for
 byte in `limits/names.rs`, one arm per field of `Root`, `forge::Limits`
 (with `client.`, `change_policy.`, `issue_policy.`) and
 `checkout::Limits`, durations by `_ms`. `limits::engine` builds
