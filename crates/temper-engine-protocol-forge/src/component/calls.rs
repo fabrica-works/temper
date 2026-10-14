@@ -336,8 +336,10 @@ fn supported(op: &api::Op) -> bool {
             | api::Read::Permission { .. }
             | api::Read::PullFiles { .. }
             | api::Read::Compare { .. }
-            | api::Read::File { .. },
+            | api::Read::File { .. }
+            | api::Read::Checks { .. }
+            | api::Read::Job { .. },
         ) => true,
-        api::Op::Write(_) | api::Op::Read(api::Read::Checks { .. } | api::Read::Job { .. }) => false,
+        api::Op::Write(_) => false,
     }
 }

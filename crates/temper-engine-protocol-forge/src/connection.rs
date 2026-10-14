@@ -439,7 +439,7 @@ impl Connection {
         });
         let l = limits::documents(&env.limits);
         let request = self.request.as_ref().expect("head belongs to a request");
-        if response.status == 401 || response.status == 403 || (response.status == 404 && raw_request(request)) {
+        if response.status == 401 || response.status == 403 || response.status == 404 {
             self.receive = Receiving::Empty;
             self.http_down(env, http::Request::Discard);
             return;

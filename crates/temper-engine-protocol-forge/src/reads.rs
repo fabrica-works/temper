@@ -48,6 +48,7 @@ pub(crate) struct Plan {
     row: Option<Repository>,
     request: Option<Exchange>,
     contents: Option<crate::contents::Plan>,
+    actions: Option<crate::actions::Plan>,
     rows: Rows,
     item: Option<api::Summary>,
     pull: Option<d::PullRequest>,
@@ -72,6 +73,7 @@ impl Plan {
             row: None,
             request: None,
             contents: None,
+            actions: None,
             rows: Rows::None,
             item: None,
             pull: None,
@@ -223,7 +225,14 @@ impl Plan {
                 self.contents = Some(plan);
                 return Ok(step);
             }
-            api::Read::Locate { .. } | api::Read::Settings | api::Read::Checks { .. } | api::Read::Job { .. } => {
+            read @ (api::Read::Checks { .. } | api::Read::Job { .. }) => {
+                let mut plan =
+                    crate::actions::Plan::new(read, self.row.as_ref().expect("resolved").clone(), l, shared, self.cap)?;
+                let step = plan.begin();
+                self.actions = Some(plan);
+                return Ok(step);
+            }
+            api::Read::Locate { .. } | api::Read::Settings => {
                 return Err(api::Error::Unavailable);
             }
         };
@@ -262,6 +271,9 @@ impl Plan {
         tables: &mut Tables,
     ) -> Result<Option<Step>, api::Error> {
         if let Some(plan) = &mut self.contents {
+            return plan.heard(heard, shared, self.repository, tables);
+        }
+        if let Some(plan) = &mut self.actions {
             return plan.heard(heard, shared, self.repository, tables);
         }
         match heard {

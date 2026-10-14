@@ -305,3 +305,197 @@ fn measured_contents() -> [(&'static str, Answer, u64); 3] {
         ),
     ]
 }
+use temper_engine_domain_forge_client::api::{Check, JobAttempt, Status};
+const ATTEMPT: JobAttempt = JobAttempt { head: HEAD, run: 7, job: 10, attempt: 3 };
+const RUN: &[u8] = br#"{"id":7,"index_in_repo":5,"commit_sha":"0100000000000000000000000000000000000000"}"#;
+const RUNS: &[u8] = br#"{"total_count":1,"workflow_runs":[{"id":7,"index_in_repo":5,"commit_sha":"0100000000000000000000000000000000000000"}]}"#;
+const JOBS: &[u8] = br#"[{"id":9,"run_id":7,"attempt":1},{"id":10,"run_id":7,"attempt":3}]"#;
+const FAILING: &[u8] = br#"{"state":"failure","total_count":1,"statuses":[{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"build","status":"failure","description":"failed","target_url":"/fixture/specimen/actions/runs/5/jobs/1"}]}"#;
+fn failing(job: Option<JobAttempt>) -> Status {
+    Status {
+        at: skein_lib::Time::ZERO,
+        context: Box::from(&b"build"[..]),
+        check: Check::Failed,
+        description: Box::from(&b"failed"[..]),
+        url: Box::from(&b"http://127.0.0.1:3000/fixture/specimen/actions/runs/5/jobs/1"[..]),
+        job,
+    }
+}
+#[test]
+fn checks_find_a_failing_jobs_run_and_attempt_from_its_link() {
+    let mut h = fixtures::Harness::ready();
+    h.known(fixtures::REPO, fixtures::specimen());
+    h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
+    h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
+    h.answer(fixtures::FORGE, &fixtures::ok(RUNS));
+    h.answer(fixtures::FORGE, &fixtures::ok(JOBS));
+    h.run(Duration::from_millis(10));
+    let answer = h.answered(1).expect("checks");
+    assert_eq!((answer.cost, answer.result.clone()), (3, Ok(Answer::Checks(Box::new([failing(Some(ATTEMPT))])))));
+    let lines = h.request_lines(fixtures::FORGE).into_boxed();
+    assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/actions/runs?head_sha=0100000000000000000000000000000000000000&run_number=5&page=1&limit=1 HTTP/1.1");
+    assert_eq!(lines[4].as_ref(), b"GET /api/v1/repos/fixture/specimen/actions/runs/7/jobs HTTP/1.1");
+}
+#[test]
+fn checks_leave_the_job_absent_when_the_run_or_index_is_missing() {
+    for (name, runs, jobs, cost) in [
+        ("no run", &br#"{"total_count":0,"workflow_runs":[]}"#[..], None, 2),
+        ("no index", RUNS, Some(&br#"[{"id":9,"run_id":7,"attempt":1}]"#[..]), 3),
+        ("other run", RUNS, Some(&br#"[{"id":9,"run_id":7,"attempt":1},{"id":10,"run_id":8,"attempt":3}]"#[..]), 3),
+    ] {
+        let mut h = fixtures::Harness::ready();
+        h.known(fixtures::REPO, fixtures::specimen());
+        h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
+        h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
+        h.answer(fixtures::FORGE, &fixtures::ok(runs));
+        if let Some(jobs) = jobs {
+            h.answer(fixtures::FORGE, &fixtures::ok(jobs));
+        }
+        h.run(Duration::from_millis(10));
+        let answer = h.answered(1).expect("checks");
+        assert_eq!(
+            (answer.cost, answer.result.clone()),
+            (cost, Ok(Answer::Checks(Box::new([failing(None)])))),
+            "{name}"
+        );
+    }
+}
+#[test]
+fn checks_leave_the_job_absent_when_an_actions_lookup_answers_404() {
+    for (name, runs, cost) in [("run lookup", None, 2), ("jobs lookup", Some(RUNS), 3)] {
+        let mut h = fixtures::Harness::ready();
+        h.known(fixtures::REPO, fixtures::specimen());
+        h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
+        h.answer(fixtures::FORGE, &fixtures::ok(FAILING));
+        if let Some(runs) = runs {
+            h.answer(fixtures::FORGE, &fixtures::ok(runs));
+        }
+        h.answer(fixtures::FORGE, &fixtures::status(404));
+        h.run(Duration::from_millis(10));
+        let answer = h.answered(1).expect("checks");
+        assert_eq!(
+            (answer.cost, answer.result.clone()),
+            (cost, Ok(Answer::Checks(Box::new([failing(None)])))),
+            "{name}"
+        );
+    }
+}
+#[test]
+fn checks_read_every_status_page_until_one_comes_short() {
+    let mut h = fixtures::Harness::ready();
+    h.known(fixtures::REPO, fixtures::specimen());
+    h.call(1, fixtures::REPO, Op::Read(Read::Checks { commit: HEAD }));
+    h.answer(fixtures::FORGE, &fixtures::ok(br#"{"state":"success","total_count":2,"statuses":[{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"a","status":"success","description":"","target_url":""},{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"b","status":"pending","description":"","target_url":""}]}"#));
+    h.answer(fixtures::FORGE, &fixtures::ok(br#"{"state":"","total_count":0,"statuses":[]}"#));
+    h.run(Duration::from_millis(10));
+    let answer = h.answered(1).expect("checks");
+    let expected = Box::new([
+        Status {
+            at: skein_lib::Time::ZERO,
+            context: Box::from(&b"a"[..]),
+            check: Check::Passed,
+            description: Box::from([]),
+            url: Box::from([]),
+            job: None,
+        },
+        Status {
+            at: skein_lib::Time::ZERO,
+            context: Box::from(&b"b"[..]),
+            check: Check::Pending,
+            description: Box::from([]),
+            url: Box::from([]),
+            job: None,
+        },
+    ]);
+    assert_eq!((answer.cost, answer.result.clone()), (2, Ok(Answer::Checks(expected))));
+    let lines = h.request_lines(fixtures::FORGE).into_boxed();
+    assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/commits/0100000000000000000000000000000000000000/status?page=2&limit=2 HTTP/1.1");
+}
+#[test]
+fn a_job_log_at_another_head_is_missing_job() {
+    let mut h = fixtures::Harness::ready();
+    h.known(fixtures::REPO, fixtures::specimen());
+    h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
+    h.run(Duration::from_millis(1));
+    assert_eq!(
+        h.request_lines(fixtures::FORGE).into_boxed().last().expect("run").as_ref(),
+        b"GET /api/v1/repos/fixture/specimen/actions/runs/7 HTTP/1.1"
+    );
+    h.answer(
+        fixtures::FORGE,
+        &fixtures::ok(br#"{"id":7,"index_in_repo":5,"commit_sha":"0300000000000000000000000000000000000000"}"#),
+    );
+    h.run(Duration::from_millis(10));
+    let answer = h.answered(1).expect("missing job");
+    assert_eq!((answer.cost, answer.result.clone()), (1, Err(Error::MissingJob)));
+}
+#[test]
+fn a_job_without_its_id_and_attempt_is_missing_job() {
+    for (name, jobs) in [
+        ("no job", &b"[]"[..]),
+        ("other id", &br#"[{"id":9,"run_id":7,"attempt":3}]"#[..]),
+        ("other attempt", &br#"[{"id":10,"run_id":7,"attempt":2}]"#[..]),
+        ("other run", &br#"[{"id":10,"run_id":8,"attempt":3}]"#[..]),
+    ] {
+        let mut h = fixtures::Harness::ready();
+        h.known(fixtures::REPO, fixtures::specimen());
+        h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
+        h.answer(fixtures::FORGE, &fixtures::ok(RUN));
+        h.answer(fixtures::FORGE, &fixtures::ok(jobs));
+        h.run(Duration::from_millis(10));
+        let answer = h.answered(1).expect("missing job");
+        assert_eq!((answer.cost, answer.result.clone()), (2, Err(Error::MissingJob)), "{name}");
+    }
+}
+#[test]
+fn a_job_read_answered_404_is_missing_job_at_each_exchange() {
+    for (name, before, cost) in [("run", &[][..], 1), ("jobs", &[RUN][..], 2), ("log", &[RUN, JOBS][..], 3)] {
+        let mut h = fixtures::Harness::ready();
+        h.known(fixtures::REPO, fixtures::specimen());
+        h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
+        for document in before {
+            h.answer(fixtures::FORGE, &fixtures::ok(document));
+        }
+        h.answer(fixtures::FORGE, &fixtures::status(404));
+        h.run(Duration::from_millis(10));
+        let answer = h.answered(1).expect("missing job");
+        assert_eq!((answer.cost, answer.result.clone()), (cost, Err(Error::MissingJob)), "{name}");
+    }
+}
+#[test]
+fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
+    for (name, response, log, truncated) in [
+        ("short", &b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc"[..], &b"abc"[..], false),
+        ("past max", &b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nabcde"[..], &b"abcd"[..], true),
+        (
+            "range names more",
+            &b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 0-3/20\r\n\r\nabcd"[..],
+            &b"abcd"[..],
+            true,
+        ),
+    ] {
+        let mut h = fixtures::Harness::ready();
+        h.known(fixtures::REPO, fixtures::specimen());
+        h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
+        h.answer(fixtures::FORGE, &fixtures::ok(RUN));
+        h.answer(fixtures::FORGE, &fixtures::ok(JOBS));
+        let request = h.request_bytes(fixtures::FORGE);
+        assert!(
+            skein_lib::bytes::find(
+                &request,
+                b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3 HTTP/1.1\r\n"
+            )
+            .is_some(),
+            "{name}: log"
+        );
+        assert!(skein_lib::bytes::find(&request, b"Range: bytes=0-4\r\n").is_some(), "{name}: range");
+        h.answer(fixtures::FORGE, response);
+        h.run(Duration::from_millis(10));
+        let answer = h.answered(1).expect("log");
+        assert_eq!(
+            (answer.cost, answer.result.clone()),
+            (3, Ok(Answer::Job { attempt: ATTEMPT, log: Box::from(log), truncated })),
+            "{name}"
+        );
+    }
+}
