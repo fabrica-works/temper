@@ -949,6 +949,25 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      aimed at a named cause, once per change; a third failure on the
      same symptom is a question with the logs.
 
+146. **A produced change's result names the resource the worker and the
+     forge settled** (temper 15.3, blocked 2026-10-14T16:54:15Z;
+     cross-session scope, a gap of 08.4's). llm.md, 5: the change's
+     "resource comes from what the worker and the forge settled, never
+     from" the model's words; `temper-engine-smith/src/finish.rs:107`
+     refuses a declared change with no resource (`Problem::Missing`),
+     and `temper-service/src/tools.rs:66` passes `None` always, so every
+     produced change ended `Failed(Invalid)` and no `OpenPull` was asked
+     (15.3's trace of its stored state, `logs/temper-15/15.3-trace-findings.md`;
+     the system story reproduces it in 0.08 s). So the root gains a
+     fenced accessor of the settled change resource for a run, and the
+     service's result routing passes it to `temper_engine_smith::result`;
+     boundary fields unchanged. At most 40 production lines in
+     `temper-engine-domain` and `temper-service`, outside 15.3's Files,
+     named in the commit body, with three tests: none settled (`Missing`),
+     one settled (the resource), more than one (refused as ambiguous),
+     each under 20 ms. The parent chat's first `Invalid` stays to trace,
+     under ruling 145.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs
