@@ -1,3 +1,4 @@
+mod connection;
 mod fixtures;
 use crate::{
     StartRead, Stopped, conventions, marker,

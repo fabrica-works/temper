@@ -157,3 +157,69 @@ pub fn specimen() -> crate::tables::Repository {
         html_url: Box::from(&b"http://127.0.0.1:3000/fixture/specimen"[..]),
     }
 }
+
+/// One connection's scripted stream, shared by its step tests.
+#[derive(Debug)]
+pub struct ConnectionHarness {
+    pub connection: crate::connection::Connection,
+    pub env: Env<Limits>,
+    pub forge: Forge,
+    pub io: Queue<skein_io::Request>,
+}
+impl ConnectionHarness {
+    pub fn new() -> Self {
+        let limits = limits();
+        let forge = settings().forges.into_boxed().into_iter().next().expect("one forge");
+        let mut connection =
+            crate::connection::Connection::new(&forge, &limits, shared(), Time::from_nanos(10_000_000_000));
+        connection.socket = Some(skein_lib::Token::new(100));
+        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+        connection.connect(&env);
+        Self { connection, env, forge, io: Queue::with_capacity(32) }
+    }
+    pub fn pump(&mut self) {
+        self.connection.pump(&self.env, &mut self.io, 16);
+    }
+    pub fn answer(&mut self, response: &[u8]) -> List<crate::connection::Heard> {
+        let mut intake = skein_lib::Intake::with_capacity(4096);
+        intake.append(response).expect("fixture response fits");
+        let mut heard = List::with_capacity(16);
+        for _ in 0_u32..1024 {
+            self.pump();
+            for _ in 0..self.io.len() {
+                let request = self.io.pop().expect("queued io request");
+                match request {
+                    skein_io::Request::Stream { down: skein_lib::stream::Down::Demand { read, room }, .. } => {
+                        if room > 0 {
+                            self.connection.stream(&self.env, skein_lib::stream::Up::Room);
+                        } else if let Some(piece) = intake.meet(read) {
+                            self.connection.stream(&self.env, skein_lib::stream::Up::Bytes(piece));
+                        }
+                    }
+                    skein_io::Request::Stream {
+                        down: skein_lib::stream::Down::Send(_) | skein_lib::stream::Down::Finish,
+                        ..
+                    } => {}
+                    skein_io::Request::Listen { .. }
+                    | skein_io::Request::Connect { .. }
+                    | skein_io::Request::Bind { .. }
+                    | skein_io::Request::Reject { .. }
+                    | skein_io::Request::Output { .. }
+                    | skein_io::Request::Spawn { .. }
+                    | skein_io::Request::Signal { .. }
+                    | skein_io::Request::Usage { .. }
+                    | skein_io::Request::Window { .. }
+                    | skein_io::Request::Close { .. }
+                    | skein_io::Request::Abort { .. } => unreachable!("one connection emits stream requests"),
+                }
+            }
+            if let Some(event) = self.connection.heard() {
+                heard.push(event).expect("fixture events fit");
+            }
+            if !self.connection.ready() {
+                break;
+            }
+        }
+        heard
+    }
+}

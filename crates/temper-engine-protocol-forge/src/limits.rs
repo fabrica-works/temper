@@ -342,6 +342,9 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(tokenizer::worst_case(&docs.json)?)?
         .checked_add(decoder)?
         .checked_add(raw)?
+        .checked_add(crate::connection::routing_bytes()?)?
+        .checked_add(u64::from(l.tls.send.max(s.io.output)))?
+        .checked_add(u64::from(l.body_bytes).checked_mul(6)?.checked_add(1024)?)?
         .checked_add(socket)?;
     let calls = Slab::<Waiting>::worst_case(s.client.calls)?
         .checked_add(Map::<Token, Id<Waiting>>::worst_case(s.client.calls)?)?
@@ -365,6 +368,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         )?;
     connection
         .checked_mul(u64::from(l.connections))?
+        .checked_add(Slab::<crate::connection::Connection>::worst_case(l.connections)?)?
         .checked_add(calls)?
         .checked_add(held)?
         .checked_add(repositories)?

@@ -4,7 +4,10 @@
 extern crate alloc;
 pub mod boundary;
 pub mod component;
+#[expect(dead_code, reason = "13.2b wires the connection machinery into the component")]
+mod connection;
 pub mod conventions;
+pub mod grow;
 pub mod limits;
 pub mod marker;
 pub mod settings;
