@@ -637,6 +637,24 @@ The supervisor's rulings follow, numbered from 101 (development.md,
      Shape says so; its Size (900), Files (the golden `control_text`
      among them) and tests are unchanged.
 
+130. **Startup checks the service's worst case through `system.rs`'s
+     own** (temper 10.2, blocked 2026-10-14T12:07:40Z; cross-session
+     scope). 10.2 checks "the two worst cases against `memory_bytes` with
+     `jig_protocol_config::fits`" before anything is made; the service's
+     envelope is 09.3's private `memory(settings, limits, store_limits,
+     accounts, queue, operations)` (`crates/temper-service/src/system.rs:503`),
+     which `Service::new` calls after the worker exists
+     (`system.rs:55-71`, `worker.operations()`). So `system.rs` gains one
+     `pub(crate) fn startup_worst_case`, taking the worker's operations
+     as a number, that computes the queue, the operations and `memory`
+     as `Service::new` does; `Service::new` calls it in place of its own
+     lines, so the envelope is computed in one place (14.1 adds the
+     forge's share there once). At most 30 lines change in `system.rs`,
+     counted in 10.2's Size; every test of `system` keeps its name and
+     expected values. The worker's operations come from its settings by
+     the same function `Worker::operations` uses, made visible within
+     the crate if needed, never copied. Session 10 says so.
+
 ## For the user
 
 Long-term choices the user may veto; each is the default the plan runs

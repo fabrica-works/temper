@@ -378,7 +378,9 @@ its default); the two worst cases against `memory_bytes` with
 Needs: nothing beyond 10.1b; 07.1's `check` and 03.1's `limits` and
 `largest` (both landed before 09).
 Files: `crates/temper-service/src/{startup.rs, startup/checks.rs,
-tests/checks.rs, tests/fixtures.rs}`. No existing type changes Shape.
+tests/checks.rs, tests/fixtures.rs}`, and `system.rs` for one
+`pub(crate) fn startup_worst_case`, which `Service::new` calls too
+(decisions.md, ruling 130). No existing type changes Shape.
 Shape: the sketch's `checks` module.
 Test shape: `src/tests/checks.rs`, fixtures as 10.1a's (rows patch
 `fixtures::document()` with `fixtures::with(document, path, json)`, made
