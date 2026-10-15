@@ -980,19 +980,34 @@ in jig's shape, ordered by what they cost the next plan.
 
 ## 10. Decisions
 
+2026-10-15. The user delegated these decisions: the designer's
+recommendation stands "unless there is something with long-term
+consequences and hard to change decisions" (2026-10-14), and the next
+run is to be planned and started, "fix any issue along the way"
+(2026-10-15). None of these is hard to change, and none is a product
+decision. The designer decided them on the evidence of sections 5, 7
+and 8, as the rows say, and applied what is adopted in skein `d296e3e`
+(development.md and its two cards) and temper `c082c61d` (testing.md
+and `STATUS.md`). Changes to the kit (`plan`, `land`, `numbers.sh`, the
+coordinator's Codex profile and the workspace's files) wait until after
+smith's parity run, active on another machine, as smith abe6ec2e
+decided: no change to the kit right before an unattended run. Their work
+goes on skein's branch `kit-after-parity`, and comes back to the
+designer once that run's retrospective has landed.
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
-| 10 | open | |
-| 11 | open | |
-| 12 | open | |
-| 13 | open | |
-| 14 | open | |
+| 1 | adopted, taking in rulings 145 and 158: different symptoms, each named, count apart | skein d296e3e: development.md, 5.5; implementer.md, 8.7 and 8.8 |
+| 2 | adopted | skein d296e3e: development.md, 5.2 (a Size of at most about 300 lines; the template's size limits: within twice the Size, 2.5 times for a codec or document increment, a split increment's parts counted together, as ruling 106) and 5.3 (105,000 tokens at the first change, 50,000 an increment) |
+| 3 | adopted | skein d296e3e: development.md, 5.2 (the Test shape names where limits come from), 5.4 (each limit through the check that admits the shipped profile) and 5.6; temper c082c61d: testing.md, 5.1 |
+| 4 | deferred: until after smith's parity run: the coordinator's Codex profile is the kit's | skein's branch `kit-after-parity`: `model_auto_compact_token_limit` in the profile, with development.md, 7.5 |
+| 5 | adopted in part: the coordinator never queries the code graph, and implementers query their own project only, never listing projects, checking the index's status or coverage, or indexing. Switching the graph's server off in the coordinator's profile, and the workspace `AGENTS.md`, are the kit's: deferred until after smith's parity run, as reliability's 11 deferred the profile's switch | skein d296e3e: development.md, 2.3 and 7.2's prompts; implementer.md, 8.1 |
+| 6 | adopted in part: the coordinator sets a step in a command of its own, after reading its checks' output. `plan landed`, and `plan` writing the fixed headings and lines, are deferred until after smith's parity run | skein d296e3e: development.md, 7.3, step 3 |
+| 7 | adopted | skein d296e3e: development.md, 1, 7.3 (step 4), 7.4 and 10.3 |
+| 8 | adopted in part: a ring is the supervisor's, never the user's; a resume's cause is a reboot when the machine booted after the heartbeat, and the user's request only after a pause the user asked for; an unattended reboot stops a run, and whether a machine may reboot is the user's choice; section 13's question on a reboot answered. `plan ring` and `plan resume` naming who speaks, loading an unloaded thread and writing the heading, the unit that resumes a run at boot, and `plan check`'s warning are the kit's: deferred until after smith's parity run, with client-composition's 4 | skein d296e3e: development.md, 6, 7.4, 7.6 and 13 |
+| 9 | adopted in part: the card names Codex 0.162's `wait` with `yield_time_ms: 300000`, which returns when the command ends. On this Codex the long wait holds, which reliability's 9 found unestablished for `write_stdin`: four waits past 61 s here, and on 2026-10-15 another machine's 23 such waits blocked a median of 129 s, up to 267 s. `test-plan --live`'s check on each new Codex is deferred until after smith's parity run | skein d296e3e: implementer.md, 8.3 |
+| 10 | adopted | skein d296e3e: development.md, 11.4 |
+| 11 | deferred: until after smith's parity run: `plan metrics` and section 15.2's definitions change together, as reliability's 17 and client-composition's 9 deferred the rest of theirs | skein's branch `kit-after-parity`: `numbers.sh`, with development.md, 7.3 (the `split` state) and 15.2 |
+| 12 | deferred: until after smith's parity run: `land` and `plan` are the kit's | skein's branch `kit-after-parity`, with development.md, 9.1 |
+| 13 | adopted in part: a live proof ends at its task's first terminal failure, and its step's `Completions:` and `Wall:` trailers total every live run of the plan; temper's live story says so. `scripts/proof-live.sh` and the live test's support are temper's code, for its next plan | skein d296e3e: development.md, 5.5; implementer.md, 8.4 and 8.8; temper c082c61d: testing.md, 2.7, and `STATUS.md` (not planned) |
+| 14 | adopted, for a ruling's deferral as for a designer's answer | skein d296e3e: development.md, 2 and 10.4; supervisor.md, 3 |
