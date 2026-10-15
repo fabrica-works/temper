@@ -1,6 +1,6 @@
 # The engine
 
-Provisional, 2026-10-04, revised 2026-10-14. What the temper engine is, as a domain layer:
+Provisional, 2026-10-04, revised 2026-10-15. What the temper engine is, as a domain layer:
 its parts and how they fit, how a decision reaches the store before
 anything leaves the engine, how it restarts, how it runs agents, and the
 capabilities it keeps from today (the fleet, briefs, notes, views,
@@ -656,7 +656,7 @@ documents' limits, the hub's turns) take jig's small profile's values
 until temper's configuration names its own (jig's
 `protocol/configuration.md`, section 6). Documents' limits are the
 configured ones (`engine.limits`), which configuration.md, 7 keeps
-within what temper's native client takes.
+within what temper's client takes.
 
 ## 14. Below the domain
 
@@ -680,10 +680,12 @@ designed where it says.
 - **Connectors:** each its own protocol; for the forge, its calls (forge.md,
   section 17; `docs/design/forge.md`), polled in standalone, its webhooks
   after.
-- **People:** jig's client protocol (jig's `protocol/client.md`), with
-  temper's client wire for the forge's application requests; signing in
-  by the deployment's link in standalone, through the forge later
-  (people.md, section 11; `docs/design/client.md`).
+- **People:** jig's clients' component (jig's `protocol/client.md`), on
+  the clients' listener of temper's server with jig's default HTTP
+  mapping, with temper's client wire for the forge's application
+  requests; signing in by the deployment's link in standalone, through
+  the forge later (people.md, section 11; `docs/design/client.md`,
+  section 8).
 - **Accounts and credentials:** skein's accounts driver through jig's
   accounts component, and temper's git identities' table
   (`docs/design/credentials.md`).

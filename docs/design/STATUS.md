@@ -36,16 +36,16 @@ real forge, and what stands between the `protocol` plan and it, is
 |---|---|---|
 | `agent-domain.md` | no | describes the legacy agent, superseded by smith and `domain/agent.md`; to be removed: not planned |
 | `channel.md` | no | all: temper's parts on jig's channel, the payload version, a git identity's value: protocol |
-| `client.md` | partly | built: the client root and view over jig's (3, 5), the forge's words and "Shown on the forge." (4.1, 4.2), its records (4.6), the native client and its sign-in (6.2's client, 7), the web crates retired (9), `tests/client`'s first stories (10). Left: the forge's ask and address, the adoption form, its page and navigation link (4.3 to 4.7, 5.2, 5.3), the engine's side (8), the terminal's renderer, command reader and loop, `temper open` (6), the one-process and process tiers (10): protocol; an adopted repository listed on the project's resources (4.3, 10), which jig's core does not list at temper's pin or jig's `main`, and pages of the forge's work on the native client (5.4), which jig's core and client refuse at temper's pin: wait for jig; the forge's documents and panels, the browser (section 11): not planned |
-| `configuration.md` | no | all but the `webhooks` member: protocol; `webhooks`: not planned |
-| `credentials.md` | no | all: protocol; the forge as people's sign-in provider: not planned |
+| `client.md` | partly | built: the forge's words and "Shown on the forge." (4.1, 4.2), its records (4.6). Left, waiting for jig's client API (jig's `STATUS.md`, "jig's client API"): the client root on `jig-client`, with two owners, temper's pages and the forge's side, routing by asker (3.1, 3.3), the pages after the mockups and their confirmations, on jig's helpers (3.5, 3.6), the forge's family as bytes and its form a page of temper's (4.3 to 4.7), `Owner` in the wire crate (4.6); the view on `skein-ui` (5); the terminal on skein's `skein-ui-text` over `jig-client-shell-native`, its host keeping the credential and signing in again with `Held` (6, 7); `temper-service` owning the clients' listener, jig's default HTTP mapping under `/jig` with its example guards, the link route's `GET` answered not found (8); `tests/client` with jig's check, and the rebound-Host attack story in the process tier (10); the crates `temper-protocol-client-wire` renamed `temper-client-protocol-wire` and `temper-shell-terminal` `temper-client-shell-terminal`, by the client naming rule; the client root, view root and native client copied from jig's retired. Not planned: the forge's documents and panels, the browser, the forge as a sign-in provider through `Mint` (section 11) |
+| `configuration.md` | no | all but the `webhooks` member: protocol; `webhooks`: not planned; 3, 8: `application.clients` (the listener), `templates` in place of `chats`, the `documents.lines` override: wait for jig's client API (jig's `STATUS.md`, "jig's client API") |
+| `credentials.md` | no | all: protocol; the forge as people's sign-in provider: not planned; 6: the terminal's credential kept by its host and given back with `Held`: waits for jig's client API (jig's `STATUS.md`, "jig's client API") |
 | `engine-domain.md` | no | the legacy engine, superseded by `domain/`; still cited by the fake forge and the checkout; to be removed: not planned |
 | `forge.md` | no | sections 1 to 4 and 6 to 13, Forgejo v16.0.5 polled, the fake forge's protocol layer, the cost checks through bytes: protocol; 5, webhooks, and 11, GitHub: not planned |
 | `git.md` | no | all: protocol; containment between hosts: not planned |
 | `llm.md` | partly | `temper-engine-smith` decodes and renders host tools and reads results; its place in the engine's routing: protocol |
 | `performance.md` | no | section 3's two containers: protocol; sections 5 and 6, measurements once `temper serve` runs: not planned |
-| `protocol.md` | no | standalone (sections 4 to 10, 12): protocol; between hosts (TLS, contained process trees, a worker-only process): not planned |
-| `testing.md` | partly | the domain and system worlds and the client's joint world (6.3) stand; section 2's tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer (4.2) and the fake git program (4.3): protocol; a scenario's limits from the shipped profile in every world, fixture and process configuration (5.1), and the live story ending at its task's first terminal failure, with each run's summary (2.7): not planned |
+| `protocol.md` | no | standalone (sections 4 to 10, 12): protocol; between hosts (TLS, contained process trees, a worker-only process): not planned; 1 to 6, 8 to 14: the client crates by the client naming rule, `temper-service` owning the clients' listener and mounting jig's clients' component: wait for jig's client API (jig's `STATUS.md`, "jig's client API") |
+| `testing.md` | partly | the domain and system worlds and the client's joint world (6.3) stand; section 2's tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer (4.2) and the fake git program (4.3): protocol; a scenario's limits from the shipped profile in every world, fixture and process configuration (5.1), and the live story ending at its task's first terminal failure, with each run's summary (2.7): not planned; 2.1, 2.6: the client's tiers on `jig-client`, the rebound-Host attack story: wait for jig's client API (jig's `STATUS.md`, "jig's client API") |
 | `worker-domain.md` | no | the worker before jig's hub, superseded by `domain/worker.md` and jig's `hosts.md`; still cited by the worker's crates and worlds; to be removed: not planned |
 | `domain/README.md` | yes | the names and maps stand; section 5 points at the protocol documents |
 | `domain/core.md` | yes | built in `jig-core` and its children under temper's root; the document still describes primitives owned by jig; to keep temper's application side and cite jig for the rest: not planned |
@@ -58,7 +58,7 @@ real forge, and what stands between the `protocol` plan and it, is
 | `domain/agent.md` | partly | the typed translation to smith (`temper-engine-smith`), the worker hosting smith, the system world; section 3's agent shell as temper's `agent` command, section 9's protocol tests and the charter's encoding: protocol |
 | `domain/worker.md` | partly | the worker root on jig's hub (`jig-domain-host`), the checkout and smith's host domain, with whole-worker worlds; section 9 below the domain, its parts naming repositories by tag: protocol; section 11's contraction (a missing base branch created, a push with no expected head): not planned |
 | `store/README.md` | no | all: temper's families on jig's store: protocol |
-| `web/` | no | W1 to W4's crates retired by `client.md`, section 9 (protocol 11.4); `web/architecture.md`, the browser: not planned; `web/ux/`, the forge's family's pages: not planned. `web/ux/` predates jig's client and is partly superseded by jig's `pages.md` and `objects.md` (`draft/mvp.md`, section 3) |
+| `web/` | no | W1 to W4's crates retired by `client.md`, section 9 (protocol 11.4); `web/architecture.md`: temper's browser, `temper-client-shell-web`, on skein's `skein-ui-web` and jig's `jig-client-shell-web`, its sign-in by the printed link's page and cookie, its tier with jig's cross-site and framed-page stories: not planned; `web/mockups/`: the pages `client.md`, 3.5 builds; `web/ux/`, the forge's family's pages: not planned. `web/ux/` predates jig's client and is partly superseded by `client.md`, 3.5 and the mockups |
 
 ## 3. Not planned
 
@@ -84,8 +84,11 @@ real forge, and what stands between the `protocol` plan and it, is
   beyond one person's machine, and for skein's TLS server side and
   contained process trees (jig's `protocol/README.md`, section 10).
 - **The browser** (`web/architecture.md`; `client.md`, section 11):
-  temper's client in jig's browser shell. Waits for jig's browser shell
-  and the client's wasm32 builds (jig's STATUS.md, "Not planned").
+  temper's browser shell, `temper-client-shell-web`, on skein's
+  `skein-ui-web` and jig's `jig-client-shell-web`, served by
+  `temper-service`, with its page's policy and jig's cross-site and
+  framed-page attack stories. Waits for temper on jig's client API
+  (below) and jig's browser step.
 - **A failed preparation's words on the task's page**
   (`domain/engine.md`, section 8): the root reports a permanent
   preparation's repository and reason as a fact of the attempt; people
@@ -121,20 +124,39 @@ real forge, and what stands between the `protocol` plan and it, is
   repins after smith's reliability plan
   (`~/src/rust/plans/reliability-plan/`, not versioned), which never
   edits temper.
-- **jig's client composition** (jig's `client/domain/view.md`, sections
-  3 to 5 and 15; `pages.md`, section 12; `root.md`, sections 7 and 15):
-  jig's pages as a library an application arranges, the tree's
-  landmarks and region names, owners in place of connectors in the view,
-  and jig's text shell, `jig-shell-text`. jig's client-composition plan
-  builds them and runs no repin, since the protocol plan holds temper's
-  pins. temper takes them in one repin, after the protocol plan, before
-  its first release on jig's client: `Owner::Side` becomes
-  `Owner::Application`, `Act::Drawing` and the new roles join its
-  matches, its own pages go inside a main landmark, its stories scope by
-  the banner and navigation landmarks, and its terminal's renderer and
-  command reader give way to `jig-shell-text`'s. More than a repin may
-  change, so it is a plan of its own (`draft/mvp.md`, section 6, which
-  then needs revising: it says jig leaves a text shell to applications).
+- **temper on jig's client API** (`client.md`; `protocol.md`;
+  `configuration.md`; `credentials.md`; `testing.md`; jig's
+  `STATUS.md`, "jig's client API"): temper builds its own presentation
+  and server on `jig-client`: its client root with temper's pages after
+  the mockups and the forge's side, its view on `skein-ui`, its terminal
+  on skein's text shell, `temper-service` mounting jig's clients'
+  component under `/jig`; its copied client root, view root and native
+  client retire, and with them the repin onto jig's pages that
+  client-composition left. Its crates follow the client naming rule:
+  `temper-protocol-client-wire` becomes `temper-client-protocol-wire`,
+  `temper-shell-terminal` becomes `temper-client-shell-terminal`.
+  `temper-service/src/family/refusals.rs` copies jig's private
+  translation of refusals (`jig-protocol-engine-clients`'
+  `translate/refusals.rs`); it goes when temper takes jig's typed
+  answers. Before that, temper's repin onto jig past skein-ui (jig's
+  `docs/development/plans/skein-ui/later.md`) changes:
+  - the tree's renamed types, `State::Provisional` dropped, and its
+    users of `jig_fake_person` (14 lines in 6 files at `8d27a682`) and
+    `jig_shell_text` moved to `skein_fake_person` and `skein_ui_text`;
+  - its four literals of skein-ui's `Limits`, which need `scene_marks`
+    and `scene_bytes`: `crates/temper-client-view/src/tests/fixtures.rs:75`,
+    `crates/temper-shell-terminal/src/tests/fixtures.rs:105`,
+    `crates/temper-shell-terminal/tests/support/mod.rs:21`,
+    `tests/client/src/fixtures.rs:111`;
+  - its joint front on jig's client world: `Reply::SignOut` takes
+    `sign_in` (`tests/client/src/front.rs:352`), its `match` on
+    `packets::Incoming` (lines 127 to 141) takes `Incoming::SignedOut`,
+    and its `Front` gets jig's `delivers` rule (jig's
+    `client/domain/client.md`, section 12).
+
+  Waits for jig's client API's plan, then a plan of temper's own.
+  `draft/mvp.md`, section 6 then needs revising: it plans temper's
+  client on jig's pages.
 
 ## 4. Drafts
 

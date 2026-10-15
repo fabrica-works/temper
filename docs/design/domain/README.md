@@ -1,6 +1,6 @@
 # temper's domain
 
-Provisional, 2026-10-04, revised 2026-10-14. The design of temper's domain layer: temper as a
+Provisional, 2026-10-04, revised 2026-10-15. The design of temper's domain layer: temper as a
 generic engine on five primitives, which owns its state in its own store
 and drives the forge as a connector. It replaces the domain documents in
 `docs/design/` (`engine-domain.md`, `worker-domain.md`,
@@ -152,8 +152,9 @@ jig's protocol layer (jig's `protocol/README.md`):
   webhooks after.
 - **`docs/design/store/README.md`:** temper's families, the forge's
   records, on jig's store.
-- **`docs/design/client.md`:** temper's client: jig's client domain and
-  view, the forge's words and adoption form, a terminal shell.
+- **`docs/design/client.md`:** temper's client: its own pages on jig's
+  client, the forge's words and adoption form, a terminal on skein's
+  text shell, and the clients' listener of temper's server.
 - **`docs/design/testing.md`:** the tiers below the domain: protocol
   worlds, the one-process world, the process tier and the live tier.
 - **`docs/design/performance.md`:** a turn's copies, counted by jig's

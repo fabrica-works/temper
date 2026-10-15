@@ -1,13 +1,13 @@
 # Configuration
 
-Provisional, 2026-10-14. What temper's processes are told when they
-start: the one JSON document `temper serve` reads, with jig's parts as
-jig defines them and temper's own members beside them; the private files
-it names; the agent's configuration; what `temper open` and `temper
-sign-in` are given; limits; what holds at a first start and at every
-start; and the formats an operator writes. jig's shape and rules are
-jig's `protocol/configuration.md`; this document says what temper adds.
-What is open is listed in section 11.
+Provisional, 2026-10-14, revised 2026-10-15. What temper's processes
+are told when they start: the one JSON document `temper serve` reads,
+with jig's parts as jig defines them and temper's own members beside
+them; the private files it names; the agent's configuration; what
+`temper open` and `temper sign-in` are given; limits; what holds at a
+first start and at every start; and the formats an operator writes.
+jig's shape and rules are jig's `protocol/configuration.md`; this
+document says what temper adds. What is open is listed in section 11.
 
 ## 1. In one page
 
@@ -20,9 +20,10 @@ What is open is listed in section 11.
 - **jig's parts are jig's:** `jig-protocol-config` parses them; temper
   writes no parser of its own for them, and adds only the checks
   standalone needs (section 2).
-- **temper's members:** `forges`, `identities`, `landing`, `charter` and
-  `limits` for the engine (section 3), and `workers` for each worker
-  (section 4). `webhooks` is reserved, and refused until it is built.
+- **temper's members:** `forges`, `identities`, `landing`, `charter`,
+  `clients` and `limits` for the engine (section 3), and `workers` for
+  each worker (section 4). `webhooks` is reserved, and refused until it
+  is built.
 - **Not configuration:** repositories, which people adopt at runtime;
   the branch namespace, which the root derives from the deployment's id;
   the forge writer's identity, which comes from each forge's `user`.
@@ -32,8 +33,8 @@ What is open is listed in section 11.
   Rust field names, and a plan writes the parser from the types (section
   10).
 - **Standalone shape:** exactly one worker, joined to the engine by the
-  in-process name `workers`; clients on loopback; the agent program is
-  temper's own binary.
+  in-process name `workers`; the clients' listener on loopback; the
+  agent program is temper's own binary.
 - **The agent's configuration is smith's** (section 5), and `temper open`
   takes no file at all (section 9).
 
@@ -49,9 +50,11 @@ What is open is listed in section 11.
 
 - **`engine`** is jig's engine part (jig's `protocol/configuration.md`,
   section 3): `deployment`, `owners`, `providers`, `rules`, `projects`,
-  `charters`, `chats`, `hosts`, `llm`, `clients`, `connectors`, `limits`
-  and `memory_bytes`, in jig's formats (jig's
-  `protocol/configuration.md`, section 10).
+  `charters`, `templates`, `hosts`, `llm`, `clients`, `connectors`,
+  `limits` and `memory_bytes`, in jig's formats (jig's
+  `protocol/configuration.md`, section 10). Its `clients` member is what
+  jig's clients' component takes; the clients' listener is temper's
+  (section 3).
 - **`workers`** is a list of jig's worker parts (jig's
   `protocol/configuration.md`, section 4): `engine`, `name`, `secret`,
   `slots`, `graces`, `agent`, `limits` and `memory_bytes`.
@@ -66,15 +69,19 @@ What is open is listed in section 11.
     "workers"}`;
   - `engine.hosts.listener` is `[{"in_process": "workers"}]`, and
     `engine.hosts.workers` names that one worker;
-  - `engine.clients.listener` is a socket address on loopback (in
-    `127.0.0.0/8`, or `::1`);
   - `engine.connectors` is exactly `[1]`: the forge connector, temper's
     one connector, whose number both ends of the client's wire fix as
-    `temper-protocol-client-wire`'s `FORGE` (client.md, 4.6);
+    `temper-client-protocol-wire`'s `FORGE` (client.md, 4.6);
   - the worker's `agent` paths are absolute (section 5).
 
   The worker's `agent` names temper's own binary (section 5), which no
   check can tell from another program.
+- **Templates are jig's two defaults,** chat (template 1, label 1) and
+  goal (template 2, label 2), as jig's `protocol/configuration.md`,
+  3.1 gives them, the chat's executor the charter chats run under;
+  temper defines no template of its own. Its client's lists filter on
+  those labels (client.md, 3.5), and a project's policy may override
+  their defaults as jig's allows.
 - **Reading,** by `temper serve`, in this order:
   1. the file, whole, with skein's startup kit, within the bound jig's
      reference binary sets on a configuration's bytes;
@@ -164,6 +171,13 @@ A rule is a `LandingRule`, member for member:
 under; it must be the `number` of one of `engine.charters`. Feeds
 `Config.forge_charter`.
 
+**`clients`:** the clients' listener, which `temper-service` owns
+(client.md, section 8):
+
+| Member | Type | Bounds | Feeds |
+|---|---|---|---|
+| `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (client.md, section 7) |
+
 **`limits`:** temper's profile and overrides (section 7).
 
 **`webhooks`:** reserved. Present, it refuses the start as not built
@@ -183,7 +197,7 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 Beside the root: the forge component takes each forge's `number`,
 `kind`, `api`, `transport`, `api_token` and `user`; the identities'
 table takes each identity's value; the engine's routing takes each
-forge's `git`.
+forge's `git`; the clients' listener takes `clients.listener`.
 
 ## 4. temper's members for a worker
 
@@ -300,27 +314,23 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **The engine's documents fit temper's client.** A document past the
   bounds a client decodes is refused there whole, as too large (jig's
   `protocol/client.md`, section 3), so the documents the engine serves
-  are within what temper's native client takes (`client.md`, 5.4):
-  `engine.limits` names `documents.rows` at most the client's `rows`,
-  and `documents.text_bytes` at most its `text`, the bound its
-  receiving wire gives a document's texts. jig's small profile serves
-  more (4 rows, texts of 4,096 bytes) than the native client composes at
-  temper's pin of jig (2 rows, texts of 128 bytes, the most jig-view's
-  `Limits::compose` accepts there), so the example and the process
-  tier's configuration override both; the engine cuts each text to its
-  bound and says so (jig's `client/domain/contract.md`, section 5:
-  "A text cut to its bound ... says it was cut"). `documents.lines`
-  bounds a document's short lists and also the segments of each part's
-  path and each pattern it holds, which the native client bounds by its
-  `rows`; so `engine.limits` names it at most the client's `rows` too,
-  and a page the client could not take is refused by the engine as too
-  large, a typed answer, rather than sent and found undecodable (client.md,
-  5.4, says which pages that is at temper's pin). `documents.chips`
-  keeps jig's small value, which the client's wire takes. The engine
-  checks none of it at start: it serves whatever
-  client the deployment lets in, whose limits are the client's. A test
-  holds the example's and the process tier's configuration to the
-  native client's limits, so the two cannot drift apart unseen.
+  are within what temper's client takes: its client takes `jig-client`'s
+  limits from jig's small profile with the same `documents.` overrides
+  the example's `engine.limits` names (client.md, section 2). The engine
+  cuts each text to its bound and says so (jig's
+  `client/domain/contract.md`, 5.3). It checks none of this at
+  start: it serves whatever client the deployment lets in, whose limits
+  are the client's. A test holds the example's and the process tier's
+  configuration to temper's client's limits, so the two cannot drift
+  apart unseen.
+- **The forge's paths fit a document.** `documents.lines` bounds a
+  document's short lists and also the segments of each part's path and
+  each pattern it holds; jig's core refuses a whole document past it. So
+  `engine.limits` names it at least the segments of the deepest path the
+  forge names: a branch's, the forge's five segments then the branch's
+  own (`domain/forge.md`, section 2), as temper's branches name them. The
+  example names it, and a page of the forge's work is never refused as
+  too large (client.md, 5.4).
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
@@ -373,12 +383,13 @@ top-level `workers`, in the same order; standalone has one. Each:
   - `DIRECTORY` is the client's private directory, made 0o700 if absent,
     and refused unless it is a directory of the user's with no group or
     other permission bits (skein's `io.md`, 5.3). It holds the bearer
-    token and the small store, jig's native shell's files (jig's
-    `protocol/client.md`, sections 8 and 10; client.md, section 7).
+    token, the terminal's file, and the small store,
+    `jig-client-shell-native`'s file (jig's `protocol/client.md`,
+    sections 8 and 10; client.md, section 7).
   - `LINK_OR_ADDRESS` is the link `temper serve` printed, the first
     time, by which the client signs in (jig's `protocol/client.md`,
-    section 8); or the engine's `http://HOST:PORT`, later, when the
-    directory holds a bearer token.
+    section 8; client.md, section 7); or the clients' listener's
+    `http://HOST:PORT`, later, when the directory holds a bearer token.
   - HOST must be an IP address on loopback, in standalone; another is
     refused before anything is sent.
   - The client's limits are constants of temper's client (client.md,
@@ -466,6 +477,7 @@ one worker, complete:
     }]
   },
   "charter": 2,
+  "clients": {"listener": {"socket": "127.0.0.1:7100"}},
   "limits": {"profile": "small", "overrides": {}},
   "workers": [{"root": "workspaces", "git": "/usr/bin/git"}]
 }
@@ -483,15 +495,15 @@ not itself valid JSON):
     "deployment": ..., "owners": ..., "providers": ..., "rules": ...,
     "projects": [{"number": 1, ...}],
     "charters": [{"number": 1, ...}, {"number": 2, ...}],
-    "chats": {"charter": 1, ...},
+    "templates": [{"number": 1, ...}, {"number": 2, ...}],
     "hosts": {
       "workers": [{"name": "worker", "digest": "secrets/worker.digest"}],
       "listener": [{"in_process": "workers"}]
     },
     "llm": ...,
-    "clients": {"listener": {"socket": "127.0.0.1:7100"}, "link": true, ...},
+    "clients": {"link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {"documents.rows": 2, "documents.text_bytes": 128, "documents.lines": 2}},
+    "limits": {"profile": "small", "overrides": {"documents.lines": 8}},
     "memory_bytes": ...
   },
   "workers": [{

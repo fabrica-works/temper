@@ -1,6 +1,6 @@
 # The forge's protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-14. How the engine reaches the
+Provisional, 2026-10-03, revised 2026-10-15. How the engine reaches the
 forge: Forgejo v16.0.5's API over HTTP and JSON, the keys' markers the
 engine writes at the head of what it creates, the webhooks Forgejo sends
 back, designed now and built after standalone, and the fake forge's
@@ -512,9 +512,9 @@ Configuration's `webhooks` member is reserved, and refused until they
 are built (configuration.md, section 3).
 
 - **A listener of its own,** at the address the `webhooks` member will
-  name, never jig's clients' listener (jig's `protocol/README.md`,
-  section 6), on skein's HTTP server, over TLS where the forge reaches
-  the engine from another host. It takes `POST` on one path per forge,
+  name, apart from the clients' listener (client.md, section 8), on
+  skein's HTTP server, over TLS where the forge reaches the engine from
+  another host. It takes `POST` on one path per forge,
   one request at a time per connection, kept alive.
 - **Verified as it streams.** Forgejo signs each delivery's body with the
   webhook's secret, in `X-Forgejo-Signature` (HMAC-SHA256, in hex). The

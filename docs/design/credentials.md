@@ -1,6 +1,6 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-14. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-15. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
@@ -48,7 +48,7 @@ is open is listed in section 8.
 | a git identity | temper | a forge token, a login, an author | a private token file per identity, and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts |
 | a forge's API token | temper | a forge token | a private file per forge | the forge component | that forge's API requests | an operator replaces the file and restarts |
 | a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
-| a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `temper open`'s directory; the engine, its digest | each of the client's requests | the sign-in ends or expires |
+| a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `jig-client` in `temper open`, which keeps it in its directory; the engine, its digest | each of the client's exchanges and its stream | the sign-in ends or expires |
 | a forge's webhook secret | temper | a shared secret | after standalone (forge.md, section 5) | — | — | — |
 
 ## 3. LLM accounts
@@ -210,15 +210,21 @@ is open is listed in section 8.
   name and secret, which the engine compares in constant time with the
   digest it holds; the files are jig's worker and engine parts'
   (configuration.md, section 6).
-- **People's sign-ins are jig's** (jig's `protocol/client.md`, section 8):
-  the engine prints a link at start; `temper open` signs in by it, and
-  keeps the bearer token it is given in its private directory (client.md,
-  section 7).
+- **People's credentials are jig's** (jig's `protocol/client.md`,
+  section 8): jig mints, verifies, expires and revokes them. Its printed
+  link signs in the deployment's first owner: `temper serve` prints the
+  link at start, `temper open` signs in by it; its client holds the
+  bearer token it is given and sends it with every exchange, and the
+  terminal keeps it in its private directory, to sign in with it again
+  (client.md, section 7).
 - **jig's secrets' store** keeps sign-ins' and services' digests; temper
   keeps nothing there.
-- **The forge as a sign-in provider** comes after standalone: a component
-  of temper's to which jig's clients' side routes (jig's
-  `protocol/client.md`, section 8).
+- **The forge as a sign-in provider** comes after standalone, as temper's
+  own sign-in: routes of temper's on its clients' listener run the
+  forge's OAuth flow, read who the person is, and ask jig's clients'
+  component to mint a credential for that identity (`Mint`; jig's
+  `protocol/client.md`, section 8; client.md, section 11). The forge's
+  OAuth client secret is then temper's, a private file read at start.
 - **No TLS key** in standalone: nothing temper serves leaves the machine.
 
 ## 7. Testing

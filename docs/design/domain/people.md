@@ -1,6 +1,6 @@
 # People
 
-Provisional, 2026-10-04, revised 2026-10-14. How people take part in temper: who they are,
+Provisional, 2026-10-04, revised 2026-10-15. How people take part in temper: who they are,
 what their role in a project lets them do, what they ask of temper and
 what waits for them, the chats they hold with agents, the tasks they
 carry out themselves, and how the web shows it all. People are parties,
@@ -54,18 +54,19 @@ authority and to the tasks.
 
 ## 3. Identity and signing in
 
-- **Signing in through the forge.** The web sends a person to the forge's
-  OAuth authorisation and back; the protocol layer exchanges the code
-  and reads who they are. The domain sees a person: the forge, their user
-  id there, and their login and name for display.
+- **Signing in through the forge.** temper's server sends a person to
+  the forge's OAuth authorisation and back, on routes of its own; it
+  exchanges the code, reads who they are, and has jig mint their
+  credential (section 11). The domain sees a person: the forge, their
+  user id there, and their login and name for display.
 - **A person record** is made the first time someone signs in, and kept.
   Signing in gives temper no right to act on the forge as that person:
   the token the exchange returns is used to read who they are, and
   dropped (section 14 keeps the alternative open).
 - **Sign-ins** are kept in the store, so a restart signs nobody out:
-  their tokens, or digests of them, are written by the web's protocol
-  layer into the store's secret records, and the domain names a sign-in
-  only by its number (engine.md, 5.4). Each expires after a configured
+  digests of their credentials are written by jig's clients' component
+  into the store's secret records, and the domain names a sign-in only
+  by its number (engine.md, 5.4). Each expires after a configured
   time, and a person may end theirs.
 - **The first owners** of a deployment are named in its configuration;
   everyone else gets a role by a project's owner, or by adoption's seed
@@ -221,22 +222,26 @@ A task whose executor is a person, or a role (core.md, 3.2):
 
 ## 11. Below the domain
 
-What the clients' protocol layer owes this domain. It is jig's (jig's
-`protocol/client.md`), composed in the engine's service
-(`docs/design/protocol.md`, section 6), and temper's first client is a
-terminal client over jig's client (`docs/design/client.md`).
+What the clients' protocol layer owes this domain. It is jig's clients'
+component (jig's `protocol/client.md`), which the engine's service
+mounts on its own clients' listener with jig's default HTTP mapping
+(`docs/design/protocol.md`, section 6; `docs/design/client.md`, section
+8). temper's first client is a terminal of temper's own pages on jig's
+client (`docs/design/client.md`).
 
-- **HTTP** for requests and reads, **one stream** of server-sent events
-  per client for watches, and records from schemas both ways: jig's, and
-  temper's client wire for the forge's application requests.
-- **Signing in:** in standalone, by the link the engine prints at start,
-  as the deployment's first owner (jig's `protocol/client.md`, section 8);
-  later, with the forge as an OAuth provider, a component of temper's
-  protocol layer to which jig's clients' side routes (open, section 14).
-  Sign-ins' secrets are held by the protocol layer and named in the
-  domain by a sign-in's number.
-- **Rendering** what the domain carries as bytes: turns, decoded in the
-  client's protocol layer (jig's `protocol/client.md`, section 3).
+- **jig's messages over HTTP,** by jig's default mapping: requests and
+  reads as exchanges, **one stream** of server-sent events per client
+  for watches, and records from schemas both ways: jig's, and temper's
+  client wire for the forge's application requests.
+- **Signing in:** in standalone, by the link `temper serve` prints at
+  start, as the deployment's first owner (jig's `protocol/client.md`,
+  section 8); later, through the forge as an OAuth provider, on
+  temper's own routes, which ask jig's clients' component to mint the
+  person's credential (open, section 14). Credentials are jig's: minted,
+  verified, expired and revoked by jig, held below the domain, and named
+  in it by a sign-in's number.
+- **Rendering** what the domain carries as bytes: turns, decoded below
+  jig's client (jig's `protocol/client.md`, section 3).
 - **Keys** for requests, made by the client, carried with each request.
 
 ## 12. The world
@@ -283,7 +288,8 @@ their task, or the task ends.
   person has, and roles that span projects.
 - **Guests:** someone without a forge account, invited to one chat.
 - **Signing in through the forge:** the forge as an OAuth provider of
-  people's identities, a component of temper's protocol layer (jig's
-  `protocol/client.md`, section 8), for deployments with more than one
-  person. Default: after standalone, where the deployment's link signs
-  in its one owner.
+  people's identities, on temper's own routes, minting each person's
+  credential through jig's clients' component (section 11;
+  `docs/design/client.md`, section 11), for deployments with more than
+  one person. Default: after standalone, where the deployment's link
+  signs in its one owner.

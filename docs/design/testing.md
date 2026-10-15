@@ -24,10 +24,10 @@ what is not built yet (section 9), and what is still open (section 10).
   and real git; and the live tier, with a real model.
 - **Peers across a wire, the machine beneath.** LLM providers and the
   forge are peers, whose fakes grow into services and meet temper at the
-  wire; people use temper's client, and their fake is jig's fake person,
-  in front of it. The machine (files, processes, and the programs they
-  run: git, rg, sh, temper's own) stays one set of state machines, with
-  a face for each layer of temper it can sit under.
+  wire; people use temper's client, and their fake is skein's fake
+  person, in front of it. The machine (files, processes, and the
+  programs they run: git, rg, sh, temper's own) stays one set of state
+  machines, with a face for each layer of temper it can sit under.
 - **The fake forge is Forgejo-shaped,** API and git in one store, so a
   branch the worker pushes is the head the engine reads. Its protocol
   layer serves Forgejo's API; its git is reached by the fake git program,
@@ -65,7 +65,7 @@ world to drive.
 
 The tiers in the two suites keep the budgets of 6.1; the process and the
 live tiers, outside them, keep their own (2.6, 2.7). A browser tier
-comes with jig's browser shell (section 9).
+comes with temper's browser shell (section 9; web/architecture.md).
 
 ### 2.1 System worlds
 
@@ -77,11 +77,12 @@ the tree the worker pushes, and the outcome the run accepted is the one
 the engine records. Between the two roots it uses the protocol layer's
 own translation, without bytes (channel.md, section 7).
 
-temper's client joined to the engine's root, `tests/client`, is a system
-world too: temper's client root and view root, jig's fake person reading
-the view's tree, and temper's engine root on the engine world's store,
-hosts and forge (client.md, section 10). Section 6.3 says why it is
-joined from the first increment.
+temper's client joined to the engine's root, `tests/client`
+(`temper-client-world`), is a system world too: temper's client root
+and view, skein's fake person reading the view's tree, jig's client
+worlds' faults and jig's check, and temper's engine root on the engine world's
+store, hosts and forge (client.md, section 10). Section 6.3 says why it
+is joined from the first increment.
 
 ### 2.2 Protocol worlds
 
@@ -141,11 +142,11 @@ and 10).
   - the fake git program for every git invocation (4.3);
   - the fake forge as a service, its protocol layer over its domain
     (4.2);
-  - people: jig's fake person in front of temper's native client
-    (client.md, section 2), over jig's client link and native shell
-    (4.4).
+  - people: skein's fake person in front of temper's terminal client,
+    its domain, view and jig's native transport (client.md, section 2;
+    4.4).
 - **Stories:**
-  - a person signs in by the link the engine prints, and a chat is
+  - a person signs in by the link `temper serve` prints, and a chat is
     answered;
   - a repository is adopted through temper's client, and a goal's change
     is prepared, committed and pushed on the fake forge through the fake
@@ -189,9 +190,10 @@ and 10).
   - the throwaway Forgejo;
   - real git, the machine's, at the absolute path configuration gives it
     (configuration.md, section 4; git.md, section 3);
-  - the person: jig's fake person in front of temper's native client
-    (client.md, section 2); and, in a test of its own, `temper open`
-    itself with stdin and stdout piped (client.md, sections 6 and 10).
+  - the person: skein's fake person in front of temper's client, over
+    jig's native transport (client.md, section 2); and, in a test of its
+    own, `temper open` itself with stdin and stdout piped (client.md,
+    sections 6 and 10).
 - **The throwaway Forgejo:** v16.0.5, the binary `TEMPER_FORGEJO` names,
   with SQLite in the scratch directory, listening on loopback only. The
   test's support starts it, makes the admin user, temper's forge user,
@@ -221,23 +223,23 @@ and 10).
   6. the person finds the work, and the change's branch on the forge is
      at the run's commit.
 
-  At temper's pin of jig the native client shows no page of a task that
-  holds or is granted the forge's resources (`client.md`, 5.4). So the
-  person reads the chat that gives the goal, and finds the work, in the
-  inbox: the chat's entry, its replies counted as they arrive, and the
-  same entries after the restart; the words of the forge task's replies
-  are not read on its page. The forge's state is the story's proof of
-  the change, read through the throwaway Forgejo's API.
+  The person reads the chat that gives the goal, finds the goal on the
+  board and its plan on its page, and finds the same after the restart.
+  The forge's state is the story's proof of the change, read through the
+  throwaway Forgejo's API.
 - **The terminal,** a second test, on a scratch directory of its own:
   `temper open DIRECTORY LINK` with stdin and stdout piped signs in by
   the link `temper serve` printed, prints the inbox, adopts a repository
   as above by commands (the form's fields written with `n words`, then
   Adopt pressed with `n`), and exits 0 on `q` after a drained close. Its
   referee reads the printed pages (the inbox and the adoption's
-  outcome; the project's page its link opens once the native client
-  takes a page whose policy names the forge's patterns, and the
-  repository listed there once jig's core lists adopted resources,
-  `client.md`, 4.3 and 5.4) and the exit status.
+  outcome) and the exit status.
+- **The server's guards,** a third test, against `temper serve`'s
+  clients' listener: jig's one attack story that needs no browser, a
+  rebound Host (jig's `protocol/browser.md`, section 15): a request
+  naming a host off the list is answered `421`, and nothing it asked is
+  made. The cross-site request and the framed page need a browser, and
+  wait for temper's browser tier (section 9).
 - **In the order of building** (protocol.md, section 12): the story's
   chat first, then its change landed, then the terminal's test.
 - **Its referee:** the person's script finishes within its deadline; the
@@ -302,7 +304,7 @@ engine         domain ─ protocol ─ io   ⇄   io ─ protocol ─ domain   t
 
 People are no peer of temper's: they use temper's client, temper's own,
 which reaches the engine over jig's client protocol, and their fake is
-jig's fake person in front of it (4.4). A peer can be a client as well as
+skein's fake person in front of it (4.4). A peer can be a client as well as
 a server: after standalone, the fake forge sends webhooks to the engine
 (forge.md, section 5).
 
@@ -542,14 +544,13 @@ on the forge and through temper's client. Their fake is a scripted actor,
 drawn from the seed.
 
 - **On the fake forge** it acts as a forge user.
-- **Through temper's client** it is jig's: jig's fake person (jig's
-  `client/domain/testing.md`, section 3), reading the tree temper's view
-  root makes and acting on it, on jig's client world kit (its harness,
-  referee and faults), in `tests/client`; and the same person in front
-  of temper's native client (client.md, section 2), in the one-process
-  world and the process tier (client.md, section 10). temper has no fake
-  person of its own: `testing/temper-fake-person` retires with
-  `temper-web-domain` and `temper-web-view` (client.md, section 9).
+- **Through temper's client** it is skein's: skein's fake person
+  (skein's `ui.md`, 17.1), reading the tree temper's view makes and
+  acting on it, with jig's client test kit's faults and check (jig's
+  `client/domain/testing.md`), in `tests/client`; and the same person in
+  front of temper's terminal client (client.md, section 2), in the
+  one-process world and the process tier (client.md, section 10).
+  temper has no fake person of its own (client.md, section 9).
 
 In the engine's worlds people are scripted, ordinary Rust rather than a
 domain: each story's person looks at the forge as observed, never at its
@@ -746,7 +747,7 @@ scripted engine before it or beside it (client.md, section 10).
 crates/*/src/tests.rs               step tests
 crates/temper/tests/process.rs      the process tier (2.6), nextest profile process
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
-crates/temper-shell-terminal/tests  the terminal shell's machine world (client.md, section 10)
+crates/temper-client-shell-terminal/tests  the terminal's machine world (client.md, section 10)
 testing/temper-fake-forge-domain    the fake forge's domain (4.2)
 testing/temper-fake-forge-protocol  the fake forge's protocol layer: Forgejo's API over skein's HTTP server
 testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
@@ -757,7 +758,7 @@ tests/engine/protocol-forge         the forge's protocol world (2.2)
 tests/worker/protocol-git           the git component's machine world (git.md, section 9)
 tests/system                        the composed system world (2.1)
 tests/conformance                   the engine root on jig's conformance harness
-tests/client                        temper's client with jig's fake person, joined to the engine's root (2.1, 6.3)
+tests/client                        temper-client-world: temper's client with skein's fake person, joined to the engine's root (2.1, 6.3)
 tests/one-process                   the one-process world (2.5)
 tests/*/*/tests/*.rs                a world's focused tests
 tests/*/*/tests/fuzzy_*.rs          its fuzzy tests: random worlds, domains driven at random
@@ -778,19 +779,17 @@ scripts/proof-live.sh               the live tier
 - **Machine worlds live beside what they test:** the forge component's
   in `tests/engine/protocol-forge`'s crate, beside its protocol world
   (forge.md, section 10); the git component's in
-  `tests/worker/protocol-git` (git.md, section 9); the terminal shell's
-  in `temper-shell-terminal`'s own tests (client.md, section 10).
-- **What goes:** `testing/temper-fake-person` and `tests/web/domain`
-  retire with `temper-web-domain` and `temper-web-view`, in the plan
-  that lands `temper-client-domain` and `tests/client` (client.md,
-  section 9); no `tests/web/*` stays.
+  `tests/worker/protocol-git` (git.md, section 9); the terminal's in
+  `temper-client-shell-terminal`'s own tests (client.md, section 10).
+- **No web crates:** neither `testing/temper-fake-person` nor any
+  `tests/web/*` is temper's (client.md, section 9).
 
 ## 9. Not built yet
 
 By tier:
 
 - **Step tests:** the codec crates (`temper-protocol-worker-wire`,
-  `temper-protocol-store`, `temper-protocol-client-wire`), Forgejo's
+  `temper-protocol-store`, `temper-client-protocol-wire`), Forgejo's
   documents, the routing's translations, git's builders and parsers.
 - **Transcripts** of the real peers temper speaks to:
   Forgejo's answers, recorded by `tools/forgejo-conformance`, and git's,
@@ -810,9 +809,9 @@ By tier:
 - **The one-process world,** with the fake forge as a service and the
   fake git program.
 - **The process tier and the live tier,** with their scripts.
-- **The browser tier,** with jig's browser shell: temper's bundle, the
-  forge's pages and signing in, in Chromium, a suite of its own outside
-  the focused and fuzzy suites (web/architecture.md, section 4).
+- **The browser tier,** with temper's browser shell: temper's bundle,
+  its pages and signing in, in Chromium, a suite of its own outside the
+  focused and fuzzy suites (web/architecture.md, section 4).
 - **Containment's checks,** which wait for skein's contained process
   trees.
 - **The referee** in the worlds that still check their scenarios inline,
@@ -830,8 +829,8 @@ By fake:
   GitHub's API after standalone.
 - **Machine:** the fake git program; rg and sh as programs with
   command-line faces; the shell subset.
-- **People:** none of temper's: jig's fake person, in front of temper's
-  view root and of temper's native client.
+- **People:** none of temper's: skein's fake person, in front of
+  temper's view and of temper's terminal client.
 
 ## 10. Open questions
 
