@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-14. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-15. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -273,13 +273,17 @@ section 8; testing-strategy.md, 2.9).
   and one small change, made by the model in a repository of the
   throwaway Forgejo, adopted as in 2.6, and pushed by real git. The story
   ends once the change's branch on the forge is at the run's commit; it
-  does not wait for the change to land.
+  does not wait for the change to land. A story also ends at its task's
+  first terminal failure, which fails the test at once, naming it: it
+  never waits out the run's 15 minutes after its task has ended.
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts.
 - **Budget:** at most 25 completions and 15 minutes in all. The live
   configuration's charters bound each run's turns so the two stories
   together make at most 25 completions, the script stops the run at 15
   minutes, and the test fails when the transcripts count more than 25.
+  Each run's summary, a failed run's included, records its completions
+  and its wall time, which a plan totals (skein's development.md, 5.5).
 - **Outside the suites:** nextest profile `live`, run only by
   `scripts/proof-live.sh`, one at a time, never at the gate.
 
@@ -593,6 +597,13 @@ temper's fakes: each conversation's script for the LLM, the repositories
 on the forge with their files and checks, the items and the people, and
 the faults to inject. A scenario cues its scripts through content: a
 repository's files say which script its run follows.
+
+A scenario's limits are the shipped profile's, `small`, built by
+`temper-service`'s limits module (configuration.md, section 7), in every
+world, fixture and process-tier configuration: none is set by hand. A
+scenario that needs another value changes it by name on the profile's,
+with the reason beside it. A limit set by hand hides what the shipped
+profile refuses, and the shipped numbers drift toward the fixtures'.
 
 ### 5.2 The referee
 
