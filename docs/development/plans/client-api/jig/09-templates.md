@@ -276,7 +276,13 @@ Files:
 - `crates/jig-protocol-store/`: `schema/people-v3.schema` (records for
   the override and its fields; `templates: list 16 TemplateOverride` in
   `PolicyValue`; `templates` in `PolicyChange`), `src/codec/people/policy.rs`,
-  the generated family, the goldens, `src/tests/fixtures.rs:369`.
+  the generated family, the goldens, `src/tests/fixtures.rs:369`, and
+  `src/tests/format.rs`'s five expected values of the fixture store's
+  value and page bounds, which the policy's `templates` raises (`:76`,
+  `:81`, `:90`, `:201`: value `80_949`; `:86`: page `81_061`, at jig
+  `e1b483760`), each set to what the new code computes (ruling 147):
+  derived values of the Shape, not "the case the Shape changes"'s four
+  assertions.
 - Users: `Settings` literals (5 in jig: `jig-domain-core/src/tests.rs:263`,
   `jig-protocol-config/src/core.rs:54`, `testing/jig-test-domain/src/tests/fixtures.rs:117`,
   `tests/core/src/world.rs:301`, `tests/engine-clients/src/fixtures/receiving.rs:33`),
