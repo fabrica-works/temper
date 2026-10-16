@@ -253,10 +253,12 @@ fn a_smith_change_with_failed_ci_is_repaired_reviewed_and_landed() {
         }
     }
     let repair = world.assigned.get(2).expect("failed CI assigned a repair").clone();
+    let failed_step = b"Failed step: 1 Run build\nEnd of its log:\n[log truncated before this]\n";
     assert!(
         repair.sections.iter().any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Ci)
             && matches!(&section.body, engine::BriefBody::Text(words)
-            if words.windows(b"failing check build 3".len()).any(|part| part == b"failing check build 3"))),
+            if words.windows(failed_step.len()).any(|part| part == failed_step)
+                && words.windows(b"failing check build 3\n".len()).any(|part| part == b"failing check build 3\n"))),
         "CI sections: {:?}",
         repair.sections
     );

@@ -1174,18 +1174,19 @@ fn check_gate_repair(no_ci: bool) {
                 && change.change.repairs == 1))));
 }
 
-#[test]
-fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
-    let (mut world, _chat, producer, branch) = change_world(false, 0, None);
-    world.external(
-        1,
-        raw::Op::Write(raw::Write::Status { commit: 1, context: Box::from(&b"build"[..]), state: raw::Check::Passed }),
-    );
+/// Temper 03.1's fake workflow step and log literals, read by hand.
+const BUILD_STEP: &[u8] = b"Failed step: 1 Run build\nEnd of its log:\n[log truncated before this]\n";
+const BUILD_LOG_END: &[u8] = b"failing check build 3\n";
+/// Temper 03.1's cancelled job's completion log, read by hand.
+const JOB_LOG_END: &[u8] = b"job build cancelled\n";
+
+/// Push the producer's head, fail build, end the producer, and await its repair.
+fn failed_ci_repair(world: &mut World, producer: &engine::Assignment, branch: &[u8]) -> engine::Assignment {
     assert!(matches!(
-        world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
+        world.external(2, raw::Op::Git(raw::Git::Create { branch: Box::from(branch), commit: 1 })),
         raw::Answer::Branch(raw::Created::Created)
     ));
-    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"first", 1)
+    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", branch, b"file", b"first", 1)
         .expect("producer pushed its branch");
     world.external(
         1,
@@ -1218,79 +1219,67 @@ fn a_failed_ci_repair_brief_contains_the_bounded_job_log() {
             break;
         }
     }
-    assert!(
-        world.assigned.len() >= 3,
-        "failed CI did not assign repair: task2={:?}; task3={:?}; task4={:?}; forge={:?}",
-        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(2)))),
-        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(3)))),
-        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(4)))),
-        world.store.rows.values().filter(|row| matches!(row, Record::Forge { .. })).collect::<Vec<_>>()
+    world.assigned.get(2).expect("Failed CI assigned a repair").clone()
+}
+
+/// The words of a repair's CI section.
+fn ci_words(repair: &engine::Assignment) -> &[u8] {
+    repair
+        .sections
+        .iter()
+        .find_map(|section| match &section.body {
+            engine::BriefBody::Text(words) if section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Ci) => {
+                Some(words.as_ref())
+            }
+            engine::BriefBody::Text(_) | engine::BriefBody::Missing(_) => None,
+        })
+        .unwrap_or_else(|| panic!("No CI section: {:?}", repair.sections))
+}
+
+fn contains(words: &[u8], part: &[u8]) -> bool {
+    words.windows(part.len()).any(|window| window == part)
+}
+
+#[test]
+fn a_failed_ci_repair_brief_names_the_failed_step_and_its_logs_end() {
+    let (mut world, _chat, producer, branch) = change_world(false, 0, None);
+    world.external(
+        1,
+        raw::Op::Write(raw::Write::Status { commit: 1, context: Box::from(&b"build"[..]), state: raw::Check::Passed }),
     );
-    let repair = world.assigned[2].clone();
+    let repair = failed_ci_repair(&mut world, &producer, &branch);
     assert!(
         matches!(repair.workspace.repositories[0].start, engine::ForgeStart::Branch(ref name) if name.as_ref() == branch.as_ref())
     );
+    let words = ci_words(&repair);
+    assert!(contains(words, BUILD_STEP), "{}", String::from_utf8_lossy(words));
+    assert!(contains(words, BUILD_LOG_END), "{}", String::from_utf8_lossy(words));
+}
+
+#[test]
+fn a_failed_ci_with_no_failed_step_briefs_the_end_of_the_jobs_log() {
+    let (mut world, _chat, producer, branch) = change_world(false, 0, None);
+    fake::set_failing(&mut world.fake, b"org/repo", b"build", raw::Failing::NoStep);
+    let repair = failed_ci_repair(&mut world, &producer, &branch);
+    let words = ci_words(&repair);
     assert!(
-        repair.sections.iter().any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Ci)
-            && matches!(&section.body, engine::BriefBody::Text(words)
-            if words.windows(b"failing check build 3".len()).any(|part| part == b"failing check build 3")
-                && words.windows(b"[job log truncated]".len()).any(|part| part == b"[job log truncated]"))),
-        "CI sections: {:?}",
-        repair.sections
+        contains(words, b"No step failed. End of the job's log:\n[log truncated before this]\n"),
+        "{}",
+        String::from_utf8_lossy(words)
     );
+    assert!(contains(words, JOB_LOG_END), "{}", String::from_utf8_lossy(words));
+    assert!(!contains(words, b"Failed step: "), "{}", String::from_utf8_lossy(words));
 }
 
 #[test]
 fn an_unreadable_failed_job_log_is_named_and_repair_still_runs() {
     let (mut world, _chat, producer, branch) = change_world(false, 0, None);
     world.fail_job_reads = true;
-    assert!(matches!(
-        world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
-        raw::Answer::Branch(raw::Created::Created)
-    ));
-    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"first", 1)
-        .expect("producer pushed its branch");
-    world.external(
-        1,
-        raw::Op::Write(raw::Write::Status {
-            commit: head,
-            context: Box::from(&b"build"[..]),
-            state: raw::Check::Failed,
-        }),
-    );
-    let event = world.protocol.answer(
-        Token::new(7),
-        producer.task,
-        producer.attempt,
-        5,
-        tasks::End::Finished {
-            result: tasks::TaskResult::Change {
-                connector: 0,
-                kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
-                words: Box::from(&b"pushed"[..]),
-            },
-            cancel_delegates: false,
-        },
-        engine::Parts::none(),
-    );
-    world.send(event);
-    for _ in 0..200 {
-        world.tick();
-        if world.assigned.len() >= 3 {
-            break;
-        }
-    }
-    let repair = world.assigned.get(2).expect("repair assigned despite missing job log");
-    assert!(
-        repair.sections.iter().any(|section| section.kind == engine::BriefKind::Forge(engine::ForgeBriefKind::Ci)
-            && matches!(&section.body, engine::BriefBody::Text(words)
-            if words.windows(b"[job log could not be read]".len()).any(|part| part == b"[job log could not be read]")
-                && words.windows(b"Description:".len()).any(|part| part == b"Description:")
-                && words.windows(b"Link:".len()).any(|part| part == b"Link:"))),
-        "CI sections: {:?}",
-        repair.sections
-    );
+    let repair = failed_ci_repair(&mut world, &producer, &branch);
+    let words = ci_words(&repair);
+    assert!(contains(words, b"[job log could not be read]"), "{}", String::from_utf8_lossy(words));
+    assert!(contains(words, b"Description:"), "{}", String::from_utf8_lossy(words));
+    assert!(contains(words, b"Link:"), "{}", String::from_utf8_lossy(words));
 }
 
 fn failed_ci_with_delayed_brief() -> (World, u64, u64) {

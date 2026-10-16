@@ -68,6 +68,12 @@ impl World {
             limits.authority.facts = 8;
         }
         if with_change {
+            // The CI section holds its head, three check lines, failed step and 76-byte
+            // log end (352 bytes), as forge_routes.rs's change stories size it.
+            // Walking's CI budget 128 and read bound 256 lose the log's end.
+            limits.brief.read_bytes = 512;
+            limits.brief.budgets.ci = 384;
+            limits.brief.brief_bytes = 768;
             limits.tasks.tasks = 12;
             limits.tasks.project_tasks = 12;
             limits.tasks.delegates = 4;

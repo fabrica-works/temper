@@ -758,3 +758,21 @@ fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
         }]
     );
 }
+
+#[test]
+fn a_ci_sections_words_keep_their_end_and_others_their_start() {
+    for (tail, gathered, cut) in [(true, b"cdefghij", b"ghij"), (false, b"abcdefgh", b"abcd")] {
+        let mut words = brief::BriefWords::with_capacity(8, tail);
+        brief::append(&mut words, b"abcdefghij");
+        assert_eq!(
+            brief::brief_part(&words, 1, 8),
+            BriefRead::Got { bytes: Box::from(&gathered[..]), left: 2 },
+            "Tail: {tail}",
+        );
+        assert_eq!(
+            brief::brief_part(&words, 1, 4),
+            BriefRead::Got { bytes: Box::from(&cut[..]), left: 6 },
+            "Tail: {tail}",
+        );
+    }
+}

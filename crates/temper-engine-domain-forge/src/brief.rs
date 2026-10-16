@@ -27,14 +27,15 @@ pub(crate) struct BriefFetch {
 }
 
 #[derive(Debug)]
-struct BriefWords {
+pub(crate) struct BriefWords {
     bytes: List<u8>,
     left: u64,
+    tail: bool,
 }
 
 impl BriefWords {
-    fn with_capacity(capacity: u32) -> BriefWords {
-        BriefWords { bytes: List::with_capacity(capacity), left: 0 }
+    pub(crate) fn with_capacity(capacity: u32, tail: bool) -> BriefWords {
+        BriefWords { bytes: List::with_capacity(capacity), left: 0, tail }
     }
 }
 
@@ -58,12 +59,19 @@ enum PullMode {
     Other,
 }
 
-fn append(out: &mut BriefWords, bytes: &[u8]) {
+pub(crate) fn append(out: &mut BriefWords, bytes: &[u8]) {
     for byte in bytes {
         if out.bytes.room() > 0 {
             out.bytes.push(*byte).expect("checked message room");
         } else {
             out.left = out.left.saturating_add(1);
+            if out.tail && !out.bytes.is_empty() {
+                for index in 1..out.bytes.len() {
+                    *out.bytes.get_mut(index.saturating_sub(1)).expect("Within words") =
+                        *out.bytes.get(index).expect("Within words");
+                }
+                *out.bytes.get_mut(out.bytes.len().saturating_sub(1)).expect("Nonempty words") = *byte;
+            }
         }
     }
 }
@@ -76,15 +84,16 @@ fn append_hex(out: &mut BriefWords, bytes: &[u8]) {
     }
 }
 
-fn brief_part(words: &BriefWords, parts: u32, bytes: u32) -> BriefRead {
+pub(crate) fn brief_part(words: &BriefWords, parts: u32, bytes: u32) -> BriefRead {
     if parts == 0 {
         return BriefRead::Failed;
     }
     let kept = words.bytes.as_slice().len().min(usize::try_from(bytes).expect("u32 fits usize"));
+    let start = if words.tail { words.bytes.as_slice().len().saturating_sub(kept) } else { 0 };
     BriefRead::Got {
-        bytes: Box::from(words.bytes.as_slice().get(..kept).expect("kept is within source")),
+        bytes: Box::from(words.bytes.as_slice().get(start..start.saturating_add(kept)).expect("Kept is within source")),
         left: words.left.saturating_add(
-            u64::try_from(words.bytes.as_slice().len().checked_sub(kept).expect("kept is within source"))
+            u64::try_from(words.bytes.as_slice().len().checked_sub(kept).expect("Kept is within source"))
                 .expect("bounded section"),
         ),
     }
@@ -128,7 +137,7 @@ pub(super) fn brief_pull(
         | change::State::Landed { .. }
         | change::State::Held { .. } => PullMode::Other,
     };
-    let words = BriefWords::with_capacity(bytes);
+    let words = BriefWords::with_capacity(bytes, false);
     let call = Token::new(owner.raw() | (1_u64 << 61_u32) | (1_u64 << 59_u32));
     let fetch = BriefFetch {
         owner,
@@ -305,13 +314,23 @@ pub(crate) fn brief_answer(
         }
         answer if fetch.stage == BriefStage::Job => {
             match answer {
-                Ok(client::api::Answer::Job { attempt, step: _, log, truncated }) if attempt.head == fetch.head.0 => {
-                    append(&mut fetch.words, b"Job log tail:\n");
+                Ok(client::api::Answer::Job { attempt, step, log, truncated }) if attempt.head == fetch.head.0 => {
+                    if let Some(client::api::Step { number, name }) = step {
+                        append(&mut fetch.words, b"Failed step: ");
+                        append(&mut fetch.words, &decimal(u64::from(number)));
+                        if !name.is_empty() {
+                            append(&mut fetch.words, b" ");
+                            append(&mut fetch.words, &name);
+                        }
+                        append(&mut fetch.words, b"\nEnd of its log:\n");
+                    } else {
+                        append(&mut fetch.words, b"No step failed. End of the job's log:\n");
+                    }
+                    if truncated {
+                        append(&mut fetch.words, b"[log truncated before this]\n");
+                    }
                     append(&mut fetch.words, &log);
                     append(&mut fetch.words, b"\n");
-                    if truncated {
-                        append(&mut fetch.words, b"[job log truncated]\n");
-                    }
                 }
                 Ok(_) | Err(_) => append(&mut fetch.words, b"[job log could not be read]\n"),
             }
@@ -425,7 +444,7 @@ pub(super) fn brief_reviews(
         return Some(BriefRead::Failed);
     }
     let repository = row.repository;
-    let mut words = BriefWords::with_capacity(bytes);
+    let mut words = BriefWords::with_capacity(bytes, false);
     for remark in &row.gate_remarks {
         if remark.head == head.0 {
             append(&mut words, b"Gate remarks: ");
@@ -502,7 +521,7 @@ pub(super) fn brief_ci(
         return Some(BriefRead::Failed);
     }
     let repository = row.repository;
-    let mut words = BriefWords::with_capacity(bytes);
+    let mut words = BriefWords::with_capacity(bytes, true);
     append(&mut words, b"Repair the failed check at change head ");
     append_hex(&mut words, &head.0[..8]);
     append(&mut words, b". Push a new head and wait for checks there.\n");
