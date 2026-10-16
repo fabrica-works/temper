@@ -4,18 +4,19 @@ use crate::{
     Limits, forge,
     words::{Word, Words},
 };
-use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
+use jig_view::{JigBindings, Owner};
 use skein_lib::Queue;
+use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
 use temper_client_domain::{Action, Domain};
 /// The composed semantic tree and jig's bindings for its last build.
 #[derive(Debug)]
 pub struct View {
-    render: jig_view::View,
+    render: skein_ui::View,
     jig_words: jig_view::words::Words,
     forge_words: Words,
     jig: JigBindings,
     forge: forge::bindings::Bindings,
-    nav: jig_view::SlotRef,
+    nav: skein_ui::SlotRef,
     limits: Limits,
 }
 impl View {
@@ -30,7 +31,7 @@ impl View {
         assert!(forge_words.connector == forge, "phrasebook belongs to its forge connector");
         assert!(crate::worst_case(limits, domain, &jig_words, &forge_words).is_some(), "view capacities are checked");
         View {
-            render: jig_view::View::new(&limits.tree),
+            render: skein_ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             nav: forge::nav(forge),
@@ -60,7 +61,9 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     if !jig_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig) {
         if let Some(form) = root.forge().form() {
             let project = forge::page::project_name(root.jig(), form.project, &view.jig_words);
+            builder.open(Role::Main);
             forge::page::page(&mut builder, form, &project, &view.forge_words, &view.jig_words, &mut view.forge);
+            builder.close();
         }
         jig_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);
     }
@@ -68,9 +71,9 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     for pass in 0..2 {
         for slot in builder.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
-            let filled = match slot.reference.owner {
-                Owner::Jig | Owner::Other { .. } => false,
-                Owner::Side { connector } => {
+            let filled = match Owner::from_opaque(slot.reference.owner) {
+                Some(Owner::Jig) | None => false,
+                Some(Owner::Application { number: connector }) => {
                     if connector != root.forge_number() {
                         false
                     } else if slot.reference == view.nav {
@@ -117,18 +120,18 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
 #[expect(clippy::manual_map, reason = "step code explicitly wraps the owner action")]
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
-    match bound.binding.owner {
-        Owner::Jig => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+    match Owner::from_opaque(bound.binding.owner) {
+        Some(Owner::Jig) => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(action) => Some(Action::Jig(action)),
             None => None,
         },
-        Owner::Side { connector } => {
+        Some(Owner::Application { number: connector }) => {
             if connector == view.forge_words.connector {
                 forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
             } else {
                 None
             }
         }
-        Owner::Other { .. } => None,
+        None => None,
     }
 }

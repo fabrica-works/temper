@@ -7,8 +7,8 @@ use jig_domain_client::{
     boundary::Offset,
     contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd},
 };
-use jig_view::{Act, NodeId, Patch, Tree};
 use skein_lib::{Env, List, Queue, RequestEnvelope, Time};
+use skein_ui::{Act, NodeId, Patch, Tree};
 use temper_client_domain::{self as domain, Action, Address, Event, JigOut, Request};
 use temper_client_view as view;
 
@@ -40,6 +40,9 @@ impl App for Temper {
         let mut root = domain::new(&limits, seed, domain::forge::Config { connector: fixtures::FORGE, version: 1 });
         domain::configure_navigation(&mut root, domain::navigation(&limits)).expect("navigation fits");
         (root, view::View::new(&bounds, &limits, jig, forge, fixtures::FORGE))
+    }
+    fn view_limits(view: &Self::View) -> skein_ui::Limits {
+        view.limits().tree
     }
     fn start(address: Address, kept: Vec<Self::Record>, offset: i32) -> Event {
         let mut records = List::with_capacity(u32::try_from(kept.len()).expect("small store count"));
@@ -143,14 +146,14 @@ impl App for Temper {
         if adoption_page(tree) {
             let mut state = jig_client_world::harness::CardSeen::Waiting;
             for node in tree.nodes() {
-                if node.role == jig_view::Role::Button
+                if node.role == skein_ui::Role::Button
                     && node.name.as_deref() == Some(b"Adopt")
-                    && node.states.as_slice().contains(&jig_view::State::Disabled)
+                    && node.states.as_slice().contains(&skein_ui::State::Disabled)
                 {
                     state = jig_client_world::harness::CardSeen::Deciding;
                 }
-                if node.role == jig_view::Role::Alert
-                    || node.role == jig_view::Role::Status
+                if node.role == skein_ui::Role::Alert
+                    || node.role == skein_ui::Role::Status
                         && node.name.as_deref().is_some_and(|name| {
                             name.starts_with(b"Adopted ") || name.starts_with(b"It is not known whether ")
                         })
@@ -194,9 +197,9 @@ impl App for Temper {
         if adoption_page(tree)
             && tree.nodes().iter().any(|value| {
                 value.id == node
-                    && value
-                        .binding
-                        .is_some_and(|binding| binding.owner == jig_view::Owner::Side { connector: fixtures::FORGE })
+                    && value.binding.is_some_and(|binding| {
+                        binding.owner == (jig_view::Owner::Application { number: fixtures::FORGE }).opaque()
+                    })
             })
         {
             Some(adoption_card())
@@ -210,7 +213,7 @@ fn adoption_card() -> CardKey {
 }
 fn adoption_page(tree: &Tree) -> bool {
     tree.nodes().iter().any(|node| {
-        node.role == jig_view::Role::Heading { level: 1 }
+        node.role == skein_ui::Role::Heading { level: 1 }
             && node.text.as_slice().iter().any(|run| run.text.starts_with(b"Adopt a repository into "))
     })
 }

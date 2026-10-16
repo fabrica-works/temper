@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::command::{self, Command, Line, Lines, Refusal};
-use jig_view::{Act, Tree};
+use skein_ui::{Act, Tree};
 
 #[test]
 fn each_command_line_reads_as_its_command() {
@@ -73,13 +73,13 @@ fn a_number_kept_across_a_rebuild_names_the_same_node() {
     let node = numbers.node(4).expect("check shown");
     let limits = fixtures::tree_limits();
     for (name, state, bound, expected) in [
-        ("bound", jig_view::State::Pressed, true, Command::Act { node, act: Act::Toggle }),
-        ("disabled", jig_view::State::Disabled, true, Command::Refused(Refusal::Gone { number: 4 })),
-        ("unbound", jig_view::State::Pressed, false, Command::Refused(Refusal::Gone { number: 4 })),
+        ("bound", skein_ui::State::Pressed, true, Command::Act { node, act: Act::Toggle }),
+        ("disabled", skein_ui::State::Disabled, true, Command::Refused(Refusal::Gone { number: 4 })),
+        ("unbound", skein_ui::State::Pressed, false, Command::Refused(Refusal::Gone { number: 4 })),
     ] {
         let mut next = fixtures::control_tree_with(Some(state), bound);
-        jig_view::diff(&old, &mut next, &limits, &mut old.len(), &mut skein_lib::Queue::with_capacity(limits.patches));
-        assert_eq!(next.find(node).expect("same check identity").role, jig_view::Role::Check, "{name}: identity");
+        skein_ui::diff(&old, &mut next, &limits, &mut old.len(), &mut skein_lib::Queue::with_capacity(limits.patches));
+        assert_eq!(next.find(node).expect("same check identity").role, skein_ui::Role::Check, "{name}: identity");
         assert_eq!(command::read(b"4", Some(&numbers), &next), expected, "{name}: command");
     }
 }

@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::render;
-use jig_view::{Role, State};
+use skein_ui::{Role, State};
 
 #[test]
 fn each_adoption_form_state_prints_as_its_golden_file() {

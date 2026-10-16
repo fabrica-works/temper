@@ -1,6 +1,6 @@
 use jig_client_world::harness::{Front, Until};
-use jig_fake_person::{Find, Step};
-use jig_view::Role;
+use skein_fake_person::{Find, Step};
+use skein_ui::Role;
 use skein_world::domain::Verdict;
 use temper_client_world::fixtures;
 
@@ -67,7 +67,7 @@ fn a_held_chats_escalation_released_from_its_task_page() {
             Step::See { find: Find::exactly_named(Role::Button, b"Release"), within: fixtures::WITHIN },
             Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
             Step::Press { find: Find::named(Role::Button, b"Confirm") },
-            Step::Press { find: Find::exactly_named(Role::Button, b"Activity") },
+            Step::Press { find: Find::exactly_named(Role::Tab, b"Activity") },
             Step::See { find: Find::text(b"Released"), within: fixtures::WITHIN },
         ],
     );

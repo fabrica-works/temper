@@ -7,8 +7,8 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
-use jig_view::{Node, NodeId, Role, Run, State, Tree};
 use skein_lib::{Decimal, List, Writer};
+use skein_ui::{Node, NodeId, Role, Run, State, Tree};
 
 /// The most lines, bytes and numbered controls of one whole page print.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -46,7 +46,7 @@ pub struct Print {
 }
 /// Checked upper envelope: text replacement, run marks, state words and indentation.
 #[must_use]
-pub fn bounds(tree: &jig_view::Limits) -> Option<Bounds> {
+pub fn bounds(tree: &skein_ui::Limits) -> Option<Bounds> {
     let lines = tree.nodes.checked_add(tree.text_bytes)?.checked_add(1)?;
     let indentation = tree.depth.checked_mul(2)?.checked_add(6)?;
     let bytes = u64::from(lines)
@@ -272,15 +272,34 @@ fn walk(tree: &Tree, frame: &Frame, output: &mut Output, numbers: &mut Numbers, 
 fn shape(node: &Node) -> (bool, u32, bool) {
     match node.role {
         Role::Page | Role::Item | Role::TreeItem | Role::Table | Role::Slot => (false, 0, false),
-        Role::Region | Role::Figure | Role::Dialog | Role::List | Role::Tree => (node.name.is_some(), 0, false),
+        Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::Select
+        | Role::Region
+        | Role::Figure
+        | Role::Dialog
+        | Role::List
+        | Role::Tree => (node.name.is_some(), 0, false),
         Role::ChoiceGroup | Role::Tabs | Role::Log | Role::Drawing | Role::Text => (true, 0, false),
         Role::Code => (true, 4, true),
         Role::Description => (true, 2, true),
         Role::Heading { .. }
         | Role::Paragraph
         | Role::Time
+        | Role::ColumnHeader
+        | Role::RowHeader
+        | Role::Image
         | Role::Cell
         | Role::Term
+        | Role::Option
+        | Role::MenuItem
+        | Role::Disclosure
         | Role::Button
         | Role::Tab
         | Role::Link
@@ -299,7 +318,20 @@ fn shape(node: &Node) -> (bool, u32, bool) {
 fn child_indent(node: &Node) -> u32 {
     match node.role {
         Role::Item | Role::TreeItem | Role::ChoiceGroup | Role::Tabs | Role::Log | Role::Drawing => 2,
-        Role::Region | Role::Figure | Role::Dialog | Role::List | Role::Tree => {
+        Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::Select
+        | Role::Region
+        | Role::Figure
+        | Role::Dialog
+        | Role::List
+        | Role::Tree => {
             if node.name.is_some() {
                 2
             } else {
@@ -312,9 +344,15 @@ fn child_indent(node: &Node) -> u32 {
         | Role::Text
         | Role::Table
         | Role::Row
+        | Role::ColumnHeader
+        | Role::RowHeader
+        | Role::Image
         | Role::Cell
         | Role::Term
         | Role::Description
+        | Role::Option
+        | Role::MenuItem
+        | Role::Disclosure
         | Role::Button
         | Role::Link
         | Role::TextField
@@ -334,10 +372,26 @@ fn child_indent(node: &Node) -> u32 {
 }
 fn numbered(node: &Node) -> bool {
     match node.role {
-        Role::Button | Role::Link | Role::TextField | Role::TextArea | Role::Choice | Role::Check | Role::Tab => {
-            node.external.is_none()
-        }
+        Role::Option
+        | Role::MenuItem
+        | Role::Disclosure
+        | Role::Button
+        | Role::Link
+        | Role::TextField
+        | Role::TextArea
+        | Role::Choice
+        | Role::Check
+        | Role::Tab => node.external.is_none(),
         Role::Page
+        | Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::Select
         | Role::Region
         | Role::Heading { .. }
         | Role::Paragraph
@@ -346,6 +400,9 @@ fn numbered(node: &Node) -> bool {
         | Role::Item
         | Role::Table
         | Role::Row
+        | Role::ColumnHeader
+        | Role::RowHeader
+        | Role::Image
         | Role::Cell
         | Role::Term
         | Role::Description
@@ -368,16 +425,7 @@ fn numbered(node: &Node) -> bool {
     }
 }
 fn line(tree: &Tree, index: u32, node: &Node, output: &mut Output, numbers: &mut Numbers) {
-    if numbered(node) {
-        if tree.bound(node.id).is_some() && !node.states.as_slice().contains(&State::Disabled) {
-            numbers.nodes.push(node.id).expect("numbers fit view bindings");
-            output.put(b"[");
-            output.decimal(numbers.count());
-            output.put(b"] ");
-        } else {
-            output.put(b"[-] ");
-        }
-    }
+    number_node(tree, node, output, numbers);
     match node.role {
         Role::Heading { level } => {
             for _ in 0..level {
@@ -386,7 +434,16 @@ fn line(tree: &Tree, index: u32, node: &Node, output: &mut Output, numbers: &mut
             output.put(b" ");
             words(tree, index, output);
         }
-        Role::Region
+        Role::Banner
+        | Role::Navigation
+        | Role::Main
+        | Role::Complementary
+        | Role::ContentInfo
+        | Role::Form
+        | Role::Search
+        | Role::Menu
+        | Role::Select
+        | Role::Region
         | Role::Figure
         | Role::Dialog
         | Role::List
@@ -398,7 +455,7 @@ fn line(tree: &Tree, index: u32, node: &Node, output: &mut Output, numbers: &mut
             name(tree, index, output);
             output.put(b":");
         }
-        Role::Button | Role::Tab => name(tree, index, output),
+        Role::Option | Role::MenuItem | Role::Disclosure | Role::Button | Role::Tab => name(tree, index, output),
         Role::Link => {
             name(tree, index, output);
             if let Some(url) = &node.external {
@@ -448,22 +505,44 @@ fn line(tree: &Tree, index: u32, node: &Node, output: &mut Output, numbers: &mut
             output.put(b":");
         }
         Role::Separator => output.put(b"--"),
-        Role::Row => {
-            let mut first = true;
-            for at in index.checked_add(1).expect("row child index fits")..end(index, node) {
-                if tree.get(at).expect("row descendant exists").role == Role::Cell {
-                    if !first {
-                        output.put(b" | ");
-                    }
-                    first = false;
-                    words(tree, at, output);
-                }
-            }
-        }
-        Role::Paragraph | Role::Text | Role::Time | Role::Cell | Role::Description | Role::Code | Role::Quote => {
+        Role::Row => row(tree, index, node, output),
+        Role::Paragraph
+        | Role::Text
+        | Role::Time
+        | Role::ColumnHeader
+        | Role::RowHeader
+        | Role::Image
+        | Role::Cell
+        | Role::Description
+        | Role::Code
+        | Role::Quote => {
             words(tree, index, output);
         }
         Role::Page | Role::Item | Role::TreeItem | Role::Table | Role::Slot => {}
+    }
+}
+fn row(tree: &Tree, index: u32, node: &Node, output: &mut Output) {
+    let mut first = true;
+    for at in index.checked_add(1).expect("row child index fits")..end(index, node) {
+        if tree.get(at).expect("row descendant exists").role == Role::Cell {
+            if !first {
+                output.put(b" | ");
+            }
+            first = false;
+            words(tree, at, output);
+        }
+    }
+}
+fn number_node(tree: &Tree, node: &Node, output: &mut Output, numbers: &mut Numbers) {
+    if numbered(node) {
+        if tree.bound(node.id).is_some() && !node.states.as_slice().contains(&State::Disabled) {
+            numbers.nodes.push(node.id).expect("numbers fit view bindings");
+            output.put(b"[");
+            output.decimal(numbers.count());
+            output.put(b"] ");
+        } else {
+            output.put(b"[-] ");
+        }
     }
 }
 fn pressed(node: &Node) -> bool {
@@ -483,7 +562,6 @@ fn states(node: &Node, output: &mut Output) {
         (State::Invalid, b" (invalid)"),
         (State::Pressed, b" (pressed)"),
         (State::Selected, b" (selected)"),
-        (State::Provisional, b" (provisional)"),
         (State::SubmitsOnEnter, b" (enter sends)"),
     ] {
         let marked =

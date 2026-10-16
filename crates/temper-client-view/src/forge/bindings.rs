@@ -1,7 +1,7 @@
 //! One bounded table for the last tree, with typed form input (client.md, 5.2).
 use alloc::boxed::Box;
-use jig_view::{Act, Binding, Owner};
 use skein_lib::{List, Token};
+use skein_ui::{Act, Binding};
 use temper_client_domain::{Action, forge};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Meaning {
@@ -38,7 +38,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("binding tokens fit");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("form bindings fit");
-        Binding { owner: Owner::Side { connector: self.connector }, token }
+        Binding { owner: (jig_view::Owner::Application { number: self.connector }).opaque(), token }
     }
 }
 #[must_use]
@@ -74,14 +74,14 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 }),
                 Meaning::Field(_) => return None,
             }),
-            (_, Act::Input { .. } | Act::Submit) => None,
+            (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,
         };
     }
     None
 }
 #[must_use]
 pub fn forge_number(text: &[u8]) -> Option<u16> {
-    let number = u16::try_from(jig_view::number(text)?).ok()?;
+    let number = u16::try_from(skein_ui::number(text)?).ok()?;
     if number == 0 { None } else { Some(number) }
 }
 #[must_use]
@@ -105,7 +105,7 @@ pub fn checks(text: &[u8], most: u32) -> Option<Box<[u32]>> {
     Some(values.into_boxed())
 }
 fn check(values: &mut List<u32>, text: &[u8]) -> Option<()> {
-    let value = u32::try_from(jig_view::number(text)?).ok()?;
+    let value = u32::try_from(skein_ui::number(text)?).ok()?;
     if value == 0 || values.as_slice().contains(&value) {
         return None;
     }

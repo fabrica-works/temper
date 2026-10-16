@@ -188,6 +188,7 @@ pub fn charter() -> agent::Charter {
         budget: smith_domain_run::Budget { turns: 1, spend: 1, time: Duration::from_secs(60) },
         reserve: Reserve { turns: 0, time: Duration::ZERO },
         llm: Llm {
+            effort: None,
             prices: smith_domain_run::Prices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1 },
             dialect: 0,
             account: 0,
@@ -233,6 +234,8 @@ pub fn start(run: Token, source: &host::Start) -> agent::Start {
 pub fn turn(number: u32) -> agent::Turn {
     use smith_domain_session::{llm, record};
     let body = record::Turn {
+        model: Box::from(*b"model"),
+        effort: None,
         version: record::VERSION,
         kind: record::Kind::Ordinary,
         endpoint: llm::Endpoint(0),

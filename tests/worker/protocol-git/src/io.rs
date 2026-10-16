@@ -240,7 +240,10 @@ impl Below {
                     self.event(records::Event::Stream { owner: token, up: stream::Up::Room });
                 } else if !pipe.ended {
                     let max = match read {
-                        stream::Read::Scan { max, .. } | stream::Read::Line { max } | stream::Read::Fill(max) => max,
+                        stream::Read::Arrived { max }
+                        | stream::Read::Scan { max, .. }
+                        | stream::Read::Line { max }
+                        | stream::Read::Fill(max) => max,
                         stream::Read::Nothing => return,
                     };
                     let end = (pipe.at + usize::try_from(max).expect("max")).min(pipe.bytes.len());

@@ -1,9 +1,9 @@
 //! Native forms, LLM scripts and independent forge observations for repository stories.
 use crate::{fixtures, world::Story};
-use jig_fake_person::{Find, Step};
-use jig_view::Role;
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
+use skein_ui::Role;
 use std::collections::BTreeMap;
 use temper_engine_domain as root;
 use temper_fake_checkout::git::Remote;

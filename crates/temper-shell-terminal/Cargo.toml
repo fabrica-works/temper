@@ -12,6 +12,7 @@ skein-http.workspace = true
 skein-shell.workspace = true
 jig-domain-client.workspace = true
 jig-view.workspace = true
+skein-ui.workspace = true
 jig-protocol-client-link.workspace = true
 jig-protocol-client-wire.workspace = true
 jig-shell-native.workspace = true

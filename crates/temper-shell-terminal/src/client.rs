@@ -56,7 +56,7 @@ pub struct NativeClient {
     env: Env<domain::Limits>,
     out: Queue<domain::Request>,
     linked: Queue<link::Request>,
-    patches: Queue<jig_view::Patch>,
+    patches: Queue<skein_ui::Patch>,
     kept: List<domain::store::Record>,
     address: domain::Address,
     phase: Phase,
@@ -153,11 +153,11 @@ impl NativeClient {
         })
     }
     #[must_use]
-    pub fn tree(&self) -> &jig_view::Tree {
+    pub fn tree(&self) -> &skein_ui::Tree {
         self.view.tree()
     }
     /// Apply an offered act; false means no binding or an already closing client.
-    pub fn act(&mut self, node: jig_view::NodeId, act: jig_view::Act) -> bool {
+    pub fn act(&mut self, node: skein_ui::NodeId, act: skein_ui::Act) -> bool {
         if matches!(self.phase, Phase::Closing { .. }) {
             return false;
         }

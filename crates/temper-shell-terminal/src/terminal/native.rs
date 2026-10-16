@@ -37,13 +37,13 @@ pub(crate) fn signing(signing: &jig_shell_native::Signing, out: bool) -> Option<
     }
 }
 impl Client for NativeClient {
-    fn tree(&self) -> &jig_view::Tree {
+    fn tree(&self) -> &skein_ui::Tree {
         Self::tree(self)
     }
     fn built(&self) -> u64 {
         self.seen().builds
     }
-    fn act(&mut self, node: jig_view::NodeId, act: jig_view::Act) -> bool {
+    fn act(&mut self, node: skein_ui::NodeId, act: skein_ui::Act) -> bool {
         Self::act(self, node, act)
     }
     fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_shell_native::Unlinked> {

@@ -5,7 +5,7 @@ use jig_client_world::{
     joint::{packets, transport::Transport},
 };
 use skein_lib::{Duration, RequestEnvelope, Time, Token, Wall};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use temper_client_domain::{self as client, Event, Request};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
@@ -29,6 +29,7 @@ pub struct Joint {
     seed: u64,
     now: Time,
     last_commit: u64,
+    sign_outs: BTreeMap<ClientId, VecDeque<Option<u64>>>,
     truth: jig_client_world::joint::truth::Truth,
 }
 impl Joint {
@@ -92,6 +93,7 @@ impl Joint {
             now: Time::ZERO,
             last_commit,
             truth,
+            sign_outs: BTreeMap::new(),
         }
     }
     fn advance(&mut self, now: Time) {
@@ -137,6 +139,10 @@ impl Joint {
                 } else {
                     self.callbacks.push((client, event));
                 }
+            }
+            packets::Incoming::SignedOut { client, sign_in } => {
+                self.sign_outs.entry(client).or_default().push_back(Some(sign_in));
+                self.callbacks.push((client, Event::SignedOut));
             }
             packets::Incoming::SignInAgain { .. } | packets::Incoming::SignInFailed { .. } => {
                 panic!("the deployment owner signs in")
@@ -220,6 +226,7 @@ impl Joint {
         }
     }
     fn detach(&mut self, who: ClientId) {
+        self.sign_outs.remove(&who);
         self.callbacks.retain(|(client, _)| *client != who);
         self.parked.remove(&who);
         for watcher in self.transport.detach(who) {
@@ -265,6 +272,7 @@ impl Front<Temper> for Joint {
             for who in self.transport.clients() {
                 self.callbacks.push((who, Event::Jig(self.transport.hello())));
                 if self.transport.sign_in(who).is_none() {
+                    self.sign_outs.entry(who).or_default().push_back(None);
                     self.callbacks.push((who, Event::SignedOut));
                 }
             }
@@ -321,6 +329,7 @@ impl Front<Temper> for Joint {
         if self.offline_until.is_none() {
             self.callbacks.push((who, Event::Jig(self.transport.hello())));
             if self.transport.sign_in(who).is_none() {
+                self.sign_outs.entry(who).or_default().push_back(None);
                 self.callbacks.push((who, Event::SignedOut));
             }
         }
@@ -338,9 +347,21 @@ impl Front<Temper> for Joint {
     fn sign_in(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
         self.callbacks.retain(|(client, event)| *client != who || !matches!(event, Event::SignedOut));
+        self.sign_outs.remove(&who);
         self.callbacks.push((who, Event::Jig(self.transport.hello())));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
+    }
+    fn delivers(&mut self, client: ClientId, event: &Event) -> bool {
+        if !matches!(event, Event::SignedOut) {
+            return true;
+        }
+        let sign_in = self
+            .sign_outs
+            .get_mut(&client)
+            .and_then(VecDeque::pop_front)
+            .expect("sign-out callback retains its exchange");
+        self.transport.sign_in(client).is_none_or(|current| Some(current) == sign_in)
     }
     fn sign_out(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
@@ -349,7 +370,8 @@ impl Front<Temper> for Joint {
             return;
         }
         let Some(sign_in) = self.transport.sign_in(who) else { return };
-        let reply_to = self.transport.reply_to(jig_client_world::joint::transport::Reply::SignOut { client: who });
+        let reply_to =
+            self.transport.reply_to(jig_client_world::joint::transport::Reply::SignOut { client: who, sign_in });
         self.send(translate::party(jig_domain_core::Event::People(jig_domain_people::Event::SignOut {
             reply_to,
             sign_in,

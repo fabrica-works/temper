@@ -3,8 +3,8 @@ use crate::{
     command::{self, Command, Line, Lines, Refusal},
     limits, render,
 };
-use jig_view::{Act, NodeId, Tree};
 use skein_lib::{Duration, Queue, Secret, Time};
+use skein_ui::{Act, NodeId, Tree};
 pub(crate) mod native;
 mod run;
 pub use run::Terminal;

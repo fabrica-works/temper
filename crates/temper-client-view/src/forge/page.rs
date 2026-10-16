@@ -5,11 +5,9 @@ use super::{
 };
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_view::{
-    Builder, Role, State,
-    phrases::{Hole, jig::JigPhrase},
-};
+use jig_view::phrases::jig::JigPhrase;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
+use skein_ui::{Builder, Role, State, phrases::Hole};
 use temper_client_domain::forge;
 pub fn navigation(builder: &mut Builder, project: Option<u32>, words: &Words, bindings: &mut Bindings) {
     if let Some(project) = project {

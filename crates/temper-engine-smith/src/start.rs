@@ -14,6 +14,7 @@ use temper_engine_domain as engine;
 #[must_use]
 pub fn model(model: &engine::Model) -> run::charter::Llm {
     run::charter::Llm {
+        effort: None,
         prices: run::Prices {
             input: model.input_price,
             cached: model.cached_price,

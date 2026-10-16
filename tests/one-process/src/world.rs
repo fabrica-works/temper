@@ -5,7 +5,7 @@ use crate::{
     referee::{self, Capture, Store, Wire},
     stories,
 };
-use jig_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
+use skein_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
 use skein_shell::Host;
@@ -194,7 +194,7 @@ pub(crate) struct Person {
     cache: referee::client::cache::Cache,
     client: Option<NativeClient>,
     root: Option<Fd>,
-    actor: jig_fake_person::Person<temper_client_domain::Address>,
+    actor: skein_fake_person::Person<temper_client_domain::Address>,
     wake: Option<Time>,
     pub(crate) signed_in: u32,
     pub(crate) finished: bool,
@@ -214,11 +214,11 @@ impl Person {
                     }),
                 },
                 Step::See {
-                    find: Find::named(jig_view::Role::TextArea, b"First words"),
+                    find: Find::named(skein_ui::Role::TextArea, b"First words"),
                     within: Duration::from_secs(5),
                 },
-                Step::Type { find: Find::named(jig_view::Role::TextArea, b"First words"), words: words.into() },
-                Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
+                Step::Type { find: Find::named(skein_ui::Role::TextArea, b"First words"), words: words.into() },
+                Step::Press { find: Find::named(skein_ui::Role::Button, b"Start a conversation") },
                 Step::See { find: Find::text(fixtures::ANSWER), within: Duration::from_secs(5) },
             ],
             Story::Adoption => stories::adoption_person(),
@@ -245,7 +245,7 @@ impl Person {
             ),
             client: None,
             root: Some(root),
-            actor: jig_fake_person::Person::new(remaining.into_boxed_slice()),
+            actor: skein_fake_person::Person::new(remaining.into_boxed_slice()),
             wake: None,
             signed_in: 0,
             finished: false,
@@ -337,8 +337,8 @@ impl Host for Person {
             {
                 Next::Wait { until: None }
             } else if self.cutting && self.offset + before as usize + 1 == fixtures::ADOPTION_REPLY_STEP {
-                match face.find(&Find::exactly_named(jig_view::Role::Button, b"Adopt")) {
-                    Found::Node(node) if face.allows(node, &jig_view::Act::Press) => self.actor.next(&mut face, now),
+                match face.find(&Find::exactly_named(skein_ui::Role::Button, b"Adopt")) {
+                    Found::Node(node) if face.allows(node, &skein_ui::Act::Press) => self.actor.next(&mut face, now),
                     Found::Node(_) | Found::Absent | Found::Pending => Next::Wait { until: None },
                 }
             } else {
@@ -405,7 +405,7 @@ impl Host for Person {
         512
     }
 }
-fn person_failed(step: u32, why: &jig_fake_person::Why, wire: &referee::client::Wire, life: u32) -> ! {
+fn person_failed(step: u32, why: &skein_fake_person::Why, wire: &referee::client::Wire, life: u32) -> ! {
     let sent: Vec<_> = wire
         .received
         .iter()

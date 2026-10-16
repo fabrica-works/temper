@@ -1,11 +1,12 @@
 //! Adoption phrases as checked English data (client.md, 4.4 and 4.7).
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_view::{
-    Builder, Owner, Run,
+use jig_view::Owner;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::{
+    Builder, Run,
     phrases::{Form, Hole, HoleKind, HoleShape, Phrase, PhraseId, PhraseShape, PluralClass, Segment},
 };
-use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     Title,
@@ -121,7 +122,7 @@ const ROWS: [Row; 49] = [
 ];
 fn id(connector: u16, index: usize) -> PhraseId {
     PhraseId {
-        owner: Owner::Side { connector },
+        owner: (Owner::Application { number: connector }).opaque(),
         number: u16::try_from(index).expect("49 phrases").checked_add(1000).expect("phrase id fits"),
     }
 }

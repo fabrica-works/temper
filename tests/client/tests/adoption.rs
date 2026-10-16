@@ -1,6 +1,6 @@
 use jig_client_world::harness::{FrontFault, Until};
-use jig_fake_person::{Find, Step};
-use jig_view::Role;
+use skein_fake_person::{Find, Step};
+use skein_ui::Role;
 use skein_world::domain::Verdict;
 use temper_client_world::fixtures;
 #[test]
@@ -69,8 +69,8 @@ fn a_double_press_of_adopt_adopts_once() {
         .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Adopt"))
         .expect("Adopt")
         .id;
-    world.act(person, node, jig_view::Act::Press);
-    world.act(person, node, jig_view::Act::Press);
+    world.act(person, node, skein_ui::Act::Press);
+    world.act(person, node, skein_ui::Act::Press);
     world.person(
         person,
         vec![Step::See { find: Find::text(b"Adopted acme/shop on forge 1 as owned."), within: fixtures::WITHIN }],

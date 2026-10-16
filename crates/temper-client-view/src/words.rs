@@ -1,13 +1,14 @@
 //! The forge's English phrasebook, copied as checked data from ops's pattern.
 use alloc::boxed::Box;
-use jig_view::{
-    Builder, Owner, Run,
+use jig_view::Owner;
+use skein_lib::{List, bytes::copy_of};
+use skein_ui::{
+    Builder, Run,
     phrases::{
         Form, Hole, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,
         PluralClass, PluralRule, Segment, SpanUnit, WallFormat,
     },
 };
-use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     Connector,
@@ -92,7 +93,7 @@ impl Word {
             Self::Shown => 23,
             Self::Unshowable => 24,
         };
-        PhraseId { owner: Owner::Side { connector }, number }
+        PhraseId { owner: (Owner::Application { number: connector }).opaque(), number }
     }
 }
 #[must_use]

@@ -1,19 +1,21 @@
 #![expect(dead_code, reason = "focused and fuzzy tests share one machine world")]
-use jig_view::{Act, Builder, NodeId, Role, Tree};
 use skein_lib::{Duration, Queue, Secret, Time, Token};
+use skein_ui::{Act, Builder, NodeId, Role, Tree};
 use std::collections::VecDeque;
 use temper_shell_terminal::{
     limits, render,
     terminal::{Client, Loop, Notice},
 };
 
-pub fn tree_limits() -> jig_view::Limits {
-    jig_view::Limits {
+pub fn tree_limits() -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: 64,
         depth: 8,
         text_per_node: 128,
         text_bytes: 4096,
         drawing_bytes: 16,
+        scene_marks: 0,
+        scene_bytes: 0,
         styles_per_node: 2,
         patches: 320,
         bindings: 16,
@@ -26,18 +28,18 @@ fn tree(revision: u64) -> Tree {
     builder.open(Role::Page);
     builder.open(Role::Region);
     builder.open(Role::Status);
-    builder.text(jig_view::Run::Plain, b"Live");
+    builder.text(skein_ui::Run::Plain, b"Live");
     builder.close();
     builder.close();
     builder.open(Role::Heading { level: 1 });
-    builder.text(jig_view::Run::Plain, format!("Revision {revision}").as_bytes());
+    builder.text(skein_ui::Run::Plain, format!("Revision {revision}").as_bytes());
     builder.close();
     for (role, label) in
         [(Role::Button, b"Button".as_slice()), (Role::Link, b"Link"), (Role::Tab, b"Tab"), (Role::Check, b"Check")]
     {
         builder.open(role);
         builder.name(label);
-        builder.bind(jig_view::Binding { owner: jig_view::Owner::Jig, token: Token::new(1) });
+        builder.bind(skein_ui::Binding { owner: jig_view::Owner::Jig.opaque(), token: Token::new(1) });
         builder.close();
     }
     builder.close();
@@ -77,7 +79,7 @@ impl Script {
     fn rebuild(&mut self) {
         self.built += 1;
         let mut next = tree(self.built);
-        jig_view::diff(&self.tree, &mut next, &tree_limits(), &mut self.next_id, &mut Queue::with_capacity(320));
+        skein_ui::diff(&self.tree, &mut next, &tree_limits(), &mut self.next_id, &mut Queue::with_capacity(320));
         self.tree = next;
     }
     pub fn change_at(&mut self, at: Duration) {

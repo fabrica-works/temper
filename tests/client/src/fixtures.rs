@@ -88,9 +88,7 @@ pub fn phrasebooks(limits: &Limits) -> Books {
 pub fn view_bounds(limits: &Limits, jig: &jig_view::words::Words, forge: &view::words::Words) -> view::Limits {
     // The world's storage profile is independent of the all-pages envelope.
     // Builder and the world heap checks enforce these practical capacities.
-    let text = jig
-        .book
-        .jig_capacity()
+    let text = jig_view::phrases::jig_capacity(&jig.book)
         .expect("jig phrase envelope")
         .checked_mul(2)
         .expect("fixture phrase size fits")
@@ -98,12 +96,14 @@ pub fn view_bounds(limits: &Limits, jig: &jig_view::words::Words, forge: &view::
         .expect("fixture text fits")
         .max(forge.capacity().expect("forge phrase envelope"));
     let bounds = view::Limits {
-        tree: jig_view::Limits {
+        tree: skein_ui::Limits {
             nodes: 1024,
             depth: limits.jig.rows + 34,
             text_per_node: text,
             text_bytes: 1024 * text,
             drawing_bytes: 0,
+            scene_marks: 0,
+            scene_bytes: 0,
             styles_per_node: 2,
             patches: 5120,
             bindings: 1024,
@@ -260,9 +260,9 @@ pub fn project() -> temper_client_domain::Address {
     })
 }
 #[must_use]
-pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<jig_fake_person::Step<temper_client_domain::Address>> {
-    use jig_fake_person::{Find, Step};
-    use jig_view::Role;
+pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<skein_fake_person::Step<temper_client_domain::Address>> {
+    use skein_fake_person::{Find, Step};
+    use skein_ui::Role;
     vec![
         Step::See { find: Find::named(Role::Link, b"Adopt a repository"), within: WITHIN },
         Step::Press { find: Find::named(Role::Link, b"Adopt a repository") },
@@ -277,9 +277,9 @@ pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<jig_fake_person::Step<temper_clie
 pub fn adopt_then_open_resources(
     owner: &[u8],
     name: &[u8],
-) -> Vec<jig_fake_person::Step<temper_client_domain::Address>> {
-    use jig_fake_person::{Find, Step};
-    use jig_view::Role;
+) -> Vec<skein_fake_person::Step<temper_client_domain::Address>> {
+    use skein_fake_person::{Find, Step};
+    use skein_ui::Role;
     let mut steps = adopt(owner, name);
     steps.extend([
         Step::See { find: Find::text(b"Adopted acme/shop on forge 1 as owned."), within: WITHIN },

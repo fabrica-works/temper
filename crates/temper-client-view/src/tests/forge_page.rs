@@ -3,7 +3,7 @@ use crate::forge::{
     bindings::{self, Bindings},
     page,
 };
-use jig_view::{Act, Role, State};
+use skein_ui::{Act, Role, State};
 use temper_client_domain::{Action, forge};
 #[test]
 fn the_page_names_every_field_a_person_acts_on() {
@@ -53,14 +53,14 @@ fn the_navigation_slot_links_the_frames_project_or_holds_nothing() {
     assert_eq!(crate::act(&mut view, link, Act::Press), None, "old link is gone");
 }
 #[test]
-fn a_check_takes_a_press_or_a_toggle() {
+fn a_check_takes_a_toggle_and_refuses_a_press() {
     let mut view = fixtures::view();
     fixtures::build(&mut view, &fixtures::adoption_root());
     for (name, expected) in
         [(b"Make it the project's home".as_slice(), forge::Act::Home), (b"It runs CI".as_slice(), forge::Act::Ci)]
     {
         let node = fixtures::find(view.tree(), Role::Check, name).expect("check");
-        assert_eq!(crate::act(&mut view, node, Act::Press), Some(Action::Forge(expected.clone())), "press {name:?}");
+        assert_eq!(crate::act(&mut view, node, Act::Press), None, "press {name:?}");
         assert_eq!(crate::act(&mut view, node, Act::Toggle), Some(Action::Forge(expected)), "toggle {name:?}");
     }
 }
@@ -71,16 +71,16 @@ fn form() -> forge::Form {
     form.texts[forge::Text::Name.index()].text = Box::from(*b"shop");
     form
 }
-fn tree(form: &forge::Form) -> jig_view::Tree {
+fn tree(form: &forge::Form) -> skein_ui::Tree {
     let words = fixtures::words();
     let jig = fixtures::jig_words();
     page_tree(form, &words, &jig)
 }
-fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_view::words::Words) -> jig_view::Tree {
+fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_view::words::Words) -> skein_ui::Tree {
     let mut limits = fixtures::tree_limits();
     limits.text_per_node = 2048;
     limits.text_bytes = 262_144;
-    let mut builder = jig_view::Builder::new(&limits);
+    let mut builder = skein_ui::Builder::new(&limits);
     let mut bindings = Bindings::new(limits.bindings, 8, 1);
     page::page(&mut builder, form, b"Shop", words, jig, &mut bindings);
     builder.finish()
@@ -236,7 +236,7 @@ fn the_outcomes_link_opens_the_projects_resources() {
     let words = fixtures::words();
     let jig = fixtures::jig_words();
     let mut builder =
-        jig_view::Builder::new(&crate::Limits::of(&fixtures::domain_limits(), &jig, &words).expect("limits").tree);
+        skein_ui::Builder::new(&crate::Limits::of(&fixtures::domain_limits(), &jig, &words).expect("limits").tree);
     let mut bindings = Bindings::new(32, 8, 1);
     let mut form = form();
     form.outcome = Some(adopted());
@@ -253,7 +253,7 @@ fn the_outcomes_link_opens_the_projects_resources() {
         }))
     );
 }
-fn has_text(tree: &jig_view::Tree, expected: &[u8]) -> bool {
+fn has_text(tree: &skein_ui::Tree, expected: &[u8]) -> bool {
     for text in fixtures::text(tree).windows(expected.len()) {
         if text == expected {
             return true;
@@ -261,7 +261,7 @@ fn has_text(tree: &jig_view::Tree, expected: &[u8]) -> bool {
     }
     false
 }
-fn has_role(tree: &jig_view::Tree, role: Role) -> bool {
+fn has_role(tree: &skein_ui::Tree, role: Role) -> bool {
     for node in tree.nodes() {
         if node.role == role {
             return true;
@@ -269,7 +269,7 @@ fn has_role(tree: &jig_view::Tree, role: Role) -> bool {
     }
     false
 }
-fn node_of_role(tree: &jig_view::Tree, role: Role) -> &jig_view::Node {
+fn node_of_role(tree: &skein_ui::Tree, role: Role) -> &skein_ui::Node {
     for node in tree.nodes() {
         if node.role == role {
             return node;

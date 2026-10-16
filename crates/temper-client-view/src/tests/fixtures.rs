@@ -61,13 +61,15 @@ pub fn jig_words() -> jig_view::words::Words {
         offset_minutes: 0,
     }
 }
-pub fn tree_limits() -> jig_view::Limits {
-    jig_view::Limits {
+pub fn tree_limits() -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: 128,
         depth: 32,
         text_per_node: 512,
         text_bytes: 65536,
         drawing_bytes: 0,
+        scene_marks: 0,
+        scene_bytes: 0,
         styles_per_node: 2,
         patches: 640,
         bindings: 128,
@@ -85,7 +87,7 @@ pub fn path(segments: &[&[u8]]) -> List<Box<[u8]>> {
     }
     path
 }
-pub fn text(tree: &jig_view::Tree) -> Box<[u8]> {
+pub fn text(tree: &skein_ui::Tree) -> Box<[u8]> {
     let mut bytes = 0_usize;
     for node in tree.nodes() {
         for run in &node.text {
@@ -101,7 +103,7 @@ pub fn text(tree: &jig_view::Tree) -> Box<[u8]> {
     writer.finish()
 }
 pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[u8]> {
-    let mut builder = jig_view::Builder::new(&tree_limits());
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     crate::forge::owner_part(
         &mut builder,
         &OwnerPart { connector: FORGE, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path(segments)) },
@@ -109,7 +111,7 @@ pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[
     );
     text(&builder.finish())
 }
-pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> jig_view::Tree {
+pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> skein_ui::Tree {
     let limits = forge::Limits { parts: 1, field_bytes: 256, checks: 8 };
     let mut side = forge::Side::new(&limits, forge::Config { connector: FORGE, version: 1 });
     if held {
@@ -120,7 +122,7 @@ pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> jig_vie
             &mut Queue::with_capacity(1),
         );
     }
-    let mut builder = jig_view::Builder::new(&tree_limits());
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     crate::forge::part(&mut builder, &side, &part, 1, words);
     builder.finish()
 }
@@ -146,11 +148,11 @@ pub fn view() -> crate::View {
     let limits = crate::Limits::of(&domain, &jig, &words).expect("view envelope fits");
     crate::View::new(&limits, &domain, jig, words, FORGE)
 }
-pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a jig_view::Tree {
+pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a skein_ui::Tree {
     crate::build(view, root, &mut Queue::with_capacity(view.limits().tree.patches));
     view.tree()
 }
-pub fn find(tree: &jig_view::Tree, role: jig_view::Role, name: &[u8]) -> Option<jig_view::NodeId> {
+pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<skein_ui::NodeId> {
     for node in tree.nodes() {
         if node.role == role && node.name.as_deref() == Some(name) {
             return Some(node.id);

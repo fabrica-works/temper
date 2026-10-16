@@ -158,7 +158,9 @@ pub fn shell(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.connections.body_bytes))?
         .checked_add(1024)?;
     let connections = u64::from(limits.connections.exchanges.checked_add(1)?);
-    skein_io::worst_case(&limits.io)?.checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)
+    skein_io::worst_case(&limits.io)?
+        .checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)?
+        .checked_add(connections.checked_mul(u64::from(limits.io.intake))?)
 }
 /// The terminal's own fixed bounds, independent of configuration.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

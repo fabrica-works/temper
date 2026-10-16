@@ -8,8 +8,8 @@
     clippy::wildcard_enum_match_arm
 )]
 use crate::render::Numbers;
-use jig_view::{Act, NodeId, Role, State, Tree};
 use skein_lib::{Decimal, List, Writer};
+use skein_ui::{Act, NodeId, Role, State, Tree};
 
 /// One ended stdin line, excluding its newline and optional final carriage return.
 #[derive(Clone, PartialEq, Eq, Debug)]

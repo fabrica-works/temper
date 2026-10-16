@@ -91,13 +91,15 @@ pub fn core_refusal() -> Box<[u8]> {
     writer.finish()
 }
 
-pub fn tree_limits() -> jig_view::Limits {
-    jig_view::Limits {
+pub fn tree_limits() -> skein_ui::Limits {
+    skein_ui::Limits {
         nodes: 1024,
         depth: 48,
         text_per_node: 1024,
         text_bytes: 1_048_576,
         drawing_bytes: 16,
+        scene_marks: 0,
+        scene_bytes: 0,
         styles_per_node: 2,
         patches: 5120,
         bindings: 1024,
@@ -132,20 +134,20 @@ pub fn adoption_form(filled: bool) -> client::forge::Form {
 pub fn adoption_page(
     form: &client::forge::Form,
     words: &(jig_view::words::Words, temper_client_view::words::Words),
-) -> jig_view::Tree {
+) -> skein_ui::Tree {
     let limits = tree_limits();
     let (jig, forge) = words;
-    let mut builder = jig_view::Builder::new(&limits);
+    let mut builder = skein_ui::Builder::new(&limits);
     synthetic_header(&mut builder, None, false);
     let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
     temper_client_view::forge::page::page(&mut builder, form, b"Project: Shop", forge, jig, &mut bindings);
     builder.close();
     visible(builder.finish())
 }
-pub fn visible(mut tree: jig_view::Tree) -> jig_view::Tree {
+pub fn visible(mut tree: skein_ui::Tree) -> skein_ui::Tree {
     let limits = tree_limits();
-    jig_view::diff(
-        &jig_view::Tree::new(limits.nodes),
+    skein_ui::diff(
+        &skein_ui::Tree::new(limits.nodes),
         &mut tree,
         &limits,
         &mut 0,
@@ -153,8 +155,8 @@ pub fn visible(mut tree: jig_view::Tree) -> jig_view::Tree {
     );
     tree
 }
-pub fn copy_tree(source: &jig_view::Tree) -> jig_view::Tree {
-    let mut builder = jig_view::Builder::new(&tree_limits());
+pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     let mut open = Vec::new();
     for (index, node) in source.nodes().iter().enumerate() {
         while open.last().is_some_and(|end| *end == index) {
@@ -190,7 +192,7 @@ pub fn copy_tree(source: &jig_view::Tree) -> jig_view::Tree {
     }
     visible(builder.finish())
 }
-pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> jig_view::Tree {
+pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> skein_ui::Tree {
     use jig_domain_client::{
         Event as JigEvent,
         contract::{Delivery, ReadResult, Subject, WatchEvent},
@@ -338,10 +340,10 @@ pub fn inbox_document(group: contract::InboxReadGroup) -> contract::InboxPage {
     }
     contract::InboxPage { cut: false, rows, before: None, after: None }
 }
-pub fn inbox_page() -> jig_view::Tree {
+pub fn inbox_page() -> skein_ui::Tree {
     page(jig_domain_client::address::Address::Inbox { project: None }, false)
 }
-pub fn task_page() -> jig_view::Tree {
+pub fn task_page() -> skein_ui::Tree {
     page(
         jig_domain_client::address::Address::Task {
             task: 9,
@@ -350,7 +352,7 @@ pub fn task_page() -> jig_view::Tree {
         false,
     )
 }
-pub fn project_page() -> jig_view::Tree {
+pub fn project_page() -> skein_ui::Tree {
     page(
         jig_domain_client::address::Address::Project {
             project: 1,
@@ -359,15 +361,15 @@ pub fn project_page() -> jig_view::Tree {
         false,
     )
 }
-pub fn deployment_page() -> jig_view::Tree {
+pub fn deployment_page() -> skein_ui::Tree {
     page(jig_domain_client::address::Address::Deployment, false)
 }
-pub fn signed_out_page() -> jig_view::Tree {
+pub fn signed_out_page() -> skein_ui::Tree {
     page(jig_domain_client::address::Address::Inbox { project: None }, true)
 }
 
-pub fn synthetic_header(builder: &mut jig_view::Builder, title: Option<&[u8]>, behind: bool) {
-    use jig_view::{Role, Run};
+pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {
+    use skein_ui::{Role, Run};
     builder.open(Role::Page);
     builder.open(Role::Region);
     builder.name(b"Frame");
@@ -389,18 +391,18 @@ pub fn synthetic_header(builder: &mut jig_view::Builder, title: Option<&[u8]>, b
         builder.close();
     }
 }
-pub fn header_page(title: Option<&[u8]>, behind: bool) -> jig_view::Tree {
-    let mut builder = jig_view::Builder::new(&tree_limits());
+pub fn header_page(title: Option<&[u8]>, behind: bool) -> skein_ui::Tree {
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     synthetic_header(&mut builder, title, behind);
     builder.close();
     visible(builder.finish())
 }
-pub fn binding() -> jig_view::Binding {
-    jig_view::Binding { owner: jig_view::Owner::Jig, token: Token::new(1) }
+pub fn binding() -> skein_ui::Binding {
+    skein_ui::Binding { owner: jig_view::Owner::Jig.opaque(), token: Token::new(1) }
 }
-pub fn every_role() -> jig_view::Tree {
-    use jig_view::{Role, Run};
-    let mut builder = jig_view::Builder::new(&tree_limits());
+pub fn every_role() -> skein_ui::Tree {
+    use skein_ui::{Role, Run};
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     synthetic_header(&mut builder, Some(b"Every role"), false);
     for (role, label) in [
         (Role::Region, b"Region".as_slice()),
@@ -458,8 +460,8 @@ pub fn every_role() -> jig_view::Tree {
     builder.close();
     visible(builder.finish())
 }
-fn role_controls(builder: &mut jig_view::Builder) {
-    use jig_view::{Role, Run, State};
+fn role_controls(builder: &mut skein_ui::Builder) {
+    use skein_ui::{Role, Run, State};
     for (role, name) in [
         (Role::Button, b"Button".as_slice()),
         (Role::Tab, b"Tab"),
@@ -493,16 +495,9 @@ fn role_controls(builder: &mut jig_view::Builder) {
     builder.open(Role::Button);
     builder.name(b"All states");
     builder.bind(binding());
-    for state in [
-        State::Selected,
-        State::Pressed,
-        State::Invalid,
-        State::Busy,
-        State::Current,
-        State::Expanded,
-        State::Disabled,
-        State::Provisional,
-    ] {
+    for state in
+        [State::Selected, State::Pressed, State::Invalid, State::Busy, State::Current, State::Expanded, State::Disabled]
+    {
         builder.state(state);
     }
     builder.close();
@@ -527,7 +522,7 @@ fn role_controls(builder: &mut jig_view::Builder) {
     builder.open(Role::Slot);
     builder.text(Run::Plain, b"Slot");
     builder.close();
-    builder.drawing(jig_view::DrawingKind { owner: jig_view::Owner::Jig, kind: 1 }, b"Drawing", b"image", 16);
+    builder.drawing(skein_ui::DrawingKind { owner: jig_view::Owner::Jig.opaque(), kind: 1 }, b"Drawing", b"image", 16);
     builder.text(Run::Plain, b"fallback");
     builder.close();
     builder.open(Role::Paragraph);
@@ -539,9 +534,9 @@ fn role_controls(builder: &mut jig_view::Builder) {
     builder.text(Run::Plain, b"after");
     builder.close();
 }
-pub fn control_text() -> jig_view::Tree {
-    use jig_view::{Role, Run};
-    let mut builder = jig_view::Builder::new(&tree_limits());
+pub fn control_text() -> skein_ui::Tree {
+    use skein_ui::{Role, Run};
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     synthetic_header(&mut builder, Some(b"Text\tchecked"), false);
     builder.open(Role::Button);
     builder.name(b"Label");
@@ -558,17 +553,17 @@ pub fn control_text() -> jig_view::Tree {
     builder.close();
     visible(builder.finish())
 }
-pub fn controls() -> (jig_view::Tree, crate::render::Numbers) {
+pub fn controls() -> (skein_ui::Tree, crate::render::Numbers) {
     let tree = visible(control_tree());
     let numbers = crate::render::print(&tree, &frame(), &bounds()).numbers;
     (tree, numbers)
 }
-pub fn control_tree() -> jig_view::Tree {
+pub fn control_tree() -> skein_ui::Tree {
     control_tree_with(None, true)
 }
-pub fn control_tree_with(check_state: Option<jig_view::State>, check_bound: bool) -> jig_view::Tree {
-    use jig_view::{Role, State};
-    let mut builder = jig_view::Builder::new(&tree_limits());
+pub fn control_tree_with(check_state: Option<skein_ui::State>, check_bound: bool) -> skein_ui::Tree {
+    use skein_ui::{Role, State};
+    let mut builder = skein_ui::Builder::new(&tree_limits());
     synthetic_header(&mut builder, Some(b"Controls"), false);
     for (role, name) in [
         (Role::Button, b"Button".as_slice()),

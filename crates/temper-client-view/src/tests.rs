@@ -1,7 +1,7 @@
 mod fixtures;
 mod forge_page;
 use jig_domain_client::contract::{Part, PartScope};
-use jig_view::Role;
+use skein_ui::Role;
 
 #[test]
 fn each_resource_path_shape_says_its_words() {

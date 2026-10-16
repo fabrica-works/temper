@@ -45,7 +45,7 @@ one | two
 [7] [ ] Check
 [8] (*) Chosen
 [9] [x] Checked
-[-] All states (disabled) (expanded) (busy) (current) (invalid) (pressed) (selected) (provisional)
+[-] All states (disabled) (expanded) (busy) (current) (invalid) (pressed) (selected)
 [-] Unbound
 Outside <https://example.test/>
 * Loading

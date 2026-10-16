@@ -153,7 +153,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "jig-channel-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-core",
  "jig-domain-host",
@@ -195,7 +195,7 @@ dependencies = [
 [[package]]
 name = "jig-client-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-core-world",
  "jig-domain-accounts",
@@ -208,7 +208,6 @@ dependencies = [
  "jig-domain-tasks",
  "jig-domain-views",
  "jig-fake-parties",
- "jig-fake-person",
  "jig-fake-workers",
  "jig-protocol-transcript",
  "jig-scripted-engine",
@@ -219,7 +218,10 @@ dependencies = [
  "jig-test-view",
  "jig-view",
  "sha2",
+ "skein-fake-person",
  "skein-lib",
+ "skein-ui",
+ "skein-ui-text",
  "skein-world",
  "smith-transcript",
 ]
@@ -227,7 +229,7 @@ dependencies = [
 [[package]]
 name = "jig-conformance"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-fake-store",
  "jig-test-system",
@@ -238,7 +240,7 @@ dependencies = [
 [[package]]
 name = "jig-core-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-conformance",
  "jig-domain-accounts",
@@ -268,7 +270,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-accounts"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -276,7 +278,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-authority"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -284,7 +286,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-brief"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -292,7 +294,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-client"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -300,7 +302,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-core"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -316,7 +318,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-fleet"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -324,7 +326,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-host"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -332,7 +334,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-notes"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -340,7 +342,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-people"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -348,7 +350,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-tasks"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -356,7 +358,7 @@ dependencies = [
 [[package]]
 name = "jig-domain-views"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -364,29 +366,20 @@ dependencies = [
 [[package]]
 name = "jig-fake-parties"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-fake-person"
-version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
-dependencies = [
- "jig-view",
  "skein-lib",
 ]
 
 [[package]]
 name = "jig-fake-store"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 
 [[package]]
 name = "jig-fake-workers"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -394,7 +387,7 @@ dependencies = [
 [[package]]
 name = "jig-people-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-people",
  "sha2",
@@ -405,7 +398,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-accounts"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "skein-lib",
@@ -416,7 +409,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-charter"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "sha2",
  "skein-lib",
@@ -428,7 +421,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-client-link"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "jig-protocol-client-wire",
@@ -441,7 +434,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-client-wire"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-codec",
  "skein-lib",
@@ -450,7 +443,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-config"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -478,7 +471,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-engine-clients"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -499,7 +492,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-engine-workers"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-host",
  "jig-protocol-worker-wire",
@@ -512,7 +505,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-store"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-authority",
  "jig-domain-core",
@@ -529,7 +522,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-tools"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-authority",
  "jig-domain-core",
@@ -542,7 +535,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-transcript"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
@@ -552,7 +545,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-worker-link"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-host",
  "jig-protocol-worker-wire",
@@ -564,7 +557,7 @@ dependencies = [
 [[package]]
 name = "jig-protocol-worker-wire"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-channel",
  "skein-codec",
@@ -574,7 +567,7 @@ dependencies = [
 [[package]]
 name = "jig-scripted-engine"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
@@ -583,7 +576,7 @@ dependencies = [
 [[package]]
 name = "jig-shell-native"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-protocol-client-link",
  "jig-protocol-client-wire",
@@ -595,7 +588,7 @@ dependencies = [
 [[package]]
 name = "jig-tasks-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-tasks",
  "skein-lib",
@@ -605,7 +598,7 @@ dependencies = [
 [[package]]
 name = "jig-test-client-kit"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-test-connector",
  "jig-test-domain-client",
@@ -615,7 +608,7 @@ dependencies = [
 [[package]]
 name = "jig-test-connector"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-lib",
 ]
@@ -623,7 +616,7 @@ dependencies = [
 [[package]]
 name = "jig-test-connector-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-test-connector",
  "jig-test-system",
@@ -634,7 +627,7 @@ dependencies = [
 [[package]]
 name = "jig-test-domain"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -653,7 +646,7 @@ dependencies = [
 [[package]]
 name = "jig-test-domain-client"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "jig-test-connector",
@@ -663,7 +656,7 @@ dependencies = [
 [[package]]
 name = "jig-test-protocol-client-wire"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "skein-codec",
  "skein-lib",
@@ -672,7 +665,7 @@ dependencies = [
 [[package]]
 name = "jig-test-service"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-accounts",
  "jig-domain-brief",
@@ -714,7 +707,7 @@ dependencies = [
 [[package]]
 name = "jig-test-store"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-core",
  "jig-domain-notes",
@@ -730,7 +723,7 @@ dependencies = [
 [[package]]
 name = "jig-test-store-files"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-conformance",
  "jig-domain-core",
@@ -747,7 +740,7 @@ dependencies = [
 [[package]]
 name = "jig-test-system"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-test-connector",
 ]
@@ -755,18 +748,19 @@ dependencies = [
 [[package]]
 name = "jig-test-view"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "jig-test-domain-client",
  "jig-view",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
 name = "jig-test-worker"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-host",
  "skein-lib",
@@ -776,10 +770,11 @@ dependencies = [
 [[package]]
 name = "jig-view"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/jig.git#d91a89c45553f3f259b4d95d34a75164a9715877"
+source = "git+https://github.com/forgetic/jig.git#a3b5354672019b776e1d4408d585dea0c126fdf7"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]
@@ -947,7 +942,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "skein-channel"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -955,7 +950,7 @@ dependencies = [
 [[package]]
 name = "skein-codec"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -963,12 +958,12 @@ dependencies = [
 [[package]]
 name = "skein-codegen"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 
 [[package]]
 name = "skein-fake-channel"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-channel",
  "skein-lib",
@@ -977,12 +972,12 @@ dependencies = [
 [[package]]
 name = "skein-fake-checkout"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 
 [[package]]
 name = "skein-fake-llm-domain"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -990,7 +985,7 @@ dependencies = [
 [[package]]
 name = "skein-fake-llm-protocol"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-fake-llm-domain",
  "skein-http",
@@ -1002,7 +997,7 @@ dependencies = [
 [[package]]
 name = "skein-fake-machine"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -1012,7 +1007,7 @@ dependencies = [
 [[package]]
 name = "skein-fake-oauth"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-json",
  "skein-lib",
@@ -1022,7 +1017,7 @@ dependencies = [
 [[package]]
 name = "skein-fake-peers"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "rustls",
  "skein-fake-llm-domain",
@@ -1037,14 +1032,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-fake-person"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
+dependencies = [
+ "skein-lib",
+ "skein-ui",
+]
+
+[[package]]
 name = "skein-heap"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 
 [[package]]
 name = "skein-http"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -1052,7 +1056,7 @@ dependencies = [
 [[package]]
 name = "skein-io"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -1060,7 +1064,7 @@ dependencies = [
 [[package]]
 name = "skein-json"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-lib",
 ]
@@ -1068,7 +1072,7 @@ dependencies = [
 [[package]]
 name = "skein-kv"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -1077,12 +1081,12 @@ dependencies = [
 [[package]]
 name = "skein-lib"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 
 [[package]]
 name = "skein-llm"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-http",
  "skein-json",
@@ -1092,7 +1096,7 @@ dependencies = [
 [[package]]
 name = "skein-llm-connection"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -1103,7 +1107,7 @@ dependencies = [
 [[package]]
 name = "skein-llm-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-fake-llm-domain",
  "skein-fake-llm-protocol",
@@ -1116,7 +1120,7 @@ dependencies = [
 [[package]]
 name = "skein-oauth"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-json",
  "skein-lib",
@@ -1125,7 +1129,7 @@ dependencies = [
 [[package]]
 name = "skein-oauth-accounts"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-http",
  "skein-io",
@@ -1137,7 +1141,7 @@ dependencies = [
 [[package]]
 name = "skein-shell"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "io-uring",
  "libc",
@@ -1148,7 +1152,7 @@ dependencies = [
 [[package]]
 name = "skein-sim"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -1157,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "skein-tls"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "rustls",
  "skein-lib",
@@ -1166,7 +1170,7 @@ dependencies = [
 [[package]]
 name = "skein-tls-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "rustls",
  "skein-heap",
@@ -1177,9 +1181,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-ui"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-ui-text"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-ui",
+]
+
+[[package]]
 name = "skein-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#b5d3a2c3363dbbd1db8dae933cd87a643a18b3f2"
+source = "git+https://github.com/forgetic/skein.git#f12f29d43b808f819795473d96bd5696ae3fb30b"
 dependencies = [
  "skein-heap",
  "skein-io",
@@ -1191,7 +1213,7 @@ dependencies = [
 [[package]]
 name = "smith-agent-process-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-fake-channel",
@@ -1228,7 +1250,7 @@ dependencies = [
 [[package]]
 name = "smith-agent-service"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-http",
@@ -1250,7 +1272,7 @@ dependencies = [
 [[package]]
 name = "smith-agent-shell"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "libc",
  "serde",
@@ -1277,7 +1299,7 @@ dependencies = [
 [[package]]
 name = "smith-agent-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-checkout",
  "skein-fake-llm-domain",
@@ -1293,7 +1315,7 @@ dependencies = [
 [[package]]
 name = "smith-channel"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-codec",
@@ -1303,7 +1325,7 @@ dependencies = [
 [[package]]
 name = "smith-charter"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-codec",
  "skein-lib",
@@ -1312,7 +1334,7 @@ dependencies = [
 [[package]]
 name = "smith-domain"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
  "smith-domain-run",
@@ -1323,7 +1345,7 @@ dependencies = [
 [[package]]
 name = "smith-domain-run"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
 ]
@@ -1331,7 +1353,7 @@ dependencies = [
 [[package]]
 name = "smith-domain-session"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
  "smith-domain-tools",
@@ -1340,7 +1362,7 @@ dependencies = [
 [[package]]
 name = "smith-domain-tools"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
 ]
@@ -1348,7 +1370,7 @@ dependencies = [
 [[package]]
 name = "smith-events"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-json",
  "skein-lib",
@@ -1357,7 +1379,7 @@ dependencies = [
 [[package]]
 name = "smith-host-domain"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
  "smith-domain",
@@ -1366,7 +1388,7 @@ dependencies = [
 [[package]]
 name = "smith-host-protocol"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-io",
@@ -1382,7 +1404,7 @@ dependencies = [
 [[package]]
 name = "smith-host-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-llm-domain",
  "skein-fake-machine",
@@ -1399,7 +1421,7 @@ dependencies = [
 [[package]]
 name = "smith-inline-agent"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
  "smith-domain",
@@ -1409,7 +1431,7 @@ dependencies = [
 [[package]]
 name = "smith-local-domain"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-lib",
  "smith-domain",
@@ -1421,7 +1443,7 @@ dependencies = [
 [[package]]
 name = "smith-local-process-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "serde",
  "serde_json",
@@ -1438,6 +1460,7 @@ dependencies = [
  "skein-llm-connection",
  "skein-llm-world",
  "skein-oauth",
+ "skein-oauth-accounts",
  "skein-shell",
  "skein-sim",
  "skein-tls",
@@ -1465,7 +1488,7 @@ dependencies = [
 [[package]]
 name = "smith-local-protocol"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-io",
  "skein-json",
@@ -1484,7 +1507,7 @@ dependencies = [
 [[package]]
 name = "smith-local-service"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-http",
@@ -1509,7 +1532,7 @@ dependencies = [
 [[package]]
 name = "smith-local-shell"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "serde",
  "serde_json",
@@ -1543,7 +1566,7 @@ dependencies = [
 [[package]]
 name = "smith-local-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-checkout",
  "skein-fake-llm-domain",
@@ -1560,7 +1583,7 @@ dependencies = [
 [[package]]
 name = "smith-machine-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-machine",
  "skein-io",
@@ -1574,7 +1597,7 @@ dependencies = [
 [[package]]
 name = "smith-protocol-channel"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-channel",
  "skein-lib",
@@ -1589,7 +1612,7 @@ dependencies = [
 [[package]]
 name = "smith-protocol-llm"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-io",
  "skein-json",
@@ -1604,7 +1627,7 @@ dependencies = [
 [[package]]
 name = "smith-protocol-machine"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-io",
  "skein-json",
@@ -1615,7 +1638,7 @@ dependencies = [
 [[package]]
 name = "smith-session-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-checkout",
  "skein-fake-llm-domain",
@@ -1632,7 +1655,7 @@ dependencies = [
 [[package]]
 name = "smith-tools-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-fake-checkout",
  "skein-io",
@@ -1645,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "smith-transcript"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/smith.git#dfc0fe5700c628d7bce7da3d2ee918e9c1fbe46d"
+source = "git+https://github.com/forgetic/smith.git#29fa97c9cdfdcd1a0d0bc28e270de5be221c0928"
 dependencies = [
  "skein-codec",
  "skein-lib",
@@ -1675,7 +1698,6 @@ dependencies = [
  "jig-channel-world",
  "jig-domain-client",
  "jig-domain-host",
- "jig-fake-person",
  "jig-protocol-config",
  "jig-protocol-store",
  "jig-shell-native",
@@ -1684,6 +1706,7 @@ dependencies = [
  "skein-fake-llm-domain",
  "skein-fake-llm-protocol",
  "skein-fake-peers",
+ "skein-fake-person",
  "skein-io",
  "skein-json",
  "skein-lib",
@@ -1694,6 +1717,7 @@ dependencies = [
  "skein-shell",
  "skein-tls",
  "skein-tls-world",
+ "skein-ui",
  "skein-world",
  "smith-agent-process-world",
  "smith-agent-service",
@@ -1727,6 +1751,7 @@ dependencies = [
  "jig-domain-client",
  "jig-view",
  "skein-lib",
+ "skein-ui",
  "temper-client-domain",
 ]
 
@@ -1741,13 +1766,14 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-fake-person",
  "jig-protocol-transcript",
  "jig-test-domain",
  "jig-test-domain-client",
  "jig-view",
+ "skein-fake-person",
  "skein-io",
  "skein-lib",
+ "skein-ui",
  "skein-world",
  "smith-transcript",
  "temper-client-domain",
@@ -2045,7 +2071,6 @@ dependencies = [
  "jig-domain-core",
  "jig-domain-people",
  "jig-domain-tasks",
- "jig-fake-person",
  "jig-protocol-client-link",
  "jig-protocol-client-wire",
  "jig-protocol-config",
@@ -2057,12 +2082,14 @@ dependencies = [
  "skein-fake-llm-domain",
  "skein-fake-machine",
  "skein-fake-peers",
+ "skein-fake-person",
  "skein-io",
  "skein-kv",
  "skein-lib",
  "skein-llm",
  "skein-shell",
  "skein-sim",
+ "skein-ui",
  "skein-world",
  "smith-agent-process-world",
  "smith-agent-service",
@@ -2190,6 +2217,7 @@ dependencies = [
  "skein-io",
  "skein-lib",
  "skein-shell",
+ "skein-ui",
  "temper-client-domain",
  "temper-client-view",
  "temper-protocol-client-wire",

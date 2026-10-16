@@ -18,8 +18,8 @@ pub fn endpoints() -> Endpoints {
 }
 
 // smith's smallest v2 charter, as jig's reference worker's fixture takes it.
-const SMALLEST: [u8; 118] = {
-    let mut bytes = [0; 118];
+const SMALLEST: [u8; 119] = {
+    let mut bytes = [0; 119];
     bytes[1] = 2;
     bytes
 };
@@ -65,6 +65,8 @@ pub fn session_turn(sequence: u32, spent: u64, length: usize, first: bool) -> re
     };
     let text = vec![u8::try_from(sequence % 200).expect("a byte") + b' '; length].into_boxed_slice();
     record::Turn {
+        model: Box::from(*b"model"),
+        effort: None,
         version: record::VERSION,
         kind,
         endpoint: llm::Endpoint(0),

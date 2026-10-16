@@ -1,5 +1,5 @@
 //! A real native client driven by jig's finite semantic-tree script.
-use jig_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
+use skein_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
 use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::Host;
@@ -18,9 +18,9 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
         resume: false,
         steps: Box::new([
             Step::Go { address: Address::Jig(jig_domain_client::address::Address::Conversations { project: None }) },
-            Step::See { find: Find::named(jig_view::Role::TextArea, b"First words"), within: Duration::from_secs(20) },
-            Step::Type { find: Find::named(jig_view::Role::TextArea, b"First words"), words: words.into() },
-            Step::Press { find: Find::named(jig_view::Role::Button, b"Start a conversation") },
+            Step::See { find: Find::named(skein_ui::Role::TextArea, b"First words"), within: Duration::from_secs(20) },
+            Step::Type { find: Find::named(skein_ui::Role::TextArea, b"First words"), words: words.into() },
+            Step::Press { find: Find::named(skein_ui::Role::Button, b"Start a conversation") },
             Step::See { find: Find::text(answer), within: Duration::from_secs(20) },
         ]),
     }
@@ -29,7 +29,7 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
 pub struct Person {
     pub client: Option<NativeClient>,
     root: Option<Fd>,
-    actor: jig_fake_person::Person<Address>,
+    actor: skein_fake_person::Person<Address>,
     input: Option<Fd>,
     output: Option<Fd>,
     reading: bool,
@@ -55,7 +55,7 @@ impl Person {
         Self {
             client: None,
             root: Some(root),
-            actor: jig_fake_person::Person::new(script.steps),
+            actor: skein_fake_person::Person::new(script.steps),
             input: Some(input),
             output: Some(output),
             reading: false,
@@ -229,7 +229,7 @@ impl Host for Person {
 
 #[must_use]
 pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
-    use jig_view::Role;
+    use skein_ui::Role;
     let mut steps = answered_chat(b"Hello", super::ANSWER).steps.into_vec();
     steps.extend([
         Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: Some(1) }) },
@@ -273,7 +273,7 @@ pub fn found() -> Script {
 fn inbox_reply(task: &[u8]) -> Step<Address> {
     Step::See {
         find: Find::text(b"Reply message:")
-            .within(Box::new([Target::Role { role: jig_view::Role::Item, name: task.into() }])),
+            .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: task.into() }])),
         within: super::WITHIN,
     }
 }
