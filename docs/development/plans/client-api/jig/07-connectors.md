@@ -339,7 +339,7 @@ Don't: put a step's effects in `ProcedureStep`; send
 `ProcedureClose` (`StartProcedure` carries activation and the inbox, as
 today); let a procedure release a hold or decide a proposal or an
 escalation (connectors.md, 6.3).
-Size: at most 280 lines.
+Size: at most 600 lines (ruling 136; 280 before it: the staged admission, its two roots and the callers' sweep).
 Removes: `ProcedureAction`, `Now::ProcedureDelegateOutcome`, the
 reference root's `unreachable!` at `routes.rs:646`.
 
