@@ -358,6 +358,18 @@ run are appended after "For the user".
      - Unchanged: the recorded cases and facts (the retry is the fixture's provisioning, never a recorded exchange); the
        recording rule's "third failure with the same symptom is a question".
 
+115. **06.1 and 06.2 land together** (plan defect, temper 06's block of 2026-10-16T23:33:36Z).
+     Ruling 115, a plan defect in the order of 06's increments: 06.1's Shape makes the fake always check ("`git::moved`
+     … starts the check of each `on_branch` pull … for `CHECK` (2 s)", ruling 111), and until 06.2's `settle` the
+     connector takes a pull not mergeable at once as conflicted, which the conformance world's
+     `a_ci_repair_recovers_its_focused_commit_cuts` meets. So 06.1 and 06.2 land together.
+
+     - One `land`, two commits: 06.1's, then 06.2's, each with its own `Step:` trailer; the gate runs once, at the tip.
+       06.1's commit need not pass the gate alone.
+     - Each keeps its own Size and its own proof; the report gives both counts and both proofs.
+     - Do not weaken the story or its fixture, and do not defer the phase.
+     - Unchanged: 06.2's Shape and tests; the README's "Sizes".
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
