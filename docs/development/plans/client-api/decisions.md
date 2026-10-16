@@ -496,6 +496,14 @@ choice would have been the user's (development.md, 10.4).
      - Checked by the sub-agent: the 09.1 sketches (`TemplateExecutor`, `TemplateBudget`, `TemplateDeadline`, `TemplateOverride`, `Template`, `merged`, `templates()`, `chat()`) pass clippy `-D warnings` in a scratch crate unchanged; `tasks::Limits::grace` is at `limits.rs:50`, the small profile's 600 s; `charters::chats` takes `limits.core.tasks.grace`; the six core `Limits` literals in jig are those listed, and temper's one at `temper-engine-domain/src/limits.rs:111`; nothing in jig matches `config::What` exhaustively; temper's `startup/problems.rs` is unchanged since `9d7fcc789`; `jig-protocol-config`'s default profile 79 of 79 and the proof test (0.33 s) pass at the base.
      A further user of a changed name or value that the Files miss, the implementer edits and lists in the commit body.
 
+139. **skein's other origins answer their favicon** (process, skein 01's block of 2026-10-16T14:12:02Z).
+     Ruling 139: process, a defect of skein 01.2's own harness, which this session wrote; skein 01 repairs it. The failing test's other origin serves one page, `/` with `<!doctype html><h1>Elsewhere</h1>` (`tests/ui-web/tests/browser_harness.rs:51`), and answers every other path 404 (`testing/skein-fake-person-browser/src/origins.rs:182-183`, tested by `an_unknown_origin_path_is_404`). The page loads no resource of its own, so the 404 the browser logged is its own request for `/favicon.ico`, which races the `See` step: the snapshot had already reached "heading Elsewhere". skein's other page server answers that path 204 (`tests/browser/src/pages.rs:26-31`). The repair:
+     - The origin server answers `/favicon.ico` with 204 and no body when no page of the origin names that path, beside the 404 at `origins.rs:182-183`; a unit test beside `an_unknown_origin_path_is_404`, `an_origins_favicon_is_204` (`origins::response("/favicon.ico")` starts with `HTTP/1.1 204 No Content\r\n`).
+     - A commit of its own, `Step: skein-01.s1`, before or after the terminal's commit; its lines are reported as outside skein-01.s1's Files and not counted in its Size.
+     - `a_page_of_another_origin_is_opened_by_its_step` keeps its steps, assertions and expected values. Run it alone once with the README's browser command, then land both commits under `land-skein.lock`.
+     - If the test still fails alone with the repair, or the logged 404 names another path: a question, with the run's output; no gate retried blind.
+     This also serves jig 20's attack stories, whose pages are other origins.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
