@@ -3,5 +3,7 @@ mod fixtures;
 mod golden;
 mod limits;
 mod members;
+mod prepare;
 mod read;
+mod spec;
 mod steps;

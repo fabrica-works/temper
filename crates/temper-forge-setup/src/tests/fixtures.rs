@@ -76,3 +76,99 @@ pub fn secrets() -> crate::state::Secrets {
         jwt_secret: Secret::new(b"jwt-secret".as_slice().into()),
     }
 }
+
+pub struct Drive {
+    machine: crate::prepare::Prepare,
+    out: skein_lib::Queue<crate::prepare::Request>,
+}
+impl Drive {
+    pub fn new(owned: crate::setup::Owned) -> Self {
+        Self {
+            machine: crate::prepare::Prepare::new(owned, place(), None),
+            out: skein_lib::Queue::with_capacity(crate::prepare::MAX_OUT),
+        }
+    }
+    pub fn send(&mut self, event: crate::prepare::Event) -> crate::prepare::Request {
+        crate::prepare::step(&mut self.machine, event, &mut self.out);
+        let request = self.out.pop().expect("one request");
+        assert!(self.out.is_empty());
+        request
+    }
+    pub fn versions(&mut self, found: crate::prepare::Found, runner: bool) -> crate::prepare::Request {
+        use crate::{
+            prepare::{Event, Request},
+            spec::Which,
+        };
+        assert_eq!(
+            self.send(Event::Found(found)),
+            Request::Version { which: Which::Forgejo, spec: crate::spec::version(Which::Forgejo, &owned(), &place()) }
+        );
+        let mut request = self.send(Event::Printed(line(Which::Forgejo)));
+        if runner {
+            assert_eq!(
+                request,
+                Request::Version {
+                    which: Which::Runner,
+                    spec: crate::spec::version(Which::Runner, &owned(), &place())
+                }
+            );
+            request = self.send(Event::Printed(line(Which::Runner)));
+        }
+        request
+    }
+    pub fn drawn(&mut self, runner: bool) -> crate::prepare::Request {
+        use crate::prepare::{Event, Request};
+        let count = if runner { 5 } else { 4 };
+        for value in 0..count {
+            let next = self.send(Event::Drew(draw(value)));
+            if value.checked_add(1).unwrap() == count {
+                return next;
+            }
+            assert_eq!(next, Request::Draw);
+        }
+        unreachable!("four or five draws")
+    }
+}
+pub fn draw(value: u8) -> skein_lib::Secret {
+    skein_lib::Secret::new(Box::new([value; 32]))
+}
+pub fn line(which: crate::spec::Which) -> Box<str> {
+    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    let (prefix, version) = match which {
+        crate::spec::Which::Forgejo => (b"forgejo version ".as_slice(), VERSION),
+        crate::spec::Which::Runner => (b"forgejo-runner version v".as_slice(), RUNNER_VERSION),
+    };
+    let mut w = Writer::new(prefix.len().checked_add(version.len()).unwrap());
+    w.put(prefix).unwrap();
+    w.put(version.as_bytes()).unwrap();
+    let bytes = w.finish();
+    let mut chunks = bytes.utf8_chunks();
+    let chunk = chunks.next().unwrap();
+    assert!(chunk.invalid().is_empty());
+    assert!(chunks.next().is_none());
+    chunk.valid().into()
+}
+pub fn first() -> crate::prepare::Found {
+    crate::prepare::Found { state: None, admin_token: false, files: false }
+}
+pub fn later() -> crate::prepare::Found {
+    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    crate::prepare::Found {
+        state: Some(crate::state::encode(&crate::state::State {
+            forgejo: VERSION.as_bytes().into(),
+            runner: Some(RUNNER_VERSION.as_bytes().into()),
+            prepared: true,
+            secrets: secrets(),
+        })),
+        admin_token: true,
+        files: true,
+    }
+}
+pub fn ran(stdout: &[u8]) -> crate::prepare::Event {
+    use crate::prepare::{Event, Exit, Ran};
+    Event::Ran(Ran {
+        exit: Exit::Code(0),
+        stdout: skein_lib::Secret::new(stdout.into()),
+        stderr: skein_lib::Secret::new(Box::new([])),
+    })
+}
