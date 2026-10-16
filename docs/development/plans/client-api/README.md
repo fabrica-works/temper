@@ -67,6 +67,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/11-client-domain.md` | jig 11: `jig-client-domain`: the contract, handles and askers, the request table, kept work | jig 01 | |
 | `jig/12-client.md` | jig 12: `jig-client`: the link's states, `me`, `SignIn { with }`, families as bytes, the thin story against the real engine | jig 10, jig 11 | |
 | `jig/13-reference-ui.md` | jig 13: the reference UI on the public client; `ops`'s and the test application's roots by asker; `jig-domain-client` gone | jig 12 | |
+| `jig/13-s1-path-segments.md` | jig-13.s1 (ruling 143): a path's segments bounded apart from the rows; the view cuts a long path | jig 13.2 | |
 | `jig/14-wire.md` | jig 14: the wire collapsed, its requests: the version refusal, scopes and windows, the operations, the compound request | jig 03 to 09, jig 21 (the fence below) | |
 | `jig/22-documents.md` | jig 22: the wire's documents: `me`, the task line and queries, offers and a decision's effect | jig 14 | |
 | `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | |
@@ -84,6 +85,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `skein/01-harness.md` | skein 01: the harness opens the printed URL, serves other origins, awaits trouble | nothing | |
 | `skein/01-s1-terminal-room.md` | skein-01.s1 (ruling 134): the terminal's room for the application's lines | nothing | |
+| `skein/01-s2-terminal-price.md` | skein-01.s2 (ruling 143): the terminal's worst case, operations and line bytes | nothing | |
 
 ### temper
 
@@ -92,7 +94,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
 | `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
-| `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16 |
+| `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16; 04.4: jig-13.s1 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
 | `temper/07-task-pages.md` | temper 07: the task's page, adoption, the confirmations; `jig-client-view` dropped | temper 06 | |
@@ -290,6 +292,20 @@ per session are in each file.
     `worst_case`'s `(u32, u64)`, both constructors' signatures), and
     `temper-client-shell-terminal` is the one temper crate that names
     `skein-ui-text`, so a move onto it is `Cargo.lock` alone.
+  - **A path's segments** (the design answer of 2026-10-16T15:20Z,
+    ruling 143): jig-13.s1 adds `segments` to jig's client limits, beside
+    `rows` and `text`. The first temper increment whose repin includes
+    jig-13.s1's landing (`git -C ~/src/rust/jig merge-base --is-ancestor
+    <jig-13.s1's landing> <the pinned commit>` succeeds), at the latest
+    temper 04.4's, adds `segments: 9` (`client.md`, 5.4) to each temper
+    literal of those limits, counted within the repin's 200 lines: at
+    temper `df37f032`, `git grep -n 'conversation_words:' -- '*.rs'`
+    prints 4 (`crates/temper-client-domain/src/tests/fixtures.rs:37`,
+    `crates/temper-client-shell-terminal/src/limits.rs:52`,
+    `crates/temper-client-view/src/tests/fixtures.rs:34`,
+    `tests/client/src/fixtures.rs:48`); a further literal gets the same,
+    listed in the commit body. temper 04.4 then holds the engine's name
+    bounds at most it.
   - **The closing repin, `temper-repin`:** temper's README-declared
     repin. The coordinator adds it at setup, `plan set temper-repin
     repo=temper state=waiting` (development.md 7.1 adds none, since the

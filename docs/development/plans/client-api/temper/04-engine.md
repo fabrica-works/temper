@@ -380,9 +380,9 @@ as many segments as the engine admits in a name"); and temper's client
 takes a path's segments apart from its rows (`client.md`, 5.4;
 `configuration.md`, 7; the design answer to the question of
 2026-10-16T14:55:38Z).
-Needs: 04.3, and the landing of jig's step for a path's segments (the
-supervisor's supplement step; README, "Pins": this increment's repin
-takes it).
+Needs: 04.3, and jig-13.s1's landing (jig's step for a path's segments,
+`jig/13-s1-path-segments.md`; README, "Pins": this increment's repin
+takes it, and "A path's segments").
 Files: `tests/engine/domain/tests/forge_routes.rs` (over 800 lines: at
 most 40 added), on its `change_world` (`:633`);
 `crates/temper-client-shell-terminal/src/limits.rs` (`segments: 9`
