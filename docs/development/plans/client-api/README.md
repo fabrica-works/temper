@@ -318,7 +318,10 @@ per session are in each file.
   `crates/jig-domain-tasks/src/boundary.rs` (jig 02 to 09, 16);
   `crates/jig-protocol-store/src/{format.rs, keys/, codec/}` (jig 02,
   03, 06, 08, 09, 16); `crates/jig-protocol-config/src/` (jig 03, 04,
-  09, 17, 18); `crates/jig-protocol-engine-clients/src/translate/` (jig 14, 16,
+  09, 17, 18), and in it `tests/domain.rs`'s
+  `memory_below_the_components_sum_is_refused` (`over`, the small
+  profile's memory sum) by each session that changes a stored record's or
+  a component's worst case (jig 02 to 09, 16; ruling 110); `crates/jig-protocol-engine-clients/src/translate/` (jig 14, 16,
   17); `testing/jig-test-domain/` (jig 06, 07, 09);
   `testing/jig-conformance/` (jig 04.7, 06.1, 08.3 to 08.6, 23);
   `crates/jig-client-protocol-link/src/{boundary,component,store,lib}.rs`,
