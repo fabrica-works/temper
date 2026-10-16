@@ -310,6 +310,20 @@ run are appended after "For the user".
        pair.
      - Session 04's question 2 is marked answered. Nothing is deferred: no `later.md` row.
 
+112. **05's Shapes against main** (ready check of temper-05.1).
+     Ruling 112, the ready check of temper-05.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/05-webhooks.md: 05.1's reference test names `domain::api::Change::Push` (`api.rs:720`), not `raw::`;
+     `server::down` (`server.rs:132`, its arm :140) and `Service::target` (`service.rs:94`) keep ignoring a `Hook`;
+     05.2's MAC in hexadecimal calls `marker::hex` (one nibble, `marker.rs:53`) on `byte / 16` and `byte % 16` of each
+     byte, as `marker.rs:23` does; 05.2's Files add the conformance's `component/hosted.rs:255` (`kit::Event`) and `:87`
+     (`Limits`), and take from 05.3 `forge.rs`'s `problems` (:197, :212) and `indexed` (:257) arms for the new
+     `Unusable` and `Stacked`, without which temper-service stops compiling at 05.2; the new stop is `stop::hooks`, not
+     `stop::listener` (`Stop::Listener`, `lib.rs:49`, is the clients'); 05.3's renamed test is
+     `an_unknown_missing_or_reserved_member_is_named_by_its_path` (`startup.rs:33`); `NotBuilt` is at `problems.rs:171`,
+     not :169. 05.1 and 05.2 corrected passed workspace clippy `-D warnings`; default suites 89 passed (05.1) and 298
+     passed (05.2), fuzzy 9 passed each. 05.3 was not checked against code. A further exhaustive match the compiler
+     finds is given its arm in the increment that adds the variant, and named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
