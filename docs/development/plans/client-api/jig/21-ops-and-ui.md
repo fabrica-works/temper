@@ -159,7 +159,11 @@ scope }`), goes, and no owner enum takes its place; a tell routes by
 UI, `Application { number }` by `jig_ops_domain_connectors::connector(number)`
 to `Connector::Observability` or `Connector::Infrastructure`, and none
 to no child; an ask leaves under `Owner::Application { number:
-jig_ops_domain_connectors::number(connector) }.asker()`.
+jig_ops_domain_connectors::number(connector) }.asker()`. `ops`'s client
+limits declare each connector whose families it sends, by
+`jig_ops_domain_connectors::number`, at
+`jig_ops_client_protocol_wire::VERSION` (`jig_client_domain::Limits.owners`,
+jig 12.4; client.md, 8.2).
 Test shape: `examples/ops/client-domain/src/tests.rs` (kept and
 extended): `routes_an_infrastructure_tell_to_its_side`,
 `passes_the_client_s_transport_requests_out_in_order`,

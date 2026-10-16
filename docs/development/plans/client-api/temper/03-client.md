@@ -543,7 +543,12 @@ transport requests out in their order and routes each tell by its
 asker, exhaustively, `Link` to each child; `Owner` in the wire crate,
 matched with no `_` arm by the engine's routing of the forge's family; the forge's
 form out of date from `client.link().not_served` (`client.md`, 3.1, 3.3,
-4.4, 4.5, 4.6; jig's `root.md`, 3 to 5, 7, 15).
+4.4, 4.5, 4.6; jig's `root.md`, 3 to 5, 7, 15). temper's client limits
+declare the forge, `FORGE` at `CLIENT_VERSION`, in
+`jig_client_domain::Limits.owners` (jig 12.4; jig's `client.md`, 8.2),
+so `not_served` names it from the hello on, before any adoption is
+sent, and a kept adoption of another version is dropped by `jig-client`
+at start.
 Needs: jig 21.2 (`ops`'s root on `jig_client::Client`, jig 13.4's
 native host and worlds among it).
 Files:

@@ -177,9 +177,11 @@ Shape:
   names the scope (jig 07.4).
 - Client: the link translates `KeyedAnswer::NotServed` into the request
   table's held-for-its-owner progress, `ReadAnswer::NotServed` into the
-  read's `Page` version not served, `OpenAnswer::NotServed` and
+  read's `Page` version not served (jig 12.4's `Readout::NotServed`,
+  its `served` the answer's range of that owner), `OpenAnswer::NotServed` and
   `WatchEnd::NotServed` into `Ended { why: version not served }`, and
-  each into the link's owners not served (jig's own: out of date); the
+  each into the link's owners not served (jig's own: out of date), as
+  jig 12.4's judgement of a declared owner, until the next hello; the
   family `Watch`, `Read` and `Send` name `scope: Scope` beside their
   bytes (the window is the `Watch`'s).
 Test shape:

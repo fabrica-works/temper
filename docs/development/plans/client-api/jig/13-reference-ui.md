@@ -360,6 +360,10 @@ by a supervisor's steer before 13.4 starts), `Page` as `Read`, `Ended` as `Ended
 reference UI's link). The family sides' `Out::{Read, Open, Close}` and
 `Send` reach the client as `Read`, `Watch`, `Unwatch` and `Send` under
 their asker, encoded by 13.3's codec, and its tells come back decoded.
+The root's client limits declare the family owners its sides send, each
+at `jig_client_test_protocol_wire::VERSION` (`jig_client_domain::Limits.owners`,
+jig 12.4; client.md, 8.2); a family message of an owner not declared
+`assert!`s in the client.
 Test shape: `testing/jig-client-test-domain/src/tests/root.rs` (the
 root's, kept and extended): `routes_a_tell_to_the_child_its_asker_names`,
 `passes_the_client_s_transport_requests_out_in_order`,

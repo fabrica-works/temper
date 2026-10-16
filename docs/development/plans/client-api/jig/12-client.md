@@ -56,10 +56,26 @@ increment proves against the real engine.
   and tells `Link` signed out"; "A sign-out that does not reach the
   engine ... leaves the party signed in"; "A sign-out's answer is its
   sign-in's".
-- Versions per owner (8.2; protocol/client.md, 9): "Outside a range of a
-  family's owner, that owner's requests stay kept and unsent, its reads
-  are answered and its watches end as version not served; outside
-  jig's, the link is out of date."
+- Versions per owner (8.2; protocol/client.md, 9): "each family owner's,
+  which the application declares as it makes the client, with its
+  limits (section 14) ... Each family's request, read and subject names
+  a declared owner, in its declared version; any other is the
+  application's mistake, and loud"; "Judged at each hello, whole. A
+  declared owner is not served when the hello names no range of it, or
+  one that leaves out its version. The judgement holds until the next
+  hello ... The client keeps, for each declared owner, its judgement and
+  the range the hello named of it; of an owner it does not declare,
+  nothing"; "Outside a range of a family's owner, that owner's requests
+  stay kept and unsent, held for its version (section 6); its reads are
+  answered at once, unsent (section 7); its watches end, none opened
+  again at that hello; each as version not served. Outside jig's, the
+  link is out of date, and its reads are answered so too."
+- A read of an owner not served (client.md, 7): "answered at once and
+  never sent: version not served, naming the owner and the range the
+  last hello named of it, or none where it named none".
+- A kept family request (client.md, 11): "one whose owner the build does
+  not declare, or whose version is not the one declared (8.2), is such
+  a record", dropped at start, and the application told.
 - Families as bytes (client.md, 4; root.md, 7): "The client never reads
   a family's bytes. It reads their owner, their version and their size".
 - The client's world: "the engine, scripted; the transport, played by
@@ -462,32 +478,88 @@ Size: at most 280 lines.
 Removes: nothing.
 
 ### 12.4 Versions per owner, and families as bytes under their owner
-Scope: the hello's ranges per owner (protocol/client.md, 9): outside
-jig's, out of date (12.1); outside a family owner's, its requests stay
-kept and unsent (each attempt answered `Again` by the client without
-leaving, its progress `NotServed`), its reads answered at once and its
-watches ended `Why::NotServed`, and `link().not_served` lists it; a
-hello in range again sends what was kept, under its keys. Families ride
-the same table, watches and reads as bytes under their owner (client.md,
-4 and 6); the story grows: a family's request answered as its owner's
-bytes.
+Scope: the family owners the build declares, and each hello judged
+whole against them (client.md, 7, 8.2, 11 and 14; protocol/client.md,
+9 and 10; the design answer to jig 12.4's question of
+2026-10-16T22:51:29Z). The application declares, in
+`jig_client_domain::Limits.owners`, each owner whose families it sends,
+with its wire's version. Outside jig's range, out of date (12.1). A
+declared owner the hello names no range of, or one without its
+version, is not served until the next hello: its requests stay kept and
+unsent (each attempt answered `Again` by the client without leaving,
+its progress `NotServed`), its reads are answered at once
+`Readout::NotServed`, its watches end `Why::NotServed` and the link
+reopens none of them at that hello, and `link().not_served` lists it
+from that hello on; a hello in range again sends what was kept, under
+its keys. While the link is out of date, every read is answered at once
+`Readout::NotServed { family: None, .. }`. A family's `Send`, `Read` or
+`Watch` naming an owner not declared, or another version, `assert!`s,
+as a key conflict does (`crates/jig-client-domain/src/requests.rs:37`);
+a kept family request of an owner not declared, or of another version,
+is dropped at `Start` and told `Told::Dropped`. Families ride the same
+table, watches and reads as bytes under their owner (client.md, 4 and
+6); the story grows: a family's request answered as its owner's bytes.
 Needs: 12.3's client.
-Files: `crates/jig-client-domain/src/{boundary.rs, requests.rs,
-watches.rs, reads.rs}`; `crates/jig-client/src/client.rs` (the link's
-`Hello { family: Some(_), .. }` to `Up::FamilyServed`);
-`tests/client-protocol/src/client.rs`, `tests/client.rs` (the family's
-request with `src/family.rs:15`'s `request` and `:32`'s `answer`).
-Shape: `Up::FamilyServed { family: u16, versions: VersionRange }`;
-`Why::NotServed`; `Progress::NotServed`; `LinkView.not_served`.
-Test shape: unit tests in `crates/jig-client-domain/src/tests/versions.rs`;
-story in `tests/client-protocol/tests/client.rs`. Tests: story
+Files: `crates/jig-client-domain/src/{boundary.rs, limits.rs,
+domain.rs, requests.rs, watches.rs, reads.rs}`;
+`crates/jig-client-protocol-link/src/{boundary.rs, component.rs (the
+hello, :536-562), limits.rs (`Limits::new`, :16)}`;
+`crates/jig-client/src/client.rs` (the link's `Hello`s to `Up::Served`
+and `Up::FamilyServed`, :322-332; `link()`, :192); the fixtures that
+build `jig_client_domain::Limits`: `crates/{jig-client-domain,
+jig-client-protocol-link, jig-client,
+jig-protocol-engine-clients}/src/tests/fixtures.rs` and
+`tests/client-protocol/src/fixtures.rs` (`owners: &[]` where no family
+is sent; the family each one's tests send, at its version, where one
+is); `tests/client-protocol/src/client.rs`, `tests/client.rs` (the
+family's request with `src/family.rs:15`'s `request` and `:32`'s
+`answer`).
+Shape:
+- `jig_client_domain::Limits` gains `owners: &'static [Spoken]`, with
+  `pub struct Spoken { pub family: u16, pub version: u32 }` in
+  `boundary.rs`. The link's `Limits::new` gives `Unusable::Limits`
+  (so `Client::new` does) for more than `w::CEILINGS.hello_served - 1`
+  owners (15: the wire's `Hello.served` holds 16 ranges, jig's among
+  them), or one family twice. The domain's `worst_case` counts its one
+  judgement per declared owner.
+- The link judges each hello against `self.limits.client.owners`: its
+  `Request::Hello` becomes `Hello { family: Option<u16>, versions:
+  Option<VersionRange> }`, one for jig's and one per declared owner,
+  `versions: None` where the hello names no range of it, none for a
+  range of an owner not declared. At the hello it reopens only the
+  watches whose owner's range holds their version; one it does not
+  reopen keeps its subject, so the domain's `Close` ends it with no
+  exchange (`close`, :377-383).
+- The domain: `Up::Served { served }` (12.1) gains `versions:
+  Option<VersionRange>`, jig's range from the hello, `served: false`
+  when it is `None`; `Up::FamilyServed { family: u16,
+  versions: Option<VersionRange> }`, served when `versions` holds the
+  declared version, an owner not declared changing nothing; `Why::NotServed`;
+  `Progress::NotServed`; `Readout::NotServed { family: Option<u16>,
+  served: Option<VersionRange> }`, `family: None` for jig's, `served`
+  the range the last hello named of that owner.
+- `LinkView.not_served: &'a [u16]`, the declared owners the last hello
+  did not serve, in declaration order; `&[]` before the first hello.
+Test shape: unit tests in `crates/jig-client-domain/src/tests/versions.rs`
+and the link's `src/tests/stream.rs`; story in
+`tests/client-protocol/tests/client.rs`. Tests: story
 `a_family_request_is_answered_as_its_owner_s_bytes`,
 `an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing`
 (the protocol world's `FrontFault::Versions` serving, front/faults.rs:43-48);
 unit `a_family_owner_not_served_keeps_its_requests_unsent`,
 `a_family_owner_not_served_ends_its_watches_not_served`,
 `a_family_owner_served_again_sends_what_was_kept`,
-`a_family_document_past_the_bytes_limit_ends_its_handle`. The fuzzy
+`a_family_document_past_the_bytes_limit_ends_its_handle`,
+`a_declared_owner_the_hello_does_not_name_is_not_served_before_any_send`
+(`link().not_served` is `[19]` after a hello with jig's range alone,
+nothing sent),
+`a_read_of_an_owner_not_served_is_answered_at_once_naming_its_range`
+(no `Down::Read`; the page names family 19 and the hello's range),
+`a_read_while_out_of_date_is_answered_not_served`,
+`a_kept_family_request_of_another_version_is_dropped_and_told`; the
+link's `the_hello_s_jig_range_reaches_the_domain` and
+`the_hello_s_family_range_reaches_its_owner` take `Some(range)`, and
+`a_hello_reopens_no_watch_of_an_owner_it_does_not_serve` is added. The fuzzy
 suite gains `tests/client-protocol/tests/fuzzy_client.rs`'s
 `random_scripted_applications_keep_the_client_s_rules`: a scripted
 application drawing its events (watches, reads, sends, sign-outs and
@@ -501,8 +573,12 @@ passes when the test connector's outcome comes back as the family's
 bytes (under 0.5 s). It passes; nothing else is wanted.
 Don't: no family's bytes decoded in the client (the story decodes them
 with the test application's wire); no typed version refusal per message
-(jig 14's).
-Size: at most 150 lines.
+(jig 14's); no range kept of an owner not declared; no declaration read
+from the messages (each message's version is checked against it, never
+learnt from it); no change to `Client::new`'s arguments.
+Size: at most 210 lines (150 before the design answer of
+2026-10-16T22:51:29Z; the declaration, its bound, the link's judgement
+and reopen, the reads at once and the kept records' drop add 60).
 Removes: nothing.
 
 ### 12.5 A typed transport for the client's world
@@ -511,7 +587,10 @@ Scope: `Client::unlinked(limits, seed)`: the domain with no link, its
 for a transport that carries them to an engine scripted in the
 contract's types (testing.md, 4; the client's world's scripted engine).
 Sign-in under it is `With::Transport`; the small store's records are the
-domain's (`RequestRecord<Held>`), kept by the world.
+domain's (`RequestRecord<Held>`), kept by the world. The world's
+transport plays the hello as the link gives it (12.4): `Up::Served`,
+then one `Up::FamilyServed` per owner its client's limits declare;
+`owners: &[]` where the world sends no family.
 Needs: 12.4's client.
 Files: `crates/jig-client/src/{client.rs, lib.rs}`,
 `src/tests/unlinked.rs`; `tests/client/Cargo.toml` (`jig-client-world`
@@ -629,14 +708,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64>;
 
 // crates/jig-client-domain/src/boundary.rs, what this session adds
 pub enum Link { SignedOut, Starting, Live, Offline, OutOfDate }   // Told::Link { link } (12.1)
-// Up gains: SignedIn, Served { served: bool } (12.1); SignedOut (12.3);
-//           FamilyServed { family: u16, versions: VersionRange } (12.4)
-// Outcome gains NotKept (12.2); Why and Progress gain NotServed (12.4)
+// Up gains: SignedIn, Served { served: bool } (12.1; 12.4 adds versions: Option<VersionRange>);
+//           SignedOut (12.3); FamilyServed { family: u16, versions: Option<VersionRange> } (12.4)
+// Outcome gains NotKept (12.2); Why and Progress gain NotServed (12.4);
+// Readout gains NotServed { family: Option<u16>, served: Option<VersionRange> } (12.4)
+/// A family owner the build sends, with its wire's version (client.md, 8.2) (12.4).
+pub struct Spoken { pub family: u16, pub version: u32 }
+// crates/jig-client-domain/src/limits.rs: Limits gains owners: &'static [Spoken] (12.4)
 
 // crates/jig-client-protocol-link/src/boundary.rs, what this session adds
 // With gains Service(Secret) and Transport (12.3); Message gains SignInService (12.3);
 // Write, Remove, Written, WriteFailed and StoreRead become Save { record }, Erase { key },
-// Stored, NotStored and Record { key, bytes } (12.1); Request gains NotKept { attempt } (12.2).
+// Stored, NotStored and Record { key, bytes } (12.1); Request gains NotKept { attempt } (12.2);
+// Request::Hello's versions become Option<VersionRange>, one per declared owner (12.4).
 ```
 
 The map in `jig-client`, written once (an algorithm easy to get wrong):
