@@ -240,7 +240,13 @@ Shape:
   `Terminal::room()` is above 0, says none once it has closed the
   terminal, and pops no `Terminal::commands()` while a line waits (the
   terminal then reads no further, `ui-text.md`, 7). Never `say` without
-  room: it panics.
+  room: it panics. The waiting queue's capacity, `table.requests + 3`,
+  reaches `Loop::new` from its callers, since `limits::Terminal` has no
+  `requests` (`terminal.rs:62-90`): `open.rs:101` passes
+  `bounds.client.table.requests`, and `tests/support/mod.rs:172` and
+  `tests/terminal.rs:182` pass `limits::native()`'s; `Loop::worst_case`
+  (`terminal.rs:300-308`, added into the host's memory at
+  `run.rs:68-69`) charges that queue in place of `limits.lines`.
 - temper's `terminal::Loop` keeps only what the text shell does not: the
   sign-in's retry and backoff (6.7), the exit status and its stderr line
   (6.1), the waiting lines and the order in which they are said.
