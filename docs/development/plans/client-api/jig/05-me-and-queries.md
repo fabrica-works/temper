@@ -506,7 +506,14 @@ Files:
 Shape:
 - `Core::conversation_requester(&self, row: &tasks::TaskRecord) ->
   Option<u64>`: the requester party of a task flagged conversation,
-  whatever its charter, tracking or recurrence; `None` otherwise.
+  whatever its charter, tracking or recurrence; `None` otherwise. A
+  tracked conversation stays one (the designer's answer to ruling 120's
+  question, 2026-10-16; jig's tasks.md, 7: "Neither touches its flags,
+  so a conversation stays one"), so the two other tests of a chat that
+  read `tracked` and `recurring` go with `chat_requester`'s: the shaped
+  `Conversations` document's (`documents/inbox_deployment.rs:340-345`)
+  and `touch_task`'s `chat` (`routing/watch_marks.rs:202-207`), each
+  calling `conversation_requester`.
 Test shape:
 - `crates/jig-domain-core/src/tests/conversation_cursor.rs` (existing):
   `a_task_flagged_conversation_under_another_charter_is_one`,
@@ -528,11 +535,13 @@ Proof: joint, `heavy cargo nextest run -p jig-core-world -E
 test(=conversations_page_both_ways_from_the_index)'` once: a party's
 `Seen` over their conversation's turns brings its task line's unread
 count to zero, and the conversations' pages read as before; under 1 s.
-Don't: read `settings.chat` to know a conversation; add a read position
-for a task not flagged conversation; rename `people::Seen::Chat` (jig
-16 does, with the shed).
+Don't: read `settings.chat`, `tracked` or `recurring` to know a
+conversation; add a read position for a task not flagged conversation;
+rename `people::Seen::Chat` (jig 16 does, with the shed).
 Size: at most 60 lines.
-Removes: `chat_requester`'s charter, tracked and recurring tests.
+Removes: `chat_requester`'s charter, tracked and recurring tests, and
+the same three in `inbox_deployment.rs`'s `conversations` and
+`watch_marks.rs`'s `touch_task`.
 
 ## Interface sketches
 

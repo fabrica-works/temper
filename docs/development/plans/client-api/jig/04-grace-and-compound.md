@@ -131,14 +131,26 @@ jig 07.5 uses through 04.5, for untracking.
 
 ## Rules that bind it
 
-- **A chat tracked by an amendment is the designer's question**
-  (ruling 120, 2026-10-16): `Core::chat_requester`
-  (`jig-domain-core/src/inbox.rs:108`) answers no party for a tracked
-  task, so a chat that 04.2's or 04.5's amendment tracks stops being its
-  party's chat. Until the answer amends this file, 04.2 and 04.5 build
-  and test tracking on tasks that are no conversation, and nothing of
-  this session admits, refuses or tests tracking a conversation; 04.1,
-  04.3, 04.4 and 04.6 do not rest on it.
+- **A tracked conversation stays one** (the designer's answer to
+  ruling 120's question, 2026-10-16; jig's tasks.md, 7: "Neither touches
+  its flags, so a conversation stays one: tracked, its turns are still
+  entries for its requester, with their read position and unread count
+  ... No tracking is refused for a task's being a conversation"). 04.2
+  and 04.5 admit tracking any task, a conversation included, and add no
+  refusal, branch or test for its being one. Neither changes
+  `Core::chat_requester` (`jig-domain-core/src/inbox.rs:107-121`): jig
+  05.5 makes the core know a conversation by its flag
+  (`conversation_requester`), and its
+  `a_tracked_conversation_keeps_its_read_position` is the test of it. No
+  test of this session asserts what a tracked conversation's inbox
+  lines, offers or read position show. Until jig 05.5 lands, a chat
+  tracked on `main` leaves its party's inbox; no client can track one
+  before jig 14 carries the tracked amendment on the wire.
+- **A task is asked to finish once** (the designer's answer to ruling
+  123's question, 2026-10-16; jig's tasks.md, 7): a cancel with a grace
+  made during a grace adds no word, and moves the grace's end, with its
+  `by` and reason, only to a sooner end (04.1's Shape). It binds 04.1,
+  and 04.5 and 04.6 where they send a cancel with a grace.
 - **Format versions** (README, Rules): tasks v3 is jig 02.1's, and
   people v3 its owner's; an increment that changes a family's records
   needs its owner's landing and edits that version in place. Regenerate
@@ -260,17 +272,30 @@ Shape:
   once (`closing::cancel_tree` with the history `control::apply`
   writes); an active one hears an amendment-kind word (`MessageKind::
   Amendment`, its words the cancel's reason), as `control::amend` builds
-  one, and keeps `Grace { by, until, reason }`, or the earlier `until`
-  when it already has one; a person task's holder sees it as they see an
-  amendment; `grace::schedule` arms the
-  alarm from `until`; `grace::fire` cancels with `grace.by` and
+  one, and keeps `Grace { by, until, reason, message }`; a person
+  task's holder sees it as they see an amendment; `grace::schedule`
+  arms the alarm from `until`; `grace::fire` cancels with `grace.by` and
   `grace.reason`.
+- A cancel with a grace during a grace (tasks.md, 7: "One with a grace
+  asks nothing more, since a task is asked to finish once, by the
+  first. If its grace ends sooner, the task's grace now ends with it,
+  and the task is then cancelled with this later cancel's maker and
+  reason ... If its grace ends no sooner, nothing of the task
+  changes"): `ask_to_finish` on an active task whose `grace` is `Some`
+  adds no word and takes no room. When its `until` is earlier than the
+  kept one, the task's `Grace` takes this cancel's `by`, `until` and
+  `reason`, keeps its `message` (the first's ask, the one word there
+  is), and `grace::schedule` re-arms the alarm from it; when it is equal
+  or later, nothing of the task changes. Either way the cancel is
+  answered as the first was, and its `message`, required as for any
+  cancel with a grace, is left unused.
 - The ask is admitted `inbox::Admission::RoomKept` (tasks.md, 8.2: "a
-  cancel, its grace's ask to finish taking the same room, so none of
-  them can be refused"): one slot per live task and the reason's bytes
-  (within `result_bytes`) are kept for it, counted in `worst_case`, so a
-  full inbox never refuses it, and it is a word of its own, never merged
-  into an amendment still waiting.
+  cancel, its grace's ask to finish taking the same room, one ask in a
+  task's life (section 7), so none of them can be refused"): one slot
+  per live task and the reason's bytes (within `result_bytes`) are kept
+  for it, counted in `worst_case`, so a full inbox never refuses it, and
+  it is a word of its own, never merged into an amendment still
+  waiting. One slot holds, since a task in a grace hears no second ask.
 - `chat::close` builds its grace with `by: Party::Person(person)`,
   `reason: EXPIRED`, its finish words `FINISH`, through
   `ask_to_finish`; its cohort check is unchanged.
@@ -328,9 +353,15 @@ Test shape:
   (601 s; the saved rows equal before),
   `a_waiting_task_cancelled_with_a_grace_ends_at_once`,
   `a_cancel_without_a_grace_during_one_cancels_at_once`,
-  `a_second_grace_never_ends_the_task_later_than_the_first`,
+  `a_second_grace_never_ends_the_task_later_than_the_first` (a 5 s
+  grace, then a 10 s one: one ask in the inbox, the task's `grace` the
+  first's, and the task cancelled at 5 s with `b"wrap up"`),
+  `a_sooner_second_grace_ends_the_task_with_its_own_reason` (a 5 s
+  grace, then a 2 s one whose reason is `b"now"`: one ask in the inbox,
+  its words `b"wrap up"`, and the task cancelled at 2 s with `b"now"`),
   `a_graces_ask_to_finish_is_admitted_into_a_full_inbox` (the inbox at
-  `inbox_messages` words first), `a_graces_ask_never_merges_into_a_waiting_amendment`
+  `inbox_messages` words first; a second cancel with a grace after it
+  is admitted too, and adds no word), `a_graces_ask_never_merges_into_a_waiting_amendment`
   (both words in the inbox after), `a_person_task_cancelled_with_a_grace_shows_its_holder_the_ask`
   (a person task taken by party 3: the ask is in its inbox as an
   amendment's word, and the task ends cancelled when the grace ends).
@@ -348,7 +379,8 @@ delegate still live; under 1 s. Nothing else is run for it.
 Don't: route a party's or a run's cancel with a grace from the core (the
 core sends `grace: None` until 04.5 and jig 06.5); read
 `Settings.close_grace` anywhere new.
-Size: at most 235 lines (about 110 of them moved out of chat.rs).
+Size: at most 255 lines (about 110 of them moved out of chat.rs; 20
+for a grace during a grace and its test, ruling 123's answer).
 Removes: chat.rs's grace half, `TaskRecord.chat_close`, the chat alarms.
 
 ### 04.2 Tracked made amendable, and goals per project, in the tasks child
@@ -659,6 +691,10 @@ Shape:
 - A grace past `limits.tasks.grace` is `Refusal::Limit { which:
   LimitKind::Grace }`; a tracking past goals per project is
   `Refusal::Limit { which: LimitKind::Goals }`.
+- A party's cancel with a grace during a grace takes 4.1's path, which
+  asks the task nothing more and keeps the sooner end with its cancel's
+  `by` and reason; it is answered `Outcome::Cancelled { task }`, as the
+  first, and the message number the core took for it stays unused.
 Test shape:
 - `crates/jig-domain-core/src/tests/acts.rs`:
   `a_member_amending_a_priority_is_refused_as_not_a_maintainer`,
