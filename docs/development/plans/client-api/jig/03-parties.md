@@ -51,9 +51,9 @@ jig 14 carries these operations to it, and jig 22 the documents.
   itself". "A request refused says why, with its facts: ... the authority
   it lacked and by how much, and whether a proposal could be accepted,
   and by whom". The base turns a goal beyond the pool into `GoalProposed`
-  (`crates/jig-domain-core/src/acts/bounds.rs:290-300`) and an amendment
+  (`crates/jig-domain-core/src/acts/bounds.rs:293-303`) and an amendment
   beyond the role into `AmendProposed`, whose proposer is the task
-  (`acts/bounds.rs:373-391`; STATUS: "a party's amendment proposal names
+  (`acts/bounds.rs:376-394`; STATUS: "a party's amendment proposal names
   the task as its proposer").
 - **`Propose`** (people.md, 5.1): "member; a batch or an amendment beyond
   their authority, of a kind a role the project's policy names may accept
@@ -61,7 +61,7 @@ jig 14 carries these operations to it, and jig 22 the documents.
   number and to whom answered". "A proposed batch giving `AsAllowed` is
   refused as not well formed" (authority.md, 7).
 - **`Withdraw`**: "their own pending proposal | withdrawn". The base
-  withdraws a task's proposal only (`crates/jig-domain-tasks/src/boundary.rs:1262`).
+  withdraws a task's proposal only (`crates/jig-domain-tasks/src/boundary.rs:1278`).
 
 ## Choices this plan makes
 
@@ -93,21 +93,21 @@ jig 14 carries these operations to it, and jig 22 the documents.
 - **References are not named by a `Create`**: `New` and an agent's
   `Delegate` carry none, though people.md, 5.1 names "a reference" among
   what a party may name; jig 03.2 raises it (Questions).
-- **The wire stays v7** (jig 14 changes its requests, jig 22 its
-  documents). The clients' component maps `Accepter::Role(_)` onto v7's
+- **The wire stays v8** (jig 14 changes its requests, jig 22 its
+  documents). The clients' component maps `Accepter::Role(_)` onto v8's
   `proposable: Some(true)` and `Accepter::Nobody` onto `Some(false)`; it
   answers its translation's `problem()` for the outcomes `Created`,
-  `Proposed` and `Withdrawn`, which no v7 ask can lead to, and for the
+  `Proposed` and `Withdrawn`, which no v8 ask can lead to, and for the
   document of a party's proposal of an amendment, which only `Propose`
   makes. jig 14 maps the outcomes, jig 22 the document.
 - **The reference UI's amendment beyond its party's role keeps working**
-  from 03.5 to jig 14.5. Its confirmation sends v7's `Ask::Amend` for an
+  from 03.5 to jig 14.5. Its confirmation sends v8's `Ask::Amend` for an
   amendment offered as proposable (`crates/jig-domain-client/src/tests/confirmation.rs:311`
-  at the base), and v7's `Amend` cannot say which it is: only the engine
+  at the base), and v8's `Amend` cannot say which it is: only the engine
   judges. So the clients' component, and nothing in the engine, turns a
-  v7 `Ask::Amend` that the engine refuses as proposable (`Authority {
+  v8 `Ask::Amend` that the engine refuses as proposable (`Authority {
   proposable: Some(Accepter::Role(_)) }`) into the party's `Propose` of
-  that amendment, and answers v7's `AmendProposed`; jig 14.5 moves the
+  that amendment, and answers v8's `AmendProposed`; jig 14.5 moves the
   confirmation onto `Propose` and removes it (03.5). This is
   transitional code with its end named (code-organization.md, 6).
 - **The reference UI loses its implicit goal proposal** at 03.4, as the
@@ -166,12 +166,18 @@ Files:
   an arm in each of its matches over `Ask` (search S9) and over
   `Outcome`), `capacity.rs`, `words.rs`.
 - `crates/jig-protocol-config/src/profile/{small.rs, standard.rs}` (people
-  `batch=2` and `4`, with the doc line), `overrides.rs` (:172 and :193,
-  `people.batch`).
+  `batch=2` and `4`, with the doc line), `overrides.rs` (:174 and :195,
+  `people.batch`); `src/tests/overrides.rs`, `SMALL` (:131; people's rows
+  :171-189), gains `(b"people.batch", 2)`, as jig 04.1's `grace` row did.
+  When a `Create` raises people's worst case, the values derived from it
+  move too: `JOURNAL` and `STORE_KV` in `profile/small.rs` (:235, :305) and
+  `standard.rs` (:141, :144), and `src/tests/domain.rs:169` (`What::Memory
+  { over: 12_090_553_463 }` at jig `e1b483760`); refresh any further derived value the gate
+  names, and list it in the commit body.
 - `crates/jig-domain-core/src/routing/create.rs` (new: the route),
-  `routing/mod.rs` (`Creation` at :108 holds a batch, as
-  `DelegateCreation` at :118 does; chats and goals give a batch of one),
-  `routing/parties.rs` (`begin_creation` :244 and `created_holdings` :289
+  `routing/mod.rs` (`Creation` at :109 holds a batch, as
+  `DelegateCreation` at :119 does; chats and goals give a batch of one),
+  `routing/parties.rs` (`begin_creation` :248 and `created_holdings` :293
   ask each connector for each member's holdings and make the batch),
   `routing/people.rs` (the route's arm), `acts/requests.rs`,
   `person_task.rs`, `roles.rs`, `routing/party_controls.rs` (arms, search
@@ -190,7 +196,11 @@ Files:
   `people::Ask`, `Outcome` and `Refusal` (searches S8 to S10):
   `testing/jig-test-domain/src/{routes.rs, application_facts.rs}`,
   `tests/core/src/{peers.rs, referee/offers.rs}`,
-  `tests/client/src/joint/wire/{outcomes.rs, refusals.rs}`,
+  `tests/client/src/joint/wire/{outcomes.rs, refusals.rs}` (`outcome`,
+  `outcomes.rs:17`, has no problem variant: its `Created`, and from 03.4
+  its `Proposed` and `Withdrawn`, arms are `unreachable!("no v8 ask leads
+  to <the outcome>")`, as the clients' component answers `problem()` for
+  them, Choices),
   `tests/people/src/{referee.rs, world.rs}`.
 - `tests/core/src/stories/offers.rs` (`world_with`, beside `world` at :21;
   Test shape).
@@ -206,7 +216,7 @@ Shape:
   `Malformed::Cycle`.
 - The people child admits a `Create` like `SetGoal`, refusing no role:
   `admission` (`domain.rs:1838`) routes the ask, and the core refuses by
-  role (step 0), as it does a goal (`acts/bounds.rs:29`, :236). The people
+  role (step 0), as it does a goal (`acts/bounds.rs:29`, :239). The people
   child checks 1 to `batch` members, each member's words within `words`
   and its `member_bytes` within `amendment_bytes`, else `Limit { which:
   Empty | Batch | Words }`.
@@ -214,7 +224,7 @@ Shape:
   project, role, batch)`, in order, each refusal naming the member's
   position where it has one:
   0. `Role { held }` unless the party's role allows `RequestKind::Create`,
-     as `goal_start` refuses (`acts/bounds.rs:233-238`): an observer's
+     as `goal_start` refuses (`acts/bounds.rs:236-241`): an observer's
      `Create` is refused;
   1. `NotWellFormed { at, why: Cycle }` when the batch's own dependencies
      (positions) close a cycle, `at` the lowest position on it; a cycle
@@ -280,7 +290,7 @@ Test shape:
   configured, `world` is `world_with` with no edit, and before
   `World::configured` `world_with` raises the journal's `writes` and
   `held` to the edited core's `core::room_max`, as
-  `tests/core/src/world.rs:176-185` sizes them for the world's own
+  `tests/core/src/world.rs:178-187` sizes them for the world's own
   limits, else `root::worst_case` refuses the journal
   (`testing/jig-test-domain/src/limits.rs:30-31`) and the world's heap
   observer panics, "testing root bound fits"; the edit sets
@@ -289,7 +299,9 @@ Test shape:
   and `project_tasks` to 8, the Small profile's, beside the world's 2, the
   reason being a batch of two beside the world's chat): the Proof's test,
   and `a_partys_batch_with_a_dependency_cycle_is_refused_naming_its_member`,
-  `a_partys_batch_is_refused_while_nobody_holds_its_escalations`,
+  `a_partys_batch_is_refused_while_nobody_holds_its_escalations` (on
+  jig 02.3's `no_holder_fixture`, `tests/core/src/stories/offers.rs:93`,
+  built as `tests/core/tests/fields.rs:41` builds its member world),
   `a_partys_batch_beyond_their_pool_is_refused_naming_the_budget`,
   `a_partys_batch_naming_an_unknown_charter_is_not_offered`. Reference,
   the Proof's:
@@ -318,9 +330,10 @@ Test shape:
   ```
 
   (`batch_world`, `member(words, spend)` (an agent's task of charter 1,
-  report contract, `Flags` plain), `ask`, `live` and `member_party` are
-  helpers of this file; `live` reads the store's row as
-  `tests/core/tests/funding.rs:87-91` does.)
+  report contract, `Flags` plain), `ask` and `member_party` are helpers
+  of this file; `live` is `jig_core_world::fixtures::live_row`
+  (`tests/core/src/fixtures.rs:24`), which reads the store's row, not a
+  new helper; README, "A test's helpers once".)
 - Ceilings: each unit test under 20 ms, each world test under 0.5 s.
 Proof: joint layer, `tests/core/tests/parties.rs`,
 `a_partys_batch_of_two_agents_tasks_is_made_as_their_roots`: a member's
@@ -357,14 +370,14 @@ Files:
 - `crates/jig-domain-core/src/routing/create.rs`; `delegation.rs` (the
   person executor through `delegation_executor`, :165); `roles.rs` (a new
   `Core::reaches(person, role, project, task, depth) -> bool`, the
-  standing `amendment_admit` computes at `acts/bounds.rs:317-325`, which
+  standing `amendment_admit` computes at `acts/bounds.rs:320-327`, which
   then calls it).
 - `crates/jig-protocol-store`: `schema/people-v3.schema` in place; the
   codec of `Member`'s new parts, `Created.given`, the new `Malformed` and
   `LackTaskKind`.
 - The engine-clients' and the tests' arms as 3.1's, for the new variants;
   `crates/jig-protocol-engine-clients/src/translate/refusals.rs` leaves
-  v7's `LackingTaskKind.executor` `None`, as at the base (jig 14 fills
+  v8's `LackingTaskKind.executor` `None`, as at the base (jig 14 fills
   it).
 - The other users of `Lack::TaskKind`, passing `None` or matching `{ .. }`:
   `crates/jig-domain-core/src/authority_facts.rs` (:42, :69),
@@ -379,7 +392,7 @@ Shape: sketch 1, with each field and variant it marks 03.2. In
   at, why: AsAllowedTwice }` at the second member giving
   `Budget::AsAllowed`;
 - a procedure's executor offered as `goal_start` checks it
-  (`acts/bounds.rs:242-256`), `NotOffered` otherwise, and its parameters
+  (`acts/bounds.rs:245-259`), `NotOffered` otherwise, and its parameters
   reach its connector in the decision that makes the batch, as a
   procedure goal's do (the goal of `tests/core/tests/stories/procedure_goals.rs`);
   a person executor mapped by `delegation_executor`; each executor checked
@@ -473,8 +486,8 @@ Files:
   `give` at :650, `Propose` for a shortage against the role or the pool).
 - `crates/jig-domain-core/src/authority_facts.rs` (:12,
   `request_refusal` names the accepter), `acts/bounds.rs` (`unproposable`
-  :401; `amendment_admit`'s rewrite of a role shortage to `Propose`,
-  :373-391, goes: the check answers it), and the literals of
+  :404; `amendment_admit`'s rewrite of a role shortage to `Propose`,
+  :376-394, goes: the check answers it), and the literals of
   `proposable: Some(false)`, `Some(true)` and `None` in the core, the
   people child and their tests (search S14, the files of crates that
   depend on `jig-domain-people`).
@@ -502,7 +515,7 @@ its lines listed in the landing's report. The test mirrors of
 `party_refusal` (`tests/core/src/peers.rs:600`), translate
 `Some(Accepter::Role(_))` onto `Some(true)`, `Some(Accepter::Nobody)` onto
 `Some(false)` and `None` onto `None`, as the clients' component maps
-them onto v7 (Choices).
+them onto v8 (Choices).
 Test shape:
 - `crates/jig-domain-authority/src/tests_party.rs` (jig 02.3's file and
   fixtures): `a_partys_batch_beyond_their_role_answers_propose`,
@@ -579,7 +592,9 @@ Files:
   `reads/rows.rs`, `reads/vocabulary.rs`, `proposals.rs`, `sibling_routes.rs`,
   `routing/tasks.rs`, and `goals.rs` (:104, :117), `inbox/census.rs:51`,
   `stored.rs:327`; in `jig-protocol-engine-clients`
-  `translate/{deployment.rs, objects.rs, objects/historical.rs}`), and
+  `translate/{deployment.rs, objects.rs, objects/historical.rs}`, and
+  `translate/answers.rs:81-84`, whose `p::Outcome::GoalProposed` arm goes
+  with `GoalProposed`), and
   the tests among search S13's files (`tests/tasks/{src/world.rs,
   tests/person.rs}`, `crates/jig-protocol-store/src/tests/{codec/phase.rs,
   fixtures.rs, fixtures/reads.rs}`, `tests/client/src/joint/{truth.rs,
@@ -595,7 +610,7 @@ Files:
 - Tests that relied on `GoalProposed`, moved to `Propose` (search S11):
   `tests/core/tests/stories/{offers.rs, procedure_goals.rs, historical.rs,
   watches.rs}`, `tests/core/tests/stories.rs` (`a_goal_with_a_deadline_is_held_past_it`,
-  :1308), `tests/core/src/{peers.rs, referee/offers.rs}`,
+  :1313), `tests/core/src/{peers.rs, referee/offers.rs}`,
   `crates/jig-protocol-engine-clients/src/tests/fixtures/answers/outcomes.rs`
   (`GoalProposed`'s row, :37, goes); the client's joint
   story `tests/client/src/joint/role_stories/proposed_story.rs`, which
@@ -620,7 +635,7 @@ Shape:
   `authority::needs(&Action::Batch(..))`, refused `Authority { lacking,
   proposable: Some(Accepter::Nobody) }` when the needs pass the project's
   ceiling or the deployment's rules (`authority::at_most` against each, as
-  `goal_start`'s `hard` is computed, `acts/bounds.rs:264`), and `Authority
+  `goal_start`'s `hard` is computed, `acts/bounds.rs:267`), and `Authority
   { lacking: Approver, proposable: Some(Accepter::Nobody) }` when
   `recipient(core, project, ProposalKind::Batch)` is `None`; then
   `tasks::Event::ProposePerson`, answered `Proposed { proposal, to }`.
@@ -638,7 +653,7 @@ Shape:
   decided row (`Stored::DecidedProposal`), live or after a restart.
 Test shape:
 - `tests/tasks/tests/proposals.rs` (the tasks world; `World::new`,
-  `task`, `tests/tasks/src/world.rs:189`, :72): `a_partys_batch_proposal_is_kept_until_decided`,
+  `task`, `tests/tasks/src/world.rs:192`, :73): `a_partys_batch_proposal_is_kept_until_decided`,
   `a_partys_withdrawn_proposal_is_decided_withdrawn`,
   `withdrawing_another_partys_proposal_is_unknown`,
   `a_batch_proposal_naming_a_task_since_ended_is_withdrawn`. Reference:
@@ -668,7 +683,8 @@ Test shape:
   `a_proposed_batch_giving_as_allowed_is_not_well_formed`,
   `a_proposal_no_role_may_accept_is_refused_at_admission`,
   `a_proposal_beyond_the_project_ceiling_is_refused_naming_nobody`,
-  `a_proposed_batch_is_refused_while_nobody_holds_its_escalations`,
+  `a_proposed_batch_is_refused_while_nobody_holds_its_escalations` (on
+  `no_holder_fixture`, as 3.1's),
   `an_observers_propose_is_refused_by_role`,
   `withdrawing_a_proposal_decided_first_says_by_whom_and_how`,
   `deciding_a_withdrawn_proposal_answers_it_was_withdrawn`,
@@ -726,19 +742,19 @@ Files:
 - `crates/jig-protocol-store`: the people codec of `Action::Amend`; the
   tasks codec of `PersonAction::Amend` (in place).
 - The transitional piece: `crates/jig-protocol-engine-clients/src/component.rs`
-  (`Waiting::Ask`, :515-534, keeps a v7 `Amend`'s translated ask until
+  (`Waiting::Ask`, :515-534, keeps a v8 `Amend`'s translated ask until
   answered and sends the follow-up request as `ServiceMade` turns into
   `Waiting::Made`, :516-522; `Waiting::Ask` built with the kept ask at
   :711), `src/sign_in.rs` (`Waiting`, :15, whose `Ask` variant, :25,
-  holds the kept ask), `src/translate/answers.rs` (v7's `AmendProposed` from
+  holds the kept ask), `src/translate/answers.rs` (v8's `AmendProposed` from
   `Proposed`), `src/limits.rs` (the kept ask in the component's worst
   case); `src/tests/fixtures/answers/outcomes.rs` (`AmendProposed`'s row,
   :143, goes).
 - Tests that relied on `AmendProposed`, moved to `Propose`:
   `tests/core/tests/stories.rs` (`an_amendment_and_a_release_are_one_decision`,
-  :976, through its helper
+  :981, through its helper
   `a_widening_amendment_with_release_is_proposed_and_released_on_acceptance`,
-  :1219), `tests/people/tests/simulation.rs` (the test of that name,
+  :1224), `tests/people/tests/simulation.rs` (the test of that name,
   :615), `tests/people/src/world.rs` (:713).
 Shape: `people::Action::Amend { task, revision, amendment: Box<Amendment>
 }`; `tasks::PersonAction::Amend { task, amendment: Box<Amendment> }`
@@ -752,16 +768,16 @@ party's inbox. A party's pending proposal to amend a task that ends is
 withdrawn in the decision that ends it.
 
 The transitional piece, from this increment to jig 14.5: the clients'
-component keeps the `people::Ask::Amend` it translated from a v7
+component keeps the `people::Ask::Amend` it translated from a v8
 `Ask::Amend` in that exchange's `Waiting::Ask`. When the answer is
 `Refused(Authority { proposable: Some(Accepter::Role(_)), .. })`, it sends,
 under the same sign-in, `people::Ask::Propose { project, action:
 Action::Amend { task, revision, amendment }, reason: <the amendment's
 reason> }` keyed by the request's key with its last byte's high bit
 flipped, so that the request sent again replays both answers; it answers
-the client v7's `AmendProposed { task, proposal, released: false }` from
+the client v8's `AmendProposed { task, proposal, released: false }` from
 `Proposed`, and any other answer as it would the `Amend`'s. The other
-answers of a v7 `Amend` are translated as at the base. jig 14.5 moves the
+answers of a v8 `Amend` are translated as at the base. jig 14.5 moves the
 reference UI's amend confirmation onto `Propose` and removes this piece.
 Test shape:
 - `tests/tasks/tests/proposals.rs`: `a_partys_amendment_proposal_names_the_party_as_proposer`,
@@ -771,9 +787,9 @@ Test shape:
   `a_rejected_amendment_proposal_reaches_the_party_not_the_task`.
 - `tests/engine-clients/tests/requests.rs` (the clients' component over
   the real core; helpers `signed_in` :9 and `request` :20):
-  `a_v7_amend_beyond_the_role_is_proposed_and_answered_amend_proposed`,
-  `a_v7_amend_sent_again_replays_the_same_proposal`,
-  `a_v7_amend_beyond_the_ceiling_stays_refused`. The client's unit test
+  `a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed`,
+  `a_v8_amend_sent_again_replays_the_same_proposal`,
+  `a_v8_amend_beyond_the_ceiling_stays_refused`. The client's unit test
   at `crates/jig-domain-client/src/tests/confirmation.rs:311` is
   unchanged: the client still sends `Ask::Amend`.
 - `crates/jig-protocol-store`: the fixtures gain an amendment action.
@@ -788,11 +804,11 @@ widening funded by the owner's pool. Under 0.5 s. Run once, `heavy cargo
 nextest run -p jig-core-world -E
 'test(a_partys_widening_amendment_is_proposed_by_the_party_and_accepted)'`,
 and once `heavy cargo nextest run -p jig-engine-clients-world -E
-'test(a_v7_amend_beyond_the_role_is_proposed_and_answered_amend_proposed)'`
+'test(a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed)'`
 for the transitional piece; each passes, and nothing else is wanted.
 Don't: keep any path in the engine that commits a proposal its proposer
 did not ask for, but a result's follow-ups (tasks.md, 5.6); turn into a
-`Propose` any v7 ask but `Amend`, or an `Amend` refused on anything but a
+`Propose` any v8 ask but `Amend`, or an `Amend` refused on anything but a
 proposable authority finding.
 Size: at most 260 lines (a codec increment).
 Removes: `Outcome::AmendProposed` and `party_controls.rs`'s rewrite to a
@@ -803,10 +819,11 @@ proposal.
 Compiled at jig's base `a3b53546` as scratch modules of
 `jig-domain-people` and `jig-domain-tasks`, `heavy cargo clippy -p
 jig-domain-tasks -p jig-domain-authority -p jig-domain-people -p
-jig-domain-core --all-targets -- -D warnings`: passed. jig 02's
-`Flags` and `Retention` were stubbed in the people module (the people
-child mirrors them; the tasks child's come from 02.1): checked at the
-ready check. The additions to `Ask`, `Outcome` and `Refusal` were compiled
+jig-domain-core --all-targets -- -D warnings`: passed; compiled again
+at jig `45b1479f3`, after jig 02 (ruling 146), with
+sketch 1's `Flags::PLAIN`: passed. The landed tasks child's `Flags` and
+`Retention` (`crates/jig-domain-tasks/src/flags.rs:4`, :18) match the
+people child's mirrors field for field. The additions to `Ask`, `Outcome` and `Refusal` were compiled
 as enums of their own beside the base's. `Outcome`, `Reply`, `Refusal` and
 `Lack` are `Copy`, and the tests copy replies
 (`crates/jig-domain-people/src/tests.rs:319`), so what they hold (`Given`,
@@ -887,6 +904,10 @@ pub enum Dependency {
 /// A member's flags; mirrors the tasks child's `Flags` (jig 02.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Flags { pub conversation: bool, pub listed: bool, pub retention: Retention }
+impl Flags {
+    /// As the tasks child's `Flags::PLAIN` (crates/jig-domain-tasks/src/flags.rs:14).
+    pub const PLAIN: Flags = Flags { conversation: false, listed: false, retention: Retention::Kept };
+}
 /// Mirrors the tasks child's `Retention` (jig 02.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Retention { Kept, ForgottenOnceRead }
