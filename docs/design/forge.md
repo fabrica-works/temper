@@ -612,7 +612,11 @@ alone until skein's TLS server side (setup.md, section 15).
   The names a hook's events take, the headers each arrives under and
   the fields each hint reads are Forgejo's sources', recorded on the
   pinned release by the conformance tool (section 13); where it records
-  otherwise, the table follows it.
+  otherwise, the table follows it. An event the tool records no
+  delivery of stays as the sources name it, its fields those of the
+  events whose payload it shares, and the tool names it unrecorded: a
+  hint only brings a read sooner (`domain/forge.md`, 5.2), so a row
+  that is wrong costs a poll's wait.
 
   **Who caused it** is what lets the domain drop its own writes' echoes:
   a creation's key for an item, the pusher for a push (`domain/forge.md`,
@@ -1097,7 +1101,9 @@ From Forgejo v17.0's API description (its tagged
 - A completed job is run again, with the jobs that need it, by
   `POST actions/jobs/{job_id}/rerun`, and a completed run by
   `POST actions/runs/{run_id}/rerun`: `204`, or `400` for one not
-  completed.
+  completed. A run is cancelled, its waiting and running jobs with it,
+  by `POST actions/runs/{run_id}/cancel`: `204`, for a run already
+  finished too, which it leaves unchanged; temper never cancels one.
 - A webhook delivery names its event in `X-Forgejo-Event` and
   `X-Forgejo-Event-Type`. A job's events are `workflow_job_waiting`,
   `_blocked`, `_running`, `_success`, `_failure`, `_cancelled` and
@@ -1187,7 +1193,8 @@ it:
   repository's id; an item's number and its body's, its comment's or its
   review's key; a push's branch, its new head, its deletion and its
   pusher's id; a creation's or deletion's branch and that it is a
-  branch's; a job's `run.repository.id` and `run.commit_sha`); that
+  branch's; a job's `run.repository.id` and `run.commit_sha`); a job's
+  cancelled end, from cancelling the run of a job no runner takes; that
   Forgejo delivers the engine's own changes; whether a job's delivery
   comes after its commit status is written; whether a pull request's
   mergeability is settled when the push that moved its head or base is

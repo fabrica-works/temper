@@ -87,16 +87,19 @@ Shape:
   `pull_request_review_approved`, `_rejected`, `_comment`. 7 W commits to `topic`: `push`, `pull_request_sync` (probe
   B). 8 O commits to `main`: `push` (probe B). 9 O makes and deletes branch `gone` and tag `v1`: `create`, `delete`. 10
   O commits the workflow `.forgejo/workflows/deliveries.yaml` to branch `ci` (jobs `pass`, `fail`, `after` with
-  `needs: [fail]`; `on: push` of `ci`; `runs-on: temper-host`): `create`, `push`, `workflow_job_success`, `_failure`,
-  `_skipped` (probe A). 11 one more issue, answered 500: no second delivery of it within 3 s.
+  `needs: [fail]`; `on: push` of `ci`; `runs-on: temper-host`; and `held`, `runs-on: temper-held`, which no runner
+  serves): `create`, `push`, `workflow_job_success`, `_failure`, `_skipped` (probe A); once these are had, O cancels the
+  run, `POST R/actions/runs/{job.run_id}/cancel`, `204` (forge.md 13): `workflow_job_cancelled` (`held`). 11 one more
+  issue, answered 500: no second delivery of it within 3 s.
 - Probe A reads the combined status of `run.commit_sha` at a job end; probe B reads the pull at step 7's and 8's
   `push`. The answer follows the probe.
-- Facts, 21, each named `delivery-` + `issues-row`, `pull-requests-row`, `comments-row`, `reviews-row`, `push-row`,
-  `create-delete-row`, `job-ends-row` (each: every event of the row, its `X-Forgejo-Event` and `-Type`, and the paths
-  named by the doc line of its `Delivery` variant in 04.2's sketch, typed as 04.2 reads them);
+- Facts, 22, each named `delivery-` + `issues-row`, `pull-requests-row`, `comments-row`, `reviews-row`, `push-row`,
+  `create-delete-row`, `job-ends-row` (each: every event of the row, the cancelled job end aside, its `X-Forgejo-Event`
+  and `-Type`, and the paths named by the doc line of its `Delivery` variant in 04.2's sketch, typed as 04.2 reads them);
   `carries-the-repository-id`; `subscribed-events-read-back`; `signature-is-hmac-sha256-hex` (`X-Forgejo-Signature`,
   and `X-Hub-Signature-256` with `sha256=`); `refs-are-full-and-tags-are-told-apart`; `branch-deletion-sends-no-push`
-  (may fail); `echoes-the-actors-own-writes` (`sender.id`, `pusher.id` are W's); `loopback-is-refused-by-default` (A);
+  (may fail); `cancelled-job-end-is-delivered` (may fail; as `job-ends-row` for `workflow_job_cancelled`);
+  `echoes-the-actors-own-writes` (`sender.id`, `pusher.id` are W's); `loopback-is-refused-by-default` (A);
   `loopback-is-allowed-when-named` (B); `failed-delivery-is-not-sent-again`; `pull-reads-not-mergeable-while-checked`.
   Pairs, exactly one of each holds: `job-end-follows-its-commit-status` or `job-end-precedes-its-commit-status` (status
   final at the job end, both jobs); `pull-is-settled-when-its-push-is-delivered` or
@@ -188,7 +191,8 @@ the unit tests use `fixtures::limits()` (string 1024, body 65 536, hand-set, abo
 `a_hook_target_reads_back_to_the_forge_it_names`; `a_target_naming_no_forge_reads_as_none`. Replay:
 `recorded_deliveries_decode_to_the_fields_their_hints_read`;
 `the_encoders_bodies_decode_unchanged_with_the_recordings_shape`;
-`every_subscribed_event_has_a_recorded_delivery_the_decoder_knows`. Fuzzy (about 5 s):
+`every_subscribed_event_has_a_recorded_delivery_the_decoder_knows` (while `delivery-cancelled-job-end-is-delivered`
+fails, it names `workflow_job_cancelled` as the one unrecorded, kept by forge.md 5). Fuzzy (about 5 s):
 `forgejo_delivery_decoders_answer_every_mutated_delivery_without_panicking`. Ceilings: unit 20 ms; replay 20 ms a case.
 Reference (new kind: a recording):
 ```rust
@@ -340,9 +344,8 @@ pub fn encode(_delivery: &Delivery, _limits: &Limits) -> Result<Sent, writer::Re
 
 ## Questions to raise when reached
 
-1. `cancelled` and `skipped` job ends: `skipped` comes from a job whose need fails; no API route to cancel a run is
-   known. A delivery not had within the Size is left unrecorded (no fact; `SUBSCRIBED` unchanged; the coverage test names
-   it) and goes to the designer: keep it subscribed unrecorded, or record it through the web route.
+1. Answered by the designer (2026-10-16): `skipped` comes from a job whose need fails, `cancelled` from cancelling
+   the run of `held` by the API (forge.md 13). If it delivers nothing, `SUBSCRIBED` keeps it, unrecorded (forge.md 5).
 2. If both facts of a pair fail (the order varies between jobs or runs): how the fake forge orders its hooks (06.1) and
    whether `settle` (06.2) needs more.
 3. If `branch-deletion-sends-no-push` fails, the document gains `Delivery::deleted()` (a push whose `after` is all
@@ -361,9 +364,9 @@ Both exit 0. After 04.1's Proof command:
 F=tools/forgejo-conformance/facts.txt
 grep -c '^unchecked' $F                                    # 0
 grep -x 'holds webhook-deliveries' $F                      # the line
-grep -c '^holds delivery-' $F                              # 21 minus the next count
-grep -c '^fails delivery-' $F                              # 2, or 3 with branch-deletion-sends-no-push
-grep '^fails delivery-' $F | grep -v -e 'job-end-\(follows\|precedes\)-its-commit-status' -e 'pull-is-\(settled\|checking\)-when-its-push-is-delivered' -e 'branch-deletion-sends-no-push'   # nothing
+grep -c '^holds delivery-' $F                              # 22 minus the next count
+grep -c '^fails delivery-' $F                              # 2, plus one for each of the next line's last two failing
+grep '^fails delivery-' $F | grep -v -e 'job-end-\(follows\|precedes\)-its-commit-status' -e 'pull-is-\(settled\|checking\)-when-its-push-is-delivered' -e 'branch-deletion-sends-no-push' -e 'cancelled-job-end-is-delivered'   # nothing
 grep -c -x -e 'holds delivery-job-end-follows-its-commit-status' -e 'holds delivery-job-end-precedes-its-commit-status' $F   # 1
 grep -c -x -e 'holds delivery-pull-is-settled-when-its-push-is-delivered' -e 'holds delivery-pull-is-checking-when-its-push-is-delivered' $F   # 1
 ls tools/forgejo-conformance/deliveries | wc -l            # at least 21
