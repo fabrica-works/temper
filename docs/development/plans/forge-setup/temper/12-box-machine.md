@@ -262,7 +262,7 @@ apart, and the box exits 1 with `box: forgejo gave up after 5 restarts` on stder
 temper 13.1, whose Proof names this increment (sim programs write no bytes).
 Don't: use `std` (print, process, thread, time, locks); write to stdout or stderr but through the
 two sinks; read a child's output without a bound; add a second loop beside the passes.
-Size: at most 220 lines of production code. Removes: nothing.
+Size: at most 220 lines of production code; it lands at up to 850 by the ruling of 2026-10-16T23:00:52Z's block. Removes: nothing.
 
 ## Interface sketches
 
@@ -399,4 +399,4 @@ None open. A once step's give-up line is the plan's choice (Choices).
 - From the parent of the first `Step: temper-12.1` commit to `origin/main` (the worktrees are gone, so no
   `origin/main...HEAD`): `git diff -M --numstat $(git log origin/main --all-match --grep='^Plan: forge-setup$'
   --grep='^Step: temper-12\.1$' --format=%H | tail -1)^ origin/main -- crates/temper-box ':!*/tests.rs'
-  ':!*/tests/*' | awk '{a+=$1} END {print a}'` prints at most 1000 (both Sizes at twice).
+  ':!*/tests/*' | awk '{a+=$1} END {print a}'` prints at most 1324 (12.1's 474 landed, and 12.2's 850).

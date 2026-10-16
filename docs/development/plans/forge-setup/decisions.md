@@ -324,6 +324,24 @@ run are appended after "For the user".
      passed (05.2), fuzzy 9 passed each. 05.3 was not checked against code. A further exhaustive match the compiler
      finds is given its arm in the increment that adds the variant, and named in the commit body.
 
+113. **12.2 at up to 850; 106's corrections on main** (plan defect, temper 12's block of 2026-10-16T23:00:52Z).
+     Ruling 113, a plan defect: 12.2's Size of 220 under-counted the host its Shape gives (the passes, a child's
+     ownership by generation, a line buffer per pipe, the queued sinks, the descriptors' teardown with the inherited root).
+     Accept, do not split: the sinks and lines (171 lines) serve the host alone, and a split would land the same code in
+     two pieces.
+
+     - 12.2 lands at up to 850 production lines by code-organization.md 6's command, past the README's "Sizes" (2.6 times,
+       572). Past 850, stop on a question again, with the count by file; a split of `lines.rs` and `sink.rs` into a
+       supplement step is then the default.
+     - The session's "Done when" count is now at most 1324 (12.1's 474 landed, and 12.2's 850), not 1000.
+     - Ruling 106's corrections to 12-box-machine.md reached `main` only now (temper d8bb411bc; they were dropped by the
+       plan's landing tool): read 12.2's Shape there before going on. They bear on the host: `io_limits` gives
+       `skein_io::Limits`'s five other fields (`sends` 1, `accepts` 1, `backlog` 1, `close_timeout` 5 s, `retry` 10 ms);
+       the harness's root is `Sim::root(Handle::new(opened.raw()))`; each ask goes to `skein_fake_machine::step` alone,
+       never `serve`, the spawn's environment recorded from its `Ask::Spawn` first.
+     - Unchanged: never trim a doc comment, a test or the formatting to meet a Size (implementer.md, 8.6); 12.2's tests
+       and their ceilings.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
