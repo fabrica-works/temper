@@ -342,6 +342,22 @@ run are appended after "For the user".
      - Unchanged: never trim a doc comment, a test or the formatting to meet a Size (implementer.md, 8.6); 12.2's tests
        and their ceilings.
 
+114. **The component fixture's HTTP 500** (process, temper 01's block of 2026-10-16T23:03:16Z).
+     Ruling 114, process. The same block twice (04.1's of 22:32:06Z, ruling 110; 01.2's) becomes a standing rule, in
+     the README's "Rules of this plan":
+
+     "The conformance tool's `Fixture::new` met `provisioning /api/v1/repos/fixture/specimen/pulls: HTTP 500` in 04.1's
+     and 01.2's recordings, in the `--component` phase, after passing before. temper 01.2 makes `Fixture::api`
+     (`tools/forgejo-conformance/src/fixture.rs:84`) keep the answer's body, at most 200 bytes, in its error, and
+     `Fixture::pull` (:98) try an HTTP 500 again, at most 3 times, 1 s apart, each try's status and body on stderr. Until
+     that lands, a recording that fails so is run once more, unchanged, without asking; a second such failure is a
+     question, with the body."
+
+     - temper 01.2: make that fix (a fix aimed at the cause, README "The recording tools"), in its own commit within
+       01.2's landing, then record once, whole, as 01.2's Proof says. Its lines count in 01.2's Size.
+     - Unchanged: the recorded cases and facts (the retry is the fixture's provisioning, never a recorded exchange); the
+       recording rule's "third failure with the same symptom is a question".
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

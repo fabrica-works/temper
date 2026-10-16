@@ -138,6 +138,16 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   of this plan, until the run ends. Unchanged: never trim a doc comment,
   a test or the formatting to meet a Size; a split increment's parts
   count together.
+- **The component fixture's HTTP 500 (ruling 114).** The conformance
+  tool's `Fixture::new` met `provisioning /api/v1/repos/fixture/specimen/pulls:
+  HTTP 500` in 04.1's and 01.2's recordings, in the `--component` phase,
+  after passing before. temper 01.2 makes `Fixture::api`
+  (`tools/forgejo-conformance/src/fixture.rs:84`) keep the answer's body,
+  at most 200 bytes, in its error, and `Fixture::pull` (:98) try an HTTP
+  500 again, at most 3 times, 1 s apart, each try's status and body on
+  stderr. Until that lands, a recording that fails so is run once more,
+  unchanged, without asking; a second such failure is a question, with
+  the body.
 - **The process tier runs where a Proof line or "Done when" says,**
   through `heavy --gate`, once; never in the gate.
 - **The suites' aims for the whole run** (decisions.md, 13): temper's
