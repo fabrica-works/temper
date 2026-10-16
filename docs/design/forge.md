@@ -863,9 +863,11 @@ side of `temper-forge-forgejo`.
   `pulls/{base}/{head}` names the oldest of several pull requests, open
   or not; a pull request whose head adds nothing to its base is opened
   (`201`); deleting a branch that is not there answers `500` with an
-  empty body; a failed job's completion step reports `failure` too. A
-  client that leans on Forgejo being better than it is
-  fails in the fake first.
+  empty body; a failed job's completion step reports `failure` too; a
+  push that moves a pull request's head or base starts its check, which
+  reads it not mergeable until it ends, and is delivered while it runs,
+  the order Forgejo sometimes takes (section 13). A client that leans on
+  Forgejo being better than it is fails in the fake first.
 - **Faults move down** (testing.md, 4.2): a call refused for the rate is
   a `429` with `Retry-After`; one failed before it is made is a refused
   connect or a reset before the request is read; one made and then timed
@@ -1197,8 +1199,10 @@ it:
   cancelled end, from cancelling the run of a job no runner takes; that
   Forgejo delivers the engine's own changes; whether a job's delivery
   comes after its commit status is written; whether a pull request's
-  mergeability is settled when the push that moved its head or base is
-  delivered; and that Forgejo answers `mergeable` false while it checks
+  mergeability is ever still checked when the push that moved its head
+  or base is delivered (the order varies between recordings, so one
+  read checking is enough), and that it settles within `settle` of the
+  delivery; and that Forgejo answers `mergeable` false while it checks
   one. The setup's own facts, its command line, admin
   routes, orgs, teams and org hooks, are setup.md, 13.3's.
 

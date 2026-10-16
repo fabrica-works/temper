@@ -102,8 +102,10 @@ Shape:
   `echoes-the-actors-own-writes` (`sender.id`, `pusher.id` are W's); `loopback-is-refused-by-default` (A);
   `loopback-is-allowed-when-named` (B); `failed-delivery-is-not-sent-again`; `pull-reads-not-mergeable-while-checked`.
   Pairs, exactly one of each holds: `job-end-follows-its-commit-status` or `job-end-precedes-its-commit-status` (status
-  final at the job end, both jobs); `pull-is-settled-when-its-push-is-delivered` or
-  `pull-is-checking-when-its-push-is-delivered` (steps 7 and 8). `webhook-deliveries` holds when every other fact holds,
+  final at the job end, both jobs); `pull-is-settled-when-its-push-is-delivered` (every probe B, steps 7 and 8, read it
+  mergeable) or `pull-is-checking-when-its-push-is-delivered` (one read it not mergeable at least, and each such pull,
+  read again once the delivery is answered at 1 s, doubling, read mergeable within 30 s, the small profile's `settle`);
+  each fact's line keeps probe B's reads. `webhook-deliveries` holds when every other fact holds,
   a pair by one of its two, and `branch-deletion-sends-no-push` either way.
 - `Listener::start() -> io::Result<Listener>` (field `port`), `next(within) -> Option<(Received, Reply)>`,
   `Reply::answer(status)` closing the connection, `Received { head, body }` unmasked, a thread per connection; the mask
@@ -346,8 +348,8 @@ pub fn encode(_delivery: &Delivery, _limits: &Limits) -> Result<Sent, writer::Re
 
 1. Answered by the designer (2026-10-16): `skipped` comes from a job whose need fails, `cancelled` from cancelling
    the run of `held` by the API (forge.md 13). If it delivers nothing, `SUBSCRIBED` keeps it, unrecorded (forge.md 5).
-2. If both facts of a pair fail (the order varies between jobs or runs): how the fake forge orders its hooks (06.1) and
-   whether `settle` (06.2) needs more.
+2. Answered by the designer (2026-10-16): the pull pair as the Facts say, Forgejo's order varying (forge.md 13); the
+   fake always checks after a move (forge.md 9; 06.1), and `settle` needs nothing more (domain/forge.md 5.2).
 3. If `branch-deletion-sends-no-push` fails, the document gains `Delivery::deleted()` (a push whose `after` is all
    zero), and the designer confirms that a deleted branch's hint then comes from that push (forge.md 5).
 4. If a create's or delete's `ref` is short, `refs-are-full-and-tags-are-told-apart` fails and `branch()` reads

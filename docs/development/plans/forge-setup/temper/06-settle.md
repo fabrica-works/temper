@@ -77,13 +77,13 @@ is raised only when CI (`env.limits.ci`) reports `Passed` or `Failed`: `ci::repo
 with `Hook::job` (the `JobRef` from `actions::reference`, `actions.rs:91`), else pushes the observation alone,
 as `wiki.rs:45,71` now do. Issue hooks carry the issue's body, comment hooks the comment's, review hooks the
 review's (`Hook::body`), pull hooks none. `Pull.checked: Time` (forge time, zero at open): `pulls::pull`
-answers `mergeable` false while `domain.clock < checked`. **The order and the phase follow 04.1's pairs**
-(the ready check runs `grep -E '^(holds|fails) delivery-(job-end|pull-is)' tools/forgejo-conformance/facts.txt`, four lines): `delivery-job-end-follows-its-commit-status`:
+answers `mergeable` false while `domain.clock < checked`. **The order follows 04.1's job pair**
+(the ready check runs `grep -E '^(holds|fails) delivery-job-end' tools/forgejo-conformance/facts.txt`, two lines): `delivery-job-end-follows-its-commit-status`:
 `ci::report` (`ci.rs:77`) sets the status, then raises the hook; `…-precedes-…`: it raises the hook, and a
 new `Alarm::Status` (`domain.rs:191`, `fire` `:419`) sets the status `LAG` (1 s, a const of `ci.rs`) later.
-`delivery-pull-is-checking-when-its-push-is-delivered`: `git::moved` (`git.rs:351`) starts the check of each
-`on_branch` pull (`store.rs:235`), for `CHECK` (2 s, a const of `pulls.rs`), as `scenario::check` does by hand;
-`…-settled-…`: it starts none. `World::hooked` sets `hooked: true` (`world.rs:132`); `take_forge` (`:514`) and
+**The phase is always checking** (forge.md 9), whichever of 04.1's pull pair holds: `git::moved` (`git.rs:351`) starts
+the check of each `on_branch` pull (`store.rs:235`), for `CHECK` (2 s, a const of `pulls.rs`), as `scenario::check`
+does by hand. `World::hooked` sets `hooked: true` (`world.rs:132`); `take_forge` (`:514`) and
 `external` (`:358`) pass each `Request::Hook` to `translate::hint`, queue the hint to the top and keep it.
 Test shape: fake `tests.rs` (harness `:249-258` keeps each hook whole, `heard` `:495`, `heard_all` `:504`;
 `setup()` `:147`, `CALM`): updated `a_subscriber_hears_of_each_change_by_webhook` (`:1401`; `Status` 2 becomes
