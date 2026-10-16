@@ -100,7 +100,30 @@ holds cli-dump-writes-the-database-and-app-ini
 holds cli-dump-appends-zip-to-a-file-name-without-it
 holds cli-dump-needs-its-tempdir-to-exist
 holds cli-dump-over-an-existing-file-overwrites-it
-unchecked webhook-deliveries: webhooks are built after standalone
+holds delivery-issues-row
+holds delivery-pull-requests-row
+holds delivery-comments-row
+holds delivery-reviews-row
+holds delivery-push-row
+holds delivery-cancelled-job-end-is-delivered
+holds delivery-create-delete-row
+holds delivery-job-ends-row
+holds delivery-carries-the-repository-id
+holds delivery-subscribed-events-read-back
+holds delivery-signature-is-hmac-sha256-hex
+holds delivery-refs-are-full-and-tags-are-told-apart
+fails delivery-branch-deletion-sends-no-push: job statuses=[true, true], pull mergeability=[[false, true], [false, true]]
+holds delivery-echoes-the-actors-own-writes
+holds delivery-loopback-is-refused-by-default
+holds delivery-loopback-is-allowed-when-named
+holds delivery-failed-delivery-is-not-sent-again
+holds delivery-pull-reads-not-mergeable-while-checked
+holds delivery-job-end-follows-its-commit-status
+fails delivery-job-end-precedes-its-commit-status: job statuses=[true, true], pull mergeability=[[false, true], [false, true]]
+fails delivery-pull-is-settled-when-its-push-is-delivered: job statuses=[true, true], pull mergeability=[[false, true], [false, true]]
+holds delivery-pull-is-checking-when-its-push-is-delivered
+# delivery-pull-is-checking-when-its-push-is-delivered: job statuses=[true, true], pull mergeability=[[false, true], [false, true]]
+holds webhook-deliveries
 holds component-start-ready
 holds component-start-other-user-stops
 holds component-start-wrong-token-stops

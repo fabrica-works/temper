@@ -7,6 +7,7 @@ pub enum SecretKind {
     ApiToken,
     GitHeader,
     RunnerSecret,
+    HookSecret,
 }
 pub struct Secrets(Vec<(SecretKind, String)>);
 impl Secrets {
@@ -68,6 +69,15 @@ pub fn case(out: &Path, name: &str, request: &[u8], response: &[u8], secrets: &S
     if dir.exists() {
         fs::remove_dir_all(&dir)?;
     }
+    fs::create_dir_all(&dir)?;
+    fs::write(dir.join("request"), request)?;
+    fs::write(dir.join("response"), response)?;
+    Ok(())
+}
+
+pub(crate) fn delivery(out: &Path, name: &str, request: &[u8], response: &[u8], secrets: &Secrets) -> Result<()> {
+    check(name, request, response, secrets)?;
+    let dir = out.join("deliveries").join(name);
     fs::create_dir_all(&dir)?;
     fs::write(dir.join("request"), request)?;
     fs::write(dir.join("response"), response)?;

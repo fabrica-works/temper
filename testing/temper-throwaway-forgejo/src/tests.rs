@@ -42,3 +42,11 @@ fn an_output_shows_its_lengths_and_no_text() {
     let output = crate::Output { code: Some(0), stdout: "secret-token\n".into(), stderr: String::new() };
     assert_eq!(format!("{output:?}"), "Output { code: Some(0), stdout_bytes: 13, stderr_bytes: 0 }");
 }
+
+#[test]
+fn the_app_ini_allows_the_webhook_host_it_is_given() {
+    let mut settings = Settings::small();
+    settings.webhook_hosts = Some("127.0.0.1".into());
+    let rendered = ini(Path::new("/scratch"), 3000, &settings, "fixture", "secret", "internal");
+    assert!(rendered.ends_with("[webhook]\nALLOWED_HOST_LIST = 127.0.0.1\n"));
+}

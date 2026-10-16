@@ -2,6 +2,7 @@
 mod cases;
 mod cli;
 pub mod component;
+mod deliveries;
 pub mod facts;
 mod fixture;
 mod job_clone;
@@ -29,10 +30,7 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     cases::flags(&fixture, out, &mut mask, &secrets)?;
     facts.extend(facts::flags(out)?);
     facts.extend(cli::facts(&forgejo, &mut fixture, &mut secrets)?);
-    facts.push(facts::Fact {
-        name: "webhook-deliveries",
-        outcome: facts::Outcome::Unchecked("webhooks are built after standalone".into()),
-    });
+    facts.extend(deliveries::record(&forgejo, scratch, out, &mut secrets)?);
     let lines = facts.iter().map(facts::Fact::line).collect::<String>();
     write::check("facts.txt", b"", lines.as_bytes(), &secrets)?;
     facts::write(out, &facts)?;

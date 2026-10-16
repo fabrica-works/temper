@@ -228,8 +228,12 @@ fn value(response: &Exchange) -> Result<Value, Failure> {
 pub(crate) fn ini(scratch: &Path, port: u16, settings: &Settings, user: &str, secret: &str, internal: &str) -> String {
     let path = scratch.display();
     let cap = settings.max_response_items.map_or_else(String::new, |n| format!("[api]\nMAX_RESPONSE_ITEMS = {n}\n"));
+    let hooks = settings
+        .webhook_hosts
+        .as_ref()
+        .map_or_else(String::new, |hosts| format!("[webhook]\nALLOWED_HOST_LIST = {hosts}\n"));
     format!(
-        "APP_NAME = temper throwaway\nRUN_USER = {user}\nWORK_PATH = {path}\n[server]\nPROTOCOL = http\nHTTP_ADDR = 127.0.0.1\nHTTP_PORT = {port}\nROOT_URL = http://127.0.0.1:{port}/\nAPP_DATA_PATH = {path}/data\nDISABLE_SSH = true\nOFFLINE_MODE = true\n[database]\nDB_TYPE = sqlite3\nPATH = {path}/forgejo.db\n[repository]\nROOT = {path}/repositories\nDEFAULT_BRANCH = main\n[security]\nINSTALL_LOCK = true\nSECRET_KEY = {secret}\nINTERNAL_TOKEN = {internal}\n[service]\nDISABLE_REGISTRATION = true\n[log]\nMODE = console\nLEVEL = Error\n[git]\nPATH = {}\n[actions]\nENABLED = {}\n{cap}",
+        "APP_NAME = temper throwaway\nRUN_USER = {user}\nWORK_PATH = {path}\n[server]\nPROTOCOL = http\nHTTP_ADDR = 127.0.0.1\nHTTP_PORT = {port}\nROOT_URL = http://127.0.0.1:{port}/\nAPP_DATA_PATH = {path}/data\nDISABLE_SSH = true\nOFFLINE_MODE = true\n[database]\nDB_TYPE = sqlite3\nPATH = {path}/forgejo.db\n[repository]\nROOT = {path}/repositories\nDEFAULT_BRANCH = main\n[security]\nINSTALL_LOCK = true\nSECRET_KEY = {secret}\nINTERNAL_TOKEN = {internal}\n[service]\nDISABLE_REGISTRATION = true\n[log]\nMODE = console\nLEVEL = Error\n[git]\nPATH = {}\n[actions]\nENABLED = {}\n{cap}{hooks}",
         settings.git.display(),
         settings.actions
     )

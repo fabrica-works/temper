@@ -32,8 +32,9 @@ by `holds`, `fails` or `unchecked` lines. Set `TEMPER_FORGEJO_RUNNER` to the
 pinned runner for Actions facts and eleven Actions transcripts.
 The runner connects through its private token file and executes two inline host
 shell jobs, one succeeding and one failing; no actions or containers are
-downloaded. Without a runner those facts remain unchecked. Webhook facts
-are left unchecked until webhooks are built.
+downloaded. Without a runner those facts remain unchecked. Webhook deliveries are recorded
+in `deliveries/<event-type>/{request,response}` with their own mask map;
+the listener holds its answer while status and mergeability probes run.
 
 `--component` drives the forge component through real io sockets on the shell's
 ring against a fresh fixture. It replaces only the `component-` facts in

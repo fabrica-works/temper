@@ -8,6 +8,7 @@ use temper_throwaway_forgejo::{Forgejo, Outgoing, Settings};
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
     Holds,
+    Observed(String),
     Fails(String),
     Unchecked(String),
 }
@@ -21,6 +22,9 @@ impl Fact {
     pub fn line(&self) -> String {
         match &self.outcome {
             Outcome::Holds => format!("holds {}\n", self.name),
+            Outcome::Observed(seen) => {
+                format!("holds {}\n# {}: {}\n", self.name, self.name, seen.replace(['\r', '\n'], " "))
+            }
             Outcome::Fails(why) => format!("fails {}: {}\n", self.name, why.replace(['\r', '\n'], " ")),
             Outcome::Unchecked(why) => format!("unchecked {}: {}\n", self.name, why.replace(['\r', '\n'], " ")),
         }

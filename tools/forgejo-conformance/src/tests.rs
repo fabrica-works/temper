@@ -66,6 +66,7 @@ fn a_fact_line_is_holds_fails_or_unchecked_with_its_reason() {
     use crate::facts::{Fact, Outcome};
     for (outcome, expected) in [
         (Outcome::Holds, "holds example\n"),
+        (Outcome::Observed("reads=[false, true]".into()), "holds example\n# example: reads=[false, true]\n"),
         (Outcome::Fails("HTTP 500".into()), "fails example: HTTP 500\n"),
         (Outcome::Unchecked("runner absent".into()), "unchecked example: runner absent\n"),
     ] {
@@ -165,4 +166,96 @@ fn the_clone_workflow_runs_steps_only_and_names_the_jobs_token() {
     assert_eq!(workflow.matches("git clone").count(), 1);
     assert!(workflow.contains("http.extraHeader=Authorization: basic $auth"));
     assert!(workflow.contains("test -s b/README.md"));
+}
+
+#[test]
+fn hmac_sha256_reads_rfc_4231_case_2() {
+    assert_eq!(
+        crate::deliveries::hmac_sha256(b"Jefe", b"what do ya want for nothing?"),
+        Some([
+            0x5b, 0xdc, 0xc1, 0x46, 0xbf, 0x60, 0x75, 0x4e, 0x6a, 0x04, 0x24, 0x26, 0x08, 0x95, 0x75, 0xc7, 0x5a, 0x00,
+            0x3f, 0x08, 0x9d, 0x27, 0x39, 0x83, 0x9d, 0xec, 0x58, 0xb9, 0x64, 0xec, 0x38, 0x43
+        ])
+    );
+}
+#[test]
+fn a_signature_holds_only_for_the_body_it_signs() {
+    use crate::deliveries::{Received, signed};
+    let mut received = Received { head: b"X-Forgejo-Signature: 22e3b1f3fb90d9e7f5814c8af105f7f7077b4e3e0ad700df7163179d5b535d85\r\nX-Hub-Signature-256: sha256=22e3b1f3fb90d9e7f5814c8af105f7f7077b4e3e0ad700df7163179d5b535d85\r\n".to_vec(), body: b"body".to_vec() };
+    assert!(signed(&received));
+    received.body.push(b'!');
+    assert!(!signed(&received));
+}
+#[test]
+fn masking_also_rewrites_the_listeners_port_and_delivery_ids() {
+    let mut mask = Mask::new(40000);
+    mask.listener(40001);
+    assert_eq!(mask.bytes(b"Host: 127.0.0.1:40001\r\nX-Forgejo-Delivery: 12345678-1234-4567-89ab-123456789abc\r\nX-Gitea-Delivery: 12345678-1234-4567-89ab-123456789abc\r\n"),b"Host: 127.0.0.1:3001\r\nX-Forgejo-Delivery: 00000000-0000-0000-0000-000000000001\r\nX-Gitea-Delivery: 00000000-0000-0000-0000-000000000001\r\n");
+}
+#[test]
+fn a_masked_delivery_keeps_a_content_length_that_matches_its_body() {
+    let mut mask = Mask::new(40000);
+    mask.listener(40001);
+    let exchange = Exchange {
+        sent: Vec::new(),
+        status: 0,
+        head: b"POST /hooks/1 HTTP/1.1\r\nContent-Length: 15\r\n\r\n".to_vec(),
+        body: b"127.0.0.1:40001".to_vec(),
+    };
+    assert_eq!(
+        mask::response(&mut mask, &exchange),
+        b"POST /hooks/1 HTTP/1.1\r\nContent-Length: 14\r\n\r\n127.0.0.1:3001"
+    );
+}
+#[test]
+fn the_listener_holds_its_answer_until_the_probe_replies() {
+    use std::{
+        io::{Read, Write},
+        net::TcpStream,
+        time::Duration,
+    };
+    let listener = crate::deliveries::Listener::start().expect("listener");
+    let mut client = TcpStream::connect(("127.0.0.1", listener.port)).expect("connect");
+    client.write_all(b"POST /hooks/1 HTTP/1.1\r\nContent-Length: 4\r\n\r\nbody").expect("sent");
+    let (received, reply) = listener.next(Duration::from_secs(5)).expect("delivery");
+    assert_eq!(received.body, b"body");
+    client.set_read_timeout(Some(Duration::from_millis(100))).expect("timeout");
+    assert!(client.read(&mut [0; 1]).is_err());
+    reply.answer(204);
+    client.set_read_timeout(Some(Duration::from_secs(5))).expect("timeout");
+    let mut answer = String::new();
+    client.read_to_string(&mut answer).expect("answer");
+    assert!(answer.starts_with("HTTP/1.1 204 No Content\r\n"), "{answer}");
+}
+#[test]
+fn the_roll_up_ignores_the_losers_of_the_pairs() {
+    use crate::facts::{Fact, Outcome};
+    let mut facts = vec![
+        Fact { name: "delivery-job-end-follows-its-commit-status", outcome: Outcome::Holds },
+        Fact { name: "delivery-job-end-precedes-its-commit-status", outcome: Outcome::Fails("later".into()) },
+        Fact {
+            name: "delivery-pull-is-settled-when-its-push-is-delivered",
+            outcome: Outcome::Fails("checking".into()),
+        },
+        Fact { name: "delivery-pull-is-checking-when-its-push-is-delivered", outcome: Outcome::Holds },
+    ];
+    facts.push(Fact { name: "delivery-cancelled-job-end-is-delivered", outcome: Outcome::Fails("absent".into()) });
+    facts.push(Fact { name: "delivery-branch-deletion-sends-no-push", outcome: Outcome::Fails("push".into()) });
+    assert!(crate::deliveries::roll_up(&facts));
+    facts[0].outcome = Outcome::Fails("varied".into());
+    assert!(!crate::deliveries::roll_up(&facts));
+}
+
+#[test]
+fn the_pull_pair_records_any_checking_probe_that_settles() {
+    for (reads, settled, expected) in [
+        (vec![vec![true], vec![true]], true, (true, false)),
+        (vec![vec![false, true], vec![true]], true, (false, true)),
+        (vec![vec![true], vec![false, false, true]], true, (false, true)),
+        (vec![vec![false, true], vec![false, true]], true, (false, true)),
+        (vec![vec![false, false], vec![true]], false, (false, false)),
+        (vec![vec![true]], true, (false, false)),
+    ] {
+        assert_eq!(crate::deliveries::pull_pair(&reads, settled), expected, "{reads:?}, settled={settled}");
+    }
 }

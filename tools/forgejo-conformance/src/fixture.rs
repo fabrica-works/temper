@@ -18,30 +18,16 @@ pub struct Fixture {
 }
 impl Fixture {
     pub fn new(forgejo: &Forgejo, scratch: &Path) -> Result<Self> {
-        let mut instance = forgejo.start(scratch, &Settings::small()).map_err(|e| failure(&e))?;
-        let owner = instance.admin().clone();
-        let writer = instance.create_user("writer").map_err(|e| failure(&e))?;
-        let stranger = instance.create_user("stranger").map_err(|e| failure(&e))?;
+        let mut f = Self::bare(forgejo, scratch, &Settings::small())?;
         let mut ids = Vec::new();
         for name in ["specimen", "private", "archived", "moved", "narrow"] {
-            ids.push(instance.create_repository(&owner, name, Init::Readme).map_err(|e| failure(&e))?.id);
+            ids.push(f.instance.create_repository(&f.owner, name, Init::Readme).map_err(|e| failure(&e))?.id);
         }
         for name in ["specimen", "archived", "narrow"] {
-            instance.add_collaborator(&owner, name, &writer, "write").map_err(|e| failure(&e))?;
+            f.instance.add_collaborator(&f.owner, name, &f.writer, "write").map_err(|e| failure(&e))?;
         }
-        let mut f = Self {
-            instance,
-            owner,
-            writer,
-            stranger,
-            repository: ids[0],
-            private: ids[1],
-            feature: 0,
-            conflict: 0,
-            narrow: 0,
-            main: String::new(),
-            head: String::new(),
-        };
+        f.repository = ids[0];
+        f.private = ids[1];
         f.api("PATCH", "/api/v1/repos/fixture/private", &json!({"private": true}))?;
         f.api("PATCH", "/api/v1/repos/fixture/archived", &json!({"archived": true}))?;
         f.api("PATCH", "/api/v1/repos/fixture/moved", &json!({"name": "renamed"}))?;
@@ -70,6 +56,25 @@ impl Fixture {
         f.narrow = f.pull(narrow, "feature", "main")?["number"].as_u64().ok_or("narrow pull missing")?;
         f.api("POST", &format!("{R}/branch_protections"), &json!({"branch_name":"main", "enable_push":false, "enable_status_check":true, "status_check_contexts":["fixture/test"], "required_approvals":1, "dismiss_stale_approvals":true}))?;
         Ok(f)
+    }
+    pub fn bare(forgejo: &Forgejo, scratch: &Path, settings: &Settings) -> Result<Self> {
+        let mut instance = forgejo.start(scratch, settings).map_err(|e| failure(&e))?;
+        let owner = instance.admin().clone();
+        let writer = instance.create_user("writer").map_err(|e| failure(&e))?;
+        let stranger = instance.create_user("stranger").map_err(|e| failure(&e))?;
+        Ok(Self {
+            instance,
+            owner,
+            writer,
+            stranger,
+            repository: 0,
+            private: 0,
+            feature: 0,
+            conflict: 0,
+            narrow: 0,
+            main: String::new(),
+            head: String::new(),
+        })
     }
     pub fn exchange(
         &self,

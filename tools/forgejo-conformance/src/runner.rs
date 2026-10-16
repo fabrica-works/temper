@@ -29,7 +29,7 @@ const NAMES: [&str; 13] = [
     "empty-log-suffix-range-answers-206-empty",
     "step-past-the-last-is-404",
 ];
-struct Runner {
+pub(crate) struct Runner {
     child: Option<Child>,
 }
 impl Drop for Runner {
@@ -223,7 +223,7 @@ fn record(
     }
     Ok(())
 }
-fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, String)> {
+pub(crate) fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, String)> {
     let scratch = f.instance.scratch().join("runner");
     fs::create_dir_all(scratch.join("home"))?;
     let version = version(binary, &scratch)?;

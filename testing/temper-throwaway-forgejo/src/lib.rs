@@ -11,6 +11,7 @@ pub use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION, names_runner};
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub max_response_items: Option<u32>,
+    pub webhook_hosts: Option<String>,
     pub actions: bool,
     pub git: PathBuf,
     pub ready_polls: u32,
@@ -20,7 +21,14 @@ impl Settings {
     #[must_use]
     pub fn small() -> Self {
         let git = "/usr/bin/git".into();
-        Self { max_response_items: Some(2), actions: true, git, ready_polls: 200, answer_bytes: 16 * 1024 * 1024 }
+        Self {
+            webhook_hosts: None,
+            max_response_items: Some(2),
+            actions: true,
+            git,
+            ready_polls: 200,
+            answer_bytes: 16 * 1024 * 1024,
+        }
     }
 }
 #[derive(Clone)]

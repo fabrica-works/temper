@@ -3,20 +3,43 @@ use temper_throwaway_forgejo::Exchange;
 #[derive(Debug)]
 pub struct Mask {
     port: u16,
+    listener: Option<u16>,
+    deliveries: BTreeMap<Vec<u8>, usize>,
     ids: BTreeMap<Vec<u8>, usize>,
     times: BTreeMap<Vec<u8>, usize>,
 }
 impl Mask {
     #[must_use]
     pub fn new(port: u16) -> Self {
-        Self { port, ids: BTreeMap::new(), times: BTreeMap::new() }
+        Self { port, listener: None, deliveries: BTreeMap::new(), ids: BTreeMap::new(), times: BTreeMap::new() }
+    }
+    pub(crate) fn listener(&mut self, port: u16) {
+        self.listener = Some(port);
     }
     #[must_use]
     pub fn bytes(&mut self, bytes: &[u8]) -> Vec<u8> {
+        let listener = self.listener.map(|port| format!("127.0.0.1:{port}"));
         let needle = format!("127.0.0.1:{}", self.port).into_bytes();
         let mut out = Vec::new();
         let mut at = 0;
         while at < bytes.len() {
+            if let Some(listener) = &listener
+                && bytes[at..].starts_with(listener.as_bytes())
+            {
+                out.extend_from_slice(b"127.0.0.1:3001");
+                at += listener.len();
+                continue;
+            }
+            if bytes.len() - at >= 36
+                && [8, 13, 18, 23].iter().all(|i| bytes[at + i] == b'-')
+                && bytes[at..at + 36].iter().all(|b| b.is_ascii_hexdigit() || *b == b'-')
+            {
+                let next = self.deliveries.len() + 1;
+                let n = *self.deliveries.entry(bytes[at..at + 36].to_vec()).or_insert(next);
+                out.extend_from_slice(format!("00000000-0000-0000-0000-{n:012x}").as_bytes());
+                at += 36;
+                continue;
+            }
             if bytes[at..].starts_with(&needle) {
                 out.extend_from_slice(b"127.0.0.1:3000");
                 at += needle.len();
