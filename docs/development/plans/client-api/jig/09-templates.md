@@ -75,7 +75,9 @@ and jig 04.1, as the session's start does.
   "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000}`,
   each member required, `null` where none; the forms: executor
   `{"charter": n}` or `"chosen"`; contract `{"report": {"words": n}}`,
-  `{"verdict": {"choices": [{"code": c, "words": n}]}}` or `{"change":
+  `{"verdict": {"choices": [{"code": c, "words": n, "followups": n,
+  "fields": [{"name": s, "max": n}]}]}}` (`tasks::Verdict`,
+  `jig-domain-tasks/src/boundary.rs`) or `{"change":
   {"connector": c, "kind": k, "words": n}}` (an approval names one
   change, so no template holds one); budget `{"amount": n}`,
   `{"as_allowed": cap or null}` or `"given"`; deadline `"none"`,
@@ -160,14 +162,16 @@ Files:
   `tests/client-protocol/src/native/config.rs:43` (each writes the chat
   and goal templates in `chats`'s place, their reports' `words` 32, within
   these fixtures' `"tasks.result_bytes":32`), and
-  `tests/client-protocol/src/front.rs:258` (`chats_made`, a name only:
+  `tests/client-protocol/src/front.rs:263` (`chats_made`, a name only:
   unchanged).
 - The core `Limits` literals (6 files: `jig-domain-core/src/tests.rs:117`,
-  `jig-protocol-store/src/tests/fixtures.rs:502`,
+  `jig-protocol-store/src/tests/fixtures.rs:503`,
   `tests/core/src/world.rs:116`, `tests/store/src/root.rs:101`, and the
   two profiles), each gaining `templates: 8`, the small profile's value.
 - Downstream: the repository downstream of jig writes `chats` in one
-  fixture and has one core `Limits` literal, absorbed at its repin.
+  fixture and has one core `Limits` literal, and matches every
+  `config::What` twice (its service's `startup/problems.rs:81-103` and
+  `:128-170`: an arm for `What::Grace` in each), absorbed at its repin.
 Shape:
 - `jig_domain_core::Template` as sketched; `Limits.templates: u32`.
 - `jig_domain_people::{TemplateExecutor, TemplateBudget,
@@ -266,7 +270,7 @@ Files:
 - `crates/jig-protocol-store/`: `schema/people-v3.schema` (records for
   the override and its fields; `templates: list 16 TemplateOverride` in
   `PolicyValue`; `templates` in `PolicyChange`), `src/codec/people/policy.rs`,
-  the generated family, the goldens, `src/tests/fixtures.rs:367`.
+  the generated family, the goldens, `src/tests/fixtures.rs:369`.
 - Users: `Settings` literals (5 in jig: `jig-domain-core/src/tests.rs:263`,
   `jig-protocol-config/src/core.rs:54`, `testing/jig-test-domain/src/tests/fixtures.rs:117`,
   `tests/core/src/world.rs:301`, `tests/engine-clients/src/fixtures/receiving.rs:33`),
@@ -280,7 +284,10 @@ Files:
   `testing/jig-test-service/src/tests/first_period.rs:17`); the JSON
   project policies of 9.1's four fixtures (`"templates": []`); the
   matches over `PolicyChange` (`tests/core/src/observations.rs:447`, an
-  arm).
+  arm; `tests/client/src/joint/wire/asks.rs:714`, `Templates { .. }`
+  joining the panic arm at :718); the `documents::Policy` literal at
+  `crates/jig-protocol-engine-clients/src/tests/fixtures/objects.rs:76`
+  (`templates: List::with_capacity(0)`).
 - Downstream: one `Settings` literal, one `Config` literal, one
   `Project` literal and one JSON policy, absorbed at its repin.
 Shape:
@@ -343,7 +350,16 @@ Needs: jig 05's `me`: `documents::Frame` and its `FrameProjectRole`
 Files:
 - `crates/jig-domain-core/src/`: `templates.rs` (`merged`),
   `documents.rs` and `documents/small.rs` (`FrameProjectRole.templates`;
-  `me`'s worst case grows by `templates` times `people.projects`).
+  `me`'s worst case grows by `documents.lines` (the frame's projects,
+  `documents/small.rs:91`) times a `List<Template>` of `templates`, with
+  their names and contracts' heap, added in
+  `document_with_context_worst_case(&Limits)` (`documents.rs:459`), since
+  `document_worst_case(&DocumentLimits)` (:425) cannot see `templates`;
+  `src/tests/frame_deployment_role.rs:68-74`'s `held` counts it too).
+- The values derived from that worst case (rulings 110 and 112):
+  `What::Memory { over }` at
+  `crates/jig-protocol-config/src/tests/domain.rs:169`, and the
+  profiles' bounds and their copies where they move.
 - `FrameProjectRole`'s users, as jig 05.4 lists them for `creating`
   (11 in 8 files at the base), among them
   `crates/jig-protocol-engine-clients/src/translate/owner.rs`, whose
@@ -392,10 +408,15 @@ Files:
 - `tests/channel/src/fixtures.rs:29-38`: its limits (`"tasks.tasks":1`,
   `"tasks.delegates":1`) cannot hold `operations >= delegates + 1` beside
   jig 04.6's `operations <= tasks`; it takes `"tasks.tasks":2`,
-  `"people.operations":2` and `"tasks.project_goals":2`, the
-  smallest values that hold both, each test of the worlds on it
+  `"people.operations":2`, `"tasks.project_goals":1` and
+  `"people.inbox_tasks":4` (the core's `worst_case` needs `inbox_tasks`
+  at least twice `tasks`, `memory.rs:99`), the smallest values that
+  hold them, each test of the worlds on it
   (`jig-channel-world`, `jig-one-process-world`, `jig-test`) kept as it
   is. A different value is a question.
+- Downstream: its service's two matches over every `config::What`
+  (`startup/problems.rs:81-103` and `:128-170`) gain an arm for
+  `What::Operations`, absorbed at its repin.
 Shape:
 - `What::Operations { operations: u32, delegates: u32, goals: u32 }`,
   pushed at `Path::root().member(b"limits")` when `people.operations <
@@ -432,6 +453,7 @@ Compiled at the base under `heavy cargo clippy -p <scratch crate>
 ```rust
 // crates/jig-domain-people/src/templates.rs (9.1; TemplateOverride 9.2)
 /// Who executes a task made from a template (configuration.md 3.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TemplateExecutor {
     /// An agent under this charter, by its number among the configured charters.
     Charter(u32),
@@ -439,6 +461,7 @@ pub enum TemplateExecutor {
     Chosen,
 }
 /// A template's budget (configuration.md 3.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TemplateBudget {
     /// This amount.
     Amount(u64),
@@ -448,6 +471,7 @@ pub enum TemplateBudget {
     Given,
 }
 /// A template's deadline (configuration.md 3.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TemplateDeadline {
     /// No deadline.
     None,
@@ -458,6 +482,7 @@ pub enum TemplateDeadline {
 }
 /// A project's policy's override of one template (authority.md 6), each
 /// field `None` where the template's own value stands.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TemplateOverride {
     pub template: u32,
     pub executor: Option<TemplateExecutor>,
@@ -466,6 +491,7 @@ pub struct TemplateOverride {
     pub priority: Option<u32>,
 }
 // crates/jig-domain-people/src/policy_value.rs
+#[derive(Clone, PartialEq, Eq, Hash, Debug)] // the base's
 pub enum PolicyChange {
     // ... the base's variants, then:
     /// The project's overrides replaced as one list, each naming a configured template.
@@ -477,6 +503,7 @@ pub enum PolicyChange {
 // crates/jig-domain-core/src/templates.rs (9.1; merged 9.3)
 /// A template: the application's defaults for a shape of work
 /// (configuration.md 3.1), served in `me`, read by no decision.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Template {
     /// Its number, never reused (0 is refused).
     pub number: u32,
