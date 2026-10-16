@@ -240,7 +240,9 @@ measured failing at the rehearsal and each changed only as said:
 jig's new pages (the frame's regions and parts), rewritten from the
 printer's output once; then `git diff -- '*/golden/*'`, once, and each
 changed line named in the landing's report: a golden line that changes
-for a reason other than jig's page is a bug;
+for a reason other than jig's page, or the dropped `State::Provisional`
+(ruling 102: `src/tests/golden/every_role.txt:48` loses its final
+` (provisional)`), is a bug;
 `a_check_takes_a_press_or_a_toggle` becomes
 `a_check_takes_a_toggle_and_refuses_a_press`, its press expecting
 `None`: skein-ui's `takes` gives a check `Toggle` alone
@@ -262,7 +264,8 @@ printing `== Inbox == Live`, and exiting 0 on `q`. Bound: 2 minutes
 Don't: pin a jig other than `a3b53546`; keep `jig-fake-person` or any
 copy of jig's old tree types; repair the printer beyond the role arms
 and the dropped state (01.3 replaces it); hand-edit generated code or
-`Cargo.lock`; change a golden for any reason but jig's pages.
+`Cargo.lock`; change a golden for any reason but jig's pages and the
+dropped `State::Provisional` (ruling 102).
 Size: at most 200 lines (146 at the rehearsal's compile, 88 of them the
 printer's role arms, `logs/w1/temper-01.1-size.txt`; the runtime repairs
 add about 6, in the view's `root.rs` and the terminal's `limits.rs`). Generated code, tests and goldens are not
@@ -402,7 +405,9 @@ pub fn refusal_line(name: &[u8], refusal: Refusal, number: u64) -> Box<[u8]>;
   temper 03, which moves the terminal onto `jig-client-shell-native`
   (decided by the planner, 2026-10-15). Nothing to raise here.
 - A golden line in 01.1 that changes for a reason other than jig's pages
-  (a word, an order, a number) is a question, with the line.
+  or the dropped `State::Provisional` (a word, an order, a number) is a
+  question, with the line. `every_role.txt:48`'s final ` (provisional)`
+  goes with the state (ruling 102).
 
 ## Done when
 
