@@ -2,10 +2,11 @@
 
 Provisional, 2026-10-14, revised 2026-10-16. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
-with jig's parts as jig defines them and temper's own members beside
-them; the private files it names; the agent's configuration; what
-`temper open` and `temper sign-in` are given; limits; what holds at a
-first start and at every start; and the formats an operator writes.
+and the forge's setup's commands with it, with jig's parts as jig
+defines them and temper's own members beside them; the private files it
+names; the agent's configuration; what `temper open` and `temper
+sign-in` are given; limits; what holds at a first start and at every
+start; and the formats an operator writes.
 jig's shape and rules are jig's `protocol/configuration.md`; this
 document says what temper adds. What is open is listed in section 11.
 
@@ -14,6 +15,7 @@ document says what temper adds. What is open is listed in section 11.
 - **One document per `temper serve`,** in jig's shape: three top-level
   members, `engine` (jig's engine part), `workers` (jig's worker parts)
   and `application` (temper's members). Nothing else at the top level.
+  The forge's setup's commands read the same document (section 8).
 - **Read once, before the loop, and strict.** Unknown, missing,
   duplicate or out-of-bound members refuse the start, naming the path
   (jig's `protocol/configuration.md`, section 1). A change is a restart.
@@ -21,9 +23,12 @@ document says what temper adds. What is open is listed in section 11.
   writes no parser of its own for them, and adds only the checks
   standalone needs (section 2).
 - **temper's members:** `forges`, `identities`, `landing`, `charter`,
-  `clients` and `limits` for the engine (section 3), and `workers` for
-  each worker (section 4). `webhooks` is reserved, and refused until it
-  is built.
+  `clients`, `webhooks` and `limits` for the engine (section 3), and
+  `workers` for each worker (section 4). `webhooks` is the forge
+  component's webhooks' listener, on loopback (forge.md, section 5).
+- **`setup`, for the forge's setup** (setup.md): how each set-up forge is
+  run and set up, which the `temper forge` commands and `temper box` act
+  on, and `temper serve` checks and acts on none of (section 3).
 - **Not configuration:** repositories, which people adopt at runtime;
   the branch namespace, which the root derives from the deployment's id;
   the forge writer's identity, which comes from each forge's `user`.
@@ -33,8 +38,9 @@ document says what temper adds. What is open is listed in section 11.
   Rust field names, and a plan writes the parser from the types (section
   10).
 - **Standalone shape:** exactly one worker, joined to the engine by the
-  in-process name `workers`; the clients' listener on loopback; the
-  agent program is temper's own binary.
+  in-process name `workers`; the clients' listener, and the webhooks'
+  listener when configured, on loopback; the agent program is temper's
+  own binary.
 - **The agent's configuration is smith's** (section 5), and `temper open`
   takes no file at all (section 9).
 
@@ -88,7 +94,9 @@ document says what temper adds. What is open is listed in section 11.
   2. jig's parts, by `jig-protocol-config`; `application`, by
      `temper-service`'s startup, with `jig-protocol-config`'s readers, so
      every problem names its path the same way
-     (`application.forges[0].user`);
+     (`application.forges[0].user`); `setup`, and the setup's and the
+     box's limits, by their own crates' checks (setup.md, sections 8 and
+     11);
   3. the checks across the whole: the references of sections 2 to 5,
      the limits against each other and the worst case (section 7), and
      the channel's start checks on temper's parts (channel.md, section
@@ -118,8 +126,9 @@ which bounds its writers. Each:
 | `transport` | `"plaintext"`, or `{"tls": {"server_name": string, "trust": file or null}}` | plaintext only when `api` is a socket address on loopback; `trust` null is the machine's roots | the forge component's connections |
 | `git` | string | an `http` or `https` URL: a host, an optional port and an optional path; no user, query, fragment or final `/`; `http` only to a loopback host | the base of each repository's remote, `<git>/<owner>/<name>.git`, which the engine's routing makes (channel.md, section 4); and the host segment of the forge's resource paths: `git`'s host, with `:port` when it names a port |
 | `api_token` | a file | a private file (section 6) | the forge component: the API token (credentials.md, section 5) |
-| `user` | u64 | above 0 | the forge user the API token belongs to: the forge writer's identity, checked at start (credentials.md, section 5) |
+| `user` | u64, or `{"file": path}` | above 0; a file is a private file (section 6) holding the id in decimal (section 10), read at start | the forge user the API token belongs to: the forge writer's identity, checked at start (credentials.md, section 5) |
 | `identity` | u32 | the `number` of one entry of `identities`; each identity named by exactly one forge | the git identity this forge's runs use (credentials.md, section 4) |
+| `webhook_secret` | a file, or `null` | a private file (section 6); a file while `webhooks` is `null` refuses the start, naming its path | the forge component's webhooks' listener: the secret each delivery to this forge is signed with (forge.md, section 5; credentials.md, section 2). A forge with none has no path on the listener |
 
 **`identities`:** a list of git identities, temper's application
 credentials (credentials.md, section 4), as many as `forges`, and at most
@@ -180,8 +189,24 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 
 **`limits`:** temper's profile and overrides (section 7).
 
-**`webhooks`:** reserved. Present, it refuses the start as not built
-(forge.md, section 5).
+**`webhooks`:** the webhooks' listener, the forge component's own
+(forge.md, section 5), or `null` for none:
+
+| Member | Type | Bounds | Feeds |
+|---|---|---|---|
+| `listener` | an address, jig's format | a socket address on loopback (in `127.0.0.0/8`, or `::1`), as the clients' listener's in standalone; unique among the deployment's listeners: neither the clients' listener's nor an owned forge's `listen` (setup.md, section 8) | the forge component's listener for Forgejo's deliveries, plaintext HTTP on skein's HTTP server, one path per forge with a `webhook_secret`, `/hooks/<number>` by the forge's `number`; the URL of each org hook reconcile makes (setup.md, section 5); an owned Forgejo's `[webhook] ALLOWED_HOST_LIST` (setup.md, 6.2) |
+
+- **A delivery is a hint,** never a fact: polling is the same with
+  webhooks or without (forge.md, section 6), and finds what a delivery
+  lost, refused or never sent told of.
+- **From another host** waits for skein's TLS server side; such a forge
+  polls (setup.md, section 15).
+
+**`setup`:** the forges' setup, a list of at most one entry per forge,
+`[]` for none. Its members, their bounds and the checks of the forge's
+own members against each entry are setup.md, section 8's. `temper serve`
+checks it whole, and acts on none of it: it reads no file that only
+`setup` names.
 
 **What the engine root's `Config` takes,** field by field:
 
@@ -195,9 +220,10 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 | `forge_charter` | `application.charter` |
 
 Beside the root: the forge component takes each forge's `number`,
-`kind`, `api`, `transport`, `api_token` and `user`; the identities'
-table takes each identity's value; the engine's routing takes each
-forge's `git`; the clients' listener takes `clients.listener`.
+`kind`, `api`, `transport`, `api_token`, `user` and `webhook_secret`,
+and the webhooks' listener, `webhooks.listener`; the identities' table
+takes each identity's value; the engine's routing takes each forge's
+`git`; the clients' listener takes `clients.listener`.
 
 ## 4. temper's members for a worker
 
@@ -245,7 +271,10 @@ top-level `workers`, in the same order; standalone has one. Each:
 | File | Named by | Holds | Read by |
 |---|---|---|---|
 | a forge's API token | `application.forges[].api_token` | the token's bytes | the forge component |
+| a forge's user's file | `application.forges[].user`'s `file` | the user's id, in decimal | `temper serve`'s startup, for the forge component |
+| a forge's webhooks' secret | `application.forges[].webhook_secret` | the secret's bytes | the forge component's webhooks' listener |
 | a git identity's token | `application.identities[].token` | the token's bytes | the identities' table |
+| a managed forge's admin's token | `application.setup[].mode.managed.admin_token` | the token's bytes | `temper forge reconcile` alone (setup.md, section 5) |
 | a worker's secret, its digest, a handed-in LLM account's file, the accounts' records' directory, an LLM account's client secret | jig's parts | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 
 - **A secret file holds its bytes and nothing else** but a final
@@ -255,11 +284,22 @@ top-level `workers`, in the same order; standalone has one. Each:
   `read_private_file` (skein's `shell.md`, 6.1): a file readable by
   anyone but the process's user, or reached through a link, refuses the
   start, naming it. An API token's bound is the forge component's
-  `token_bytes` (forge.md, section 7); an identity's token's is the
-  channel's bound on a grant's value, which its whole value, login and
-  author included, must fit (section 3; channel.md, section 8).
-- **Never written back.** temper writes none of them; an operator
-  replaces one and restarts (credentials.md, sections 4 and 5).
+  `token_bytes` (forge.md, section 7), and so is an admin's token's; a
+  webhooks' secret's is the forge component's `hook_secret_bytes`
+  (forge.md, section 7); a user's file's is 20 digits; an identity's
+  token's is the channel's bound on a grant's value, which its whole
+  value, login and author included, must fit (section 3; channel.md,
+  section 8).
+- **A set-up forge's directory** (`application.setup[].directory`) is
+  private, 0o700, the user's own and not reached through a link, made so
+  by the first command that writes in it, and refused otherwise, as a
+  worker's root is (section 4). Its files are setup.md, section 3's, each
+  written whole by the layer that makes it; the forge's `api_token`,
+  `user` and `webhook_secret`, and its identity's `token`, name them
+  (setup.md, section 8).
+- **Never written by `temper serve`.** The setup's commands write the
+  files of a set-up forge's directory (setup.md, section 3); an operator
+  replaces any other and restarts (credentials.md, sections 4 and 5).
 - **No temper secret in jig's secrets' store** (credentials.md, section
   6).
 
@@ -272,12 +312,15 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **Every limit temper's own domains and components take:** the forge's
   and its change and issue policies, the queue window, the forge
   client's, the checkout's, the root's own beyond jig's core, the forge
-  component's and the git component's.
+  component's, its webhooks' listener's among them, and the git
+  component's; and the setup's and the box's, which `temper serve`
+  checks and takes none of (setup.md, sections 5 and 7).
 - **One profile, `small`,** for one person's machine; another name is
   refused. Its numbers are constants in `temper-service`'s limits module,
-  each documented with what it bounds. Where a limit of temper's is a
-  quantity jig's profile also sets, its constant cites jig's small
-  profile's (jig's `protocol/configuration.md`, section 6).
+  and the setup's and the box's in their own crates, each documented
+  with what it bounds. Where a limit of temper's is a quantity jig's
+  profile also sets, its constant cites jig's small profile's (jig's
+  `protocol/configuration.md`, section 6).
 - **Overrides by dotted name:** the path of the field in its owner's
   `Limits` type, a duration's last segment with `_ms`. A name temper does
   not know, or a value outside its type, refuses the start, naming it.
@@ -287,11 +330,30 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `root.` | the engine root's own limits, beyond those jig's `engine.limits` sets |
   | `forge.` | `temper-engine-domain-forge`'s `Limits`: `forge.client.`, `forge.change_policy.` and `forge.issue_policy.` for its children, `forge.queue_window_ms` |
   | `checkout.` | `temper-worker-domain-checkout`'s `Limits` |
-  | `forge_component.` | the forge component's (forge.md, section 7) |
+  | `forge_component.` | the forge component's, its webhooks' listener's among them (forge.md, section 7) |
   | `git_component.` | the git component's (git.md, section 8) |
+  | `setup.` | `temper-forge-setup`'s `Limits`: reconcile's (setup.md, section 5) |
+  | `box.` | `temper-box`'s `Limits`: the box's restarts and stop (setup.md, 7.2) |
 
   For example `forge.repositories`, `forge.client.calls`,
   `checkout.remote_timeout_ms`.
+- **The webhooks', the keep's settling, the setup's and the box's
+  limits,** whose numbers are `small`'s constants, as every other's:
+
+  | Name | Bounds |
+  |---|---|
+  | `forge.client.settle_ms` | after a move of a pull request's head or base, how long a not mergeable answer, or a hinted job's pending CI, is read again at `hinted` and not believed (`domain/forge.md`, 5.2) |
+  | `forge_component.hooks` | the webhooks' listener's connections in all |
+  | `forge_component.hook_head_bytes` | a delivery's request head |
+  | `forge_component.hook_body_bytes` | a delivery's body, hashed and decoded as it streams, so time and bytes, not memory; one past it is answered `413` and hints nothing |
+  | `forge_component.hook_deadline_ms` | `hook_deadline`: a delivery's read and answer, from its connection's accept or its last answer |
+  | `forge_component.hook_secret_bytes` | a webhooks' secret |
+  | `setup.orgs` | a setup's `orgs` |
+  | `setup.deadline_ms` | a reconcile's run, its wait for the forge among it |
+  | `setup.backoff_ms`, `setup.backoff_max_ms` | reconcile's first request made again, doubling |
+  | `box.backoff_ms`, `box.backoff_max_ms` | a long step restarted, doubling |
+  | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up |
+  | `box.grace_ms` | a long step's grace, between its stop's signal and its close |
 - **Limits checked against each other at start,** each failure naming
   both limits:
   - the forge component's: its connections equal the forge client's
@@ -302,6 +364,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   - the git component's: each rule of git.md, section 8 (its operations
     at least the checkout's workspaces, its output caps at least what
     it parses and the diagnostic it keeps);
+  - the setup's and the box's: each backoff at most its maximum;
+    `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
+    below `box.window_ms`;
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest
     part the engine can send within what the worker's limits take; the
@@ -345,6 +410,15 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 ## 8. First start and every start
 
+- **Every command that reads the document checks it whole.** `temper
+  serve`, `temper sign-in`, every `temper forge` command and `temper box`
+  read it and check it as section 2 says, its steps 1 to 3, so a
+  document one of them takes, the others take (setup.md, section 8).
+  Each then reads the private files its own part needs alone: a `temper
+  forge` command its forge's, by setup.md, sections 5 and 6; `temper
+  box` none; `temper serve` every one the document names but those that
+  only `setup` names. A set-up forge's files that its members name, which
+  the commands before it made, are among the ones it reads.
 - **A deployment's first start** is the first with an empty store (jig's
   `protocol/configuration.md`, section 8): the shell draws the
   deployment's id, and the core seeds owners and projects from
@@ -379,7 +453,10 @@ top-level `workers`, in the same order; standalone has one. Each:
   client.md, section 4).
 - **What a change reaches,** after its restart: a forge's `git`, every
   remote from the next assignment on; a forge's `api_token` and `user`,
-  checked again; an identity's token, granted again at generation 1.
+  checked again; a forge's `webhook_secret`, and the webhooks' listener,
+  from the first delivery on; an identity's token, granted again at
+  generation 1; a forge's setup, at the next run of its commands
+  (setup.md, 6.3 and section 5).
 
 ## 9. The client's arguments
 
@@ -403,6 +480,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   `temper serve` (credentials.md, section 3).
 - **`temper agent AGENT.json`** reads smith's agent configuration
   (section 5).
+- **`temper forge prepare|run|reconcile CONFIG.json FORGE`** and
+  **`temper box CONFIG.json`** read the same document as `temper serve`
+  (section 8; setup.md, sections 5 to 7).
 
 ## 10. Formats
 
@@ -440,6 +520,9 @@ written by the format rule as one member of temper's own type, where
 jig's endpoints spell them as sibling members (`"transport": "tls"`,
 `"server_name"`, `"trust"`).
 
+**A user's file,** temper's own, holds the forge user's id in decimal
+digits, and nothing else but a final newline, as a secret file does.
+
 **The `application` member for standalone,** one forge, one identity and
 one worker, complete:
 
@@ -453,7 +536,8 @@ one worker, complete:
     "git": "https://forge.example",
     "api_token": "secrets/forge-1.api-token",
     "user": 42,
-    "identity": 1
+    "identity": 1,
+    "webhook_secret": null
   }],
   "identities": [{
     "number": 1,
@@ -483,13 +567,16 @@ one worker, complete:
   },
   "charter": 2,
   "clients": {"listener": {"socket": "127.0.0.1:7100"}},
+  "webhooks": null,
+  "setup": [],
   "limits": {"profile": "small", "overrides": {}},
   "workers": [{"root": "workspaces", "git": "/usr/bin/git"}]
 }
 ```
 
 A landing rule may name a repository no project has adopted yet: it
-covers nothing until a person adopts `acme/widget`.
+covers nothing until a person adopts `acme/widget`. The forge is reached
+over TLS from another host, so it polls, with no webhooks.
 
 **The whole document,** jig's members elided as `...` (this skeleton is
 not itself valid JSON):
@@ -528,6 +615,88 @@ not itself valid JSON):
 }
 ```
 
+**The owned example** (setup.md, section 8): the `application` member
+for one owned forge with a runner, webhooks, one git identity and one
+worker, complete, in place of the standalone one in the whole document
+above, whose `engine.llm` names the one LLM account `temper sign-in`
+signs in. A person, a test or QA's host starts from it; `temper box
+CONFIG.json` runs it (setup.md, section 7):
+
+```json
+"application": {
+  "forges": [{
+    "number": 1,
+    "kind": "forgejo",
+    "api": {"socket": "127.0.0.1:3000"},
+    "transport": "plaintext",
+    "git": "http://127.0.0.1:3000",
+    "api_token": "forge-1/api_token",
+    "user": {"file": "forge-1/user"},
+    "identity": 1,
+    "webhook_secret": "forge-1/webhook_secret"
+  }],
+  "identities": [{
+    "number": 1,
+    "token": "forge-1/git_token",
+    "login": "temper",
+    "author": {"name": "temper", "email": "temper@example.invalid"}
+  }],
+  "landing": {
+    "deployment": [],
+    "projects": [{
+      "project": 1,
+      "rules": [{
+        "connector": 1,
+        "kind": 4,
+        "pattern": {
+          "segments": ["forge", "127.0.0.1:3000", "acme", "widget", "branch"],
+          "last": "exact",
+          "value": "main"
+        },
+        "enforce": true,
+        "ci": true,
+        "up_to_date": true,
+        "gates": [{"number": 1, "blocking": true, "freshness": "clean"}],
+        "approvals": []
+      }]
+    }]
+  },
+  "charter": 2,
+  "clients": {"listener": {"socket": "127.0.0.1:7100"}},
+  "webhooks": {"listener": {"socket": "127.0.0.1:7101"}},
+  "setup": [{
+    "forge": 1,
+    "directory": "forge-1",
+    "bot": {"login": "temper", "email": "temper@example.invalid"},
+    "orgs": ["acme"],
+    "mode": {"owned": {
+      "forgejo": "/opt/forgejo/forgejo",
+      "runner": {
+        "binary": "/opt/forgejo/forgejo-runner",
+        "labels": ["temper-host:host"],
+        "capacity": 1,
+        "path": "/usr/local/bin:/usr/bin:/bin"
+      },
+      "listen": {"socket": "127.0.0.1:3000"},
+      "person": {"login": "ada", "email": "ada@example.invalid"}
+    }}
+  }],
+  "limits": {"profile": "small", "overrides": {}},
+  "workers": [{"root": "workspaces", "git": "/usr/bin/git"}]
+}
+```
+
+- **The forge's members are its setup's, written out** (setup.md, section
+  8): `api` and `git` from `listen`, plaintext; `api_token`, `user`,
+  `webhook_secret` and the identity's `token` in the forge's directory;
+  the identity's `login` the bot's.
+- **Its landing rule asks for CI,** Actions on the owned runner, and an
+  agent's review; `acme/widget` is a repository the person makes in the
+  org on Forgejo's web, with Actions, then adopts (setup.md, 6.5).
+- **Three loopback addresses,** Forgejo's (`listen`), the clients'
+  listener's and the webhooks' listener's, are what a host changes to run
+  several boxes on one machine, with each box's directories.
+
 ## 11. Open questions
 
 - **A calendar for periods.** The smallest source opens one period per
@@ -535,9 +704,6 @@ not itself valid JSON):
   budget is not renewed. Default: as is, until a calendar child of
   temper's root is designed, as `ops`'s is (jig's
   `protocol/service.md`, section 7).
-- **`webhooks`' member.** Default: reserved and refused; when built, each
-  forge's webhooks' listener address and secret file, by forge.md,
-  section 5.
 - **A forge removed while the store holds its repositories.** Default:
   the start is refused at the forge's restart step, naming the forge
   number (jig's `protocol/configuration.md`, section 9, removed parts).

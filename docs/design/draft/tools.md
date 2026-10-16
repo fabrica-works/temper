@@ -60,8 +60,8 @@ user settled.
   (section 10).
 - **Not here:** the person's pages, which the fake person's stories
   prove; the browser's QA, by agents driving the browser once temper
-  has one; and temper's own forge, which deserves a design of its own
-  (sections 2 and 11).
+  has one; and temper's own forge, which `setup.md` designs (sections 2
+  and 11).
 
 ## 2. What it is for, and what not
 
@@ -89,7 +89,8 @@ user settled.
   on skein's browser harness or a browser driver. These tools are not
   a way around the browser.
 - **Not the deployment under test.** Starting temper with a forge, a
-  runner and a model to drive is temper's own forge (section 11).
+  runner and a model to drive is `setup.md`'s owned mode and its box
+  (section 11).
 
 ## 3. Why the plumbing, not the pages
 
@@ -543,22 +544,17 @@ that runs one (section 14).
 
 ## 11. Beside it: temper's own forge
 
-The deployment the agents drive (a forge, its CI runner, temper, a
-model) is a product feature of its own, not a test harness: temper
-offers to start, own and configure Forgejo and its runner for a
-deployment, as it owns its store. It deserves its own design and plan,
-after this draft. What the tools need of it:
+`setup.md` answers it. The deployment the agents drive is an owned
+setup, run by `temper box` or by QA's host from the same commands: one
+an agent starts, signs in to and throws away, with a repository in an
+org to adopt; its forge readable by the agent directly, its API and
+`git`, as the person; the engine's and the worker's logs in the box's
+stderr, and Forgejo's in its directory, outside the tools (`setup.md`,
+sections 7 and 12). Resetting it is the harness's, never a tool's.
 
-- a deployment an agent can start, sign in to and throw away, with a
-  repository to adopt;
-- the forge readable by the agent directly (its API, `git`), since
-  temper serves no forge part but adoption;
-- the engine's and the worker's logs where the agent can read them,
-  outside the tools.
-
-Until then, QA runs against a deployment set up by hand
-(`draft/mvp.md`'s milestone), and resetting it is the harness's, never
-a tool's.
+Open: a token for the agent's reads of the forge. Default, as
+`setup.md`, section 16 has it: none; the person makes one on Forgejo's
+web.
 
 ## 12. Testing
 

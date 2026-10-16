@@ -1,14 +1,16 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-15. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-16. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
 jig's `protocol/llm.md`, sections 5 and 6); temper's own are its git
-identities and the forges' API tokens. The files they come from are
-configuration.md's (section 6); a git identity's value on the channel is
-channel.md's (section 6); git's use of it is git.md's (section 5). What
-is open is listed in section 8.
+identities, the forges' API tokens and their webhooks' secrets. The files
+they come from are configuration.md's (section 6); a git identity's value
+on the channel is channel.md's (section 6); git's use of it is git.md's
+(section 5); the credentials of the forge's setup, which `temper serve`
+never holds, are setup.md's (section 9). What is open is listed in
+section 8.
 
 ## 1. In one page
 
@@ -29,11 +31,18 @@ is open is listed in section 8.
 - **The API token is the engine's protocol layer's only.** One per forge,
   read at start, never granted, never stored, and checked against the
   forge's user before temper acts as it (section 5).
+- **The webhooks' secret is the forge component's too.** One per forge
+  with webhooks, read at start, by which the webhooks' listener checks
+  each delivery's signature; never granted, never stored, and never sent
+  by the engine (forge.md, section 5). Reconcile gives it to the hooks it
+  makes (setup.md, section 5).
 - **Git gets its credentials per invocation,** in that process's
   environment only, never in an argument, a URL or a file.
 - **Least power.** The git identity is apart from the API token: a worker
   needs only fetching and pushing, so a deployment can give git a token
-  with less power than the engine's.
+  with less power than the engine's. The engine never holds a site
+  admin's token: when temper sets a forge up, the admin's token is read
+  by `temper forge reconcile` alone, which ends (setup.md, section 9).
 - **No temper secret in jig's secrets' store** in standalone: every
   temper secret is a file read at start. jig keeps sign-ins' and
   services' digests there.
@@ -45,11 +54,17 @@ is open is listed in section 8.
 | Credential | Owner | Kind | Source | Held by | Used by | Changes |
 |---|---|---|---|---|---|---|
 | an LLM account | jig | an OAuth record (refresh token, access token, expiry), or a handed-in access token | `temper sign-in`, or a private file another program's login fills | skein's accounts driver; the access tokens lent, jig's accounts' table | the worker's agent processes, through grants | the driver refreshes a signed-in one; a handed-in one is replaced by hand, then read at the next start |
-| a git identity | temper | a forge token, a login, an author | a private token file per identity, and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts |
-| a forge's API token | temper | a forge token | a private file per forge | the forge component | that forge's API requests | an operator replaces the file and restarts |
+| a git identity | temper | a forge token, a login, an author | a private token file per identity, the person's, or reconcile's when its forge is managed or owned (setup.md, section 5), and the identity's members | the identities' table on the engine, and on the worker from grants | the git component's invocations | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
+| a forge's API token | temper | a forge token | a private file per forge, the person's, or reconcile's when the forge is managed or owned (setup.md, section 5) | the forge component | that forge's API requests | an operator replaces the file and restarts; reconcile makes it again at a start when its file does not answer as the bot |
 | a worker's secret | jig | a shared secret | the worker's secret file; the engine's digest file | the worker; the engine, its digest | the link's opening | an operator replaces both |
 | a sign-in's secret | jig | a bearer token | the printed link, then the sign-in | `jig-client` in `temper open`, which keeps it in its directory; the engine, its digest | each of the client's exchanges and its stream | the sign-in ends or expires |
-| a forge's webhook secret | temper | a shared secret | after standalone (forge.md, section 5) | — | — | — |
+| a forge's webhooks' secret | temper | a shared secret | a private file per forge, `forges[].webhook_secret`: the person's, or reconcile's, drawn when the file is missing (setup.md, section 5) | the forge component's webhooks' listener, on loopback; the forge's hooks, which sign each delivery with it | checking each delivery's signature (forge.md, section 5) | an operator replaces the file and the hooks' secret, and restarts; reconcile patches its hooks with the file's at every start |
+
+- **The forge's setup's credentials** (a site admin's token, the bot's
+  and temper's admin's passwords, the person's first password on an
+  owned Forgejo, the runner's secret, Forgejo's own secrets) are
+  setup.md's (section 9): made and read by the setup's commands, kept in
+  the forge's directory or nowhere, and never held by `temper serve`.
 
 ## 3. LLM accounts
 
@@ -182,10 +197,13 @@ is open is listed in section 8.
   fact or a log, and never sent to another forge or another host.
 - **Checked at start.** The forge component's first exchange with each
   forge is `GET /api/v1/user`; the answer's `id` must equal
-  `forges[].user`. Another id, or a `401` or `403`, stops the engine,
-  naming the forge, whether at start or when the forge first answers: a
-  wrong token would make temper act as someone else, so the check is
-  fail-stop, never a degraded mode. The service drains as at a
+  `forges[].user`: the number it gives, or the id in decimal in the
+  private file it names, read at start (configuration.md, sections 3 and
+  6), which reconcile writes when the forge is managed or owned
+  (setup.md, section 5). Another id, or a `401` or `403`, stops the
+  engine, naming the forge, whether at start or when the forge first
+  answers: a wrong token would make temper act as someone else, so the
+  check is fail-stop, never a degraded mode. The service drains as at a
   shutdown, and `temper serve` exits 1, the reason on stderr
   (protocol.md, section 6; forge.md, 3.5).
 - **Until the forge's start is done** (the check, then its page cap:
@@ -200,8 +218,10 @@ is open is listed in section 8.
   writes from others': a key's provenance, and its own writes' echoes
   (`domain/forge.md`, 5.2; forge.md, section 4).
 - **A token the forge stops taking** fails each call as forge.md, 3.4
-  classifies a refusal; nothing refreshes it. An operator replaces the
-  file and restarts, and the check runs again.
+  classifies a refusal; nothing refreshes it while the engine runs. An
+  operator replaces the file and restarts, and the check runs again; on
+  a managed or owned forge, reconcile makes it again before the restart's
+  `temper serve` (setup.md, 7.2 and section 5).
 
 ## 6. Workers' secrets and sign-ins
 
@@ -232,8 +252,8 @@ is open is listed in section 8.
 - **No value across a domain boundary:** the one-process world and the
   forge's protocol world search every root's events and requests, every
   fact and every store record for the values their fakes issued (LLM
-  access tokens, identities' tokens, API tokens), and fail on any
-  (testing.md, 2.5).
+  access tokens, identities' tokens, API tokens, webhooks' secrets), and
+  fail on any (testing.md, 2.5).
 - **The identities' table:** step tests of its filling at start, a value
   filled into a grant and taken out on the worker, and two generations.
 - **Git's environment:** step tests of its builder: the header's bytes,
@@ -259,7 +279,8 @@ is open is listed in section 8.
   contained process trees give agents a process namespace of their own,
   which closes it (jig's `protocol/README.md`, section 10). Without
   them, the token would reach git through a pipe and a credential helper
-  instead.
+  instead. An owned runner's jobs run as the same user too; their
+  isolation, CI's, is later (setup.md, section 15).
 - **Generations across starts.** Generation 1 at every start names a new
   value once a token file is replaced, which is sound only while no
   worker outlives the engine. Default: standalone only; workers on other

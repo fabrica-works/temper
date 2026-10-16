@@ -140,6 +140,15 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   an admin (section 20.1; `docs/design/forge.md`, section 13): adoption
   records protection as unknown, never as absent. A refused
   merge narrows what temper may do, as connectors.md, section 11 says.
+- **A repository of an org a setup names** (`docs/design/setup.md`,
+  section 5) is adopted with no collaborator step: temper's user is a
+  member of the org's team, which has write on every repository the org
+  has or will have, so the adoption reads that write access as any
+  other; and the org's hook, made when the deployment has a webhooks'
+  listener, delivers its hints. Any other repository, a person's own
+  among them, is adopted as before: a person gives temper's user its
+  access, as a collaborator or through a team, and adds its hook or
+  leaves it to poll.
 - **The project names, per repository:** its landing branches; temper's
   branch prefix, `temper/` by default, which protection can reserve to
   temper's user; the merge style, the repository's own by default,
@@ -186,13 +195,36 @@ Its capacity is a limit: a batch naming resources past it is refused.
   forge's time, inclusive, least recently updated first, paged; its cost
   follows the rate of change, not the number of pull requests held.
 - **Per pull request,** what moves no updated time on Forgejo (CI
-  reporting, its base moving) is read again on a backoff that doubles up
-  to a ceiling, and at once on a hint naming its head or its base.
-- **Landing branches' tips** are read on a hint naming them, and on a
-  slow pace otherwise.
-- **Hints** from webhooks name the repository and what changed (an item,
-  a branch, a commit) and who caused it; temper's own are echoes,
-  dropped.
+  reporting, its base moving) is read again on a backoff that doubles
+  from `poll` up to `poll_max`, and at once on a hint naming its number,
+  its head or its base, by branch or by commit: after `hinted`, the
+  pause that gathers one change's hints into one read. Its backoff then
+  starts again from `poll`.
+- **What Forgejo settles after it delivers** is read again sooner.
+  Forgejo checks a pull request's mergeability after a push moves its
+  head or base, and answers it not mergeable while it checks; a job's
+  commit status may be written after the job's end is delivered
+  (`docs/design/forge.md`, section 13). So, within `settle` of a move of
+  its head or base (known by a hint, a read or temper's own push), a
+  pull request that reads not mergeable is read again at `hinted`,
+  doubling, until it reads mergeable or `settle` has passed; and a
+  commit a job's hint named whose CI reads pending is read again the
+  same way. Until `settle` has passed, not mergeable is not known: the
+  change waits, and is never taken as conflicted on it (8.2).
+- **Landing branches' tips** are read on a hint naming them, or a
+  commit at their tip, and on a slow pace otherwise.
+- **Hints** come from the forge's webhook deliveries
+  (`docs/design/forge.md`, section 5): each names the repository and
+  what changed (an item, a branch, a commit) and who caused it; temper's
+  own are echoes, dropped. A hint is a reason to read, never a fact: it
+  brings forward the reads of what it names and the repository's
+  listing, and a hint naming a commit reads CI on it for whatever
+  watches it. One for a repository or a resource the keep does not
+  hold, or that comes before its restore, is dropped; the next listing
+  finds what it told of.
+- **The paces are unchanged by webhooks:** `poll`, `poll_max`, `hinted`
+  and `slow` are what they are with no hook, so a delivery lost, refused
+  or never sent costs latency, never liveness.
 - **A slow pass** reads again, at its own pace, every live resource the
   listings have not shown for a while, so that nothing waits on a hint
   that never came.
@@ -388,6 +420,8 @@ producing ─► opening ─► checking ─► gating ─► queued ─► firs
    **updated** (section 10): cleanly, and its new head is checked again,
    its gates carried over; or in conflict, and it leaves the queue to be
    **resolved**, its new head checked again and its gates asked again.
+   A pull request whose mergeability has not settled (5.2) is neither:
+   the change waits for it.
 7. **Landing:** merged at exactly its head, in the repository's merge
    style, squash by default, automatically: anything stricter is a rule
    (authority.md, section 10). Merged, the change is **landed**: its
@@ -890,8 +924,6 @@ it, or said to be still to check:
   leaves open).
 - **A person's approval as a rule,** posted as the person so that
   protection requires it independently (core.md, section 11).
-- **Webhooks through the API** at adoption, which needs admin rights on
-  each repository.
 - **A failure that is the runner's, not the change's:** a job whose
   set-up step failed, or whose runner was lost, is a repair like any
   other. Running the job again first, through the API, is

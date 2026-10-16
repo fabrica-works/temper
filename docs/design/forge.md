@@ -3,9 +3,9 @@
 Provisional, 2026-10-03, revised 2026-10-16. How the engine reaches the
 forge: Forgejo v17.0's API over HTTP and JSON, the keys' markers the
 engine writes at the head of what it creates, the webhooks Forgejo sends
-back, designed now and built after standalone, and the fake forge's
-protocol layer that serves the same API in the worlds. The overview is
-protocol.md (sections 5 and 6); the vocabulary carried is the forge
+back to a listener on loopback, and the fake forge's protocol layer that
+serves the same API in the worlds. The overview is protocol.md (sections
+5 and 6); the vocabulary carried is the forge
 client's (`temper_engine_domain_forge_client::api`, `domain/forge.md`,
 sections 5, 6 and 17); the machines are skein's (skein's `http.md`,
 `json.md`, `tls.md`). GitHub comes later, and section 11 says where it
@@ -39,9 +39,12 @@ section 14.
   granted and never stored; the first exchange with each forge checks
   that the token belongs to the configured user, and a wrong one stops
   the start (3.5; credentials.md, section 5).
-- **Standalone polls.** Webhooks keep their design (section 5): verified
-  as they stream, answered first, each hint naming what caused it. They
-  are built after standalone.
+- **Webhooks for latency, polling for liveness.** Forgejo's deliveries
+  reach a listener of the component's own, on loopback (section 5):
+  verified as they stream, answered first, each hint naming what caused
+  it. Polling stands as it is and finds what a delivery lost, refused or
+  never sent told of; a forge on another host polls alone until skein's
+  TLS server side (setup.md, section 15).
 - **The fake forge speaks the same API,** from the server's side, with
   Forgejo's quirks where they are known (its default order, its page
   cap, its unpaged threads), and counts the requests it serves, so the
@@ -59,15 +62,15 @@ temper-engine-domain-forge-client   Read, Write, Answer, Error, Hint (api.rs)
   ▲  the root: Request::Forge; Event::Forge (the client's Answered, the forge's Hint)
 the routing (temper-service)        io ↔ components ↔ root
   ▲
-temper-engine-protocol-forge        calls, connections, repositories' paths, users, each forge's start; later, webhooks
+temper-engine-protocol-forge        calls, connections, repositories' paths, users, each forge's start; the webhooks' listener: verified deliveries as hints
   ▲  documents
-temper-forge-forgejo                Forgejo's requests and answers, both sides; later, webhook payloads
+temper-forge-forgejo                Forgejo's requests and answers, both sides; deliveries' payloads; the org hooks' and the setup's documents
   ▲  tokens
 skein-json
   ▲  body stream
-skein-http (client; later, a server for webhooks)
+skein-http (client; a server for webhooks, plaintext on loopback)
   ▲  plaintext
-skein-tls (client, for a forge whose transport is TLS; later, a server for webhooks)
+skein-tls (client, for a forge whose transport is TLS; later, a server for webhooks from another host)
   ▲  ciphertext
 skein-io socket
 ```
@@ -76,10 +79,14 @@ skein-io socket
   holds Forgejo's documents and nothing of temper's domains: each
   request's method, path, query and JSON body as a sized encoder; each
   answer's decoder, a small state machine over JSON tokens; error bodies;
-  later, the webhook payloads and their signature check. Both sides live
-  there, the client's for the engine and the server's for the fake forge
-  (section 9), so the two are also fed transcripts of the real Forgejo
-  (section 10).
+  the deliveries' headers and each payload's decoder, of the fields a
+  hint reads (section 5); and the setup's documents, admin users, tokens
+  under basic auth, orgs, teams and their members, and org hooks, which
+  reconcile sends (setup.md, sections 5 and 11). Both sides live there,
+  the client's for the engine and reconcile and the server's for the fake
+  forge (section 9); for deliveries, the fake forge's encoder and the
+  engine's decoder. So the two are also fed transcripts of the real
+  Forgejo (section 10).
 - **The forge component,** `temper-engine-protocol-forge`, is a
   child of the engine's protocol layer, beside jig's components, with its
   own limits, worst case, deadlines and most outputs per entry point; the
@@ -88,28 +95,35 @@ skein-io socket
   section 2). One component serves every configured forge. It holds the
   calls in flight, the forges' connections, each forge's start
   (section 3.5), the repositories' paths and the users, and the
-  translation between the forge client's vocabulary and the documents.
+  translation between the forge client's vocabulary and the documents;
+  and the webhooks' listener, its connections and each forge's webhook
+  secret, verifying each delivery and making it a hint (section 5).
 - **What crosses to the root** is the root's boundary: a
   `Request::Forge { call, repository, op }`, which the routing hands to
   the component, ended by exactly one `client::Event::Answered { call,
   cost, result }`, which the routing hands the root as `Event::Forge`
   (the forge's `Event::Client`); and the forge's `Event::Hint { hint }`,
-  which no request causes (`domain/forge.md`, 5.2).
+  which no request causes: a verified delivery's (section 5;
+  `domain/forge.md`, 5.2).
 - **Room, and the drain.** An answer or a hint the root's admission
   cannot take yet (its journal full) comes back to the component, which
   holds it and offers it again, reading nothing more off that
   connection meanwhile (jig's `protocol/service.md`, section 2, room);
-  it holds at most one per call. One the root returns undecided during
-  its drain (its `Request::Busy`) stays with the component and is never
+  it holds at most one per call and one per webhook connection. One the
+  root returns undecided during its drain (its `Request::Busy`) stays
+  with the component and is never
   offered again: it goes when the component closes, and the next
   process reads afresh and settles its outbox (jig's
   `domain/engine.md`, 6.1; `domain/forge.md`, section 16).
 - **What it is told at start:** each entry of `application.forges`
   (configuration.md, section 3): the forge's number, its kind (Forgejo),
-  its API's address and transport, its API token's file and the user the
-  token belongs to. It reads no other member: a forge's `git` base is
-  the routing's, for runs' remotes (channel.md, section 4), and its
-  `identity` names a git identity, which the component never holds.
+  its API's address and transport, its API token's file, the user the
+  token belongs to (a number, or a file holding it: setup.md, section 8)
+  and its `webhook_secret`'s file, when it has one; and
+  `application.webhooks`, the listener's address, when configured. It
+  reads no other member: a forge's `git` base is the routing's, for
+  runs' remotes (channel.md, section 4), and its `identity` names a git
+  identity, which the component never holds.
 
 ## 3. Forgejo's API as temper uses it
 
@@ -542,38 +556,63 @@ the forge, and labels are for display only, which no call writes
 
 ## 5. Webhooks
 
-After standalone (protocol.md, section 12): standalone polls
-(section 6), and this section is the design webhooks are built to.
-Configuration's `webhooks` member is reserved, and refused until they
-are built (configuration.md, section 3).
+Forgejo's deliveries, made hints: they cut polling's latency, and decide
+nothing. Polling stands as it is (section 6; `domain/forge.md`, 5.2) and
+finds whatever a delivery lost, refused or never sent told of. A
+delivery reaches the engine on loopback; a forge on another host polls
+alone until skein's TLS server side (setup.md, section 15).
 
-- **A listener of its own,** at the address the `webhooks` member will
-  name, apart from the clients' listener (client.md, section 8), on
-  skein's HTTP server, over TLS where the forge reaches the engine from
-  another host. It takes `POST` on one path per forge,
-  one request at a time per connection, kept alive.
-- **Verified as it streams.** Forgejo signs each delivery's body with the
-  webhook's secret, in `X-Forgejo-Signature` (HMAC-SHA256, in hex). The
-  body is hashed as it arrives, and decoded at the same time into the few
-  fields a hint needs; nothing of it is believed until the whole body is
-  read and the signature holds, compared in constant time. A delivery
-  that fails is answered `403` and dropped. The secret is the forge's,
-  from a private file the `webhooks` member will name, held from start.
+- **The webhooks' listener,** `application.webhooks`, `{"listener":
+  address}` (configuration.md, section 3): a socket address on loopback
+  (in `127.0.0.0/8`, or `::1`), plaintext HTTP on skein's HTTP server, a
+  listener of the forge component's own, apart from the clients'
+  listener (client.md, section 8). It takes `POST` on one path per
+  forge, `/hooks/<number>`, the forge's `number`, one request at a time
+  per connection, kept alive.
+- **Each forge's secret,** its `webhook_secret`: a member of its
+  `forges` entry naming a private file (configuration.md, section 6),
+  read at start and held in the component's own table, never logged.
+  It is optional, and present only with `application.webhooks`: a
+  `webhook_secret` with no `webhooks` refuses the start, naming its
+  path. A forge with no secret has no path: a request to it is answered
+  `404`, as one to a path that names no forge, and hints nothing.
+- **Signed, and verified as it streams.** Forgejo signs each delivery's
+  body with its hook's secret: HMAC-SHA256, in hexadecimal, in
+  `X-Forgejo-Signature`. The component computes it as the body arrives,
+  with skein lib's `sha256::Hmac` keyed by the forge's secret, and
+  decodes the body at the same time into the few fields its hint reads;
+  nothing of it is believed until the whole body is read and the
+  signature holds, compared with `sha256::equal`, in constant time
+  (skein's `lib.md`, 6.2). A delivery with no signature or a wrong one
+  is answered `403` and dropped.
 - **Answered first.** Once the body is read and verified, the response
   (`204`) is queued, and only then does the hint go up. The engine never
   makes Forgejo wait on its work. skein's HTTP server lets the component
-  answer when it chooses (skein's `http.md`, 5.4).
-- **Which deliveries hint what**, by `X-Forgejo-Event`, each hint's
-  repository the forge's number and the payload's `repository.id`
-  (`run.repository.id` for a job's), so no path is needed (3.1):
+  answer when it chooses (skein's `http.md`, 5.4). A verified delivery
+  that hints nothing (an event of no row below, a tag's) is answered
+  `204` all the same.
+- **The events a hook subscribes to** are every event whose delivery the
+  table maps to a hint, and no other. The component reads each delivery
+  by `X-Forgejo-Event`, the header it arrives under, which several
+  events share; each hint's repository is the forge's number and the
+  payload's `repository.id` (`run.repository.id` for a job's), so no
+  path is needed (3.1):
 
-  | Event | `Hint` |
-  |---|---|
-  | `issues`, `issue_comment`, `pull_request`, `pull_request_comment`, `pull_request_approved`, `pull_request_rejected` | `Change::Item(number)`, with the key of the issue's, the comment's or the review's body |
-  | `push` | `Change::BranchMoved { branch, head, actor }`, the commit it moved to and the pusher's id; a deletion, `Change::Branch(branch)` |
-  | `create`, `delete` of a branch | `Change::Branch(branch)` |
-  | `workflow_job_success`, `workflow_job_failure`, `workflow_job_cancelled`, `workflow_job_skipped` | `Change::Commit(commit)`, the run's `commit_sha` |
-  | anything else | nothing |
+  | Events subscribed | `X-Forgejo-Event` | `Hint` |
+  |---|---|---|
+  | `issues`, `issue_assign`, `issue_label`, `issue_milestone` | `issues` | `Change::Item(number)`, with the key of the issue's body |
+  | `pull_request`, `pull_request_assign`, `pull_request_label`, `pull_request_milestone`, `pull_request_sync`, `pull_request_review_request` | `pull_request` | `Change::Item(number)`, with no key: a pull request's key is its branches (3.2) |
+  | `issue_comment`, `pull_request_comment` | `issue_comment` | `Change::Item(number)`, with the key of the comment's body |
+  | `pull_request_review_approved`, `pull_request_review_rejected`, `pull_request_review_comment` | `pull_request_approved`, `pull_request_rejected`, `pull_request_comment` | `Change::Item(number)`, with the key of the review's body |
+  | `push` | `push` | of a branch, `Change::BranchMoved { branch, head, actor }`, the commit it moved to and the pusher's id; of a branch deleted, `Change::Branch(branch)` |
+  | `create`, `delete` | `create`, `delete` | of a branch, `Change::Branch(branch)` |
+  | a job's ends: `workflow_job_success`, `workflow_job_failure`, `workflow_job_cancelled`, `workflow_job_skipped` | the same | `Change::Commit(commit)`, the run's `commit_sha` |
+  | none | anything else; a tag's `push`, `create` or `delete` | nothing |
+
+  The names a hook's events take, the headers each arrives under and
+  the fields each hint reads are Forgejo's sources', recorded on the
+  pinned release by the conformance tool (section 13); where it records
+  otherwise, the table follows it.
 
   **Who caused it** is what lets the domain drop its own writes' echoes:
   a creation's key for an item, the pusher for a push (`domain/forge.md`,
@@ -585,17 +624,40 @@ are built (configuration.md, section 3).
 - **CI is hinted as each job ends.** A job's delivery is sent for each
   of its attempts, so a job run again is hinted again when it ends. The
   run's deliveries (`workflow_run_*`), sent once its last job ends, and
-  the deprecated `action_run_*` are not subscribed. Forgejo sends no
-  delivery for a commit status: CI that another system reports, and the
-  verdicts temper posts, are found by polling alone (`domain/forge.md`,
-  5.2).
-- **Bounded.** Connections, the head's size and the body's are capped; a
-  body past its cap is answered `413` and hints nothing, and polling
-  finds what it told of. Push payloads list commits, which the decoder
-  skips.
-- **Set up by the deployment.** Each repository's webhook (its URL, its
-  secret, its events) is configured on the forge by whoever deploys the
-  engine; making them through the API is a question of section 14.
+  the deprecated `action_run_*` are not subscribed.
+- **What has no delivery** is found by polling alone (`domain/forge.md`,
+  5.2): a commit status, which Forgejo never delivers, so CI that a
+  system other than Actions reports and the verdicts temper posts.
+- **What Forgejo settles after it delivers,** which section 13 records
+  (whether a job's commit status is written before its delivery; whether
+  a pull request's mergeability is settled when the push that moved its
+  head or base is delivered), is read again at `hinted`, doubling,
+  within the keep's `settle` of the move, and a pull request that reads
+  not mergeable within it is never taken as conflicted
+  (`domain/forge.md`, 5.2).
+- **Bounded.** Connections (`hooks`), the head (`hook_head_bytes`) and
+  the body (`hook_body_bytes`) are capped, and each request is read
+  within `hook_deadline` (section 7). A body whose length passes its cap
+  is answered `413` and hints nothing. Push payloads list commits, which
+  the decoder skips.
+- **Not sent again.** Forgejo does not resend a failed delivery: one
+  lost while `temper serve` is down, refused for its size or its
+  signature, or never sent is found by polling. A hint that arrives
+  before the engine's domain is ready is dropped, and the keep's first
+  listing finds what it told of.
+- **Polling is unchanged.** The keep's `poll`, `poll_max`, `hinted` and
+  `slow` are what they are with no webhook: a hint brings a read sooner,
+  and nothing waits on one (`domain/forge.md`, 5.2).
+- **Hooks are set up by reconcile, or by the person.** For a managed or
+  owned forge, reconcile makes one org hook per org of its setup, its
+  URL the listener's path for the forge
+  (`http://<listener>/hooks/<number>`), with the forge's secret, the
+  events above, JSON and active, and patches it at every start (setup.md,
+  section 5, step 6); an owned Forgejo's settings allow the listener
+  (setup.md, 6.2). For a connected forge, the person makes each org's or
+  repository's hook the same way, and lets Forgejo's `[webhook]
+  ALLOWED_HOST_LIST` reach the listener (setup.md, section 4). A
+  repository with no hook polls (`domain/forge.md`, section 4).
 
 ## 6. The load rules, and where each is kept
 
@@ -607,10 +669,10 @@ are built (configuration.md, section 3).
 | One path to CI; never a closed pull request's | statuses of the head only (3.2); a closed item leaves the working set |
 | API only; `page` and `limit` always; the forge's cap | 3.1 |
 | Contents only when a decision reads them | a pull request's files and a comparison, read for a brief or an overlap, each file's reads charged (3.2) |
-| Webhooks: hints, answered first, merged, targeted, echoes dropped | section 5, after standalone; the domain merges hints into one earlier pass, and drops its own echoes by key and by pusher |
+| Webhooks: hints, answered first, merged, targeted, echoes dropped | section 5; the domain merges hints into one earlier pass, and drops its own echoes by key and by pusher |
 | Closed items by deltas, not sweeps | the keep-up listing's `since`; closed items are never listed again |
 | Backoff and jitter; honour the rate; no blind retries of writes | the domain's backoff and budget; `RateLimited { after }`; keyed creations found again after a `Timeout`; no retry here (3.4) |
-| Slow cadences; webhooks for latency, polling for liveness | the domain's `poll`, `hinted` and `slow`; standalone polls alone |
+| Slow cadences; webhooks for latency, polling for liveness | the domain's `poll`, `hinted` and `slow`, unchanged by webhooks; a forge with no hook, or on another host, polls alone |
 
 Nothing the engine writes changes often: it writes the forge only to
 make an effect (`domain/forge.md`, section 6), never as a heartbeat.
@@ -628,9 +690,13 @@ make an effect (`domain/forge.md`, section 6), never as a heartbeat.
   its stack (TLS, HTTP client, JSON tokenizer, the answer's decoder) and
   its deadlines;
 - **the tables** of section 3.5: repositories, users, page caps, API
-  tokens;
-- **later, a webhook connection,** bound to an accepted socket, holding
-  its stack, the HMAC state and the fields decoded.
+  tokens; and each forge's webhook secret (section 5);
+- **the webhooks' listener,** when `webhooks` is configured, bound to
+  io's listening socket;
+- **a webhook connection,** bound to a socket the listener accepted,
+  holding its stack (HTTP server, JSON tokenizer, the delivery's
+  decoder), the HMAC state, the fields decoded, and the hint it holds
+  until the root has room (section 2).
 
 **Limits** (the forge component's, in temper's `limits` member,
 configuration.md, section 7; their values in `temper-service`'s profile
@@ -661,8 +727,12 @@ configuration.md, section 7; their values in `temper-service`'s profile
 - `start_backoff`, `start_backoff_max`: a forge's start asked again;
 - what TLS, HTTP and JSON take as their own (skein's `tls.md`, `http.md`,
   `json.md`);
-- later, the webhook listener's `hooks` (connections),
-  `hook_head_bytes`, `hook_body_bytes` and its read deadline.
+- the webhooks' listener's: `hooks`, the webhook connections, beyond
+  which the listener accepts no more until one closes;
+  `hook_head_bytes`, `hook_body_bytes`, the largest delivery's head and
+  body read; `hook_deadline`, a request's read and answer, from its
+  connection's accept or its last answer; `hook_secret_bytes`, the
+  largest webhook secret.
 
 **Checked at start,** with every limit of temper's and jig's
 (configuration.md, section 7): `connections` equals the client's `calls`;
@@ -672,9 +742,9 @@ largest rows fits the client's `answer_bytes`, so no page size is 0.
 
 **The worst case** is the sum of: each connection's stack and intake and
 output caps; each call's answer as it is built, at most the client's
-`answer_bytes`; the tables; later, each webhook connection's stack. None
-of it grows with the forge's history: a long thread or a large payload
-costs time, not memory.
+`answer_bytes`; the tables; each webhook connection's stack, its
+decoded fields and its held hint. None of it grows with the forge's
+history: a long thread or a large payload costs time, not memory.
 
 ## 8. State machines
 
@@ -725,14 +795,18 @@ cost.
 (jig's `protocol/service.md`, section 5); calls in flight end with their
 connections, and no answer goes up once the root has stopped.
 
-**Later, a webhook connection:**
+**A webhook connection,** from the listener's accept:
 
 | State | Holds | Demand | Deadline | On |
 |---|---|---|---|---|
-| Head | the head so far | a scan for the head's end | the read deadline | a `POST` to a forge's path, its length within the cap: Body; anything else: answered `4xx`, Closing |
-| Body | HMAC state, fields decoded | the body, as the decoder demands | the read deadline | read and verified: Answering; signature wrong: `403`, Closing; past the cap: `413`, Closing |
-| Answering | the hint | room | the read deadline | `204` queued: the hint up, then Head (kept alive) or Closing |
+| Head | the head so far | a scan for the head's end | `hook_deadline` | a `POST` to the path of a forge with a secret, its length within `hook_body_bytes`: Body; its length past it: `413`, Closing; a path of no such forge: `404`, Closing; any other head: answered `4xx`, Closing |
+| Body | the HMAC state, the fields decoded | the body, as the decoder demands | `hook_deadline` | read and verified: Answering; the signature missing or wrong: `403`, Closing; a verified body that does not decode: `400`, Closing |
+| Answering | the hint, or none | room | `hook_deadline` | `204` queued: the hint offered up, and held while the root has no room (section 2); then Head (kept alive) or Closing |
 | Closing | nothing | none | io's close deadline | closed |
+
+A fault or the deadline in any state closes the connection with no
+answer and no hint: Forgejo counts the delivery failed, and polling
+finds what it told of (section 5).
 
 ## 9. The fake forge's protocol layer
 
@@ -789,11 +863,19 @@ side of `temper-forge-forgejo`.
 - **Requests are counted,** by route, by user and in total, in the
   fake's tally, so a world can hold the engine's load to its ceilings
   (section 10).
-- **Later, webhooks are sent,** for the fake's `Request::Hook`, as
-  Forgejo sends them: one `POST` per change, its body signed with the
-  forge's secret, after the latency the fake draws, late, out of order or
+- **Deliveries are sent,** for the fake domain's `Request::Hook`, as
+  Forgejo sends them: one `POST` per change to the URL of the
+  repository's hook (the scenario's, or the org hook reconcile made),
+  with section 5's event, headers and fields, its body signed with the
+  hook's secret, after the latency the fake draws, late, out of order or
   never; the fake's protocol layer is the client then, on a connection
-  of its own.
+  of its own. A status of the fake's CI is delivered as its job's end; a
+  status anyone else reports sends nothing, as on Forgejo.
+- **The setup's routes** (setup.md, sections 11 and 13.2), for
+  reconcile's world: admin users, tokens under basic auth, orgs, teams
+  and their members, and org hooks, from the server side of
+  `temper-forge-forgejo`'s setup documents, the fake's domain growing
+  what they keep.
 - **No git over HTTP.** The engine's protocol layer never speaks git. In
   the one-process world a run's git is the fake git program
   (`testing/temper-fake-git`, git.md, section 9), over the fake checkout
@@ -807,8 +889,8 @@ suites' budgets:
 
 - **Step tests** for `temper-forge-forgejo`: each decoder against
   transcripts of a throwaway Forgejo v17.0 (each answer section 3.2
-  reads, each error section 3.4 names, and later each webhook delivery
-  section 5 hints), against answers generated from the seed, and against
+  reads, each error section 3.4 names, and each delivery section 5
+  hints), against answers generated from the seed, and against
   mutations of both; golden bytes for each encoder; bounds at their limit
   and one past; a fuzz target for each decoder. Server encoders meet the
   client decoders, and the client encoders meet the server decoders.
@@ -824,12 +906,18 @@ suites' budgets:
   a scripted HTTP peer, over in-memory streams: every state of section
   8's machines, faults at every byte, deadlines, a wrong user or another
   `4xx` stopping the start, a path dropped on `404` or a redirect and
-  resolved again, a body past `body_bytes`.
+  resolved again, a body past `body_bytes`. And the webhooks' listener
+  against scripted deliveries: a good delivery hinted, its `204` queued
+  before its hint goes up; a bad signature `403`; an oversize body `413`;
+  an unknown event `204` and nothing hinted; a forge with no secret
+  `404`; a hint held while the root has no room; faults at every byte.
 - **The protocol world,** `tests/engine/protocol-forge`: the engine's
   forge component and the fake forge's protocol layer, joined by
   in-memory streams cut at random, running the forge connector world's
   stories (`tests/engine/forge`, `domain/forge.md`, section 18) through
   bytes: what the engine's domain asked is what the fake's domain did.
+  The fake's deliveries reach the engine's listener signed, late, out of
+  order or never, so its stories run with hints and without them.
   A focused test of it aims at 0.5 s at most; missed, it is made
   cheaper or moved to the fuzzy suite, never merged with another.
 - **The cost checks,** in the forge connector's world counting
@@ -865,9 +953,10 @@ suites' budgets:
   program `TEMPER_FORGEJO_RUNNER` names, pinned as Forgejo is and refused
   at another version, registered with the throwaway instance alone;
   without it the tool reports those facts unchecked.
-- **The process tier** (testing.md, 2.6): the real binary against the
-  throwaway Forgejo, a repository adopted and a change landed, the
-  forge component's start and polling among what it runs.
+- **The process tier** (testing.md, 2.6): the real binary against an
+  owned Forgejo (setup.md, 13.4), a repository adopted and a change
+  landed, the forge component's start, polling and webhooks among what
+  it runs.
 
 ## 11. Room for GitHub, and for recording
 
@@ -922,11 +1011,19 @@ root cannot take yet held and offered again, and one returned in the
 drain kept and never offered again (section 2).
 
 **Configuration** (configuration.md, section 3): each forge's number,
-kind, API address, transport, API token's file and user; `webhooks`
-reserved.
+kind, API address, transport, API token's file and user, a number or a
+file holding it; its `webhook_secret`'s file, optional; and
+`application.webhooks`, the listener's address on loopback. A
+`webhook_secret` with no `webhooks` refuses the start, naming its path.
 
-**skein owes nothing new** for standalone: temper's protocol layer
-uses skein at its pinned revision as it is (protocol.md, section 11).
+**The setup** (setup.md, section 5, step 6): for a managed or owned
+forge, each org's hook at the listener's path for the forge, with its
+secret and section 5's events.
+
+**skein owes,** for webhooks, lib's HMAC-SHA256 and its comparison in
+constant time, `sha256::Hmac` and `sha256::equal` (skein's `lib.md`,
+6.2). Otherwise temper's protocol layer uses skein at its pinned
+revision as it is (protocol.md, section 11).
 
 - skein-http's client tells a request the server never saw from one it
   may have read (skein's `http.md`, 3.4), which 3.4 needs; its server
@@ -1074,8 +1171,20 @@ it:
   repository's old path (git.md, section 10), and that a push a
   protected branch refuses prints a `[remote rejected]` whose reason
   ends in `declined` (git.md, 4.8);
-- later, the webhook headers and payloads of every event of section 5,
-  and whether Forgejo delivers the engine's own changes.
+- the deliveries of section 5, by a hook made as reconcile makes one:
+  the name a hook's events take for each event of section 5's table, and
+  the `X-Forgejo-Event` and `X-Forgejo-Event-Type` it arrives under; the
+  signature's header and its hexadecimal; the fields each hint reads (a
+  repository's id; an item's number and its body's, its comment's or its
+  review's key; a push's branch, its new head, its deletion and its
+  pusher's id; a creation's or deletion's branch and that it is a
+  branch's; a job's `run.repository.id` and `run.commit_sha`); that
+  Forgejo delivers the engine's own changes; whether a job's delivery
+  comes after its commit status is written; whether a pull request's
+  mergeability is settled when the push that moved its head or base is
+  delivered; and that Forgejo answers `mergeable` false while it checks
+  one. The setup's own facts, its command line, admin
+  routes, orgs, teams and org hooks, are setup.md, 13.3's.
 
 ## 14. Open questions
 
@@ -1104,10 +1213,6 @@ it:
 - **The merge style:** the repository's `default_merge_style`. A style a
   project names per repository (`domain/forge.md`, section 4) would need
   `Write::Merge` to carry it. Default: the repository's.
-- **Webhooks through the API:** whether the engine makes each
-  repository's webhook (its URL, secret and events) at adoption, or the
-  deployment does; the first needs admin rights on every repository.
-  Default: the deployment.
 - **An expired or revoked API token** reads as `Forbidden` on every call
   until the next start, which it stops (3.5). Default: so; the domain
   could tell it apart, so a person is told once.

@@ -1,13 +1,13 @@
 # Continuous QA
 
-Draft, 2026-10-07. Agents and procedures that keep using a build of
-main, on every landing or on a period, to check it still works and to
-find bugs, with temper as its first subject. This document says what
-continuous QA is for, given temper's worlds; which of temper's and jig's
-parts it is built from; what is new; where it lives; and in what order
-it could be built. Nothing here is adopted: `docs/design/domain/` and
-jig's documents describe what is built. What is still open is listed in
-section 10.
+Draft, 2026-10-07, revised 2026-10-16. Agents and procedures that keep
+using a build of main, on every landing or on a period, to check it
+still works and to find bugs, with temper as its first subject. This
+document says what continuous QA is for, given temper's worlds; which of
+temper's and jig's parts it is built from; what is new; where it lives;
+and in what order it could be built. Nothing here is adopted:
+`docs/design/domain/` and jig's documents describe what is built. What
+is still open is listed in section 10.
 
 ## 1. In one page
 
@@ -97,10 +97,11 @@ connector, close kin of `ops`'s infrastructure connector.
 
 - **Resources:** pools, environments in them, and deployments in an
   environment, each of a head of a repository.
-- **Temper in a box,** its first kind: a throwaway Forgejo, made as
-  `tools/forgejo-conformance` makes its scratch instance; an engine and
-  a worker built at the head; an LLM endpoint; seed state (an owner,
-  repositories to adopt, accounts).
+- **Temper in a box,** its first kind: an owned setup (`setup.md`), run
+  by `temper box` or by QA's host from the same commands (`setup.md`,
+  sections 7 and 12): Forgejo and its runner, an engine and a worker
+  built at the head; an LLM endpoint; seed state (an owner, repositories
+  to adopt, accounts).
 - **Two levels of LLM:**
   - *scripted:* a fake endpoint over the providers' real protocol,
     cheap and deterministic, for the plumbing (section 2, items 1, 2
@@ -112,8 +113,9 @@ connector, close kin of `ops`'s infrastructure connector.
   process, stall the network, fill a disk) for chaos.
 - **Procedures:** provision, then wait until ready; deploy, then check,
   whose result is a verdict at the head it deployed.
-- **Reads for agents:** the box's logs, its processes and their memory,
-  the throwaway forge's objects.
+- **Reads for agents:** the box's logs, in its stderr and its forge's
+  directory, its processes and their memory, the owned forge's objects
+  through its API as the person.
 - **Workspaces:** none of its own. A build is a run in a checkout, as
   any; what it produces is named for the deployment to take.
 
@@ -142,7 +144,7 @@ What says a bug was found, beyond an agent thinking so:
   engine by design (`domain/core.md`, section 4), so every stop is
   read.
 - **temper's promises, seen from outside** (`domain/core.md`,
-  section 10), on the throwaway forge, as the referee sees them in the
+  section 10), on the box's forge, as the referee sees them in the
   worlds: two creations under one key; a forced push; a write to an
   object temper does not own; a merge at a head its decision did not
   see.
@@ -207,7 +209,7 @@ Q, the QA deployment's service
 - **h7 lands.** W hears it and makes S and X, both at h7; X's charter
   is aimed at the landing queue, which h7 touched.
 - **X finds** a change merged twice after a restart, by the promise of
-  once, seen on the throwaway forge. F is made, reproduced, and B finds
+  once, seen on the box's forge. F is made, reproduced, and B finds
   h5 as the first head that fails.
 - **F is filed** as an issue on temper's home repository, naming h5,
   the repro and its class: below the domain, the store's protocol.

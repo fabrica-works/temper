@@ -1,10 +1,10 @@
 # The first milestone
 
-Draft, 2026-10-14. What temper's first milestone is (the smallest
-product that works end to end, for real), how far the client is from
-its design, what the `protocol` plan gives the milestone, and what no
-plan gives it yet. It is an assessment of temper at `main` 95622baa,
-with jig pinned at `d91a89c4`, and nothing here is adopted:
+Draft, 2026-10-14, revised 2026-10-16. What temper's first milestone is
+(the smallest product that works end to end, for real), how far the
+client is from its design, what the `protocol` plan gives the milestone,
+and what no plan gives it yet. It is an assessment of temper at `main`
+95622baa, with jig pinned at `d91a89c4`, and nothing here is adopted:
 `client.md` and the documents it cites describe the client. What is
 still open is listed in section 7.
 
@@ -40,16 +40,17 @@ still open is listed in section 7.
 - **Two gaps stand between that plan and the milestone** (section 5):
   1. **Nothing has run for real.** Every tier runs on the throwaway
      Forgejo, with no CI; the real model runs only in the live tier,
-     which stops at the push. No document says how a person sets temper
-     up.
+     which stops at the push. How a person sets temper up is
+     `setup.md`'s, on a box, not built yet.
   2. **What came of the work, and why it stopped, are not in the
      client.** The forge's results and holds say "Shown on the forge.",
      with no link: the person cannot see what landed, or why a change is
      held, which is where the person is needed.
 - **Not for the milestone:** a person's approval of changes, the
   browser, a run's live text, the forge's panels in full (queues,
-  health, drift), webhooks, GitHub, several people, findings, recurring
-  tasks (section 6).
+  health, drift), GitHub, several people, findings, recurring tasks
+  (section 6). Webhooks come with the forge's setup (`setup.md`,
+  section 10).
 
 ## 2. The milestone
 
@@ -75,9 +76,10 @@ One story, on one person's machine:
 8. `temper serve` is stopped and started again; nothing the person saw
    is lost, and work in flight goes on.
 
-Steps 1 to 5 and 8 are the `protocol` plan's process tier (`testing.md`,
-2.6), on a throwaway Forgejo with no CI, a project check in its place.
-Running them for real, and steps 6 and 7, are this draft's gaps.
+Steps 1 to 5 and 8 are the `protocol` plan's process tier, on a
+throwaway Forgejo with no CI, a project check in its place; on an owned
+Forgejo with CI it is the forge's setup's (`testing.md`, 2.6; `setup.md`,
+13.4). Running them for real, and steps 6 and 7, are this draft's gaps.
 
 ## 3. The client against its design
 
@@ -137,10 +139,11 @@ scope, participation) waits for a later plan.
   longest chain left is the engine's service, the worker's service, the
   binary, a chat answered by the binary, a change landed, and adopting
   by commands (08.4, 08.5 → 09 → 10 → 12.2 → 15.3 → 16.6).
-- **Its process tier** (`testing.md`, 2.6) is section 2's steps 1 to 4
-  and 8 against the throwaway Forgejo: no Actions runner, the project's
-  landing rule with no CI, no gate and no approval, a fake LLM peer. Its
-  live tier (2.7) adds a real model, and stops once the change is
+- **Its process tier** is section 2's steps 1 to 4 and 8 against the
+  throwaway Forgejo: no Actions runner, the project's landing rule with
+  no CI, no gate and no approval, a fake LLM peer; the forge's setup puts
+  it on an owned Forgejo with CI (`testing.md`, 2.6; `setup.md`, 13.4).
+  Its live tier (2.7) adds a real model, and stops once the change is
   pushed.
 - **What it does not prove,** and the milestone needs: CI from Forgejo's
   Actions in a run (decoded from transcripts, judged in the worlds on
@@ -152,16 +155,19 @@ scope, participation) waits for a later plan.
 
 ### 5.1 Running for real
 
-- **A person's setup:** `configuration.md` is the reference, and its
-  example is complete, but no document walks a person through a first
-  deployment: a Forgejo user and tokens for temper, the project and its
-  landing rule (CI and an agent's review), the git identity, the LLM
-  account and `temper sign-in`, then `temper serve` and `temper open`.
-- **A dogfood run:** section 2's story by hand, on a real Forgejo with
-  Actions and a real repository, with a real model, through to the
-  landing. Its findings are written as world stories, fake corrections
-  or charter changes (`draft/qa.md`, section 1, says why). It is
-  evidence, not a tier.
+- **A person's setup** is `setup.md`'s (section 12): the document
+  written from the owned example (`configuration.md`, section 10), with
+  the project's landing rule (CI and an agent's review) and the LLM
+  account; `temper sign-in`; `temper box`, which runs Forgejo, its
+  runner, reconcile and `temper serve`; a repository with Actions made in
+  an org on Forgejo's web, then adopted through `temper open`. What is
+  left is the setup document that walks a person through it, written on
+  the box.
+- **A dogfood run:** section 2's story by hand, on a box, with Actions on
+  the owned runner and a real repository, with a real model, through to
+  the landing. Its findings are written as world stories, fake
+  corrections or charter changes (`draft/qa.md`, section 1, says why).
+  It is evidence, not a tier.
 
 ### 5.2 What came of the work, and why it stopped
 
@@ -211,24 +217,24 @@ say.
 
 1. **The `protocol` plan to its end.** Nothing else serves the milestone
    sooner, and its chain is long.
-2. **The dogfood run** (5.1), with the setup document written as it
-   goes, as soon as the binary lands a change on the throwaway Forgejo
-   (plan 15.3). Its findings feed the next plan.
+2. **The forge's setup** (`setup.md`, section 14), after it: webhooks,
+   owned's preparation, reconcile, `temper box` and the owned example.
+   **The dogfood run** (5.1), on the box, with the setup document
+   written as it goes. Its findings feed the next plan.
 3. **A plan for 5.2 and 5.3,** temper only, on the adoption's pattern: a
    design pass on `client.md` (the forge's read family, its words and
    slots), then the records, the engine's reads, the view, and the
    stories in `tests/client` and the process tier.
 4. **After the milestone,** each waiting for what its document names:
-   the browser, a run's live text, the forge's panels in full, webhooks,
-   GitHub, several people, repinning jig, smith and skein; and the
+   the browser, a run's live text, the forge's panels in full, GitHub,
+   several people, repinning jig, smith and skein; and the
    person's own workflow, from a brainstorm through a design and a plan
    to its supervised run, as temper's goals and plans.
 
 ## 7. Open questions
 
-- **CI for the milestone:** Forgejo's Actions with a runner, or the
-  project's checks on the worker. Default: Actions, since a real
-  repository has it.
+- **CI for the milestone** is answered by `setup.md`, section 12:
+  Actions on the owned runner.
 - **The milestone's model:** the account `temper sign-in` signs in,
   against which provider. Default: the provider the live tier uses.
 - **Where a person's approval is set** (5.4): as a gate the plan adds to

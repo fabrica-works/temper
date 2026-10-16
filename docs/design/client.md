@@ -948,11 +948,11 @@ The client's tiers, as testing.md places them (section 2):
   pending.
 - **The process tier** (testing.md, 2.6): the real `temper` binary;
   skein's fake person through temper's client signs in by the printed
-  link and adopts a repository on the throwaway Forgejo, with "It runs
-  CI" unchecked and one check, since that Forgejo runs no Actions runner
-  (testing.md, 2.6). And `temper open` itself, stdin and stdout piped:
-  it signs in by the printed link, prints the inbox, adopts a repository
-  by commands, and exits 0 on `q` after a drained close. And jig's
+  link and adopts a repository on an owned Forgejo (setup.md, section 2),
+  with "It runs CI" checked, since its runner runs Actions (testing.md,
+  2.6). And `temper open` itself, stdin and stdout piped: it signs in by
+  the printed link, prints the inbox, adopts a repository by commands,
+  and exits 0 on `q` after a drained close. And jig's
   attack story that needs no browser, a rebound Host, against `temper
   serve`'s clients' listener: a request naming a host off the list is
   answered `421`, with nothing done (jig's `protocol/browser.md`,

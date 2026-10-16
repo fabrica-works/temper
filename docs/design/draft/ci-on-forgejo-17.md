@@ -79,8 +79,8 @@ its completion (`Complete job`), the workflow's own steps between.
 - **Its authority:** the `push` kind on the change's branch, since a
   push of the same head would run the same CI (`domain/forge.md`,
   section 2; authority.md, section 4). Forgejo asks the API token's
-  `write:repository` scope, which the bot's token has
-  (`draft/forge-setup.md`, section 4).
+  `write:repository` scope, which the bot's token has (`setup.md`,
+  section 4).
 - **Counted at the head.** The change keeps its re-runs at its head; a
   new head starts at none. `reruns` is one of the change's bounds
   (`domain/forge.md`, 8.1), with repairs and resolutions.
@@ -173,12 +173,11 @@ relies on each:
 2. **Re-runs** (section 2): first of these, since each failure the
    runner caused now costs a repair's run.
 3. **A stall's reasons** (section 3): small, and most useful once people
-   run their own runners (`draft/forge-setup.md`, connected and managed
-   modes).
+   run their own runners (`setup.md`, connected and managed modes).
 4. **The agents' log tools** (section 4): with the next change to
    temper's host tools.
-5. **Webhooks:** built with `draft/forge-setup.md`, which makes them; the
-   events are forge.md, section 5's.
+5. **Webhooks:** with the forge's setup (`setup.md`, section 14), whose
+   reconcile makes them; the events are forge.md, section 5's.
 
 ## 8. Open questions
 
