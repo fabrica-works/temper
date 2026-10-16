@@ -347,7 +347,7 @@ jobs:
 E. 10.1's reference tests, in the shell crate.
 ```rust
 // crates/temper-forge-setup-shell/tests/reconcile.rs
-mod support;
+pub mod support;
 use skein_shell::Clock;
 use support::Peer;
 use temper_forge_setup_shell::reconcile::reconcile;

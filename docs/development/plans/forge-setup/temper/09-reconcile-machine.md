@@ -62,7 +62,7 @@ the setup's routes: 09.1 the frame, the admin and the bot (unit); 09.2 the bot's
 ### 09.1 The machine: its frame, the admin, the bot, the bot's id
 Scope: `reconcile` in `temper-forge-setup`: the vocabulary (sketch A) and setup.md 5 steps 1, 2 and 4.
 Needs: temper 07.1 (the crate, `Entry`, `Setup`, the fixtures module), temper 07.2 (`place::File`, which `Need` and `Event` name) and
-temper 01.2 (`UserOf`, `CreateUser` with its `full_name`; `User`'s `is_admin` and `full_name`). 07.1 names the crate's edge to
+temper 01.1 (`User`'s `is_admin` and `full_name`, 01-users-tokens.md:93) and 01.2 (`UserOf`, `CreateUser` with its `full_name`). 07.1 names the crate's edge to
 `temper-forge-forgejo` (setup.md 11): 09.1 adds none.
 Files: `crates/temper-forge-setup/`: `src/reconcile.rs` (new), `src/lib.rs` (`pub mod reconcile`, shared with 07.x),
 `src/tests/reconcile.rs` (new), `src/tests/fixtures.rs` (07.1's, extended).
@@ -124,7 +124,7 @@ Files: `crates/temper-forge-setup/src/reconcile/tokens.rs` (new), `reconcile.rs`
 `setup.rs`, `setup/{accounts,tokens}.rs` (new), `lib.rs`, and the hotspots shared with 01.2, 01.3, 02.x and 05.1 (rebase, never
 overwrite): `service.rs` (the `Store` field and `setup_mut`; `user` :104 resolves a `token` against `Config` then the store;
 :80 and :116 count the store) and `server.rs` (`decoded` :428 asks the store before `table`). The route map's 40 is `ROUTES`,
-64, after 01.2 (tally.rs:106). The world: `tests/forge-setup/reconcile/` (new), the root `Cargo.toml` (member), `Cargo.lock`.
+64, after 01.2 (tally.rs:106); `tally.rs:122`'s `expect("users bounded by token table")` reworded once the store's tokens count. Tests: the fake's `src/tests.rs` (`mod setup;`), `src/tests/fixtures.rs` (`ask_as`), `src/tests/setup.rs` (new). The world: `tests/forge-setup/reconcile/` (new), the root `Cargo.toml` (member), `Cargo.lock`.
 Shape:
 - Machine, after the bot, for `ApiToken` then `GitToken`: `Read(file)`; some secret: `Send(User)` under it, kept when the
   user's id is the bot's. Another user, 401 or no file: made again. `Tokens` as admin, by page; the token of its name
@@ -138,7 +138,7 @@ Shape:
   account's full user; the admin routes (users, their tokens) need a site admin's token, else 403, and none or an unknown one
   401; a second token of one name is refused; statuses and bodies as 01.2's and 01.3's transcripts record. `Service::setup_mut` is the scenario's way in (sketch B).
 - World crate `temper-forge-setup-reconcile-world`: `World::{managed, owned}(seed)` reads its own entry through 07.1's
-  `Setup::read` (forge 1, bot `temper`, orgs `acme` and `work`; owned: person `ada`) and makes a forge with the site admin
+  `Setup::read` from a document of its own, not `TWO` (forge 1, bot `temper`, orgs `acme` and `work`; owned: person `ada`) and makes a forge with the site admin
   `temper-admin` (id 1) and its token (owned adds the site admin `ada`, id 2). `reconcile() -> Ended` (`Done` or the `Failure`)
   runs one machine through bytes (`exchange.rs`: a `Need::Send` as HTTP text through skein-http's client and `Pipe`; the fake's
   `Server` and `Service` driven as `Joint::tick` drives them, joint.rs:147 of the protocol-forge world; `decode_answer` makes a
@@ -190,7 +190,7 @@ Needs: 09.2; temper 02.2 (org hooks and the delete of one; 02.1's orgs, teams an
 temper 04.2 (`SUBSCRIBED` and `hook_target` in `temper-forge-forgejo`'s `delivery.rs`, which 04.2 owns).
 Files: `crates/temper-forge-setup/src/reconcile/{orgs,hooks}.rs` (new), `reconcile.rs`; the fake's `setup/{orgs,hooks}.rs` (new),
 `setup.rs`, the hotspots of 09.2 and `server.rs`'s `Put` arm (:393: the members' `PUT` is routed, once 01.1 has `Method::Put`);
-the world's `tests/reconcile.rs` and `src/world.rs`.
+the world's `tests/reconcile.rs` and `src/world.rs`; `crates/temper-forge-setup/src/tests/reconcile.rs` (09.1's, extended).
 Shape:
 - Machine, after the id: `ApiSettings` once, if no listing has read the cap. Per org in order: `Org`; 404 managed is
   `OrgMissing`, owned `CreateOrg` for the person (02.1's encoder makes it private, answer 19). Teams listed by page for the
@@ -216,7 +216,7 @@ Test shape: world tests: `an_owned_forge_makes_a_missing_org_for_its_person`,
 `an_org_hook_is_made_with_the_secret_the_events_json_and_active` (events: `SUBSCRIBED`),
 `the_webhook_secret_is_drawn_when_missing_and_kept_when_present`,
 `two_hooks_with_the_listeners_url_keep_the_lowest_patched_and_the_rest_deleted` (a third of another URL stays). Unit, in the
-crate's `tests/reconcile.rs`: `hook_urls_are_written_for_loopback_v4_and_v6` (literals, and `None` for 192.0.2.1),
+crate's `src/tests/reconcile.rs`: `hook_urls_are_written_for_loopback_v4_and_v6` (literals, and `None` for 192.0.2.1),
 `a_lower_hook_met_later_deletes_the_higher_one_kept` (rows 7, 3: `DeleteOrgHook` 7, the page listed again, `EditOrgHook` 3).
 Proof: world; `heavy cargo nextest run -p temper-forge-setup-reconcile-world --test reconcile` shows an owned empty forge converged:
 two orgs owned by `ada`, each with the bot's team holding the bot and one hook at `/hooks/1` carrying the secret of `webhook_secret`;
@@ -369,8 +369,11 @@ impl Store {
     /// Scenario: an account (its id) and a token of `user` as `secret`; then the world's reads.
     pub fn account(&mut self, login: &[u8], admin: bool, full_name: &[u8]) -> u64 { todo!() }
     pub fn token(&mut self, user: u64, name: &[u8], scopes: &[&[u8]], secret: Secret) { todo!() }
+    #[must_use]
     pub fn find(&self, login: &[u8]) -> Option<&Account> { todo!() }
+    #[must_use]
     pub fn token_user(&self, secret: &[u8]) -> Option<u64> { todo!() }
+    #[must_use]
     pub fn scopes(&self, user: u64, name: &[u8]) -> Option<&[Box<[u8]>]> { todo!() }
 }
 ```

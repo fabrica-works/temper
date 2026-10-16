@@ -18,7 +18,7 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
 - Code: `crates/temper/src/sign_in.rs:83-146,166-219` (a command on a `Kernel` and a `Host`: the model of both hosts),
   `src/lib.rs:22-75,302-309`, `src/main.rs:2`, `src/tests.rs:4-17,106-123`; skein-io `src/kernel.rs:523-546` (`Spawn`,
   `Pipe`), `src/tests/process.rs:90-136` (a child's pipes as streams; :118-125 a close kills its group),
-  `src/layer.rs:194-205` (`adopt_signals`); skein-shell `src/ring.rs:95-99` (`open_termination_signals`);
+  `src/layer.rs:198-206` (`Io::adopt_signals`); skein-shell `src/ring.rs:95-99` (`open_termination_signals`);
   `testing/temper-throwaway-forgejo/src/instance.rs:13-20,27-83,209-225`, `tests/throwaway.rs:3-12` (a script as the
   binary); 08.3's Files for the process tier's support.
 
@@ -36,7 +36,7 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
 
 - **One `Kernel` per command** (answer 37; 6.3). `command::run_one` opens the termination signals (`skein_shell::
   open_termination_signals`: blocked from the first call on, so one arriving between two commands waits for the next),
-  a `Kernel` and a `Layer` that adopts them, spawns the spec (`Request::Spawn`: its environment the whole one, `root`
+  a `Kernel` and an `Io` that adopts them, spawns the spec (`Request::Spawn`: its environment the whole one, `root`
   from `skein_shell::open_root`, pipes for fds 1 and 2), reads both pipes to their end keeping `spec.output` bytes of
   each (07.4's `OUTPUT`; `Ran`), awaits `Exited`, closes the child. `Event::Shutdown` closes it instead, which kills
   its group, and returns `Error::Interrupted`. The host is a plain loop over the machine's requests; `run`'s `--version`
@@ -64,7 +64,7 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
 
 - **The lock and the exec are `process.rs`'s.** The boundary test scans `crates/*/src`, test files aside, and fails
   the gate on `std::process` or a file lock elsewhere, but `std::process::ExitCode` in `main.rs`; it scans neither
-  `testing/` nor `tools/`. Tests under `tests/` spawn `temper` by `std::process::Command`, as `support/live.rs:140`.
+  `testing/` nor `tools/`. Tests under `tests/` may use `std::process::Command` (`support/live.rs:140` spawns git by it; the tier starts `temper` through skein-world's `Binary`, `tests/support/mod.rs:85`).
 - **No secret in an argument, a refusal or a `Debug`.** A refusal prints versions, paths and commands only (`state` holds
   Forgejo's secrets). Checked by 07.4's `no_argument_of_any_command_holds_a_secret`, 08.2's
   `no_secret_of_the_state_reaches_a_refusal` and 07.2's `a_state_debug_shows_no_secret`; no other type holds one, and the
@@ -82,11 +82,12 @@ binary under it, and replaces itself by `forgejo web` or `forgejo-runner daemon`
 ### 08.1 `temper forge prepare CONFIG.json FORGE`
 Scope: setup.md 6.3 and 8 for an owned forge: the locks, the checks, the commands on skein-io, the files.
 Needs: temper 07.3 (the document's checks), 07.4 (the machine and the specs; through it 07.2 and temper 03).
-Files: new `crates/temper-forge-setup-shell/`: `Cargo.toml` (own `[lints]` as `crates/temper/Cargo.toml:68-84`; deps
+Files: new `crates/temper-forge-setup-shell/`: `Cargo.toml` (own `[lints]` as `crates/temper/Cargo.toml:69-84`; deps
 `temper-forge-setup`, `skein-io`, `skein-lib`, `skein-shell`, and `temper-forge-forgejo`, `skein-json` (protocol.md 5,
 answer 44; first used by temper 10.1); dev `jig-protocol-config`), `clippy.toml` as
 `crates/temper/clippy.toml`, `src/{lib,process,command,files,prepare}.rs`, `tests/{boundary,locks,commands,files}.rs`,
-`tests/support/mod.rs` (the crate's fixtures: `Scratch`, `script`, `io()`; 08.2 and 10.1 extend). `crates/temper`:
+`tests/support/mod.rs` (the crate's fixtures: `Scratch`, `script`, `io()`; 08.2 and 10.1 extend; each test file
+declares it `pub mod support;`, as `crates/temper/tests/configuration.rs:1`, or clippy finds its unused helpers dead). `crates/temper`:
 `Cargo.toml`, new `src/forge.rs`, `src/lib.rs:22,26-31,63-75` (USAGE, `Command::Forge { arguments }`, its arm;
 **hotspot**), `src/tests.rs:7,14`, new `tests/forge.rs` (default suite), `tests/process.rs` (one test; **hotspot**),
 `tests/support/mod.rs` (a `pub mod owned;`; **hotspot**), new `tests/support/owned.rs`. Root `Cargo.toml`, `Cargo.lock`.
@@ -132,7 +133,7 @@ preparation_interrupted` (`hang("forgejo", "migrate")`, `sh -c 'kill -TERM <pid>
 In `src/tests.rs`, rows as :106-123: `forge_without_its_arguments_prints_its_usage`.
 ```rust
 // crates/temper-forge-setup-shell/tests/commands.rs
-mod support;
+pub mod support;
 use temper_forge_setup::prepare::Exit;
 use temper_forge_setup_shell::command;
 #[test]
@@ -205,8 +206,10 @@ lines are built with a `Writer` from `VERSION` and `RUNNER_VERSION`. Limits: non
   exact, `v13.2.00` refused); `the_run_refuses_a_runner_the_setup_lacks`;
 - `the_run_specs_name_work_path_configuration_and_environment` (`Web`, `Daemon`, literals; in `spec.rs`).
 Binary tests in `tests/forge.rs` (each under 0.5 s), on `scripted` (`--version` prints the pin; `web` and `daemon`
-write `$$`, the arguments, `env` and `/proc/$$/fd` to a marker, then `exec sleep 60`) and `finished`, with two more
-helpers in `owned.rs`: `Programs::marker(&self, program: &str, within: Duration) -> Marker` waits for the marker
+write `$$`, the arguments and `env` to a marker, then `exec sleep 60`) and `finished`, with two more
+helpers in `owned.rs`: `Programs::marker(&self, program: &str, within: Duration) -> Marker` waits for the marker,
+then for `/proc/<pid>/comm` to read `sleep`, and fills `descriptors` from `/proc/<pid>/fd` then (before the exec, a
+script's own `/proc/$$/fd` also lists its script's and a pipe's descriptors)
 (`Marker { pid: u32, arguments: Vec<String>, environment: Vec<String>, descriptors: Vec<u32> }`) and
 `Programs::lock(&self, program: &str) -> PathBuf` is that program's lock file:
 `a_second_run_is_refused_while_the_first_holds_the_lock`;
@@ -269,7 +272,8 @@ restart`). Limits: the tier keeps the shipped profile's (`support/configuration.
 `Settings::small()` still gives `attach` its answer bound.
 Proof: process, the tier whole, once, `TEMPER_FORGEJO` set: `heavy --gate scripts/proof-one-process.sh` exits 0 and
 every test passes, the landing story merging its pull request on an owned Forgejo (base: 42.4 s for six tests,
-`findings/forge-and-tiers.md` 4; at most 90 s now). Second, the live binary in its fake mode, which shares `start`
+`findings/forge-and-tiers.md` 4; now at most 42.4 s plus the ceilings of the tests added to the `process` binary
+since the base: 08.1's 30 s, 08.2's 60 s, and each other landed by then, named in the report). Second, the live binary in its fake mode, which shares `start`
 (no `TEMPER_RUN_LOGS`): `heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temper --bin temper &&
 cargo nextest run -p temper --profile live'` ends `1 test run: 1 passed`, at most 90 s. Nothing runs higher:
 reconcile and CI are temper 10.
