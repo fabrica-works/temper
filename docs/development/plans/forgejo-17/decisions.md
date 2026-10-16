@@ -154,6 +154,29 @@
      3. If any of the four tests fails, or the run panics elsewhere, block
         again with the log.
 
+102. **temper 02's Shapes against main** (ready check of temper-02.1).
+     temper/02-documents.md corrected against origin/main b6a69057 and
+     temper 01.1's and 01.2's landings (two ready checks, through heavy;
+     with these corrections applied, 02.1's code passed fmt, clippy
+     `-D warnings`, nextest 1257 passed, fuzzy 46 passed):
+     - Choices: steps in a listing's rows are read and dropped, not skipped.
+     - 02.1's Files: `decode/walk.rs:363-367` (the `Read::Body` cap), and the
+       `d::Row` matches `actions.rs:233-242`, `contents.rs:207-217`,
+       `reads.rs:388`, `:624-629`, `:708-716`, `writes.rs:196-207`.
+     - 02.1's Shape: a job's end answers its row only when the root is
+       `Jobs` (the base answers one always, `client/actions.rs:78-80`);
+       `Row::Step` in `contents.rs` (`InvalidAnswer`), `writes.rs` (nothing),
+       `long` (`false`). Its Don't no longer forbids `Row::Step`.
+     - 02.1's throwaway test: `.expect("UTF-8 request")` for `.unwrap()`,
+       which the crate's `unwrap_used` denies (`Cargo.toml:20`).
+     - The recorder: `fixture.rs:80`, `cases.rs:24`, `runner.rs:169` take
+       `Option<Range>`; `cases.rs:201`, `runner.rs:104` pass `Range::Head(3)`.
+     - 02.2: the fake's flag check goes in a helper outside `answers::read`
+       (96 of clippy's 100 lines at the base); the forgejo test writes its
+       two targets as byte literals (`format!` is disallowed).
+     A further copy of a corrected name is corrected the same way, and listed
+     in the commit body.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`

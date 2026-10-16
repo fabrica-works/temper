@@ -115,7 +115,8 @@ has no steps is not checked here: `later.md` (decisions.md, 13).
    no list of steps is held, and no bound counts them. A job with no
    `steps` member (no runner took it) has no step rows. A run's listing
    of jobs gives no step rows: steps in its rows, if Forgejo sent any,
-   are skipped. One decoder table serves the job at the root and as a
+   are read and dropped (a step in a listing row with a bad `status`
+   fails the listing, as any malformed member does). One decoder table serves the job at the root and as a
    listing row. The server's `Answer::Job { job: Job, steps: Box<[Step]>
    }` holds the steps it writes.
 2. **Bounds and words, as 06's other documents:** a job's steps are
@@ -234,6 +235,7 @@ Files:
 - `crates/temper-forge-forgejo/src/`: `document.rs` (`Job` `:334-340`,
   `Document` `:83-102`, beside `style`/`style_text` `:193-213`);
   `request.rs:142-150`; `client.rs:48-54`, `:93-128`, `:133`;
+  `decode/walk.rs:363-367` (the `Read::Body` cap);
   `client/actions.rs:1-135`; `client/files.rs:95-104`; `server.rs`
   (`Answer` `:64-106`, `:137`); `server/actions.rs:24-45`, `:76-89`. The
   exhaustive matches a new `Request` reaches: `client/writes.rs:123,245`,
@@ -246,7 +248,10 @@ Files:
   (`raw_request`); `reads.rs:658-699` (`page_bound`); the six `d::Document`
   matches, `actions.rs:304-317`, `contents.rs:269-282`, `reads.rs:646-655`
   and `:719-736`, `reads/done.rs:85-92`, `writes.rs:318-333`;
-  `actions.rs:300` (`step: None`). Shared with temper 04 (`actions.rs`).
+  `actions.rs:300` (`step: None`); the `d::Row` matches,
+  `actions.rs:233-242`, `contents.rs:207-217`, `reads.rs:388`,
+  `:624-629` and `:708-716`, `writes.rs:196-207`. Shared with temper 04
+  (`actions.rs`).
   Tests: `src/tests.rs`, beside `:307-315`.
 - `testing/temper-fake-forge-protocol/src/`: `routes.rs:79-115`,
   `:142-226`, `:297-318`; `answers.rs:213,275,437` and `:357`;
@@ -303,8 +308,10 @@ Shape:
   step's end, with the root `Job`, answers `Step::Row(Row::Step(step),
   Request::Next)`, as a run's end answers its row with the root
   `Listing`; with the root `Jobs` the step is dropped. A job's end
-  answers it as a row when the root is `Jobs`, as at the base; with the
-  root `Job`, `Move::Done` answers `Document::Job(job)`.
+  answers it as a row only when the root is `Jobs` (the base answers one
+  always, `client/actions.rs:78-80`: without the check, a job read at
+  the root sends a `Row::Job` up before its steps); with the root `Job`,
+  `Move::Done` answers `Document::Job(job)`.
   `client::decoder` maps `Request::Job` to `Kind::Action(ActionKind::Job)`.
   If clippy's `large_enum_variant` names `DecoderState::Actions`, it is
   boxed, as its siblings are.
@@ -323,8 +330,10 @@ Shape:
   `contents.rs` and `reads/done.rs`; nothing in `writes.rs`,
   `keep_document` and `long`), as `Document::Run` does in the plans that
   never send `Request::Run`. `d::Row::Step(_)` joins each `d::Row`
-  match the same way: `InvalidAnswer` in `actions.rs`'s rows and
-  `reads.rs:388`, nothing in `reads.rs:624-629` and `:708-709`.
+  match the same way: `InvalidAnswer` in `actions.rs`'s rows
+  (`:233-242`), `contents.rs:207-217` and `reads.rs:388`; nothing in
+  `writes.rs:196-207` and `reads.rs:624-629`; `false` in `long`'s arm,
+  `reads.rs:708-716`.
   `actions.rs:300` sends `step: None`. No arm reads a job or a step
   before temper 04.1. The component's `worst_case` (`limits.rs:311`) is
   not changed: a step is one row being built and one delivered, its name
@@ -338,9 +347,10 @@ Shape:
   unchanged.
 - The recorder: `temper_throwaway_forgejo::Range`, `Outgoing.range:
   Option<Range>` (the sketch); `http.rs` writes `Range: bytes=0-<n>` for
-  `Head(n)` and `Range: bytes=-<n>` for `Tail(n)`; `fixture.rs:80`,
-  `cases.rs:24,201` and `runner.rs:104,169` pass `Range::Head(3)` where
-  they passed `(0, 3)`.
+  `Head(n)` and `Range: bytes=-<n>` for `Tail(n)`; the parameters
+  `fixture.rs:80`, `cases.rs:24` and `runner.rs:169` take `Option<Range>`
+  where they took `Option<(u64, u64)>`, and `cases.rs:201` and
+  `runner.rs:104` pass `Range::Head(3)` where they passed `(0, 3)`.
 - The conformance (`runner.rs`), in a function of its own, since
   `run_with` is 92 lines and clippy's pedantic `too_many_lines` stops at
   100: `fn job_steps(f: &Fixture, out: Option<&Path>, mask: &mut Mask,
@@ -450,7 +460,7 @@ Test shape:
   fn a_range_is_sent_as_a_head_or_a_suffix() {
       for (range, line) in [(Range::Tail(10), "Range: bytes=-10\r\n"), (Range::Head(3), "Range: bytes=0-3\r\n")] {
           let outgoing = Outgoing { range: Some(range), ..Outgoing::get("/api/v1/version", None) };
-          let sent = String::from_utf8(http::request(3000, &outgoing, None)).unwrap();
+          let sent = String::from_utf8(http::request(3000, &outgoing, None)).expect("UTF-8 request");
           assert!(sent.contains(line), "{range:?}: {sent}");
       }
   }
@@ -527,7 +537,7 @@ Don't: send `Request::Job` or a step's log from the component, or serve
 either from the fake's domain (temper 04.1, 03.1); read `bytes 0--1/0` in
 `header.rs:19-38` (temper 04.2: no test of this session reads a
 `Content-Range` through it; the codecs world checks status lines and
-bodies); add a `Row::Step` or a second job type; change the workflow at
+bodies); add a second job type; change the workflow at
 `runner.rs:60`, whose jobs the transcripts' literals rest on; capture a
 log's search (`q`, `qi`) or its NDJSON form.
 
@@ -586,7 +596,10 @@ Shape:
 - The fake: `answers::read`'s `a::Answer::Comparison` arm answers `files:
   Box::from([])` when the request is `Request::Compare { files: false,
   .. }`, `files(values)` otherwise; its commits and `total_commits` as
-  before.
+  before. `answers::read` is 96 of clippy's 100 `too_many_lines` at the
+  base: the check goes in a helper outside it (`fn compared(request:
+  &Request, values: ...) -> Box<[ChangedFile]>`), and the arm calls it
+  in its one `files:` line.
 - The conformance: `pub fn flags(f: &Fixture, out: &Path, mask: &mut
   Mask, secrets: &Secrets) -> Result<()>` in `cases.rs` records, with the
   writer's token, through `Recorder::w`: `compare-verification-false`
@@ -626,7 +639,12 @@ Test shape:
       let limits = fixtures::limits();
       let before = id::read(b"0100000000000000000000000000000000000000").unwrap();
       let after = id::read(b"0300000000000000000000000000000000000000").unwrap();
-      for (files, query) in [(true, "?verification=false"), (false, "?files=false&verification=false")] {
+      // `format!` is a disallowed macro here: the two targets are written whole.
+      let targets: [(bool, &[u8]); 2] = [
+          (true, b"/api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000?verification=false"),
+          (false, b"/api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000?files=false&verification=false"),
+      ];
+      for (files, target) in targets {
           let request = Request::Compare {
               at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
               before,
@@ -634,10 +652,7 @@ Test shape:
               files,
           };
           let encoded = client::encode(&request, &limits).unwrap();
-          let target = format!(
-              "/api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000{query}"
-          );
-          assert_eq!(encoded.target.as_ref(), target.as_bytes(), "{files}");
+          assert_eq!(encoded.target.as_ref(), target, "{files}");
           let crate::server::Route::Ready(routed) =
               crate::server::route(encoded.method, &encoded.target, &limits).unwrap()
           else {
