@@ -214,6 +214,17 @@ run are appended after "For the user".
      - forge.md 13's to-check list gains "a job's cancelled end, from cancelling the run of a job no runner takes".
      - 05 (the component's hint for a job's end) is unchanged. Nothing is deferred: no `later.md` row.
 
+105. **06's Shapes against main** (ready check of temper-06.1).
+     Ruling 105, the ready check of temper-06.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/06-settle.md: `translate::hint` serves the forge world and the conformance world, the client world keeps
+     ignoring hooks (`client/src/world.rs:125,467,645`); Files add fake `tests/next.rs`, whose `:32,33` read the
+     harness's hooks by tuple position; `Config` has six literals, named, not five; the updated tests add
+     `observations_and_webhooks_follow_branches_pull_requests_and_the_wiki` (`tests.rs:1720`) and the totals at
+     `tests.rs:1431-1433`; `wiki.rs:45,71` call `Hook::wiki` now and push the observation alone once `Wiki` goes;
+     the helpers moved to `changes.rs` add `change_step_with_release` (`simulation.rs:324`), `change_step_task` is
+     `pub`, and `protocol.rs:63-66` keeps its copy. Sketches A to E compiled under clippy; no suite was reached. A further
+     user of a reshaped `Hook` or `Change` found while working is updated, and named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
