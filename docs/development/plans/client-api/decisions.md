@@ -742,6 +742,30 @@ choice would have been the user's (development.md, 10.4).
      6. **The unlanded increment** (jig `6cf299600`) stands, but for its `Seen::Results` route. `Now::LoadForgettable` and its root arms go, `Event::Forget { row }` becomes `{ owner }`, and `ResultRef` gains its field: `forgettable: None` in the six test files that make one (`git grep -l 'ResultRef {' origin/main -- ':!docs' | wc -l` prints 9 at db13a6f18: all but `boundary.rs` and the two production sites).
      7. **Nothing new is deferred.** A forgettable task the cache does not name, or one a live task names when it is read, is retention's, already not planned (jig's `STATUS.md` people.md row, client-api's `later.md` row of what that file leaves not planned). No `later.md` row is added. The plan's open question on the uncached task is answered and removed.
 
+166. **jig 08.4's mark loads held, a second mark busy** (design gap, the supervisor's question of 2026-10-16T19:18:33Z).
+     Ruling 166: the designer's answer of 2026-10-16T19:32Z, landed as jig 09a600c43 and temper f92fddd0:
+
+
+     ### jig 08.4: an ended conversation's mark decided on a position not yet durable, 2026-10-16T19:32Z
+
+     Landed: jig 09a600c43 (`docs/design/domain/engine.md`, 5.3; `domain/people.md`, 6; `protocol/store.md`, 3; `STATUS.md`); temper f92fddd0 (the plan's `jig/08-store-indexes.md`, 08.4 and "Who owns what"; `README.md`, "jig 08.4's census"; `later.md`).
+
+     ### Decision
+
+     1. **The design does not accept it.** `max(loaded, marked)` does not hold. When both marks' loads go out before either mark is decided, each takes the max over the same old position, so the second can save a position below the first's. The stale save is durable, not just a count, against people.md 6: "nothing read comes back unread". And after the first mark's forget, the second can save an `EndedRead` for a task that has been erased.
+     2. **What the design asks.** engine.md 5.3, new: "What a decision loads stays as loaded until it is decided. Its loads are held (4.2): each is sent once every commit made before it is durable, so it sees them. While they are in flight, a request whose decision would change what they load is answered busy". engine.md 4.2 already said: "held: ... a load (so that it sees every commit before it)". people.md 6, new: "One such mark loads at a time: while it does, the party's next `Seen` over that conversation's turns, or over results that would forget it, is answered busy". Busy is an answer the contract already has: "nothing was made and nothing kept; send it again, under its key, after a backoff" (contract.md 4).
+     3. **What changes in 08.4** (its Shape):
+        - `core::Held::Load(Box<Now>)`. `Seen::Chat` on an ended conversation sends `Now::SeenChat`, then `Now::LoadEndedRead`, each inside a `Held::Load`, never as `Request::Now`. A root holds it in the decision. Once the journal releases it, the root routes the wrapped `Now` the way the base routes that load (`examples/ops/domain/src/route.rs:1368-1374`).
+        - While a `Seen::Chat` of a task waits on its loads, the core answers `Again(Busy)`, before any load, to another `Seen::Chat` of that task and to a `Seen::Results` that would forget it. The check is `people::Domain::chat_mark_loading(task, except)`, in `ended.rs`. 8.3's `MarkTurns` marks two conversations, one mark each, so neither is busy.
+        - Files: `routing/people.rs` (:279-289, :310), `routing/vocabulary.rs`, the held arms of the three roots, the 19 exhaustive lists of `core::Held` (`git grep -l 'Held::NotesLoad' -- ':!docs'`), and temper's `route/held.rs` at its repin (README, "jig 08.4's census").
+        - Don't: send a mark's load as `Request::Now`.
+        - Size goes from 355 to 395 lines (40 for this).
+     4. **The check goes in the core world, with no new store.** jig-core-world already holds each commit back from the component for `world.store_delay` ticks (`testing/jig-test-store-files/src/store.rs:117-138`). A `Request::Now` load reaches the component at once (`:198-204`). store.md 14: "The world holds commits between the root and the component". The tests, each with `world.store_delay = 3`:
+        - `activity.rs`: `a_mark_sent_as_its_chat_ends_waits_for_the_end` (sent `Now`, the load finds no ended record and the mark is refused unknown); `a_second_mark_on_an_ended_chat_while_the_first_loads_is_busy` (a mark through 2, then one through 1: the store keeps `EndedRead { through: 2 }`);
+        - `forgetting.rs`: `a_results_mark_while_a_chat_mark_loads_is_busy` (no row of the task is left, `EndedRead` included).
+        testing.md is unchanged.
+     5. **Deferred:** jig's other point loads (`HistoricalProposal`, `HistoricalEscalation`, `HistoricalPersonTask`, `PartyInputs`) still go out `Now`, against engine.md 4.2. They have a `later.md` row, for a jig plan after this one, and jig's `STATUS.md` engine.md row lists them as not planned. jig is upstream of the plan, so no downstream `STATUS.md` needs a row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
