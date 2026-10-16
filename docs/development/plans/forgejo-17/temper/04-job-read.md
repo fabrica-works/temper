@@ -214,10 +214,9 @@ measure, the store, the agent's `job` tool and the forge client world
 `component-read-job` names the step.
 Needs: nothing beyond the session's start (temper 02.1's job document
 and requests; temper 03.1's fake jobs with steps, served over HTTP).
-Files: `crates/temper-engine-protocol-forge/src/actions.rs` (364 lines:
-`Mode`, `Stage` :13-26, `Plan` :28-44, the job row :212-232, the run
-:269-283, the listing :284-303, `log` :350-363; shared with temper 02.1,
-which adds `Document::Job`'s arm), `src/reads/size.rs:113`;
+Files: `crates/temper-engine-protocol-forge/src/actions.rs` (371 lines
+since temper 02.1: `Mode`, `Stage` :13-26, `Plan` :28-44, the job row
+:212-232, the run :270-284, the listing :285-309, `log` :357-370), `src/reads/size.rs:113`;
 `crates/temper-engine-domain-forge-client/src/api.rs` (844 lines:
 `Answer::Job` :155-156, `JobAttempt` :374-381; `accepts` :511-514
 unchanged), `src/bounds.rs:152`; `crates/temper-protocol-store/schema/`
@@ -288,8 +287,19 @@ Shape:
   (`tests/engine/forge/client/src/world.rs:439-451`,
   `tests/engine/domain/src/forge_stand.rs:96-119`,
   `tests/system/src/forge.rs:339-417`, and the same at
-  `tests/engine/domain/tests/forge_routes.rs:438,524` and
-  `tests/conformance/src/systems.rs:164,311`). The arm for
+  `tests/engine/domain/tests/forge_routes.rs:438,524`,
+  `tests/conformance/src/systems.rs:164,311`, and
+  `tests/engine/forge/src/world.rs:506,520`, which compiles the same
+  `translate.rs` through `#[path]`, `lib.rs:4-5`). `translate::answer`
+  is 92 of clippy's 100 `too_many_lines` at the base, 93 after 03.1: the
+  arm calls a helper beside `byte_answer`, `fn job_answer(asked:
+  &client::Op, job: &forge::Job, steps: &[forge::Step]) ->
+  client::Answer`, written as loops, which replaces 03.1's
+  `workflow_log` (it goes). The helper first asserts the fake's job is
+  the attempt asked (`assert_eq!` on its `attempt`): the read by id
+  drops the attempt, no world reads a stale one (every world's checks
+  set `reruns: 0`), and the component answers `MissingJob` for one, so
+  a world that met one would diverge silently. The arm for
   `forge::Answer::Job { steps, .. }` takes the first of `steps` whose
   `status` is `forge::StepStatus::Failure`, and gives `step:
   Some(client::Step { number, name })` and that step's `log`; with none
@@ -321,12 +331,17 @@ own job literal has it. Limits: the component's fixture
 ```rust
 #[test]
 fn the_failed_step_is_the_first_whose_status_is_failure() {
-    let rows: [(&str, [&str; 3], u32, &[u8]); 3] = [
-        ("workflow before completion", ["success", "failure", "failure"], 1, b"build"),
-        ("set-up", ["failure", "cancelled", "failure"], 0, b"Set up job"),
-        ("completion alone", ["success", "success", "failure"], 2, b"Complete job"),
+    // `format!` is a disallowed macro in step crates: each row names its log's line whole.
+    type StepRow = (&'static str, [&'static str; 3], u32, &'static [u8], &'static [u8]);
+    let rows: [StepRow; 3] = [
+        ("workflow before completion", ["success", "failure", "failure"], 1, b"build",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=1 HTTP/1.1"),
+        ("set-up", ["failure", "cancelled", "failure"], 0, b"Set up job",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=0 HTTP/1.1"),
+        ("completion alone", ["success", "success", "failure"], 2, b"Complete job",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=2 HTTP/1.1"),
     ];
-    for (name, statuses, number, step) in rows {
+    for (name, statuses, number, step, log) in rows {
         let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         h.answer(fixtures::FORGE, &fixtures::ok(RUN));
@@ -335,8 +350,7 @@ fn the_failed_step_is_the_first_whose_status_is_failure() {
         h.run(Duration::from_millis(10));
         let lines = h.request_lines(fixtures::FORGE).into_boxed();
         assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/actions/jobs/10 HTTP/1.1", "{name}: job");
-        let log = alloc::format!("GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step={number} HTTP/1.1");
-        assert_eq!(lines[4].as_ref(), log.as_bytes(), "{name}: the step's log");
+        assert_eq!(lines[4].as_ref(), log, "{name}: the step's log");
         let step = Some(Step { number, name: Box::from(step) });
         let expected = Answer::Job { attempt: ATTEMPT, step, log: Box::from(&b"abc"[..]), truncated: false };
         let answer = h.answered(1).expect("job");
@@ -345,7 +359,8 @@ fn the_failed_step_is_the_first_whose_status_is_failure() {
 }
 ```
 `job(statuses)` is a helper of the file that writes `JOB` with the three
-steps' statuses given. Tests, each under 20 ms:
+steps' statuses given, by pushing its pieces into a `skein_lib::List<u8>`
+(`format!` is disallowed). Tests, each under 20 ms:
 `the_failed_step_is_the_first_whose_status_is_failure` (above);
 `a_job_with_no_failed_step_reads_its_log_without_a_step` (statuses
 `success`, `cancelled`, `cancelled`: the log line ends
@@ -373,7 +388,10 @@ question 2);
 its step"` (log `abc`, step 1 `build`: 8);
 `a_jobs_verified_log_uses_range_and_content_range_reports_more` and
 `a_job_log_at_another_head_is_missing_job` keep their names, on `JOB`,
-their expected answers with step 1 `build`. In the client's `tests.rs`:
+their expected answers with step 1 `build`; the first's request check
+(`src/tests/contents.rs:472` on origin/main df37f0329) reads
+`logs?attempt=3&step=1 HTTP/1.1` where it read `logs?attempt=3
+HTTP/1.1`. In the client's `tests.rs`:
 `job_logs_are_bounded_and_pinned_to_the_failing_attempt` gives its first
 answer step 1 `build`; new
 `a_job_answers_step_name_counts_against_answer_bytes` (`max_bytes` 4096:
@@ -418,9 +436,10 @@ truncated: true }`. New beside it,
 20 ms each, and `simulation.rs` grows by at most 40 lines net (Rules).
 In the joint
 world, `Joint::with` takes its repository's `raw::Checks` as a seventh
-parameter, the literal at `joint.rs:66-74` moved into `fn checks(passes:
-u32) -> raw::Checks`; `Joint::new` and `Protocol::cutting`
-(`protocol.rs:46`) pass `checks(1000)` as today; `Joint::failing(seed:
+parameter, the literal at `joint.rs:70-78` moved into `fn checks(passes:
+u32) -> raw::Checks`; its callers, `Joint::cutting` (`joint.rs:47`,
+which `Joint::new` calls) and `Protocol::cutting` (`protocol.rs:46`),
+pass `checks(1000)` as today; `Joint::failing(seed:
 u64) -> Joint` passes `checks(0)`, on temper 03.1's default
 `Failing::Workflow`. The joint test, in `tests/fake_protocol.rs`, under
 0.5 s:
@@ -483,7 +502,7 @@ per-field bound to the client, or change its admission of `max_bytes`
 (design question 2: the component's raw room keeps the answer within
 the bound); change `read_job`'s description or schema
 (`crates/temper-engine-smith/src/calls.rs:35`); change the conformance's
-workflow (`runner.rs:60`) or record transcripts.
+workflow (`runner.rs:68`) or record transcripts.
 Size: at most 110 lines: 10 more than planned, for the log's raw room
 (design question 2) and an empty name's words (question 1).
 Removes: `actions.rs`'s `found` and its jobs-listing stage in
@@ -504,13 +523,14 @@ Files: `crates/temper-engine-protocol-forge/src/plan.rs:5-17`,
 `start` :156-220, the raw arm :354-375, `Done` :378-396, `response`
 :456-468, `raw_demand` :476-485, `decoder` :632-637), `src/grow.rs`,
 `src/actions.rs` (the head :136-146, the log's exchange, `log`
-:350-363), `src/contents.rs:102-105` (the consumer,
+:357-370), `src/contents.rs:102-105` (the consumer,
 `src/component/calls.rs:219`, passes `request.range` unchanged);
 `crates/temper-forge-forgejo/src/header.rs:4-38`;
 `crates/temper-engine-smith/src/answers.rs` (the `Job` arm);
 `tools/forgejo-conformance/src/component/reads.rs:91-110`. Tests:
-`crates/temper-engine-protocol-forge/src/tests/connection.rs` (:15-25,
-:206-227 and :283-293 pass `Some(Range::Head(n))`; the `None`s stay),
+`crates/temper-engine-protocol-forge/src/tests/connection.rs` (:217
+and :285 pass `Some(Range::Head(n))`; the `None`s stay; :15-25, `Grow`'s
+test, passes no range),
 `src/tests/contents.rs`, `crates/temper-forge-forgejo/src/tests.rs:316-331`,
 `crates/temper-engine-smith/src/tests.rs`,
 `tests/engine/protocol-forge/tests/fake_protocol.rs`.
@@ -565,8 +585,9 @@ Shape:
   Without `TEMPER_FORGEJO_RUNNER` it is `unchecked` beside the other two
   (`reads.rs:93`).
 Test shape: `src/tests/connection.rs` on `fixtures::ConnectionHarness`
-(`tests/fixtures.rs:402-462`), `fixtures::ok`, `contains` (`:229`),
-`raw_request()` (`:237`); `src/tests/contents.rs` on 04.1's `JOB`. Limits:
+(`tests/fixtures.rs:402-462`), `fixtures::ok`, and the helpers of
+`src/tests/connection.rs`, `contains` (`:229`) and `raw_request()`
+(`:237`); `src/tests/contents.rs` on 04.1's `JOB`. Limits:
 the component's fixture; one test sets `h.env.limits.body_bytes_in` to 8,
 beside the fixture's 1,048,576, so that a 9-byte body passes it. The
 reference test:
@@ -665,7 +686,6 @@ crates, with `Box` from the prelude:
 //! Each module stands for the crate module of the same path.
 #![expect(unused_variables, reason = "a sketch's bodies are unreachable; its parameters are its signature")]
 #![expect(dead_code, reason = "a sketch's private fields and crate items are its shape")]
-#![expect(clippy::unused_self, reason = "a sketch's bodies are unreachable; `self` is its signature")]
 
 pub mod temper_engine_domain_forge_client {
     // temper_engine_domain_forge_client::api (04.1): `Step` beside `JobAttempt`.

@@ -261,6 +261,31 @@
      04.1 replaces the arm. A further copy of a corrected name is corrected
      the same way, and listed in the commit body.
 
+106. **temper 04's Shapes against main** (ready check of temper-04.1).
+     temper/04-job-read.md corrected against origin/main 49f589b32 (a ready
+     check, through heavy: the sketch and 04.1's contents and smith reference
+     tests passed clippy `-D warnings` with these corrections) and 02.2's
+     landing df37f0329:
+     - The sketch drops `#![expect(clippy::unused_self, ...)]`, never met.
+     - 04.1's reference test names each row's log line whole, with `type
+       StepRow`; `job(statuses)` pushes into a `skein_lib::List<u8>`
+       (`format!` is disallowed in step crates).
+     - `a_jobs_verified_log_uses_range_and_content_range_reports_more`'s
+       request check (`src/tests/contents.rs:472`) reads `&step=1`.
+     - translate: its callers include `tests/engine/forge/src/world.rs:506,520`;
+       the arm calls `fn job_answer(asked, job, steps)` beside `byte_answer`
+       (`answer` is 92 of clippy's 100 lines), which replaces 03.1's
+       `workflow_log`, and first asserts the fake's job is the attempt asked:
+       the read by id drops the attempt, and the component answers
+       `MissingJob` for a stale one, which no world reads.
+     - Line numbers: `actions.rs` is 371 lines since 02.1 (the run :270-284,
+       the listing :285-309, `log` :357-370); `joint.rs:70-78`, called from
+       `Joint::cutting` (:47); `runner.rs:68`; connection tests :217 and
+       :285 pass a range, and `contains`/`raw_request()` are helpers of
+       `src/tests/connection.rs`.
+     A further copy of a corrected name is corrected the same way, and listed
+     in the commit body.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
