@@ -172,3 +172,67 @@ pub fn ran(stdout: &[u8]) -> crate::prepare::Event {
         stderr: skein_lib::Secret::new(Box::new([])),
     })
 }
+pub const ADMIN: &[u8] = b"site-admin-token";
+pub fn secret(value: &[u8]) -> skein_lib::Secret {
+    skein_lib::Secret::new(bytes::copy_of(value))
+}
+pub fn admin() -> temper_forge_forgejo::document::User {
+    temper_forge_forgejo::document::User {
+        id: 1,
+        login: b"temper-admin".as_slice().into(),
+        is_admin: true,
+        full_name: Box::new([]),
+    }
+}
+pub fn person(login: &[u8], full_name: &[u8]) -> temper_forge_forgejo::document::User {
+    temper_forge_forgejo::document::User {
+        id: 42,
+        login: bytes::copy_of(login),
+        is_admin: false,
+        full_name: bytes::copy_of(full_name),
+    }
+}
+pub struct Run {
+    machine: crate::reconcile::Reconcile,
+    entry: crate::setup::Entry,
+}
+impl Run {
+    pub fn managed() -> Self {
+        Self::new(1)
+    }
+    pub fn owned() -> Self {
+        Self::new(2)
+    }
+    fn new(forge: u16) -> Self {
+        let entry = setup().entry(forge).expect("fixture forge").clone();
+        Self { machine: crate::reconcile::Reconcile::new(&entry, None), entry }
+    }
+    pub fn step(&mut self, event: crate::reconcile::Event) -> crate::reconcile::Need {
+        let mut out = skein_lib::Queue::with_capacity(crate::reconcile::MAX_OUT);
+        crate::reconcile::step(&mut self.machine, event, &mut out);
+        assert_eq!(out.len(), 1);
+        out.pop().expect("one need")
+    }
+    pub fn forge(&self) -> u16 {
+        self.entry.forge
+    }
+    pub fn bot(&self) -> Box<[u8]> {
+        self.entry.bot.login.clone()
+    }
+    pub fn bot_lookup(&mut self) {
+        use crate::{
+            place::File,
+            reconcile::{Event, Need, Reply},
+        };
+        use temper_forge_forgejo::{document::Document, request::Request};
+        assert_eq!(self.step(Event::Begin), Need::Read(File::AdminToken));
+        assert_eq!(
+            self.step(Event::Read(Some(secret(ADMIN)))),
+            Need::Send { request: Request::User, token: secret(ADMIN) }
+        );
+        assert_eq!(
+            self.step(Event::Reply(Reply::Document(Document::User(admin())))),
+            Need::Send { request: Request::UserOf { login: self.bot() }, token: secret(ADMIN) }
+        );
+    }
+}
