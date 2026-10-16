@@ -389,7 +389,7 @@ takes it, and "A path's segments").
 Files: `tests/engine/domain/tests/forge_routes.rs` (over 800 lines: at
 most 40 added), on its `change_world` (`:633`);
 `crates/temper-client-shell-terminal/src/limits.rs` (`segments: 9`
-beside `rows: 2`, `:51`: at least the forge's tier's names' bounds, 9,
+beside `rows`, `:51`, back to 2 from ruling 160's interim 3: at least the forge's tier's names' bounds, 9,
 `crates/temper/tests/support/forgejo.rs:152-156`, and the example's 8,
 `configuration.md`, 7); `crates/temper/tests/configuration.rs:17-21`.
 Shape: no type. temper writes no `documents.lines` for a path: the

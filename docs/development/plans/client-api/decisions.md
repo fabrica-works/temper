@@ -666,6 +666,16 @@ choice would have been the user's (development.md, 10.4).
 
      Unchanged: the rule that a file over 800 lines at the base grows by at most 40 lines (`control.rs` 897 at the base, +50 −38; `domain.rs` 1283, +9; `boundary.rs` 1839, +14 −2: each within it); the 800-line aim; the Don't list; the Proof; the gate; implementer.md, 8.6: "Never trim a doc comment, a test or the formatting to meet a Size". A count that passes 1,000 is a question again, with the count by file.
 
+160. **temper's terminal rows is 3 until temper 04.4** (plan defect, temper 03's block of 2026-10-16T18:03:17Z).
+     Ruling 160, a plan defect in the order of steps. temper's design says what its client does: `client.md`, 5.4: "A path's segments have a bound of their own, 9, apart from the windows' rows ... so a page of the forge's work is never refused for a path". Ruling 143 put that bound in jig-13.s1, after jig 13.2, on the premise that temper 04 "waits on nothing more"; but temper 03's repin onto jig `94eaa034` already delivers a delegate chip holding a forge path. `hub_name` makes each forge hold three segments, forge, repository and branch (`forge_route.rs:609-611`), and jig at the pin bounds a receiving path by the client's rows (`limits.rs:31`, `translate/documents.rs:330`), against the terminal's `rows: 2`. jig-13.s1 cannot be pinned: it waits on jig 12 and 13.2, neither landed. An upstream amendment to the pin is not taken: temper pins jig's `main`.
+
+     Interim, until temper 04.4:
+     1. The combined s1/03.2 landing sets the terminal's `rows: 3` (`crates/temper-client-shell-terminal/src/limits.rs:51`), its comment "interim 3 for a forge hold's three segments, ruling 160; temper 04.4 returns it to 2 with `segments: 9`". It refreshes the values derived from it (the worst-case sums of `the_native_limits_pass_each_worst_case` and `the_native_limits_make_the_terminal`, the render envelope check) and lists each in the commit body; those lines are outside the repin's 200.
+     2. The check, once, before anything else: with `rows: 3`, `heavy cargo nextest run -p temper-client-shell-terminal`, then `heavy cargo nextest run -p temper-one-process-world -E 'test(an_adopted_repository_gets_its_change_pushed_through_git)'`. If `Limits::compose` refuses 3 (the native limits' test fails), or the story still fails on a path, stop and report it as a question with the failing value; try nothing else.
+     3. temper 04.4 sets `segments: 9` and returns `rows` to 2 (its Files say so now).
+
+     Unchanged: every other native bound; the engine's `documents.rows` and `documents.lines`, 2, which `crates/temper/tests/configuration.rs:17-18` keep at most the native rows; every story assertion; ruling 155's combined landing; jig-13.s1 and its place. A further value derived from `rows` gets the same refresh, listed in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

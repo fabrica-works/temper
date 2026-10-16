@@ -73,6 +73,11 @@ temper-engine-domain-world --test escalation -E
 temper's gate, by `land`.
 Size: aim for at most 220 production lines besides the repin's
 repairs; past it, report why. The repin's 200 lines stay a rule.
+Interim, ruling 160: the combined s1/03.2 landing sets the terminal's
+`rows: 3` (`crates/temper-client-shell-terminal/src/limits.rs:51`), for
+a forge hold's three segments (`hub_name`, `forge_route.rs:609`), and
+refreshes the values derived from it, listed in the commit body; temper
+04.4 returns it to 2 with `segments: 9`.
 Don't: change temper's store format (`store-v1.schema:120`'s
 `CallPayload` holds the connector's answers alone; jig's core v3 keeps
 these four); unify or rename temper's tools (`decide` and
