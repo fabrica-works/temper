@@ -126,6 +126,15 @@ real forge, and what stands between the `protocol` plan and it, is
   repins after smith's reliability plan
   (`~/src/rust/plans/reliability-plan/`, not versioned), which never
   edits temper.
+- **smith's parity changes, for temper's next repin of smith** (smith's
+  parity plan, its `later.md`; skein's development.md, 5.7): smith's
+  transcript version 4, and the tools domain's new `Call` and `Outcome`
+  variants, for jobs, which temper's three generated crates and its
+  users of `smith-domain-tools` follow. Against smith's `main` of
+  2026-10-15, temper's own code fails with 10 errors
+  (`smith_transcript::v3`, `Request::Job`, `Turn`'s `jobs`). client-api
+  moves temper to jig's pin of smith, `29fa97c9`, before them. Waits for
+  the plan that moves temper past it.
 - **temper's client beyond client-api** (`client.md`, 3.5, 3.6, 10;
   `configuration.md`, 7; `testing.md`, 2.6; `web/mockups/`): the board
   and reordering goals, the changes page, an agent's task page, a goal's
