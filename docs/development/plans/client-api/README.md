@@ -251,6 +251,22 @@ per session are in each file.
     refusal bytes temper's store keeps); that increment's report says so.
     temper's client store and wire: the temper session that first changes
     one names it and bumps it; no other temper session changes it before.
+- **Generated code** (the steer of 2026-10-16T12:47Z, jig 07's crate
+  under logs/ after jig 06's): a schema's code and goldens are written
+  only by its drift test's write mode, in the build lane. No session
+  builds a crate of its own to generate them, under logs/ or elsewhere:
+  such a crate compiles `skein-codegen` from skein's `main`, not jig's
+  pin.
+  - A store family, or the test connector
+    (`testing/jig-test-store/schema/test-connector-v1.schema`): `heavy sh
+    -c 'SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-store-codecs-world
+    --test drift -E "test(<its drift test>)"'`, the drift tests being
+    `the_<family>_familys_code_and_goldens_have_no_drift` and
+    `the_test_connectors_code_and_goldens_have_no_drift`
+    (`tests/store-codecs/tests/drift.rs`).
+  - jig's client wire, and the test client's:
+    `heavy sh -c 'SKEIN_CODEGEN_WRITE=1 cargo nextest run -p
+    jig-client-wire-world --test drift --test test_client_wire'`.
 - **The meeting point:** a client increment proves against the real
   engine, in `tests/client-protocol`, the joint world `tests/client`, or
   the process tier, from jig 12 on; never only against
