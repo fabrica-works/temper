@@ -901,8 +901,8 @@ Files:
   core's touch of both parties' `me` and inbox (`touch_party`).
 - `testing/jig-conformance/src/scenarios.rs` (`Scenario::{Compound,
   Grace}` in `ALL`, their `Action`s and `program` arms),
-  `testing/jig-conformance/src/referee.rs` (`Observed::Compound`, its
-  rule under `Promise::Once`).
+  `testing/jig-conformance/src/referee.rs` (`Observed::{CompoundAsked,
+  Compound}`, their rule under `Promise::Once`; ruling 183).
 - `tests/conformance/src/scenarios.rs` (both scenarios' configuration,
   actions and checks for the testing application),
   `tests/conformance/src/lib.rs` (the worker script for each scenario,
@@ -928,10 +928,21 @@ Shape:
   (`Action::Finish`) in one seed's half and not in the other; its check:
   done once, or cancelled once with the cancel's reason at or after the
   grace's end. Each program has at most 8 commits.
+- `Observed::CompoundAsked { tasks: Vec<u64> }`, declared by the
+  scenario's action before each send of the compound (`Action::Compound`
+  and `Action::CompoundAgain`): the referee keeps, for the first ask of
+  a `tasks` list, each named task's row (`referee::Task`) from its last
+  durable snapshot; a later ask of the same list keeps that baseline.
+  On each `Observed::Durable`, the first commit after the baseline that
+  changes any named row is recorded with the rows it changed.
+  (Ruling 183.)
 - `Observed::Compound { tasks: Vec<u64>, made: bool }`, declared by the
-  scenario's actions when its answer arrives: made, each named task's
-  durable row changed in one commit; refused, none changed since the
-  request.
+  scenario's actions when its answer arrives, with the `tasks` of its
+  ask: made, the recorded commit changed every named row; refused, no
+  named row changed since the baseline. An answer with no ask of its
+  `tasks` breaks the rule too. A task whose operation changes no field
+  of `referee::Task` (a graced cancel keeps its phase, `grace.rs:170`)
+  is left out of both `tasks` lists.
 Test shape:
 - `crates/jig-domain-people/src/tests.rs` (at most 40 lines):
   `a_moved_chats_old_requester_loses_its_read_position`,
@@ -962,7 +973,8 @@ restarted twice inside its grace ends once; the referee holds at each
 iteration; under 2 s.
 Don't: give the two scenarios their own sweep; mark the world's
 `Testing` application not applicable to either (its kinds have both).
-Size: at most 130 lines (about 90 of them in `testing/jig-conformance`).
+Size: at most 150 lines (about 110 of them in `testing/jig-conformance`;
+ruling 183).
 Removes: nothing.
 
 ## Interface sketches

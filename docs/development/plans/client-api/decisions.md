@@ -920,6 +920,19 @@ choice would have been the user's (development.md, 10.4).
 
      23.1 keeps `Observed::{ProposeAsked, ProposeRefused}`, the ask credits and their rule, and uses `party_proposals` as 03.4 lands it. The referee and adapter lines are test support, outside 03.4's production count; the steer of 22:44Z, point 1 (1050 lines of production code at most, past it a question) stands.
 
+183. **jig 04.7's compound referee takes the ask as its baseline** (plan defect, jig 04's block of 2026-10-16T23:19:06Z).
+     Plan defect: 04.7's Shape gives `Observed::Compound { tasks, made }` the rule "refused, none changed since the request" with no observation of the request, and the referee's only atomicity rule, `batch` (`referee.rs:779`), reads when each task first appeared (`self.first`), not when a row changed. Option A of the report, as the plan already does for 23.1's `Observed::ProposeAsked`:
+
+     - `Observed::CompoundAsked { tasks: Vec<u64> }`, declared by the scenario's action before each send of the compound (`Action::Compound` and `Action::CompoundAgain`). The referee keeps, for the first ask of a `tasks` list, each named task's row (`referee::Task`) from its last durable snapshot (`self.last`); a later ask of the same list keeps that baseline, so a request sent again after the compound's commit is judged against the first ask.
+     - On each `Observed::Durable`, the first commit after the baseline that changes any named row is recorded, with the rows it changed. Later commits do not move it (the chat's grace ending, a moved delegate's turn).
+     - `Observed::Compound { tasks, made }`, with the `tasks` of its ask, under `Promise::Once`: made, the recorded commit changed every named row; refused, no named row changed since the baseline. An answer whose `tasks` were never asked breaks the rule too.
+     - A task whose operation changes no field of `referee::Task` (a graced cancel keeps the task's phase until the grace ends, `crates/jig-domain-tasks/src/grace.rs:170`) is left out of both `tasks` lists, and the report names it. Nothing else changes in the referee's row.
+     - Option B (a commit number on `Observed::Compound` and a row history) is not taken.
+     - The referee's two tests stay as the Test shape names them: `a_compound_made_across_two_commits_breaks_once` (an ask, two commits each changing one named row, a made answer) and `a_refused_compound_with_a_changed_task_breaks_once` (an ask, a commit changing a named row, a refused answer).
+     - Size: at most 150 lines (about 110 in `testing/jig-conformance`), in place of 130 and 90. Past 150, the session reports it with its count by file. No production code changes for this ruling; `people::Outcome` and the store stay as they are.
+     - Unchanged: ruling 181 (04.6's answer stands until the designer answers question.md); 04.7's scenarios, cuts, proof and "Don't". If the designer's answer changes the compound's answer, it comes as a ruling of its own.
+     - Any further copy of `Observed`'s variants that 04.7 finds matched exhaustively takes the new variant; list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
