@@ -818,6 +818,9 @@ choice would have been the user's (development.md, 10.4).
         - **Tests and Size.** New tests: `a_parked_request_whose_record_is_not_stored_is_answered_not_kept` and `a_failed_write_answers_only_the_requests_it_carried`. Size goes from 215 to 250.
      4. **Nothing is deferred:** no `later.md` row.
 
+171. **skein-01.s3's Shapes against main** (ready check of skein-01.s3).
+     skein-01.s3's session file, checked against skein `1f71424` and temper `4c522a82` by a read-only sub-agent, is corrected in `skein/01-s3-not-kept.md`: `answered` spans `requests.rs:268-:305`; skein has no `docs/development/workflow.md`, so the file names its gate, `scripts/check.sh`; `not_kept`'s guard and the tests' `Save` and `Erase` checks are exhaustive `match`es, since skein's `clippy.toml:86` disallows `core::matches` in tests too (a `matches!` failed `cargo clippy --workspace --all-targets -- -D warnings`) and `wildcard_enum_match_arm` is denied; the first test gains a second parked request whose `Save` is not taken, whose `not_kept` gives `Erase` and no `Save`, which pins `save = false` (no test of the answer's two failed without it); Size goes from 30 to 70, the sketch with two tests being 57 lines. Checked in a scratch worktree with the sketch applied: clippy with `-D warnings` and `cargo fmt --all --check` clean; `cargo nextest run -p skein-lib -p skein-lib-tests`, 161 passed, both `not_kept_*` included; the fuzzy profile, 6 passed, `fuzzy_request_table` included; no `not_kept` in skein, jig or temper, and no downstream match on the table's enums changes. Refresh any further copy, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
