@@ -58,6 +58,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/02-task-fields.md` | jig 02: a task's label, flags and last activity; `AsAllowed`; the escalation holder; a task's goal | nothing | |
 | `jig/03-parties.md` | jig 03: parties' `Create`, `Propose` and `Withdraw`; proposing made explicit | jig 02 | |
 | `jig/04-grace-and-compound.md` | jig 04: cancel with a grace, `Move`'s check, tracked and priority amended, goals per project, the compound request | jig 02.1 | 04.3 to 04.7: jig 02.3 |
+| `jig/04-s1-numbered-by-place.md` | jig-04.s1 (ruling 184): a compound's operations numbered by place | jig 04.7 | |
 | `jig/05-me-and-queries.md` | jig 05: waiting on, the task line, task queries, `me`, conversations by their flag | nothing | 05.2, 05.5: jig 02.1 |
 | `jig/06-agents-tools.md` | jig 06: the agents' tools name revisions | nothing | 06.3: jig 02.1; 06.4: jig 03; 06.5: jig 03, jig 04.5 |
 | `jig/07-connectors.md` | jig 07: connectors' topics and procedures, the party's own scope and windows, untracking | nothing | 07.5: jig 04.5; 07.6: jig 02.3 |

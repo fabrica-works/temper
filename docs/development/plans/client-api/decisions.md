@@ -933,6 +933,22 @@ choice would have been the user's (development.md, 10.4).
      - Unchanged: ruling 181 (04.6's answer stands until the designer answers question.md); 04.7's scenarios, cuts, proof and "Don't". If the designer's answer changes the compound's answer, it comes as a ruling of its own.
      - Any further copy of `Observed`'s variants that 04.7 finds matched exhaustively takes the new variant; list it in the commit body.
 
+184. **jig 04.6: a compound's operations numbered by place, and jig-04.s1** (design answer, jig 04's question of 2026-10-16T23:16:03Z).
+     Ruling 184, the designer's answer, landed as jig a20cf96c4 and temper 90ed12e0; it ends ruling 181's interim. Item 3 is the supplement step jig-04.s1 (`jig/04-s1-numbered-by-place.md`), in session jig 04 after 04.7 lands; jig 14 and jig 15 start after it:
+
+
+     1. **Each operation's outcome is made, with a message number by place, and nothing more.** contract.md, 3.4, now: "Its operations take consecutive message numbers, one each, in the request's order, and the answer names the first: the operation at place *i* took the first plus *i*. A `Message`'s words have that number in its task's inbox, as a lone `Message`'s answer names theirs. What another operation adds to its task's inbox, if anything, has its number too; one that adds nothing leaves its number unused." It also says: "Nothing more of an operation is answered, as nothing more is when it is alone. What it changed (a grace's end, a spec's revision, a requester and the reservation moved, a hold lifted) is in its task's documents". people.md, 5.1 says the same ("*Numbered by place*").
+     2. **The landed answer keeps its shape and `Copy`:** `Outcome::Compound { project, operations, first_message }`. What changes is its numbering. On main, only the operations that add a message take a number (`crates/jig-domain-core/src/compound.rs:60`, `issue` at :224). Now every operation takes one.
+     3. **A step after 04.6 (the supervisor's), about 20 lines:**
+        - `issue` takes a fresh `Family::Message` number for every operation, and `first_message` is the number of the operation at place 0. Stop, Move, a Cancel without a grace and a Release whose `again` is not `Some(false)` take one too, and leave it unused.
+        - `valid_answer_shape` (`crates/jig-domain-people/src/domain.rs:1345`) admits a made compound only when `first_message != 0`, as `Created` checks `first != 0` (:1359).
+        - The fakes' `first_message: 0` become 1: `crates/jig-domain-people/src/tests/compound.rs:33`, `tests/people/tests/compound.rs:27`, `tests/people/src/world.rs:563`.
+        - In `tests/core/tests/operations.rs` (:134-135 and :239-240), the chat's cancel with a grace is at place 2 of `closing`. So its grace's `message` is asserted as `first_message + 2`, and the answer's `first_message` stays 1.
+        - Proof: `heavy cargo nextest run -p jig-core-world -E 'test(a_compound_closes_a_conversation_moving_one_delegate_and_cancelling_another)'`, once. Nothing else is wanted.
+     4. **jig 14.3 (in the plan):** the wire's answer is `OwnerOutcomeCompound { project: u32, operations: u32, first_message: u64 }`, field for field. There is no `OperationOutcome` and no per-operation list. The link's test is now `a_compound_answer_names_its_first_message_and_operations`.
+     5. **jig 15.4 (in the plan):** `Thread::sending(key, by, words, place)`, with `place` 0 for a lone `Message`. `answered` marks the words sent with `first_message + place`, tested by `words_sent_in_a_compound_are_numbered_by_their_place`.
+     6. **Unchanged:** 04.7, whose tests judge only made or refused at a place (ruling 181). Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
