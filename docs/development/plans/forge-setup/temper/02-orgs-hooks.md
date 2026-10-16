@@ -86,7 +86,8 @@ the members listed and put; both sides; the facts, with a repository made later 
 routes' scopes. The bullet's git-token half (`GET /user` under `write:repository` alone: 403; with `read:user`: 200) is
 01.3's (findings rows 5 and 6).
 Needs: temper 01.2 (the recorder `setup::record`, `setup::scoped` and the `setup-admin` token it makes, `profile_limits`,
-the replay tests, `ROUTES`; its Needs bring
+the replay tests, `ROUTES`, and `cases.rs`'s `Recorder` and `send` `pub(crate)`, 01-users-tokens.md:162; make `w`
+(`cases.rs:33`) and the fields `orgs.rs` reads `pub(crate)` too where 01.2 left them private; its Needs bring
 01.1's `Method::Put` and the body decoder's numbers and booleans, refused today at `server/writes.rs:313`, and the
 codec world's `b"PUT"` arm).
 Files: `temper-forge-forgejo`: `request.rs` (after `DeleteBranch`, :219); `document.rs` (types below; `Row` :67,
@@ -96,12 +97,14 @@ chain of `server.rs:39` after 01's); `client.rs` (mods :12-22, `encode` :34, `De
 `step` :155); `server.rs` (mods :12-18, `Answer` :64, `write` :119); `server/writes.rs` (`WriteKind::{NewOrg,
 NewTeam}`, `fields` :37, `element` :72, the `member` arm for `includes_all_repositories`); arms in
 `client/{start,writes,files,reviews,items}.rs`, `server/{start,items,reviews,branches,files,actions}.rs` and
-`server/writes.rs:245-282`. Elsewhere: `temper-engine-protocol-forge` `connection.rs:686`, `reads.rs:665`, and the
-`Document`/`Row` lists (`reads.rs:391,634,662,724,746`, `reads/done.rs:93`, `contents.rs:219,287`, `actions.rs:329`,
-`writes.rs:207,335`); the fake (`testing/temper-fake-forge-protocol/src`): `routes.rs:68,146`, `answers.rs:229,292,456`,
+`server/writes.rs:245-282`, `:316-394` (`scalar`), `:398-439` (`set_id`); `client/writes.rs:38-124` (`target`), `:171`
+(`write`); `client/start.rs:135`; `server/items.rs:252`. Elsewhere: `temper-engine-protocol-forge` `connection.rs:686`, `reads.rs:665`, and the
+`Document`/`Row` lists (`reads.rs:391,634,662,724,746`, `reads/done.rs:93`, `contents.rs:219,287`, `actions.rs:232-242,329`,
+`writes.rs:207,335`); the fake (`testing/temper-fake-forge-protocol/src`): `routes.rs:68,146,235` (`write`'s `Err(Refused)` list, :321), `answers.rs:229,292,456`,
 `response.rs:118,172,176-216`, `server.rs:520`, `tally.rs` (`Route` :5, `route` :48; 01.2's `ROUTES` is 64: 40 + 6
 + the 7 here + 4 of 02.2 fit), refusing with `Error::Refused` until temper 09.3 (transitional, ended there);
-`tests/codecs/src/forgejo.rs` (rows of `setup_cases()`); the tool: new `src/orgs.rs`, called from `setup.rs`.
+`tests/codecs/src/forgejo.rs` (rows of `setup_cases()`) and the exhaustive `Answer` matches of `tests/codecs/tests/`
+`forgejo_files.rs:153`, `forgejo_items.rs:146`, `forgejo_reviews.rs:112`, `forgejo_start.rs:70`, `forgejo_writes.rs:169`; the tool: new `src/orgs.rs`, called from `setup.rs`.
 Counts: `grep -rn 'Request::DeleteBranch' --include='*.rs' crates testing` prints 28 lines at the base (17 files), and
 `grep -rn 'Answer::CombinedStatus' --include='*.rs' crates testing tests` 18 (14 files): the arms in `crates/` are
 about 140 of the Size.
@@ -291,10 +294,12 @@ pub struct Org { pub id: u64, pub name: Box<[u8]> }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Hook { pub id: u64, pub url: Box<[u8]>, pub events: Box<[Box<[u8]>]>, pub active: bool }
 /// The access a word names, or none for another word. (02.1)
+#[must_use]
 pub fn access(text: &[u8]) -> Option<Access> {
     todo!()
 }
 /// The word of an access. (02.1)
+#[must_use]
 pub fn access_text(access: Access) -> &'static [u8] {
     todo!()
 }
@@ -386,6 +391,6 @@ From the repository root, after 02.2 has landed; `TEMPER_FORGEJO` and `TEMPER_FO
 
 1. The facts hold: `grep -c -e '^holds setup-org-' -e '^holds setup-team-' -e '^holds setup-hook-' tools/forgejo-conformance/facts.txt` prints 30, and the same with `^fails` prints 0.
 2. The captures are there: `ls -d tools/forgejo-conformance/transcripts/setup-org-* tools/forgejo-conformance/transcripts/setup-team-* tools/forgejo-conformance/transcripts/setup-hook-*` lists 33 directories.
-3. Both sides agree and compile: `heavy cargo nextest run -p temper-forge-forgejo -p temper-codecs-world -p temper-fake-forge-protocol -p temper-engine-protocol-forge` passes, `heavy cargo nextest run -p temper-forge-forgejo -E 'test(/tests::orgs::/) | test(/tests::hooks::/)'` runs 14 tests, and so does `heavy cargo nextest run -p temper-codecs-world --profile fuzzy --test fuzzy_forgejo`.
+3. Both sides agree and compile: `heavy cargo nextest run -p temper-forge-forgejo -p temper-codecs-world -p temper-fake-forge-protocol -p temper-engine-protocol-forge` passes, `heavy cargo nextest run -p temper-forge-forgejo -E 'test(/tests::orgs::/) | test(/tests::hooks::/)'` runs 14 tests, and `heavy cargo nextest run -p temper-codecs-world --profile fuzzy --test fuzzy_forgejo` passes (2 tests).
 4. Clippy is clean where the arms are: `heavy cargo clippy -p temper-forge-forgejo -p temper-engine-protocol-forge -p temper-fake-forge-protocol -p temper-codecs-world -p forgejo-conformance --all-targets -- -D warnings`.
 5. Each landing's report gives its hand-written production lines by code-organization.md's command, against Size 250 and 150 (codec).
