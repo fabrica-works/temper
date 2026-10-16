@@ -1,11 +1,9 @@
 mod fixtures;
 mod form;
 use crate::{Address, Ask, Event, Fact, Request, forge, store::Record};
+use jig_client_domain::contract::{self, Part, PartScope};
 use jig_domain_client::boundary::Offset;
-use jig_domain_client::{
-    contract::{self, Part, PartScope},
-    pages::navigation::Destination,
-};
+use jig_domain_client::pages::navigation::Destination;
 use skein_lib::{List, Queue, RequestRecord};
 
 #[test]

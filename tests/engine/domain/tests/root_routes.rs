@@ -10,6 +10,7 @@ use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record, Write};
 use temper_engine_domain_world::direct::Driver;
+use temper_engine_domain_world::fixtures::{report_delegate, task_amendment, tool_call};
 use temper_engine_domain_world::protocol;
 use temper_engine_domain_world::store::Store;
 use temper_engine_domain_world::walking::{Settings, World, charter, config, limits};
@@ -242,7 +243,7 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     limits.people.requests = 8;
     limits.people.pending = 4;
     // jig's children name more outputs per route now; the journal takes them.
-    limits.journal.writes = 1200;
+    limits.journal.writes = 3000;
     limits.journal.deliveries = 40;
     limits.journal.held = 120;
     let mut config = config(seed);
@@ -1498,25 +1499,6 @@ fn a_pending_note_reserves_its_named_answer_until_the_store_returns() {
     ));
 }
 
-fn report_delegate(words: &[u8], dependencies: Box<[engine::Dependency]>) -> engine::Delegate {
-    engine::Delegate {
-        executor: tasks::Executor::Agent { charter: 1 },
-        spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
-        contract: tasks::Contract::Report { words: 128 },
-        authority: tasks::Authority {
-            tools: tasks::Tools(1023),
-            grants: Box::new([]),
-            delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
-            budget: tasks::Budget { spend: 10, deadline: None },
-            notes: tasks::Scopes(0),
-            note_resources: Box::new([]),
-        },
-        symbolic_grants: Box::new([]),
-        dependencies,
-        wake: tasks::WakePolicy::DEFAULT,
-    }
-}
-
 fn call_batch(
     driver: &mut Driver,
     parent: &engine::Assignment,
@@ -1546,14 +1528,6 @@ fn assigned_task(driver: &Driver, task: u64) -> engine::Assignment {
         .expect("task assigned")
 }
 
-fn tool_call(driver: &mut Driver, source: &engine::Assignment, call: u64, tool: engine::Tool) {
-    let body = engine::Call { completion: 1, position: u32::try_from(call).expect("small call"), tool };
-    driver.call(Token::new(7), source.task, source.attempt, call, body);
-    for _ in 0..60 {
-        driver.advance(true);
-    }
-}
-
 /// The proposal a run's call made, from its answer.
 fn proposal_of(driver: &Driver, call: u64) -> u64 {
     let Some(engine::CallAnswer::Proposed { proposal }) = driver.answered(call) else {
@@ -1580,18 +1554,6 @@ fn proposal_waits_at(driver: &Driver, task: u64, holder: tasks::ProposalHolder) 
 }
 
 /// A run's amendment of a delegate's words or authority, with its reason.
-fn task_amendment(words: Option<&[u8]>, authority: Option<tasks::Authority>, reason: &[u8]) -> tasks::Amendment {
-    tasks::Amendment {
-        addressed: None,
-        instructions: None,
-        release: None,
-        spec: words.map(|words| tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
-        wake: None,
-        dependencies: None,
-        authority,
-        reason: reason.into(),
-    }
-}
 
 // A pending proposal is a virtual inbox entry that reaches the live run as
 // the hub's message, named by its proposal (jig's `domain/hosts.md`, 2).
@@ -1745,6 +1707,8 @@ fn a_recurring_procedure_uses_the_root_period_route() {
     hello(&mut driver);
     driver.settle();
     let mut member = tasks::New {
+        label: 0,
+        flags: tasks::Flags::PLAIN,
         number: 1,
         project: 1,
         executor: tasks::Executor::Agent { charter: 1 },
@@ -1890,12 +1854,13 @@ fn an_amendment_reaches_a_live_run() {
     let child = call_batch(&mut driver, &parent, 90, Box::new([member]))[0];
     let running = assigned_task(&driver, child);
     let amendment = task_amendment(Some(b"revised"), Some(wider), b"the target changed");
-    tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, amendment });
-    assert_eq!(driver.answered(91), Some(&engine::CallAnswer::Controlled));
+    let revision = live(&driver, child).revisions.spec;
+    tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, revision, amendment });
+    assert_eq!(driver.answered(91), Some(&engine::CallAnswer::Revised { task: child, revision: revision + 1 }));
     assert!(driver.transactions.iter().any(|writes| {
         writes.iter().any(|write| {
             matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(record))))
-            if record.part == jig_domain_core::CallPart::Controlled)
+            if record.part == jig_domain_core::CallPart::Revised { task: child, revision: revision + 1 })
         }) && writes.iter().any(|write| {
             matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))))
             if task.number == child && task.spec.words.as_ref() == b"revised" && task.numbers.budget == 20)
@@ -1925,8 +1890,9 @@ fn an_ancestor_amends_a_live_grandchild() {
         call_batch(&mut driver, &child_run, 902, Box::new([report_delegate(b"grandchild", Box::new([]))]))[0];
     let grandchild_run = assigned_task(&driver, grandchild);
     let amendment = task_amendment(Some(b"revised by ancestor"), None, b"tree plan changed");
-    tool_call(&mut driver, &root, 903, engine::Tool::Amend { target: grandchild, amendment });
-    assert_eq!(driver.answered(903), Some(&engine::CallAnswer::Controlled));
+    let revision = live(&driver, grandchild).revisions.spec;
+    tool_call(&mut driver, &root, 903, engine::Tool::Amend { target: grandchild, revision, amendment });
+    assert_eq!(driver.answered(903), Some(&engine::CallAnswer::Revised { task: grandchild, revision: revision + 1 }));
     let row = live(&driver, grandchild);
     assert_eq!(row.spec.words.as_ref(), b"revised by ancestor");
     let amended = row.inbox.iter().find(|word| matches!(word.kind, tasks::MessageKind::Amendment { .. }));
@@ -1944,7 +1910,8 @@ fn a_narrowing_stops_the_old_run_and_offers_the_amendment_to_the_next() {
     let child = call_batch(&mut driver, &parent, 90, Box::new([member]))[0];
     let first = assigned_task(&driver, child);
     let amendment = task_amendment(None, Some(narrower), b"smaller scope");
-    tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, amendment });
+    let revision = live(&driver, child).revisions.spec;
+    tool_call(&mut driver, &parent, 91, engine::Tool::Amend { target: child, revision, amendment });
     assert!(cancelled(&driver).contains(&(child, first.attempt)));
     driver.answer(Token::new(7), child, first.attempt, 0, tasks::End::Parked, engine::Parts::none());
     driver.settle();
@@ -2021,8 +1988,12 @@ fn release_tool_resets_a_delegates_exhausted_tries() {
         engine::Parts::none(),
     );
     driver.settle();
-    tool_call(&mut driver, &parent, 91, engine::Tool::Release { target: child });
-    assert_eq!(driver.answered(91), Some(&engine::CallAnswer::Controlled));
+    let revision = live(&driver, child).revisions.hold;
+    tool_call(&mut driver, &parent, 91, engine::Tool::Release { target: child, revision, again: None });
+    assert_eq!(
+        driver.answered(91),
+        Some(&engine::CallAnswer::Revised { task: child, revision: live(&driver, child).revisions.spec })
+    );
     let task = live(&driver, child);
     assert_eq!(task.tries, tasks::Tries::NONE);
     assert!(matches!(task.phase, tasks::Phase::Active(_)));

@@ -114,3 +114,14 @@ fn a_standing_task_keeps_its_promises_at_focused_crash_cuts() {
 fn a_run_budget_keeps_its_promises_at_focused_crash_cuts() {
     crashed_at(jig_conformance::scenarios::Scenario::RunBudget, [1, 10, 21]);
 }
+
+#[test]
+fn a_run_amendment_sees_the_partys_committed_spec_revision() {
+    jig_conformance::scenarios::run::<Temper>(
+        jig_conformance::scenarios::Scenario::RacingDecisions,
+        jig_conformance::Cut::None,
+        71,
+    )
+    .expect("revision race")
+    .expect("applicable");
+}

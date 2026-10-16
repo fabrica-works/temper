@@ -137,7 +137,7 @@ impl Client for Script {
         self.pending = true;
         true
     }
-    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
+    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
         assert_eq!(link, b"private-link");
         self.sign_ins.push(self.now);
         Ok(())

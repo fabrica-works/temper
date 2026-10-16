@@ -1,5 +1,5 @@
+use jig_client_domain::contract;
 use jig_client_protocol_link as link;
-use jig_domain_client::contract;
 use skein_lib::{RequestRecord, Token};
 use temper_client_domain as client;
 pub const ATTEMPT: Token = Token::new(101);
@@ -73,7 +73,7 @@ pub fn adopted(protection: client::forge::Protection) -> client::forge::Adopted 
 pub fn send_adoption(attempt: Token) -> client::Request {
     client::Request::Send { attempt, key: [9; 16], ask: client::Ask::Forge(client::forge::Ask::Adopt(adoption())) }
 }
-pub fn final_answer(attempt: Token, answer: link::Answered) -> link::Request {
+pub fn final_answer(attempt: Token, answer: jig_client_domain::Answered) -> link::Request {
     link::Request::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(answer) }
 }
 pub fn role_refusal() -> contract::Refusal {
@@ -197,10 +197,8 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
     visible(builder.finish())
 }
 pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> skein_ui::Tree {
-    use jig_domain_client::{
-        Event as JigEvent,
-        contract::{Delivery, ReadResult, Subject, WatchEvent},
-    };
+    use jig_client_domain::contract::{Delivery, ReadResult, Subject, WatchEvent};
+    use jig_domain_client::Event as JigEvent;
     use skein_lib::{Env, Queue, Wall};
     use temper_client_domain::{Event, JigOut, Request};
     let mut limits = crate::limits::native().client;
@@ -228,12 +226,7 @@ pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> s
     if signed_out {
         client::step(&mut root, &env, Event::SignedOut, &mut out);
     } else {
-        client::step(
-            &mut root,
-            &env,
-            Event::Jig(JigEvent::Hello { versions: contract::VersionRange { first: 7, last: 7 } }),
-            &mut out,
-        );
+        client::step(&mut root, &env, Event::Jig(JigEvent::Hello { served: true }), &mut out);
         for _ in 0..128 {
             let Some(request) = out.pop() else {
                 break;

@@ -131,7 +131,7 @@ impl Person {
         client.iterate(now, wall);
         while let Some(signing) = client.signing() {
             assert!(
-                matches!(signing, jig_client_shell_native::Signing::SignedIn { .. }),
+                matches!(signing, jig_client_protocol_link::Signing::SignedIn { .. }),
                 "native signing failed: {signing:?}"
             );
         }

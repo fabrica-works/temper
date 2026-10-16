@@ -132,7 +132,7 @@ pub fn root(
         match scenario {
             Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6, 15],
             Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4, 15],
-            Some(Scenario::StandingTask | Scenario::RunBudget) => &[1, 2, 15],
+            Some(Scenario::StandingTask | Scenario::RunBudget | Scenario::RacingDecisions) => &[1, 2, 15],
             Some(Scenario::ShrinkingPool) => panic!("forge has no pooled holds"),
             None => &[1, 8, 13, 2, 3, 4, 6, 15],
         }

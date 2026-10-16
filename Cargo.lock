@@ -1728,6 +1728,7 @@ name = "temper"
 version = "0.0.0"
 dependencies = [
  "jig-channel-world",
+ "jig-client-protocol-link",
  "jig-client-shell-native",
  "jig-client-view",
  "jig-domain-client",
@@ -1772,6 +1773,7 @@ dependencies = [
 name = "temper-client-domain"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
  "jig-domain-client",
  "skein-lib",
 ]
@@ -1788,6 +1790,8 @@ dependencies = [
 name = "temper-client-shell-terminal"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
+ "jig-client-protocol-http",
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-shell-native",
@@ -1810,6 +1814,7 @@ dependencies = [
 name = "temper-client-view"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
  "jig-client-view",
  "jig-domain-client",
  "skein-lib",
@@ -1822,6 +1827,7 @@ name = "temper-client-world"
 version = "0.0.0"
 dependencies = [
  "jig-boundary",
+ "jig-client-domain",
  "jig-client-test-domain",
  "jig-client-view",
  "jig-client-world",
@@ -2051,6 +2057,7 @@ dependencies = [
  "jig-domain-brief",
  "jig-domain-host",
  "jig-domain-notes",
+ "jig-domain-people",
  "jig-domain-tasks",
  "skein-json",
  "skein-lib",
@@ -2128,6 +2135,7 @@ name = "temper-one-process-world"
 version = "0.0.0"
 dependencies = [
  "jig-channel-world",
+ "jig-client-domain",
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-shell-native",

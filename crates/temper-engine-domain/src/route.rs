@@ -326,6 +326,10 @@ pub(crate) fn decide_call(
         | core::CallPart::Proposed { .. }
         | core::CallPart::ProposalDecided { .. }
         | core::CallPart::ProposalRefused(_)
+        | core::CallPart::Again { .. }
+        | core::CallPart::PassedUp { .. }
+        | core::CallPart::Revised { .. }
+        | core::CallPart::Moved { .. }
         | core::CallPart::Controlled
         | core::CallPart::ControlRefused(_)
         | core::CallPart::ControlDenied { .. }

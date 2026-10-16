@@ -17,6 +17,14 @@ pub use jig_domain_core::{
 /// Exact typed answer kept for replay across a lost channel or root restart.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CallAnswer {
+    /// A release must name again exactly when its effect is uncertain.
+    Again { task: u64, required: bool },
+    /// The caller exceeded its authority and passed the escalation up.
+    PassedUp { task: u64 },
+    /// A control committed at the spec revision its next amendment names.
+    Revised { task: u64, revision: u64 },
+    /// The revision named by the caller moved to this value.
+    Moved { task: u64, now: jig_domain_people::Moved },
     /// A forge write joined the named call's decision; later attempts can reask for its settled result.
     ForgeEffect { entry: u64, deadline: skein_lib::Wall, outcome: Option<temper_engine_domain_forge_client::Outcome> },
     /// A forge write was refused before an outbox entry existed.
@@ -79,6 +87,14 @@ impl CallAnswer {
     #[must_use]
     pub fn core_part(&self, connector: u16) -> jig_domain_core::CallPart {
         match self {
+            CallAnswer::Again { task, required } => {
+                jig_domain_core::CallPart::Again { task: *task, required: *required }
+            }
+            CallAnswer::PassedUp { task } => jig_domain_core::CallPart::PassedUp { task: *task },
+            CallAnswer::Revised { task, revision } => {
+                jig_domain_core::CallPart::Revised { task: *task, revision: *revision }
+            }
+            CallAnswer::Moved { task, now } => jig_domain_core::CallPart::Moved { task: *task, now: *now },
             CallAnswer::ForgeEffect { entry, deadline, outcome } => {
                 let outcome = match outcome {
                     Some(temper_engine_domain_forge_client::Outcome::Made { .. }) => {
@@ -151,6 +167,14 @@ impl CallAnswer {
     #[must_use]
     pub fn from_core(part: &jig_domain_core::CallPart) -> Option<CallAnswer> {
         Some(match part {
+            jig_domain_core::CallPart::Again { task, required } => {
+                CallAnswer::Again { task: *task, required: *required }
+            }
+            jig_domain_core::CallPart::PassedUp { task } => CallAnswer::PassedUp { task: *task },
+            jig_domain_core::CallPart::Revised { task, revision } => {
+                CallAnswer::Revised { task: *task, revision: *revision }
+            }
+            jig_domain_core::CallPart::Moved { task, now } => CallAnswer::Moved { task: *task, now: *now },
             jig_domain_core::CallPart::Effect { entry, deadline, .. } => {
                 CallAnswer::ForgeEffect { entry: *entry, deadline: *deadline, outcome: None }
             }
@@ -666,6 +690,10 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
         | CallAnswer::ProposalRefused(_)
         | CallAnswer::EscalationDecided { .. }
         | CallAnswer::EscalationRefused(_)
+        | CallAnswer::Again { .. }
+        | CallAnswer::PassedUp { .. }
+        | CallAnswer::Revised { .. }
+        | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
         | CallAnswer::ControlRefused(_)
         | CallAnswer::ControlDenied { .. }

@@ -5,7 +5,7 @@ use crate::{
     referee::{self, Capture, Store, Wire},
     stories,
 };
-use jig_client_shell_native::Signing;
+use jig_client_protocol_link::Signing;
 use skein_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
@@ -355,8 +355,8 @@ impl Host for Person {
                         let frame = self.wire.received.iter().any(|event| {
                             matches!(
                                 event,
-                                referee::client::Received::Delivery(jig_domain_client::contract::Delivery::Frame(_))
-                                    | referee::client::Received::Read(jig_domain_client::contract::ReadValue::Frame(_))
+                                referee::client::Received::Delivery(jig_client_domain::contract::Delivery::Frame(_))
+                                    | referee::client::Received::Read(jig_client_domain::contract::ReadValue::Frame(_))
                             )
                         });
                         PROGRESS.with(|progress| progress.borrow_mut().press_had_frame.push((self.life, frame)));

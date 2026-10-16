@@ -353,6 +353,10 @@ pub(crate) fn keep_connector_answer(
         | CallAnswer::Proposed { .. }
         | CallAnswer::ProposalDecided { .. }
         | CallAnswer::ProposalRefused(_)
+        | CallAnswer::Again { .. }
+        | CallAnswer::PassedUp { .. }
+        | CallAnswer::Revised { .. }
+        | CallAnswer::Moved { .. }
         | CallAnswer::Controlled
         | CallAnswer::ControlRefused(_)
         | CallAnswer::ControlDenied { .. }

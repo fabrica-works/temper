@@ -1,4 +1,4 @@
-use jig_domain_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
+use jig_client_domain::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall, Writer};
 use temper_client_domain::{Limits, forge};
 pub const FORGE: u16 = 1;
@@ -161,7 +161,7 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
     None
 }
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
-    use jig_domain_client::contract::{
+    use jig_client_domain::contract::{
         self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, ProjectRole, Subject, WatchEvent,
     };
     use temper_client_domain::{Address, Event, JigOut, Request};
@@ -195,12 +195,7 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             chat_budget: 0,
         })
         .expect("one project");
-    temper_client_domain::step(
-        &mut root,
-        &env,
-        Event::Jig(jig_domain_client::Event::Hello { versions: contract::VersionRange { first: 7, last: 7 } }),
-        &mut out,
-    );
+    temper_client_domain::step(&mut root, &env, Event::Jig(jig_domain_client::Event::Hello { served: true }), &mut out);
     temper_client_domain::step(
         &mut root,
         &env,

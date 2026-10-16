@@ -5,7 +5,7 @@ use crate::{
     store::{Key, Record},
 };
 use alloc::boxed::Box;
-use jig_domain_client::contract::{Ask as JigAsk, Read, Subject};
+use jig_client_domain::contract::{Ask as JigAsk, Read, Subject};
 use skein_lib::{List, RequestEnvelope, RequestKey, Token};
 /// One keyed request, tagged with the child that owns its meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,7 +17,7 @@ pub enum Ask {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
     Forge(crate::forge::Answer),
-    Jig(jig_domain_client::contract::Answer),
+    Jig(jig_client_domain::contract::Answer),
 }
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,7 +43,7 @@ pub enum JigOut {
     Open { watch: Token, subject: Subject },
     Continue { watch: Token, subject: Subject },
     Close { watch: Token },
-    Answered { asked: Token, answer: jig_domain_client::contract::Answer },
+    Answered { asked: Token, answer: jig_client_domain::contract::Answer },
     Unknown { asked: Token },
 }
 /// Bounded routing and child facts for the shell to observe.

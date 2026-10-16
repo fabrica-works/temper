@@ -1,6 +1,6 @@
 mod fixtures;
 mod forge_page;
-use jig_domain_client::contract::{Part, PartScope};
+use jig_client_domain::contract::{Part, PartScope};
 use skein_ui::Role;
 
 #[test]
@@ -61,7 +61,7 @@ fn each_numbered_kind_says_its_words_and_others_kind_n() {
 }
 #[test]
 fn a_part_needing_a_document_says_shown_on_the_forge() {
-    use jig_domain_client::contract::ProposalKey;
+    use jig_client_domain::contract::ProposalKey;
     let words = fixtures::words();
     let connector = fixtures::FORGE;
     let parts = [
@@ -69,7 +69,7 @@ fn a_part_needing_a_document_says_shown_on_the_forge() {
         Part::Result { connector, task: 1 },
         Part::Effect {
             connector,
-            proposal: ProposalKey { proposer: jig_domain_client::contract::Proposer::Task(1), number: 1 },
+            proposal: ProposalKey { proposer: jig_client_domain::contract::Proposer::Task(1), number: 1 },
         },
         Part::OwnerEffect { connector, proposal: 1 },
         Part::Outbox { connector, scope: PartScope::Project(fixtures::PROJECT), entry: 1 },

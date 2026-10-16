@@ -33,6 +33,7 @@ pub fn party(event: core::Event) -> engine::Event {
         core::Event::Unwatch { watcher } => PartyInput::Unwatch { watcher },
         core::Event::Delivered { watcher } => PartyInput::Delivered { watcher },
         core::Event::StreamDelivered { watcher } => PartyInput::StreamDelivered { watcher },
+        core::Event::SubscribeTopic { .. } => panic!("the client kit does not make SubscribeTopic"),
         core::Event::Fill { .. } => panic!("the client kit does not make Fill"),
         core::Event::Stopping => panic!("the client kit does not make Stopping"),
         core::Event::Marked { .. } => panic!("the client kit does not make Marked"),

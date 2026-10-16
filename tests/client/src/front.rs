@@ -78,9 +78,9 @@ impl Joint {
             keyed_fault: None,
             reads: 0,
             read_loads: BTreeSet::new(),
-            transport: Transport::new(jig_domain_client::contract::VersionRange {
-                first: jig_domain_client::contract::CLIENT_VERSION,
-                last: jig_domain_client::contract::CLIENT_VERSION,
+            transport: Transport::new(jig_client_domain::contract::VersionRange {
+                first: jig_client_protocol_wire::VERSION,
+                last: jig_client_protocol_wire::VERSION,
             }),
             limits,
             callbacks: Vec::new(),
@@ -337,7 +337,7 @@ impl Front<Temper> for Joint {
     fn received(&mut self, who: ClientId, event: &Event) {
         if let Event::Jig(jig_domain_client::Event::Watch {
             watch,
-            event: jig_domain_client::contract::WatchEvent::Delivered(_),
+            event: jig_client_domain::contract::WatchEvent::Delivered(_),
         }) = event
             && let Some(event) = self.transport.taken(who, *watch)
         {

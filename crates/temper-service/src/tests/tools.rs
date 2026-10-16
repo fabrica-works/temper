@@ -23,14 +23,17 @@ fn call(activation: u64, tool: &[u8], input: &[u8]) -> jig_domain_fleet::Call {
 }
 #[test]
 fn a_call_is_decoded_into_the_roots_tool() {
-    let event = crate::tools::decode(TO, 3, 7, &call(7, b"release", br#"{"target":5}"#));
+    let event = crate::tools::decode(TO, 3, 7, &call(7, b"release", br#"{"target":5,"revision":1}"#));
     let root::Event::Worker(root::WorkerInput::DecodedHostCall { to, body }) = event else { panic!("decoded call") };
     assert_eq!(to, TO);
-    assert_eq!(body, root::Call { completion: 2, position: 1, tool: root::Tool::Release { target: 5 } });
+    assert_eq!(
+        body,
+        root::Call { completion: 2, position: 1, tool: root::Tool::Release { target: 5, revision: 1, again: None } }
+    );
 }
 #[test]
 fn a_call_of_another_activation_is_answered_an_error() {
-    let event = crate::tools::decode(TO, 3, 8, &call(7, b"release", br#"{"target":5}"#));
+    let event = crate::tools::decode(TO, 3, 8, &call(7, b"release", br#"{"target":5,"revision":1}"#));
     let root::Event::Worker(root::WorkerInput::RenderedHostCall { to, answer }) = event else {
         panic!("rendered error")
     };

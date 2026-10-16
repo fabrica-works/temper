@@ -11,6 +11,7 @@ name = "temper"
 path = "src/main.rs"
 
 [dependencies]
+jig-client-protocol-link.workspace = true
 temper-service.workspace = true
 temper-client-shell-terminal.workspace = true
 jig-client-view.workspace = true

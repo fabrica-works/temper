@@ -16,7 +16,7 @@ pub trait Client {
     fn act(&mut self, node: NodeId, act: Act) -> bool;
     /// # Errors
     /// Refuses a link that is malformed or names another engine.
-    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_shell_native::Unlinked>;
+    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked>;
     fn notice(&mut self) -> Option<Notice>;
     fn close(&mut self);
 }

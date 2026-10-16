@@ -1,8 +1,8 @@
 use crate::{Address, Event, JigOut, Limits, Request, forge, store::Record};
-use jig_domain_client::boundary::Offset;
-use jig_domain_client::contract::{
+use jig_client_domain::contract::{
     self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent,
 };
+use jig_domain_client::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 pub const FORGE: u16 = 1;
 pub const OTHER: u16 = 2;
@@ -242,11 +242,6 @@ pub fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
 pub fn confirm(root: &mut crate::Domain, watch: Token, party: u64, out: &mut Queue<Request>) {
     let limits = limits();
     let env = env(&limits);
-    crate::step(
-        root,
-        &env,
-        Event::Jig(jig_domain_client::Event::Hello { versions: contract::VersionRange { first: 7, last: 7 } }),
-        out,
-    );
+    crate::step(root, &env, Event::Jig(jig_domain_client::Event::Hello { served: true }), out);
     crate::step(root, &env, Event::Jig(jig_domain_client::Event::Watch { watch, event: frame(party) }), out);
 }

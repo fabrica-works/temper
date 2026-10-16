@@ -137,11 +137,11 @@ pub enum Tool {
     /// Create one authorized batch of direct task delegates.
     Delegate { batch: Box<[Delegate]> },
     /// Amend one live delegate after authority fitting and finite source checks.
-    Amend { target: u64, amendment: tasks::Amendment },
+    Amend { target: u64, revision: u64, amendment: tasks::Amendment },
     /// Cancel one live delegate's whole subtree with a bounded reason.
     Cancel { target: u64, reason: Box<[u8]> },
     /// Release one held delegate.
-    Release { target: u64 },
+    Release { target: u64, revision: u64, again: Option<bool> },
     /// Send whole bounded words to a task the caller references.
     Message { target: u64, form: MessageForm, words: Box<[u8]> },
     /// Give two tasks referenced by the caller reciprocal references.

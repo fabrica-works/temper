@@ -14,6 +14,7 @@ use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client::api;
 type World = Harness<Temper>;
+mod revisions;
 fn check(holds: bool, why: &str) -> Result<(), Violation> {
     if holds { Ok(()) } else { Err(Violation { promise: Promise::Lost, why: why.into() }) }
 }
@@ -354,6 +355,8 @@ impl ScenarioApplication for Temper {
                             key: 1,
                             overlap: tasks::RecurringOverlap::Skip,
                             batch: Box::new([tasks::New {
+                                label: 0,
+                                flags: tasks::Flags::PLAIN,
                                 number: 1,
                                 project: 1,
                                 executor: tasks::Executor::Agent { charter: 1 },
@@ -502,6 +505,8 @@ impl ScenarioApplication for Temper {
                     world.peers.policy_generation += 1;
                 }
             }
+            Action::PartyAmend => revisions::party_amend(world)?,
+            Action::RunAmend => revisions::run_amend(world),
             Action::FillPool | Action::ShrinkPool | Action::FinishHolder(_) => {
                 panic!("ShrinkingPool is not applicable: forge has no pooled holds")
             }
@@ -510,6 +515,7 @@ impl ScenarioApplication for Temper {
     }
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         match scenario {
+            Scenario::RacingDecisions => revisions::check(world),
             Scenario::LateCopy => {
                 check_lazy(world.systems.effects.len() == 2 && world.systems.effects.iter().all(|x| x.applied), || {
                     format!("idempotent copies effects={:?} answers={:?}", world.systems.effects, world.peers.answers)

@@ -181,6 +181,33 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             text.add(b" decided")?;
             false
         }
+        CallAnswer::Again { task, required } => {
+            text.add(b"Refused: task ")?;
+            text.number(*task)?;
+            text.add(if *required {
+                b" holds an effect whose outcome is uncertain; say again: true or false"
+            } else {
+                b" holds no uncertain effect; leave again out"
+            })?;
+            true
+        }
+        CallAnswer::PassedUp { task } => {
+            text.add(b"Beyond your authority: task ")?;
+            text.number(*task)?;
+            text.add(b"'s escalation was passed up")?;
+            false
+        }
+        CallAnswer::Revised { task, revision } => {
+            text.add(b"Done: task ")?;
+            text.number(*task)?;
+            text.add(b" is at spec revision ")?;
+            text.number(*revision)?;
+            false
+        }
+        CallAnswer::Moved { task, now } => {
+            moved(&mut text, *task, now)?;
+            true
+        }
         CallAnswer::Controlled => {
             text.add(b"Done")?;
             false
@@ -645,4 +672,53 @@ fn file_text(text: &mut Text, file: &api::File) -> Result<(), Problem> {
         None => text.add(b"[absent]")?,
     }
     text.add(b"\n")
+}
+
+fn moved(text: &mut Text, task: u64, now: &jig_domain_people::Moved) -> Result<(), Problem> {
+    use jig_domain_people::Moved;
+    text.add(b"Moved: task ")?;
+    text.number(task)?;
+    let (kind, revision) = match now {
+        Moved::Spec { revision } => (b" is at spec revision ".as_slice(), *revision),
+        Moved::Person { revision } => (b" is at person revision ".as_slice(), *revision),
+        Moved::Note { revision } => (b" is at note revision ".as_slice(), u64::from(*revision)),
+        Moved::Hold { revision, .. } => (b" is held at hold revision ".as_slice(), *revision),
+    };
+    text.add(kind)?;
+    text.number(revision)?;
+    text.add(b" now")?;
+    if let Moved::Hold { reason, .. } = now {
+        text.add(b", ")?;
+        text.add(hold_reason(reason))?;
+    }
+    Ok(())
+}
+
+fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
+    use jig_domain_people::{FailureClass, HoldReason};
+    match reason {
+        HoldReason::Failures { class } => match class {
+            FailureClass::Transient => b"for transient failures",
+            FailureClass::Permanent => b"for permanent failures",
+            FailureClass::Run => b"for run failures",
+            FailureClass::Agent => b"for agent failures",
+            FailureClass::Lost => b"for lost runs",
+            FailureClass::Invalid => b"for invalid results",
+        },
+        HoldReason::Stalled => b"because it stalled",
+        HoldReason::Dependency { .. } => b"for its dependency",
+        HoldReason::Stopped => b"because it was stopped",
+        HoldReason::StoppedBy { .. } => b"because a party stopped it",
+        HoldReason::Drift => b"for drift",
+        HoldReason::Effects => b"for its effects",
+        HoldReason::EffectFailed => b"for a failed effect",
+        HoldReason::Uncertain { .. } => b"for an uncertain effect",
+        HoldReason::Budget => b"for its budget",
+        HoldReason::Deadline => b"for its deadline",
+        HoldReason::HoldsWaited => b"for waiting on holds",
+        HoldReason::ResourceUnavailable => b"for an unavailable resource",
+        HoldReason::ResourceAccess => b"for resource access",
+        HoldReason::PoolLost { .. } => b"for a lost pool",
+        HoldReason::Procedure => b"for its procedure",
+    }
 }

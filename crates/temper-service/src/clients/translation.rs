@@ -26,7 +26,8 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         core::Event::Unwatch { watcher } => root::PartyInput::Unwatch { watcher },
         core::Event::Delivered { watcher } => root::PartyInput::Delivered { watcher },
         core::Event::StreamDelivered { watcher } => root::PartyInput::StreamDelivered { watcher },
-        core::Event::Fill { .. }
+        core::Event::SubscribeTopic { .. }
+        | core::Event::Fill { .. }
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }

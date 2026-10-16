@@ -1,7 +1,7 @@
 //! Keep: bounded parts held until their page generation leaves.
 //! Replace: Ops connector subjects with the forge's parts, which need no reads.
 //! `Show` retains a part; `PartsLeft` frees that generation and every older one.
-use jig_domain_client::contract::Part;
+use jig_client_domain::contract::Part;
 use skein_lib::{Env, List, Queue, Time};
 mod form;
 mod vocabulary;
@@ -22,7 +22,7 @@ pub enum Event {
     Answered { request: skein_lib::Token, answer: Answer },
     Went { address: Address },
     Left,
-    Served { versions: jig_domain_client::contract::VersionRange },
+    Served { versions: jig_client_domain::contract::VersionRange },
     Show { part: Part, generation: u32 },
     PartsLeft { generation: u32 },
 }

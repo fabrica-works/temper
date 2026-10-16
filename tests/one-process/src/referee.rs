@@ -482,7 +482,7 @@ fn settled(store: &Store) -> u32 {
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "the conformance receipts select committed client documents")]
 fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) -> Vec<rules::Receipt> {
-    use jig_domain_client::contract as c;
+    use jig_client_domain::contract as c;
     match event {
         client::Received::SignedIn(party) => {
             let receipts: Vec<_> = store

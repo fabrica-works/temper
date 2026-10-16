@@ -2,8 +2,8 @@ use crate::{
     limits,
     route::{self, Down, Notice, Up},
 };
+use jig_client_domain::contract;
 use jig_client_protocol_link as link;
-use jig_domain_client::contract;
 use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
 mod family;
@@ -16,7 +16,7 @@ fn a_jig_read_reaches_the_link_with_its_own_token() {
         client::Request::Jig(client::JigOut::Read { read: fixtures::READ, what: fixtures::inbox_read() }),
         &mut fixtures::family(),
     );
-    let Down::Link(link::Event::Read { read, what: link::Readable::Jig(what) }) = down else {
+    let Down::Link(link::Event::Read { read, what: jig_client_domain::Readable::Jig(what) }) = down else {
         panic!("jig read reaches its link");
     };
     assert_eq!(read, fixtures::READ);
@@ -118,7 +118,7 @@ fn a_family_readout_or_delivery_nobody_asked_for_is_a_notice() {
             "read",
             link::Request::Read {
                 read: fixtures::READ,
-                result: link::Readout::Family { family: 1, record: Some(Box::from(*b"record")) },
+                result: jig_client_domain::Readout::Family { family: 1, record: Some(Box::from(*b"record")) },
             },
         ),
         (

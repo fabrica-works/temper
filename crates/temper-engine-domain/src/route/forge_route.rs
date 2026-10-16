@@ -2359,6 +2359,10 @@ pub(crate) fn effect_answer(domain: &Domain, key: CallKey, part: &jig_domain_cor
         | jig_domain_core::CallPart::Proposed { .. }
         | jig_domain_core::CallPart::ProposalDecided { .. }
         | jig_domain_core::CallPart::ProposalRefused(_)
+        | jig_domain_core::CallPart::Again { .. }
+        | jig_domain_core::CallPart::PassedUp { .. }
+        | jig_domain_core::CallPart::Revised { .. }
+        | jig_domain_core::CallPart::Moved { .. }
         | jig_domain_core::CallPart::Controlled
         | jig_domain_core::CallPart::ControlRefused(_)
         | jig_domain_core::CallPart::ControlDenied { .. }

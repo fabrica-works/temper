@@ -40,10 +40,10 @@ const SPECS: [Spec; 34] = [
     Spec { name: b"effect_forge", description: b"Ask the connector for a keyed forge write.", schema: br#"{"type":"object","properties":{"repository":{"type":"object"},"resource":{"type":"object"},"write":{"type":"object"}},"required":["repository","resource","write"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"subscribe_forge", description: b"Hear matching forge news.", schema: br#"{"type":"object","properties":{"topic":{"type":"object"},"own_change":{"type":"integer","minimum":1},"paths":{"type":"array","items":{"type":"string"}}},"required":["topic"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"delegate", description: b"Create an authorized batch of direct child tasks.", schema: br#"{"type":"object","properties":{"batch":{"type":"array","items":{"type":"object"}}},"required":["batch"]}"#, effect: run::HostEffect::Write },
-    Spec { name: b"amend", description: b"Amend a live delegate within authority.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1},"amendment":{"type":"object"}},"required":["target","amendment"]}"#, effect: run::HostEffect::Write },
+    Spec { name: b"amend", description: b"Amend a live delegate within authority.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1},"revision":{"type":"integer","minimum":0},"amendment":{"type":"object"}},"required":["target","revision","amendment"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"message", description: b"Send words, a question or an answer to a referenced task.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1},"form":{"type":"string","enum":["words","question","answer"]},"words":{"type":"string"},"question":{"type":"integer","minimum":1}},"required":["target","form","words"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"cancel", description: b"Cancel a live delegate and its subtree.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1},"reason":{"type":"string"}},"required":["target","reason"]}"#, effect: run::HostEffect::Write },
-    Spec { name: b"release", description: b"Release a held delegate.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1}},"required":["target"]}"#, effect: run::HostEffect::Write },
+    Spec { name: b"release", description: b"Release a held delegate.", schema: br#"{"type":"object","properties":{"target":{"type":"integer","minimum":1},"revision":{"type":"integer","minimum":0},"again":{"type":"boolean"}},"required":["target","revision"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"introduce", description: b"Give two referenced tasks reciprocal references.", schema: br#"{"type":"object","properties":{"left":{"type":"integer","minimum":1},"right":{"type":"integer","minimum":1}},"required":["left","right"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"unsubscribe", description: b"Remove a standing subscription.", schema: br#"{"type":"object","properties":{"subscription":{"type":"integer","minimum":1}},"required":["subscription"]}"#, effect: run::HostEffect::Write },
     Spec { name: b"withdraw", description: b"Withdraw one of your pending proposals.", schema: br#"{"type":"object","properties":{"proposal":{"type":"integer","minimum":1}},"required":["proposal"]}"#, effect: run::HostEffect::Write },
@@ -120,6 +120,7 @@ pub fn call(name: run::CallName, tool: &[u8], input: &run::HostInput) -> Result<
         b"delegate" => engine::Tool::Delegate { batch: nested::delegates(value.required(b"batch")?)? },
         b"amend" => engine::Tool::Amend {
             target: positive(&value, b"target")?,
+            revision: number(&value, b"revision")?,
             amendment: nested::amendment(value.required(b"amendment")?)?,
         },
         b"message" => {
@@ -137,7 +138,14 @@ pub fn call(name: run::CallName, tool: &[u8], input: &run::HostInput) -> Result<
         b"cancel" => {
             engine::Tool::Cancel { target: positive(&value, b"target")?, reason: value.required(b"reason")?.text()? }
         }
-        b"release" => engine::Tool::Release { target: positive(&value, b"target")? },
+        b"release" => engine::Tool::Release {
+            target: positive(&value, b"target")?,
+            revision: number(&value, b"revision")?,
+            again: match value.field(b"again")? {
+                Some(again) => Some(again.boolean()?),
+                None => None,
+            },
+        },
         b"introduce" => {
             engine::Tool::Introduce { left: positive(&value, b"left")?, right: positive(&value, b"right")? }
         }

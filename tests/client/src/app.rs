@@ -1,12 +1,10 @@
 //! The shell adapter observes requests and trees, never a domain's decisions.
+use jig_client_domain::contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd};
 use jig_client_world::{
     harness::{App, CardKey, Duty, Receipt, Seen, Sent, StoreWrite},
     observe,
 };
-use jig_domain_client::{
-    boundary::Offset,
-    contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd},
-};
+use jig_domain_client::boundary::Offset;
 use skein_lib::{Env, List, Queue, RequestEnvelope, Time};
 use skein_ui::{Act, NodeId, Patch, Tree};
 use temper_client_domain::{self as domain, Action, Address, Event, JigOut, Request};

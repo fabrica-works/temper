@@ -237,7 +237,13 @@ impl Driver {
     /// A signed-in owner's chat, assigned to the one worker on channel 7.
     #[must_use]
     pub fn chat() -> (Driver, engine::Assignment) {
-        let mut driver = Driver::new(Store::new());
+        Self::configured_chat(config(91), &limits())
+    }
+
+    /// A chat with the story's bounded configuration.
+    #[must_use]
+    pub fn configured_chat(configuration: engine::Config, bounds: &engine::Limits) -> (Driver, engine::Assignment) {
+        let mut driver = Driver::configured(Store::new(), configuration, bounds);
         driver.hello(Token::new(7));
         driver.settle();
         driver.sign_in();

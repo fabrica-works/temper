@@ -154,11 +154,11 @@ pub(crate) fn relay_payload(
                         },
                     }));
                 }
-                Tool::Amend { target, amendment } => {
+                Tool::Amend { target, revision, amendment } => {
                     domain.work.push(Work::Core(core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: core::NamedAction::Amend { target, amendment },
+                        action: core::NamedAction::Amend { target, revision, amendment },
                     }));
                 }
                 Tool::Cancel { target, reason } => {
@@ -168,14 +168,11 @@ pub(crate) fn relay_payload(
                         action: core::NamedAction::Control { target, control: tasks::Control::Cancel { reason } },
                     }));
                 }
-                Tool::Release { target } => {
+                Tool::Release { target, revision, again } => {
                     domain.work.push(Work::Core(core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: core::NamedAction::Control {
-                            target,
-                            control: tasks::Control::Release { again: None, message: None },
-                        },
+                        action: core::NamedAction::Release { target, revision, again },
                     }));
                 }
                 Tool::Message { target, form, words } => {

@@ -71,6 +71,8 @@ jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-engine-clients = { git = "https://github.com/forgetic/jig.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
+jig-client-domain = { git = "https://github.com/forgetic/jig.git" }
+jig-client-protocol-http = { git = "https://github.com/forgetic/jig.git" }
 jig-client-protocol-link = { git = "https://github.com/forgetic/jig.git" }
 jig-client-shell-native = { git = "https://github.com/forgetic/jig.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }

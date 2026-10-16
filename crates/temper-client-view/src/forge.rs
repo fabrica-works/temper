@@ -2,7 +2,7 @@
 //! Replace: Ops subjects with the forge's resource words and fixed paragraph.
 use crate::words::{Word, Words};
 use alloc::boxed::Box;
-use jig_domain_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
+use jig_client_domain::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Reader, Token, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, SlotRef, phrases::Hole};
 pub mod bindings;

@@ -8,6 +8,8 @@ use smith_domain as smith;
 use smith_domain_run as run;
 use temper_engine_domain as engine;
 
+const CALL_TASK: u64 = 23;
+
 use crate::{ChangeResource, Problem, answer, call, result, start, tools};
 
 fn decoded(tool: &[u8], json: &[u8]) -> Result<engine::Call, Problem> {
@@ -142,10 +144,10 @@ fn every_declared_tool_decodes_its_minimum_shape_and_rejects_a_wrong_shape() {
         (b"effect_forge", br#"{"repository":{"forge":1,"repository":2},"resource":{"kind":"repository"},"write":{"kind":"close","number":3}}"#, br#"{"repository":{"forge":1,"repository":2},"resource":{},"write":{"kind":"close","number":3}}"#),
         (b"subscribe_forge", br#"{"topic":{"repository":{"forge":1,"repository":2},"kind":"pull","number":3}}"#, br#"{"topic":{}}"#),
         (b"delegate", br#"{"batch":[]}"#, br#"{"batch":{}}"#),
-        (b"amend", br#"{"target":3,"amendment":{"reason":"x"}}"#, br#"{"target":3,"amendment":{}}"#),
+        (b"amend", br#"{"target":3,"revision":1,"amendment":{"reason":"x"}}"#, br#"{"target":3,"amendment":{}}"#),
         (b"message", br#"{"target":3,"form":"words","words":"x"}"#, br#"{"target":3,"form":"unknown","words":"x"}"#),
         (b"cancel", br#"{"target":3,"reason":"x"}"#, br#"{"target":3}"#),
-        (b"release", br#"{"target":3}"#, br#"{"target":0}"#),
+        (b"release", br#"{"target":3,"revision":1}"#, br#"{"target":0}"#),
         (b"introduce", br#"{"left":3,"right":4}"#, br#"{"left":3}"#),
         (b"unsubscribe", br#"{"subscription":3}"#, br#"{"subscription":"x"}"#),
         (b"withdraw", br#"{"proposal":3}"#, br#"{"proposal":0}"#),
@@ -314,4 +316,114 @@ fn a_job_answer_with_an_empty_step_name_names_its_number_alone() {
     let rendered = answer(&engine::CallAnswer::ForgeRead(Box::new(Ok(read))));
     assert_eq!(rendered.text(), b"Job 8 run 7, failed step 1:\nfailing check build 3\n");
     assert!(!rendered.error(), "A read answer is no error");
+}
+
+struct RevisionCall {
+    name: &'static [u8],
+    missing: &'static [u8],
+    valid: &'static [u8],
+    again: Option<bool>,
+}
+const REVISION_CALLS: &[RevisionCall] = &[
+    RevisionCall {
+        name: b"amend",
+        missing: br#"{"target":23,"amendment":{"reason":"change"}}"#,
+        valid: br#"{"target":23,"revision":0,"amendment":{"reason":"change"}}"#,
+        again: None,
+    },
+    RevisionCall {
+        name: b"release",
+        missing: br#"{"target":23}"#,
+        valid: br#"{"target":23,"revision":0}"#,
+        again: None,
+    },
+    RevisionCall {
+        name: b"release",
+        missing: br#"{"target":23,"again":false}"#,
+        valid: br#"{"target":23,"revision":0,"again":false}"#,
+        again: Some(false),
+    },
+    RevisionCall {
+        name: b"release",
+        missing: br#"{"target":23,"again":true}"#,
+        valid: br#"{"target":23,"revision":0,"again":true}"#,
+        again: Some(true),
+    },
+];
+#[test]
+fn amend_and_release_calls_name_their_revision() {
+    for row in REVISION_CALLS {
+        assert_eq!(decoded(row.name, row.missing), Err(Problem::Missing), "{:?}", row.name);
+        let expected = if row.name == b"amend" {
+            engine::Tool::Amend {
+                target: CALL_TASK,
+                revision: 0,
+                amendment: tasks::Amendment {
+                    addressed: None,
+                    instructions: None,
+                    release: None,
+                    spec: None,
+                    wake: None,
+                    dependencies: None,
+                    authority: None,
+                    reason: Box::new(*b"change"),
+                },
+            }
+        } else {
+            engine::Tool::Release { target: CALL_TASK, revision: 0, again: row.again }
+        };
+        let body = decoded(row.name, row.valid).expect("revision-bearing tool");
+        assert_eq!(body.tool, expected, "{:?}", row.name);
+    }
+}
+
+const ANSWER_CASES: &[(engine::CallAnswer, &[u8], bool)] = &[
+    (
+        engine::CallAnswer::Again { task: CALL_TASK, required: true },
+        b"Refused: task 23 holds an effect whose outcome is uncertain; say again: true or false",
+        true,
+    ),
+    (
+        engine::CallAnswer::Again { task: CALL_TASK, required: false },
+        b"Refused: task 23 holds no uncertain effect; leave again out",
+        true,
+    ),
+    (
+        engine::CallAnswer::PassedUp { task: CALL_TASK },
+        b"Beyond your authority: task 23's escalation was passed up",
+        false,
+    ),
+    (engine::CallAnswer::Revised { task: CALL_TASK, revision: 2 }, b"Done: task 23 is at spec revision 2", false),
+    (
+        engine::CallAnswer::Moved { task: CALL_TASK, now: jig_domain_people::Moved::Spec { revision: 2 } },
+        b"Moved: task 23 is at spec revision 2 now",
+        true,
+    ),
+    (
+        engine::CallAnswer::Moved {
+            task: CALL_TASK,
+            now: jig_domain_people::Moved::Hold { revision: 2, reason: jig_domain_people::HoldReason::Stopped },
+        },
+        b"Moved: task 23 is held at hold revision 2 now, because it was stopped",
+        true,
+    ),
+    (
+        engine::CallAnswer::Moved { task: CALL_TASK, now: jig_domain_people::Moved::Person { revision: 2 } },
+        b"Moved: task 23 is at person revision 2 now",
+        true,
+    ),
+    (
+        engine::CallAnswer::Moved { task: CALL_TASK, now: jig_domain_people::Moved::Note { revision: 2 } },
+        b"Moved: task 23 is at note revision 2 now",
+        true,
+    ),
+];
+
+#[test]
+fn each_of_jigs_new_call_answers_renders_its_task_and_value() {
+    for (value, words, error) in ANSWER_CASES {
+        let rendered = answer(value);
+        assert_eq!(rendered.text(), *words, "{value:?}");
+        assert_eq!(rendered.error(), *error, "{value:?}");
+    }
 }

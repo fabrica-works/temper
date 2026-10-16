@@ -1,7 +1,7 @@
 use super::fixtures;
 use crate::route::{self, Down, Notice, Up, family};
+use jig_client_domain::contract;
 use jig_client_protocol_link as link;
-use jig_domain_client::contract;
 use temper_client_domain::{self as client, forge};
 use temper_client_protocol_wire::{self as wire, CLIENT_VERSION, FORGE, v1 as w};
 
@@ -52,9 +52,9 @@ fn protection_rule() -> w::Protection {
         .expect("rule fits"),
     )
 }
-fn answer(outcome: w::Outcome) -> link::Family {
+fn answer(outcome: w::Outcome) -> jig_client_domain::Family {
     let record = w::AdoptAnswer::new(&fixtures::wire_limits(), w::AdoptAnswerParts { outcome }).expect("outcome fits");
-    link::Family { family: FORGE, version: CLIENT_VERSION, bytes: wire::answer(&record) }
+    jig_client_domain::Family { family: FORGE, version: CLIENT_VERSION, bytes: wire::answer(&record) }
 }
 fn refused(reason: w::ForgeReason) -> w::Outcome {
     w::Outcome::ForgeRefused(
@@ -118,11 +118,11 @@ fn each_outcome_decodes_to_the_forge_sides_answer() {
 fn jigs_refusal_at_admission_of_a_forge_attempt_is_entrance_refused() {
     let mut family = fixtures::family();
     let sent = family::down(fixtures::send_adoption(fixtures::ATTEMPT), &mut family);
-    let Down::Link(link::Event::Send { ask: link::Ask::Family(record), .. }) = sent else {
+    let Down::Link(link::Event::Send { ask: jig_client_domain::Ask::Family(record), .. }) = sent else {
         panic!("the adoption leaves as the family's record");
     };
     assert_eq!((record.family, record.version), (FORGE, CLIENT_VERSION));
-    let refused = link::Answered::Jig(contract::Answer::Refused(fixtures::role_refusal()));
+    let refused = jig_client_domain::Answered::Jig(contract::Answer::Refused(fixtures::role_refusal()));
     let up = family::up(fixtures::final_answer(fixtures::ATTEMPT, refused), &mut family);
     let Up::Root(client::Event::Answer { answer: Some(client::Answered::Forge(answer)), .. }) = up else {
         panic!("jig's refusal reaches the forge's side");
@@ -147,11 +147,11 @@ fn a_restored_adoption_of_another_version_is_dropped() {
     let link::Saved::Table { version, mut record } = saved else {
         panic!("table saved");
     };
-    let link::Ask::Family(mut ask) = record.request else {
+    let jig_client_domain::Ask::Family(mut ask) = record.request else {
         panic!("forge saved");
     };
     ask.version = 2;
-    record.request = link::Ask::Family(ask);
+    record.request = jig_client_domain::Ask::Family(ask);
     let up = route::up(link::Request::Kept { record: link::Saved::Table { version, record } }, &mut family);
     assert!(
         matches!(up, Up::Notice(Notice::Dropped { keeper: link::Keeper::Family(FORGE) })),
@@ -179,8 +179,9 @@ fn each_attempt_terminal_frees_room_for_its_retry() {
 #[test]
 fn an_undecodable_family_answer_is_lost_and_keeps_the_keyed_request() {
     let mut family = fixtures::family();
-    let record = link::Family { family: FORGE, version: CLIENT_VERSION, bytes: Box::from(*b"invalid") };
-    let up = route::up(fixtures::final_answer(fixtures::ATTEMPT, link::Answered::Family(record)), &mut family);
+    let record = jig_client_domain::Family { family: FORGE, version: CLIENT_VERSION, bytes: Box::from(*b"invalid") };
+    let up =
+        route::up(fixtures::final_answer(fixtures::ATTEMPT, jig_client_domain::Answered::Family(record)), &mut family);
     assert!(
         matches!(up, Up::Root(client::Event::Answer { envelope: skein_lib::RequestEnvelope::Lost, answer: None, .. })),
         "an undecodable outcome cannot retire the table's request"

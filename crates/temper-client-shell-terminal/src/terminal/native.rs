@@ -5,10 +5,8 @@ use crate::{
     route,
 };
 pub(crate) fn event(event: &temper_client_domain::Event) -> Option<Notice> {
-    use jig_domain_client::{
-        Event as Jig,
-        contract::{ReadNone, ReadResult, WatchEnd},
-    };
+    use jig_client_domain::contract::{ReadNone, ReadResult, WatchEnd};
+    use jig_domain_client::Event as Jig;
     use temper_client_domain::Event;
     if matches!(
         event,

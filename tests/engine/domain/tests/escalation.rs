@@ -6,6 +6,13 @@ use skein_lib::Token;
 use temper_engine_domain::{EscalationDecisionRecord, Key, Record, Write};
 use temper_engine_domain_world::escalation::{Cut, Settings, World, run_replayed};
 use temper_engine_domain_world::escalation_referee::{REASON, Referee, Story};
+use temper_engine_domain_world::fixtures::{revision_delegate, task_amendment, tool_call};
+
+const FIRST_CALL: u64 = 61;
+const SECOND_CALL: u64 = 62;
+const STALE_CALL: u64 = 63;
+const STOP_REPLY: u64 = 123;
+const OWNER: u64 = 1;
 
 fn settled(story: Story) -> World {
     let mut world = World::new(Settings::calm(9100, story));
@@ -397,4 +404,71 @@ fn a_historical_query_retries_busy_with_a_fresh_reply_right() {
     let world = run_replayed(settings);
     assert!(world.referee.done());
     assert!(world.referee.busy_asks() > 0, "the retained seed exercises named-query pressure");
+}
+
+#[test]
+fn an_amend_naming_an_old_spec_revision_is_answered_moved() {
+    use temper_engine_domain::{CallAnswer, Tool};
+    let (mut driver, parent, child) = revision_delegate();
+    let first = driver.task(child).expect("delegate").revisions.spec;
+    let amendment = task_amendment(Some(b"second"), None, b"change");
+    tool_call(&mut driver, &parent, FIRST_CALL, Tool::Amend { target: child, revision: first, amendment });
+    let before = driver.task(child).expect("delegate").clone();
+    let amendment = task_amendment(Some(b"stale"), None, b"old view");
+    tool_call(&mut driver, &parent, STALE_CALL, Tool::Amend { target: child, revision: first, amendment });
+    assert_eq!(
+        driver.answered(STALE_CALL),
+        Some(&CallAnswer::Moved { task: child, now: people::Moved::Spec { revision: before.revisions.spec } })
+    );
+    assert_eq!(driver.task(child), Some(&before));
+}
+
+#[test]
+fn an_amends_answer_names_the_revision_its_next_amendment_names() {
+    use temper_engine_domain::{CallAnswer, Tool};
+    let (mut driver, parent, child) = revision_delegate();
+    let first = driver.task(child).expect("delegate").revisions.spec;
+    let amendment = task_amendment(Some(b"second"), None, b"change");
+    tool_call(&mut driver, &parent, FIRST_CALL, Tool::Amend { target: child, revision: first, amendment });
+    assert_eq!(driver.answered(FIRST_CALL), Some(&CallAnswer::Revised { task: child, revision: first + 1 }));
+    let Some(CallAnswer::Revised { revision, .. }) = driver.answered(FIRST_CALL) else { panic!("revised") };
+    let revision = *revision;
+    let amendment = task_amendment(Some(b"third"), None, b"next");
+    tool_call(&mut driver, &parent, SECOND_CALL, Tool::Amend { target: child, revision, amendment });
+    assert_eq!(driver.answered(SECOND_CALL), Some(&CallAnswer::Revised { task: child, revision: revision + 1 }));
+    assert_eq!(driver.task(child).expect("delegate").spec.words.as_ref(), b"third");
+}
+
+#[test]
+fn a_release_naming_an_old_hold_revision_is_answered_moved() {
+    use temper_engine_domain::{CallAnswer, Tool};
+    let (mut driver, parent, child) = revision_delegate();
+    stop_delegate(&mut driver, child, [41; 16]);
+    let first = driver.task(child).expect("held delegate").revisions.hold;
+    tool_call(&mut driver, &parent, FIRST_CALL, Tool::Release { target: child, revision: first, again: None });
+    stop_delegate(&mut driver, child, [42; 16]);
+    let before = driver.task(child).expect("held delegate").clone();
+    assert!(before.revisions.hold > first);
+    tool_call(&mut driver, &parent, STALE_CALL, Tool::Release { target: child, revision: first, again: None });
+    assert_eq!(
+        driver.answered(STALE_CALL),
+        Some(&CallAnswer::Moved {
+            task: child,
+            now: people::Moved::Hold {
+                revision: before.revisions.hold,
+                reason: people::HoldReason::StoppedBy { party: OWNER },
+            },
+        })
+    );
+    assert_eq!(driver.task(child), Some(&before));
+}
+
+fn stop_delegate(driver: &mut temper_engine_domain_world::direct::Driver, child: u64, key: [u8; 16]) {
+    driver.send(temper_engine_domain::Event::Party(temper_engine_domain::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(Token::new(STOP_REPLY)),
+        sign_in: driver.session(),
+        key,
+        ask: people::Ask::Stop { project: 1, task: child },
+    }));
+    driver.settle();
 }

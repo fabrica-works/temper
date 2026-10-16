@@ -134,11 +134,11 @@ fn each_outcome_reads_as_the_designs_sentence() {
 }
 #[test]
 fn each_kind_of_jig_refusal_uses_jigs_words() {
-    let refusal = jig_domain_client::contract::Refusal::Role { held: None };
+    let refusal = jig_client_domain::contract::Refusal::Role { held: None };
     for answer in [
         forge::Answer::CoreRefused(refusal.clone()),
         forge::Answer::EntranceRefused(
-            jig_domain_client::contract::EntranceRefusal::new(refusal.clone()).expect("entrance refusal"),
+            jig_client_domain::contract::EntranceRefusal::new(refusal.clone()).expect("entrance refusal"),
         ),
     ] {
         let mut form = form();
