@@ -154,9 +154,10 @@ Files:
 - `crates/jig-domain-core/src/templates.rs` (new: `Template`),
   `routing/vocabulary.rs` (`Limits.templates`), `memory.rs`
   (`worst_case` is `None` when `templates` is 0), `lib.rs`.
-- The `chats` member's users, 9 files in jig (from `git grep -l -E
-  '"chats"|b"chats"|\bChats\b|charters::chats|close_grace_ms|engine\.chats'`):
-  the 5 above in `jig-protocol-config`, and the JSON fixtures
+- The `chats` member's users, 10 files in jig (from `git grep -l -E
+  '"chats"|b"chats"|\bChats\b|charters::chats|close_grace_ms|engine\.chats'
+  -- '*.rs'`): the 6 above in `jig-protocol-config` (`tests/domain.rs:248`,
+  jig 04.1's test, writes `close_grace_ms`), and the JSON fixtures
   `testing/jig-test-service/src/tests/fixtures.rs:49`,
   `tests/channel/src/fixtures.rs:78`,
   `tests/client-protocol/src/native/config.rs:43` (each writes the chat
@@ -165,9 +166,12 @@ Files:
   `tests/client-protocol/src/front.rs:263` (`chats_made`, a name only:
   unchanged).
 - The core `Limits` literals (6 files: `jig-domain-core/src/tests.rs:117`,
-  `jig-protocol-store/src/tests/fixtures.rs:503`,
+  `jig-protocol-store/src/tests/fixtures.rs:504`,
   `tests/core/src/world.rs:116`, `tests/store/src/root.rs:101`, and the
-  two profiles), each gaining `templates: 8`, the small profile's value.
+  two profiles), each gaining `templates: 8`, the small profile's value,
+  but the standard profile, whose `CORE` spreads `..small::CORE`
+  (`profile/standard.rs:98-115`) and writes `templates: 16`, as Choices
+  gives it.
 - Downstream: the repository downstream of jig writes `chats` in one
   fixture and has one core `Limits` literal, and matches every
   `config::What` twice (its service's `startup/problems.rs:81-103` and
