@@ -131,6 +131,14 @@ jig 07.5 uses through 04.5, for untracking.
 
 ## Rules that bind it
 
+- **A chat tracked by an amendment is the designer's question**
+  (ruling 120, 2026-10-16): `Core::chat_requester`
+  (`jig-domain-core/src/inbox.rs:108`) answers no party for a tracked
+  task, so a chat that 04.2's or 04.5's amendment tracks stops being its
+  party's chat. Until the answer amends this file, 04.2 and 04.5 build
+  and test tracking on tasks that are no conversation, and nothing of
+  this session admits, refuses or tests tracking a conversation; 04.1,
+  04.3, 04.4 and 04.6 do not rest on it.
 - **Format versions** (README, Rules): tasks v3 is jig 02.1's, and
   people v3 its owner's; an increment that changes a family's records
   needs its owner's landing and edits that version in place. Regenerate
@@ -139,9 +147,10 @@ jig 07.5 uses through 04.5, for untracking.
   schema.
 - **Files over 800 lines at the base get at most 40 lines each**
   (code-organization.md, 7): here `jig-domain-tasks/src/{boundary.rs
-  (1794), domain.rs (1275), stored.rs (1070), proposals.rs (856)}`,
+  (1804), domain.rs (1278), stored.rs (1072), proposals.rs (856)}`,
   `jig-domain-people/src/{domain.rs (1884), tests.rs (1596)}`,
-  `jig-domain-core/src/{routing/tasks.rs (1449), tests.rs (2987)}`. New
+  `jig-domain-core/src/{routing/tasks.rs (1459), tests.rs (2993)}`
+  (on `main` after jig 02.1). New
   code goes in the new modules this file names.
 - **No shape of work grows** (code-organization.md, 6): `Ask::Close`,
   `Ask::Prioritise`, `Event::CloseChat` and `Settings.close_grace` stay
@@ -194,7 +203,7 @@ Files:
   `people::Refusal::Limit { which: people::LimitKind::Spec }` until 04.5
   points it at `LimitKind::Grace`; people's kinds are people v3's, which
   04.1 does not take; no person's ask carries a grace before 04.5).
-- `crates/jig-protocol-tools/src/render.rs` (`task_problem`, :212,
+- `crates/jig-protocol-tools/src/render.rs` (`task_problem`, :222,
   matches every `tasks::Refusal`: a `Grace` arm).
 - Users of `Control::Cancel` (21 in 17 files; edited to `{ reason,
   grace: None, message: None }`): `jig-domain-core/src/routing/
@@ -219,6 +228,15 @@ Files:
   `tests/store/src/root.rs:23`, `jig-protocol-store/src/tests/fixtures.rs:54`,
   `jig-domain-core/src/tests.rs:31`, and the profile, `overrides.rs` and
   `limits.rs` themselves.
+- The values derived from the task record's worst case, which
+  `Grace { by: Party, reason }` grows, as jig 02.1's fields did (rulings
+  110 and 112): `STORE_KV`'s `value`, `chunk` and `page.bytes` in
+  `crates/jig-protocol-config/src/profile/small.rs:305, 313-314` and
+  `profile/standard.rs:144, 150-151`; `What::Memory { over }` in
+  `crates/jig-protocol-config/src/tests/domain.rs:169`; their copies in
+  `testing/jig-test-service/src/tests.rs:24-25`. 04.2, 04.5 and 04.6
+  refresh the same values where their records grow (04.6's `operations`
+  priced into `ask_bytes` moves the memory sum).
 - Downstream: the repository downstream of jig has 1 `Control::Cancel`,
   1 `chat_close`, 1 tasks `Limits` literal, 2 `close_grace` users and a
   match over every `tasks::Refusal`
@@ -257,9 +275,9 @@ Shape:
 Test shape:
 - `tests/tasks/tests/lifecycle/grace.rs` (new, `#[path =
   "lifecycle/grace.rs"] mod grace;` in `lifecycle.rs`, as `goals` is at
-  :774), the tasks world: `World::new` (src/world.rs:189),
-  `task` (:72), `World::make` (:822), `claim` (:859), `elapse` (:962),
-  `restart` (:992), `settle` (:940), `record` (:796). Limits: the
+  :774), the tasks world: `World::new` (src/world.rs:191),
+  `task` (:72), `World::make` (:824), `claim` (:861), `elapse` (:964),
+  `restart` (:994), `settle` (:942), `record` (:798). Limits: the
   world's `LIMITS` (src/world.rs:17) gains `grace:
   Duration::from_secs(600)`, the small profile's value. Reference test:
 
@@ -367,7 +385,9 @@ Files:
   routing/runs.rs, tests.rs, tests/acts.rs, tests/acts/kind_order.rs}`,
   `jig-protocol-tools/src/nested.rs`,
   `jig-protocol-store/src/{codec/tasks/proposals.rs, tests/fixtures.rs,
-  tests/codec/phase.rs}`, `tests/core/tests/stories.rs`; the tasks
+  tests/codec/phase.rs}`, `tests/core/tests/stories.rs`,
+  `tests/conformance/src/actions.rs:102` (jig 06.1's `RacingDecisions`
+  run amendment); the tasks
   `Limits` literals of 4.1's list, each gaining `project_goals`: the
   small profile's 8, but 2 in `jig-domain-tasks/src/tests/revisions.rs:21`,
   `tests/tasks/src/world.rs:17` and `tests/core/src/world.rs:19`, where
@@ -390,7 +410,7 @@ Shape:
 Test shape:
 - `crates/jig-domain-tasks/src/tests/revisions/tracking.rs` (new, `mod
   tracking;` in tests/revisions.rs), with `Harness` (tests/revisions.rs:
-  94), `task` (:76), `amendment` (:206), `to` (:100), and `LIMITS`
+  96), `task` (:76), `amendment` (:208), `to` (:102), and `LIMITS`
   (:21) with `project_goals: 2`. Tests:
   `an_amendment_tracks_a_task_at_its_priority`,
   `an_amendment_untracks_a_goal_and_moves_no_spec_revision`,
@@ -441,14 +461,20 @@ Shape:
   `apply_cancel` (`CancelPlan`), `inbox::check_message`/
   `apply_message`, `run::check_stop`/`apply_stop`. The plans are
   `pub(crate)` and own what the apply writes (the prepared inbox, the
-  next phase, the selected subtree).
+  next phase, the selected subtree). `apply_message` keeps jig 02.1's
+  `last_activity` write (`inbox.rs:326`), as the split of
+  `closing::end_task` keeps its own (`closing.rs:389`).
 - `Core::move_admit` refuses `people::Refusal::NoEscalationHolder`,
   after its role check and before its authority check, when
   `self.authority.escalations_held(project, role)` is false.
 Test shape:
 - The tasks child's present tests of these entry points stay as they are
   and pass unchanged (tests/revisions.rs, tests/revisions/chat.rs,
-  tests/address.rs, tests/instructions.rs): the split's check.
+  tests/address.rs, tests/instructions.rs), with the tasks world's
+  `tests/tasks/tests/activity.rs:139, 159`
+  (`a_tasks_last_activity_moves_when_it_hears_words`,
+  `a_requesters_last_activity_moves_when_a_delegate_ends`): the split's
+  check.
 - `crates/jig-domain-core/src/tests/escalation_holder.rs` (jig 02.3's),
   with its fixture (`core()`, tests.rs:308, and
   `funding_fixtures.rs:2`'s `set_role_authority`):
@@ -572,7 +598,7 @@ takes tracked and priority, amended by a maintainer only, with no
 revision for a priority alone; the core routes both to 4.1's and 4.2's
 tasks paths, issuing the finish message, and refuses a tracking
 amendment that would pass the projections' room as a tracked `Make` is
-refused (routing/tasks.rs:1351); the shaped `Ask::Prioritise` takes the
+refused (routing/tasks.rs:1361); the shaped `Ask::Prioritise` takes the
 maintainer check.
 Needs: the people family at version 3 on `main` (jig 02.3's landing,
 README, Rules).
@@ -609,7 +635,9 @@ Files:
   added), among them `jig-domain-core/src/tests/document_offers.rs:79`,
   `jig-protocol-store/src/tests/codec/pieces.rs:22`,
   `tests/core/src/stories/instructions.rs:24` and
-  `tests/people/tests/simulation.rs:448, 574`, and the exhaustive matches
+  `tests/people/tests/simulation.rs:448, 574`,
+  `tests/conformance/src/scenarios.rs:227` (`RacingDecisions`' party
+  amendment), and the exhaustive matches
   over `LimitKind`, as the compiler names them.
 - Downstream: its 2 `Ask::Cancel`, 3 people `Amendment` literals, and 2
   matches over `people::LimitKind`
