@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     process::Output,
 };
-use temper_throwaway_forgejo::{Account, Init, Instance, Outgoing};
+use temper_throwaway_forgejo::{Account, Forgejo, Init, Instance, Outgoing};
 fn api(instance: &Instance, method: &str, target: &str, body: &Value) -> Result<Value> {
     let body = body.to_string();
     let response = instance
@@ -147,7 +147,7 @@ fn push(
     args.extend(["--", url, &refspec]);
     c.execute(Some(case), &f.repo, &args, Some(f.identity()), false, b"")
 }
-pub(crate) fn record(instance: Instance, c: &mut Capture) -> Result<()> {
+pub(crate) fn record(forgejo: &Forgejo, instance: Instance, c: &mut Capture) -> Result<()> {
     let workspace = instance.scratch().join("worker/workspaces/1");
     fs::create_dir_all(&workspace)?;
     let version = c.execute(Some("version"), &workspace, &["version"], None, false, b"")?;
@@ -179,16 +179,29 @@ pub(crate) fn record(instance: Instance, c: &mut Capture) -> Result<()> {
     let commit = locals(&f, c)?;
     pushes(&f, c, &commit)?;
     api(&f.instance, "PATCH", "/api/v1/repos/fixture/specimen", &json!({"name":"renamed"}))?;
-    let redirected = fetch(c, None, &f.repo, &url, "refs/heads/main", identity)?;
+    fetch(c, Some("fetch-renamed"), &f.repo, &url, "refs/heads/main", identity)?;
+    let exit = fs::read(c.out.join("transcripts/fetch-renamed/exit"))?;
+    let stderr = fs::read(c.out.join("transcripts/fetch-renamed/stderr"))?;
+    let redirected = followed(&exit, &stderr);
     let protected = fs::read(c.out.join("transcripts/push-protected/stdout"))?;
     let protected = String::from_utf8_lossy(&protected);
     let declined =
         protected.lines().any(|s| s.starts_with('!') && s.contains("[remote rejected]") && s.ends_with("declined)"));
     let facts = format!(
-        "# {}\n{} git-follows-a-renamed-repository-redirect{}\n{} protected-push-is-remote-rejected-declined{}\n",
+        "# forgejo {} sha256 {}\n# {}\n{} git-follows-a-renamed-repository-redirect{}\n{} protected-push-is-remote-rejected-declined{}\n",
+        forgejo.version(),
+        forgejo.sha256(),
         printed.trim(),
-        if redirected.status.success() { "holds" } else { "fails" },
-        if redirected.status.success() { String::new() } else { format!(": {}", redirected.status) },
+        if redirected { "holds" } else { "fails" },
+        if redirected {
+            String::new()
+        } else {
+            format!(
+                ": exit {}; {}",
+                String::from_utf8_lossy(&exit).trim(),
+                String::from_utf8_lossy(&stderr).replace(['\r', '\n'], " ")
+            )
+        },
         if declined { "holds" } else { "fails" },
         if declined { String::new() } else { format!(": {}", protected.replace(['\r', '\n'], " ")) }
     );
@@ -332,4 +345,12 @@ fn pushes(f: &Fixture, c: &mut Capture, commit: &str) -> Result<()> {
     local(c, f, Some("push-ancestor-yes"), &["merge-base", "--is-ancestor", &f.base, commit])?;
     local(c, f, Some("push-ancestor-no"), &["merge-base", "--is-ancestor", commit, &f.base])?;
     Ok(())
+}
+
+/// Whether the recorded fetch followed the redirect to the renamed repository.
+pub(crate) fn followed(exit: &[u8], stderr: &[u8]) -> bool {
+    exit == b"0\n"
+        && stderr.split(|byte| *byte == b'\n').any(|line| {
+            line.starts_with(b"warning: redirecting to ") && line.windows(16).any(|part| part == b"/fixture/renamed")
+        })
 }

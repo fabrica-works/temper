@@ -86,3 +86,26 @@ fn no_argument_holds_a_token_or_its_base64() {
         assert!(!arg.contains(token) && !arg.contains(&encoded), "argument holds a credential");
     }
 }
+
+#[test]
+fn a_renamed_fetch_warned_of_its_redirect_holds_the_fact() {
+    assert!(crate::cases::followed(
+        b"0\n",
+        b"warning: redirecting to http://127.0.0.1:3000/fixture/renamed.git/\nPOST git-upload-pack (285 bytes)\n"
+    ));
+}
+#[test]
+fn a_renamed_fetch_without_git_s_redirect_warning_fails_the_fact() {
+    assert!(!crate::cases::followed(b"0\n", b"POST git-upload-pack (285 bytes)\n"));
+}
+#[test]
+fn a_renamed_fetch_exiting_non_zero_fails_the_redirect_fact() {
+    assert!(!crate::cases::followed(
+        b"128\n",
+        b"warning: redirecting to http://127.0.0.1:3000/fixture/renamed.git/\nPOST git-upload-pack (285 bytes)\n"
+    ));
+}
+#[test]
+fn a_redirect_to_the_old_name_fails_the_redirect_fact() {
+    assert!(!crate::cases::followed(b"0\n", b"warning: redirecting to http://127.0.0.1:3000/fixture/specimen.git/\n"));
+}

@@ -89,7 +89,7 @@ pub fn run(git: &Path, scratch: &Path, out: &Path) -> Result<()> {
         mask: mask::Mask::new(scratch, instance.port()),
         secrets: instance.secrets(),
     };
-    cases::record(instance, &mut capture)
+    cases::record(&forgejo, instance, &mut capture)
 }
 #[cfg(test)]
 mod tests;

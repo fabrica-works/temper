@@ -3,7 +3,7 @@ use temper_worker_protocol_git::{
     Version,
     output::{self, Status},
 };
-use temper_worker_protocol_git_world::transcripts;
+use temper_worker_protocol_git_world::{fixtures::SIX, transcripts};
 
 // The transcript's masked ids are literal bytes, independent of the parser.
 const ONE: git::Commit =
@@ -18,6 +18,7 @@ const FETCHES: &[(&str, git::Commit)] = &[
     ("fetch-default", TWO),
     ("fetch-up-to-date", TWO),
     ("fetch-sha256-branch", FOUR),
+    ("fetch-renamed", SIX),
 ];
 const PUSHES: &[(&str, &[u8], Status)] = &[
     ("create-new-branch", b"created", Status::NewBranch),
