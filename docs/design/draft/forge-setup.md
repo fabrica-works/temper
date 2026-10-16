@@ -121,7 +121,7 @@ connected  temper serve             ◄── reads them, through the forges and
 
 - **What temper strictly needs,** for each forge: the bot's API token,
   its git token and its id (credentials.md, sections 4 and 5); for
-  webhooks, their secret. The scopes, to check on v16.0.5 (section
+  webhooks, their secret. The scopes, to check on v17.0 (section
   14.3): `read:user`, `write:issue` and `write:repository` for the API
   token, `write:repository` alone for the git token.
 - **What the person does:** a Forgejo user for temper, not a site admin;
@@ -206,11 +206,11 @@ managed or owned.
   loopback; the person's login and email; the orgs; the runner's
   labels, capacity and `PATH`; the forge's directory.
 - **The binaries are checked** by every command that runs them: the
-  first version line equal to temper's pin, Forgejo v16.0.5 and the
-  runner v12.13.2, the versions the conformance checks (forge.md,
-  section 10; `tools/forgejo-conformance`), and the digest, when the
-  setup names one. Another binary refuses the command, naming its path
-  and what it printed. temper downloads nothing.
+  first version line equal to temper's pin, a patch release of Forgejo
+  v17.0 and one of the runner v13.2, the versions the conformance checks
+  (forge.md, section 10; `tools/forgejo-conformance`), and the digest,
+  when the setup names one. Another binary refuses the command, naming
+  its path and what it printed. temper downloads nothing.
 - **One pin,** a constant of `temper-forge-forgejo`, read by the
   conformance tool and by owned mode alike, so the Forgejo temper runs is
   the Forgejo whose facts it checked.
@@ -246,10 +246,13 @@ Forgejo's lock (6.4), checks the binaries, and decides by `state`:
    made by `admin user generate-access-token` into `admin_token`; the
    person's account, a site admin with a password Forgejo draws into
    `person_password`, to change at their first sign-in; the runner's
-   secret drawn into `runner/secret`, registered as a global runner by
-   `forgejo-cli actions register`, and the runner's registration file
-   written from it; `state` written last, so a preparation cut short is
-   made again from the start.
+   secret drawn into `runner/secret` (40 hexadecimal digits, no line
+   feed), registered as a global runner by `forgejo-cli actions register
+   --secret-file`, and the runner's connection written from it into the
+   runner's configuration (`server.connections`), its token in a private
+   file the connection names (`token_url: file:`); the work path's
+   repositories directory, which `forgejo dump` needs; `state` written
+   last, so a preparation cut short is made again from the start.
 2. **A later preparation at the same versions:** `app.ini` written
    again, so a change of the setup reaches Forgejo; `admin_token` made
    again when missing, and temper's admin with it; nothing else.
@@ -263,10 +266,10 @@ Forgejo's lock (6.4), checks the binaries, and decides by `state`:
   the preparation.
 - **No secret in an argument.** A password is drawn by Forgejo (the
   user creation's random password) and read from its output; the
-  runner's secret goes by file (`--secret-file`). Where a v16.0.5
-  command takes a secret only as an argument, the preparation writes
-  that file itself, in its program's format, rather than pass the
-  secret (to check, 14.3).
+  runner's secret goes by file (`--secret-file`). The runner v13.2's
+  `create-runner-file` takes its secret only as an argument, so the
+  preparation never runs it: it writes the runner's connection itself,
+  in the runner's configuration, with its token in a file (14.3).
 - **Its commands' output,** kept for a failure's message, is masked of
   every secret it holds, as the throwaway Forgejo masks its own.
 
@@ -436,7 +439,7 @@ Each needs nothing below the commands to change:
 | the bot's password | managed, owned | reconcile, random, at each token it makes | nowhere | the requests that make that token |
 | temper's admin's password | owned | Forgejo, random | nowhere | nothing |
 | the person's first password | owned | Forgejo, random, at the first preparation | `person_password` | the person |
-| the runner's secret | owned | the preparation | `runner/secret` | Forgejo's command line; the runner's registration file |
+| the runner's secret | owned | the preparation | `runner/secret` | Forgejo's command line; the runner's connection, through the token's file it names |
 | Forgejo's own secrets | owned | the preparation | `state`, and `app.ini` | Forgejo |
 | the webhooks' secret | every mode | the person; reconcile | `webhook_secret`, or the person's file | the webhooks' listener; Forgejo's hooks |
 
@@ -568,16 +571,25 @@ On the fake forge's protocol layer, serving the setup's routes:
 - a person's account under the bot's login refused;
 - no secret in a failure's message or a log line.
 
-### 14.3 Facts to check on v16.0.5
+### 14.3 Facts to check on v17.0
 
 By `tools/forgejo-conformance`, before a machine relies on each:
 
-- `admin user create` with a random password, and how it prints it;
-  `admin user generate-access-token --raw` with scopes; `forgejo dump`
-  and `migrate` on a work path; `forgejo-cli actions register` with
-  `--secret-file`, and whether it is idempotent; the runner v12.13.2's
-  `create-runner-file`, and whether it takes its secret other than as
-  an argument;
+- the command line, as known of v17.0 and the runner v13.2, to record
+  as facts: `admin user create --random-password` prints `generated
+  random password is '<password>'` on its first line;
+  `admin user generate-access-token --raw --scopes` prints the token
+  alone; `migrate` runs on a fresh work path; `forgejo dump` needs the
+  work path's repositories directory; `forgejo-cli actions register
+  --secret-file` takes exactly 40 hexadecimal digits with no line feed,
+  and run again with the same secret names the same runner; the
+  runner's `create-runner-file` takes its secret only as `--secret`, and
+  is deprecated for the configuration's `server.connections`, whose
+  token a file may hold (`token_url: file:`);
+- how a connection's `uuid` and `token` follow from the secret that
+  `forgejo-cli actions register` registered, and that the runner
+  started on that configuration alone takes the throwaway instance's
+  jobs;
 - the admin routes: making a user, resetting its password (the members
   `PATCH /admin/users/{login}` requires), its description; making a
   token under basic auth, and deleting one by name; the scopes each

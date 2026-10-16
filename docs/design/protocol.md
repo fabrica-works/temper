@@ -1,6 +1,6 @@
 # The protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-15. temper's protocol layer:
+Provisional, 2026-10-03, revised 2026-10-16. temper's protocol layer:
 how temper composes jig's protocol layer with components of its own (its
 forge's, its checkout's, its client's) into the processes of one binary.
 jig owns the layer's shape (jig's `protocol/README.md`) and the services'
@@ -113,7 +113,7 @@ service (`jig-test-service`), the reference binary (`jig-test`).
 | the terminal shell | `temper-client-shell-terminal` (client.md, section 6) |
 | the clients' listener | `temper-service`'s listener for clients, on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig` (client.md, section 8) |
 | the fake git program | `testing/temper-fake-git` (testing.md, 4.3) |
-| the throwaway Forgejo | a Forgejo v16.0.5 started by a test script on loopback, with SQLite in a scratch directory, removed after (testing.md, 2.6) |
+| the throwaway Forgejo | a Forgejo v17.0 started by a test script on loopback, with SQLite in a scratch directory, removed after (testing.md, 2.6) |
 | locate | the forge connector's read of a repository's id by owner and name (forge.md, 3.2) |
 
 ## 4. The processes and the binary
@@ -320,7 +320,7 @@ temper-service, engine module           iterate: io ↔ components ↔ root
 Starting, ending, `iterate`'s passes, room and timers are jig's
 (jig's `protocol/service.md`, sections 3 to 5). What temper adds:
 
-- **The forge component,** speaking Forgejo v16.0.5's REST API under
+- **The forge component,** speaking Forgejo v17.0's REST API under
   `/api/v1`, polled at the domain's cadences (forge.md, section 3). The
   root's `Request::Forge { call, repository, op }` goes to it; it
   answers each call with exactly one

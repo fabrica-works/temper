@@ -1,7 +1,7 @@
 # The forge's protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-15. How the engine reaches the
-forge: Forgejo v16.0.5's API over HTTP and JSON, the keys' markers the
+Provisional, 2026-10-03, revised 2026-10-16. How the engine reaches the
+forge: Forgejo v17.0's API over HTTP and JSON, the keys' markers the
 engine writes at the head of what it creates, the webhooks Forgejo sends
 back, designed now and built after standalone, and the fake forge's
 protocol layer that serves the same API in the worlds. The overview is
@@ -46,10 +46,11 @@ section 14.
   Forgejo's quirks where they are known (its default order, its page
   cap, its unpaged threads), and counts the requests it serves, so the
   engine's worlds can hold the forge's load to a ceiling.
-- **Facts are checked against a real Forgejo v16.0.5** before the
+- **Facts are checked against a real Forgejo v17.0** before the
   component relies on them, by a conformance run against a throwaway
-  instance, outside the suites; what it records becomes the decoders'
-  transcripts.
+  instance and forgejo-runner v13.2, outside the suites; what it records
+  becomes the decoders' transcripts. temper requires that release: one
+  patch release of it is pinned, and no other version is served.
 
 ## 2. In the engine
 
@@ -184,9 +185,9 @@ first failure, but where a row says otherwise.
 | `Read::Branch { branch }` | `GET R/branches/<branch>` | `commit.id` |
 | `Read::Branches` | `GET R/branches?page=<n>&limit=<size>`, from page 1 until a page comes short | every `name`; past the answer's bound, `TooLarge` |
 | `Read::PullFiles { number, head, page }` | `GET R/pulls/<number>`; `GET R/pulls/<number>/files?page=<page>&limit=<size>`; for each file, `GET R/raw/<path>?ref=<merge_base>` (but for `added`; at `previous_filename` for `renamed`) and `GET R/raw/<filename>?ref=<head>` (but for `deleted`) | `head`; each file's `filename` with its contents at the merge base and at the head, a side absent when the file's `status` says so or its read answers `404`; `more` from `X-HasMore`; a `head.sha` other than `head` fails the call `Stale` before any file is read |
-| `Read::Compare { before, after }` | `GET R/compare/<before>...<after>`; `GET R/compare/<after>...<before>`; for each file, `GET R/raw/<filename>?ref=<before>` and `?ref=<after>` | `files[].filename` with its contents at `before` and at `after`, a side absent when its read answers `404`; `commits[].sha`; `contains_before` when the second comparison's `total_commits` is 0; the whole comparison within the answer's bound, or `TooLarge` |
+| `Read::Compare { before, after }` | `GET R/compare/<before>...<after>?verification=false`; `GET R/compare/<after>...<before>?files=false&verification=false`; for each file, `GET R/raw/<filename>?ref=<before>` and `?ref=<after>` | `files[].filename` with its contents at `before` and at `after`, a side absent when its read answers `404`; `commits[].sha`; `contains_before` when the second comparison's `total_commits` is 0; the whole comparison within the answer's bound, or `TooLarge` |
 | `Read::Checks { commit }` | `GET R/commits/<commit>/status?page=<n>&limit=<size>`, every page; for each failing status whose link names a run of this repository's Actions: `GET R/actions/runs?head_sha=<commit>&run_number=<n>&page=1&limit=1`, then `GET R/actions/runs/<id>/jobs` | each context's latest status as for `Statuses`, its `job` the commit, the run's `id`, the job's `id` and its `attempt` when found, none otherwise |
-| `Read::Job { attempt, max_bytes }` | `GET R/actions/runs/<run>`; `GET R/actions/runs/<run>/jobs`; `GET R/actions/jobs/<job>/logs?attempt=<attempt>` with `Range: bytes=0-<max_bytes>` | the log's first `max_bytes` bytes, `truncated` when more came or `Content-Range` names more; `MissingJob` when a read answers `404`, the run's `commit_sha` is not the attempt's head, or the run has no such job at that attempt |
+| `Read::Job { attempt, max_bytes }` | `GET R/actions/runs/<run>`; `GET R/actions/jobs/<job>`; `GET R/actions/jobs/<job>/logs?attempt=<attempt>&step=<number>` with `Range: bytes=-<max_bytes>`, `step` the failed step's, absent when no step failed | the failed step, its `number` and `name`, none when no step failed; the last `max_bytes` bytes of that step's log, or of the job's whole log when no step failed; `truncated` when `Content-Range` names bytes before them; `MissingJob` when a read answers `404`, the run's `commit_sha` is not the attempt's head, or the job's `run_id` or `attempt` is not the attempt's |
 | `Read::File { head, path, max_bytes }` | `GET R/raw/<path>?ref=<head>` with `Range: bytes=0-<max_bytes>` | the first `max_bytes` bytes; `truncated` when more came |
 | `Read::Protection { branch }` | `GET R/branches/<branch>`; then `GET R/branch_protections/<effective_branch_protection_name>` when it names a rule, or `GET R/branch_protections` when it names none | `rule_name`, `status_check_contexts` when `enable_status_check`, `required_approvals`, `dismiss_stale_approvals`; none when no rule applies; a `403` (a writer who is not an admin) `Forbidden` |
 | `Read::Settings` | `GET /api/v1/repositories/<id>` | `default_branch`; `allow_merge_commits`, `allow_squash_merge`, `allow_rebase`; the repository's row kept afresh (3.5) |
@@ -194,7 +195,7 @@ first failure, but where a row says otherwise.
 | `Read::Permission { user }` | `GET R/collaborators/<login>/permission` | `permission`: `none`, `read`, `write`, `admin`, and `owner` as `Admin` |
 | `Read::Locate { owner, name }` | `GET /api/v1/repos/<owner>/<name>` | `Located { repository }` from `id`; the repository's row kept (3.5) |
 | `Write::CreateIssue { key, title, body }` | `POST R/issues` `{title, body}`, the body behind the key's marker | `Created` from `number` |
-| `Write::OpenPull { title, body, head, base }` | `GET R/branches/<head>`; `GET R/branches/<base>`; `GET R/compare/<base's commit.id>...<head's commit.id>`, of which only `total_commits` is kept; when it is 0, nothing more; else `POST R/pulls` `{head, base, title, body}` | `Created` from `number`; `NothingToMerge` when `total_commits` is 0, the pull request not written |
+| `Write::OpenPull { title, body, head, base }` | `GET R/branches/<head>`; `GET R/branches/<base>`; `GET R/compare/<base's commit.id>...<head's commit.id>?files=false&verification=false`, of which only `total_commits` is kept; when it is 0, nothing more; else `POST R/pulls` `{head, base, title, body}` | `Created` from `number`; `NothingToMerge` when `total_commits` is 0, the pull request not written |
 | `Write::Post { number, key, body }` | `POST R/issues/<number>/comments` `{body}`, behind the key's marker | `Commented` from `id` |
 | `Write::Review { number, key, verdict, body }` | `POST R/pulls/<number>/reviews` `{event, body}`, `event` `APPROVED`, `REQUEST_CHANGES` or `COMMENT`, the body behind the key's marker | `Reviewed` from `id` |
 | `Write::Edit { number, title, body }` | `PATCH R/issues/<number>` `{title, body}`, each only when given | `Done` |
@@ -242,7 +243,7 @@ Notes on the table:
   alone, never from a history of runs.
 - **Job attempts.** An Actions status links to its job's page,
   `<the path of the repository's html_url>/actions/runs/<run
-  number>/jobs/<job index>`, relative to the forge's origin, as v16.0.5
+  number>/jobs/<job index>`, relative to the forge's origin, as Forgejo
   writes it (13); the same link with the whole `html_url` before it is
   read the same way. The run's number is its `index_in_repo`, which the
   runs' listing filters by (`run_number`); the job is the one at that
@@ -250,6 +251,22 @@ Notes on the table:
   another shape, one that starts `//` or names another scheme or host,
   or a run or a job not found, leaves the status's `job` none, and the
   call answers all the same.
+- **A failed job's log is its failed step's end.** Forgejo answers a job
+  (`actions/jobs/<job>`) with its steps, those of its latest attempt:
+  number 0 is the runner's set-up (`Set up job`), the last its completion
+  (`Complete job`), and the workflow's own steps are between. The failed
+  step is the first whose `status` is `failure`: the completion step
+  reports `failure` whenever the job fails, so it is the failed step only
+  when none before it failed. Its log alone is read
+  (`step`), and of it the end, by a suffix range, since a step tells its
+  failure last. A job with no step failed (one cancelled, or one whose
+  runner was lost) is read whole, its end the same way; one never given
+  to a runner has no log (`404`, `MissingJob`). The job's `attempt` is its
+  latest: one other than the call's (the job ran again since) is
+  `MissingJob`, as a log Forgejo no longer keeps is (`404`). A `200` is
+  read through, its last `max_bytes` bytes kept as it streams; a range
+  over an empty log is an empty log (13). The log's search (`q`) and its
+  NDJSON form are not read: neither answers a range.
 - **Links are absolute.** A status's link goes to the domain whole: one
   relative to the forge's origin (a `target_url` that starts with one
   `/`) gets the origin (scheme, host and port) of the repository's
@@ -280,7 +297,7 @@ Notes on the table:
   rebase (`domain/forge.md`, section 10).
 - **A pull request for a head and base.** Forgejo keeps at most one pull
   request open for a head and a base. Its lookup, `pulls/{base}/{head}`,
-  names one of several, the oldest on v16.0.5 (13), and its listing has
+  names one of several, the oldest (13), and its listing has
   no head or base filter. So `PullFor` answers the open one: the
   lookup's, or, when the lookup names one closed or merged, the row of
   the open pull requests' listing whose `head.ref`, `head.repo_id` and
@@ -292,6 +309,14 @@ Notes on the table:
   listing is read only when that one is closed or merged, or another
   hand opened one for its branches. Each page counts in the call's cost;
   the call's deadline bounds them.
+- **Comparisons ask for what they keep.** Every comparison sends
+  `verification=false`, since no commit's signature is read; one read
+  only for its `total_commits` (`OpenPull`'s, and `Compare`'s second)
+  also sends `files=false`, so Forgejo lists no commit's files. Whether
+  `files=false` leaves out the comparison's own `files` too is to check
+  (13); `Compare`'s first comparison, which keeps them, never sends it.
+  The answer is decoded as before: what the call does not keep is
+  skipped as it streams.
 - **Opening compares first.** Forgejo opens a pull request whose head
   adds nothing to its base (13), which the forge client's vocabulary
   refuses as `NothingToMerge` (`domain/forge.md`, section 6). So
@@ -405,14 +430,14 @@ such a request costs nothing.
   it (`idle`, section 7).
 - **One status, several meanings.** Where Forgejo answers two failures
   with one status (`405` on a merge), the decoder reads its `message`
-  into the failure; the messages are pinned by transcripts of Forgejo
-  v16.0.5 (section 13). A `4xx` means Forgejo did not act, so a message
+  into the failure; the messages are pinned by transcripts of the pinned
+  Forgejo (section 13). A `4xx` means Forgejo did not act, so a message
   the decoder does not know is `Refused` on a write, never a guess at
   which failure it was; on a read, `InvalidAnswer`.
 - **Not errors:** a `409` on `CreateBranch` is `Branch(Exists)`, which
   the client follows with a read of the branch; a `404` on
   `DeleteBranch` is `Missing`, which the client counts as the branch
-  gone (`domain/forge.md`, section 6). Forgejo v16.0.5 answers the
+  gone (`domain/forge.md`, section 6). Forgejo answers the
   deletion of a branch that is not there `500` with an empty body (13):
   a `Timeout`, after which the client's find reads the branch, and that
   read's `404` is `Missing`, the branch gone.
@@ -529,22 +554,30 @@ are built (configuration.md, section 3).
   answer when it chooses (skein's `http.md`, 5.4).
 - **Which deliveries hint what**, by `X-Forgejo-Event`, each hint's
   repository the forge's number and the payload's `repository.id`
-  (3.1), so no path is needed:
+  (`run.repository.id` for a job's), so no path is needed (3.1):
 
   | Event | `Hint` |
   |---|---|
   | `issues`, `issue_comment`, `pull_request`, `pull_request_comment`, `pull_request_approved`, `pull_request_rejected` | `Change::Item(number)`, with the key of the issue's, the comment's or the review's body |
   | `push` | `Change::BranchMoved { branch, head, actor }`, the commit it moved to and the pusher's id; a deletion, `Change::Branch(branch)` |
   | `create`, `delete` of a branch | `Change::Branch(branch)` |
-  | `status`, `action_run_failure`, `action_run_recover`, `action_run_success` | `Change::Commit(commit)` |
+  | `workflow_job_success`, `workflow_job_failure`, `workflow_job_cancelled`, `workflow_job_skipped` | `Change::Commit(commit)`, the run's `commit_sha` |
   | anything else | nothing |
 
   **Who caused it** is what lets the domain drop its own writes' echoes:
   a creation's key for an item, the pusher for a push (`domain/forge.md`,
-  5.2). Actions deliveries carry their fields inside `run`:
-  `repository`, `trigger_user.id` and `commit_sha`; they have no
-  top-level repository or sender. A hint for a repository the deployment
-  has not adopted goes up all the same; the domain drops it.
+  5.2). A job's delivery carries `job` (its `id`, `run_id`, `attempt`
+  and `status`) and `run`, whose `repository`, `trigger_user.id` and
+  `commit_sha` stand for the top-level repository and sender it does not
+  have. A hint for a repository the deployment has not adopted goes up
+  all the same; the domain drops it.
+- **CI is hinted as each job ends.** A job's delivery is sent for each
+  of its attempts, so a job run again is hinted again when it ends. The
+  run's deliveries (`workflow_run_*`), sent once its last job ends, and
+  the deprecated `action_run_*` are not subscribed. Forgejo sends no
+  delivery for a commit status: CI that another system reports, and the
+  verdicts temper posts, are found by polling alone (`domain/forge.md`,
+  5.2).
 - **Bounded.** Connections, the head's size and the body's are capped; a
   body past its cap is answered `413` and hints nothing, and polling
   finds what it told of. Push payloads list commits, which the decoder
@@ -709,7 +742,10 @@ side of `temper-forge-forgejo`.
   runs, for `Read::Checks` and `Read::Job` (3.2), as a commit's run by
   its number (`actions/runs?head_sha&run_number`), a run by its id
   (`actions/runs/{id}`) and a run's jobs (`actions/runs/{id}/jobs`), each
-  job with its id and attempt; the oldest pull request for a head and
+  job with its id and attempt, and a job by its id (`actions/jobs/{id}`)
+  with its steps, its log read by attempt and step
+  (`actions/jobs/{id}/logs?attempt&step`) with byte ranges, a suffix
+  range among them; the oldest pull request for a head and
   base, open or not, and the open pull requests, oldest first, for
   `Read::PullFor`'s requests (3.2); and the fake's CI statuses link their
   jobs in Forgejo's shape, relative to the origin, `<the path of
@@ -731,7 +767,8 @@ side of `temper-forge-forgejo`.
   `pulls/{base}/{head}` names the oldest of several pull requests, open
   or not; a pull request whose head adds nothing to its base is opened
   (`201`); deleting a branch that is not there answers `500` with an
-  empty body. A client that leans on Forgejo being better than it is
+  empty body; a failed job's completion step reports `failure` too. A
+  client that leans on Forgejo being better than it is
   fails in the fake first.
 - **Faults move down** (testing.md, 4.2): a call refused for the rate is
   a `429` with `Retry-After`; one failed before it is made is a refused
@@ -758,7 +795,7 @@ The tiers below the domain (testing.md, section 2), each within the
 suites' budgets:
 
 - **Step tests** for `temper-forge-forgejo`: each decoder against
-  transcripts of a throwaway Forgejo v16.0.5 (each answer section 3.2
+  transcripts of a throwaway Forgejo v17.0 (each answer section 3.2
   reads, each error section 3.4 names, and later each webhook delivery
   section 5 hints), against answers generated from the seed, and against
   mutations of both; golden bytes for each encoder; bounds at their limit
@@ -799,19 +836,24 @@ suites' budgets:
     equal the sum of the costs the answers reported, the forges' starts'
     reads aside.
 - **The real Forgejo check,** outside the two suites:
-  `tools/forgejo-conformance` against a throwaway Forgejo v16.0.5 (SQLite
+  `tools/forgejo-conformance` against a throwaway Forgejo v17.0 (SQLite
   in a scratch directory, loopback, a small `MAX_RESPONSE_ITEMS` so
   paging shows, webhooks allowed to loopback; the tool makes its admin
   user and tokens; never an existing Forgejo). Its binary is the one
   `TEMPER_FORGEJO` names, as the process tier's is (testing.md, 2.6): the
   tool names no path of its own, refuses to run without the variable,
-  and refuses a binary whose `--version` is not v16.0.5, naming it; it
-  records the binary's digest with what it captured. It drives the facts
+  and refuses a binary whose `--version` is not the pinned release,
+  naming it; it records the binary's digest with what it captured. The
+  pin is one patch release of v17.0, a constant the throwaway Forgejo and
+  the tool share; moving it to a later patch is a change of that constant
+  and of the transcripts and facts the tool records, with no change to
+  this document. It drives the facts
   of section 13 through plain requests and the forge component, says
   which hold, and records what it sent and received as transcripts,
-  masked. Actions facts need a runner: `forgejo-runner`, the program
-  `TEMPER_FORGEJO_RUNNER` names, registered with the throwaway instance
-  alone; without it the tool reports those facts unchecked.
+  masked. Actions facts need a runner: `forgejo-runner` v13.2, the
+  program `TEMPER_FORGEJO_RUNNER` names, pinned as Forgejo is and refused
+  at another version, registered with the throwaway instance alone;
+  without it the tool reports those facts unchecked.
 - **The process tier** (testing.md, 2.6): the real binary against the
   throwaway Forgejo, a repository adopted and a change landed, the
   forge component's start and polling among what it runs.
@@ -888,8 +930,8 @@ uses skein at its pinned revision as it is (protocol.md, section 11).
 
 ## 13. Facts checked, and to check
 
-From Forgejo v16.0.5's API description (its tagged
-`templates/swagger/v1_json.tmpl`):
+From Forgejo v17.0's API description (its tagged
+`templates/swagger/v1_json.tmpl`) and its sources:
 
 - `/settings/api` answers `max_response_items` and `default_paging_num`.
 - The issue listing takes `state`, `type`, `since`, `before`, `labels`,
@@ -899,7 +941,9 @@ From Forgejo v16.0.5's API description (its tagged
 - An issue's comments take `since` and `before` (updated times) and no
   page; a review's comments take neither; a comparison
   (`compare/{basehead}`) takes no page and answers `total_commits`,
-  `commits` and `files` (each a `filename` and a `status`).
+  `commits` and `files` (each a `filename` and a `status`); it takes
+  `files` (which files each commit changed) and `verification` (each
+  commit's signature checked), both true by default.
 - A combined status is paged and answers `state`, `statuses` and
   `total_count`; a status is `pending`, `success`, `error`, `failure`,
   `warning` or `skipped`.
@@ -919,95 +963,106 @@ From Forgejo v16.0.5's API description (its tagged
   `old_ref_name`, and answers `409` among its failures.
 - A run's jobs are listed by `actions/runs/{run_id}/jobs`, unpaged, each
   with its `id`, `run_id` and `attempt`; runs are listed with
-  `head_sha` and `run_number` filters; a job's plaintext log is read by
-  `actions/jobs/{job_id}/logs?attempt=`, answered `200` or `206`.
+  `head_sha` and `run_number` filters.
+- A job is read by `actions/jobs/{job_id}`: its `id`, `run_id`,
+  `attempt` (its latest), `status`, `runs_on`, and its latest attempt's
+  `steps`, each a `number`, `name` and `status`; number 0 is `Set up
+  job`, the last `Complete job`, and a job no runner took has no steps.
+- A job's plaintext log is read by
+  `actions/jobs/{job_id}/logs?attempt=`, its latest attempt's without
+  it, with `step=` for one step's slice; it is served with byte ranges
+  (Go's `http.ServeContent`: `200`, or `206` for a range, a suffix range
+  included), over the step's slice when one is named. A step past the
+  last, a job never run and a log expired answer `404`. With `q` (`qi`
+  for any case) it answers the lines holding the string, and with
+  `format=ndjson` one `{time, content}` object a line; either answers
+  the whole body, with no ranges.
+- A completed job is run again, with the jobs that need it, by
+  `POST actions/jobs/{job_id}/rerun`, and a completed run by
+  `POST actions/runs/{run_id}/rerun`: `204`, or `400` for one not
+  completed.
+- A webhook delivery names its event in `X-Forgejo-Event` and
+  `X-Forgejo-Event-Type`. A job's events are `workflow_job_waiting`,
+  `_blocked`, `_running`, `_success`, `_failure`, `_cancelled` and
+  `_skipped`, chosen per hook; a run's are `workflow_run_` and the same
+  states; `action_run_failure` and `action_run_success` are deprecated.
+  A job's payload is `action`, `job` and `run`, a run's `action` and
+  `run`, with no top-level repository or sender. There is no event for a
+  commit status.
 - `GET /users/search` takes a `uid`; a collaborators' listing answers
   users only, so each one's permission is a read by login.
 
-Observed on Forgejo v16.0.5 by `tools/forgejo-conformance`
-(`facts.txt`), where the design leans on them:
+Observed on Forgejo v17.0 by `tools/forgejo-conformance` (`facts.txt`
+names each), where the design leans on them:
 
-- The lookup `pulls/{base}/{head}` names the oldest of several pull
-  requests for a head and base: a closed one before a newer open one
-  (3.2, "A pull request for a head and base").
+- With Forgejo's default settings, `max_response_items` is 50 and
+  `default_paging_num` 30.
+- `sort=leastupdate` is honoured, ties ordered by number; `since` is
+  inclusive at the second, and in 2554 answers an empty page with its
+  `Date`. Comments, reviews, a push to a head, closing and reopening
+  move an item's updated time; a comment's edit or deletion, a status
+  and a base's push do not. An unedited comment's and review's updated
+  time equals its creation's, and an edit moves it.
+- The lookup `pulls/{base}/{head}` takes a percent-encoded slash, and
+  names the oldest of several pull requests for a head and base: a
+  closed one before a newer open one (3.2, "A pull request for a head
+  and base").
 - `POST R/pulls` whose head adds nothing to its base answers `201` and
   opens the pull request; it is not refused (3.2, "Opening compares
   first").
-- Deleting a branch that is not there answers `500` with an empty body,
+- An update refused for a conflict answers `409`, `merge failed because
+  of conflict`; a merge naming an old head answers `409`, `head out of
+  date`; a merge answers `200` with no body; merges refused for a closed
+  pull request, a conflict, a protection or a style answer `405`.
+- A pull request's files page, with `X-HasMore`; a comparison ignores
+  `page` and `limit` and answers everything.
+- Creating a branch at a full commit id answers `201` at that commit.
+  Deleting a branch that is not there answers `500` with an empty body,
   not `404` (3.4).
 - A branch's `effective_branch_protection_name` is empty for a write
   collaborator who is not an admin, and names the rule for an admin; a
-  writer's read then goes to the listing, which answers it `403` (3.2,
-  `Read::Protection`).
+  writer's protection reads answer `403` (3.2, `Read::Protection`).
 - A status written by Actions has `creator` `null`, and its
   `target_url` is relative to the origin:
   `/fixture/specimen/actions/runs/1/jobs/0` for a repository whose
   `html_url` is `http://127.0.0.1:3000/fixture/specimen`; the job's
-  index counts from 0 (3.2, "Job attempts").
+  index counts from 0, and the link names no attempt (3.2, "Job
+  attempts"). Each job is a status on its head; `run_number` is a run's
+  `index_in_repo`; a run's jobs come in index order; a job's log and a
+  raw file answer a range `206`.
+- A body's line feed after the marker is kept, and bodies of 64 KiB and
+  1 MiB are kept whole; `PATCH issues/{index}` edits a pull request's
+  title and body; `branches/{branch}` takes a percent-encoded slash; a
+  pull request's `base.sha` is its base's tip; a combined status with no
+  status counts 0, and `skipped` with `success` combines as passed; an
+  issue's comments and a pull request's reviews come oldest first; a
+  dismissed review keeps its body; a remark's `position` is its line;
+  opening a pull request that is open answers `409`, an empty title
+  `422`; deleting a protected branch answers `403`; creating a branch
+  that exists answers `409`.
+- A repository the token cannot read answers `404`, by path and by id;
+  a moved repository's old path answers a redirect; an archived
+  repository's write answers `423`. No rate-limit headers are sent.
 
-Observed on Forgejo v15.0.0 (`domain/forge.md`, 20.1 has the rest),
-each to confirm on v16.0.5:
-
-- With Forgejo's default settings, `max_response_items` is 50 and
-  `default_paging_num` 30.
-- The direct `pulls/{base}/{head}` lookup accepts a percent-encoded slash
-  in the head branch and returns one pull request. It is separate from
-  the listing, which has no base or head filters.
-- An update refused for a conflict answers `409`, `merge failed because
-  of conflict`; a merge naming an old head answers `409`, `head out of
-  date`; a merge answers `200` with no body.
-- A pull request's files page correctly; a comparison ignores `page`
-  and `limit` and returns everything.
-- Creating a branch with a full commit id as `old_ref_name` answers
-  `201` at exactly that commit.
-- A write collaborator who is not an admin is answered `403` on every
-  branch protection read.
-- The webhook event names and the Actions deliveries' nested fields of
-  section 5 match the v15.0.0 sources.
-
-To check on v16.0.5 (section 10), each before the component relies on
+To check on v17.0 (section 10), each before the component relies on
 it:
 
-- that `sort=leastupdate` is honoured, ties ordered by number, `since`
-  inclusive at the second; that `since` in 2554 answers an empty page
-  with its `Date`;
-- what moves an item's updated time: comments posted, edited, deleted;
-  reviews; a push to a head; a status on it; a base moving; closing and
-  reopening;
-- that an unedited comment's and review's updated time equals its
-  creation's, and an edit moves it (3.3);
-- that a body's line feed after the marker is kept as sent;
-- that `PATCH issues/{index}` edits a pull request's title and body;
-- branch names with a slash in `branches/{branch}`;
-- that the open pull requests' listing (`pulls?state=open&sort=oldest`)
-  pages with `page` and `limit`, and carries each row's `head.ref`,
-  `head.repo_id` and `base.ref` (3.2, "A pull request for a head and
-  base");
-- that `base.sha` is the base branch's tip when read;
-- a combined status with no status: its `state` and `total_count`; how
-  `skipped` combines;
-- that Actions report each job as a status on its head; whether that
-  status's link names an attempt; that
-  `run_number` is a run's `index_in_repo`; the order of a run's jobs;
-  that a log read with `Range` answers `206`, and a raw file read too;
-- that an issue's comments and a pull request's reviews come oldest
-  first, in id order; how a dismissed review shows, and what `position`
-  a remark's line is;
-- every status and message of section 3.4, the merge's above all; that
-  `OpenPull` answers `409` for an open pull request; that a comparison
-  of a commit with itself, or with its ancestor, counts `total_commits`
-  0; that a moved repository's old path answers a redirect;
-- what the API answers for a repository the API token cannot read, by
-  path and by id (`404`, or `403`): it decides whether a locate reports
-  such a repository not found or no access (client.md, 4.7), and whether
-  a call on it is `Missing` or `Forbidden` (3.4);
-- by `tools/git-transcripts` (git.md, section 9), for the git component:
-  whether Forgejo redirects git's requests for a renamed repository's old
-  path (git.md, section 10), and the line git prints for a push a
-  protected branch refuses, which git.md, 4.8 reads as a `[remote
-  rejected]` whose reason ends in `declined`;
-- the largest body Forgejo keeps on SQLite;
-- whether Forgejo limits the API's rate, and with which headers;
+- that a job's steps are numbered from 0, `Set up job` first and
+  `Complete job` last; that a failed workflow step is `failure`, and the
+  completion step `failure` with it; that a job waiting for a runner has
+  no steps;
+- that a step's log (`step`) holds that step's lines alone, and that a
+  range over it answers `206`: a suffix range with the slice's last
+  bytes, and a `Content-Range` naming where they start; what a range
+  answers over an empty log; that a step past the last answers `404`;
+- that a comparison sent `files=false` lists no commit's files, and
+  whether it leaves out its own `files` too; that `verification=false`
+  changes nothing the calls keep;
+- by `tools/git-transcripts` (git.md, section 9), for the git
+  component: that git follows Forgejo's redirect for a renamed
+  repository's old path (git.md, section 10), and that a push a
+  protected branch refuses prints a `[remote rejected]` whose reason
+  ends in `declined` (git.md, 4.8);
 - later, the webhook headers and payloads of every event of section 5,
   and whether Forgejo delivers the engine's own changes.
 

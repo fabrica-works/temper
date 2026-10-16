@@ -1,6 +1,6 @@
 # The forge connector
 
-Provisional, 2026-10-04, revised 2026-10-14. How temper drives a forge, Forgejo first: the
+Provisional, 2026-10-04, revised 2026-10-16. How temper drives a forge, Forgejo first: the
 forge as a connector (connectors.md), with its resources, effects,
 topics, procedures and tools; adopting repositories; keeping up; a
 change's way to landing; landing queues; updates and conflicts; issues;
@@ -62,11 +62,13 @@ changes in. What is still open is listed in section 20.
   state; the comments and reviews on a participating object (section 7).
 - **Procedures:** the change (section 8).
 - **Tools,** reads an agent may call: a pull request, its files and its
-  diff; CI on a head, and a failed job's output; an issue and its
+  diff; CI on a head, and a failed job's output, its failed step's end;
+  an issue and its
   comments; the landings on a branch since a commit. Each answer is cut
   to its limit.
 - **Brief sections:** the pull request against its base; CI's failures
-  on its head, with their output; reviews' remarks; a conflict, with what
+  on its head, each with its failed step and the end of that step's
+  output; reviews' remarks; a conflict, with what
   landed in the base since.
 
 ## 3. Structure
@@ -134,10 +136,9 @@ temper-engine-domain-forge              the connector's top: resources, write ho
   enough for context; write access lets temper push its branches and open
   pull requests; protection that keeps temper from merging makes landing
   a wait for someone else's merge (section 13).
-  Forgejo 15 was observed to refuse protection reads to a write
-  collaborator, still to confirm on v16.0.5 (section 20;
-  `docs/design/forge.md`, section 13): adoption records protection as
-  unknown, never as absent. A refused
+  Forgejo refuses protection reads to a write collaborator who is not
+  an admin (section 20.1; `docs/design/forge.md`, section 13): adoption
+  records protection as unknown, never as absent. A refused
   merge narrows what temper may do, as connectors.md, section 11 says.
 - **The project names, per repository:** its landing branches; temper's
   branch prefix, `temper/` by default, which protection can reserve to
@@ -438,10 +439,13 @@ starts from current code. It never updates only because its base moved.
   head; a gate's remarks; or, for a clean update whose CI then fails (a
   semantic conflict), the base merged in and what landed in it. It pushes
   a new head, and the change is checked again.
-  The target is Forgejo v16.0.5. The client reads the failed job's
-  plaintext log through the API, bounded by the repair brief's byte budget
-  (section 20). It pins the job attempt and reports truncation; a failed
-  read is recorded explicitly alongside the status description and link.
+  For each failed check, the brief carries its context, description and
+  link, then the step that failed, by name, and the end of that step's
+  log, where a step tells its failure; the job's whole log's end when no
+  step failed. The log is read at the job attempt that failed on this
+  head, within the brief's byte budget, and its truncation is said; a
+  read that fails is said in its place (section 20.1;
+  `docs/design/forge.md`, 3.2).
 - **A resolution** is a task for an agent whose workspace starts from a
   merge in progress: the base merged into the branch, the conflicting
   files marked. The agent edits them and runs the checks, with no git
@@ -744,8 +748,8 @@ answered first, the fake forge's protocol layer, the load rules) stands.
   - editing a pull request's or an issue's title and body;
   - branch protection, read at adoption;
   - creating a branch at a commit;
-  - a failed CI job's description and link from commit statuses; its
-    output only when the provider has a supported log read (section 20);
+  - a failed CI job's description and link from commit statuses, and
+    the step that failed with the end of its log (section 20.1);
   - the repository's settings at adoption: its merge styles, its
     default branch; and its collaborators with their permissions, to seed
     people's roles (people.md, section 4).
@@ -838,52 +842,41 @@ idle are bounded by the limits.
 
 ### 20.1 Target version and groundwork observations
 
-The target is **Forgejo v16.0.5**. Job logs are readable through its
-supported API; the client and repair procedures assume this capability.
-The tagged [v16.0.5 API specification](https://codeberg.org/forgejo/forgejo/src/tag/v16.0.5/templates/swagger/v1_json.tmpl)
-defines:
+The target is **Forgejo v17.0**, one patch release of it pinned, with
+forgejo-runner v13.2 for its Actions (`docs/design/forge.md`, sections
+10 and 13). What the change procedure leans on, each checked on the
+pinned release by `tools/forgejo-conformance`, whose `facts.txt` names
+it, or said to be still to check:
 
-- `GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs` to name a run's
-  jobs and attempts;
-- `GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs?attempt={attempt}`
-  for one job's plaintext log, with HTTP byte ranges (`200` or `206`);
-- `GET /repos/{owner}/{repo}/actions/runs/{run_id}/logs` for a ZIP of the
-  latest attempts' logs. Repair briefs use the bounded per-job read.
-
-A log read names the exact job attempt associated with the failing head;
-its owned bytes count against the client's reply and brief limits. Missing,
-forbidden or failed reads are explicit outcomes, not an unsupported-API
-fallback. Tagged-source inspection establishes the API contract; the v15
-capture below is historical evidence and does not verify v16 responses,
-permission behavior or byte-range handling. The v16 protocol conformance
-work must retain real exchanges for these routes.
-
-Checked against the verified Forgejo 15.0.0 binary, in disposable SQLite
-state on loopback, with a non-admin write collaborator and an isolated
-Forgejo runner v3.5.1. The shell-only workflow prints a fixed marker and
-exits unsuccessfully; it downloads no actions and performs no checkout.
-`tools/forgejo-conformance/run.py --next-domain` captures the actual
-exchanges and signed update webhooks; each case below names an exchange
-there. These are facts about this version and configuration, not a claim
-about every Forgejo deployment.
-
-| Question | Observed fact and consequence | Evidence cases |
-|---|---|---|
-| Conflicting merge-style update | `POST .../pulls/{n}/update?style=merge` returns `409`, with message `merge failed because of conflict`; the head is unchanged. This specific refusal is a conflict resolution. Other failures still require a fresh read before deciding what happened. | `00a-conflicting-update`, `00a-conflict-head-after` |
-| Clean update and CI | Update returns `200` with an empty body, moves the head, emits push and synchronized pull-request webhooks, and starts the configured push workflow on exactly that new head. Its deliberate failure appears in both Actions and the combined commit status, with a description and job link. CI must be checked again at that head. | `00a-clean-update`, `00a-clean-pull-after`, `00a-runs-after-update`, `00a-updated-head-status`; both retained webhooks |
-| File and commit listing | Pull-request files page correctly: with `limit=1`, three pages contain distinct files and the fourth is empty; their commit URLs name the current head. Comparison returns all three files and commits on every `page=1..4&limit=1`, even with `MAX_RESPONSE_ITEMS=2`; paging is ignored. Apply the bounded, conservative handling of section 7.3. | `00a-pull-files-page-1` through `-4`, `00a-comparison-page-1` through `-4` |
-| Failed Actions log | A real failed job and its status are readable with the write token. The running binary's REST Swagger has no job-log route; attempted run `jobs` and `logs` routes both return `404`. This establishes the absence of a supported REST log read on v15 only. It is superseded for the v16.0.5 target by the API contract above; repair briefs read job logs (8.4). | `00a-run-at-updated-head`, `00a-tasks-after-update`, `00a-probe-jobs`, `00a-probe-logs`; extracted `next_domain.actions_api_paths` |
-| Branch at a commit | `POST .../branches` with `old_ref_name` equal to a full commit id returns `201` and creates the branch at exactly that commit. No worker push is needed to create or recreate it. | `00a-main`, `00a-create-commit-origin` |
-| Protection with write permission | Both listing protections and reading the existing `main` protection return `403`: `user should be an owner or a collaborator with admin write of a repository`. Adoption records protection as unknown (section 4). The token's user is non-admin and its repository permission is `write`. | `00a-writer-user`, `00a-writer-permission`, `00a-protect-main`, `00a-protection-list-as-writer`, `00a-protection-as-writer` |
-| Conditional merge and retarget | A merge naming the old head returns `409`, with message `head out of date`. After retargeting, merging the current head returns `200` with an empty body, records the retargeted base and merge commit, advances only that base and leaves `main` unchanged. Read the current base and head before landing. | `00a-merge-stale-head`, `00a-retarget-pull`, `00a-merge-retargeted-current-head`, `00a-retargeted-merged-pull`, `00a-retarget-base-after`, `00a-main-after-retarget` |
-
-Each question is settled by an observation or its fallback for the
-probed v15 configuration. Large comparison completeness and other
-workflow configurations are not inferred from this small fixture. The
-v16.0.5 log routes require their own conformance exchanges. The retarget
-probe changes the base before the merge; it does not establish an atomic
-condition on both base and head, or behavior when a person retargets
-concurrently with the merge.
+- **CI and its failures.** Actions report each job as a status on the
+  commit it ran on, with a description and a link to the job; a run's
+  jobs name each job's attempt. A job is read with its latest attempt's
+  steps, the runner's set-up first and its completion last, and one
+  step's log is read alone, with byte ranges, so a repair's brief reads
+  the end of the step that failed (8.4). A log read names the exact job
+  attempt that failed on the head, and its bytes count against the
+  client's answer and the brief's budget. A missing, forbidden or failed
+  read is an explicit outcome in the brief, beside the status's
+  description and link.
+- **A conflicting update** (`POST .../pulls/{n}/update?style=merge`)
+  answers `409`, `merge failed because of conflict`, and leaves the head
+  as it was: a conflict to resolve (section 10). Any other failure asks
+  for a fresh read before deciding what happened.
+- **A clean update** answers `200` with no body and moves the head; CI
+  runs on the new head, and is checked again there (to check: that the
+  push workflow starts on exactly that head).
+- **Files and comparisons:** a pull request's files page; a comparison
+  ignores paging and answers everything, handled bounded as section 7.3
+  says.
+- **A branch at a commit** is created at a full commit id, with no
+  worker push.
+- **Protection with write permission:** a writer's protection reads
+  answer `403`, so adoption records protection as unknown (section 4).
+- **A conditional merge:** one naming an old head answers `409`, `head
+  out of date`; one at the current head answers `200` with no body. A
+  merge after the pull request's base was changed lands in the new base
+  (to check), so the current base and head are read before landing;
+  nothing makes the merge conditional on both.
 
 ### 20.2 Open questions
 
@@ -899,6 +892,11 @@ concurrently with the merge.
   protection requires it independently (core.md, section 11).
 - **Webhooks through the API** at adoption, which needs admin rights on
   each repository.
+- **A failure that is the runner's, not the change's:** a job whose
+  set-up step failed, or whose runner was lost, is a repair like any
+  other. Running the job again first, through the API, is
+  `draft/ci-on-forgejo-17.md`, with the stalls' reasons and the agents'
+  log tools.
 - **Intake:** issues others open as a source of goals.
 - **A resource refused as forbidden:** whether the connector should hear
   when it is readable again, rather than read it on a backoff.

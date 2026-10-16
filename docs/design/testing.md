@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-15. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-16. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -194,12 +194,13 @@ and 10).
     jig's native transport (client.md, section 2); and, in a test of its
     own, `temper open` itself with stdin and stdout piped (client.md,
     sections 6 and 10).
-- **The throwaway Forgejo:** v16.0.5, the binary `TEMPER_FORGEJO` names,
+- **The throwaway Forgejo:** v17.0, the binary `TEMPER_FORGEJO` names,
   with SQLite in the scratch directory, listening on loopback only. The
   test's support starts it, makes the admin user, temper's forge user,
   their tokens and a repository, and stops and removes the instance
-  after. It refuses to run without `TEMPER_FORGEJO`, or with a binary of
-  another version, naming it. Never an existing Forgejo.
+  after. It refuses to run without `TEMPER_FORGEJO`, or with a binary
+  other than the pinned patch release (forge.md, section 10), naming it.
+  Never an existing Forgejo.
   `tools/forgejo-conformance` and `tools/git-transcripts` start theirs
   the same way, from the same variable (forge.md, section 10; git.md,
   section 9).
@@ -794,7 +795,7 @@ By tier:
 - **Transcripts** of the real peers temper speaks to:
   Forgejo's answers, recorded by `tools/forgejo-conformance`, and git's,
   recorded by `tools/git-transcripts`, both against the throwaway
-  Forgejo v16.0.5 that `TEMPER_FORGEJO` names (forge.md, section 10).
+  Forgejo v17.0 that `TEMPER_FORGEJO` names (forge.md, section 10).
   LLM providers' are skein's.
 - **Machine worlds:** the forge component's, the git component's and the
   terminal shell's.

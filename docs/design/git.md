@@ -1,6 +1,6 @@
 # The checkout's io: git
 
-Provisional, 2026-10-14. How the worker's protocol layer runs the
+Provisional, 2026-10-14, revised 2026-10-16. How the worker's protocol layer runs the
 checkout's operations (`domain/worker.md`, section 5): the git component,
 `temper-worker-protocol-git`. For each operation of
 `temper-worker-domain-checkout`'s `git::Op`, the fixed sequence of git
@@ -618,7 +618,7 @@ As testing.md applies skein's strategy, within the suites' budgets
   name the engine's root holds. Default: git follows the forge's
   redirect for its first request (git's `http.followRedirects`, whose
   default is `initial`), and a remote that changes misses the checkout's
-  cache, which clones afresh. Whether Forgejo v16.0.5 redirects git's
+  cache, which clones afresh. Whether Forgejo v17.0 redirects git's
   requests for a renamed repository is checked by `tools/git-transcripts`.
 - **HEAD after a commit.** Default: not moved (section 4.7), keeping each
   commit to four invocations; an agent that reads git sees the work
