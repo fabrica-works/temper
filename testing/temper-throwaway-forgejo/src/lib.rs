@@ -2,9 +2,10 @@
 mod binary;
 mod http;
 mod instance;
-pub use binary::{Forgejo, RUNNER_VERSION, Refusal, VERSION, names_runner};
+pub use binary::{Forgejo, Refusal};
 pub use instance::Instance;
 use std::{fmt, path::PathBuf};
+pub use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION, names_runner};
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub max_response_items: Option<u32>,

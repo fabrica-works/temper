@@ -1,4 +1,5 @@
 mod fixtures;
+mod pin;
 use crate::{
     client,
     decode::Malformed,

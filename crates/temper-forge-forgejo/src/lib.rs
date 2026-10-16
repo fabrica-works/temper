@@ -9,6 +9,7 @@ pub mod header;
 pub mod id;
 pub mod limits;
 pub mod path;
+pub mod pin;
 pub mod request;
 pub mod server;
 #[cfg(test)]

@@ -1,6 +1,4 @@
-use crate::{
-    Outgoing, RUNNER_VERSION, Settings, Token, VERSION, binary::names_forgejo, http, instance::ini, names_runner,
-};
+use crate::{Outgoing, Settings, Token, http, instance::ini};
 use std::path::Path;
 #[test]
 fn the_app_ini_names_loopback_sqlite_and_the_page_cap() {
@@ -27,44 +25,6 @@ fn a_recorded_request_holds_no_token() {
     let sent = http::request(3000, &outgoing, Some("token MASKED"));
     assert_eq!(sent, b"GET /api/v1/user HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: token MASKED\r\nConnection: close\r\n\r\n");
     assert_eq!(format!("{token:?}"), "Token { length: 40 }");
-}
-
-#[test]
-fn forgejo_s_line_with_its_build_details_names_the_pin() {
-    for line in [
-        format!(
-            "forgejo version {VERSION}+gitea-1.22.0 (release name {VERSION}) built with GNU Make 4.4.1, go1.26.9 : bindata, timetzdata, sqlite, sqlite_unlock_notify"
-        ),
-        format!("forgejo version {VERSION}"),
-    ] {
-        assert!(names_forgejo(&line), "{line}");
-    }
-}
-#[test]
-fn a_forgejo_version_extending_the_pin_is_refused() {
-    for line in [
-        format!("forgejo version 1{VERSION}+gitea-1.22.0"),
-        format!("forgejo version {VERSION}0+gitea-1.22.0"),
-        format!("forgejo version {VERSION}-rc1"),
-        format!("gitea version {VERSION}+gitea-1.22.0"),
-    ] {
-        assert!(!names_forgejo(&line), "{line}");
-    }
-}
-#[test]
-fn the_runner_s_version_line_names_the_runner_pin() {
-    assert!(names_runner(&format!("forgejo-runner version v{RUNNER_VERSION}")));
-}
-#[test]
-fn a_runner_version_containing_the_pin_is_refused() {
-    for line in [
-        format!("forgejo-runner version v1{RUNNER_VERSION}"),
-        format!("forgejo-runner version v{RUNNER_VERSION}0"),
-        format!("forgejo-runner version v{RUNNER_VERSION}-dev"),
-        format!("forgejo-runner version {RUNNER_VERSION}"),
-    ] {
-        assert!(!names_runner(&line), "{line}");
-    }
 }
 
 #[test]

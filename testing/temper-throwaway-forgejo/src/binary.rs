@@ -5,20 +5,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-/// The pinned Forgejo release shared by the throwaway instance, tools and process tier.
-pub const VERSION: &str = "17.0.0";
-/// The pinned forgejo-runner release checked by the conformance tool.
-pub const RUNNER_VERSION: &str = "13.2.0";
-/// Whether Forgejo's first version line names the pin, optionally followed by build details.
-#[must_use]
-pub(crate) fn names_forgejo(line: &str) -> bool {
-    line.strip_prefix("forgejo version ").and_then(|rest| rest.split(['+', ' ']).next()) == Some(VERSION)
-}
-/// Whether forgejo-runner's first version line names exactly the runner pin.
-#[must_use]
-pub fn names_runner(line: &str) -> bool {
-    line.strip_prefix("forgejo-runner version v") == Some(RUNNER_VERSION)
-}
+use temper_forge_forgejo::pin::names_forgejo;
 #[derive(Debug, Clone)]
 pub struct Forgejo {
     binary: PathBuf,
