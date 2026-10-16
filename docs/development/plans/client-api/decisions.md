@@ -860,6 +860,11 @@ choice would have been the user's (development.md, 10.4).
 176. **The check of 20:41Z's lasting steers in the README** (steer of 2026-10-16T21:01Z).
      The check of 2026-10-16T20:41:43Z's steer of 21:01Z: its points 1 (a .rs file of at most 800 lines at `origin/main` stays at most 800, with the three that crossed it brought back when next edited) and 3 (`person_unchanged` taken from `jig_core_world::fixtures` where a crate can reach it) hold to the run's end, so their Pass on texts join the README's rule "The run's steers" (ruling 167), and the coordinator gives them in no prompt. Point 2 (a session past 150K hands over at its landing, development.md, section 7.3, step 4) is the coordinator's alone. Unchanged: the 18:42Z and 19:38Z points.
 
+177. **jig 03.4: no retention for a decided proposal's update** (plan defect, jig 03's block of 2026-10-16T21:03:50Z).
+     Plan defect in ruling 175: its retention sentence rested on a premise nobody checked. Nothing forgets a decided proposal on `main`, so 03.4 adds no retention, no read mark for proposals, and no erase helper without a caller: the proposer's update lives as long as its decided proposal does, which is the decided proposal's lifetime today, unchanged. `Seen` and read marks keep covering results and chats only.
+
+     The removal waits for the plan that forgets decided proposals: later.md's new row names it (the decided proposal, its core decision and its update's index key removed as one deletion), and jig's retention plan takes it. The rest of ruling 175 stands: the `UpdateObject` variant, its v3 schema and codec, the join to `Stored::DecidedProposal` with `CoreRecord::ProposalDecision`, and 03.4's Size of at most 420 lines. Ruling 175's Files name `crates/jig-domain-core/src/forget.rs`: touch it only for an arm an exhaustive match over `UpdateObject` there needs, and no more.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
