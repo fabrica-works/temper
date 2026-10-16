@@ -356,7 +356,8 @@ before the terminal says so; the link's exchanges and the stream travel
 over `jig-client-protocol-http` in the shell (`client.md`, 6.1, 6.6,
 6.7, 7; `credentials.md`, 6).
 Needs: jig 10.3 (the link's vocabulary, `jig-client-protocol-http`, the
-native shell on it).
+native shell on it), and temper-03.s1's landing (ruling 153), whose repin
+holds jig 10.3: 03.2 makes no repin commit, and its lines are its Shape's.
 Files: `crates/temper-client-shell-terminal/src/`: `client.rs` (391
 lines at the base: the sign-in at :110-116, `sign_in` and `signing` at
 :180-189), `route.rs` (:52-57, the link's requests to the shell;

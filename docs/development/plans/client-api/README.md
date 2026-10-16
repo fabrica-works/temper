@@ -93,7 +93,8 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
-| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10, temper-03.s1; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-s1-engine-revisions.md` | temper-03.s1 (ruling 153): the repin onto jig 10.3, with jig 06's revisions and answers in temper's engine tools | jig 10.3 | |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16; 04.4: jig-13.s1 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
