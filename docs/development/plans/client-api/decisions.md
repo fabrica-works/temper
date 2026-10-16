@@ -788,6 +788,15 @@ choice would have been the user's (development.md, 10.4).
      3. 12.2 does not land before the answer's unblock. When the rest is done first, commit it on the branch, report, and wait for the unblock.
      4. Unchanged: 12.2's Scope, Files, Shape and Tests; jig 12.3 to 12.5 wait for 12.2 as the plan says.
 
+169. **temper 03.3 converts ENGINE's chats to templates, 04.1's conversion** (plan defect, temper 03's block of 2026-10-16T19:54:38Z).
+     Ruling 169, a plan defect, the implementer's option A: yes. 03.3's pin carries jig 09.1's reader, which refuses `ENGINE`'s `chats` and wants `templates`, so 04.1's `ENGINE` conversion is a repair of 03.3's repin, as the README's "What a temper repin repairs" has it ("what else jig landed since temper's last repin"), and as ruling 164 carried 04.1's limits.
+
+     1. 03.3 converts `ENGINE` (`crates/temper-service/src/tests/fixtures.rs`) as 04.1's Files give it, word for word: `:46`'s `"chats": {"charter": 1, "close_grace_ms": 5000}` becomes `"templates"`, "jig's two defaults written out in jig 09.1's format, as jig 09's fixtures write them: 'jig's defaults are written, not implied', their reports' `words` 32, within `ENGINE`'s `"tasks.result_bytes":32`"; its policy at `:65` gains `"templates": []`; and the `Project` literal at `:436` gains `templates` where the pinned types ask it.
+     2. 04.1 keeps what remains: its reader work, its tests (`a_chats_member_is_refused_as_unknown_naming_its_path` among them), `forgejo.rs`'s `people.operations` after jig 09.4, and the rest of its Files. Its "Removes: the `chats` member in `ENGINE`" is 03.3's now.
+     3. The lines count among 03.3's repin repairs (ruling 164: past 200, it lands with the count in its report; past 300, a question). Existing assertions keep their names and values.
+     4. Any further copy of the `chats` member the repin's suites find: convert it the same way, and list it in the commit body. On temper's main only `fixtures.rs:46` holds one.
+     5. Unchanged: ruling 164; 03.3's Shape, Test shape and Proof; 04.1's Don't ("set a template's field by hand where jig's fixture gives it").
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

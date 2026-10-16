@@ -459,7 +459,10 @@ README's 200 lines: jig 07.2's `ProcedureStep` in place of
 `tests/engine/domain/tests/root_routes.rs:1654-1659`), and of 04.1, what
 the compile needs: `Limits.templates` (`limits.rs:29-54`), `core_limits`
 (`:109-143`) and the service's `templates: jig.core.templates`
-(`crates/temper-service/src/limits.rs:264-278`).
+(`crates/temper-service/src/limits.rs:264-278`); and, since the pin's
+configuration reader refuses `chats` (ruling 169), 04.1's `ENGINE`
+conversion as 04.1's Files give it (`crates/temper-service/src/tests/fixtures.rs:46`,
+:65, and :436 where the pinned types ask it).
 Shape: as jig 11.3 changes `testing/jig-client-test-domain/src/{store.rs,
 domain.rs}`: the root's table keeps `Held { key: Key { asker, number },
 request }`, the asker from the root's owner (`Owner::Jig` 65536,
