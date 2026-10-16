@@ -285,6 +285,31 @@ run are appended after "For the user".
        the body and the log's lines.
      - Unchanged: the recording rule's "third failure with the same symptom is a question".
 
+111. **04.1's pull pair; the fake always checks** (designer's answer, temper 04's block of 2026-10-16T22:36:21Z).
+     Ruling 111: the designer's answer to session 04's question 2, landed in temper edcd1954b:
+
+     temper 04.1, a pull's mergeability at its push's delivery varies: **the design bears either order. The facts record
+     whether Forgejo was ever seen checking, and the fake always checks.** Landed in temper edcd1954b (forge.md 9 and 13;
+     plans/forge-setup/temper/04-deliveries.md, 06-settle.md). domain/forge.md is unchanged.
+
+     - **`settle` (06.2) needs nothing more.** domain/forge.md 5.2: "within `settle` of a move of its head or base (…), a
+       pull request that reads not mergeable is read again at `hinted`, doubling, until it reads mergeable or `settle` has
+       passed", and "Until `settle` has passed since the move, not mergeable is not known".
+     - **The pull pair (04.1's Facts):** `pull-is-settled-when-its-push-is-delivered` holds when every probe B (steps 7 and
+       8) read the pull mergeable. `pull-is-checking-when-its-push-is-delivered` holds when one probe at least read it not
+       mergeable, and each such pull then read mergeable within 30 s (the small profile's `settle`). It is read again once
+       the delivery is answered, at 1 s, doubling. Each fact's line keeps probe B's reads. Exactly one holds on every run.
+       If Forgejo takes longer than `settle`, both fail, and that is a new question. "Done when" is unchanged.
+     - **forge.md 13 now asks** "whether a pull request's mergeability is ever still checked when the push that moved its
+       head or base is delivered (the order varies between recordings, so one read checking is enough), and that it settles
+       within `settle` of the delivery".
+     - **The fake (06.1) always checks,** whichever pull fact holds. forge.md 9, "Forgejo's quirks, kept": "a push that
+       moves a pull request's head or base starts its check, which reads it not mergeable until it ends, and is delivered
+       while it runs, the order Forgejo sometimes takes (section 13)". `git::moved` starts each `on_branch` pull's check
+       for `CHECK` (2 s). 06.1's ready check greps `delivery-job-end` alone (two lines); the job order still follows its
+       pair.
+     - Session 04's question 2 is marked answered. Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
