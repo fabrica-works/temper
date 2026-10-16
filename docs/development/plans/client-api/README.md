@@ -296,9 +296,13 @@ per session are in each file.
   - Each landing's report names its suites' times from its
     `Gate-Result` line, and nothing else is measured. An aim exceeded is
     a guide missed: the landing stands, and the session's next increment
-    first makes the slowest tests cheaper, found by `heavy --gate --
-    cargo nextest run --workspace --profile measure -j 1` once, until its
-    own gate is back under the aim; after a session's last increment the
+    first makes the slowest tests cheaper, found once by the measure run
+    of the suite that missed (`.config/nextest.toml`'s two commands):
+    the focused suite's `heavy --gate -- cargo nextest run --workspace
+    --profile measure -j 1`, the fuzzy suite's `heavy --gate -- cargo
+    nextest run --workspace --profile measure -j 1 --ignore-default-filter
+    -E 'binary(/^fuzzy_/)'` (ruling 109), until its own gate is back
+    under the aim; after a session's last increment the
     supervisor decides. Never: raising a `global-timeout`, a slow period
     or a per-test ceiling, or moving a focused test to the fuzzy suite.
   - A test's own time in a session file ("under 20 ms", "under 0.5 s")
