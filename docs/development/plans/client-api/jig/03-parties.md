@@ -131,8 +131,9 @@ jig 14 carries these operations to it, and jig 22 the documents.
   `crates/jig-domain-core/src/{effects.rs, routing/tasks.rs,
   reads/rows.rs, documents/objects.rs}` and the test files
   `crates/jig-domain-people/src/tests.rs`, `crates/jig-domain-core/src/tests.rs`,
-  `tests/core/tests/stories.rs`. New code goes in the new modules this
-  file names.
+  `tests/core/tests/stories.rs`, `testing/jig-test-domain/src/routes.rs`,
+  `tests/people/src/world.rs`, `tests/tasks/src/world.rs`. New code goes
+  in the new modules this file names.
 - **Nothing new is added to the shapes of work**, and jig's files never
   name the repository downstream of jig (session 02's Rules, with its
   check command). `people::Ask` is matched exhaustively downstream
@@ -183,7 +184,7 @@ Files:
   regenerated with its goldens; `src/codec/people/asks.rs` (`Create`,
   both ways, in a new module `src/codec/people/batch.rs` for `Member`),
   `src/codec/people/outcomes.rs`, `src/codec/people/outcomes/facts.rs`;
-  the codec's limit from people `batch` (`src/codec.rs`).
+  the codec's limit from people `batch` (`limits`, `src/codec/people.rs:25`).
 - `crates/jig-protocol-engine-clients/src/translate/answers.rs` and
   `refusals.rs` (Choices). Arms in the other exhaustive matches over
   `people::Ask`, `Outcome` and `Refusal` (searches S8 to S10):
@@ -191,6 +192,8 @@ Files:
   `tests/core/src/{peers.rs, referee/offers.rs}`,
   `tests/client/src/joint/wire/{outcomes.rs, refusals.rs}`,
   `tests/people/src/{referee.rs, world.rs}`.
+- `tests/core/src/stories/offers.rs` (`world_with`, beside `world` at :21;
+  Test shape).
 - Users of `people::Limits` (11 files, search S7), edited to the new form.
   The downstream repository's repin absorbs the new ask, outcome, refusal
   and limit (search S18: 28 files match `people::Ask::`).
@@ -201,13 +204,18 @@ Shape:
   `Ask::Create { project, batch: Box<[Member]> }`; `Outcome::Created {
   first, last }`; `Refusal::NotWellFormed { at: u32, why: Malformed }`,
   `Malformed::Cycle`.
-- The people child admits a `Create` like `SetGoal`: role member or
-  above (`RequestKind::Create`), 1 to `batch` members, each member's words
-  within `words` and its `member_bytes` within `amendment_bytes`, else
-  `Limit { which: Empty | Batch | Words }`.
+- The people child admits a `Create` like `SetGoal`, refusing no role:
+  `admission` (`domain.rs:1838`) routes the ask, and the core refuses by
+  role (step 0), as it does a goal (`acts/bounds.rs:29`, :236). The people
+  child checks 1 to `batch` members, each member's words within `words`
+  and its `member_bytes` within `amendment_bytes`, else `Limit { which:
+  Empty | Batch | Words }`.
 - `routing::create::create_request(core, env, out, work, request, person,
   project, role, batch)`, in order, each refusal naming the member's
   position where it has one:
+  0. `Role { held }` unless the party's role allows `RequestKind::Create`,
+     as `goal_start` refuses (`acts/bounds.rs:233-238`): an observer's
+     `Create` is refused;
   1. `NotWellFormed { at, why: Cycle }` when the batch's own dependencies
      (positions) close a cycle, `at` the lowest position on it; a cycle
      through a live task stays the tasks child's `Limit { which: Cycle }`;
@@ -223,7 +231,17 @@ Shape:
      the batch made as `Creation` makes a goal: holdings asked of each
      connector, then `tasks::Event::Make { creator: Party::Person(person)
      }`, answered `Created { first, last }`; the tasks child's refusals
-     answered through `routing/refusals.rs:23` (`task_answer`).
+     answered through `person_task_refusal` (`routing/refusals.rs:11`),
+     as a person task's are (its `task_answer`, :23, is private).
+- The test mirrors of `Refusal`, `testing/jig-test-connector/src/application_core.rs:6`
+  and `testing/jig-fake-parties/src/facts.rs:6`, stay as they are, with
+  their codecs and schema: their mappers, `refusal`
+  (`testing/jig-test-domain/src/application_facts.rs:6`) and
+  `party_refusal` (`tests/core/src/peers.rs:600`), translate
+  `NotWellFormed { why: Cycle, .. }` onto the mirror's nearest refusal,
+  `Limit { which: Cycle }`. 03.2's and 03.4's `Malformed` variants are
+  translated the same way, each onto the nearest refusal the landing's
+  report names.
 Test shape:
 - `crates/jig-domain-people/src/tests/create.rs` (new, a module of
   `tests.rs`; fixtures of `tests.rs`: `LIMITS` :10, whose `batch` this
@@ -231,7 +249,9 @@ Test shape:
   `Test::member` :310, `Test::request` :305, `reply` :316; and a helper of
   this file, `member(words)`, an agent's task of charter 1 with a report
   contract): `a_members_create_routes_once_to_the_core`,
-  `an_observers_create_is_refused_by_role`,
+  `an_observers_create_is_refused_by_role` (the ask routed, then the
+  root's `Event::Decided { request, outcome: Outcome::Refused(Refusal::Role
+  { held: Some(Role::Observer) }) }` replayed, as `tests.rs:478` does),
   `an_empty_create_is_refused_as_empty`,
   `a_create_past_its_batch_limit_is_refused`,
   `a_create_whose_words_pass_their_bound_is_refused`. Reference:
@@ -253,10 +273,19 @@ Test shape:
   gain `Created` and `NotWellFormed`, so `people_outcomes_read_back_as_written`
   does; the drift test regenerates v3.
 - `tests/core/tests/parties.rs` (new, the joint world; the world
-  `jig_core_world::stories::offers::world(seed, Some(people::Role::Member))`,
-  `tests/core/src/stories/offers.rs:21`; `limits.core.tasks.batch`,
-  `limits.core.authority.batch` and `limits.core.people.batch` set to 2,
-  the Small profile's, beside the world's 1, and `limits.core.tasks.tasks`
+  `jig_core_world::stories::offers::world_with(seed, Some(people::Role::Member),
+  edit)`, a new function of `tests/core/src/stories/offers.rs`, since
+  `world` (:21) builds its world itself and its limits cannot be set
+  afterwards: `edit` changes the fixture's limits before the world is
+  configured, `world` is `world_with` with no edit, and before
+  `World::configured` `world_with` raises the journal's `writes` and
+  `held` to the edited core's `core::room_max`, as
+  `tests/core/src/world.rs:176-185` sizes them for the world's own
+  limits, else `root::worst_case` refuses the journal
+  (`testing/jig-test-domain/src/limits.rs:30-31`) and the world's heap
+  observer panics, "testing root bound fits"; the edit sets
+  `limits.core.tasks.batch`, `limits.core.authority.batch` and
+  `limits.core.people.batch` to 2, the Small profile's, beside the world's 1, and `limits.core.tasks.tasks`
   and `project_tasks` to 8, the Small profile's, beside the world's 2, the
   reason being a batch of two beside the world's chat): the Proof's test,
   and `a_partys_batch_with_a_dependency_cycle_is_refused_naming_its_member`,
@@ -337,6 +366,12 @@ Files:
   `crates/jig-protocol-engine-clients/src/translate/refusals.rs` leaves
   v7's `LackingTaskKind.executor` `None`, as at the base (jig 14 fills
   it).
+- The other users of `Lack::TaskKind`, passing `None` or matching `{ .. }`:
+  `crates/jig-domain-core/src/authority_facts.rs` (:42, :69),
+  `crates/jig-domain-core/src/routing/refusals.rs:47`,
+  `crates/jig-domain-people/src/tests.rs:1178`,
+  `crates/jig-protocol-engine-clients/src/tests/fixtures/answers/lacks.rs:28`,
+  `tests/people/src/referee.rs:121`.
 Shape: sketch 1, with each field and variant it marks 03.2. In
 `create_request`, beside 3.1's steps:
 - first, `NotWellFormed { at, why: Conversation }` for the conversation
@@ -448,8 +483,10 @@ Files:
   option Accepter`), `src/codec/people/outcomes/facts.rs`.
 - `crates/jig-protocol-engine-clients/src/translate/refusals.rs` (Choices);
   the tests' arms (`tests/core/src/peers.rs`, `tests/client/src/joint/wire/refusals.rs`,
-  `testing/jig-test-domain/src/application_facts.rs`,
-  `testing/jig-fake-parties/src/facts.rs`).
+  `testing/jig-test-domain/src/application_facts.rs`); the test mirrors
+  `testing/jig-fake-parties/src/facts.rs` and
+  `testing/jig-test-connector/src/application_core.rs` stay as they are
+  (Shape).
 Shape: `people::Accepter { Nobody, Role(u32) }`; `Refusal::Authority {
 lacking, proposable: Option<Accepter> }`, `None` still making no claim. For
 a party's request whose authority check answers `Propose`, the refusal
@@ -459,7 +496,13 @@ policy names none; for one that answers `Refuse` on an authority finding,
 `Some(Accepter::Nobody)`. The callers that read a party's `Answer` (`rg -n
 'Answer::(Refuse|Propose)' crates/jig-domain-core/src`) treat any answer
 but `Allow` as refused, as they do at the base; the search is run once and
-its lines listed in the landing's report.
+its lines listed in the landing's report. The test mirrors of
+`Refusal` keep `proposable: Option<bool>`, as in 3.1: their mappers,
+`refusal` (`testing/jig-test-domain/src/application_facts.rs:6`) and
+`party_refusal` (`tests/core/src/peers.rs:600`), translate
+`Some(Accepter::Role(_))` onto `Some(true)`, `Some(Accepter::Nobody)` onto
+`Some(false)` and `None` onto `None`, as the clients' component maps
+them onto v7 (Choices).
 Test shape:
 - `crates/jig-domain-authority/src/tests_party.rs` (jig 02.3's file and
   fixtures): `a_partys_batch_beyond_their_role_answers_propose`,
@@ -529,11 +572,13 @@ Files:
   `Withdraw`), `routing/party_decisions.rs` (`goal_decide`, :16-97, for a
   party's proposal of a batch), `routing/parties.rs` (the goal's
   `CreationKind::Goal { direct: false }` and `GoalRoute::Proposing` go:
-  `goal_start` refuses), `acts/bounds.rs` (`goal_start` :221 refuses
+  `goal_start` refuses), `run.rs` (`GoalRoute::Proposing`, :397, goes),
+  `acts/bounds.rs` (`goal_start` :221 refuses
   beyond the pool with 3.3's refusal), and the users of `PersonProposal.goal`
   (search S13: in the core `documents/objects.rs`, `acts/objects/decisions.rs`,
   `reads/rows.rs`, `reads/vocabulary.rs`, `proposals.rs`, `sibling_routes.rs`,
-  `routing/tasks.rs`; in `jig-protocol-engine-clients`
+  `routing/tasks.rs`, and `goals.rs` (:104, :117), `inbox/census.rs:51`,
+  `stored.rs:327`; in `jig-protocol-engine-clients`
   `translate/{deployment.rs, objects.rs, objects/historical.rs}`), and
   the tests among search S13's files (`tests/tasks/{src/world.rs,
   tests/person.rs}`, `crates/jig-protocol-store/src/tests/{codec/phase.rs,
@@ -550,10 +595,13 @@ Files:
 - Tests that relied on `GoalProposed`, moved to `Propose` (search S11):
   `tests/core/tests/stories/{offers.rs, procedure_goals.rs, historical.rs,
   watches.rs}`, `tests/core/tests/stories.rs` (`a_goal_with_a_deadline_is_held_past_it`,
-  :1314), `tests/core/src/{peers.rs, referee/offers.rs}`,
-  `tests/people/{src/world.rs, tests/simulation.rs}`; the client's joint
+  :1308), `tests/core/src/{peers.rs, referee/offers.rs}`,
+  `crates/jig-protocol-engine-clients/src/tests/fixtures/answers/outcomes.rs`
+  (`GoalProposed`'s row, :37, goes); the client's joint
   story `tests/client/src/joint/role_stories/proposed_story.rs`, which
   asserts the refusal (Choices). Arms as 3.1's for the new variants.
+  (`tests/people/{src/world.rs, tests/simulation.rs}` match search S11 for
+  `AmendProposed` only: 03.5's.)
 Shape:
 - `people::Action::Batch(Box<[Member]>)`; `Ask::Propose { project, action,
   reason }`, `Ask::Withdraw { project, proposal }`; `Outcome::Proposed {
@@ -673,21 +721,25 @@ Files:
   rewrite to a proposal goes), `acts/bounds.rs` (`amendment_admit`
   answers a refusal), `routing/people.rs`, `routing/tasks.rs`,
   `routing/application_routes.rs`, `sibling_routes.rs` (`AmendProposed`'s
-  arms, search S11).
+  arms, search S11), `run.rs` (`PersonTaskRoute::AmendProposed`, :392,
+  goes).
 - `crates/jig-protocol-store`: the people codec of `Action::Amend`; the
   tasks codec of `PersonAction::Amend` (in place).
 - The transitional piece: `crates/jig-protocol-engine-clients/src/component.rs`
   (`Waiting::Ask`, :515-534, keeps a v7 `Amend`'s translated ask until
   answered and sends the follow-up request as `ServiceMade` turns into
-  `Waiting::Made`, :516-522), `src/translate/answers.rs` (v7's `AmendProposed` from
+  `Waiting::Made`, :516-522; `Waiting::Ask` built with the kept ask at
+  :711), `src/sign_in.rs` (`Waiting`, :15, whose `Ask` variant, :25,
+  holds the kept ask), `src/translate/answers.rs` (v7's `AmendProposed` from
   `Proposed`), `src/limits.rs` (the kept ask in the component's worst
-  case).
+  case); `src/tests/fixtures/answers/outcomes.rs` (`AmendProposed`'s row,
+  :143, goes).
 - Tests that relied on `AmendProposed`, moved to `Propose`:
   `tests/core/tests/stories.rs` (`an_amendment_and_a_release_are_one_decision`,
-  :982, through its helper
+  :976, through its helper
   `a_widening_amendment_with_release_is_proposed_and_released_on_acceptance`,
-  :1225), `tests/people/tests/simulation.rs` (the test of that name,
-  :615).
+  :1219), `tests/people/tests/simulation.rs` (the test of that name,
+  :615), `tests/people/src/world.rs` (:713).
 Shape: `people::Action::Amend { task, revision, amendment: Box<Amendment>
 }`; `tasks::PersonAction::Amend { task, amendment: Box<Amendment> }`
 (sketches 1 and 2). `propose_request` for an amendment: the task in the
@@ -755,13 +807,18 @@ jig-domain-core --all-targets -- -D warnings`: passed. jig 02's
 `Flags` and `Retention` were stubbed in the people module (the people
 child mirrors them; the tasks child's come from 02.1): checked at the
 ready check. The additions to `Ask`, `Outcome` and `Refusal` were compiled
-as enums of their own beside the base's.
+as enums of their own beside the base's. `Outcome`, `Reply`, `Refusal` and
+`Lack` are `Copy`, and the tests copy replies
+(`crates/jig-domain-people/src/tests.rs:319`), so what they hold (`Given`,
+`Accepter`, `Malformed`, `TaskExecutor`) derives `Copy`, as `Flags` and
+`Retention` do in the tasks child; the other types derive the rest.
 
 ```rust
 // Sketch 1. crates/jig-domain-people/src/batch.rs, boundary.rs and refusals.rs (jig 03.1 to 03.5)
 /// One task of a party's `Create`, or of a batch they propose, in the people child's vocabulary
 /// (domain/tasks.md, sections 3 and 4; client/domain/contract.md, 3.2). Mirrors the tasks child's
 /// `New` and the core's `Delegate`, and `Member` in `people-v3.schema`, field for field.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Member {
     pub executor: TaskExecutor,
     /// Its spec's words.
@@ -786,6 +843,7 @@ pub struct Member {
     pub flags: Flags,
 }
 /// Who carries a member out.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskExecutor {
     /// An agent running a configured charter.
     Agent { charter: u32 },
@@ -795,6 +853,7 @@ pub enum TaskExecutor {
     Person(PersonAddress),
 }
 /// A member's result contract; an approval is a procedure's, never a party's (domain/tasks.md, 3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Contract {
     /// A report of at most `words` bytes.
     Report { words: u32 },
@@ -804,10 +863,13 @@ pub enum Contract {
     Change { connector: u16, kind: u16, words: u32 },
 }
 /// One verdict a contract allows; mirrors the tasks child's `Verdict`.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Verdict { pub code: u32, pub words: u32, pub followups: u32, pub fields: Box<[FieldRule]> }
 /// One machine field a verdict requires; mirrors the tasks child's `FieldRule`.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct FieldRule { pub name: Box<[u8]>, pub max: u32 }
 /// How a member's budget is given (domain/authority.md, section 7; 03.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Budget {
     /// `authority.spend`, as given.
     Named,
@@ -815,6 +877,7 @@ pub enum Budget {
     AsAllowed { cap: Option<u64> },
 }
 /// What a member starts after (03.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Dependency {
     /// Another member of the same batch, by zero-based position.
     Batch(u32),
@@ -822,11 +885,14 @@ pub enum Dependency {
     Existing(u64),
 }
 /// A member's flags; mirrors the tasks child's `Flags` (jig 02.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Flags { pub conversation: bool, pub listed: bool, pub retention: Retention }
 /// Mirrors the tasks child's `Retention` (jig 02.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Retention { Kept, ForgottenOnceRead }
 /// What a party proposes (domain/people.md, 5.1): a batch, or an amendment of a task, a widening
 /// of its authority among them; never an effect.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Action {
     /// A batch whose tasks would be the party's roots, each budget named (03.4).
     Batch(Box<[Member]>),
@@ -848,8 +914,10 @@ pub enum Action {
 //     /// The party's proposal was withdrawn.
 //     Withdrawn { proposal: u64 },
 /// The budget a member gave `AsAllowed`, and what it was given (03.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Given { pub task: u64, pub amount: u64 }
 /// Who could accept a proposal of a refused request (client/domain/contract.md, 3.5 and 4; 03.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Accepter {
     /// No proposal of it could be accepted: beyond the ceiling or the rules, or no role decides its kind.
     Nobody,
@@ -862,6 +930,7 @@ pub enum Accepter {
 //     /// A batch's member, by position, is not well formed (03.1).
 //     NotWellFormed { at: u32, why: Malformed },
 /// Why a member is not well formed (client/domain/contract.md, 4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Malformed {
     /// The batch's own dependencies close a cycle through this member (03.1).
     Cycle,
@@ -880,6 +949,7 @@ pub enum Malformed {
 // Sketch 2. crates/jig-domain-tasks/src/proposals.rs and boundary.rs (jig 03.4, 03.5)
 /// A party's proposal, kept apart from the task-origin `Proposal` (domain/tasks.md, section 9).
 /// Replaces `PersonProposal { goal: New }` in place; mirrors `PersonProposal` in `tasks-v3.schema`.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PersonProposal {
     pub number: u64,
     /// The proposing party.
@@ -891,6 +961,7 @@ pub struct PersonProposal {
     pub state: PersonProposalState,
 }
 /// What a party's proposal asks for.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonAction {
     /// Roots of the proposer, funded by the accepter (a goal is one tracked member).
     Batch(Box<[New]>),
@@ -898,6 +969,7 @@ pub enum PersonAction {
     Amend { task: u64, amendment: Box<Amendment> },
 }
 /// A party proposal's state.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonProposalState {
     Pending { since: Wall },
     Accepted { by: Party },
