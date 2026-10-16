@@ -717,14 +717,24 @@ next plan.
 
 ## 10. Decisions
 
+2026-10-16. The director, acting for the user with their authority
+(development.md, section 2.7), adopted each proposal. The designer
+applied the text parts to development.md and its cards in skein ce02728, and
+proposal 3's kit part in skein e6fd9fb: a run claimed after it takes its kit
+from its claim. The other kit parts, proposal 1's refusal and proposal
+6's cleanup, go to the next kit batch with the rows waiting on
+`kit-after-parity`, once temper's client-api run and smith's wall-clock
+run have ended: both were claimed before e6fd9fb, and run main's kit to
+their end.
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
+| 1 | adopted | skein ce02728: development.md, 5.4; `plan check`'s refusal of a plan whose `findings/` has no base runs, or whose questions are open, in the next kit batch |
+| 2 | adopted | skein ce02728: development.md, 4.5 and 5.2 |
+| 3 | adopted | skein e6fd9fb: `plan claim` adds the run's `kit/`, and `plan`, `land` and `heavy` hand over to it, for the runs claimed after it; skein ce02728: development.md, 3.5, 3.6, 4.4, 6, 12 and 14.1, and supervisor.md, 1 |
+| 4 | adopted | skein ce02728: development.md, 7.2; supervisor.md, 5, steps 3 and 4 |
+| 5 | adopted | skein ce02728: supervisor.md, 5, 6, 8 and 9; development.md, 2 and 14.1 |
+| 6 | adopted | skein ce02728: supervisor.md, 8, step 3; development.md, 7.6; `plan downstream`'s removal of its worktrees, in the next kit batch |
+| 7 | adopted | skein ce02728: implementer.md, 8.6; development.md, 5.2 |
+| 8 | adopted | skein ce02728: development.md, 5.2, 5.4 and 5.5; implementer.md, 8.4 |
+| 9 | adopted | skein ce02728: development.md, 10.5; supervisor.md, 7 |
