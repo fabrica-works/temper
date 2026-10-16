@@ -107,9 +107,11 @@ only jig 02.1.
   one naming none of the three keys (`EndedPart::None`).
 - **Who joins what.** The store joins an ended row's owner record and,
   for a task flagged conversation whose requester is a party, its
-  `EndedRead` row as the row's `related` record (`reads::Row.related`,
-  today an inbox reply's activity line). The core reads that position
-  where it reads `people::Domain::chat_seen` for a live one.
+  `EndedRead` row's `through`, by a point read, in the row's own field
+  `reads::Row.ended_read: Option<u64>` (ruling 172); `related` keeps
+  the immutable evidence it carries, an inbox reply's activity line
+  among it. The core reads that position where it reads
+  `people::Domain::chat_seen` for a live one.
 
 ## Rules that bind it
 
@@ -617,6 +619,10 @@ Files:
   `Event::EndedReadLoaded`, `Held::Load`), `routing/people.rs` (the
   `Seen::Results` arm, :279-289, and the ended `Seen::Chat`, :310: held
   loads, one mark at a time), `routing/mod.rs`, `stopping.rs`,
+  `reads/vocabulary.rs` (`Row.ended_read: Option<u64>`, :194, ruling
+  172; every `reads::Row` literal gains it, `None` but the store's
+  indexed join: `git grep -n -E '^\s*unjoined[:,]' -- '*.rs'
+  ':!**/generated/**'` prints ten at jig `05e9d00e7`),
   `documents/inbox_deployment.rs` (`conversation_from_row` takes the
   joined position for an ended row), `reads/indexed.rs` (:199),
   `reads/rows.rs` (:1189; at most 40 lines), `inbox.rs:132`,
@@ -629,7 +635,7 @@ Files:
   joined ended record, the two in one page and counted as two rows),
   `src/historical.rs` (`Now::LoadEndedRead`'s key
   and answer), `src/reads/indexed.rs` (`joined`: a conversation row's
-  `related` is its `EndedRead`), `schema/people-v3.schema` (`record
+  `ended_read` is its `EndedRead`'s `through`; ruling 172), `schema/people-v3.schema` (`record
   EndedRead { task: u64 party: u64 through: u64 }`), `src/codec/people.rs`,
   the generated family, the goldens, `src/tests/{intervals.rs, restore.rs,
   codec.rs, fixtures/keys.rs}` (`people_key`'s `below(7)`, :60, becomes
@@ -757,7 +763,7 @@ Shape:
   the index row before the pair, and a page whose first pair does not
   fit is cut (store.md 7.2: "never parts a position from its record").
 - `conversation_from_row(core, limits, party, row, seen: Option<u64>)`:
-  `Some` for an ended row, from the row's `related`.
+  `Some` for an ended row, from the row's `ended_read` (ruling 172).
 Test shape:
 - `crates/jig-domain-people/src/tests/ended.rs` (new; `mod ended;` in
   tests.rs), the people `LIMITS` (tests.rs:10):
@@ -842,11 +848,12 @@ and no unread result row names; part an `EndedRead` row from its record
 across pages; load anything after a mark is decided; send a mark's load
 as `Request::Now`; let two decisions on one ended conversation rest on
 loads made before either was decided.
-Size: at most 395 lines of production code (a codec increment; 40 of
+Size: at most 410 lines of production code (a codec increment; 40 of
 them for the census's pairs, places and once per party, by the design
 answer of 2026-10-16; 15 for `turns_read`, by the design answer of
 2026-10-16T19:02Z; 40 for the held loads and one mark at a time, by
-the design answer of 2026-10-16T19:32Z).
+the design answer of 2026-10-16T19:32Z; 15 for `Row.ended_read`, by
+ruling 172).
 Removes: ended positions in `people::Domain::chats_seen` and the
 census's read of tag 15.
 
@@ -859,7 +866,8 @@ ended delegates (tag 17) for a requester task or a parent; the
 ended-by-project index for a project, listed tasks only. The query's
 other keys filter the index's rows; a page goes on from the last row
 examined and may come back cut; each row joins its record and, for a
-conversation, its `EndedRead`; the core makes its task line.
+conversation, its `EndedRead`'s `through` in `reads::Row.ended_read`
+(08.4, ruling 172); the core makes its task line.
 Needs: jig 05's task query: `documents::TaskQuery`,
 `reads::{Read, Scope}::Tasks` with its live group, `PageRow::Line`, and
 `documents::task_line` for a loaded ended row.

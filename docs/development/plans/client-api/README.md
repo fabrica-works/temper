@@ -240,6 +240,8 @@ per session are in each file.
       refuses `loads.rows` below 2, and the small profile
       (`crates/temper-service/src/limits.rs`, `root.loads.rows`) and the
       walking world (`tests/engine/domain/src/walking.rs`) ask 2;
+    - `tests/client/src/fixtures.rs:238`'s `reads::Row` gains
+      `ended_read: None` (ruling 172);
     - tests: `tests/engine/domain/tests/loads.rs`,
       `a_census_page_takes_an_ended_read_position_then_its_task` (the
       real store seeded with an `EndedRead` row, its ended task and a
