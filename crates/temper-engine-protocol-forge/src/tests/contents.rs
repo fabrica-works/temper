@@ -140,7 +140,8 @@ fn comparisons_read_both_directions_and_both_file_sides() {
         )
     );
     let lines = h.request_lines(fixtures::FORGE).into_boxed();
-    assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000 HTTP/1.1");
+    assert_eq!(lines[2].as_ref(), b"GET /api/v1/repos/fixture/specimen/compare/0300000000000000000000000000000000000000...0100000000000000000000000000000000000000?verification=false HTTP/1.1");
+    assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000?files=false&verification=false HTTP/1.1");
 }
 #[test]
 fn file_reads_send_the_range_and_keep_only_the_requested_bytes() {

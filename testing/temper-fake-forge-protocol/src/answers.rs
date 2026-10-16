@@ -137,6 +137,9 @@ fn files(files: &[a::ChangedFile]) -> Box<[d::ChangedFile]> {
     }
     out.into_boxed()
 }
+fn compared(request: &Request, values: &[a::ChangedFile]) -> Box<[d::ChangedFile]> {
+    if let Request::Compare { files: false, .. } = request { Box::from([]) } else { files(values) }
+}
 fn repository(config: &Config, request: &Request, settings: &a::Settings) -> Result<Answer, a::Error> {
     let full = routes::repository(config, request).ok_or(a::Error::Missing(a::What::Repository))?;
     let slash = bytes::find(&full, b"/").ok_or(a::Error::Missing(a::What::Repository))?;
@@ -369,7 +372,7 @@ pub fn read(config: &Config, request: &Request, answer: &a::Answer) -> Result<An
             Ok(Answer::Compare {
                 compare: d::Compare { total_commits: u64::try_from(commits.len()).expect("domain bound") },
                 commits: out.into_boxed(),
-                files: files(values),
+                files: compared(request, values),
             })
         }
         a::Answer::Located { .. }

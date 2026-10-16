@@ -292,7 +292,7 @@ fn open_pull_with_nothing_to_merge_compares_and_writes_nothing() {
     let written = h.request_bytes(fixtures::FORGE);
     assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/branches/work ").is_some());
     assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/branches/main ").is_some());
-    assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0100000000000000000000000000000000000000 ").is_some());
+    assert!(bytes::find(&written, b"GET /api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0100000000000000000000000000000000000000?files=false&verification=false ").is_some());
     assert!(bytes::find(&written, b"POST ").is_none(), "nothing written after comparison");
 }
 #[test]

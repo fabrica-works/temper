@@ -123,6 +123,7 @@ pub enum Request {
         at: Repo,
         before: crate::id::ObjectId,
         after: crate::id::ObjectId,
+        files: bool,
     },
     Raw {
         at: Repo,

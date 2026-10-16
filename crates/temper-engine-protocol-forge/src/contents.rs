@@ -94,7 +94,9 @@ impl Plan {
             Mode::Compare { before, after } => {
                 self.before = *before;
                 self.after = *after;
-                Ok(Step::send(r::Request::Compare { at, before: self.id(*before), after: self.id(*after) }))
+                let before = self.id(*before);
+                let after = self.id(*after);
+                Ok(Step::send(r::Request::Compare { at, before, after, files: true }))
             }
             Mode::File { head, path, max } => {
                 self.size = u64::try_from(path.len()).expect("bounded path");
@@ -258,6 +260,7 @@ impl Plan {
                         at: self.at(),
                         before: self.id(self.after),
                         after: self.id(self.before),
+                        files: false,
                     })))
                 } else if self.stage == Stage::Reverse {
                     self.contains = comparison.total_commits == 0;

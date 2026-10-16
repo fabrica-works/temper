@@ -34,6 +34,7 @@ pub(super) fn route(method: Method, bytes: &[u8], limits: &Limits) -> Result<Rou
                 before: id::read(commits.get(..split).expect("split position")).ok_or(Unrouted::Malformed)?,
                 after: id::read(commits.get(split.saturating_add(3)..).expect("split tail"))
                     .ok_or(Unrouted::Malformed)?,
+                files: query_value(&target.query, b"files").as_deref() != Some(b"false".as_slice()),
             }
         }
         [raw, segments @ ..] if &**raw == b"raw" && !segments.is_empty() => {

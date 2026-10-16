@@ -41,11 +41,7 @@ fn answers() -> Vec<(&'static str, Answer)> {
                 state,
                 user: forgejo::user(2),
                 labels: Box::from([]),
-                updated_at: if case == "close-issue" || case == "reopen-issue" {
-                    Wall::from_nanos(1_577_817_006_000_000_000)
-                } else {
-                    at
-                },
+                updated_at: at,
                 title: Box::from(title),
                 body: Body::Kept(Box::from(*b"<!-- temper:key 01000001 -->\nissue text")),
             }),
@@ -108,8 +104,8 @@ fn posted_answers() -> Vec<(&'static str, Answer)> {
                 state,
                 commit_id: forgejo::sha(4),
                 body: Body::Kept(Box::from(body.as_bytes())),
-                submitted_at: Some(if id == 3 { Wall::from_nanos(1_577_817_006_000_000_000) } else { at }),
-                updated_at: Some(if id == 3 { Wall::from_nanos(1_577_817_006_000_000_000) } else { at }),
+                submitted_at: Some(at),
+                updated_at: Some(at),
                 official,
                 dismissed: false,
             }),
@@ -123,7 +119,7 @@ fn posted_answers() -> Vec<(&'static str, Answer)> {
             case,
             Answer::Status(CommitStatus {
                 creator: Some(forgejo::user(2)),
-                updated_at: Wall::from_nanos(1_577_817_006_000_000_000),
+                updated_at: Wall::from_nanos(1_577_817_005_000_000_000),
                 context: Box::from(context),
                 status,
                 description: Box::from([]),

@@ -82,7 +82,7 @@ fn read_rows() -> [(Request, Route, Op); 24] {
             Op::Read(Read::PullFiles { number: 3, page: 2, limit: 2 }),
         ),
         (
-            Request::Compare { at: at(), before: routes::object(8), after: oid },
+            Request::Compare { at: at(), before: routes::object(8), after: oid, files: true },
             Route::Compare,
             Op::Read(Read::Compare { base: 8, head: 9, page: 1, limit: 2 }),
         ),

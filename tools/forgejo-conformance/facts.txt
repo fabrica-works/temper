@@ -69,6 +69,10 @@ holds step-log-suffix-range-answers-206-with-its-last-bytes
 holds step-log-suffix-content-range-names-its-first-byte
 holds empty-log-suffix-range-answers-206-empty
 holds step-past-the-last-is-404
+holds compare-files-false-lists-no-commits-files
+holds compare-files-false-keeps-its-own-files-empty
+holds compare-verification-false-changes-nothing-kept
+holds compare-files-false-keeps-total-commits-and-shas
 unchecked webhook-deliveries: webhooks are built after standalone
 holds component-start-ready
 holds component-start-other-user-stops

@@ -598,3 +598,30 @@ fn a_step_name_past_string_bytes_reads_empty() {
         ]
     );
 }
+
+#[test]
+fn a_comparison_sends_verification_false_and_files_false_when_asked() {
+    let limits = fixtures::limits();
+    let before = id::read(b"0100000000000000000000000000000000000000").unwrap();
+    let after = id::read(b"0300000000000000000000000000000000000000").unwrap();
+    let targets: [(bool, &[u8]); 2] = [
+        (true, b"/api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000?verification=false"),
+        (false, b"/api/v1/repos/fixture/specimen/compare/0100000000000000000000000000000000000000...0300000000000000000000000000000000000000?files=false&verification=false"),
+    ];
+    for (files, target) in targets {
+        let request = Request::Compare {
+            at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
+            before,
+            after,
+            files,
+        };
+        let encoded = client::encode(&request, &limits).unwrap();
+        assert_eq!(encoded.target.as_ref(), target, "{files}");
+        let crate::server::Route::Ready(routed) =
+            crate::server::route(encoded.method, &encoded.target, &limits).unwrap()
+        else {
+            panic!("A comparison routes without a body");
+        };
+        assert_eq!(routed, request, "{files}");
+    }
+}

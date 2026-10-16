@@ -70,12 +70,13 @@ fn target(request: &Request, out: &mut Target) {
             out.put(b"/files");
             out.page(*page, false);
         }
-        Request::Compare { at, before, after } => {
+        Request::Compare { at, before, after, files } => {
             out.repo(at);
             out.put(b"/compare/");
             out.put(&id::write(before));
             out.put(b"...");
             out.put(&id::write(after));
+            out.put(if *files { b"?verification=false" } else { b"?files=false&verification=false" });
         }
         Request::Raw { at, path, reference } => {
             out.repo(at);

@@ -291,3 +291,15 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
     r.w("delete-missing-branch", "DELETE", &format!("{R}/branches/missing"), None)?;
     Ok(())
 }
+
+pub fn flags(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &Secrets) -> Result<()> {
+    let mut r = Recorder { f, out, mask, secrets };
+    for (name, before, after, flags) in [
+        ("compare-verification-false", &f.main, &f.head, "verification=false"),
+        ("compare-files-false", &f.main, &f.head, "files=false&verification=false"),
+        ("compare-reverse-files-false", &f.head, &f.main, "files=false&verification=false"),
+    ] {
+        r.w(name, "GET", &format!("{R}/compare/{before}...{after}?{flags}"), None)?;
+    }
+    Ok(())
+}

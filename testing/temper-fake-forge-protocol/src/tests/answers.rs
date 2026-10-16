@@ -194,3 +194,23 @@ fn statuses_combine_failed_before_pending_before_passed() {
         }
     }
 }
+
+#[test]
+fn a_files_false_comparison_keeps_commits_and_lists_no_files() {
+    let input = a::Answer::Comparison {
+        base: 8,
+        head: 9,
+        contains_base: true,
+        files: Box::new([a::ChangedFile { path: boxed(b"src"), before: None, after: Some(boxed(b"a")) }]),
+        commits: Box::new([9]),
+    };
+    for (files, listed) in [(true, 1), (false, 0)] {
+        let request = Request::Compare { at: at(), before: routes::object(8), after: routes::object(9), files };
+        let Ok(Answer::Compare { compare, commits, files: changed }) = answers::read(&config(), &request, &input)
+        else {
+            panic!("A comparison");
+        };
+        assert_eq!((compare.total_commits, commits.as_ref()), (1, [routes::object(9)].as_slice()), "{files}");
+        assert_eq!(changed.len(), listed, "{files}");
+    }
+}

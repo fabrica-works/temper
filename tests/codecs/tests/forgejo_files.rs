@@ -70,26 +70,6 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>, u16)> {
             Some(Answer::Files(Box::from([file(2)]))),
             200,
         ),
-        (
-            "compare",
-            Request::Compare { at: forgejo::specimen(), before: forgejo::sha(6), after: forgejo::sha(4) },
-            Some(Answer::Compare {
-                compare: Compare { total_commits: 3 },
-                commits: Box::from([forgejo::sha(4), forgejo::sha(10), forgejo::sha(8)]),
-                files: Box::from([file(2), file(1), file(0)]),
-            }),
-            200,
-        ),
-        (
-            "compare-reverse",
-            Request::Compare { at: forgejo::specimen(), before: forgejo::sha(4), after: forgejo::sha(6) },
-            Some(Answer::Compare {
-                compare: Compare { total_commits: 0 },
-                commits: Box::from([]),
-                files: Box::from([]),
-            }),
-            200,
-        ),
         ("raw-file", raw(), None, 200),
         ("raw-file-range", raw(), None, 206),
         (
@@ -137,6 +117,36 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>, u16)> {
         ("actions-job-log-step-suffix", step_log(2, 1), None, 206),
         ("actions-job-log-past-last-step", step_log(2, 3), None, 404),
         ("actions-job-log-empty-suffix", step_log(1, 1), None, 206),
+        (
+            "compare-verification-false",
+            Request::Compare { at: forgejo::specimen(), before: forgejo::sha(6), after: forgejo::sha(4), files: true },
+            Some(Answer::Compare {
+                compare: Compare { total_commits: 3 },
+                commits: Box::from([forgejo::sha(4), forgejo::sha(10), forgejo::sha(8)]),
+                files: Box::from([file(2), file(1), file(0)]),
+            }),
+            200,
+        ),
+        (
+            "compare-reverse-files-false",
+            Request::Compare { at: forgejo::specimen(), before: forgejo::sha(4), after: forgejo::sha(6), files: false },
+            Some(Answer::Compare {
+                compare: Compare { total_commits: 0 },
+                commits: Box::from([]),
+                files: Box::from([]),
+            }),
+            200,
+        ),
+        (
+            "compare-files-false",
+            Request::Compare { at: forgejo::specimen(), before: forgejo::sha(6), after: forgejo::sha(4), files: false },
+            Some(Answer::Compare {
+                compare: Compare { total_commits: 3 },
+                commits: Box::from([forgejo::sha(4), forgejo::sha(10), forgejo::sha(8)]),
+                files: Box::from([]),
+            }),
+            200,
+        ),
     ]
 }
 fn expected(answer: Answer) -> (Document, Vec<Row>) {

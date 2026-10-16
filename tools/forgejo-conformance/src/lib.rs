@@ -23,6 +23,8 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     let mut facts = facts::evaluate(&forgejo, &fixture, out)?;
     let (runner, actions) = runner::run(&fixture, out, &mut mask, &mut secrets)?;
     facts.extend(actions);
+    cases::flags(&fixture, out, &mut mask, &secrets)?;
+    facts.extend(facts::flags(out)?);
     facts.push(facts::Fact {
         name: "webhook-deliveries",
         outcome: facts::Outcome::Unchecked("webhooks are built after standalone".into()),

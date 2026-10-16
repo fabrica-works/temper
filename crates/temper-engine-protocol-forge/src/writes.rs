@@ -507,7 +507,8 @@ impl Plan {
             }
             Stage::Base => {
                 self.stage = Stage::Compare;
-                Request::Compare { at: self.at(), before: branch.commit, after: self.head.expect("head branch") }
+                let after = self.head.expect("head branch");
+                Request::Compare { at: self.at(), before: branch.commit, after, files: false }
             }
             Stage::Write
             | Stage::Compare

@@ -524,3 +524,41 @@ pub fn replace_block(text: &str, prefix: &str, facts: &[Fact]) -> String {
     }
     result
 }
+
+/// # Errors
+/// Returns a transcript-read failure.
+pub fn flags(out: &Path) -> Result<Vec<Fact>> {
+    let plain = case(out, "compare")?.body;
+    let reverse = case(out, "compare-reverse")?.body;
+    let verification = case(out, "compare-verification-false")?;
+    let files = case(out, "compare-files-false")?;
+    let backwards = case(out, "compare-reverse-files-false")?.body;
+    let shas = |body: &Value| {
+        body["commits"].as_array().map(|rows| rows.iter().map(|row| row["sha"].clone()).collect::<Vec<_>>())
+    };
+    let names = |body: &Value| {
+        body["files"].as_array().map(|rows| rows.iter().map(|row| row["filename"].clone()).collect::<Vec<_>>())
+    };
+    let commits = &files.body["commits"];
+    let no_files = files.status == 200
+        && commits.as_array().is_some_and(|rows| !rows.is_empty() && rows.iter().all(|row| row["files"].is_null()));
+    let empty = files.body["files"] == json!([]) && backwards["files"] == json!([]);
+    let verified = verification.status == 200
+        && verification.body["total_commits"] == plain["total_commits"]
+        && shas(&verification.body) == shas(&plain)
+        && names(&verification.body) == names(&plain);
+    let kept = files.body["total_commits"] == plain["total_commits"]
+        && shas(&files.body) == shas(&plain)
+        && backwards["total_commits"] == reverse["total_commits"];
+    let seen = format!("Forward {}, reverse {}, verification {}", files.body, backwards, verification.body);
+    let mut facts = Vec::new();
+    for (name, holds) in [
+        ("compare-files-false-lists-no-commits-files", no_files),
+        ("compare-files-false-keeps-its-own-files-empty", empty),
+        ("compare-verification-false-changes-nothing-kept", verified),
+        ("compare-files-false-keeps-total-commits-and-shas", kept),
+    ] {
+        add(&mut facts, name, holds, &seen);
+    }
+    Ok(facts)
+}
