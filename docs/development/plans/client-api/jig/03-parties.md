@@ -91,8 +91,8 @@ jig 14 carries these operations to it, and jig 22 the documents.
   an amendment in place of its goal; a task's `Proposal` (one per task)
   is unchanged.
 - **References are not named by a `Create`**: `New` and an agent's
-  `Delegate` carry none, though people.md, 5.1 names "a reference" among
-  what a party may name; jig 03.2 raises it (Questions).
+  `Delegate` carry none, as people.md, 5.1 says: "a batch gives its
+  tasks no references" (ruling 156).
 - **The wire stays v8** (jig 14 changes its requests, jig 22 its
   documents). The clients' component maps `Accepter::Role(_)` onto v8's
   `proposable: Some(true)` and `Accepter::Nobody` onto `Some(false)`; it
@@ -404,8 +404,21 @@ Shape: sketch 1, with each field and variant it marks 03.2. In
   (`Core::person_tree`, `roles.rs:197`), or any task of the project for
   an owner or a maintainer, or a policy role allowed `Amend`; inputs are
   loaded as an agent's delegate's are (`Core::delegate_inputs`,
-  `delegation.rs:130`, then the root's stub loads), and a load the root
-  cannot route for a party's request at the base is a question (below);
+  `delegation.rs:130`, then the root's stub loads), through a load of
+  its own (ruling 156): a core `Request` keyed by the party request's
+  `Token`, with its person, project and its bounded unique input task
+  numbers, as `Request::HistoricalPersonTask` is keyed, and a matching
+  `Event` with the stubs `DelegateValidated` gives, or the failure
+  `DelegateInputFailed` gives, and `busy`; the core keeps the checked
+  creation until it returns. Each root that answers
+  `HistoricalPersonTask` answers it the same way (`git -C
+  ~/src/rust/jig grep -l 'HistoricalPersonTask' -- '*.rs'` names them:
+  `examples/ops/domain/src/route.rs`, `testing/jig-test-service/src/route.rs`,
+  `testing/jig-test-domain/src/routes.rs`, `testing/jig-test-store/src/route.rs`,
+  `tests/client-protocol/src/engine.rs`, `tests/core/src/world.rs`,
+  `tests/ops/src/joint/engine.rs` among them, at jig `840274718`); temper's
+  root follows at its first repin past this increment's landing, as the
+  README's "What a temper repin repairs" says;
 - `named` grants narrowed with each member's number by
   `crate::resolved_delegate_authority` (`delegation.rs:210`), as an
   agent's are (`routing/run_delegation.rs:91-99`);
@@ -469,7 +482,9 @@ cargo nextest run -p jig-core-world -E
 passes, and nothing else is wanted.
 Don't: let a party's member hand down holds (a party holds none); accept
 `AsAllowed` in a proposed batch (03.4 refuses it).
-Size: at most 290 lines (a codec increment).
+Size: at most 290 lines (a codec increment), and the roots' routing of
+the inputs' load beside them, aim for at most 80 lines; past it, report
+why (ruling 156).
 Removes: nothing.
 
 ### 03.3 Refusals say who could accept a proposal
@@ -1013,17 +1028,10 @@ among its own checks.
 
 ## Questions to raise when reached
 
-- **3.2: references in a party's `Create`.** people.md, 5.1 lets a
-  `Create` name "a reference" in the party's reach, but neither `New` nor
-  an agent's `Delegate` carries references at the base. The default here:
-  a `Create` names none, and the question goes to the designer with the
-  increment's report.
-- **3.2: inputs' loads.** An agent's inputs are loaded by the root,
-  which answers `DelegateValidated` with their stubs. The implementer
-  routes a party's inputs the same way by default and raises it in the
-  increment's report if the application's root must answer a new event,
-  or if `routing/create.rs` passes 80 lines of inputs, counted by
-  code-organization.md 7's command on that file.
+- **3.2: references and inputs' loads:** answered by ruling 156
+  (Choices; 03.2's inputs). `routing/create.rs` past 80 lines of inputs,
+  counted by code-organization.md 7's command on that file, is still
+  raised in the increment's report.
 
 ## Done when
 

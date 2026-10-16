@@ -634,6 +634,15 @@ choice would have been the user's (development.md, 10.4).
      3. **If the client's repairs pass 200 lines, or the gate needs more of 03.2's Shape:** land temper-03.s1 and 03.2 in one `land`, s1's commits first, each step's last commit with its own `Step:` trailer, rather than asking again.
      4. **03.2 and 03.3** do not do again what s1 carried; 03.3's Files are what remains of them.
 
+156. **A party's Create: no references; its inputs' load keyed by its token** (plan defect, jig 03's block of 2026-10-16T17:27:01Z).
+     Ruling 156, a plan defect on both headings: the design answers them, and the kit has the shape.
+
+     1. **References: a `Create` names none.** people.md, 5.1, landed before the run (jig `0ec80c047`): "A party's `Create` may name, as a dependency, a live task, or, as an input, an ended task's result: a task in their tree, or any task of the project for a maintainer, as a task's batch reaches its delegates and the tasks it was introduced to (tasks.md, section 4 and 8.5); a batch gives its tasks no references." The session's default holds; nothing goes to the designer.
+     2. **Inputs: the implementer's proposal.** A core `Request` keyed by the party request's `Token`, with its person, project and its bounded unique input task numbers, as `Request::HistoricalPersonTask { request: Token, person, project, task }` is keyed; a matching `Event` with the stubs `DelegateValidated` gives, or the failure `DelegateInputFailed` gives, and `busy`, as the `Historical*` events carry it. The core keeps the checked creation until it returns. tasks.md, section 3: "While a task that ended is named by a live one (… an input …), the core keeps a stub of it".
+     3. **The roots:** each root that answers `HistoricalPersonTask` answers the new request the same way (`git grep -l 'HistoricalPersonTask' -- '*.rs'` names them; 03.2's Files list them). Their routing counts beside the 290 lines, aim for at most 80; past it, the report says why.
+     4. **Downstream:** temper's root (`crates/temper-engine-domain/src/{archive.rs, route/now.rs}`, `crates/temper-service/src/clients/translation.rs`, `tests/client/src/translate.rs`, which answer `HistoricalPersonTask` today) follows at temper's first repin past jig 03.2's landing, as the README's "What a temper repin repairs" says. jig 03.2 does not name temper.
+     5. **Unchanged:** `DelegateValidated` and `DelegateInputFailed` for an agent's delegates; the wire (v8); `routing/create.rs` past 80 lines of inputs is still raised in the report.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
