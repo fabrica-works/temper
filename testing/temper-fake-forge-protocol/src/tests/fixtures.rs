@@ -2,6 +2,16 @@ use crate::{Config, Faults, Limits, Repository};
 use alloc::boxed::Box;
 use skein_lib::{List, Secret, bytes};
 use temper_forge_forgejo::request::Repo;
+pub const FIXTURE_SECRET: &[u8] = b"fixture-hook-secret";
+pub fn hooked_config() -> Config {
+    let mut config = config();
+    config.hooks = Some(crate::delivery::Endpoint {
+        forge: 1,
+        host: boxed(b"127.0.0.1:7200"),
+        secret: Secret::new(boxed(FIXTURE_SECRET)),
+    });
+    config
+}
 pub const TOKEN: &[u8] = b"1111111111111111111111111111111111111111";
 pub fn config() -> Config {
     let mut tokens = List::with_capacity(1);
@@ -20,6 +30,7 @@ pub fn config() -> Config {
         repositories,
         max_response_items: 2,
         default_paging_num: 30,
+        hooks: None,
         faults: Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }
@@ -71,9 +82,16 @@ pub struct Harness {
     pub output: List<u8>,
     pub calls: u32,
     pub closed: bool,
+    pub deliveries: List<crate::delivery::Post>,
 }
 impl Harness {
     pub fn new(config: Config) -> Self {
+        Self::with(config, false)
+    }
+    pub fn hooked() -> Self {
+        Self::with(hooked_config(), true)
+    }
+    fn with(config: Config, hooked: bool) -> Self {
         let limits = limits();
         let fake_config = temper_engine_forge_world::fake_config();
         let mut domain = fake::Domain::new(&fake_config, 3);
@@ -96,7 +114,7 @@ impl Harness {
                     cue: None,
                 },
                 protection: None,
-                hooked: false,
+                hooked,
             },
         );
         fake::grant(&mut domain, b"org/repo", 1, a::Permission::Admin);
@@ -115,6 +133,7 @@ impl Harness {
             output: List::with_capacity(65536),
             calls: 0,
             closed: false,
+            deliveries: List::with_capacity(32),
         };
         crate::start(&mut h.server, &mut h.service, &h.env, &mut h.above, &mut h.below);
         h
@@ -173,6 +192,9 @@ impl Harness {
             }
             fake::fire(&mut self.domain, &self.fake_env, &mut self.domain_out);
             while let Some(reply) = self.domain_out.pop() {
+                if let Some(post) = self.service.delivery(&reply, &self.env.limits) {
+                    self.deliveries.push(post).expect("fixture delivery capacity");
+                }
                 if let Ok((_, reply)) = self.service.target(reply) {
                     crate::down(
                         &mut self.server,
@@ -228,6 +250,9 @@ impl Harness {
             self.env.wall = Wall::from_nanos(self.env.now.as_nanos());
             fake::fire(&mut self.domain, &self.fake_env, &mut self.domain_out);
             while let Some(request) = self.domain_out.pop() {
+                if let Some(post) = self.service.delivery(&request, &self.env.limits) {
+                    self.deliveries.push(post).expect("fixture delivery capacity");
+                }
                 if let fake::Request::Reply { to, result } = request {
                     assert_eq!(to.into_token(), Token::new(999));
                     self.domain.reclaim();
@@ -297,5 +322,22 @@ impl Harness {
         .expect("changed");
         self.call(2, a::Op::Git(a::Git::Push { branch: boxed(branch), commit, expected: None })).expect("push");
         commit
+    }
+}
+
+/// Reads the event line that the renderer places in each request.
+pub fn delivery_event(post: &crate::delivery::Post) -> &[u8] {
+    let start = bytes::find(&post.head, b"X-Forgejo-Event: ").expect("event header").saturating_add(17);
+    let value = &post.head[start..];
+    &value[..bytes::find(value, b"\r\n").expect("event line")]
+}
+impl Harness {
+    pub fn delivered(&self, event: &[u8]) -> &crate::delivery::Post {
+        for post in &self.deliveries {
+            if delivery_event(post) == event {
+                return post;
+            }
+        }
+        panic!("domain event delivered");
     }
 }

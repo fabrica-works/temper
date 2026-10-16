@@ -169,16 +169,6 @@ fn the_clone_workflow_runs_steps_only_and_names_the_jobs_token() {
 }
 
 #[test]
-fn hmac_sha256_reads_rfc_4231_case_2() {
-    assert_eq!(
-        crate::deliveries::hmac_sha256(b"Jefe", b"what do ya want for nothing?"),
-        Some([
-            0x5b, 0xdc, 0xc1, 0x46, 0xbf, 0x60, 0x75, 0x4e, 0x6a, 0x04, 0x24, 0x26, 0x08, 0x95, 0x75, 0xc7, 0x5a, 0x00,
-            0x3f, 0x08, 0x9d, 0x27, 0x39, 0x83, 0x9d, 0xec, 0x58, 0xb9, 0x64, 0xec, 0x38, 0x43
-        ])
-    );
-}
-#[test]
 fn a_signature_holds_only_for_the_body_it_signs() {
     use crate::deliveries::{Received, signed};
     let mut received = Received { head: b"X-Forgejo-Signature: 22e3b1f3fb90d9e7f5814c8af105f7f7077b4e3e0ad700df7163179d5b535d85\r\nX-Hub-Signature-256: sha256=22e3b1f3fb90d9e7f5814c8af105f7f7077b4e3e0ad700df7163179d5b535d85\r\n".to_vec(), body: b"body".to_vec() };

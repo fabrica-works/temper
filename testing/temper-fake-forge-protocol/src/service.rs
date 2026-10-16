@@ -21,6 +21,11 @@ pub struct Service {
 }
 impl Service {
     pub fn new(config: Config, limits: &Limits, seed: u64) -> Result<Self, Error> {
+        if let Some(endpoint) = &config.hooks
+            && (endpoint.host.is_empty() || endpoint.secret.is_empty())
+        {
+            return Err(Error::Limits);
+        }
         if worst_case(limits, &config).is_none()
             || config.max_response_items == 0
             || config.default_paging_num == 0
@@ -123,6 +128,11 @@ pub fn worst_case(limits: &Limits, config: &Config) -> Option<u64> {
         return None;
     }
     let mut tables = u64::try_from(config.base.len()).ok()?;
+    if let Some(endpoint) = &config.hooks {
+        tables = tables
+            .checked_add(u64::try_from(endpoint.host.len()).ok()?)?
+            .checked_add(u64::try_from(endpoint.secret.len()).ok()?)?;
+    }
     tables = tables
         .checked_add(List::<(skein_lib::Secret, u64)>::worst_case(config.tokens.capacity())?)?
         .checked_add(List::<(u64, Box<[u8]>)>::worst_case(config.users.capacity())?)?

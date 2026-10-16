@@ -125,34 +125,19 @@ fn response(status: u16) -> Vec<u8> {
     )
     .into_bytes()
 }
-pub(crate) fn hmac_sha256(key: &[u8], message: &[u8]) -> Option<[u8; 32]> {
-    if key.len() > 64 {
-        return None;
-    }
-    let mut inner = vec![0x36; 64];
-    let mut outer = vec![0x5c; 64];
-    for (i, byte) in key.iter().enumerate() {
-        inner[i] ^= byte;
-        outer[i] ^= byte;
-    }
-    inner.extend_from_slice(message);
-    for word in skein_io::digest::digest(&inner).0 {
-        outer.extend_from_slice(&word.to_be_bytes());
-    }
-    let mut result = [0; 32];
-    for (out, word) in result.chunks_exact_mut(8).zip(skein_io::digest::digest(&outer).0) {
-        out.copy_from_slice(&word.to_be_bytes());
-    }
-    Some(result)
-}
 pub(crate) fn signed(received: &Received) -> bool {
     use std::fmt::Write;
     let mut signature = String::new();
-    for byte in hmac_sha256(SECRET.as_bytes(), &received.body).expect("short key") {
+    let mut hmac = skein_lib::sha256::Hmac::new(SECRET.as_bytes());
+    hmac.update(&received.body);
+    for byte in hmac.finish() {
         write!(signature, "{byte:02x}").expect("string write");
     }
-    received.header("X-Forgejo-Signature") == signature
-        && received.header("X-Hub-Signature-256") == format!("sha256={signature}")
+    skein_lib::sha256::equal(received.header("X-Forgejo-Signature").as_bytes(), signature.as_bytes())
+        && skein_lib::sha256::equal(
+            received.header("X-Hub-Signature-256").as_bytes(),
+            format!("sha256={signature}").as_bytes(),
+        )
 }
 struct Capture {
     received: Received,

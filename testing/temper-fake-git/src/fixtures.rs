@@ -107,6 +107,7 @@ pub fn table(full: &[u8], protected: Option<&[u8]>) -> temper_fake_forge_protoco
         repositories,
         max_response_items: 8,
         default_paging_num: 30,
+        hooks: None,
         faults: temper_fake_forge_protocol::Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }

@@ -155,6 +155,7 @@ pub fn protocol_config() -> temper_fake_forge_protocol::Config {
         repositories,
         max_response_items: 2,
         default_paging_num: 30,
+        hooks: None,
         faults: Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }

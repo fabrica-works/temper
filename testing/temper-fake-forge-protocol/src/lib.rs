@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod answers;
+pub mod delivery;
 use alloc::boxed::Box;
 use skein_lib::{List, Secret};
 pub mod errors;
@@ -40,6 +41,7 @@ pub struct Faults {
 /// Scenario tables; tokens stay solely on this side of the domain boundary.
 #[derive(Debug)]
 pub struct Config {
+    pub hooks: Option<delivery::Endpoint>,
     pub base: Box<[u8]>,
     pub tokens: List<(Secret, u64)>,
     pub users: List<(u64, Box<[u8]>)>,
