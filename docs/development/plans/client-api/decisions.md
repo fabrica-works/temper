@@ -865,6 +865,9 @@ choice would have been the user's (development.md, 10.4).
 
      The removal waits for the plan that forgets decided proposals: later.md's new row names it (the decided proposal, its core decision and its update's index key removed as one deletion), and jig's retention plan takes it. The rest of ruling 175 stands: the `UpdateObject` variant, its v3 schema and codec, the join to `Stored::DecidedProposal` with `CoreRecord::ProposalDecision`, and 03.4's Size of at most 420 lines. Ruling 175's Files name `crates/jig-domain-core/src/forget.rs`: touch it only for an arm an exhaustive match over `UpdateObject` there needs, and no more.
 
+178. **The 22:44Z steer's point 2 in the README's steers** (process, the coordinator's block of 2026-10-16T22:46:03Z).
+     Ruling 178: the 22:44:00Z steer's point 2 holds until the run's end, so its Pass on text goes into the README's "The run's steers", as ruling 167 says ("A later steer's text that holds until the run's end lands here, by the supervisor, before the steer is sent"). It is there now, under "22:44Z, point 2 (jig 12)", word for word as the steer gave it. Points 1 and 3 end at the landings of jig 03.4 and 04.6 and stay out of the README. The coordinator gives point 2's text in no later prompt: jig 12's sessions read it in the README.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

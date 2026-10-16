@@ -649,6 +649,14 @@ per session are in each file.
     `jig_core_world::fixtures::person_unchanged` and its copy goes. A crate
     that cannot depend on `jig-core-world` keeps one copy and names why in
     its commit body.
+  - 22:44Z, point 2 (jig 12): Before a new test repeats a block, search
+    the crate's fixtures for it (README, "A test's helpers once").
+    jig-client's `src/tests/fixtures.rs` has no `Client::fire(at)`: add it
+    beside `step` (clear the requests, fire the machine, drain its output
+    as `step` does) and use it. The sign-in sequence is `Client::sign_in`:
+    reuse it. Name each time as a const, never
+    `Time::from_nanos(100_000_000)` or `Duration::from_millis(10)` inline.
+    When you next edit `tests/store.rs`, move it onto `fire` too.
 
 ## Prerequisites the run checks at its start
 
