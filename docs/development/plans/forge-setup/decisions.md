@@ -155,6 +155,21 @@ run are appended after "For the user".
      - Unchanged: 04.2's Size (220, codec); the rule against trimming a doc comment, a test or the formatting to meet a
        Size (implementer.md, 8.6); the proof, the recording whole, before landing.
 
+102. **07.1's Size at 300; sizes within 2.6 times** (plan defect, temper 07's block of 2026-10-16T22:11:00Z).
+     Ruling 102, a plan defect: 07.1's Size of 280 under-counted its own Shape (sketches 1-3, `problem::{Problems,
+     lines}`, `limits::{apply, check}`, `check::members`' refusals of setup.md 8, `Step` and `steps`). Accept, do not split:
+     07.1 is written, its 17 tests pass, and 07.2-07.4, temper 08, 09 and 12 wait on it.
+
+     - 07.1's Size is now 300, the plan's largest (development.md, 5.2: "Every Size is at most about 300 lines").
+     - The same block twice (04.1, ruling 101; 07.1) becomes a standing rule, in the README's "Rules of this plan":
+       "An increment of this plan lands within 2.6 times its Size without asking, a Size marked "(codec)" within 3 times;
+       its report gives the count by code-organization.md 6's command, by file. Past that, it stops on a question, as
+       implementer.md 8.6 says." By it, 07.1 lands at its 724 and what its review needs, up to 780.
+     - Unchanged: never trim a doc comment, a test or the formatting to meet a Size (implementer.md, 8.6); a split
+       increment's parts count together; 07.2-07.4's Sizes.
+     - For the retrospective: with Sizes at most about 300 and increments landing at about twice them (development.md,
+       5.2), a tolerance of twice stops about half of them; this plan's two size blocks came in its first 11 minutes.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
