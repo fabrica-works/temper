@@ -389,9 +389,11 @@ takes it, and "A path's segments").
 Files: `tests/engine/domain/tests/forge_routes.rs` (over 800 lines: at
 most 40 added), on its `change_world` (`:633`);
 `crates/temper-client-shell-terminal/src/limits.rs` (`segments: 9`
-beside `rows`, `:51`, back to 2 from ruling 160's interim 3: at least the forge's tier's names' bounds, 9,
+beside `rows: 2`, `:51`: at least the forge's tier's names' bounds, 9,
 `crates/temper/tests/support/forgejo.rs:152-156`, and the example's 8,
-`configuration.md`, 7); `crates/temper/tests/configuration.rs:17-21`.
+`configuration.md`, 7); `crates/temper/tests/configuration.rs:17-21`;
+`tests/one-process/tests/one_process.rs:43` (ruling 163's `#[ignore]`
+removed: the story runs in the gate again).
 Shape: no type. temper writes no `documents.lines` for a path: the
 process tier's `documents.lines`, 2 (`support/configuration.rs:32`,
 `support/forgejo.rs:137`), stays, at most the client's rows. In
@@ -429,7 +431,9 @@ world's `documents.lines` set, new beside it.) Tests, each row under
 producer's `task` document read the same way.
 Proof: the world layer only: no page of temper's reads a task line
 before temper 06.4's Chats page, whose joint-world story then runs over
-the same configuration.
+the same configuration. And, once, the story ruling 163 deferred: `heavy cargo
+nextest run -p temper-one-process-world -E
+'test(an_adopted_repository_gets_its_change_pushed_through_git)'`.
 Don't: set `documents.lines` for a path; change jig's profile; cut a
 path in temper.
 Size: at most 10 lines of production code.

@@ -694,6 +694,16 @@ choice would have been the user's (development.md, 10.4).
      - s1: `profile/small.rs:47, :67, :119`; the `resource_path_fits` callers and `owner_historical.rs:487`, `owner_authority.rs:95-103` in Files.
      Not checked: 13.2's and 13.4's compiles and path-rewrite counts; a fresh check takes them after jig 12.5 lands. A further copy or user found when reached is refreshed and listed in the commit body.
 
+163. **temper's terminal rows stays 2; the forge-path story waits for temper 04.4** (plan defect, temper 03's block of 2026-10-16T18:34:11Z).
+     Ruling 163, a plan defect in the order of steps. Ruling 160's interim cannot hold: at the pin (`94eaa034`), `crates/jig-client-view/src/limits.rs:48`, `limits.nodes.checked_mul(limits.text_per_node)`, a u32, refuses `rows: 3` (nodes 19,123,621 × 1,024 = 19,582,587,904, report of 18:33:20Z). No native bound of temper's own repairs it within an interim: `u32::MAX / 19,123,621` is 224, below the 554 that the phrase alone gives `text_per_node` (2 × 277), so `text` cannot; nodes would have to fall below 4,194,303, a fifth, through objects, parts, notices and the other bounds of the target. jig's repair is upstream of the pin, and the designed fix is jig-13.s1's `segments` (`client.md`, 5.4), which temper 04.4 takes.
+
+     So, until temper 04.4:
+     1. The terminal's `rows` stays 2: drop ruling 160's uncommitted `rows: 3` and its comment.
+     2. The combined s1/03.2 landing marks the one-process story `an_adopted_repository_gets_its_change_pushed_through_git` (`tests/one-process/tests/one_process.rs:43`) `#[ignore = "a forge hold's three segments need segments: 9, temper 04.4 (ruling 163)"]`, as `testing/temper-throwaway-forgejo/tests/throwaway.rs:34` marks its own, and lands under the gate as ruling 155 says. A further test that fails only on a forge path's segments gets the same mark, listed in the commit body and the report; past three such tests, stop and report.
+     3. temper 04.4 removes the mark, and its Proof runs the story once (its Files and Proof say so now).
+
+     Unchanged: every native bound; every story assertion; ruling 155's combined landing; jig-13.s1 and its place; the private commits 6b487696, e6b3c96f, 5fbd0459.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
