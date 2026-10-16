@@ -452,6 +452,14 @@ family/refusals.rs:3, clients.rs, tests/clients.rs, tests/clients/peer.rs}`,
 client/cache.rs}`. Found by `git grep -n -E
 'jig_domain_client::contract|Hello \{|Saved::Table|client_wire::v7|v7 as w'
 -- '*.rs'` in temper.
+Repin repairs of 03.3's pin, jig `755e02e53` (ruling 164), within the
+README's 200 lines: jig 07.2's `ProcedureStep` in place of
+`ProcedureAction` through temper's engine (`boundary.rs:8,364-369`,
+`lib.rs:39`, `route.rs:34,100-101`, `route/forge_route.rs:1835-1906`,
+`tests/engine/domain/tests/root_routes.rs:1654-1659`), and of 04.1, what
+the compile needs: `Limits.templates` (`limits.rs:29-54`), `core_limits`
+(`:109-143`) and the service's `templates: jig.core.templates`
+(`crates/temper-service/src/limits.rs:264-278`).
 Shape: as jig 11.3 changes `testing/jig-client-test-domain/src/{store.rs,
 domain.rs}`: the root's table keeps `Held { key: Key { asker, number },
 request }`, the asker from the root's owner (`Owner::Jig` 65536,

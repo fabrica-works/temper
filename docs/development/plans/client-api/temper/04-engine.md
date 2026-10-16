@@ -142,7 +142,9 @@ place of the `chats` member, and jig's new core limit on templates
 taken by temper's engine root (`configuration.md`, 2 and 8; jig 09.1).
 Needs: jig 09.4 (jig 09's last increment: `templates` and the
 policies' overrides; temper 03 is the session's start).
-Files: `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46`
+Files (temper-03.3 carried `Limits.templates`, `core_limits` and the
+service's `templates: jig.core.templates`, ruling 164: 04.1 does what
+remains): `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46`
 (`ENGINE`'s `"chats": {"charter": 1, "close_grace_ms": 5000}` becomes
 `"templates"`, jig's two defaults written out in jig 09.1's format, as
 jig 09's fixtures write them: "jig's defaults are written, not

@@ -704,6 +704,14 @@ choice would have been the user's (development.md, 10.4).
 
      Unchanged: every native bound; every story assertion; ruling 155's combined landing; jig-13.s1 and its place; the private commits 6b487696, e6b3c96f, 5fbd0459.
 
+164. **temper 03.3's repin takes jig 07.2's procedure step and jig 09's templates limit** (plan defect, temper 03's block of 2026-10-16T19:14:48Z).
+     Ruling 164, a plan defect on both headings, the implementer's proposals: yes. The README answers both, "What a temper repin repairs": "what else jig landed since temper's last repin, adapted the way jig adapted its own reference code (`jig-client-test-domain`, `jig-test-service`, `ops`), as the commit of that change shows, in at most 200 added lines outside the Shape's Files". 03.3's pin, jig `755e02e53` (jig 11.5's landing), holds jig 07.2 (`055b8a547`), 09.1 (`b850f2edc`) and 09.2 (`8912bca2a`). No temper step names 07.2's move, and 04.1, which would have taken jig 09 at its own repin, comes after 03.3.
+
+     1. **The procedure step:** temper's `PartyInput::ProcedureStep` takes jig 07.2's: `action: ProcedureAction` becomes `decision: ProcedureStep` (jig `crates/jig-domain-core/src/delegation.rs:39`); temper's `lib.rs:39` re-exports `ProcedureStep` and `StepEnd` in place of `ProcedureAction`; the forge's route (`route/forge_route.rs:1835-1906`) makes each step as 07.2's commit makes its reference roots' (one delegate is a batch of one), and routes `Ask::StepMade` and `Ask::StepRefused` through the forge's existing association, as jig's reference roots route them. Users: `crates/temper-engine-domain/src/{boundary.rs:8,364-369, lib.rs:39, route.rs:34,100-101, route/forge_route.rs}`, `tests/engine/domain/tests/root_routes.rs:1654-1659`. A further user the compiler names gets the same change, listed in the commit body.
+     2. **The templates limit:** 03.3 carries of 04.1 what the repin needs to compile: `temper_engine_domain::Limits.templates` (`limits.rs:29-54`), `core_limits` taking it as `documents` is (`:109-143`, never a literal), and the service's `templates: jig.core.templates` (`crates/temper-service/src/limits.rs:264-278`), with any limits literal of a world the compiler names, listed in the commit body. 04.1 does what remains: the configurations' `templates` in place of `chats`, the startup's reader, its tests.
+     3. **Counted:** both within the README's 200 added lines outside 03.3's Files, summed once as the README says, each item's lines given in the report. Past 200, land and give the count; a question only past 300.
+     4. **Unchanged:** 03.3's Shape, Size (120, the path rewrite apart) and Proof; the forge's behaviour (each step makes what it made); temper's store format beyond what 03.3's Files already name; temper's tool names; 04.1's Needs and Shape.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
