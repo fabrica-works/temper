@@ -525,7 +525,9 @@ Files:
   (new).
 - `crates/jig-domain-core/src/`: `inbox/census.rs` (`Census::admits`,
   `restore_inbox_row(&mut self, limits, record: &Record) -> bool`, one
-  pending position), `restart/census.rs`, `forget.rs` (8.3's `Reading.turns`
+  pending position), `restart/census.rs` (`Census::interval`, and
+  `admits` on it), `restart.rs` (`restart_done`: a position pending
+  refuses), `forget.rs` (8.3's `Reading.turns`
   from the loaded position), `inbox.rs` (`seen_chat_loaded`),
   `routing/vocabulary.rs` (`Now::LoadEndedRead`, `Event::EndedReadLoaded`,
   `AfterRead`), `routing/mod.rs`, `stopping.rs`,
@@ -538,7 +540,8 @@ Files:
   `src/intervals.rs` (`RestoreRange::People` ends before tag 7;
   `census_ranges` reads `[JIG, 2, 7]` in place of `[JIG, 1, 15]`),
   `src/restore.rs` (`decode` hands up an `EndedRead` row and then its
-  joined ended record), `src/historical.rs` (`Now::LoadEndedRead`'s key
+  joined ended record, the two in one page and counted as two rows),
+  `src/historical.rs` (`Now::LoadEndedRead`'s key
   and answer), `src/reads/indexed.rs` (`joined`: a conversation row's
   `related` is its `EndedRead`), `schema/people-v3.schema` (`record
   EndedRead { task: u64 party: u64 through: u64 }`), `src/codec/people.rs`,
@@ -568,7 +571,9 @@ Files:
 - Downstream: 3 files match `people::Stored` (its engine store, its
   engine world's roles and referee), its engine root's restart
   (`restore_inbox_row`) and `now` routes (`Now`), and its client world's
-  translation (`ChatState`), absorbed at its repin.
+  translation (`ChatState`), absorbed at its repin; and temper's census
+  walk, which jig's reference code does not show, repaired as the
+  README's "jig 08.4's census" says.
 Shape:
 - `people::Key::EndedRead { task: u64, party: u64 }`;
   `people::Stored::EndedRead { task: u64, party: u64, through: u64 }`;
@@ -596,6 +601,29 @@ Shape:
   the next row, its ended record, takes it into `ChatState { live:
   false, seen: Some(through) }`; a census whose pending position meets
   another row refuses the restart (`false`).
+- `restore_inbox_row` refuses a record after a pending position that
+  is not that position's ended task, with that position's party its
+  requester; `restart_done(RestartStep::LoadInbox)` with a position
+  pending refuses the restart. A record without a pending position
+  takes no `ChatState`: an ended conversation's comes with its position.
+- **Each ended task once per party, whichever part names it** (store.md
+  7.2: "neither part's progress skips a row of the other"). At the
+  base, the one `Progress.unread_result` mark per party
+  (`inbox/census.rs:116-122`), set by an ended conversation's unread
+  result in the first part, skips every lower unread result of the same
+  party in the second.
+- `Census::interval(&self, key: &Key) -> Option<u32>`: 0 for
+  `Key::People(people::Key::EndedRead { .. })`, 1 + k for a `Result` of
+  the census's k-th party past its read position, `None` for any other
+  key; `admits` is `interval(key).is_some()`, and `census_ranges`
+  builds its intervals in that order (store.md 7.2: "The census places
+  each key it admits in the walk's order"). temper's root places its
+  census cursors by it, and keeps no copy of the order.
+- The census's page (`restore.rs`): an `EndedRead` row and its ended
+  record count two against the asker's rows, and their bytes against
+  its bytes; the page ends before a pair that does not fit, its cursor
+  the index row before the pair, and a page whose first pair does not
+  fit is cut (store.md 7.2: "never parts a position from its record").
 - `conversation_from_row(core, limits, party, row, seen: Option<u64>)`:
   `Some` for an ended row, from the row's `related`.
 Test shape:
@@ -610,8 +638,21 @@ Test shape:
   `the_census_reads_conversations_then_results_in_listed_order` renamed
   `the_census_reads_ended_read_positions_then_results_in_listed_order`,
   its expected first interval `[JIG, 2, 7]`.
+- `crates/jig-protocol-store/src/tests/intervals.rs`:
+  `the_census_holds_the_keys_it_admits_and_no_others` also holds each
+  admitted key to the interval `Census::interval` names.
 - `crates/jig-protocol-store/src/tests/restore.rs`:
-  `the_census_hands_up_an_ended_read_position_then_its_task`.
+  `the_census_hands_up_an_ended_read_position_then_its_task`, and
+  `the_census_never_parts_an_ended_read_position_from_its_task` (two
+  `EndedRead` rows: asked for 3 rows, the page holds one pair, its
+  cursor the first `EndedRead`'s key; asked for 1, the page is cut).
+- `crates/jig-domain-core/src/tests/restore_admission.rs`:
+  `a_census_position_followed_by_another_task_is_refused`.
+- `tests/core/tests/restart.rs`:
+  `a_restart_keeps_an_unread_goal_older_than_an_unread_chat` (a goal
+  ends, then a chat, neither read; after `world.restart`,
+  `census_unread_results` lists both, newest first, and
+  `census_updates` is unchanged).
 - `tests/core/tests/activity.rs`:
   `an_ended_chats_read_position_is_read_back_after_a_restart` (a chat
   with two turns, the first marked, ends; after `world.restart`, the
@@ -636,8 +677,11 @@ restart, an ended chat reads with the position its person left, and
 the unread results; under 1 s.
 Don't: restore an `EndedRead` row at start; hold ended positions in the
 people child; read an ended record in the census that no `EndedRead` row
-and no unread result row names.
-Size: at most 300 lines of production code (a codec increment).
+and no unread result row names; part an `EndedRead` row from its record
+across pages.
+Size: at most 340 lines of production code (a codec increment; 40 of
+them for the census's pairs, places and once per party, by the design
+answer of 2026-10-16).
 Removes: ended positions in `people::Domain::chats_seen` and the
 census's read of tag 15.
 

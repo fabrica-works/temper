@@ -147,6 +147,9 @@ stays joined to temper's engine root throughout.
   `store-v2.schema` and `CoreRefused`'s bound from jig's people v3
   ceilings; if temper 02.1 did not, it is 03.2, this session's first
   repin, or the first after it that includes it.
+- **jig 08.4's census:** the first increment of this session whose
+  repin includes jig 08.4's landing repairs temper's census walk, as the
+  README's "jig 08.4's census" says.
 - **The meeting point:** each increment's story runs against temper's
   engine root, in `tests/client`, the one-process world or the process
   tier, never only against `jig-client-scripted-engine` (README, Rules).

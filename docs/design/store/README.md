@@ -1,6 +1,6 @@
 # temper's store
 
-Provisional, 2026-10-05, revised 2026-10-14. What temper keeps in jig's
+Provisional, 2026-10-05, revised 2026-10-16. What temper keeps in jig's
 store, and how: its families, the forge's records, under the
 application's tag; their keys, their records and temper's store
 version; and the restart's ranges. The store itself is jig's:
@@ -31,8 +31,9 @@ What is open is listed in section 7.
   temper's is loaded on demand (section 5).
 - **The core's restart ranges are jig's:** the root's core ranges are
   asked as jig's coarser ones and filtered, and its census takes jig's
-  index walk as it comes, an ended task per index row, its cursor the
-  index row's key (section 5).
+  walk as it comes: an ended task per index row, after its ended read
+  position for an ended conversation, its cursor the last index row's
+  key, which jig's census places in the walk (section 5).
 - **Sized from limits.** The largest key and record follow from the
   forge's limits, and jig's component checks them with its own at start
   (section 4).
@@ -190,20 +191,27 @@ section 7).
   jig's walk goes on, is asked again from jig's cursor before the root
   hears of it, so a page that goes on keeps a row, and its cursor is the
   last key kept.
-- **The census is jig's index walk.** `Range::Census` is jig's census
-  (jig's `protocol/store.md`, 7.2 and 7.4): its index rows walked in
-  order (the conversations' index, `ConversationOldest`, then each
-  party's unread results, `Result`, parties in the census's order, each
-  interval by key), and each joined to the ended task it names. So a
-  page's rows are ended tasks in the walk's order, the same task once
-  for each index row that names it, and its cursor is the key of the
-  last index row walked, not a row's key. The root checks that each row
-  is an ended task and that the cursor is an index key the census
+- **The census is jig's walk.** `Range::Census` is jig's census (jig's
+  `protocol/store.md`, 7.2 and 7.4): the family of ended read positions,
+  then each party's unread results (`Result`), parties in the census's
+  order, each interval by key. An ended conversation comes as two rows,
+  its ended read position (`EndedRead`) and then its ended task; an
+  unread result as one, the ended task its index row names. So a page's
+  rows are ended read positions and ended tasks in the walk's order, the
+  same task once for each index row that names it, and its cursor is the
+  key of the last index row walked: an `EndedRead` key, which is a row
+  of the page, or a `Result` key, which is not. jig's `Census::interval`
+  places a cursor in the walk; temper keeps no copy of the walk's order.
+- **The root checks the census's rows, and keeps none.** Each row is an
+  ended task or an ended read position, and the cursor a key the census
   admits, past the page's start in the walk's order; a page may hold no
-  row and go on. It neither orders nor dedupes the rows: jig's core
-  restores them as they come, keeping per party how far it has read, as
-  jig's reference root hands them. A cut census page stops the restart,
-  as every cut restart page does.
+  row and go on. The root neither pairs, orders nor dedupes the rows: it
+  hands each to jig's core as it comes, as jig's reference root does,
+  and the core holds an ended read position until its task's record and
+  keeps per party how far it has read. jig's component never parts a
+  position from its task and counts both against the page's rows, so
+  the root's `loads.rows` is at least 2, checked at start. A cut census
+  page stops the restart, as every cut restart page does.
 
 ## 6. Testing
 

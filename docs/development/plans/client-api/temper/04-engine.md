@@ -108,6 +108,9 @@ profile, and sets `documents.lines` where it is not (`configuration.md`,
   skein's and smith's lines equal to those of `git -C ~/src/rust/jig
   show <the landing>:Cargo.lock`; a second revision of a source still
   there after a second `cargo update` is a question.
+- **jig 08.4's census:** the first increment of this session whose
+  repin includes jig 08.4's landing repairs temper's census walk, as the
+  README's "jig 08.4's census" says.
 - **A repin's repairs outside its Shape** follow jig's own diffs of
   `jig-test-service`, `jig-client-test-domain` and `ops`, counted with
   `git diff --numstat origin/main...HEAD -- <the changed paths outside

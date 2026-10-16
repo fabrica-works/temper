@@ -199,6 +199,36 @@ per session are in each file.
     summed once before landing and given in the report. More is a
     question (development.md, 5.7), never a reason to pin a jig older
     than temper's present pin.
+  - **jig 08.4's census** (the design answer of 2026-10-16): the first
+    temper increment whose repin includes jig 08.4's landing (`git -C
+    ~/src/rust/jig merge-base --is-ancestor <jig 08.4's landing> <the
+    pinned commit>` succeeds) repairs temper's census walk, which jig's
+    reference code does not show (temper's `store/README.md`, section 5;
+    jig's `protocol/store.md`, 7.2); at the latest temper 04.2's, since
+    jig 14 starts after jig 08. Counted within the repin's 200 lines:
+    - `crates/temper-engine-domain/src/store.rs`: `census_interval`
+      goes, and its callers (`loads.rs`, `census_position`;
+      `crates/temper-service/src/store/ranges.rs`, `cursor`) call jig's
+      `Census::interval`; `Range::contains` for `Range::Census` admits
+      an ended task, not task 0, and an `EndedRead` key the census
+      admits;
+    - `restart.rs`, `census_page`: each core row goes to
+      `restore_inbox_row` as it comes, a forge row refuses;
+    - the root's limits check (`limits.rs`, beside `loads.loads < 2`)
+      refuses `loads.rows` below 2, and the small profile
+      (`crates/temper-service/src/limits.rs`, `root.loads.rows`) and the
+      walking world (`tests/engine/domain/src/walking.rs`) ask 2;
+    - tests: `tests/engine/domain/tests/loads.rs`,
+      `a_census_page_takes_an_ended_read_position_then_its_task` (the
+      real store seeded with an `EndedRead` row, its ended task and a
+      `Result` row, paged two rows at a time: the position and its task,
+      the cursor the `EndedRead` key; then the result's task, the cursor
+      its `Result` key), and `a_census_cursor_behind_its_start_is_out_of_order`
+      with an `EndedRead` cursor before a `Result` one; and, beside the
+      root world's restart stories (`tests/engine/domain/tests/root_routes.rs`),
+      `an_ended_chats_read_position_survives_a_restart` (a chat of two
+      turns, the first marked, ends; after the restart its line reads
+      one unread turn).
   - **The closing repin, `temper-repin`:** temper's README-declared
     repin. The coordinator adds it at setup, `plan set temper-repin
     repo=temper state=waiting` (development.md 7.1 adds none, since the
