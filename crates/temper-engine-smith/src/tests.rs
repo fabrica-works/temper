@@ -288,9 +288,9 @@ fn a_job_answer_names_its_failed_step_before_its_log() {
     use temper_engine_domain_forge_client::api;
     let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
     let step = Some(api::Step { number: 1, name: Box::from(&b"build"[..]) });
-    let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };
+    let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: true };
     let rendered = answer(&engine::CallAnswer::ForgeRead(Box::new(Ok(read))));
-    assert_eq!(rendered.text(), b"Job 8 run 7, failed step 1 build:\nfailing check build 3\n");
+    assert_eq!(rendered.text(), b"Job 8 run 7, failed step 1 build:\n[earlier log bytes cut]\nfailing check build 3\n");
     assert!(!rendered.error(), "A read answer is no error");
 }
 

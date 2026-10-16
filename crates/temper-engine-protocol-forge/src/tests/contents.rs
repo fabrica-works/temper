@@ -460,13 +460,18 @@ fn a_job_read_answered_404_is_missing_job_at_each_exchange() {
     }
 }
 #[test]
-fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
+fn a_job_log_asks_a_suffix_range_and_bytes_before_it_are_truncated() {
     for (name, response, log, truncated) in [
-        ("short", &b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc"[..], &b"abc"[..], false),
-        ("past max", &b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nabcde"[..], &b"abcd"[..], true),
+        (
+            "short",
+            &b"HTTP/1.1 206 Partial Content\r\nContent-Length: 3\r\nContent-Range: bytes 0-2/3\r\n\r\nabc"[..],
+            &b"abc"[..],
+            false,
+        ),
+        ("past max", &b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nabcdef"[..], &b"cdef"[..], true),
         (
             "range names more",
-            &b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 0-3/20\r\n\r\nabcd"[..],
+            &b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 16-19/20\r\n\r\nabcd"[..],
             &b"abcd"[..],
             true,
         ),
@@ -484,7 +489,7 @@ fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
             .is_some(),
             "{name}: log"
         );
-        assert!(skein_lib::bytes::find(&request, b"Range: bytes=0-4\r\n").is_some(), "{name}: range");
+        assert!(skein_lib::bytes::find(&request, b"Range: bytes=-4\r\n").is_some(), "{name}: range");
         h.answer(fixtures::FORGE, response);
         h.run(Duration::from_millis(10));
         let answer = h.answered(1).expect("log");
@@ -681,4 +686,23 @@ fn a_jobs_log_room_is_answer_bytes_less_its_steps_name() {
         truncated: true,
     };
     assert_eq!(h.answered(1).expect("Job answer").result, Ok(expected));
+}
+
+#[test]
+fn an_empty_log_answered_with_an_empty_range_is_an_empty_log() {
+    let mut h = fixtures::known();
+    h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
+    h.answer(fixtures::FORGE, &fixtures::ok(RUN));
+    h.answer(fixtures::FORGE, &fixtures::ok(JOB));
+    h.answer(
+        fixtures::FORGE,
+        b"HTTP/1.1 206 Partial Content\r\nContent-Length: 0\r\nContent-Range: bytes 0--1/0\r\n\r\n",
+    );
+    h.run(Duration::from_millis(10));
+    let answer = h.answered(1).expect("Empty log");
+    let step = Some(Step { number: 1, name: Box::from(&b"build"[..]) });
+    assert_eq!(
+        (answer.cost, answer.result.clone()),
+        (3, Ok(Answer::Job { attempt: ATTEMPT, step, log: Box::from([]), truncated: false }))
+    );
 }

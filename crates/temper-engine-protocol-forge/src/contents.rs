@@ -103,7 +103,7 @@ impl Plan {
                 self.check_size(shared)?;
                 Ok(Step::Send(Exchange {
                     request: r::Request::Raw { at, path: path.clone(), reference: self.id(*head) },
-                    range: Some(*max),
+                    range: Some(crate::plan::Range::Head(*max)),
                 }))
             }
         }

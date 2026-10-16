@@ -90,6 +90,7 @@ holds component-read-pull-files
 holds component-read-compare
 holds component-read-checks
 holds component-read-job
+holds component-read-job-answers-the-failed-steps-end
 holds component-read-file
 holds component-read-protection
 holds component-read-settings

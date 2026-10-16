@@ -1,10 +1,16 @@
 //! One call's exchanges, and its single terminal answer (forge.md, 3.2).
 use temper_engine_domain_forge_client::api;
 use temper_forge_forgejo::request;
+/// The bytes requested from a raw answer.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) enum Range {
+    Head(u32),
+    Tail(u32),
+}
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct Exchange {
     pub request: request::Request,
-    pub range: Option<u32>,
+    pub range: Option<Range>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Step {

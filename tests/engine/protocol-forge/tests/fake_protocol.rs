@@ -91,3 +91,23 @@ fn a_failed_job_read_names_its_failed_step_and_reads_its_log() {
     let step = Some(temper_engine_domain_forge_client::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
     assert_eq!(answered.result, Ok(Answer::Job { attempt, step, log: Box::from(BUILD_STEP_LOG), truncated: false }));
 }
+
+#[test]
+fn a_failed_jobs_log_end_comes_through_a_suffix_range() {
+    let mut joint = Joint::failing(5);
+    let pushed = joint.push(b"work", b"change");
+    joint.run_for(Duration::from_secs(1));
+    let head = temper_engine_forge_world::translate::commit(pushed);
+    joint.call(1, REPO, Op::Read(Read::Checks { commit: head }));
+    joint.run_for(Duration::from_secs(1));
+    let Some(Ok(Answer::Checks(statuses))) = joint.answered(1).map(|a| &a.result) else {
+        panic!("Checks: {:?}", joint.answered(1))
+    };
+    let attempt = statuses[0].job.expect("The failed status links its job");
+    joint.call(2, REPO, Op::Read(Read::Job { attempt, max_bytes: 8 }));
+    joint.run_for(Duration::from_secs(1));
+    let answered = joint.answered(2).expect("Job answer");
+    assert_eq!(answered.cost, 3, "Run, job, the step log");
+    let step = Some(temper_engine_domain_forge_client::api::Step { number: 1, name: Box::from(BUILD_STEP_NAME) });
+    assert_eq!(answered.result, Ok(Answer::Job { attempt, step, log: Box::from(&b"build 3\n"[..]), truncated: true }));
+}

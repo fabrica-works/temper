@@ -58,3 +58,47 @@ impl Grow {
         self.bytes.capacity()
     }
 }
+/// A body's last `max` bytes, replacing the oldest once full.
+#[derive(Debug)]
+pub struct Tail {
+    grow: Grow,
+    start: u32,
+    dropped: bool,
+}
+impl Tail {
+    /// Starts at `first` bytes, growing up to `max`.
+    #[must_use]
+    pub fn new(first: u32, max: u32) -> Self {
+        Self { grow: Grow::new(first, max), start: 0, dropped: false }
+    }
+    /// Appends each byte, replacing the oldest when full.
+    pub fn write(&mut self, piece: &[u8]) {
+        for byte in piece {
+            if self.grow.room() > 0 {
+                self.grow.write(core::slice::from_ref(byte)).expect("Room for one byte");
+            } else {
+                self.dropped = true;
+                if self.grow.cap > 0 {
+                    *self.grow.bytes.get_mut(self.start).expect("Full tail") = *byte;
+                    self.start = self.start.saturating_add(1).checked_rem(self.grow.cap).expect("Nonzero tail");
+                }
+            }
+        }
+    }
+    /// Whether any earlier byte was dropped.
+    #[must_use]
+    pub fn dropped(&self) -> bool {
+        self.dropped
+    }
+    /// The retained bytes, oldest first, in a box of their length.
+    #[must_use]
+    pub fn finish(self) -> Box<[u8]> {
+        let mut bytes = self.grow.finish();
+        bytes.rotate_left(usize::try_from(self.start).expect("Bounded position"));
+        bytes
+    }
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> u32 {
+        self.grow.capacity()
+    }
+}

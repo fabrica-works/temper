@@ -314,11 +314,11 @@ fn x_hasmore_reads_true_or_false_only() {
     }
 }
 #[test]
-fn a_content_range_reads_its_first_last_and_total() {
+fn a_content_range_reads_its_first_end_and_total() {
     use crate::header::{ContentRange, content_range};
     for (text, expected) in [
-        (b"bytes 0-3/7".as_slice(), Some(ContentRange { first: 0, last: 3, total: Some(7) })),
-        (b"bytes 4-6/*", Some(ContentRange { first: 4, last: 6, total: None })),
+        (b"bytes 0-3/7".as_slice(), Some(ContentRange { first: 0, end: 4, total: Some(7) })),
+        (b"bytes 4-6/*", Some(ContentRange { first: 4, end: 7, total: None })),
         (b"bytes 3-0/7", None),
         (b"bytes 0-7/7", None),
         (b"bytes */7", None),
@@ -623,5 +623,17 @@ fn a_comparison_sends_verification_false_and_files_false_when_asked() {
             panic!("A comparison routes without a body");
         };
         assert_eq!(routed, request, "{files}");
+    }
+}
+
+#[test]
+fn an_empty_range_over_an_empty_log_reads_as_empty() {
+    use crate::header::{ContentRange, content_range};
+    for (text, expected) in [
+        (b"bytes 0--1/0".as_slice(), Some(ContentRange { first: 0, end: 0, total: Some(0) })),
+        (b"bytes 0--1/2", None),
+        (b"bytes 1--1/0", None),
+    ] {
+        assert_eq!(content_range(text), expected, "{text:?}");
     }
 }

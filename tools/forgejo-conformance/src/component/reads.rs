@@ -7,6 +7,7 @@ use crate::{
 use serde_json::json;
 use skein_lib::Time;
 use temper_engine_domain_forge_client::api::{self, Answer, Read};
+const JOB_END: &str = "component-read-job-answers-the-failed-steps-end";
 pub(super) fn bytes(text: &str) -> Box<[u8]> {
     text.as_bytes().into()
 }
@@ -90,7 +91,7 @@ pub(super) fn run(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<
 }
 fn actions(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     if std::env::var_os("TEMPER_FORGEJO_RUNNER").is_none() {
-        for name in ["component-read-checks", "component-read-job"] {
+        for name in ["component-read-checks", "component-read-job", JOB_END] {
             facts
                 .push(Fact { name, outcome: crate::facts::Outcome::Unchecked("TEMPER_FORGEJO_RUNNER not set".into()) });
         }
@@ -108,8 +109,18 @@ fn actions(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
             .and_then(|steps| steps.iter().find(|s| s["status"] == "failure"))
             .ok_or("failed step")?;
         facts.push(h.observe("component-read-job", repo, Read::Job { attempt, max_bytes: 65536 }.operation(), |a| matches!(a, Answer::Job { attempt: got, step: Some(step), log, .. } if *got == attempt && Some(u64::from(step.number)) == failed["number"].as_u64() && Some(step.name.as_ref()) == failed["name"].as_str().map(str::as_bytes) && log.windows(b"TEMPER_CONFORMANCE_FAILED_JOB".len()).any(|s| s == b"TEMPER_CONFORMANCE_FAILED_JOB"))));
+        let number = failed["number"].as_u64().ok_or("Failed step number")?;
+        let log = f.exchange(
+            "GET",
+            &format!("{R}/actions/jobs/{}/logs?attempt={}&step={number}", attempt.job, attempt.attempt),
+            None,
+            Some(&f.writer.token),
+            None,
+        )?;
+        facts.push(h.observe(JOB_END, repo, Read::Job { attempt, max_bytes: 16 }.operation(), |a| matches!(a, Answer::Job { step: Some(step), log: kept, truncated: true, .. } if u64::from(step.number) == number && kept.len() == 16 && log.body.ends_with(kept))));
     } else {
         facts.push(super::fact("component-read-job", false, &"checks contained no failed job attempt"));
+        facts.push(super::fact(JOB_END, false, &"Checks contained no failed job attempt"));
     }
     Ok(())
 }

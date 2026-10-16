@@ -7,7 +7,7 @@ use crate::{
     tables::{Repository, Tables},
 };
 use alloc::boxed::Box;
-use skein_lib::{List, bytes};
+use skein_lib::List;
 use temper_engine_domain_forge_client::api;
 use temper_forge_forgejo::{document as d, header, id::ObjectId, request as r};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -139,10 +139,7 @@ impl Plan {
                 if self.stage == Stage::Log
                     && let Some(range) = fields.content_range
                 {
-                    self.truncated = match range.total {
-                        Some(total) => total > range.last.saturating_add(1),
-                        None => false,
-                    };
+                    self.truncated = range.first > 0;
                 }
                 Ok(None)
             }
@@ -313,7 +310,7 @@ impl Plan {
                             None => None,
                         },
                     },
-                    range: Some(max),
+                    range: Some(crate::plan::Range::Tail(max)),
                 })))
             }
             d::Document::User(_)
@@ -369,18 +366,15 @@ impl Plan {
         };
         shared.client.answer_bytes.saturating_sub(u32::try_from(name).expect("Bounded step name"))
     }
-    fn log(&mut self, value: Box<[u8]>, more: bool) -> Result<Option<Step>, api::Error> {
+    fn log(&mut self, log: Box<[u8]>, more: bool) -> Result<Option<Step>, api::Error> {
         if self.stage != Stage::Log {
             return Err(api::Error::InvalidAnswer);
         }
-        let (attempt, max) = match self.mode {
-            Mode::Job { attempt, max } => (attempt, max),
+        let attempt = match self.mode {
+            Mode::Job { attempt, .. } => attempt,
             Mode::Checks(_) => return Err(api::Error::InvalidAnswer),
         };
-        let length = value.len().min(usize::try_from(max).expect("bounded max"));
-        let truncated = more || self.truncated || value.len() > length;
-        let log =
-            if length == value.len() { value } else { bytes::copy_of(value.get(..length).expect("bounded length")) };
+        let truncated = more || self.truncated;
         Ok(Some(Step::Done(Ok(api::Answer::Job { attempt, step: self.step.take(), log, truncated }))))
     }
 }

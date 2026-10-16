@@ -2,7 +2,8 @@
 use super::fixtures;
 use crate::{
     connection::{Failure, Heard, Phase},
-    grow::{Full, Grow},
+    grow::{Full, Grow, Tail},
+    plan::Range,
 };
 use alloc::boxed::Box;
 use skein_lib::{
@@ -214,7 +215,7 @@ fn raw_reads_keep_the_range_and_refuse_bytes_past_remaining_answer_room() {
     for (name, response, max, room, expected, more, phase, range) in rows {
         let mut h = fixtures::ConnectionHarness::new();
         h.connection.raw_room(room);
-        h.connection.start(&h.env, &h.forge, raw_request(), Some(max)).expect("valid raw request");
+        h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Head(max))).expect("valid raw request");
         let heard = h.answer(&fixtures::ok(response));
         assert_eq!(
             heard.last(),
@@ -225,6 +226,7 @@ fn raw_reads_keep_the_range_and_refuse_bytes_past_remaining_answer_room() {
         assert!(contains(&h.sent, range), "{name}: range header");
     }
 }
+type TailRow = (&'static str, &'static [u8], &'static [u8], bool, Phase);
 type RawRow = (&'static str, &'static [u8], u32, u32, &'static [u8], bool, Phase, &'static [u8]);
 fn contains(bytes: &[u8], expected: &[u8]) -> bool {
     for piece in bytes.windows(expected.len()) {
@@ -282,7 +284,7 @@ fn a_reset_while_the_start_reads_waits_before_a_new_connection() {
 #[test]
 fn a_chunked_raw_read_keeps_the_last_short_piece() {
     let mut h = fixtures::ConnectionHarness::new();
-    h.connection.start(&h.env, &h.forge, raw_request(), Some(3)).expect("valid raw request");
+    h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Head(3))).expect("valid raw request");
     let heard = h.answer(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n0\r\n\r\n");
     assert_eq!(
         heard.last(),
@@ -290,4 +292,74 @@ fn a_chunked_raw_read_keeps_the_last_short_piece() {
         "final bytes kept"
     );
     assert_eq!(h.connection.phase, Phase::Idle, "complete body reusable");
+}
+
+#[test]
+fn the_tail_keeps_the_last_max_bytes_across_writes() {
+    for (name, pieces, expected, dropped, capacities) in [
+        ("short", [b"ab".as_slice(), b"", b""], b"ab".as_slice(), false, [2, 2, 2]),
+        ("wrapped", [b"ab".as_slice(), b"cde", b"f"], b"cdef".as_slice(), true, [2, 4, 4]),
+    ] {
+        let mut tail = Tail::new(2, 4);
+        for (piece, capacity) in pieces.into_iter().zip(capacities) {
+            tail.write(piece);
+            assert_eq!(tail.capacity(), capacity, "{name}: Capacity");
+        }
+        assert_eq!(tail.dropped(), dropped, "{name}: Earlier bytes");
+        assert_eq!(tail.finish().as_ref(), expected, "{name}: Last bytes");
+    }
+}
+#[test]
+fn a_tail_read_keeps_a_200s_last_bytes_and_closes_when_some_were_dropped() {
+    let rows: [TailRow; 3] = [
+        ("short", b"ab", b"ab", false, Phase::Idle),
+        ("max", b"abc", b"abc", false, Phase::Idle),
+        ("longer", b"abcdef", b"def", true, Phase::Closed),
+    ];
+    for (name, response, expected, more, phase) in rows {
+        let mut h = fixtures::ConnectionHarness::new();
+        h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Tail(3))).expect("Valid raw request");
+        let heard = h.answer(&fixtures::ok(response));
+        let kept = Heard::Done(crate::connection::Body::Raw { bytes: Box::from(expected), more });
+        assert_eq!(heard.last(), Some(&kept), "{name}: The last bytes");
+        assert_eq!(h.connection.phase, phase, "{name}: Connection state");
+        assert!(contains(&h.sent, b"Range: bytes=-3\r\n"), "{name}: Suffix range");
+    }
+}
+#[test]
+fn a_tail_read_keeps_at_most_the_raw_room() {
+    let mut h = fixtures::ConnectionHarness::new();
+    h.connection.raw_room(8);
+    h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Tail(16))).expect("Valid raw request");
+    let heard = h.answer(&fixtures::ok(b"abcdefghijklmnopqrst"));
+    assert_eq!(
+        heard.last(),
+        Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(&b"mnopqrst"[..]), more: true }))
+    );
+    assert_eq!(h.connection.phase, Phase::Closed, "Earlier bytes were dropped");
+}
+#[test]
+fn a_chunked_tail_read_keeps_the_last_bytes_across_pieces() {
+    let mut h = fixtures::ConnectionHarness::new();
+    h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Tail(3))).expect("Valid raw request");
+    let heard = h.answer(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n3\r\ncde\r\n0\r\n\r\n");
+    assert_eq!(
+        heard.last(),
+        Some(&Heard::Done(crate::connection::Body::Raw { bytes: Box::from(&b"cde"[..]), more: true }))
+    );
+    assert_eq!(h.connection.phase, Phase::Closed, "Earlier bytes were dropped");
+}
+#[test]
+fn a_tail_read_past_body_bytes_in_is_malformed_and_closes() {
+    let mut h = fixtures::ConnectionHarness::new();
+    h.env.limits.body_bytes_in = 8;
+    h.connection.start(&h.env, &h.forge, raw_request(), Some(Range::Tail(3))).expect("Valid raw request");
+    let heard = h.answer(&fixtures::ok(b"abcdefghi"));
+    assert_eq!(
+        heard.last(),
+        Some(&Heard::Done(crate::connection::Body::Malformed(temper_forge_forgejo::decode::Malformed::Bound {
+            field: b"log"
+        })))
+    );
+    assert_eq!(h.connection.phase, Phase::Closed, "Body limit closes");
 }

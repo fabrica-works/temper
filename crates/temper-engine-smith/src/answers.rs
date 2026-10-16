@@ -540,10 +540,10 @@ fn forge_answer(text: &mut Text, answer: &api::Answer) -> Result<(), Problem> {
                 text.add(b", no step failed")?;
             }
             text.add(b":\n")?;
-            text.add(log)?;
             if *truncated {
-                text.add(b"\n[log truncated]")?;
+                text.add(b"[earlier log bytes cut]\n")?;
             }
+            text.add(log)?;
         }
         api::Answer::File { head, path, bytes, truncated } => {
             text.add(path)?;

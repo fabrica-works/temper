@@ -40,7 +40,7 @@ pub struct Fields {
 pub enum Body {
     /// A JSON answer, whole; its rows went up before it.
     Document(document::Document),
-    /// A raw answer within its cap; `more` when bytes followed the cap.
+    /// A raw answer within its cap; `more` when bytes followed a head or preceded a tail.
     Raw { bytes: Box<[u8]>, more: bool },
     /// No body, or one not read (a failure's status needs no message).
     Empty,
@@ -69,8 +69,9 @@ pub enum Heard {
 }
 
 use crate::{
-    grow::Grow,
+    grow::{Grow, Tail},
     limits::{self, Limits, Shared},
+    plan::Range,
     settings::{Forge, Transport},
 };
 use skein_http::client as http;
@@ -85,6 +86,7 @@ use temper_forge_forgejo::{client as documents, request};
 enum Receiving {
     Json(documents::Decoder),
     Raw { grow: Grow, max: u32, remaining: Option<u64> },
+    Tail { tail: Tail, read: u64, remaining: Option<u64> },
     Empty,
 }
 /// One connection's machines, socket identity, request and pending output.
@@ -113,7 +115,7 @@ pub(crate) struct Connection {
     after: u64,
     upload: Option<Box<[u8]>>,
     uploaded: u32,
-    raw_max: u32,
+    raw_range: Range,
     raw_cap: u32,
 }
 impl Connection {
@@ -149,7 +151,7 @@ impl Connection {
             after: 0,
             upload: None,
             uploaded: 0,
-            raw_max: 0,
+            raw_range: Range::Head(0),
             raw_cap: shared.client.answer_bytes,
         }
     }
@@ -158,7 +160,7 @@ impl Connection {
         env: &Env<Limits>,
         forge: &Forge,
         request: request::Request,
-        range: Option<u32>,
+        range: Option<Range>,
     ) -> Result<(), documents::Refusal> {
         let encoded = documents::encode(&request, &limits::documents(&env.limits))?;
         let mut headers = List::with_capacity(5);
@@ -177,10 +179,14 @@ impl Connection {
             }
             None => http::Body::None,
         };
-        if let Some(max) = range {
+        if let Some(range) = range {
+            let (prefix, max) = match range {
+                Range::Head(n) => (b"bytes=0-".as_slice(), n),
+                Range::Tail(n) => (b"bytes=-".as_slice(), n),
+            };
             let decimal = skein_lib::Decimal::of(u64::from(max));
-            let mut value = Writer::new(decimal.as_bytes().len().saturating_add(8));
-            value.put(b"bytes=0-").expect("range prefix measured");
+            let mut value = Writer::new(decimal.as_bytes().len().saturating_add(prefix.len()));
+            value.put(prefix).expect("range prefix measured");
             value.put(decimal.as_bytes()).expect("range measured");
             headers
                 .push(skein_http::Header { name: Box::from(&b"Range"[..]), value: value.finish() })
@@ -189,7 +195,7 @@ impl Connection {
         self.request = Some(request);
         self.upload = encoded.body;
         self.uploaded = 0;
-        self.raw_max = range.unwrap_or(self.raw_cap);
+        self.raw_range = range.unwrap_or(Range::Head(self.raw_cap));
         self.done = None;
         self.written = false;
         self.after = 0;
@@ -351,6 +357,27 @@ impl Connection {
                 Receiving::Empty => {
                     drop(event);
                 }
+                Receiving::Tail { tail, read, remaining } => match event {
+                    Up::Bytes(piece) => {
+                        let length = u64::try_from(piece.len()).expect("Bounded piece");
+                        *read = read.saturating_add(length);
+                        if let Some(left) = remaining {
+                            *left = left.saturating_sub(length);
+                        }
+                        if *read > u64::from(env.limits.body_bytes_in) {
+                            self.receive = Receiving::Empty;
+                            self.heard.push(Heard::Done(Body::Malformed(decode::Malformed::Bound { field: b"log" })));
+                            self.phase = Phase::Closed;
+                            self.deadline = None;
+                        } else {
+                            tail.write(&piece);
+                            self.raw_demand(env);
+                        }
+                    }
+                    Up::End => {}
+                    Up::Failed(_) => self.failed(Failure::Seen),
+                    Up::Room => unreachable!("Tail bodies only read"),
+                },
                 Receiving::Raw { grow, max, remaining } => match event {
                     Up::Bytes(piece) => {
                         if let Some(left) = remaining {
@@ -360,7 +387,9 @@ impl Connection {
                         if more {
                             let grow = match core::mem::replace(&mut self.receive, Receiving::Empty) {
                                 Receiving::Raw { grow, .. } => grow,
-                                Receiving::Json(_) | Receiving::Empty => unreachable!("raw body"),
+                                Receiving::Json(_) | Receiving::Tail { .. } | Receiving::Empty => {
+                                    unreachable!("raw body")
+                                }
                             };
                             self.heard.push(Heard::Done(Body::Raw { more: true, bytes: grow.finish() }));
                             self.phase = Phase::Closed;
@@ -382,11 +411,12 @@ impl Connection {
                     }
                     Receiving::Empty => self.done.take().unwrap_or(Body::Empty),
                     Receiving::Raw { grow, max, .. } => Body::Raw { more: grow.len() > max, bytes: grow.finish() },
+                    Receiving::Tail { tail, .. } => Body::Raw { more: tail.dropped(), bytes: tail.finish() },
                 };
                 let close = reuse == http::Reuse::Close
                     || match &done {
-                        Body::Malformed(_) => true,
-                        Body::Document(_) | Body::Raw { .. } | Body::Empty => false,
+                        Body::Malformed(_) | Body::Raw { more: true, .. } => true,
+                        Body::Document(_) | Body::Raw { more: false, .. } | Body::Empty => false,
                     };
                 self.heard.push(Heard::Done(done));
                 self.request = None;
@@ -455,14 +485,21 @@ impl Connection {
             }
             None => {
                 if raw_request(request) {
-                    let cap = self.raw_max.saturating_add(1).min(self.raw_cap);
-                    self.receive = Receiving::Raw {
-                        grow: Grow::new(env.limits.chunk, cap),
-                        max: self.raw_max,
-                        remaining: match response.framing {
-                            http::Framing::Length(length) => Some(length),
-                            http::Framing::Empty => Some(0),
-                            http::Framing::Chunked | http::Framing::UntilEnd => None,
+                    let remaining = match response.framing {
+                        http::Framing::Length(length) => Some(length),
+                        http::Framing::Empty => Some(0),
+                        http::Framing::Chunked | http::Framing::UntilEnd => None,
+                    };
+                    self.receive = match self.raw_range {
+                        Range::Head(max) => Receiving::Raw {
+                            grow: Grow::new(env.limits.chunk, max.saturating_add(1).min(self.raw_cap)),
+                            max,
+                            remaining,
+                        },
+                        Range::Tail(max) => Receiving::Tail {
+                            tail: Tail::new(env.limits.chunk, max.min(self.raw_cap)),
+                            read: 0,
+                            remaining,
                         },
                     };
                     self.raw_demand(env);
@@ -477,6 +514,10 @@ impl Connection {
         let count = match &self.receive {
             Receiving::Raw { grow, remaining, .. } => match remaining {
                 Some(left) => grow.room().min(env.limits.chunk).min(u32::try_from(*left).unwrap_or(u32::MAX)).max(1),
+                None => 1,
+            },
+            Receiving::Tail { remaining, .. } => match remaining {
+                Some(left) => env.limits.chunk.min(u32::try_from(*left).unwrap_or(u32::MAX)).max(1),
                 None => 1,
             },
             Receiving::Json(_) | Receiving::Empty => return,
@@ -632,7 +673,7 @@ impl Connection {
     fn decoder(&mut self) -> Option<&mut documents::Decoder> {
         match &mut self.receive {
             Receiving::Json(decoder) => Some(decoder),
-            Receiving::Raw { .. } | Receiving::Empty => None,
+            Receiving::Raw { .. } | Receiving::Tail { .. } | Receiving::Empty => None,
         }
     }
 }

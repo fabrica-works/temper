@@ -4,7 +4,7 @@ use skein_lib::{Duration, Wall};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ContentRange {
     pub first: u64,
-    pub last: u64,
+    pub end: u64,
     pub total: Option<u64>,
 }
 #[must_use]
@@ -17,6 +17,9 @@ pub fn has_more(value: &[u8]) -> Option<bool> {
 }
 #[must_use]
 pub fn content_range(value: &[u8]) -> Option<ContentRange> {
+    if value == b"bytes 0--1/0" {
+        return Some(ContentRange { first: 0, end: 0, total: Some(0) });
+    }
     let value = value.strip_prefix(b"bytes ")?;
     let dash = skein_lib::bytes::find(value, b"-")?;
     let slash = skein_lib::bytes::find(value, b"/")?;
@@ -34,7 +37,7 @@ pub fn content_range(value: &[u8]) -> Option<ContentRange> {
     {
         return None;
     }
-    Some(ContentRange { first, last, total })
+    Some(ContentRange { first, end: last.checked_add(1)?, total })
 }
 #[must_use]
 pub fn retry_after(value: &[u8], date: Wall) -> Option<Duration> {
