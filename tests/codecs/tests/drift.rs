@@ -28,7 +28,7 @@ fn worker_wire_schema_matches_generated_code_and_goldens() {
 }
 #[test]
 fn client_wire_schema_matches_generated_code_and_goldens() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/temper-protocol-client-wire");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/temper-client-protocol-wire");
     let source = fs::read_to_string(root.join("schema/client-wire-v1.schema")).expect("client wire schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v1.rs");

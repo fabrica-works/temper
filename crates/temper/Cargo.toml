@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 temper-service.workspace = true
-temper-shell-terminal.workspace = true
+temper-client-shell-terminal.workspace = true
 jig-view.workspace = true
 skein-ui.workspace = true
 temper-worker-domain.workspace = true
@@ -38,7 +38,7 @@ temper-engine-domain.workspace = true
 temper-protocol-store.workspace = true
 jig-protocol-store.workspace = true
 temper-throwaway-forgejo.workspace = true
-temper-shell-terminal.workspace = true
+temper-client-shell-terminal.workspace = true
 temper-client-domain.workspace = true
 skein-fake-person.workspace = true
 jig-view.workspace = true

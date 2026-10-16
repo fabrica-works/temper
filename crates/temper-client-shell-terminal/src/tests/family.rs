@@ -3,7 +3,7 @@ use crate::route::{self, Down, Notice, Up, family};
 use jig_domain_client::contract;
 use jig_protocol_client_link as link;
 use temper_client_domain::{self as client, forge};
-use temper_protocol_client_wire::{self as wire, CLIENT_VERSION, FORGE, v1 as w};
+use temper_client_protocol_wire::{self as wire, CLIENT_VERSION, FORGE, v1 as w};
 
 #[test]
 fn an_adoption_round_trips_through_the_family_record() {

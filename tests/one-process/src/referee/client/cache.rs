@@ -63,7 +63,7 @@ impl Cache {
             files: BTreeMap::new(),
             history,
             life,
-            limits: temper_shell_terminal::limits::link(&temper_shell_terminal::limits::native())
+            limits: temper_client_shell_terminal::limits::link(&temper_client_shell_terminal::limits::native())
                 .expect("native link limits")
                 .wire,
         }

@@ -4,7 +4,7 @@ use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::Host;
 use temper_client_domain::Address;
-use temper_shell_terminal::client::{NativeClient, Settings, Start};
+use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
 const PIPE: Token = Token::new(u64::MAX);
 const CLOSE: Token = Token::new(u64::MAX - 1);
 /// The script is separate from the client's production composition.
@@ -113,7 +113,7 @@ impl Person {
                     Settings {
                         engine: skein_io::Addr::Ip(address),
                         directory: b"private".as_slice().into(),
-                        limits: temper_shell_terminal::limits::native(),
+                        limits: temper_client_shell_terminal::limits::native(),
                     },
                     self.root.take().expect("client root"),
                     skein_shell::effective_user(),
@@ -139,7 +139,9 @@ impl Person {
             assert!(
                 !matches!(
                     notice,
-                    temper_shell_terminal::client::Shown::Notice(temper_shell_terminal::route::Notice::Fact(_))
+                    temper_client_shell_terminal::client::Shown::Notice(
+                        temper_client_shell_terminal::route::Notice::Fact(_)
+                    )
                 ),
                 "native person step {} protocol fact: {notice:?}",
                 self.actor.at()
@@ -147,8 +149,8 @@ impl Person {
             assert!(
                 !matches!(
                     notice,
-                    temper_shell_terminal::client::Shown::Terminal(
-                        temper_shell_terminal::terminal::Notice::DirectoryRefused
+                    temper_client_shell_terminal::client::Shown::Terminal(
+                        temper_client_shell_terminal::terminal::Notice::DirectoryRefused
                     )
                 ),
                 "private client directory refused"

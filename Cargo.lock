@@ -1727,11 +1727,11 @@ dependencies = [
  "smith-local-process-world",
  "smith-local-service",
  "temper-client-domain",
+ "temper-client-shell-terminal",
  "temper-engine-domain",
  "temper-engine-protocol-forge",
  "temper-protocol-store",
  "temper-service",
- "temper-shell-terminal",
  "temper-throwaway-forgejo",
  "temper-worker-domain",
 ]
@@ -1742,6 +1742,34 @@ version = "0.0.0"
 dependencies = [
  "jig-domain-client",
  "skein-lib",
+]
+
+[[package]]
+name = "temper-client-protocol-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
+name = "temper-client-shell-terminal"
+version = "0.0.0"
+dependencies = [
+ "jig-client-world",
+ "jig-domain-client",
+ "jig-protocol-client-link",
+ "jig-protocol-client-wire",
+ "jig-shell-native",
+ "jig-view",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "skein-ui",
+ "temper-client-domain",
+ "temper-client-protocol-wire",
+ "temper-client-view",
 ]
 
 [[package]]
@@ -1793,12 +1821,12 @@ dependencies = [
  "skein-codegen",
  "skein-json",
  "skein-lib",
+ "temper-client-protocol-wire",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
  "temper-forge-forgejo",
- "temper-protocol-client-wire",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
 ]
@@ -2101,6 +2129,7 @@ dependencies = [
  "smith-local-service",
  "smith-protocol-llm",
  "temper-client-domain",
+ "temper-client-shell-terminal",
  "temper-engine-domain",
  "temper-engine-domain-forge",
  "temper-engine-protocol-forge",
@@ -2112,15 +2141,6 @@ dependencies = [
  "temper-fake-git",
  "temper-protocol-store",
  "temper-service",
- "temper-shell-terminal",
-]
-
-[[package]]
-name = "temper-protocol-client-wire"
-version = "0.0.0"
-dependencies = [
- "skein-codec",
- "skein-lib",
 ]
 
 [[package]]
@@ -2187,6 +2207,7 @@ dependencies = [
  "smith-host-protocol",
  "smith-protocol-channel",
  "smith-transcript",
+ "temper-client-protocol-wire",
  "temper-engine-domain",
  "temper-engine-domain-forge",
  "temper-engine-domain-forge-change",
@@ -2194,33 +2215,12 @@ dependencies = [
  "temper-engine-domain-forge-issues",
  "temper-engine-protocol-forge",
  "temper-engine-smith",
- "temper-protocol-client-wire",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
  "temper-worker-domain",
  "temper-worker-domain-checkout",
  "temper-worker-protocol-git",
  "temper-worker-protocol-git-world",
-]
-
-[[package]]
-name = "temper-shell-terminal"
-version = "0.0.0"
-dependencies = [
- "jig-client-world",
- "jig-domain-client",
- "jig-protocol-client-link",
- "jig-protocol-client-wire",
- "jig-shell-native",
- "jig-view",
- "skein-http",
- "skein-io",
- "skein-lib",
- "skein-shell",
- "skein-ui",
- "temper-client-domain",
- "temper-client-view",
- "temper-protocol-client-wire",
 ]
 
 [[package]]

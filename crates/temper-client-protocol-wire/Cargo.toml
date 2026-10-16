@@ -1,5 +1,5 @@
 [package]
-name = "temper-protocol-client-wire"
+name = "temper-client-protocol-wire"
 description = "The forge family's bounded client records"
 version.workspace = true
 edition.workspace = true

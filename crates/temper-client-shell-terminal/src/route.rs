@@ -66,14 +66,14 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
                     record: skein_lib::RequestRecord { request: link::Ask::Family(record), .. },
                     ..
                 } => {
-                    record.family == temper_protocol_client_wire::FORGE
-                        && record.version != temper_protocol_client_wire::CLIENT_VERSION
+                    record.family == temper_client_protocol_wire::FORGE
+                        && record.version != temper_client_protocol_wire::CLIENT_VERSION
                 }
                 link::Saved::Jig(_) | link::Saved::Table { .. } | link::Saved::Family { .. } => false,
             };
             if dropped {
                 return Up::Notice(Notice::Dropped {
-                    keeper: link::Keeper::Family(temper_protocol_client_wire::FORGE),
+                    keeper: link::Keeper::Family(temper_client_protocol_wire::FORGE),
                 });
             }
             match kept(record, family) {
@@ -122,7 +122,7 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
             Up::Root(client::Event::Jig(jig_domain_client::Event::Hello { versions }))
         }
         link::Request::Hello { family: Some(number), versions } => {
-            if number == temper_protocol_client_wire::FORGE {
+            if number == temper_client_protocol_wire::FORGE {
                 Up::Root(client::Event::Forge(client::forge::Event::Served { versions }))
             } else {
                 Up::Notice(Notice::Served { family: number, versions })

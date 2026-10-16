@@ -2,7 +2,7 @@
 use skein_lib::{Duration, Queue, Secret, Time, Token};
 use skein_ui::{Act, Builder, NodeId, Role, Tree};
 use std::collections::VecDeque;
-use temper_shell_terminal::{
+use temper_client_shell_terminal::{
     limits, render,
     terminal::{Client, Loop, Notice},
 };

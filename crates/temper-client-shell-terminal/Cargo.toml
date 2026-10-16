@@ -1,5 +1,5 @@
 [package]
-name = "temper-shell-terminal"
+name = "temper-client-shell-terminal"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,7 +18,7 @@ jig-protocol-client-wire.workspace = true
 jig-shell-native.workspace = true
 temper-client-domain.workspace = true
 temper-client-view.workspace = true
-temper-protocol-client-wire.workspace = true
+temper-client-protocol-wire.workspace = true
 
 [dev-dependencies]
 jig-client-world.workspace = true

@@ -104,7 +104,7 @@ pub fn link(limits: &Limits) -> Result<link::Limits, link::Unusable> {
 pub fn family(limits: &Limits) -> Option<crate::route::family::Family> {
     Some(crate::route::family::Family {
         attempts: crate::route::family::Attempts::new(limits.client.table.requests),
-        wire: temper_protocol_client_wire::limits(&temper_protocol_client_wire::Bounds {
+        wire: temper_client_protocol_wire::limits(&temper_client_protocol_wire::Bounds {
             field_bytes: 256,
             checks: 8,
             contexts: 16,
@@ -124,7 +124,7 @@ pub fn view(
         offset_minutes: 0,
     };
     let forge =
-        temper_client_view::words::Words::english(temper_protocol_client_wire::FORGE, limits.client.jig.text).ok()?;
+        temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, limits.client.jig.text).ok()?;
     let view = temper_client_view::Limits::of(&limits.client, &jig, &forge)?;
     Some((view, jig, forge))
 }

@@ -9,7 +9,7 @@ members = [
     "testing/temper-fake-forge-protocol",
     "crates/temper",
     "tests/engine/protocol-forge",
-    "crates/temper-shell-terminal",
+    "crates/temper-client-shell-terminal",
     "tests/client",
     "crates/temper-client-view",
     "crates/temper-client-domain",
@@ -17,7 +17,7 @@ members = [
     "tests/worker/protocol-git",
     "crates/temper-forge-forgejo",
     "crates/temper-worker-protocol-git",
-    "crates/temper-protocol-client-wire",
+    "crates/temper-client-protocol-wire",
     "tools/forgejo-conformance",
     "tools/git-transcripts",
     "crates/temper-protocol-worker-wire",
@@ -69,7 +69,7 @@ skein-tls-world = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-engine-clients = { git = "https://github.com/forgetic/jig.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
-temper-shell-terminal = { path = "crates/temper-shell-terminal" }
+temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
 jig-protocol-client-link = { git = "https://github.com/forgetic/jig.git" }
 jig-shell-native = { git = "https://github.com/forgetic/jig.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }
@@ -90,7 +90,7 @@ smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 temper-worker-protocol-git-world = { path = "tests/worker/protocol-git" }
 temper-forge-forgejo = { path = "crates/temper-forge-forgejo" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }
-temper-protocol-client-wire = { path = "crates/temper-protocol-client-wire" }
+temper-client-protocol-wire = { path = "crates/temper-client-protocol-wire" }
 jig-protocol-client-wire = { git = "https://github.com/forgetic/jig.git" }
 temper-protocol-worker-wire = { path = "crates/temper-protocol-worker-wire" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }

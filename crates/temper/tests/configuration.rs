@@ -13,7 +13,7 @@ fn the_process_configurations_documents_fit_the_native_client() {
     )
     .expect("engine document");
     let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
-    let native = temper_shell_terminal::limits::native().client.jig;
+    let native = temper_client_shell_terminal::limits::native().client.jig;
     assert!(engine.limits.core.documents.rows <= native.rows, "the native client can receive every document row");
     assert!(engine.limits.core.documents.lines <= native.rows, "the native client can receive every document path");
     assert!(

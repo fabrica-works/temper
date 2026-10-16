@@ -6,7 +6,7 @@ use skein_lib::{
 };
 use skein_shell::{Clock, Config, Host, Kernel};
 use std::{ffi::OsString, net::SocketAddr, os::unix::ffi::OsStrExt, path::Path};
-use temper_shell_terminal::{
+use temper_client_shell_terminal::{
     client::{NativeClient, Settings, Start},
     limits, render,
     terminal::{Loop, Terminal},

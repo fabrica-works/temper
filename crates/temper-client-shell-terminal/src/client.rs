@@ -119,8 +119,8 @@ impl NativeClient {
             &bounds.client,
             seed,
             domain::forge::Config {
-                connector: temper_protocol_client_wire::FORGE,
-                version: temper_protocol_client_wire::CLIENT_VERSION,
+                connector: temper_client_protocol_wire::FORGE,
+                version: temper_client_protocol_wire::CLIENT_VERSION,
             },
         );
         domain::configure_navigation(&mut root, domain::navigation(&bounds.client)).expect("native navigation fits");
@@ -134,7 +134,7 @@ impl NativeClient {
                 &bounds.client,
                 jig_words,
                 forge_words,
-                temper_protocol_client_wire::FORGE,
+                temper_client_protocol_wire::FORGE,
             ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds.client },
             out: Queue::with_capacity(domain::max_out(&bounds.client)),

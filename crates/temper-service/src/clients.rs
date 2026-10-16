@@ -87,9 +87,9 @@ impl Clients {
             .or(Err(invalid(What::Bound)))?;
         served
             .push(kit::Served {
-                family: Some(temper_protocol_client_wire::FORGE),
-                first: temper_protocol_client_wire::CLIENT_VERSION,
-                last: temper_protocol_client_wire::CLIENT_VERSION,
+                family: Some(temper_client_protocol_wire::FORGE),
+                first: temper_client_protocol_wire::CLIENT_VERSION,
+                last: temper_client_protocol_wire::CLIENT_VERSION,
             })
             .or(Err(invalid(What::Bound)))?;
         let settings = kit::Settings {
@@ -223,7 +223,7 @@ impl Clients {
                     Err(value) => self.down(*value),
                 },
                 kit::Request::Application(value) => {
-                    match crate::family::to_root(value, forges, &temper_protocol_client_wire::v1::CEILINGS) {
+                    match crate::family::to_root(value, forges, &temper_client_protocol_wire::v1::CEILINGS) {
                         Ok(value) => self.root(value, events),
                         Err(value) => self.down(*value),
                     }

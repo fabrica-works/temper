@@ -31,7 +31,7 @@ pub fn inbox_read() -> contract::Read {
 pub fn family() -> crate::route::family::Family {
     crate::limits::family(&crate::limits::native()).expect("bounded fixture family")
 }
-pub fn wire_limits() -> temper_protocol_client_wire::v1::Limits {
+pub fn wire_limits() -> temper_client_protocol_wire::v1::Limits {
     family().wire
 }
 pub fn adoption() -> client::forge::Adoption {

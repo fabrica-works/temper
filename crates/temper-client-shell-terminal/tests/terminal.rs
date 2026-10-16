@@ -1,6 +1,6 @@
 mod support;
 use skein_lib::{Duration, Time};
-use temper_shell_terminal::terminal::Notice;
+use temper_client_shell_terminal::terminal::Notice;
 
 #[test]
 fn a_change_within_the_interval_prints_once_when_it_ends() {
@@ -149,7 +149,7 @@ fn a_refused_directory_exits_one_with_its_line() {
         ))
     );
 }
-fn refused_directory() -> temper_shell_terminal::terminal::Terminal {
+fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
     use skein_io::kernel::{Complete, Done, Error, Fd, Kind, Op, Stat};
     use skein_shell::Host;
     use std::{
@@ -157,7 +157,7 @@ fn refused_directory() -> temper_shell_terminal::terminal::Terminal {
         fs,
         os::unix::fs::{MetadataExt, PermissionsExt},
     };
-    use temper_shell_terminal::{
+    use temper_client_shell_terminal::{
         client::{NativeClient, Settings, Start},
         limits,
         terminal::{Loop, Terminal},

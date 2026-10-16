@@ -40,13 +40,13 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 root::PartyRequest::Deliver(root::Delivery::Application { to, outcome }) => {
                     match crate::family::answer(
                         outcome,
-                        &temper_protocol_client_wire::v1::CEILINGS,
+                        &temper_client_protocol_wire::v1::CEILINGS,
                         &engine.clients.env.limits.wire,
                     ) {
                         Some(record) => Some(jig_protocol_engine_clients::Event::Application(
                             jig_protocol_engine_clients::FromApplication::Answered {
                                 to,
-                                family: temper_protocol_client_wire::FORGE,
+                                family: temper_client_protocol_wire::FORGE,
                                 record,
                             },
                         )),

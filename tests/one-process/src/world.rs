@@ -11,7 +11,7 @@ use skein_lib::{Duration, Queue, Time, Wall};
 use skein_shell::Host;
 use skein_world::{Inherited, Memory};
 use std::{cell::RefCell, rc::Rc};
-use temper_shell_terminal::client::{NativeClient, Settings as ClientSettings, Start};
+use temper_client_shell_terminal::client::{NativeClient, Settings as ClientSettings, Start};
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
     pub seed: u64,
@@ -263,7 +263,7 @@ impl Person {
                 ClientSettings {
                     engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
                     directory: b"private".as_slice().into(),
-                    limits: temper_shell_terminal::limits::native(),
+                    limits: temper_client_shell_terminal::limits::native(),
                 },
                 self.root.take().expect("private root"),
                 1000,
@@ -308,9 +308,11 @@ impl Host for Person {
             if self.cutting
                 && matches!(
                     notice,
-                    temper_shell_terminal::client::Shown::Notice(temper_shell_terminal::route::Notice::Fact(
-                        jig_protocol_client_link::Fact::StreamDropped
-                    ))
+                    temper_client_shell_terminal::client::Shown::Notice(
+                        temper_client_shell_terminal::route::Notice::Fact(
+                            jig_protocol_client_link::Fact::StreamDropped
+                        )
+                    )
                 )
             {
                 continue;
@@ -318,7 +320,9 @@ impl Host for Person {
             assert!(
                 !matches!(
                     notice,
-                    temper_shell_terminal::client::Shown::Notice(temper_shell_terminal::route::Notice::Fact(_))
+                    temper_client_shell_terminal::client::Shown::Notice(
+                        temper_client_shell_terminal::route::Notice::Fact(_)
+                    )
                 ),
                 "client protocol fact: {notice:?}"
             );
@@ -586,7 +590,7 @@ fn person(inherited: &Inherited) -> Proc {
                 ClientSettings {
                     engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
                     directory: b"private".as_slice().into(),
-                    limits: temper_shell_terminal::limits::native(),
+                    limits: temper_client_shell_terminal::limits::native(),
                 },
                 person.root.take().expect("private root"),
                 1000,

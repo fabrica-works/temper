@@ -10,7 +10,7 @@
 use jig_protocol_client_link as link;
 use skein_lib::{List, Reader, Set, Token, Writer};
 use temper_client_domain::forge;
-use temper_protocol_client_wire::{self as wire, v1 as w};
+use temper_client_protocol_wire::{self as wire, v1 as w};
 
 #[derive(Debug)]
 pub struct Attempts {
