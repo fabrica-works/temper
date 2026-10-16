@@ -82,15 +82,22 @@ fn exchanges_and_store_writes_go_to_jigs_shell() {
         ),
         (
             "exchange",
-            link::Request::Exchange { exchange: fixtures::ATTEMPT, path: b"/read", body: Box::from(*b"body") },
-            link::Request::Exchange { exchange: fixtures::ATTEMPT, path: b"/read", body: Box::from(*b"body") },
+            link::Request::Exchange {
+                exchange: fixtures::ATTEMPT,
+                credential: Some(fixtures::credential()),
+                message: link::Message::Read(Box::from(*b"body")),
+            },
+            link::Request::Exchange {
+                exchange: fixtures::ATTEMPT,
+                credential: Some(fixtures::credential()),
+                message: link::Message::Read(Box::from(*b"body")),
+            },
         ),
         (
-            "abandon",
-            link::Request::Abandon { exchange: fixtures::ATTEMPT },
-            link::Request::Abandon { exchange: fixtures::ATTEMPT },
+            "open",
+            link::Request::OpenStream { credential: Some(fixtures::credential()) },
+            link::Request::OpenStream { credential: Some(fixtures::credential()) },
         ),
-        ("open", link::Request::OpenStream, link::Request::OpenStream),
         ("close", link::Request::CloseStream, link::Request::CloseStream),
     ];
     for (name, request, expected) in requests {
@@ -125,7 +132,7 @@ fn a_family_readout_or_delivery_nobody_asked_for_is_a_notice() {
             "delivery",
             link::Request::FamilyDelivery {
                 watch: fixtures::WATCH,
-                record: link::Family { family: 1, version: 1, bytes: Box::from(*b"record") },
+                record: jig_client_domain::Family { family: 1, version: 1, bytes: Box::from(*b"record") },
             },
         ),
     ] {
@@ -192,4 +199,29 @@ fn the_native_limits_make_the_terminal() {
     assert!(skein_ui_text::Terminal::worst_case(&settings, &view.tree).is_some(), "native terminal memory fits");
     assert!(skein_ui_text::Terminal::operations(&settings, &view.tree).is_some(), "native terminal operations fit");
     assert!(skein_ui_text::Terminal::new(settings, &view.tree).is_some(), "native terminal settings fit");
+}
+
+#[test]
+fn a_signed_in_signing_keeps_the_credential_before_any_notice() {
+    let ups = route::signing(&link::Signing::SignedIn { party: fixtures::PARTY }, Some(&fixtures::credential()));
+    let [Up::Keep(credential), Up::Notice(Notice::SignedIn)] = ups.as_slice() else {
+        panic!("credential precedes the signed-in notice");
+    };
+    assert_eq!(*credential, Some(fixtures::credential()));
+}
+#[test]
+fn a_signed_out_signing_drops_the_kept_credential() {
+    let ups = route::signing(&link::Signing::SignedOut, None);
+    let [Up::Keep(credential), Up::Notice(Notice::SignedOut)] = ups.as_slice() else {
+        panic!("credential removal precedes the signed-out notice");
+    };
+    assert_eq!(*credential, None);
+}
+#[test]
+fn a_kept_credential_signs_in_held_with_no_exchange() {
+    let mut link = link::Link::new(&limits::link(&limits::native()).expect("native bounds")).expect("bounded link");
+    let mut out = Queue::with_capacity(link.max_out());
+    link.step(Time::ZERO, link::Event::SignIn { with: link::With::Held(fixtures::credential()) }, &mut out);
+    assert_eq!(link.credential(), Some(&fixtures::credential()));
+    assert!(out.is_empty(), "a held credential sends no sign-in exchange");
 }

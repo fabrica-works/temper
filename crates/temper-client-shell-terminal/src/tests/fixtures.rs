@@ -6,6 +6,10 @@ pub const ATTEMPT: Token = Token::new(101);
 pub const READ: Token = Token::new(102);
 pub const WATCH: Token = Token::new(103);
 pub const SERVICE: u64 = 7;
+pub const PARTY: u64 = 9;
+pub fn credential() -> skein_lib::Secret {
+    skein_lib::Secret::new(Box::from(CREDENTIAL))
+}
 pub const CREDENTIAL: &[u8] = b"one-time-service-credential";
 pub fn jig_record() -> jig_domain_client::store::Record {
     jig_domain_client::store::Record::Place {

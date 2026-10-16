@@ -9,7 +9,7 @@
 )]
 use jig_client_domain::contract::VersionRange;
 use jig_client_protocol_link as link;
-use skein_lib::{RequestRecord, Secret};
+use skein_lib::{List, RequestRecord, Secret};
 use temper_client_domain as client;
 pub mod family;
 
@@ -19,11 +19,15 @@ pub enum Up {
     Root(client::Event),
     Shell(link::Request),
     Kept(client::store::Record),
+    Keep(Option<Secret>),
+    Signing(link::Signing),
     Notice(Notice),
 }
 /// Values shown outside the domain, including one-time credentials.
 #[derive(Debug)]
 pub enum Notice {
+    SignedIn,
+    SignedOut,
     Credential { party: u64, credential: Secret },
     Dropped { keeper: link::Keeper },
     Unread { keeper: link::Keeper },
@@ -52,8 +56,7 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
         transport @ (link::Request::Write { .. }
         | link::Request::Remove { .. }
         | link::Request::Exchange { .. }
-        | link::Request::Abandon { .. }
-        | link::Request::OpenStream
+        | link::Request::OpenStream { .. }
         | link::Request::CloseStream) => Up::Shell(transport),
         link::Request::Kept { record } => {
             let keeper = match &record {
@@ -132,11 +135,27 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
                 Up::Notice(Notice::Served { family: number, versions })
             }
         }
+        link::Request::Signing { signing } => Up::Signing(signing),
         link::Request::ServiceCredential { party, credential } => Up::Notice(Notice::Credential { party, credential }),
         link::Request::Dropped { keeper } => Up::Notice(Notice::Dropped { keeper }),
         link::Request::FamilyDelivery { .. } => Up::Notice(Notice::Unasked),
         link::Request::Fact { fact } => Up::Notice(Notice::Fact(fact)),
     }
+}
+/// Credential persistence precedes the terminal's signing notice.
+#[must_use]
+pub fn signing(signing: &link::Signing, credential: Option<&Secret>) -> List<Up> {
+    let mut ups = List::with_capacity(2);
+    let notice = match signing {
+        link::Signing::SignedIn { .. } => Some(Notice::SignedIn),
+        link::Signing::SignedOut => Some(Notice::SignedOut),
+        link::Signing::Again | link::Signing::Refused | link::Signing::Lost => None,
+    };
+    if let Some(notice) = notice {
+        ups.push(Up::Keep(credential.cloned())).expect("credential and notice fit");
+        ups.push(Up::Notice(notice)).expect("credential and notice fit");
+    }
+    ups
 }
 #[must_use]
 pub fn down(request: client::Request, family: &mut family::Family) -> Down {

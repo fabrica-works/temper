@@ -70,6 +70,7 @@ pub fn native() -> Limits {
         },
         connections: jig_client_shell_native::Limits {
             exchanges: EXCHANGES,
+            deadline: DEADLINE,
             body_bytes: 33_554_432, // Whole small store and HTTP response bodies.
             http: skein_http::client::Limits {
                 head: 4096,    // Incoming HTTP head bytes.
@@ -97,7 +98,7 @@ pub fn native() -> Limits {
 /// # Errors
 /// Returns the link's refusal if these client bounds cannot be encoded.
 pub fn link(limits: &Limits) -> Result<link::Limits, link::Unusable> {
-    link::Limits::new(limits.client.jig, EXCHANGES, DEADLINE)
+    link::Limits::new(limits.client.jig, EXCHANGES)
 }
 /// Family bounds mirror the small forge's names, gates and protection contexts.
 #[must_use]
@@ -158,7 +159,14 @@ pub fn shell(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.connections.body_bytes))?
         .checked_add(1024)?;
     let connections = u64::from(limits.connections.exchanges.checked_add(1)?);
+    let stream = jig_client_protocol_http::worst_case(&jig_client_protocol_http::Limits {
+        record: limits.connections.body_bytes.checked_add(512)?,
+        chunk: limits.connections.http.read,
+    })?;
+    let heard = limits.connections.http.read.checked_mul(3)?.checked_add(8)?;
     skein_io::worst_case(&limits.io)?
+        .checked_add(stream)?
+        .checked_add(skein_lib::Queue::<link::Heard>::worst_case(heard)?)?
         .checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)?
         .checked_add(connections.checked_mul(u64::from(limits.io.intake))?)
 }

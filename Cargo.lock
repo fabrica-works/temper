@@ -1828,6 +1828,7 @@ version = "0.0.0"
 dependencies = [
  "jig-boundary",
  "jig-client-domain",
+ "jig-client-protocol-wire",
  "jig-client-test-domain",
  "jig-client-view",
  "jig-client-world",

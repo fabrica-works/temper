@@ -4,7 +4,8 @@ use crate::{
     route::{self, Down, Duty, Up},
 };
 use jig_client_protocol_link as link;
-use jig_client_shell_native::{Shell, Signing};
+use jig_client_shell_native::Shell;
+use link::Signing;
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Env, List, Queue, Time, Wall};
 use skein_shell::Host;
@@ -64,6 +65,7 @@ pub struct NativeClient {
     signing_out: bool,
     notices: Queue<Shown>,
     signing: Queue<Signing>,
+    saving_signing: Option<Signing>,
     seen: Seen,
     memory: u64,
     loaded: bool,
@@ -78,7 +80,7 @@ impl NativeClient {
         user: u32,
         seed: u64,
         start: Start,
-    ) -> Result<Self, jig_client_shell_native::Unlinked> {
+    ) -> Result<Self, jig_client_protocol_http::Unlinked> {
         let bounds = settings.limits;
         let mut memory = limits::worst_case(&bounds).expect("native capacities are checked");
         let (view_limits, jig_words, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
@@ -100,7 +102,8 @@ impl NativeClient {
             .and_then(|n| n.checked_add(u64::from(records).checked_mul(bounds.client.jig.document_bytes)?))
             .and_then(|n| n.checked_add(u64::from(notices).checked_mul(40)?))
             .expect("native queues fit memory");
-        let linked = Queue::with_capacity(link.max_out());
+        let mut linked = Queue::with_capacity(link.max_out());
+        let mut link = link;
         let mut shell = Shell::new(jig_client_shell_native::Settings {
             engine: settings.engine,
             directory: settings.directory,
@@ -109,7 +112,8 @@ impl NativeClient {
         });
         let token_start = match start {
             Start::Link(printed) => {
-                shell.sign_in(&printed)?;
+                let secret = shell.sign_in(&printed)?;
+                link.step(Time::ZERO, link::Event::SignIn { with: link::With::Link(secret) }, &mut linked);
                 false
             }
             Start::Token => true,
@@ -147,6 +151,7 @@ impl NativeClient {
             signing_out: false,
             notices: Queue::with_capacity(notices),
             signing: Queue::with_capacity(limits::EXCHANGES),
+            saving_signing: None,
             seen: Seen::default(),
             memory,
             loaded: false,
@@ -176,8 +181,11 @@ impl NativeClient {
     }
     /// # Errors
     /// Refuses a link outside the configured engine's address.
-    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
-        self.shell.sign_in(printed)
+    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
+        let secret = self.shell.sign_in(printed)?;
+        self.link.step(self.env.now, link::Event::SignIn { with: link::With::Link(secret) }, &mut self.linked);
+        self.outputs();
+        Ok(())
     }
     /// Each sign-in outcome is handed to the caller unchanged, once.
     pub fn signing(&mut self) -> Option<Signing> {
@@ -230,6 +238,29 @@ impl NativeClient {
             });
         }
     }
+    fn signed(&mut self, signing: Signing) {
+        if let Some(notice) = crate::terminal::native::signing(&signing, self.signing_out) {
+            self.notices.push(Shown::Terminal(notice));
+        }
+        match &signing {
+            Signing::SignedIn { .. } => {
+                self.seen.signed_in = self.seen.signed_in.saturating_add(1);
+                self.start();
+            }
+            Signing::SignedOut => {
+                self.signing_out = false;
+                self.event(domain::Event::SignedOut);
+            }
+            Signing::Again | Signing::Lost | Signing::Refused => {
+                if self.signing_out {
+                    self.signing_out = false;
+                    self.event(domain::Event::Jig(jig_domain_client::Event::SignOutLost));
+                }
+            }
+        }
+        self.signing.push(signing);
+        self.outputs();
+    }
     fn outputs(&mut self) {
         // A link event can synchronously emit another root request. Drain the
         // two bounded queues together before admitting the next external event.
@@ -247,7 +278,7 @@ impl NativeClient {
                         Duty::SignOut => {
                             if !matches!(self.phase, Phase::Closing { .. }) {
                                 self.signing_out = true;
-                                self.shell.sign_out();
+                                self.link.step(self.env.now, link::Event::SignOut, &mut self.linked);
                             }
                         }
                         Duty::Fact(_) => self.seen.facts = self.seen.facts.saturating_add(1),
@@ -260,11 +291,25 @@ impl NativeClient {
                     Up::Root(event) => self.event(event),
                     Up::Shell(request) => {
                         if matches!(self.phase, Phase::Closing { .. })
-                            && matches!(request, link::Request::Exchange { .. } | link::Request::OpenStream)
+                            && matches!(request, link::Request::Exchange { .. } | link::Request::OpenStream { .. })
                         {
                             continue;
                         }
                         self.shell.down(request);
+                    }
+                    Up::Keep(credential) => self.shell.keep(credential),
+                    Up::Signing(signing) => {
+                        if matches!(signing, Signing::SignedIn { .. } | Signing::SignedOut) {
+                            for up in &route::signing(&signing, self.link.credential()) {
+                                if let Up::Keep(credential) = up {
+                                    self.shell.keep(credential.clone());
+                                }
+                            }
+                            // The notice follows the credential's durable write.
+                            self.saving_signing = Some(signing);
+                        } else {
+                            self.signed(signing);
+                        }
                     }
                     Up::Kept(record) => self.kept.push(record).expect("link's kept records fit"),
                     Up::Notice(notice) => {
@@ -285,7 +330,12 @@ impl Host for NativeClient {
             while self.shell.events().pop().is_some() {}
             return;
         }
-        if let Some(records) = self.shell.loaded() {
+        if let Some((credential, records)) = self.shell.loaded() {
+            if self.phase == Phase::WaitingToken
+                && let Some(credential) = credential
+            {
+                self.link.step(now, link::Event::SignIn { with: link::With::Held(credential) }, &mut self.linked);
+            }
             self.loaded = true;
             let mut versions = List::with_capacity(2);
             for version in route::versions() {
@@ -301,28 +351,9 @@ impl Host for NativeClient {
                 self.start();
             }
         }
-        while let Some(signing) = self.shell.signing() {
-            if let Some(notice) = crate::terminal::native::signing(&signing, self.signing_out) {
-                self.notices.push(Shown::Terminal(notice));
-            }
-            match &signing {
-                Signing::SignedIn { .. } => {
-                    self.seen.signed_in = self.seen.signed_in.saturating_add(1);
-                    self.start();
-                }
-                Signing::SignedOut { .. } => {
-                    self.signing_out = false;
-                    self.event(domain::Event::SignedOut);
-                }
-                Signing::Again { .. } | Signing::Lost { .. } | Signing::Refused { .. } => {
-                    if self.signing_out {
-                        self.signing_out = false;
-                        self.event(domain::Event::Jig(jig_domain_client::Event::SignOutLost));
-                    }
-                }
-            }
-            self.signing.push(signing);
-            self.outputs();
+        if let Some(ok) = self.shell.kept() {
+            let signing = self.saving_signing.take().expect("pending credential write");
+            self.signed(if ok { signing } else { Signing::Lost });
         }
         while let Some(event) = self.shell.events().pop() {
             if matches!(event, link::Event::WriteFailed) {
