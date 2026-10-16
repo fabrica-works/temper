@@ -134,7 +134,7 @@ Tests: `machine.rs`: `a_once_step_must_exit_zero_before_the_next_starts`,
 `the_small_profile_has_the_five_values_of_the_plan`, `a_backoff_above_its_maximum_names_both_limits`,
 `a_maximum_not_below_the_window_names_both_limits`, `restarts_above_sixty_four_name_their_limit`,
 `a_name_that_is_no_box_limit_is_unknown`, `a_value_past_u32_is_out_of_range`. `boundary.rs` uses
-jig-boundary at the locked rev 2900e9b (`manifests`, `manifest.rs:106`; normal and target
+jig-boundary at the rev `Cargo.lock` locks (755e02e at temper eab91b13; `manifests`, `manifest.rs:106`; normal and target
 dependencies) as `tests/client/tests/names.rs:3-9` does; tests run from `crates/temper-box`:
 ```rust
 // crates/temper-box/src/tests/boundary.rs
@@ -203,13 +203,18 @@ Shape:
   entry, so lines of two pipes never mix; `Up::Failed` is reported once and stops the box, exit
   1 (as `crates/temper/src/host.rs:78-92`). `io_limits`: `sockets` three per step and three
   adopted, `intake` `LINE_BYTES`, `output` that plus the longest step name and 3 bytes (the
-  box's line is shorter), `receive` 1, `names` 0, `refusals` the steps.
+  box's line is shorter), `receive` 1, `names` 0, `refusals` the steps, `sends` 1 (one `Send` on each `Room`),
+  `accepts` 1 and `backlog` 1 (io's minimum, `Limits::is_usable`, `limits.rs:71-79`; the box never listens),
+  `close_timeout` 5 s and `retry` 10 ms (as `temper-client-shell-terminal/src/limits.rs:90-94`).
 Test shape: `Harness` in fixtures runs `Service` over `skein_sim::Sim` as `skein_shell::drive`
 (drive.rs:53-75) runs it over the ring: `Sim::new(SEED, Config::calm())` (sim.rs:150),
 `spawn_process` (:203), `open_signal_source` (:310), two `open_inherited_write` (processes.rs:273),
-a root from `Machine::lay(&[])` (fake machine fs.rs:316) through `Sim::root` (files.rs:53); each
+a root from `Machine::lay(&[])` (fake machine fs.rs:316; it gives an `Opened`) through
+`Sim::root(Handle::new(opened.raw()))` (files.rs:53); each
 turn `reap`, `iterate`, `drain`, `submit` (sim.rs:362, 346), every call waiting answered by
-`skein_fake_machine::step` (recording each spawn, its environment and `Sim::now`, :191), and when
+`skein_fake_machine::step`, one ask at a time, never `serve`: `step` drops a spawn's environment (`face.rs:19`,
+`env: _`), so the harness records each spawn, its environment and `Sim::now` (sim.rs:191) from its `Ask::Spawn`
+before it steps it; and when
 idle `advance_to` the earlier of `next_due` and the host's deadline (:428, :449). Programs are the
 fake machine's: `process_fixture` with the step's arguments `exit 0`, `exit 1` or `never`
 (face.rs:76-105), which ignore a last argument: `once` and `long` append the step's name there,
