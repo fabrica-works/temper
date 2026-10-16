@@ -411,11 +411,12 @@ Shape:
   message: Message, amend: boxed Amend, cancel: Cancel, release: Release,
   stop: Stop, move_task: Move }`; `Compound { project: u32, operations:
   bytes 1048576 }` (pieces, each an `Operation`); `Ask.message: Message`,
-  `Ask.compound: Compound`; `enum OperationOutcome { said:
-  OwnerOutcomeSaid, amended: OwnerOutcomeAmended, cancelled:
-  OwnerOutcomeCancelled, released: OwnerOutcomeReleased, stopped:
-  OwnerOutcomeStopped, moved: OwnerOutcomeMoved }`; `OwnerOutcomeCompound
-  { outcomes: list 64 OperationOutcome }` and `OwnerOutcome.compound`;
+  `Ask.compound: Compound`; `OwnerOutcomeCompound { project: u32,
+  operations: u32, first_message: u64 }`, field for field
+  `people::Outcome::Compound` (the designer's answer of 2026-10-16;
+  jig's contract.md, 3.4: "the operation at place *i* took the first
+  plus *i*"; "Nothing more of an operation is answered"), and
+  `OwnerOutcome.compound`; no per-operation list or `OperationOutcome`;
   `Refused { refusal: Refusal, at: option u32 }`; `AdmissionLimit`
   gains `operations`; `MadeWords` and `Made.words` go (`Message`'s
   outcome is `OwnerOutcomeSaid`, as jig 04 left the people outcome).
@@ -433,7 +434,10 @@ Test shape: the wire crate: `a_compound_s_operations_round_trip_as_pieces`;
 the component's tests: `a_compound_reaches_the_people_child_in_order`,
 `a_compound_operation_naming_another_project_is_refused_at_its_place`,
 `a_compound_refusal_names_its_first_failing_place`; the link's:
-`a_compound_answer_gives_each_operation_s_outcome_in_order`;
+`a_compound_answer_names_its_first_message_and_operations` (the
+engine's `Outcome::Compound` out of `translate/answers.rs`'s error arm,
+:186 at jig 983862753, and through the link to the contract's answer,
+its three fields unchanged);
 `tests/client-protocol/tests/protocol.rs`:
 `words_to_a_stopped_task_release_it_in_one_compound_request` (the
 reference UI's words to a stopped chat, by the fake person: one keyed
@@ -647,8 +651,7 @@ enum ProposeAction { batch: ProposeBatch, amendment: boxed ProposeAmendment, wid
 record Propose { project: u32 action: ProposeAction reason: text 65536 }
 record Withdraw { project: u32 proposal: u64 }
 enum Ask { start_chat: StartChat, message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, move_task: Move, set_goal: SetGoal, prioritise: Prioritise, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create, propose: Propose, withdraw: Withdraw }
-enum OperationOutcome { said: OwnerOutcomeSaid, amended: OwnerOutcomeAmended, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, stopped: OwnerOutcomeStopped, moved: OwnerOutcomeMoved }
-record OwnerOutcomeCompound { outcomes: list 64 OperationOutcome }
+record OwnerOutcomeCompound { project: u32 operations: u32 first_message: u64 }
 record OwnerOutcomeCreated { tasks: list 32 u64 given: option u64 }
 record OwnerOutcomeProposed { proposal: u64 }
 record OwnerOutcomeWithdrawn { proposal: u64 }

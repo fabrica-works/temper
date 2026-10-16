@@ -102,13 +102,21 @@ jig 07.5 uses through 04.5, for untracking.
   pool's reservation so far, revisions an earlier operation moved), and
   applied only after the last check passed; nothing is cloned or rolled
   back.
-- **The compound's answer stays `Copy`.** `people::Outcome` and `Reply`
-  are `Copy` and matched in about 80 places; the compound's answer is
-  `Outcome::Compound { project, operations, first_message }` (the
-  messages its operations took are numbered from `first_message`, one
-  each, in the request's order) and its refusal
-  `Outcome::CompoundRefused { at, why }`. This is a question for the
-  designer (below).
+- **The compound's answer stays `Copy`, numbered by place** (the
+  designer's answer to ruling 181's question, 2026-10-16; jig's
+  contract.md, 3.4: "Its operations take consecutive message numbers,
+  one each, in the request's order, and the answer names the first: the
+  operation at place *i* took the first plus *i*"; "one that adds
+  nothing leaves its number unused"; "Nothing more of an operation is
+  answered"). `people::Outcome` and `Reply` stay `Copy`; the compound's
+  answer is `Outcome::Compound { project, operations, first_message }`
+  and its refusal `Outcome::CompoundRefused { at, why }`. Every
+  operation takes one number in the core's `issue`
+  (`jig-domain-core/src/compound.rs`): the operation that adds a message
+  to its task's inbox uses it, the others leave it unused, so
+  `first_message` is never 0 for a made compound. 04.6 landed numbering
+  only the operations that add a message (jig 983862753); a step after
+  04.6, the supervisor's, makes it one per operation.
 - **Maintainer** means the `Owner` or `Maintainer` role (people.md, 4:
   "owner: everything a maintainer may"); a policy role (numbered above 3)
   does not amend tracked or priority, and the shaped `Ask::Prioritise`
@@ -821,7 +829,8 @@ Shape:
   LimitKind::Operations }` at admission.
 - `people::Outcome::Compound { project: u32, operations: u32,
   first_message: u64 }` (`first_message` 0 when no operation took a
-  message); `people::Outcome::CompoundRefused { at: u32, why: Refusal }`.
+  message, as landed; the step after 04.6 numbers every operation, and
+  `first_message` is never 0: Choices); `people::Outcome::CompoundRefused { at: u32, why: Refusal }`.
   `valid_answer_shape` admits them for a compound only.
 - `Limits::operations: u32`.
 - `tasks::CompoundAdmission` (ruling 174): read-only, it holds the
@@ -1138,8 +1147,8 @@ Cancel { project: u32, task: u64, reason: Box<[u8]>, grace: Option<Duration> },
 Compound { project: u32, operations: List<Operation> },
 
 // in `Outcome` (which stays `Copy`):
-/// The operations were made, in order; the messages the operations took are
-/// numbered from `first_message`, one each, in the request's order.
+/// The operations were made, in order; each took one message number, the one at
+/// place `i` `first_message + i`, unused where it added no message.
 Compound { project: u32, operations: u32, first_message: u64 },
 /// Nothing was made: the operation at zero-based place `at` failed, for `why`.
 CompoundRefused { at: u32, why: Refusal },
@@ -1157,10 +1166,9 @@ Operations,
 
 - **A compound's answer** (contract.md, 3.4: "done, with each
   operation's outcome in order"): what an operation's outcome holds
-  beyond "made". This plan answers the messages' numbers, consecutive
-  from `first_message` in the request's order (04.6); a per-operation
-  list would make `people::Outcome` not `Copy`. Raise it with 04.6's
-  landing.
+  beyond "made". Answered by the designer, 2026-10-16: made, with a
+  message number by place, and nothing more (Choices, "The compound's
+  answer stays `Copy`, numbered by place").
 - **One task named by two operations** of one compound (two amendments
   of its spec): this plan checks the second against the revision the
   first leaves (`Staged.revisions`), so a client names the first's

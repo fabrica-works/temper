@@ -347,8 +347,14 @@ RunBegan { attempt }, RunEnded { attempt }, Left { lines } }`; `pub
 struct Thread` with `new(task, &Limits)`, `document(&mut self, &Task) ->
 Option<Read>`, `page(&mut self, ActivityPage) -> Option<Read>`,
 `older(&mut self) -> Option<Read>`, `run(&mut self, &RunState,
-Option<&RunText>)`, `sending(&mut self, key: Key, by: u64, words: Text)
--> bool`, `answered(&mut self, key: Key, &Answer)`, `lines(&self)`.
+Option<&RunText>)`, `sending(&mut self, key: Key, by: u64, words: Text,
+place: u32) -> bool`, `answered(&mut self, key: Key, &Answer)`,
+`lines(&self)`. `place` is the words' place in their compound request,
+0 for a lone `Message`; `answered` marks them sent with a lone
+`Message`'s `message`, or a compound's `first_message + place` (the
+designer's answer of 2026-10-16; jig's contract.md, 3.4: "the operation
+at place *i* took the first plus *i*. A `Message`'s words have that
+number in its task's inbox").
 `Conversation` becomes `Thread` and `KeptWords` its words, in place;
 request tokens become `jig_client` keys.
 Test shape: the moved model's tests move with it (at the base the
@@ -356,7 +362,9 @@ tests of `crates/jig-domain-client/src/tests/conversations.rs` that
 drive `Conversation` and `KeptWords` directly, their names and expected
 values kept); `crates/jig-client/src/tests/thread.rs`
 adds `a_committed_turn_replaces_its_provisional_text`,
-`a_turn_that_does_not_decode_stays_a_line_saying_why`;
+`a_turn_that_does_not_decode_stays_a_line_saying_why`,
+`words_sent_in_a_compound_are_numbered_by_their_place` (words at place 1
+of a compound answered `first_message: 40` read sent with message 41);
 `tests/client-protocol/tests/client.rs` (jig 12's story file):
 `a_person_s_words_read_as_being_sent_then_sent_then_read` (the thread
 fed from the client's handles while the real engine admits the
@@ -639,7 +647,7 @@ impl Thread {
     pub fn page(&mut self, page: ActivityPage) -> Option<Read>;
     pub fn older(&mut self) -> Option<Read>;
     pub fn run(&mut self, run: &RunState, text: Option<&RunText>);
-    pub fn sending(&mut self, key: Key, by: u64, words: Text) -> bool;
+    pub fn sending(&mut self, key: Key, by: u64, words: Text, place: u32) -> bool;
     pub fn answered(&mut self, key: Key, answer: &Answer);
     pub fn lines(&self) -> impl Iterator<Item = Line<'_>>;
 }
