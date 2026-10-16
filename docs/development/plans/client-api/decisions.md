@@ -336,6 +336,80 @@ choice would have been the user's (development.md, 10.4).
      04.1's Shape now reads: `Grace { by: Party, until: Wall, reason: Box<[u8]>, message: u64 }`, `message` the ask to finish's number, the cancel's `message`; `inbox::prepare`'s merge (its one key for `MessageKind::Amendment`, `inbox.rs:31`) passes over the word of that number, which keeps its slot; `stored.rs`'s count of amendment words (`:395`) and the restore admit it beside one ordinary amendment. Ruling 120's derived values (the task record's worst case) count the field. No new `MessageKind`; no reading of text or sender.
      Unchanged: ruling 123, interim: a cancel with a grace during a grace keeps the earlier `until`, adds no word and changes no `by` or reason, and 04.1 does not land before the designer's answer to that question.
 
+125. **A tracked conversation stays one; a task is asked to finish once** (design gap, jig 04's block of 2026-10-16T11:24:44Z and the ready check of jig-04.1).
+     The designer's answers, landed as jig a70de2906 and temper ed6593899:
+
+     # Answer
+
+     Both answers have a `## Decision` of their own, first; their reasoning
+     follows under one `## Reasoning`, so that `sed '/^## Reasoning/,$d'`
+     keeps both decisions.
+
+
+     1. **(A): the conversation flag decides, and a tracked conversation stays
+        its party's.** Tracking never ends a conversation, and no tracking is
+        refused for one. jig's tasks.md, 7, "Tracking and untracking", now
+        reads: "Neither touches its flags, so a conversation stays one:
+        tracked, its turns are still entries for its requester, with their
+        read position and unread count (section 3; people.md, section 6). No
+        tracking is refused for a task's being a conversation." core.md, 6.2:
+        "A chat, a triage or a repair is made untracked ... A conversation
+        tracked later stays a conversation". people.md, 6: "A conversation is
+        a task its creator flagged so ..., whatever its charter, tracked or
+        not".
+     2. **04.2 and 04.5 admit tracking any task, a conversation included,**
+        and add no refusal, branch or test for its being one. The rule "A
+        tracked conversation stays one" replaces ruling 120's interim rule in
+        jig 04's Rules. No test of jig 04 asserts what a tracked
+        conversation's inbox lines, offers or read position show.
+     3. **The code changes at jig 05.5, as planned.** 05.5 already makes
+        `chat_requester` into `conversation_requester`, "the requester party
+        of a task flagged conversation, whatever its charter, tracking or
+        recurrence", tested by `a_tracked_conversation_keeps_its_read_position`.
+        It now also names the two other tests of a chat that read `tracked`
+        and `recurring`: `documents/inbox_deployment.rs:340-345` and
+        `routing/watch_marks.rs:202-207`. Both go, as `chat_requester`'s do.
+        Its Don't now reads: "read `settings.chat`, `tracked` or `recurring`
+        to know a conversation".
+     4. **Between 04.5 and 05.5,** a chat tracked on `main` leaves its party's
+        inbox. No client can track one before jig 14 carries the tracked
+        amendment on the wire (04.5's Files: "the wire's cancel and amendment
+        give `grace: None`, `tracked: None`: jig 14 carries them").
+     5. **Unchanged:** 04.7 (`MoveChat`, `Scenario::Compound`) and jig 08 use
+        the core's conversation test, whichever name it has. Nothing is
+        deferred: no `later.md` row.
+
+
+     1. **(A): a task is asked to finish once.** tasks.md, 7 now reads: "One
+        with a grace asks nothing more, since a task is asked to finish once,
+        by the first. If its grace ends sooner, the task's grace now ends with
+        it, and the task is then cancelled with this later cancel's maker and
+        reason, since that cancel is what ends it. If its grace ends no
+        sooner, nothing of the task changes." 8.2's room kept: "a cancel, its
+        grace's ask to finish taking the same room, one ask in a task's life
+        (section 7)".
+     2. **04.1's Shape:** `ask_to_finish` on an active task whose `grace` is
+        `Some` adds no word and takes no room. If its `until` is earlier, the
+        `Grace` takes this cancel's `by`, `until` and `reason`, keeps its
+        `message` (ruling 124's field: the first ask, the one word there is),
+        and `grace::schedule` re-arms the alarm. If it is equal or later,
+        nothing changes. The cancel is answered as the first was, and its
+        `message` is left unused. A held or waiting task is still cancelled at
+        once.
+     3. **04.1's tests:** `a_second_grace_never_ends_the_task_later_than_the_first`
+        (a 5 s grace, then a 10 s one: one ask, ends at 5 s with `b"wrap up"`);
+        new, `a_sooner_second_grace_ends_the_task_with_its_own_reason` (5 s,
+        then 2 s with `b"now"`: one ask, its words `b"wrap up"`, ends at 2 s
+        with `b"now"`); the full-inbox test also admits a second cancel
+        with a grace, which adds no word. Size goes from 235 to 255.
+     4. **04.5:** a party's cancel with a grace during a grace takes 4.1's
+        path. It is answered `Outcome::Cancelled { task }`, and the message
+        number the core took for it stays unused. 04.6's compound applies
+        cancels in order, so a second one sees the first's grace. 04.7's
+        scenarios cancel once: unchanged.
+     5. A rule in jig 04's Rules, "A task is asked to finish once", binds
+        04.1, 04.5 and 04.6. Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
