@@ -250,6 +250,16 @@ run are appended after "For the user".
      37 of 37. A further private `mod support;` in a test crate whose helpers some files leave unused is made `pub`, and
      named in the commit body.
 
+108. **09's Shapes against main** (ready check of temper-09.1).
+     Ruling 108, the ready check of temper-09.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/09-reconcile-machine.md: 09.1 needs 01.1 for `User`'s `is_admin` and `full_name` (01-users-tokens.md:93) and
+     01.2 for `UserOf` and `CreateUser`; 09.3's unit tests are in `crates/temper-forge-setup/src/tests/reconcile.rs`,
+     now in its Files; 09.2's Files add the fake's `src/tests.rs` (`mod setup;`), `src/tests/fixtures.rs` (`ask_as`),
+     `src/tests/setup.rs`, and `tally.rs:122`'s `expect` message, stale once the store's tokens count; the world reads a
+     document of its own, not `TWO` (one org per entry there); sketch B's `find`, `token_user` and `scopes` are
+     `#[must_use]` (clippy's `must_use_candidate`). Sketch A and the 09.1 reference test compiled under clippy; no suite
+     ran. A further sketch function that clippy asks to mark `#[must_use]` is marked, and named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
