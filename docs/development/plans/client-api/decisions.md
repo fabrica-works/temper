@@ -839,6 +839,15 @@ choice would have been the user's (development.md, 10.4).
      3. **If s3's second gate fails too,** s3 waits: the session does s4 first, on a fresh branch from `origin/main`, lands it, then rebases s3 onto it and lands s3.
      4. jig 12.2's move of jig's skein still waits for s3's landing (ruling 170); s4 does not hold it.
 
+174. **jig 04.6's compound admission across core and tasks** (plan defect, jig 04's block of 2026-10-16T20:39:52Z).
+     Plan defect: 04.6's Shape had the core admit each operation "as it would alone" but named no way to judge it against what earlier operations leave in the tasks child, which the design asks in its own words: "They are admitted in order, each checked as it would be alone against the state those before it leave ... the refusal names the first that failed, and why" (jig's tasks.md, 7, "Several operations, one decision"); the route is "people (one project, within operations per request) → for each operation in order: authority, one pool counted across them → tasks" (engine.md, 4.4); and "a parent owns its children's state and routes between them" (engine.md, 4).
+
+     The proposal is approved: `jig-domain-tasks` gains a public, read-only `CompoundAdmission`, which holds the private `Staged` and borrows the `Domain`. For one operation it runs the checks `compound()` runs (`compound.rs:190`, `check`) and stages it. Its borrowed accessors give the core the projected fields its admits read: revisions, tracking, requester ancestry, funding, phase, address. `compound()` runs its checks through the same code, not a copy. The core admits each operation in order as it would alone, its own admit (`control_admit`, `amend_admit`, `move_admit`, `person_message`, 4.5's maintainer check) and then the admission's, against the projection; it sends one `tasks::Event::Compound` once all pass. The first failure, the core's or the tasks child's, is `Outcome::CompoundRefused { at }`, with `at` its place.
+
+     Don't: clone a `Domain` or a task record for the admission; mutate the `Domain` through it; widen `Staged`'s fields past `pub(crate)`; write a second copy of the tasks child's checks in the core. The admission's signatures are yours, within these bounds. Add one test to `tests/core/tests/operations.rs` for the case your report names: operation 0 refused by the tasks child and operation 1 by the core answers `CompoundRefused { at: 0 }`; under 0.5 s.
+
+     04.6's Size becomes at most 420 lines (was 300). Unchanged: the rest of 04.6's Shape, Test shape and Proof, and 04.7.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

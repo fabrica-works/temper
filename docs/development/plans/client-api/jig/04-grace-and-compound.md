@@ -782,6 +782,9 @@ Files:
   priced in `ask_bytes`), `refusals.rs` (`LimitKind::Operations`),
   `domain.rs` and `capacity.rs`, `words.rs` (an arm each, at most 40
   lines in domain.rs), `lib.rs`.
+- `crates/jig-domain-tasks/src/`: `compound.rs` and
+  `compound/staged.rs` (`CompoundAdmission`, ruling 174), `lib.rs` (its
+  re-export).
 - `crates/jig-domain-core/src/`: `compound.rs` (new: the route),
   `run.rs` (`PersonTaskRoute::Compound`, :382), `routing/people.rs` (the
   dispatch arm),
@@ -821,6 +824,15 @@ Shape:
   message); `people::Outcome::CompoundRefused { at: u32, why: Refusal }`.
   `valid_answer_shape` admits them for a compound only.
 - `Limits::operations: u32`.
+- `tasks::CompoundAdmission` (ruling 174): read-only, it holds the
+  private `Staged` and borrows the `Domain`; for one operation it runs
+  the checks `compound()` runs (compound.rs:190, `check`) and stages it;
+  borrowed accessors give the core the projected fields its admits read
+  (revisions, tracking, requester ancestry, funding, phase, address).
+  `compound()` runs its checks through the same code. The core admits
+  each operation in order as it would alone, its own admit and then the
+  admission's, against the projection, and sends one `Event::Compound`
+  once all pass; the first failure, either's, is `CompoundRefused { at }`.
 Test shape:
 - `crates/jig-domain-people/src/tests/compound.rs` (new; `mod compound;`
   in tests.rs), with the people `LIMITS` (tests.rs:10):
@@ -855,8 +867,10 @@ once and answered once; under 0.5 s.
 Don't: let a compound hold `Create`, `Propose`, `Withdraw`, `Decide`,
 `Answer`, `Take`, `HandBack`, `Seen` or a project's own request; chain
 two keyed requests in the core; check operations per request against
-delegates or goals at start (jig 09.4).
-Size: at most 300 lines (a codec increment: lands within 2.5 times).
+delegates or goals at start (jig 09.4); clone a `Domain` or a task
+record for the admission, mutate the `Domain` through it, or write a
+second copy of the tasks child's checks in the core (ruling 174).
+Size: at most 420 lines (a codec increment: lands within 2.5 times).
 Removes: nothing.
 
 ### 04.7 A move's conversation read position; the compound and the grace as conformance scenarios
