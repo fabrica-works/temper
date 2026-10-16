@@ -189,7 +189,9 @@ per session are in each file.
     no repin commit is made. Otherwise: `heavy cargo update -p
     jig-domain-core --precise <that landing>`, then `heavy cargo update
     -p skein-lib --precise <jig's pin of skein, or skein-01.s2's landing
-    while that pin does not hold it (below)>` and `heavy cargo update
+    while that pin does not hold it (below)>`, not run when temper's
+    skein already holds that commit ("temper's skein ahead", below), and
+    `heavy cargo update
     -p smith-host-protocol --precise <jig's pin of smith>` (each read with
     `git -C ~/src/rust/jig show <that landing>:Cargo.lock | grep -o
     'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' | sort -u`).
@@ -197,7 +199,9 @@ per session are in each file.
     Cargo.lock | sort -u` prints three lines: `jig.git#<that landing>`,
     and skein's and smith's lines as jig's lock at that landing prints
     them, skein's being skein-01.s2's landing instead while jig's does
-    not hold it (below). A `cargo update` that leaves a second revision
+    not hold it (below), or a later skein commit that holds it: skein's
+    line passes when `git -C ~/src/rust/skein merge-base --is-ancestor
+    <that commit> <skein's line>` succeeds. A `cargo update` that leaves a second revision
     of a source is run once more; a second revision still there after it
     is a question.
   - **What a temper repin repairs:** the capability its increment's Needs
@@ -293,6 +297,19 @@ per session are in each file.
     `worst_case`'s `(u32, u64)`, both constructors' signatures), and
     `temper-client-shell-terminal` is the one temper crate that names
     `skein-ui-text`, so a move onto it is `Cargo.lock` alone.
+  - **temper's skein ahead** (ruling 154, the director's request of
+    2026-10-16T17:16Z): temper's skein may be ahead of this plan's
+    target for it (the floor above, skein-01.s2's landing, or jig's
+    pin): another temper plan moves it forward, forge-setup's first
+    (skein lib's `sha256::Hmac` and `sha256::equal`, additive). No skein
+    move of this plan takes temper's skein back: each goes to the later
+    of its target and temper's present skein (`git -C ~/src/rust/skein
+    merge-base --is-ancestor <target> <temper's skein>` succeeding means
+    no move), and each check of skein's line reads that command, not an
+    equality. Cargo takes every skein crate from one git source, locked
+    in temper's `Cargo.lock`, so jig's and smith's crates build on
+    temper's skein. A build failure in a jig or smith crate on it is a
+    question.
   - **A path's segments** (the design answer of 2026-10-16T15:20Z,
     ruling 143): jig-13.s1 adds `segments` to jig's client limits, beside
     `rows` and `text`. The first temper increment whose repin includes
@@ -311,9 +328,10 @@ per session are in each file.
     repin. The coordinator adds it at setup, `plan set temper-repin
     repo=temper state=waiting` (development.md 7.1 adds none, since the
     plan lives in temper), and starts it once every other step of the
-    plan has landed. Its step 1 moves jig to `origin/main`, and skein and
-    smith to jig's pins of them (each read as above), in place of 5.7's
-    "each to its `origin/main`".
+    plan has landed. Its step 1 moves jig to `origin/main`, smith to
+    jig's pin of it, and skein to jig's pin of it only where that is
+    forward ("temper's skein ahead", below) (each read as above), in
+    place of 5.7's "each to its `origin/main`".
 - **Format versions** (development.md, 5.1): each changes once in this
   plan, at its owner's landing, and is edited in place after:
   - jig's store: tasks v3, owner jig 02.1; people v3, owner jig 02.3;

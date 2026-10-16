@@ -124,14 +124,17 @@ stays joined to temper's engine root throughout.
   present jig pin>` succeeds, no repin commit is made. The repin: `heavy
   cargo update -p jig-domain-core --precise <the landing>`, then `heavy
   cargo update -p skein-lib --precise <its pin of skein, or temper's
-  skein floor while that pin does not hold it>` and `heavy cargo update
+  skein floor while that pin does not hold it>`, none when temper's skein
+  already holds it, and `heavy cargo update
   -p smith-host-protocol --precise <its pin of smith>`; then `grep -o
   'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
   sort -u` prints three lines: `jig.git#<the landing>`, smith's line
   equal to that of `git -C ~/src/rust/jig show <the landing>:Cargo.lock`,
-  and skein's equal to it or, while it does not hold temper's skein
-  floor, the floor (README, "Pins", "The terminal's room" and "The
-  print's room"); a second revision of a source still there after a
+  and skein's a commit that holds it or, while it does not hold
+  temper's skein floor, the floor (`git -C ~/src/rust/skein merge-base
+  --is-ancestor <that commit> <skein's line>` succeeds; README, "Pins",
+  "The terminal's room", "The print's room" and "temper's skein
+  ahead"); a second revision of a source still there after a
   second `cargo update` is a question.
 - **A repin's repairs outside its Shape** follow jig's own diffs and
   are counted with `git diff --numstat origin/main...HEAD -- <the

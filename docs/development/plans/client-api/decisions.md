@@ -617,6 +617,15 @@ choice would have been the user's (development.md, 10.4).
      4. **A further user** of a changed tool or answer that the compiler names gets the same change, listed in the commit body.
      5. **Deferred:** temper's `domain/engine.md`, 7.3's tools table, written before jig 06, names neither the revisions nor "moved": a `later.md` row for the designer's next landing in temper.
 
+154. **temper's skein may be ahead of this plan's target** (the director's request of 2026-10-16T17:16Z).
+     The director's request, for the user, before forge-setup's first skein step lands: temper's skein may be ahead of this plan's target for it. Amends the plan's `README.md`, "Pins" (the repin's skein update and check, "temper's skein ahead", the closing repin), and the repin checks of `temper/03-client.md`, `04-engine.md` and `05-server.md`.
+
+     1. **temper's skein may be ahead** of the floor, skein-01.s2's landing (`8a10437f`) or jig's pin: another temper plan moves it forward, forge-setup's first (skein lib's `sha256::Hmac` and `sha256::equal`, additive).
+     2. **No skein move of this plan takes it back.** Each repin's `heavy cargo update -p skein-lib --precise <target>` is not run when `git -C ~/src/rust/skein merge-base --is-ancestor <target> <temper's skein>` succeeds; the check of skein's line reads that command, not an equality. The closing repin moves skein to jig's pin only where that is forward.
+     3. **Unchanged:** jig's and smith's lines, read as before; jig's own pin of skein and jig 19's move; a build failure in a jig or smith crate on temper's skein is a question.
+
+     Checked: `git -C temper show origin/main:Cargo.lock | grep -o 'forgetic/skein.git#[0-9a-f]*' | sort -u` → `skein.git#8a10437fa55735f83502cd189b0314fbcf3af5fc` (skein-01.s2's landing, `8a10437`); jig's at its 10.3 landing → `skein.git#f12f29d4…`; jig's and temper's `Cargo.toml` name skein as `{ git = "https://github.com/forgetic/skein.git" }`, no `rev`: one source, which temper's lock pins.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

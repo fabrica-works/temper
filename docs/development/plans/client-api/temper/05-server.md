@@ -104,10 +104,13 @@ reach the engine through the mapping from the first increment on.
   `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
   Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`,
   smith's line equal to that of `git -C ~/src/rust/jig show <the
-  landing>:Cargo.lock`, and skein's equal to it or, while it does not
-  hold temper's skein floor, the floor, which the repin's `cargo
-  update -p skein-lib --precise` then takes (README, "Pins", "The
-  terminal's room" and "The print's room"); a second revision of a
+  landing>:Cargo.lock`, and skein's a commit that holds it or, while it
+  does not hold temper's skein floor, the floor (`git -C
+  ~/src/rust/skein merge-base --is-ancestor <that commit> <skein's
+  line>` succeeds), which the repin's `cargo update -p skein-lib
+  --precise` takes only when temper's skein does not already hold it
+  (README, "Pins", "The terminal's room", "The print's room" and
+  "temper's skein ahead"); a second revision of a
   source still there after a second `cargo update` is a question.
 - **A repin's repairs outside its Shape** follow jig's own diffs of
   `jig-test-service`, counted with `git diff --numstat
