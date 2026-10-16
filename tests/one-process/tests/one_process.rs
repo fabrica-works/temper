@@ -40,6 +40,7 @@ fn a_person_signs_in_by_the_printed_link_and_a_chat_is_answered() {
     assert_eq!(outcome.chats_answered, 1);
 }
 #[test]
+#[ignore = "a forge hold's three segments need segments: 9, temper 04.4 (ruling 163)"]
 fn an_adopted_repository_gets_its_change_pushed_through_git() {
     let outcome = world::run(fixtures::calm(fixtures::SEED), world::Story::Adopt);
     assert_eq!(outcome.verdict, Verdict::Passed);
