@@ -130,6 +130,14 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   Transcripts and `facts.txt` are written by the tools only; a new
   capture is appended after the existing ones. `heavy --gate` refuses a
   tree with changes: commit first.
+- **Sizes (ruling 102).** An increment of this plan lands within 2.6
+  times its Size without asking, a Size marked "(codec)" within 3 times;
+  its report gives the count by code-organization.md 6's command, by
+  file. Past that, it stops on a question, as implementer.md 8.6 says.
+  This takes the place of 8.6's twice and 2.5 times, for every session
+  of this plan, until the run ends. Unchanged: never trim a doc comment,
+  a test or the formatting to meet a Size; a split increment's parts
+  count together.
 - **The process tier runs where a Proof line or "Done when" says,**
   through `heavy --gate`, once; never in the gate.
 - **The suites' aims for the whole run** (decisions.md, 13): temper's

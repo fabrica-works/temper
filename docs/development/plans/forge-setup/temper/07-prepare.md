@@ -101,7 +101,7 @@ fn an_owned_entry_with_a_runner_reads_into_its_members() {
 Proof: unit, `heavy cargo nextest run -p temper-forge-setup`: the cases above pass and `TWO` gives the six steps in the design tree's
 order (setup.md 7.1), under 2 s. Unit: nothing calls the crate until 07.3 (`checked`) and temper 13.1 (`steps`).
 Don't: check `webhooks` or `webhook_secret` (05.3); add a second problem form or a `Default`; read a file; expose a `Kind`.
-Size: 280. Removes: nothing.
+Size: 300. Removes: nothing.
 
 ### 07.2 Forgejo's files: `app.ini`, the runner's configuration, `state`, the layout
 Scope: setup.md 6.2, 6.3 (the runner's connection), 6.4 (its configuration), 3; decisions.md 8; answer 3.
