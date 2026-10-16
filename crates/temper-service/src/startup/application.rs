@@ -15,6 +15,7 @@ pub struct Members {
     pub landing: temper_engine_domain::LandingPolicy,
     pub charter: u32,
     pub limits: limits::Limits,
+    pub overrides: Box<[(Box<[u8]>, u64)]>,
     pub workers: Box<[Worker]>,
 }
 #[derive(Debug)]
@@ -25,9 +26,19 @@ pub struct Forge {
     pub transport: Transport,
     pub git: Box<[u8]>,
     pub api_token: Box<[u8]>,
-    pub user: u64,
+    pub user: User,
     pub identity: u32,
 }
+/// How a forge's account id is supplied.
+#[derive(Debug, PartialEq, Eq)]
+pub enum User {
+    /// An explicit positive account id.
+    Id(u64),
+    /// A private file holding the decimal account id.
+    File(Box<[u8]>),
+}
+/// Twenty decimal digits and one final line feed.
+pub const USER_BYTES: u32 = 21;
 #[derive(Debug)]
 pub enum Transport {
     Plaintext,
@@ -45,7 +56,13 @@ pub struct Worker {
     pub root: Box<[u8]>,
     pub git: Box<[u8]>,
 }
-fn configured_limits(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<limits::Limits> {
+fn configured_limits(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    problems: &mut Problems,
+    handed: &mut List<(Box<[u8]>, u64)>,
+) -> Option<limits::Limits> {
     let mut object = read::object(document, at, path, problems)?;
     let profile = read::text(&mut object, document, b"profile", path, problems);
     let overrides = read::required(&mut object, document, b"overrides", path, problems);
@@ -70,7 +87,9 @@ fn configured_limits(document: &Document, at: u32, path: &Path, problems: &mut P
             let Some(value_at) = object.member(document, name) else { continue };
             match config::read::integer(document, value_at, u64::MAX) {
                 Ok(value) => {
-                    if let Err(what) = limits::apply(&mut limits, name, value) {
+                    if limits::handed_on(name) {
+                        handed.push((bytes::copy_of(name), value)).expect("bounded overrides");
+                    } else if let Err(what) = limits::apply(&mut limits, name, value) {
                         problems.push(path.member(name), What::Override(what));
                     }
                 }
@@ -112,6 +131,27 @@ fn transport(document: &Document, at: u32, path: &Path, problems: &mut Problems)
     }
     read::finish(object, document, &path, problems);
     Some(Transport::Tls { server_name: server_name?, trust })
+}
+fn user(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<User> {
+    if document.token(at)?.kind != Kind::ObjectStart {
+        return match config::read::integer(document, at, u64::MAX) {
+            Ok(value) => {
+                read::form(value > 0, path.clone(), problems);
+                Some(User::Id(value))
+            }
+            Err(what) => {
+                problems.push(path.clone(), What::Jig(what));
+                None
+            }
+        };
+    }
+    let mut object = read::object(document, at, path, problems)?;
+    let file = read::text(&mut object, document, b"file", path, problems);
+    read::finish(object, document, path, problems);
+    if let Some(file) = &file {
+        read::form(!file.is_empty(), path.member(b"file"), problems);
+    }
+    Some(User::File(file?))
 }
 #[expect(clippy::disallowed_methods, reason = "the configuration protocol parses URL hosts and ports")]
 fn git_base(input: &[u8]) -> bool {
@@ -190,7 +230,11 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
     };
     let git = read::text(&mut object, document, b"git", path, problems);
     let api_token = read::text(&mut object, document, b"api_token", path, problems);
-    let user = read::integer(&mut object, document, b"user", path, problems);
+    let at = read::required(&mut object, document, b"user", path, problems);
+    let user = match at {
+        Some(at) => user(document, at, &path.member(b"user"), problems),
+        None => None,
+    };
     let identity = read::number(&mut object, document, b"identity", path, problems);
     read::finish(object, document, path, problems);
     if let Some(kind) = kind {
@@ -198,9 +242,6 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
     }
     if let Some(git) = &git {
         read::form(git_base(git), path.member(b"git"), problems);
-    }
-    if let Some(user) = user {
-        read::form(user > 0, path.member(b"user"), problems);
     }
     let api = api?;
     let transport = transport?;
@@ -327,9 +368,11 @@ fn references(
 pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut Problems) -> Option<Members> {
     let path = Path::root().member(b"application");
     let mut object = read::object(document, at, &path, problems)?;
+    let mut overrides = List::with_capacity(document.len());
+    read::required(&mut object, document, b"setup", &path, problems);
     let limit_at = read::required(&mut object, document, b"limits", &path, problems);
     let limits = match limit_at {
-        Some(at) => configured_limits(document, at, &path.member(b"limits"), problems),
+        Some(at) => configured_limits(document, at, &path.member(b"limits"), problems, &mut overrides),
         None => None,
     };
     let bounds = limits.unwrap_or(limits::profile(limits::Profile::Small));
@@ -411,6 +454,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
         workers: workers.into_boxed(),
         charter: charter?,
         limits: limits?,
+        overrides: overrides.into_boxed(),
         landing: landing?,
     })
 }
@@ -418,7 +462,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
     let count = members
         .forges
         .len()
-        .checked_mul(2)
+        .checked_mul(3)
         .expect("bounded forges")
         .checked_add(members.identities.len())
         .expect("bounded files");
@@ -433,6 +477,16 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
                 private: true,
             })
             .expect("bounded files");
+        if let User::File(name) = &forge.user {
+            files
+                .push(config::File {
+                    at: path.member(b"user").member(b"file"),
+                    path: name.clone(),
+                    max: USER_BYTES,
+                    private: true,
+                })
+                .expect("bounded files");
+        }
         match &forge.transport {
             Transport::Plaintext => {}
             Transport::Tls { trust, .. } => {
@@ -501,7 +555,25 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                 settings::Transport::Tls { server_name: server_name.clone(), trust }
             }
         };
-        if let Some(token) = token {
+        let user = match &forge.user {
+            User::Id(value) => Some(*value),
+            User::File(name) => {
+                let at = path.member(b"user").member(b"file");
+                match contents(files, name, USER_BYTES, at.clone(), problems) {
+                    Some(value) => match read::decimal(&value) {
+                        Some(value) => Some(value),
+                        None => {
+                            problems.push(at, What::Jig(config::What::Form));
+                            None
+                        }
+                    },
+                    None => None,
+                }
+            }
+        };
+        if let Some(token) = token
+            && let Some(user) = user
+        {
             forges
                 .push(settings::Forge {
                     number: forge.number,
@@ -510,7 +582,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                     transport,
                     git: forge.git.clone(),
                     api_token: config::secret(token),
-                    user: forge.user,
+                    user,
                     identity: forge.identity,
                 })
                 .expect("bounded forges");

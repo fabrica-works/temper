@@ -117,7 +117,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     write_private(&directory.join("secrets/forge-1.git-token"), token.as_bytes());
     value["application"]["forges"][0]["api"] = json!({"socket":api.to_string()});
     value["application"]["forges"][0]["git"] = git.clone().into();
-    value["application"]["forges"][0]["user"] = (*user).into();
+    write_private(&directory.join("secrets/forge-1.user"), format!("{user}\n").as_bytes());
     value["application"]["identities"][0]["login"] = "temper-bot".into();
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",api.to_string()],"last":"open","value":"acme"}});
     let grants =

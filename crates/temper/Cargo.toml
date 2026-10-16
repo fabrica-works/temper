@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 jig-client-protocol-link.workspace = true
 temper-service.workspace = true
+temper-forge-setup.workspace = true
 temper-client-shell-terminal.workspace = true
 jig-client-view.workspace = true
 skein-ui.workspace = true

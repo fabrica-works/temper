@@ -295,3 +295,9 @@ const GIT: temper_worker_protocol_git::Limits = temper_worker_protocol_git::Limi
     // Every name in that page at the kernel's longest name.
     sweep_bytes: 4080,
 };
+
+/// Limits decoded by the setup and box owners, kept with their values.
+#[must_use]
+pub fn handed_on(name: &[u8]) -> bool {
+    name.starts_with(b"setup.") || name.starts_with(b"box.")
+}

@@ -97,16 +97,16 @@ pub(crate) fn document() -> Vec<u8> {
     }
     value["application"] = serde_json::json!({
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:3000"},"transport":"plaintext",
-            "git":"http://127.0.0.1:3000","api_token":"secrets/forge.api-token","user":1,"identity":1}],
+            "git":"http://127.0.0.1:3000","api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge.git-token","login":"worker","author":{"name":"Worker","email":"worker@example.invalid"}}],
-        "landing":{"deployment":[],"projects":[]},"charter":1,
+        "setup":[],"landing":{"deployment":[],"projects":[]},"charter":1,
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,"checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker","git":"/usr/bin/git"}]});
     crate::stories::configure(&mut value);
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
-    let mut entries = List::with_capacity(8);
+    let mut entries = List::with_capacity(9);
     for source in [channel::files(false), channel::files(true)] {
         for (name, value) in source.entries.into_boxed() {
             let name = if name.as_ref() == b"agent.json" { b"/opt/temper/agent.json".as_slice().into() } else { name };
@@ -116,6 +116,9 @@ pub(crate) fn files() -> temper_service::settings::Files {
     for name in [b"secrets/forge.api-token".as_slice(), b"secrets/forge.git-token"] {
         entries.push((name.into(), Secret::new(temper_fake_git::fixtures::TOKEN.into()))).expect("forge files");
     }
+    entries
+        .push((b"secrets/forge-1.user".as_slice().into(), Secret::new(b"1\n".as_slice().into())))
+        .expect("user file");
     temper_service::settings::Files { entries }
 }
 pub(crate) fn seeds() -> temper_service::settings::Seeds {

@@ -37,9 +37,7 @@ impl Refused {
     }
 }
 pub fn account(bytes: &[u8], number: u32) -> Result<SignIn, Refused> {
-    temper_service::named(bytes).map_err(|why| {
-        Refused::Configuration(String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())
-    })?;
+    super::setup::check(bytes).map_err(Refused::Configuration)?;
     let document = config::document(
         bytes,
         &config::DocumentLimits { bytes: super::CONFIG_BYTES, tokens: super::CONFIG_BYTES, depth: 32 },

@@ -17,6 +17,7 @@ use temper_service::{
 
 mod host;
 pub mod open;
+mod setup;
 pub mod sign_in;
 pub use host::Host;
 pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT";
@@ -308,8 +309,7 @@ fn private_root(path: &Path, user: u32) -> Result<(), String> {
     Ok(())
 }
 fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
-    let named =
-        service::named(bytes).map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
+    let (named, _) = setup::check(bytes)?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");

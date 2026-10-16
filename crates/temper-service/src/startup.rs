@@ -4,6 +4,7 @@ pub(crate) mod checks;
 mod problems;
 use crate::{AccountsRuntime, Service, Worker, WorkerRuntime, settings};
 use alloc::boxed::Box;
+pub use application::{Forge, Identity, Transport, USER_BYTES, User};
 use jig_protocol_config::{self as config, Path, Segment, read};
 pub use problems::{Problem, Problems, What, lines};
 use skein_lib::List;
@@ -17,6 +18,10 @@ pub struct Named {
     pub deployment: Box<[u8]>,
     pub worker_root: Box<[u8]>,
     pub agent: Box<[u8]>,
+    pub forges: Box<[Forge]>,
+    pub identities: Box<[Identity]>,
+    pub clients: config::Address,
+    pub overrides: Box<[(Box<[u8]>, u64)]>,
 }
 #[derive(Debug)]
 struct Parsed {
@@ -144,6 +149,10 @@ pub fn named(document: &[u8]) -> Result<Named, Problems> {
     let files = all_files(&parsed);
     Ok(Named {
         files,
+        clients: parsed.engine.clients.listener,
+        forges: parsed.application.forges,
+        identities: parsed.application.identities,
+        overrides: parsed.application.overrides,
         deployment: parsed.engine.deployment.directory,
         worker_root: parsed.application.workers.first().expect("one application worker checked").root.clone(),
         agent: parsed.workers.first().expect("one worker checked").agent.configuration.clone(),

@@ -78,3 +78,91 @@ fn an_address_with_no_token_in_the_directory_is_not_signed_in() {
         scratch.remove();
     }
 }
+
+#[test]
+fn a_user_file_readable_by_others_refuses_the_start_naming_it() {
+    let scratch = support::Scratch::startup("public-user");
+    support::configuration(scratch.path(), &support::Forge::Unreached);
+    fs::set_permissions(scratch.path().join("secrets/forge-1.user"), fs::Permissions::from_mode(0o644))
+        .expect("fixture operation");
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        "temper serve: application.forges[0].user.file: secrets/forge-1.user: readable by others or reached through a link\n"
+    );
+    scratch.remove();
+}
+fn managed(directory: &std::path::Path, move_files: bool) -> serde_json::Value {
+    support::configuration(directory, &support::Forge::Unreached);
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.join("config.json")).expect("configuration bytes"))
+            .expect("fixture operation");
+    value["application"]["setup"] = serde_json::json!([{
+        "forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},
+        "orgs":["acme"],"mode":{"managed":{"admin_token":"secrets/forgejo-admin"}}
+    }]);
+    if move_files {
+        fs::create_dir(directory.join("forge-1")).expect("fixture operation");
+        for (from, to) in [
+            ("secrets/forge-1.api-token", "api_token"),
+            ("secrets/forge-1.git-token", "git_token"),
+            ("secrets/forge-1.user", "user"),
+        ] {
+            fs::rename(directory.join(from), directory.join("forge-1").join(to)).expect("fixture operation");
+        }
+        value["application"]["forges"][0]["api_token"] = "forge-1/api_token".into();
+        value["application"]["forges"][0]["user"] = serde_json::json!({"file":"forge-1/user"});
+        value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
+    }
+    support::write_private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("configuration JSON"));
+    value
+}
+#[test]
+fn a_setup_naming_another_api_token_file_refuses_temper_serve_naming_its_path() {
+    let scratch = support::Scratch::startup("setup-token");
+    let mut value = managed(scratch.path(), true);
+    value["application"]["forges"][0]["api_token"] = "another/api_token".into();
+    support::write_private(
+        &scratch.path().join("config.json"),
+        &serde_json::to_vec(&value).expect("configuration JSON"),
+    );
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        "temper serve: application.forges[0].api_token: invalid form\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_setup_limit_past_its_check_refuses_temper_serve_naming_both_limits() {
+    let scratch = support::Scratch::startup("setup-limits");
+    let mut value = managed(scratch.path(), true);
+    value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 6000.into();
+    support::write_private(
+        &scratch.path().join("config.json"),
+        &serde_json::to_vec(&value).expect("configuration JSON"),
+    );
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        "temper serve: application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_managed_entrys_absent_admin_token_file_does_not_stop_temper_serve() {
+    let scratch = support::Scratch::startup("setup-no-admin");
+    managed(scratch.path(), true);
+    assert!(!scratch.path().join("secrets/forgejo-admin").exists());
+    assert!(temper::prepare_in(scratch.path()).is_ok());
+    scratch.remove();
+}
+#[test]
+fn a_setup_naming_another_api_token_file_refuses_temper_sign_in_naming_its_path() {
+    let scratch = support::Scratch::startup("setup-sign-in");
+    let mut value = managed(scratch.path(), true);
+    value["application"]["forges"][0]["api_token"] = "another/api_token".into();
+    let refused = temper::sign_in::account(&serde_json::to_vec(&value).expect("configuration JSON"), 1)
+        .err()
+        .expect("configuration refused")
+        .line();
+    assert_eq!(refused, "temper sign-in: application.forges[0].api_token: invalid form\n");
+    scratch.remove();
+}

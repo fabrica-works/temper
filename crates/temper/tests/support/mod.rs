@@ -29,6 +29,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>) {
         &directory.join("accounts/chat.json"),
         br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
     );
+    write_private(&directory.join("secrets/forge-1.user"), b"42\n");
     write_private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value");
     write_private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value");
     write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);

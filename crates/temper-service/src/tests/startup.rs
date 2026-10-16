@@ -16,12 +16,12 @@ fn the_standalone_example_reads_into_its_members() {
     let (members, problems) = application(fixtures::APPLICATION, &jig);
     assert_eq!(&*lines(&problems), b"", "example accepted");
     let members = members.unwrap();
-    assert_eq!(members.forges[0].user, 42);
+    assert_eq!(members.forges[0].user, application::User::File(b"secrets/forge-1.user".as_slice().into()));
     assert_eq!(members.forges[0].git.as_ref(), b"http://127.0.0.1:9");
     assert_eq!(members.identities[0].author.name.as_ref(), b"Temper");
     assert_eq!(members.workers[0].git.as_ref(), b"/usr/bin/git");
     assert_eq!(members.charter, 1);
-    assert_eq!(application::files(&members, 4096, 8192).len(), 2, "both private files");
+    assert_eq!(application::files(&members, 4096, 8192).len(), 3, "all private files");
     let resolved = application::resolve(&members, &fixtures::files(), &mut Problems::empty()).unwrap();
     assert_eq!(resolved.forges[0].api_token.expose(), b"api-token");
     assert_eq!(resolved.identities[0].token.expose(), b"git-token");
@@ -35,11 +35,11 @@ fn an_unknown_missing_or_reserved_member_is_named_by_its_path() {
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
     for (from, to, expected) in [
         (
-            "\"user\":42",
+            "\"user\":{\"file\":\"secrets/forge-1.user\"}",
             "\"usr\":42",
             "application.forges[0].user: missing\napplication.forges[0].usr: unknown member\n",
         ),
-        (",\"user\":42", "", "application.forges[0].user: missing\n"),
+        (",\"user\":{\"file\":\"secrets/forge-1.user\"}", "", "application.forges[0].user: missing\n"),
         ("\"charter\":1", "\"webhooks\":null,\"charter\":1", "application.webhooks: reserved: not built yet\n"),
         ("\"small\"", "\"large\"", "application.limits.profile: the only profile is \"small\"\n"),
     ] {
@@ -154,8 +154,12 @@ fn malformed_members_and_references_are_named() {
         ("\"project\":1", "\"project\":2", "application.landing.projects[0].project: unknown reference\n"),
         ("\"login\":\"temper\"", "\"login\":\"bad:login\"", "application.identities[0].login: invalid form\n"),
         ("\"name\":\"Temper\"", "\"name\":\"<Temper>\"", "application.identities[0].author.name: invalid form\n"),
-        ("\"user\":42", "\"user\":0", "application.forges[0].user: invalid form\n"),
-        ("\"user\":42", "\"user\":42,\"user\":43", "application.forges[0].user: duplicate\n"),
+        ("\"user\":{\"file\":\"secrets/forge-1.user\"}", "\"user\":0", "application.forges[0].user: invalid form\n"),
+        (
+            "\"user\":{\"file\":\"secrets/forge-1.user\"}",
+            "\"user\":{\"file\":\"secrets/forge-1.user\"},\"user\":43",
+            "application.forges[0].user: duplicate\n",
+        ),
         ("\"git\":\"/usr/bin/git\"", "\"git\":\"git\"", "application.workers[0].git: must be an absolute path\n"),
         (
             "\"transport\":\"plaintext\"",
@@ -181,8 +185,9 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
     let files = application::files(&members, 4096, 8192);
     for (index, path, max, private) in [
         (0, b"secrets/forge-1.api-token".as_slice(), 4096, true),
-        (1, b"root.der".as_slice(), 1_048_576, false),
-        (2, b"secrets/forge-1.git-token".as_slice(), 8192, true),
+        (1, b"secrets/forge-1.user".as_slice(), 21, true),
+        (2, b"root.der".as_slice(), 1_048_576, false),
+        (3, b"secrets/forge-1.git-token".as_slice(), 8192, true),
     ] {
         assert_eq!(files[index].path.as_ref(), path, "file {index}");
         assert_eq!(files[index].max, max, "bound {index}");
@@ -195,7 +200,7 @@ fn application_files_keep_paths_bounds_privacy_and_resolution_refusals() {
 #[test]
 fn named_lists_each_file_with_its_bound_and_privacy() {
     let named = crate::named(&fixtures::document()).unwrap();
-    assert_eq!(named.files.len(), 7, "all files listed");
+    assert_eq!(named.files.len(), 8, "all files listed");
     for (name, path, max, private) in [
         (b"charters/chat.txt".as_slice(), b"engine.charters[0].instructions".as_slice(), 16_219, false),
         (b"secrets/worker-a.digest", b"engine.hosts.workers[0].digest", 65, true),
@@ -322,4 +327,78 @@ fn a_worker_secret_at_its_bound_excludes_its_final_newline() {
         7,
     );
     assert!(made.is_ok(), "four secret bytes plus their final newline fit four");
+}
+
+#[test]
+fn a_user_file_member_reads_as_a_private_file_of_21_bytes() {
+    let (members, problems) = application(fixtures::APPLICATION, &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    let files = application::files(&members.unwrap(), 4096, 8192);
+    let file = files.iter().find(|file| file.path.as_ref() == b"secrets/forge-1.user").unwrap();
+    assert_eq!(file.max, 21);
+    assert!(file.private);
+    let mut problems = Problems::empty();
+    problems.push(file.at.clone(), What::Jig(config::What::Missing));
+    assert_eq!(&*lines(&problems), b"application.forges[0].user.file: missing\n");
+}
+#[test]
+fn a_user_file_resolves_to_the_decimal_id_it_holds() {
+    let (members, _) = application(fixtures::APPLICATION, &fixtures::engine().jig);
+    let mut problems = Problems::empty();
+    let resolved = application::resolve(&members.unwrap(), &fixtures::files(), &mut problems).unwrap();
+    assert_eq!(resolved.forges[0].user, 42);
+    assert_eq!(&*lines(&problems), b"");
+}
+#[test]
+fn a_user_file_holding_no_positive_decimal_is_refused_by_path() {
+    let (members, _) = application(fixtures::APPLICATION, &fixtures::engine().jig);
+    let members = members.unwrap();
+    for value in
+        [b"".as_slice(), b"0", b"042", b"-1", b"4 2", b"42\n\n", b"123456789012345678901", b"18446744073709551616"]
+    {
+        let mut files = fixtures::files();
+        files.entries = fixtures::without(files.entries, b"secrets/forge-1.user");
+        files.entries.push((b"secrets/forge-1.user".as_slice().into(), skein_lib::Secret::new(value.into()))).unwrap();
+        let mut problems = Problems::empty();
+        assert!(application::resolve(&members, &files, &mut problems).is_none(), "{value:?}");
+        assert_eq!(&*lines(&problems), b"application.forges[0].user.file: invalid form\n", "{value:?}");
+    }
+}
+fn refused_user(value: &str) -> Box<[u8]> {
+    let input =
+        core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("{\"file\":\"secrets/forge-1.user\"}", value);
+    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert!(members.is_none());
+    lines(&problems)
+}
+#[test]
+fn a_user_object_with_a_missing_file_is_refused() {
+    assert_eq!(&*refused_user("{}"), b"application.forges[0].user.file: missing\n");
+}
+#[test]
+fn a_user_object_with_a_stray_member_is_refused() {
+    assert_eq!(&*refused_user("{\"file\":\"x\",\"stray\":1}"), b"application.forges[0].user.stray: unknown member\n");
+}
+#[test]
+fn a_user_object_with_an_empty_path_is_refused() {
+    assert_eq!(&*refused_user("{\"file\":\"\"}"), b"application.forges[0].user.file: invalid form\n");
+}
+#[test]
+fn a_missing_setup_is_refused_naming_its_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("\"setup\":[],", "");
+    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert!(members.is_none());
+    assert_eq!(&*lines(&problems), b"application.setup: missing\n");
+}
+#[test]
+fn a_setup_or_box_override_is_handed_on_with_its_value() {
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace("\"overrides\":{}", "\"overrides\":{\"setup.orgs\":2,\"box.steps\":3}");
+    let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    assert_eq!(
+        &*members.unwrap().overrides,
+        &[(b"setup.orgs".as_slice().into(), 2), (b"box.steps".as_slice().into(), 3)]
+    );
 }
