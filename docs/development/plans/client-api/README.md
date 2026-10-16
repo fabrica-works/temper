@@ -308,7 +308,10 @@ per session are in each file.
     nextest run --workspace --profile measure -j 1 --ignore-default-filter
     -E 'binary(/^fuzzy_/)'` (ruling 109), until its own gate is back
     under the aim; after a session's last increment the
-    supervisor decides. Never: raising a `global-timeout`, a slow period
+    supervisor decides. temper's
+    `fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure`
+    is no test to make cheaper in this run (ruling 122, `later.md`): the
+    slowest tests a repair finds are the others. Never: raising a `global-timeout`, a slow period
     or a per-test ceiling, or moving a focused test to the fuzzy suite.
   - A test's own time in a session file ("under 20 ms", "under 0.5 s")
     is an aim, development.md 5.6's ceiling: nothing measures one test,
