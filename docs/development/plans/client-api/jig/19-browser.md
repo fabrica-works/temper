@@ -93,28 +93,24 @@ story is a person who opens the printed link and sees their inbox
   sets `opt-level = 3`, as skein's does.
 - **Adding a crate of skein's re-resolves skein's git source** to its
   newest commit (seen at the base: the lock moved from `f12f29d4` to
-  another commit when `skein-ui-bundle` was added). Before the repin
-  (19.1 to 19.3), an increment that adds one holds the pin in the same
-  commit: `heavy cargo update -p skein-lib --precise <jig's skein pin at
-  the session's start>`, after which `grep -o 'skein.git#[0-9a-f]*'
-  Cargo.lock | sort -u` prints the one commit it printed before. From
-  the repin on (19.4, 19.5, jig 20), it holds the repin's commit the
-  same way.
-- **The repin** is 19.4's first commit, on its own (README, "Pins"):
-  its commit is skein-01.s2's landing, which holds skein-01.s1's, skein
-  01.3's and forgejo-17's skein step's, the one `git -C ~/src/rust/skein
-  fetch origin && git -C ~/src/rust/skein log origin/main --all-match
-  --grep='^Plan: client-api$' --grep='^Step: skein-01.s2$' --format=%H
-  -1` prints; `heavy cargo update -p skein-lib --precise <that
-  commit>`, with its one repair in the same commit, `lines: 0,
-  line_bytes: 0` in jig's `skein_ui_text::Settings` literal (`git grep -n
-  'skein_ui_text::Settings'`: `tests/client-protocol/src/native/world.rs:232`
-  at jig `7dc234d1b`; jig's world says no line of its own), after which
-  `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints that one
-  commit, and each later `cargo update` (19.4's own additions of
-  `skein-fake-person-browser`, `skein-ui-bundle` and `skein-scratch`
-  among them) holds it with `--precise <that commit>`; a failure in a
-  smith crate is a question.
+  another commit when `skein-ui-bundle` was added). An increment that
+  adds one (19.4's `skein-fake-person-browser`, `skein-ui-bundle` and
+  `skein-scratch` among them) holds the pin in the same commit: `heavy
+  cargo update -p skein-lib --precise <jig's skein pin at the session's
+  start>`, after which `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort
+  -u` prints the one commit it printed before; a failure in a smith
+  crate is a question.
+- **No repin:** jig 12.2's first commit moved jig's skein to skein-01.s3's
+  landing, which holds skein-01.s2's, skein-01.s1's, skein 01.3's and
+  forgejo-17's skein step's, with the one repair, `lines: 0, line_bytes:
+  0` in jig's `skein_ui_text::Settings` literal (README, "Pins"; the
+  design answer to jig 12.2's question of 2026-10-16T19:46:42Z). jig 19 moves skein
+  in no commit. At its start, with `<skein-01.s2>` the commit `git -C
+  ~/src/rust/skein fetch origin && git -C ~/src/rust/skein log
+  origin/main --all-match --grep='^Plan: client-api$' --grep='^Step:
+  skein-01.s2$' --format=%H -1` prints, `git -C ~/src/rust/skein
+  merge-base --is-ancestor <skein-01.s2> <jig's pin of skein>`
+  succeeds; if it fails, that is a question.
 - **The test shell's stylesheet** is `testing/jig-client-test-shell-web/jig_client_test_shell_web.css`,
   so that the bundle holds `<name>.css` as `browser.md`, 4.2 lists it;
   its root file is `files/robots.txt` (jig 18's root file).
@@ -312,9 +308,7 @@ Removes: nothing.
 
 ### 19.4 The test shell, its bundle in the gate, and the browser tier's first story
 
-Scope: skein repinned onto skein-01.s2's landing, which holds skein 01
-and skein-01.s1 (a commit of its own, first);
-`jig-client-test-shell-web` (`browser.md`, 3.1: start, the turn of 5.2,
+Scope: `jig-client-test-shell-web` (`browser.md`, 3.1: start, the turn of 5.2,
 the client host's functions of 3.2, the sign-in part at start, history
 through the codec); its bundle built in the gate; `[profile.browser]`
 and the default and fuzzy profiles' filters; the browser tier,
@@ -323,9 +317,9 @@ the third suite in jig's `docs/development/workflow.md`, 2, with the
 module's size (`browser.md`, 4.2).
 Needs: skein 01's harness (`Printed` in the URL form on stdout,
 `Setup.restart`; its last landing, `Step: skein-01.3`), and
-skein-01.s2's landing, the commit the repin takes.
-Files: `Cargo.lock` and the `skein_ui_text::Settings` literal's file
-(the repin commit); new `testing/jig-client-test-shell-web/{Cargo.toml,
+skein-01.s2's landing, both held by jig's pin of skein since jig 12.2's
+move ("No repin").
+Files: `Cargo.lock`; new `testing/jig-client-test-shell-web/{Cargo.toml,
 clippy.toml, jig_client_test_shell_web.css, files/robots.txt, pictures/}`,
 `src/lib.rs`; new `tests/client-browser/{Cargo.toml, clippy.toml}`,
 `src/lib.rs`, `tests/browser_tier.rs`; `.config/nextest.toml`;
@@ -441,7 +435,7 @@ story is run alone as the README's "One test of the browser suite"
 says.
 Don't: write a page of jig's own; carry a JavaScript snippet (`browser.md`,
 17: none by default); give the tier a world's seed or a fixed sleep;
-raise a profile's budget; move skein in any commit but the repin.
+raise a profile's budget; move skein in any commit.
 Size: at most 250 lines (the shell's; `tests/` is not counted).
 Removes: nothing.
 
@@ -582,14 +576,11 @@ Each command runs once, after the session's last increment lands.
 - `git -C ~/src/rust/jig log origin/main --grep='^Plan: client-api$'
   --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
   '^jig-19\.'` prints 5.
-- The repin is a commit of its own: with `<skein-01.s2>` the commit of
-  "Choices"' command, `git -C ~/src/rust/jig log origin/main --reverse
-  --format=%H -S'<skein-01.s2>' -- Cargo.lock | head -1` prints the
-  repin's commit, and `git -C ~/src/rust/jig show --stat --format=
-  <that commit>` lists `Cargo.lock` and the `skein_ui_text::Settings`
-  literal's file alone.
 - `git -C ~/src/rust/jig show origin/main:Cargo.lock | grep -o
-  'skein.git#[0-9a-f]*' | sort -u` prints one line, `<skein-01.s2>`'s.
+  'skein.git#[0-9a-f]*' | sort -u` prints one line, the commit of jig
+  12.2's move, and with `<skein-01.s2>` the commit of "Choices"'
+  command, `git -C ~/src/rust/skein merge-base --is-ancestor
+  <skein-01.s2> <that commit>` succeeds.
 - `git -C ~/src/rust/jig grep -n -e wasm32-unknown-unknown -e 'profile
   browser' origin/main -- scripts/check.sh` prints a line for each
   (README, "Done when", 7).

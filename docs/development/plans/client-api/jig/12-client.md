@@ -46,7 +46,10 @@ increment proves against the real engine.
 - The small store (11): "A request's record leaves in a `Save`, and the
   client gives the request's first `Exchange` only once the transport
   says `Stored`. `NotStored` ... retires the requests the write carried,
-  unsent, each answered *not kept*."
+  unsent, each answered *not kept*, by its key (skein's `lib.md`, 12,
+  not kept): parked, or with its `Exchange` waiting for the write ... A
+  record is whole in each write, so a request whose record a later write
+  carries again is decided by that later write".
 - `SignIn { with }` (12): `Link(secret)`, `Service(credential)`,
   `Held(credential)`, `Transport`; signed out "drops the credential
   held, ends every handle (`Ended`, signed out), parks every request,
@@ -80,7 +83,9 @@ increment proves against the real engine.
 - **The small store's barrier is the client's, for keyed requests
   alone** (findings/wire-and-client.md, 5j): reads and watches leave at
   once; a step's records go in one `Save` or one `Erase`; `NotStored`
-  answers each keyed request the write carried `NotKept`.
+  of a `Save` answers each keyed request whose record it was the last
+  to carry `NotKept`, by its key, parked or not (skein-01.s3's
+  `RequestTable::not_kept`).
 - **The thin story** lives in `tests/client-protocol` (findings 6:
   `src/engine.rs` runs the real core under the clients' component over
   HTTP bytes): a scripted application in front of `jig_client::Client`,
@@ -264,13 +269,18 @@ fn client_crate_links_only_its_domain_link_and_foundation() {
 ### 12.2 Keyed requests end to end: kept before sent, answered once durable, kept across a reload
 Scope: the client's barrier (client.md, 11): a step's records in one
 `Save`; a keyed request's first `Exchange` only after `Stored`; reads
-and watches never wait; `NotStored` answers each keyed request its write
-carried `Outcome::NotKept`; `Start { kept }` restores the table's
+and watches never wait; `NotStored` of a `Save` answers each keyed
+request whose record it was the last to carry `Outcome::NotKept`, by its
+key, parked or not (client.md, 11; skein's `lib.md`, 12, not kept);
+`Start { kept }` restores the table's
 records, each told `Kept { key, request }`. The story grows: a `Stop`
 answered once after its commit is durable, and kept across a reload.
-Needs: 12.1's client.
-Files: `crates/jig-client/src/{client.rs, store.rs (new)}`;
-`crates/jig-client-domain/src/{boundary.rs, requests.rs}` (`NotKept`);
+Needs: 12.1's client; skein-01.s3's landing (`RequestTable::not_kept`).
+Files: `Cargo.lock` and `tests/client-protocol/src/native/world.rs`
+(the skein move, a commit of its own, first; README, "Pins");
+`crates/jig-client/src/{client.rs, store.rs (new)}`;
+`crates/jig-client-domain/src/{boundary.rs, requests.rs}` (`NotKept`;
+`Up::NotKept { key }`);
 `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}` (the
 link's barrier holds `Message::Request` exchanges alone, findings 5j;
 `Request::NotKept { attempt }` for each held keyed attempt on
@@ -298,6 +308,38 @@ roots' path, through the link outside them until jig 13.4 (the test
 root) and jig 21.2 (`ops`'s), maps the
 link's `NotKept { attempt }` to its table's final answer with none (its
 `Fact::InvalidAnswer`), as the link's `WriteFailed` has no other user.
+A request not kept (the design answer to jig 12.2's question of
+2026-10-16T19:46:42Z; client.md, 11; skein's `lib.md`, 12):
+- The skein move is the first commit, on its own (README, "Pins"):
+  `heavy cargo update -p skein-lib --precise <skein-01.s3's landing>`,
+  with its one repair, `lines: 0, line_bytes: 0` in the
+  `skein_ui_text::Settings` literal at
+  `tests/client-protocol/src/native/world.rs:232` (jig `bb977c909`).
+- `jig-client`'s `store.rs` numbers the writes it gives, `Save` and
+  `Erase` alike, and counts their answers: each answer is for the
+  oldest write not yet answered (client.md, 16). It keeps a map from
+  each table key whose record a `Save` carried (`Down::Save`'s
+  `record.key`) to the number of the last such write. A key leaves the
+  map when that write is answered, or when its `Down::Erase` passes, so
+  the map holds at most `requests.requests` keys, priced in
+  `worst_case`. A request's record is whole in each `Save`, so its last
+  write alone decides whether it is kept.
+- On `NotStored` of write `w`, before the link takes it, the client
+  gives the domain `Up::NotKept { key }` for each key whose last write
+  is `w`, and drops them from the map; on `Stored` of `w`, it drops
+  them only. The domain calls `table.not_kept(key)`: for `Some(owner)`
+  it removes `owner` from its requests and tells `Answered { key:
+  owner, outcome: NotKept }`; for `None` (answered, unknown or not
+  kept already), nothing. An `Erase` is no key's last write, so its
+  `NotStored` answers nothing.
+- Then the link takes `NotStored`. Each `Request::NotKept { attempt }`
+  it gives reaches the domain as `Up::Answer { attempt, envelope:
+  RequestEnvelope::Lost, answer: None, why: None }`. That attempt is
+  stale for a request retired just before. It is a retry under its key
+  for a request whose record a later write carries, which leaves once
+  that write is stored.
+- Don't: answer a request not kept by its attempt, or by a write that
+  is not its last.
 Test shape: unit tests in `crates/jig-client/src/tests/store.rs`
 (fixtures from 12.1); story tests in `tests/client-protocol/tests/client.rs`.
 Tests: story `a_stop_is_answered_once_after_its_commit_is_durable`
@@ -316,6 +358,16 @@ second is answered as the first decided, contract.md, 4); unit
 `a_keyed_request_waits_for_its_record_to_be_stored`,
 `a_read_leaves_while_a_record_is_being_stored`,
 `a_record_not_stored_answers_its_request_not_kept`,
+`a_parked_request_whose_record_is_not_stored_is_answered_not_kept`
+(`me` delivered, then `StreamGone`: a `Send` leaves one `Save`, answered
+`NotStored`; `Answered { outcome: NotKept }` is told once, the next
+`Erase` carries its record's key, and once live again no `Exchange`
+carries it),
+`a_failed_write_answers_only_the_requests_it_carried` (two requests
+whose records leave in two writes, the first answered `NotStored` and
+the second `Stored`: the first is answered `NotKept`, the second is not,
+and its `Exchange` leaves once, at most `requests.first` after its
+`Stored`),
 `a_step_s_records_leave_in_one_save`,
 `a_request_lost_while_live_is_sent_again_and_the_link_stays_live`
 (client.md, 8.2), `a_kept_record_of_another_version_is_dropped_and_told`
@@ -350,7 +402,8 @@ engine makes the `Stop` once (under 0.5 s). It passes; nothing else is
 wanted.
 Don't: no answer kept in the small store; no request sent before its
 `Stored`.
-Size: at most 215 lines.
+Size: at most 250 lines (35 for a request not kept: the writes' numbers
+and the map, `Up::NotKept`).
 Removes: the link's barrier on reads and watches.
 
 ### 12.3 `SignIn { with }` and `SignOut`
