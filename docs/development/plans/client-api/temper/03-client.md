@@ -197,7 +197,7 @@ below) and `Cargo.lock` (the skein move, first, and the dev-dependency);
 tests), `tests/support/mod.rs` (271), `tests/fuzzy_terminal.rs`,
 `src/tests.rs`. Users found by `git grep -n -e 'terminal::Loop' -e
 'Loop::new' -e 'render::Frame' -e 'render::bounds' -- '*.rs'` in temper
-(at the base: `open.rs:101`, `tests/support/mod.rs:167`,
+(at the base: `open.rs:101`, `tests/support/mod.rs:172`,
 `tests/terminal.rs:182`; `terminal/run.rs` writes `super::Loop`).
 `crates/temper/tests/support/person.rs:153` names `terminal::Notice`,
 which stays.

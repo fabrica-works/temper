@@ -83,6 +83,7 @@ more says so in its row and its file. Dependencies are by capability:
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `skein/01-harness.md` | skein 01: the harness opens the printed URL, serves other origins, awaits trouble | nothing | |
+| `skein/01-s1-terminal-room.md` | skein-01.s1 (ruling 134): the terminal's room for the application's lines | nothing | |
 
 ### temper
 
