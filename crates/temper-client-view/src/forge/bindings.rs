@@ -38,7 +38,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("binding tokens fit");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("form bindings fit");
-        Binding { owner: (jig_view::Owner::Application { number: self.connector }).opaque(), token }
+        Binding { owner: (jig_client_view::Owner::Application { number: self.connector }).opaque(), token }
     }
 }
 #[must_use]

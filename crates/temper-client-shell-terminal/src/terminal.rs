@@ -18,7 +18,7 @@ pub trait Client {
     fn act(&mut self, node: NodeId, act: Act) -> bool;
     /// # Errors
     /// Refuses a link that is malformed or names another engine.
-    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_shell_native::Unlinked>;
+    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_shell_native::Unlinked>;
     fn notice(&mut self) -> Option<Notice>;
     fn close(&mut self);
 }
@@ -200,7 +200,7 @@ impl Loop {
             skein_ui_text::render(
                 client.tree(),
                 b"temper",
-                Some(jig_view::regions::JigRegion::Link.region()),
+                Some(jig_client_view::regions::JigRegion::Link.region()),
                 &mut self.print,
             );
             self.output = Some(Box::from(self.print.text.as_slice()));

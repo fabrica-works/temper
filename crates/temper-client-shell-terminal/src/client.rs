@@ -3,8 +3,8 @@ use crate::{
     limits,
     route::{self, Down, Duty, Up},
 };
-use jig_protocol_client_link as link;
-use jig_shell_native::{Shell, Signing};
+use jig_client_protocol_link as link;
+use jig_client_shell_native::{Shell, Signing};
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Env, List, Queue, Time, Wall};
 use skein_shell::Host;
@@ -78,7 +78,7 @@ impl NativeClient {
         user: u32,
         seed: u64,
         start: Start,
-    ) -> Result<Self, jig_shell_native::Unlinked> {
+    ) -> Result<Self, jig_client_shell_native::Unlinked> {
         let bounds = settings.limits;
         let mut memory = limits::worst_case(&bounds).expect("native capacities are checked");
         let (view_limits, jig_words, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
@@ -101,7 +101,7 @@ impl NativeClient {
             .and_then(|n| n.checked_add(u64::from(notices).checked_mul(40)?))
             .expect("native queues fit memory");
         let linked = Queue::with_capacity(link.max_out());
-        let mut shell = Shell::new(jig_shell_native::Settings {
+        let mut shell = Shell::new(jig_client_shell_native::Settings {
             engine: settings.engine,
             directory: settings.directory,
             limits: bounds.connections,
@@ -176,7 +176,7 @@ impl NativeClient {
     }
     /// # Errors
     /// Refuses a link outside the configured engine's address.
-    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_shell_native::Unlinked> {
+    pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
         self.shell.sign_in(printed)
     }
     /// Each sign-in outcome is handed to the caller unchanged, once.

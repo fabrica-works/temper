@@ -5,7 +5,7 @@ use super::{
 };
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_view::phrases::jig::JigPhrase;
+use jig_client_view::phrases::jig::JigPhrase;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, State, phrases::Hole};
 use temper_client_domain::forge;
@@ -22,7 +22,7 @@ fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bind
     builder.close();
 }
 #[must_use]
-pub fn project_name(jig: &jig_domain_client::Domain, project: u32, words: &jig_view::words::Words) -> Box<[u8]> {
+pub fn project_name(jig: &jig_domain_client::Domain, project: u32, words: &jig_client_view::words::Words) -> Box<[u8]> {
     if let Some(frame) = &jig.frame().document {
         for row in &frame.projects {
             if row.project == project
@@ -39,7 +39,7 @@ pub fn page(
     form: &forge::Form,
     project_name: &[u8],
     words: &Words,
-    jig: &jig_view::words::Words,
+    jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
     builder.open(Role::Heading { level: 1 });
@@ -195,7 +195,7 @@ fn outcome(
     form: &forge::Form,
     answer: &forge::Answer,
     words: &Words,
-    jig: &jig_view::words::Words,
+    jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
     match answer {

@@ -7,8 +7,8 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
+use jig_client_protocol_link as link;
 use jig_domain_client::contract::VersionRange;
-use jig_protocol_client_link as link;
 use skein_lib::{RequestRecord, Secret};
 use temper_client_domain as client;
 pub mod family;

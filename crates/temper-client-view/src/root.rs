@@ -4,7 +4,7 @@ use crate::{
     Limits, forge,
     words::{Word, Words},
 };
-use jig_view::{JigBindings, Owner};
+use jig_client_view::{JigBindings, Owner};
 use skein_lib::Queue;
 use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
 use temper_client_domain::{Action, Domain};
@@ -12,7 +12,7 @@ use temper_client_domain::{Action, Domain};
 #[derive(Debug)]
 pub struct View {
     render: skein_ui::View,
-    jig_words: jig_view::words::Words,
+    jig_words: jig_client_view::words::Words,
     forge_words: Words,
     jig: JigBindings,
     forge: forge::bindings::Bindings,
@@ -24,7 +24,7 @@ impl View {
     pub fn new(
         limits: &Limits,
         domain: &temper_client_domain::Limits,
-        jig_words: jig_view::words::Words,
+        jig_words: jig_client_view::words::Words,
         forge_words: Words,
         forge: u16,
     ) -> View {
@@ -58,14 +58,14 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.forge.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if !jig_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig) {
+    if !jig_client_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig) {
         if let Some(form) = root.forge().form() {
             let project = forge::page::project_name(root.jig(), form.project, &view.jig_words);
             builder.open(Role::Main);
             forge::page::page(&mut builder, form, &project, &view.forge_words, &view.jig_words, &mut view.forge);
             builder.close();
         }
-        jig_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);
+        jig_client_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);
     }
     builder.close();
     for pass in 0..2 {
@@ -121,7 +121,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
     match Owner::from_opaque(bound.binding.owner) {
-        Some(Owner::Jig) => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+        Some(Owner::Jig) => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(action) => Some(Action::Jig(action)),
             None => None,
         },

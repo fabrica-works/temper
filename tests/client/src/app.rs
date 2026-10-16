@@ -198,7 +198,7 @@ impl App for Temper {
             && tree.nodes().iter().any(|value| {
                 value.id == node
                     && value.binding.is_some_and(|binding| {
-                        binding.owner == (jig_view::Owner::Application { number: fixtures::FORGE }).opaque()
+                        binding.owner == (jig_client_view::Owner::Application { number: fixtures::FORGE }).opaque()
                     })
             })
         {

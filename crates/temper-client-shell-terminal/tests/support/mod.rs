@@ -27,7 +27,7 @@ fn tree(revision: u64) -> Tree {
     let mut builder = Builder::new(&tree_limits());
     builder.open(Role::Page);
     builder.open(Role::Region);
-    builder.region(jig_view::regions::JigRegion::Link.region());
+    builder.region(jig_client_view::regions::JigRegion::Link.region());
     builder.open(Role::Status);
     builder.text(skein_ui::Run::Plain, b"Live");
     builder.close();
@@ -41,7 +41,7 @@ fn tree(revision: u64) -> Tree {
     {
         builder.open(role);
         builder.name(label);
-        builder.bind(skein_ui::Binding { owner: jig_view::Owner::Jig.opaque(), token: Token::new(1) });
+        builder.bind(skein_ui::Binding { owner: jig_client_view::Owner::Jig.opaque(), token: Token::new(1) });
         builder.close();
     }
     builder.close();
@@ -121,7 +121,12 @@ impl Client for Script {
             return false;
         }
         let mut print = skein_ui_text::Print::new(&tree_limits()).expect("world print envelope");
-        skein_ui_text::render(&self.tree, b"temper", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+        skein_ui_text::render(
+            &self.tree,
+            b"temper",
+            Some(jig_client_view::regions::JigRegion::Link.region()),
+            &mut print,
+        );
         let number =
             print.numbers.iter().position(|id| *id == node).map(|index| u32::try_from(index).expect("number fits") + 1);
         let Some(number) = number else {
@@ -132,7 +137,7 @@ impl Client for Script {
         self.pending = true;
         true
     }
-    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_shell_native::Unlinked> {
+    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
         assert_eq!(link, b"private-link");
         self.sign_ins.push(self.now);
         Ok(())

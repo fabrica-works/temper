@@ -102,7 +102,7 @@ fn encoded_role(role: forge::Role) -> w::Role {
 pub fn answer(
     outcome: Option<forge::ApplicationOutcome>,
     limits: &w::Limits,
-    jig: &jig_protocol_client_wire::v7::Limits,
+    jig: &jig_client_protocol_wire::v7::Limits,
 ) -> Option<Box<[u8]>> {
     let outcome = match outcome {
         Some(forge::ApplicationOutcome::Adopted(a)) => w::Outcome::Adopted(

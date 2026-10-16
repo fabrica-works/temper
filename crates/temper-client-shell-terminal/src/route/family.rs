@@ -7,7 +7,7 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
-use jig_protocol_client_link as link;
+use jig_client_protocol_link as link;
 use skein_lib::{List, Reader, Set, Token, Writer};
 use temper_client_domain::forge;
 use temper_client_protocol_wire::{self as wire, v1 as w};
@@ -160,7 +160,7 @@ pub fn answer(record: &link::Family, limits: &w::Limits, link: &link::Limits) ->
 }
 #[must_use]
 pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_domain_client::contract::Refusal> {
-    use jig_protocol_client_wire as j;
+    use jig_client_protocol_wire as j;
     let mut reader = Reader::new(bytes);
     let refusal = j::Refusal::decode(&limits.wire, &mut reader).ok()?;
     if !reader.is_empty() {

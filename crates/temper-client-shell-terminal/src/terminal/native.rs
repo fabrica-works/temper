@@ -24,8 +24,8 @@ pub(crate) fn event(event: &temper_client_domain::Event) -> Option<Notice> {
         None
     }
 }
-pub(crate) fn signing(signing: &jig_shell_native::Signing, out: bool) -> Option<Notice> {
-    use jig_shell_native::Signing;
+pub(crate) fn signing(signing: &jig_client_shell_native::Signing, out: bool) -> Option<Notice> {
+    use jig_client_shell_native::Signing;
     match signing {
         Signing::Again { .. } | Signing::Lost { .. } if !out => Some(Notice::SignInAgain),
         Signing::Refused { .. } if !out => Some(Notice::SignInRefused),
@@ -46,7 +46,7 @@ impl Client for NativeClient {
     fn act(&mut self, node: skein_ui::NodeId, act: skein_ui::Act) -> bool {
         Self::act(self, node, act)
     }
-    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_shell_native::Unlinked> {
+    fn sign_in(&mut self, link: &[u8]) -> Result<(), jig_client_shell_native::Unlinked> {
         Self::sign_in(self, link)
     }
     fn notice(&mut self) -> Option<Notice> {

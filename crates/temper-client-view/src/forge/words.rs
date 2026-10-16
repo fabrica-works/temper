@@ -1,7 +1,7 @@
 //! Adoption phrases as checked English data (client.md, 4.4 and 4.7).
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_view::Owner;
+use jig_client_view::Owner;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{
     Builder, Run,

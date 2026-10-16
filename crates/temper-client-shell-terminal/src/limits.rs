@@ -7,7 +7,7 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
-use jig_protocol_client_link as link;
+use jig_client_protocol_link as link;
 use skein_lib::{Duration, RequestLimits};
 use temper_client_domain as client;
 /// Concurrent HTTP exchanges, beside the event stream.
@@ -18,7 +18,7 @@ pub const DEADLINE: Duration = Duration::from_secs(30);
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     pub client: client::Limits,
-    pub connections: jig_shell_native::Limits,
+    pub connections: jig_client_shell_native::Limits,
     pub io: skein_io::Limits,
 }
 #[must_use]
@@ -68,7 +68,7 @@ pub fn native() -> Limits {
                 margin: Duration::from_secs(1), // Retention's safety margin.
             },
         },
-        connections: jig_shell_native::Limits {
+        connections: jig_client_shell_native::Limits {
             exchanges: EXCHANGES,
             body_bytes: 33_554_432, // Whole small store and HTTP response bodies.
             http: skein_http::client::Limits {
@@ -117,9 +117,9 @@ pub fn family(limits: &Limits) -> Option<crate::route::family::Family> {
 #[must_use]
 pub fn view(
     limits: &Limits,
-) -> Option<(temper_client_view::Limits, jig_view::words::Words, temper_client_view::words::Words)> {
-    let jig = jig_view::words::Words {
-        book: jig_view::phrases::english::english(limits.client.jig.text).ok()?,
+) -> Option<(temper_client_view::Limits, jig_client_view::words::Words, temper_client_view::words::Words)> {
+    let jig = jig_client_view::words::Words {
+        book: jig_client_view::phrases::english::english(limits.client.jig.text).ok()?,
         language: 0,
         offset_minutes: 0,
     };

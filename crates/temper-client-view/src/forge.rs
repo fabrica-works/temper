@@ -19,7 +19,7 @@ pub enum Resource<'a> {
 }
 #[must_use]
 pub const fn nav(forge: u16) -> SlotRef {
-    SlotRef { owner: (jig_view::Owner::Application { number: forge }).opaque(), token: Token::new(0) }
+    SlotRef { owner: (jig_client_view::Owner::Application { number: forge }).opaque(), token: Token::new(0) }
 }
 #[must_use]
 pub fn resource(path: &[Box<[u8]>]) -> Resource<'_> {

@@ -1,5 +1,5 @@
 //! jig's core refusal remains opaque in the forge family (client.md, 4.6).
-use jig_protocol_client_wire as jig;
+use jig_client_protocol_wire as jig;
 use skein_lib::{Reader, Writer};
 use temper_client_protocol_wire::v1;
 

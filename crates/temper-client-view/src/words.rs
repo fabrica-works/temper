@@ -1,6 +1,6 @@
 //! The forge's English phrasebook, copied as checked data from ops's pattern.
 use alloc::boxed::Box;
-use jig_view::Owner;
+use jig_client_view::Owner;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{
     Builder, Run,

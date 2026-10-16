@@ -1,5 +1,5 @@
+use jig_client_protocol_link as link;
 use jig_domain_client::contract;
-use jig_protocol_client_link as link;
 use skein_lib::{RequestRecord, Token};
 use temper_client_domain as client;
 pub const ATTEMPT: Token = Token::new(101);
@@ -83,7 +83,7 @@ pub fn entrance(refusal: contract::Refusal) -> contract::EntranceRefusal {
     contract::EntranceRefusal::new(refusal).expect("fixed entrance facts")
 }
 pub fn core_refusal() -> Box<[u8]> {
-    use jig_protocol_client_wire as w;
+    use jig_client_protocol_wire as w;
     let limits = family().link.wire;
     let value = w::Refusal::Role(w::RefusalRole::new(&limits, w::RefusalRoleParts { held: None }).expect("role fits"));
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measure fits"));
@@ -109,7 +109,7 @@ pub fn tree_limits() -> skein_ui::Limits {
 }
 pub(crate) fn print(tree: &skein_ui::Tree) -> skein_ui_text::Print {
     let mut print = skein_ui_text::Print::new(&tree_limits()).expect("fixture print bounds");
-    skein_ui_text::render(tree, b"temper", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+    skein_ui_text::render(tree, b"temper", Some(jig_client_view::regions::JigRegion::Link.region()), &mut print);
     print
 }
 pub fn golden(name: &str) -> std::path::PathBuf {
@@ -132,7 +132,7 @@ pub fn adoption_form(filled: bool) -> client::forge::Form {
 }
 pub fn adoption_page(
     form: &client::forge::Form,
-    words: &(jig_view::words::Words, temper_client_view::words::Words),
+    words: &(jig_client_view::words::Words, temper_client_view::words::Words),
 ) -> skein_ui::Tree {
     let limits = tree_limits();
     let (jig, forge) = words;
@@ -298,14 +298,14 @@ pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> s
 fn root_navigation(root: &mut client::Domain, limits: &client::Limits) {
     client::configure_navigation(root, client::navigation(limits)).expect("fixture navigation");
 }
-pub fn page_words() -> (jig_view::words::Words, temper_client_view::words::Words) {
-    static WORDS: std::sync::OnceLock<(jig_view::words::Words, temper_client_view::words::Words)> =
+pub fn page_words() -> (jig_client_view::words::Words, temper_client_view::words::Words) {
+    static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, temper_client_view::words::Words)> =
         std::sync::OnceLock::new();
     WORDS
         .get_or_init(|| {
             (
-                jig_view::words::Words {
-                    book: jig_view::phrases::english::english(32).expect("fixture English"),
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(32).expect("fixture English"),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -379,7 +379,7 @@ pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, b
     builder.open(Role::Page);
     builder.open(Role::Region);
     builder.name(b"Frame");
-    builder.region(jig_view::regions::JigRegion::Link.region());
+    builder.region(jig_client_view::regions::JigRegion::Link.region());
     builder.open(Role::Status);
     builder.text(Run::Plain, b"Live");
     builder.close();
@@ -407,7 +407,7 @@ pub fn header_page(title: Option<&[u8]>, behind: bool) -> skein_ui::Tree {
     visible(builder.finish())
 }
 pub fn binding() -> skein_ui::Binding {
-    skein_ui::Binding { owner: jig_view::Owner::Jig.opaque(), token: Token::new(1) }
+    skein_ui::Binding { owner: jig_client_view::Owner::Jig.opaque(), token: Token::new(1) }
 }
 pub fn every_role() -> skein_ui::Tree {
     use skein_ui::{Role, Run};
@@ -531,7 +531,12 @@ fn role_controls(builder: &mut skein_ui::Builder) {
     builder.open(Role::Slot);
     builder.text(Run::Plain, b"Slot");
     builder.close();
-    builder.drawing(skein_ui::DrawingKind { owner: jig_view::Owner::Jig.opaque(), kind: 1 }, b"Drawing", b"image", 16);
+    builder.drawing(
+        skein_ui::DrawingKind { owner: jig_client_view::Owner::Jig.opaque(), kind: 1 },
+        b"Drawing",
+        b"image",
+        16,
+    );
     builder.text(Run::Plain, b"fallback");
     builder.close();
     builder.open(Role::Paragraph);

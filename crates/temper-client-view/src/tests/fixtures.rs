@@ -54,9 +54,9 @@ pub fn limits() -> Limits {
 pub fn words() -> crate::words::Words {
     crate::words::Words::english(FORGE, 64).expect("forge English fits")
 }
-pub fn jig_words() -> jig_view::words::Words {
-    jig_view::words::Words {
-        book: jig_view::phrases::english::english(32).expect("jig English fits"),
+pub fn jig_words() -> jig_client_view::words::Words {
+    jig_client_view::words::Words {
+        book: jig_client_view::phrases::english::english(32).expect("jig English fits"),
         language: 0,
         offset_minutes: 0,
     }

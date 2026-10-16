@@ -2,8 +2,8 @@ use crate::{
     limits,
     route::{self, Down, Notice, Up},
 };
+use jig_client_protocol_link as link;
 use jig_domain_client::contract;
-use jig_protocol_client_link as link;
 use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
 mod family;
@@ -143,7 +143,7 @@ fn the_native_limits_pass_each_worst_case() {
     let root = client::worst_case(&limits.client).expect("usable root");
     let view = temper_client_view::worst_case(&view, &limits.client, &jig, &forge).expect("usable view");
     let link = link::worst_case(&limits::link(&limits).expect("usable link")).expect("usable link memory");
-    let shell = jig_shell_native::Shell::new(jig_shell_native::Settings {
+    let shell = jig_client_shell_native::Shell::new(jig_client_shell_native::Settings {
         engine: skein_io::Addr::Ip("127.0.0.1:7100".parse().expect("loopback")),
         directory: Box::from(*b"client"),
         limits: limits.connections,

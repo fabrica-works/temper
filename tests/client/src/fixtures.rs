@@ -66,7 +66,7 @@ pub fn domain_limits() -> Limits {
     }
 }
 
-type Books = (jig_view::words::Words, view::words::Words);
+type Books = (jig_client_view::words::Words, view::words::Words);
 static BOOKS: OnceLock<Mutex<BTreeMap<u32, Books>>> = OnceLock::new();
 pub fn phrasebooks(limits: &Limits) -> Books {
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
@@ -74,8 +74,8 @@ pub fn phrasebooks(limits: &Limits) -> Books {
         .entry(limits.jig.text)
         .or_insert_with(|| {
             (
-                jig_view::words::Words {
-                    book: jig_view::phrases::english::english(limits.jig.text).expect("jig English fits"),
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("jig English fits"),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -85,10 +85,10 @@ pub fn phrasebooks(limits: &Limits) -> Books {
         .clone()
 }
 #[must_use]
-pub fn view_bounds(limits: &Limits, jig: &jig_view::words::Words, forge: &view::words::Words) -> view::Limits {
+pub fn view_bounds(limits: &Limits, jig: &jig_client_view::words::Words, forge: &view::words::Words) -> view::Limits {
     // The world's storage profile is independent of the all-pages envelope.
     // Builder and the world heap checks enforce these practical capacities.
-    let text = jig_view::phrases::jig_capacity(&jig.book)
+    let text = jig_client_view::phrases::jig_capacity(&jig.book)
         .expect("jig phrase envelope")
         .checked_mul(2)
         .expect("fixture phrase size fits")

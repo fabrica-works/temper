@@ -7,9 +7,13 @@ pub struct Limits {
 }
 impl Limits {
     #[must_use]
-    pub fn of(domain: &temper_client_domain::Limits, jig: &jig_view::words::Words, forge: &Words) -> Option<Limits> {
+    pub fn of(
+        domain: &temper_client_domain::Limits,
+        jig: &jig_client_view::words::Words,
+        forge: &Words,
+    ) -> Option<Limits> {
         let fragments = domain.jig.parts.checked_mul(2)?;
-        let mut tree = jig_view::limits::compose(
+        let mut tree = jig_client_view::limits::compose(
             &domain.jig,
             jig,
             &jig_domain_client::pages::Arrangement::none(),
@@ -28,11 +32,11 @@ impl Limits {
 pub fn worst_case(
     limits: &Limits,
     domain: &temper_client_domain::Limits,
-    jig: &jig_view::words::Words,
+    jig: &jig_client_view::words::Words,
     forge: &Words,
 ) -> Option<u64> {
     skein_ui::worst_case(&limits.tree)?
-        .checked_add(jig_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
+        .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
         .checked_add(skein_ui::phrases::worst_case(forge.book.limits())?)?

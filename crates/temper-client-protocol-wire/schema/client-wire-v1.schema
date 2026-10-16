@@ -13,7 +13,7 @@ record Kinds { read: bool push: bool open: bool land: bool review: bool status: 
 record Rule { branch: bytes 1024 contexts: list 64 bytes 1024 approvals: u32 dismiss_stale: bool }
 enum Protection { unknown, absent, rule: Rule }
 record Adopted { forge: u16 repository: u32 owner: bytes 1024 name: bytes 1024 role: Role home: bool kinds: Kinds protection: Protection }
-# jig-protocol-client-wire's Refusal, encoded at jig's VERSION; 16777209 so
+# jig-client-protocol-wire's Refusal, encoded at jig's VERSION; 16777209 so
 # that AdoptAnswer at its ceiling fits jig's Owned.record (16777216).
 record CoreRefused { refusal: bytes 16777209 }
 enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer }

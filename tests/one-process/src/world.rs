@@ -5,6 +5,7 @@ use crate::{
     referee::{self, Capture, Store, Wire},
     stories,
 };
+use jig_client_shell_native::Signing;
 use skein_fake_person::{Doing, Face, Find, Found, Next, Step, TreeFace};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Duration, Queue, Time, Wall};
@@ -300,7 +301,7 @@ impl Host for Person {
         }
         client.iterate(now, wall);
         while let Some(signing) = client.signing() {
-            assert!(matches!(signing, jig_shell_native::Signing::SignedIn { .. }), "sign-in failed: {signing:?}");
+            assert!(matches!(signing, Signing::SignedIn { .. }), "sign-in failed: {signing:?}");
             self.signed_in += 1;
             PROGRESS.with(|progress| progress.borrow_mut().signed = true);
         }
@@ -310,7 +311,7 @@ impl Host for Person {
                     notice,
                     temper_client_shell_terminal::client::Shown::Notice(
                         temper_client_shell_terminal::route::Notice::Fact(
-                            jig_protocol_client_link::Fact::StreamDropped
+                            jig_client_protocol_link::Fact::StreamDropped
                         )
                     )
                 )

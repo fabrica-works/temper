@@ -252,8 +252,8 @@ fn delivery_packet(
 }
 /// The kit's shared packet carrier has a test application owner; only jig belongs here.
 #[must_use]
-pub fn callback(event: jig_test_domain_client::Event) -> Event {
-    use jig_test_domain_client::{Answered, Event as KitEvent};
+pub fn callback(event: jig_client_test_domain::Event) -> Event {
+    use jig_client_test_domain::{Answered, Event as KitEvent};
     match event {
         KitEvent::Jig(event) => Event::Jig(event),
         KitEvent::Answer { attempt, envelope, answer } => {

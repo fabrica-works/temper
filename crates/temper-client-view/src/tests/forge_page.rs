@@ -76,7 +76,7 @@ fn tree(form: &forge::Form) -> skein_ui::Tree {
     let jig = fixtures::jig_words();
     page_tree(form, &words, &jig)
 }
-fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_view::words::Words) -> skein_ui::Tree {
+fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_client_view::words::Words) -> skein_ui::Tree {
     let mut limits = fixtures::tree_limits();
     limits.text_per_node = 2048;
     limits.text_bytes = 262_144;
