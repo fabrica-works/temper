@@ -42,11 +42,12 @@ later is section 15; what is open, section 16.
   Forgejo request and nothing of setup but its steps. systemd, QA's
   environments or a test arrange the same commands another way
   (section 7).
-- **Reconcile converges at every start:** the bot user, its two tokens,
-  a team with write on every repository of each configured org, the bot
-  in it, and each org's webhook, each made when missing, repaired when
-  changed and left alone otherwise. The admin's token is read then, by
-  `temper forge reconcile` alone (section 5).
+- **Reconcile converges at every start:** the bot user, made when
+  missing and otherwise checked, never edited; its two tokens, a team
+  with write on every repository of each configured org, the bot in it,
+  and each org's webhook, each made when missing, repaired when changed
+  and left alone otherwise. The admin's token is read then, by `temper
+  forge reconcile` alone (section 5).
 - **Owned is a stock Forgejo.** temper writes its `app.ini`, runs its
   migrations, makes its own admin and the person's account with
   Forgejo's command line, registers the runner offline, dumps before an
@@ -161,7 +162,13 @@ managed or owned.
      the request that makes it, so no run cut short leaves the bot
      unmarked. A user of that login without the marker is refused,
      naming the login, so a login written wrong never takes over a
-     person's account; one that is a site admin is refused too.
+     person's account; one that is a site admin is refused too. A bot
+     that passes is never edited: its email is the setup's `bot.email`
+     when reconcile makes it, and stays as it is after. A change to
+     `bot.email` reaches only a bot made after it; an existing bot's
+     email is the person's to change, on Forgejo. temper reads no mail
+     of the bot's, and its commits name the identity's `author`
+     (configuration.md, section 3), not this email.
   3. **Its two tokens.** Each of `api_token` and `git_token` is kept when
      its file answers `GET /api/v1/user` as the bot. Otherwise it is made
      again by the admin's token alone: the bot's token of its name
@@ -477,7 +484,7 @@ Each needs nothing below the commands to change:
   |---|---|---|
   | `forge` | u16 | the `number` of one entry of `forges`, of kind Forgejo |
   | `directory` | a path | a private directory (section 3), unique among `setup` |
-  | `bot` | `{"login", "email"}` | a Forgejo login; an email |
+  | `bot` | `{"login", "email"}` | a Forgejo login; an email, the bot's when reconcile makes it (section 5, step 2) |
   | `orgs` | list of strings | at least one, at most `setup.orgs`, each a Forgejo org name |
   | `mode` | `{"managed": {"admin_token": file}}` or `{"owned": ...}` | |
   | `owned.forgejo`, `owned.runner.binary` | absolute paths | checked against the pins of 6.1 |

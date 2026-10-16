@@ -380,7 +380,9 @@ impl Store {
 
 ## Questions to raise when reached
 
-- **09.1: does reconcile repair an existing bot's email?** The design names only the marker; until answered: it does not.
+- **09.1: does reconcile repair an existing bot's email?** Answered: no. setup.md 5, step 2: "A bot that passes is never
+  edited: its email is the setup's `bot.email` when reconcile makes it, and stays as it is after." 09.1 landed so; nothing
+  changes.
 
 ## Done when
 
