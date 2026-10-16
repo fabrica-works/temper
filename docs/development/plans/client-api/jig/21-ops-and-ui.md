@@ -1,0 +1,365 @@
+# Session 21: `ops` and the reference UI's state on the client alone
+
+Jig 13 put the test application on `jig_client::Client`, the reference
+UI reaching it through `jig_client_view::bridge`. This session does the
+same for `ops`: its families travel as bytes through their own wire
+crate, `jig-ops-client-protocol-wire` (21.1), and its root holds the
+client and routes by asker (21.2). Then the reference UI's state becomes
+`jig_client_view::Ui`, reading the client alone (view.md, 18): its
+documents, run text and link from the client by its handles, the bridge
+and the moved client half gone (21.3); and its requests on `pending`,
+with each child watching `me` by a handle of its own in place of the
+by-value hand-offs (21.4).
+
+The repository downstream of jig copies `ops`'s client root: in 21.2,
+21.3 and 21.4, the change to `ops`'s root (`examples/ops/client-domain`,
+`examples/ops/client-view`) lands as one commit of its own within the
+increment, whose message says what an application's root changes and
+why, so that its diff reads alone (decisions.md, 6).
+
+## Read first
+
+- jig's `docs/design/client/domain/view.md`, sections 2 and 18 (18.1 to
+  18.10).
+- jig's `docs/design/client/domain/root.md`, sections 2, 3, 5, 7, 10, 12
+  and 15.
+- jig's `docs/design/client/domain/client.md`, sections 4, 6, 8, 11 and
+  12.
+- jig's `docs/design/client/domain/pages.md`, section 8.
+- jig's `docs/design/client/domain/testing.md`, sections 4, 5 and 6.
+- jig's `docs/design/protocol/client.md`, section 11;
+  `docs/design/examples.md`, section 8.
+- The plan's `findings/wire-and-client.md`, sections 2 and 5 (b, d),
+  `code-organization.md`, sections 1, 2, 6 and 7, and decisions.md, 6.
+- Sessions 12 and 13's files: their sketches are this session's types.
+- skein's `programming-model.md`, sections 4.5, 5.2 and 6.3;
+  `testing-strategy.md`, sections 2.2, 6 and 7.
+
+## What the design asks
+
+- `ops`'s wire: "`jig-ops-client-protocol-wire`, its families' wire,
+  which its client and its engine both read: incidents, alerts,
+  environments and panels, and environments' requests and their
+  outcomes" (examples.md, 8; protocol/client.md, 11); its owners "its
+  two connectors' client sides, numbered as its connectors are"
+  (examples.md, 8; root.md, 15).
+- The reference UI: `jig_client_view::Ui: step(now, &Client, Event, &mut
+  Queue<Request>), fire(now, &Client, &mut Queue<Request>),
+  next_deadline()`; "It keeps no document of its own: it reads each from
+  the client, by its handles"; "its handles and keys carry its asker,
+  jig's owner, 65536" (view.md, 18 and 18.1); "Handles, not
+  generations" (18.2).
+- "`me`, always ... by a handle of its own" (view.md, 18.2); "A child
+  that needs who is signed in, or the projects they hold roles in,
+  watches `me` by a handle of its own" (root.md, 5).
+- Requests "shown as asked" from `Pending` and `client.pending(key)`;
+  "Kept work ... has no card ... Refused, or unknown whether made, it
+  shows as a notice ...; kept for another party, it is counted for the
+  page someone else's work" (view.md, 18.4).
+- `jig-client-view` "depends on `skein-ui` and `jig-client`, and on
+  nothing else of jig's" (view.md, 2).
+
+## Choices this plan makes
+
+- **`ops`'s families' wire is made here** (21.1), not in jig 16: `ops`'s
+  root cannot hand the client its families as bytes without it, and
+  21.3 cannot remove the bridge while `ops`'s root uses it.
+- **The bridge ends in 21.3,** with the moved client half of
+  `jig-domain-client` that jig 13.2 kept in `jig-client-view`
+  (`watches.rs`, `reads.rs`, `link.rs`, `versions.rs`, the spine's watch
+  functions, the frame's link judgment).
+- **`Named` replaces `ShowObjects`, `ShowSections` and `ObjectsLeft`**
+  (view.md, 18.1: "the whole list each time").
+- **Not here:** the reference UI's lists on task queries and the shape
+  pages removed (jig 16); the helpers (jig 15).
+
+## Rules that bind it
+
+- **`ops`'s root changes in one commit of its own per increment**
+  (decisions.md, 6): before each landing of 21.2, 21.3 and 21.4, `git
+  log --oneline origin/main..HEAD -- examples/ops/client-domain
+  examples/ops/client-view | wc -l` prints 1.
+- **A root keeps no map and no `_` arm** (root.md, 10): checked by
+  clippy's `wildcard_enum_match_arm` and
+  `match_wildcard_for_single_variants`, denied in the workspace; and
+  `git grep -n -E 'Map<|BTreeMap' -- examples/ops/client-domain/src/route.rs
+  examples/ops/client-domain/src/domain.rs
+  testing/jig-client-test-domain/src/route.rs
+  testing/jig-client-test-domain/src/domain.rs` prints nothing at each
+  increment's end.
+- **jig never names the repository downstream of jig**: `git -C <the
+  session's jig worktree> grep -n -i -w temper -- crates testing
+  tests examples scripts` prints nothing at each increment's end
+  (code-organization.md, 6).
+
+## Increments
+
+### 21.1 `ops`'s families as bytes: `jig-ops-client-protocol-wire`
+Scope: `ops`'s families' wire (examples.md, 8; protocol/client.md, 11):
+infrastructure's environment requests and their outcomes,
+observability's and infrastructure's subjects and documents (incidents,
+alerts, environments, panels), in a schema, with the client's side's
+codec from `ops`'s client sides' values (`infrastructure::{Ask, Answer,
+Subject, Document}`, `observability::{Subject, Document}`).
+Needs: jig 13 on `main` (the session's start).
+Files: new `examples/ops/client-protocol-wire/{Cargo.toml,
+schema/ops-client-v1.schema, src/lib.rs, src/generated/v1.rs, golden/v1/,
+src/codec.rs}`; workspace `Cargo.toml` and `Cargo.lock` (shared);
+`tests/client-wire/tests/drift.rs` (a third drift test,
+`ops_client_wire_schema_matches_generated_code_and_goldens`);
+`tests/boundary/src/tests/graph.rs` (a rule as
+`client_wire_links_only_its_codec_and_foundation`, graph.rs:560, for
+it).
+Shape: `jig_ops_client_protocol_wire::{v1, VERSION, codec::{ask,
+answer, subject, document, Undecodable}}`: `ask(&infrastructure::Ask)
+-> Box<[u8]>`, `answer(&[u8]) -> Result<infrastructure::Answer,
+Undecodable>`, `subject(&Subject) -> Box<[u8]>`, `document(subject,
+&[u8]) -> Result<Document, Undecodable>`, one pair per family; the
+engine's side encodes documents and decodes requests with the same
+records, which the world's scripted `ops` engine uses.
+Test shape: `examples/ops/client-protocol-wire/src/tests.rs`: a round
+trip per record kind (`an_environment_request_round_trips_through_its_bytes`,
+`an_incident_document_round_trips_through_its_bytes`,
+`a_record_of_another_version_is_undecodable`), and the drift test. Each
+under 20 ms.
+Proof: unit layer: the gate runs these tests and the drift test;
+nothing else. 21.2 connects it, its root encoding with it against
+`ops`'s real engine.
+Don't: no record of jig's in it; no shape of work (code-organization.md,
+6).
+Size: at most 250 lines (the schema and generated code are not
+counted).
+Removes: nothing.
+
+### 21.2 `ops`'s root on `jig_client::Client`, routing by asker
+Scope: `jig-ops-client-domain` as jig 13.4 made the test root: it holds the
+client, routes by asker (its owners are its connectors, and it shares
+their enum, `jig_ops_domain_connectors::Connector`, as it is: root.md,
+15 and examples.md, 8, "as `ops` shares `Connector`"), its families'
+values as bytes by 21.1's codec,
+the reference UI through jig 13.4's bridge; `jig-ops-client-view` follows.
+`ops`'s root's change is one commit of its own (the session's
+introduction).
+Needs: 21.1's crate.
+Files: `examples/ops/client-domain/src/{domain.rs, boundary.rs,
+route.rs, owner.rs, limits.rs, store.rs, infrastructure.rs,
+observability.rs}`; `examples/ops/client-view/src/**` (its routing);
+`tests/ops/src/client/{transport.rs, app.rs, script.rs}`,
+`tests/ops/src/joint/**` (their transport: `Client::typed` in the
+scripted world, bytes in the joint world through the clients'
+component); `tests/boundary/src/tests/graph.rs`
+(`ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary`
+and `ops_client_view_is_step_code_with_only_client_and_connector_vocabulary`,
+graph.rs:337 and 350, gain `jig-client` and
+`jig-ops-client-protocol-wire`; `jig-client-domain` is reached through
+`jig-client`'s re-exports, jig 12.1).
+Shape: as jig 13.4's: `ops`'s table owner, `owner::Owner` (with `Kept {
+scope }`), goes, and no owner enum takes its place; a tell routes by
+`jig_client_view::Owner::of_asker` (jig 13.4), `Jig` to the reference
+UI, `Application { number }` by `jig_ops_domain_connectors::connector(number)`
+to `Connector::Observability` or `Connector::Infrastructure`, and none
+to no child; an ask leaves under `Owner::Application { number:
+jig_ops_domain_connectors::number(connector) }.asker()`.
+Test shape: `examples/ops/client-domain/src/tests.rs` (kept and
+extended): `routes_an_infrastructure_tell_to_its_side`,
+`passes_the_client_s_transport_requests_out_in_order`,
+`a_tell_under_an_asker_no_connector_names_reaches_no_child`. Each under
+20 ms.
+Proof: joint layer, `ops`'s real engine: `heavy cargo nextest run -p
+jig-ops-world --profile fuzzy -E 'binary(fuzzy_joint) &
+test(=p_accepts_the_restart_from_the_incidents_page)'`, once (0.83 s at
+the base); it passes; nothing else is wanted. In the default suite, the
+gate runs `p_accepts_a_restart_from_the_incidents_page` (tests/ops);
+nothing else.
+Don't: no change to `ops`'s families' meaning or pages; no file of
+`ops`'s root changed outside that one commit.
+Size: at most 250 lines.
+Removes: `ops`'s root's `RequestTable` and its table owner,
+`owner::Owner`.
+
+### 21.3 The reference UI's state on the client alone: `jig_client_view::Ui`
+Scope: view.md, 18.1's surface: `Ui::step(now, wall, &Client, Event,
+out)`, `fire`, `next_deadline`; its watches and reads by handle under
+`Asker::JIG`, documents read from `client.document(handle)` when told
+`Changed`, a run's text from `client.text(handle)`; its link from
+`Told::Link` and `client.link()` (signed out, out of date and someone
+else's work as pages not about the work, view.md, 18.6); its page's
+generations become handles (18.2, "Handles, not generations"). Both
+roots step it with the client they hold.
+Needs: 21.2 (both roots on the client).
+Files: `crates/jig-client-view/src/{ui.rs, boundary.rs, page.rs and
+page/**, objects.rs, application.rs, conversation/**, frame/me.rs,
+lib.rs}`; removed: `bridge.rs`, `watches.rs`, `reads.rs`, `link.rs`,
+`versions.rs`, the spine's watch functions (the moved domain.rs's
+`open`, `retire`, `close_*`, `watch_event`, findings 2's "watch spine",
+lines 830-1167 at the base); both roots' `route.rs` (the Ui stepped
+with `&Client`; `ops`'s in its own commit); `testing/jig-client-test-view`,
+`examples/ops/client-view` (they read `ui.sections()`, `ui.shown()`);
+the worlds' fronts.
+Shape: as the sketch: `Ui`, `Event::{Start, Went, Left, Act, Named,
+Client { told }}`, `Request::{Client { asked }, Show, Save, Erase,
+ShowPart, PartsLeft}`, `How`, `Refused`. `Named` replaces
+`ShowObjects`, `ShowSections` and `ObjectsLeft` (view.md, 18.1, the
+whole list each time); naming the same sections again keeps their
+handles and watches open (pages.md, 12.5). Until 21.4 the Ui shows a
+request answered `NotKept`, `Limit`, `Unconfirmed` or `Unknown` as
+`Progress::Unknown` shows today. The frame's party part says a sign-out
+did not reach the engine, from `client.link().sign_out_lost`, and
+offers it again (view.md, 18.6; pages.md, 2). A page whose watches and
+reads would pass the Ui's handles opens what fits and says what it left
+out (view.md, 18.2); on an application's page, each named section says
+in its own region when it is behind, has rows left out, was refused or
+is missing (pages.md, 12.5; view.md, 18.2). The sign-in page leaves a
+slot for the application's own ways of signing in (pages.md, 8 and 9;
+view.md, 4.1), owned by the application, `Owner::Application`, and
+filled by its view root.
+Test shape: the moved tests keep their names on the new surface; their
+fixtures (`src/tests/fixtures.rs`) hold a `jig_client::Client::typed`
+and feed its `Up` (jig 12.5) for documents. Added:
+`a_page_reads_its_documents_from_the_client_by_handle`,
+`a_handle_the_page_no_longer_holds_is_dropped`,
+`signed_out_shows_the_sign_in_page_and_keeps_the_place`,
+`out_of_date_shows_its_page_and_sends_nothing`,
+`a_sign_out_that_did_not_reach_the_engine_is_offered_again`,
+`a_page_past_the_ui_s_handles_opens_what_fits_and_says_what_it_left_out`,
+`naming_the_same_sections_again_keeps_their_watches_open`,
+`each_named_section_says_behind_in_its_own_region`,
+`the_sign_in_page_leaves_a_slot_for_the_application_s_ways`. The client
+world's referee (tests/client, `harness/referee.rs`) gains testing.md,
+6.3's "A sign-out told: a sign-out the engine did not receive is never
+shown done", with its referee test
+`a_sign_out_shown_done_before_the_engine_received_it_is_caught`. Each
+under 20 ms.
+Proof: joint layer: `heavy cargo nextest run -p jig-client-protocol-world
+-E 'test(a_person_signs_in_by_the_printed_link_and_starts_a_chat) |
+test(a_slow_reader_gets_fewer_deliveries_and_others_are_answered)'`,
+once (under 2 s); it passes; nothing else is wanted. In the client's
+world, the gate runs
+`a_dropped_watch_shows_the_page_behind_until_it_reopens` (tests/client);
+nothing else.
+Don't: no document kept by the Ui across steps (view.md, 18); no
+decision the client makes (whether the link is live, when to retry).
+Size: at most 300 lines (most of the change is removal; the sign-in
+slot and the sections' words about 60 of them).
+Removes: the bridge; the moved `watches.rs`, `reads.rs`, `link.rs`,
+`versions.rs`; the page's generations.
+
+### 21.4 The reference UI's requests on `pending`; siblings watch `me` themselves
+Scope: the Ui's intents keyed `Key { asker: Asker::JIG, number }`, drawn
+from its seed, their progress read from `client.pending(key)` and shown
+as asked, answered once (`Answered`), `NotKept` offered again and
+`Unknown` saying where to look (view.md, 18.4); kept work under jig's
+asker shown as a notice when refused or unknown, counted for "someone
+else's work" by `pending(key).party` (pages.md, 8); the by-value
+hand-offs (`Frame`, `FrameIs`, `Ask { ByValue }`, findings 5d) replaced
+by each child's own handle on `me` (root.md, 5), in the test
+application's family sides and `ops`'s (its own commit). An act refused
+by the client's limit (`Outcome::Limit`) is refused in place, "too many
+requests in flight", never queued (view.md, 18.4); one answered
+`Outcome::Unconfirmed` is refused in place and offered again once the
+link is live. The page "someone else's work" (pages.md, 8) leaves when
+its party signs in, or when each of its kept requests is answered
+unknown.
+Needs: 21.3's `Ui`.
+Files: `crates/jig-client-view/src/{intents.rs, notices/kept.rs,
+page/**, frame/me.rs, boundary.rs, ui.rs}`;
+`testing/jig-client-test-domain/src/{first.rs, second.rs, route.rs}`;
+`examples/ops/client-domain/src/{infrastructure.rs, observability.rs,
+route.rs}`; the worlds' fronts.
+Shape: `Event::Ask { ask: ByValue }`, `Event::Frame { asked }`,
+`Request::FrameIs`, `Request::Answered { asked }`, `Request::Unknown {
+asked }`, `Event::Kept { scope, requests }`, `Event::KeptGone`,
+`Request::{Confirmed, Retention, Link}` go; the family sides' `Event::{
+FrameIs, Confirmed, Link }` give way to their `me` handle and
+`Told::Link`.
+Test shape: the moved intent tests keep their names; added
+`a_request_shows_the_progress_the_client_reports`,
+`a_request_not_kept_is_offered_again`,
+`a_kept_request_refused_shows_a_notice`,
+`another_party_s_kept_work_shows_someone_else_s_work`,
+`a_family_side_reads_the_party_from_its_own_me_handle`,
+`an_act_past_the_client_s_limit_is_refused_in_place`,
+`an_act_answered_unconfirmed_is_offered_again_once_live`,
+`someone_else_s_work_leaves_when_its_party_signs_in`,
+`someone_else_s_work_leaves_when_its_requests_are_unknown`. Each under
+20 ms.
+Proof: joint layer: `heavy cargo nextest run -p jig-client-protocol-world
+-E 'test(signed_out_with_requests_pending_then_signed_in_again) |
+test(a_request_whose_answer_was_lost_is_made_once)'`, once (under 2 s);
+and `heavy cargo nextest run -p jig-ops-world --profile fuzzy -E
+'binary(fuzzy_joint) & test(=p_accepts_the_restart_from_the_incidents_page)'`,
+once; both pass; nothing else is wanted.
+Don't: no intent kept across a restart (view.md, 18.4: kept work has no
+card); no map in a root.
+Size: at most 290 lines.
+Removes: the by-value hand-offs; `Kept { scope, requests }`.
+
+## Interface sketches
+
+Checked at the base with `heavy cargo clippy -p jig-w6-sketch
+--all-targets -- -D warnings` in a scratch crate, the page's types named
+at their base paths (`jig_domain_client::{action, address, pages,
+contract}`), passing. The Ui owns its place, page, working set, intents,
+drafts and notices; it reads documents, pending requests and the link
+from the client the root lends; the root owns only the client and its
+children.
+
+```rust
+// crates/jig-client-view/src/ui.rs (21.3)
+/// What the reference UI hears (view.md, 18.1).
+pub enum Event {
+    /// Its own records, as the application kept them; the place it starts at; its seed.
+    Start { records: List<Record>, place: Place, seed: u64 },
+    /// A place of the reference UI's gone to.
+    Went { place: Place },
+    /// A place of the application's.
+    Left,
+    /// A person's act on one of its nodes.
+    Act { action: Act },
+    /// What the application's page names of jig's, the whole list each time.
+    Named { objects: List<ObjectKey>, sections: List<Section> },
+    /// What the client told under `Asker::JIG`, and the link, as the root routes them.
+    Client { told: Told },
+}
+pub enum How { Push, Replace }
+/// What the reference UI asks (view.md, 18.1).
+pub enum Request {
+    /// One of the client's events, `Watch`, `Unwatch`, `Read`, `Send` or
+    /// `SignOut`, which the root gives the client in the same step.
+    Client { asked: jig_client::Event },
+    Show { place: Place, how: How },
+    Save { records: List<Record> },
+    Erase { records: List<RecordKey> },
+    ShowPart { part: Part, scope: PartScope },
+    PartsLeft,
+}
+pub enum Refused { Navigation, Arrangement }
+pub struct Ui { /* place, page, objects, intents, drafts, notices, seed */ }
+impl Ui {
+    pub fn new(navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>;
+    pub fn step(&mut self, now: Time, wall: Wall, client: &Client, event: Event, out: &mut Queue<Request>);
+    pub fn fire(&mut self, now: Time, wall: Wall, client: &Client, out: &mut Queue<Request>);
+    pub fn next_deadline(&self) -> Option<Time>;
+    pub fn shown(&self) -> u64;
+}
+```
+
+## Questions to raise when reached
+
+- None beyond jig 12's and jig 13's.
+
+## Done when
+
+- `git -C ~/src/rust/jig ls-tree -d --name-only origin/main
+  examples/ops/client-protocol-wire` prints the directory.
+- `git -C ~/src/rust/jig grep -n -E 'RequestTable' origin/main --
+  examples/ops/client-domain/src` prints nothing.
+- `git -C ~/src/rust/jig ls-tree --name-only origin/main --
+  crates/jig-client-view/src/bridge.rs crates/jig-client-view/src/watches.rs
+  crates/jig-client-view/src/reads.rs crates/jig-client-view/src/link.rs
+  crates/jig-client-view/src/versions.rs` prints nothing.
+- `git -C ~/src/rust/jig grep -n -E -e 'FrameIs|ByValue' -e 'Kept \{ scope'
+  -e 'fn watch_event' -e 'Event::Frame' origin/main --
+  crates/jig-client-view/src testing/jig-client-test-domain/src
+  testing/jig-client-test-view/src examples/ops/client-domain/src
+  examples/ops/client-view/src` prints nothing.

@@ -1,0 +1,29 @@
+# client-api: later
+
+What the designs name but this plan does not do, and when it should be
+done. temper's rows wait for temper's next plan of its client, named
+here `client-pages` (not yet written), which builds the rest of "temper
+on jig's client API" (temper's `STATUS.md`).
+
+| Item | Design | When |
+|---|---|---|
+| temper's board: goals in priority order, "Set a goal", reordering goals | temper's `client.md`, 3.5 (`Board { project }`) | temper's `client-pages` plan |
+| temper's changes page ("Shown on the forge.") | temper's `client.md`, 3.5 (`Changes { project }`), 4.2 | temper's `client-pages` plan |
+| An agent's task page (`agent-task.html`): its transcript and composer, with Amend and Stop | temper's `client.md`, 3.5 (`Task { task }`, an agent's task) | temper's `client-pages` plan |
+| The confirmations of acts no present story makes (amend, cancel, stop on a goal; reordering) | temper's `client.md`, 3.6 | temper's `client-pages` plan |
+| The rebound-Host attack story in temper's process tier | temper's `testing.md`, 2.6; `client.md`, 10 | temper's `client-pages` plan |
+| temper's browser, `temper-client-shell-web`, with jig's cross-site and framed-page stories | temper's `web/architecture.md`; `STATUS.md`, `web/` | after temper's `client-pages` plan |
+| The forge as people's sign-in provider, through `Mint` | temper's `client.md`, 11; `credentials.md` | a temper plan of its own, once wanted |
+| `documents.lines` override in temper's configuration | temper's `configuration.md`, 7 | temper's `client-pages` plan, unless temper 04 finds the task line refusing the forge's deepest path (then temper 04 does it) |
+| smith's crates under the client naming rule: a check of smith's workspace | jig's `README.md`, 15 (the user's rule names smith) | when smith gets its first client crate |
+| The splits of files over 800 lines that this plan touches | code-organization.md, 7 | a consolidation pass |
+| The process tier's person finding the goal on the board after the restart, and the goal set on the board (from temper 07.4 it is set from a chat) | temper's `testing.md`, 2.6 | temper's `client-pages` plan, with the board |
+| A goal's page's history, budget and authority, and its Amend, Stop and Cancel acts | temper's `client.md`, 3.5 (`Task { task }`) | temper's `client-pages` plan |
+| The brief's Lineage, Calls and Waiting sections | jig's `domain/engine.md`, 9 | a jig plan after this one; the start's messages carry what waits meanwhile |
+| A procedure's step's effects within its one decision | jig's `domain/connectors.md`, 6.3 | a jig plan after this one; effects stay their own decisions meanwhile |
+| What jig's rows of `STATUS.md` leave "not planned" beside "(jig's client API)" (versioning, several applications in one client, the service and one-shot modes, an application's streams, jig's drawing kinds, retention, `ops` standalone, a connector's request budget, an application's own child domains) | jig's `STATUS.md`, section 3 | as each item there says |
+| jig's tier calling skein's two-person stories for a browser shell (typing while a patch arrives; a write refused): a second person signed in by the fresh link a refused, spent one draws | jig's `protocol/browser.md`, 15; `protocol/client.md`, 8 | when skein's harness opens a link printed after a person's start |
+| A client in the engine's process, reaching the clients' component by an in-process transport, the application's routing, with no listener and no HTTP | jig's `protocol/service.md`, 10 | a jig plan after this one, with the first application that runs a client in its engine's process (decisions.md, 15) |
+| The clients' listener off loopback, with its certificate and key files, the key read as a private file; the Host check's certificate name between hosts | jig's `protocol/service.md`, 7; `protocol/browser.md`, 12.2 | once skein has a TLS server side; until then jig 18 refuses a listener off loopback |
+| The reference UI's policy section showing a project's template overrides | jig's `client/domain/pages.md`, 6.5 | a jig plan after this one; the overrides are on the wire from jig 14 and in the policy's document from jig 22 |
+| `me`'s creating bounds for a `Create` of any executor | jig's `client/domain/contract.md`, 5.3 | a jig plan after this one, once jig 03's `Create` offers have landed; jig 05.4 builds `acts::bounds::goal` alone |

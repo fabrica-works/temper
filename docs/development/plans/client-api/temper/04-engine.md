@@ -1,0 +1,409 @@
+# Session 04: the engine and the forge's family on templates and the collapsed wire
+
+jig's engine takes its shapes of work from templates in the configuration
+(jig 09), its client wire collapses onto the plumbing operations, `me` and
+the task line (jig 14, 22), and the shapes of work leave its engine and its
+wire (jig 16). temper follows each: its configurations name jig's two
+templates in place of `chats` (`configuration.md`, 2); the forge's family
+carries jig's refusal facts as the collapsed wire encodes them, and the
+forge's form learns from jig's typed answer that a version is not served
+(`client.md`, 4.4, 4.6, 8); the engine root's arms and records for chats,
+goals and lists go when jig's do, and the tests that started chats with
+`StartChat` make them from the chat template. A last increment checks that
+a task line of the forge's deepest path is served under the shipped
+profile, and sets `documents.lines` where it is not (`configuration.md`,
+7).
+
+## Read first
+
+- temper's `docs/design/configuration.md`: 2 (the bullet "Templates are
+  jig's two defaults"), 7 (the bullets "The engine's documents fit
+  temper's client" and "The forge's paths fit a document").
+- temper's `docs/design/client.md`: 4.4 (the bullet "Out of date"), 4.6
+  (the outcome "refused by the core"), 8 (the bullets "jig's clients'
+  component" and "The forge's request, decoded before the root").
+- temper's `docs/design/STATUS.md`, 3, "temper on jig's client API" (the
+  sentence on `temper-service/src/family/refusals.rs`).
+- jig's `docs/design/protocol/configuration.md`, 3.1; jig's
+  `docs/design/client/domain/contract.md`, 3.6, 4 and 8.
+- This plan's `jig/09-templates.md`, `jig/14-wire.md` and
+  `jig/16-shed.md`: their Shapes, and how each rewrote jig's own tests
+  and fixtures (`jig-test-service`, the core's and the channel world's
+  fixtures); `decisions.md`, 1c and 6; `findings/temper.md`, 4 and 6.
+- skein's `programming-model.md`: 3, 4.4, 6.3 (by number only); skein's
+  `testing-strategy.md`: 2.2, 2.9, 7 (by number only).
+
+## What the design asks
+
+- **Templates** (`configuration.md`, 2): "Templates are jig's two
+  defaults, chat (template 1, label 1) and goal (template 2, label 2), as
+  jig's `protocol/configuration.md`, 3.1 gives them, the chat's executor
+  the charter chats run under; temper defines no template of its own."
+- **A refusal by the core** (`client.md`, 4.6): "jig's refusal facts,
+  carried whole as `jig-client-protocol-wire` encodes them, and shown in
+  jig's words for its refusals"; and STATUS: `refusals.rs` "copies jig's
+  private translation of refusals ...; it goes when temper takes jig's
+  typed answers."
+- **Out of date** (`client.md`, 4.4): "when the engine does not serve
+  this client's version of the forge's records (the stream's hello, or
+  jig's typed answer that a version is not served, naming the ranges
+  served ...), the page says 'This temper is out of date for adopting
+  repositories: run the temper the engine runs.', the button is
+  disabled, and a pending adoption stays in the small store."
+- **The forge's paths fit a document** (`configuration.md`, 7):
+  "`documents.lines` bounds a document's short lists and also the
+  segments of each part's path ... So `engine.limits` names it at least
+  the segments of the deepest path the forge names: a branch's, the
+  forge's five segments then the branch's own".
+
+## Choices this plan makes
+
+- **temper defines no template.** The configurations temper writes by
+  hand name jig's two defaults, in jig 09's format, the chat's charter 1
+  and its grace 5,000 ms (today's `close_grace_ms`); those made from
+  jig's `engine_document()` take jig's fixture as it is.
+- **The engine follows jig's arms, and adds none.** Each arm and record
+  of temper's engine root for a chat, a goal or a list goes in the
+  increment that follows the jig landing that removes it, replaced by
+  nothing (code-organization.md, 6: "No shape of work in the engine or
+  the wire").
+- **`refusals.rs`:** if jig 14's Shape makes the translation of
+  `jig_domain_people::Refusal` into the wire's refusal record callable by
+  an application (a `pub fn` of `jig-protocol-engine-clients` or of the
+  wire crate), 04.2 calls it and `crates/temper-service/src/family/refusals.rs`
+  goes. Otherwise, the default, 04.2 edits it as jig 14's diff edits
+  `translate/refusals.rs`, and it stays a copy (STATUS's row keeps it).
+- **The chats tests made by `StartChat`** are made from the chat
+  template as jig 16 makes jig's own (the helper its Test shape names);
+  where it names none, by one fixture, `walking::chat(project, words)`,
+  in `tests/engine/domain/src/walking.rs`, written once and used by the
+  others.
+- **temper's store version.** temper's `CoreRefused` record keeps jig's
+  people refusal's bytes (`crates/temper-protocol-store/schema/store-v1.schema:175-176`,
+  bound 23). The first temper increment whose repin includes jig
+  02.3's landing (people v3) bumps `STORE_VERSION` to 2 and writes
+  `store-v2.schema` (README, "Format versions"); 04.1 bumps it if no
+  increment did before it (`git -C <worktree> show
+  origin/main:crates/temper-protocol-store/src/lib.rs | grep
+  'STORE_VERSION: u32 = 1'` prints a line); a later increment of this
+  session edits `store-v2.schema` in place.
+- **`documents.lines`** is checked, not assumed: 04.4 serves a task line
+  of the forge's deepest path in the engine's domain world under jig's
+  small profile and under the process tier's override, and only where
+  one is refused does it set the override.
+
+## Rules that bind it
+
+- **Each increment whose Needs name a jig capability starts with a
+  repin commit of its own** onto the landing of the newest jig step its
+  Needs name (README, Rules, "Pins": 04.1 jig 09.4's, 04.2 jig 22's
+  last, 04.3 jig 16's last), found by `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
+  origin/main --all-match --grep='^Plan: client-api$' --grep='^Step:
+  jig-NN.k$' --format=%H -1`
+  with the step's number, never jig's `origin/main`; when `git -C
+  ~/src/rust/jig merge-base --is-ancestor <that landing> <temper's
+  present jig pin>` succeeds, no repin commit is made. After a repin,
+  `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
+  Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`, and
+  skein's and smith's lines equal to those of `git -C ~/src/rust/jig
+  show <the landing>:Cargo.lock`; a second revision of a source still
+  there after a second `cargo update` is a question.
+- **A repin's repairs outside its Shape** follow jig's own diffs of
+  `jig-test-service`, `jig-client-test-domain` and `ops`, counted with
+  `git diff --numstat origin/main...HEAD -- <the changed paths outside
+  the increment's Files> ':!Cargo.lock'`, added lines, at most 200
+  (README, "Pins"); past it, a question.
+- **No shape of work in the engine or the wire** (code-organization.md,
+  6): no arm, record, key or fixture is added for a chat, a goal or a
+  list; `git -C <worktree> grep -n -w -e StartChat -e SetGoal -e
+  Prioritise -e SeenChat -e ForgetChat -e ReadChat -e Disposal -- crates
+  tests testing` prints nothing at 04.3's end.
+- **Limits from the shipped profile:** each world and fixture takes its
+  limits from `jig_protocol_config::profile(Profile::Small)` and
+  `temper_service::limits::profile(Profile::Small)`; 04.4's process-tier
+  case names its `documents.lines` value, 2, beside the profile's, with
+  its source (`crates/temper/tests/support/configuration.rs:32`).
+
+## Increments
+
+### 04.1 `templates` in temper's configurations, in place of `chats`
+
+Scope: jig's two templates in the configurations temper writes, in
+place of the `chats` member, and jig's new core limit on templates
+taken by temper's engine root (`configuration.md`, 2 and 8; jig 09.1).
+Needs: jig 09.4 (jig 09's last increment: `templates` and the
+policies' overrides; temper 03 is the session's start).
+Files: `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46`
+(`ENGINE`'s `"chats": {"charter": 1, "close_grace_ms": 5000}` becomes
+`"templates"`, jig's two defaults written out in jig 09.1's format, as
+jig 09's fixtures write them: "jig's defaults are written, not
+implied"); `crates/temper-engine-domain/src/limits.rs:109-145`
+(`core_limits`, the one core `Limits` literal of temper's production
+code, gains `templates`, taken from the engine's limits as `documents`
+is at :113, through `temper_service::limits::engine`, never a literal);
+the configurations made from jig's `engine_document()`
+(`crates/temper/tests/support/configuration.rs:15`,
+`tests/one-process/src/fixtures.rs:78`) take jig 09's fixture
+unchanged. If no temper increment bumped `STORE_VERSION` before
+(Choices), `crates/temper-protocol-store/` too: `src/lib.rs:15`
+(`STORE_VERSION` 2), `schema/store-v1.schema` moved to
+`store-v2.schema` with `CoreRefused`'s bound from jig's people v3
+ceilings, its generated code and goldens. The core's `Settings` literal at
+`tests/engine/domain/src/walking.rs:253-260` keeps `chat: 1` (:257) and
+`close_grace` (:254): jig 09 keeps both, filled from template 1, until
+jig 16 removes them (04.3). Users found by `git grep -n -e '"chats"' -e
+close_grace -e 'chat: 1' -e 'jig_domain_core::Limits {' -- '*.rs'` in
+temper: the three above at the base. Shared:
+`crates/temper-engine-domain/src/store.rs` (README, "Shared files"),
+if the repin's repairs reach it.
+Shape: no type of temper's changes; `temper-service`'s startup passes
+`engine.templates` to jig's reader and keeps nothing of it.
+Test shape: `crates/temper-service/src/tests/startup.rs`, on
+`fixtures::engine()` (`crates/temper-service/src/tests/fixtures.rs:76`).
+The reference test, its field names jig 09's:
+```rust
+#[test]
+fn the_example_engine_keeps_jigs_chat_and_goal_templates() {
+    let jig = fixtures::engine().jig;
+    let labels: Vec<u32> = jig.templates.iter().map(|template| template.label).collect();
+    assert_eq!(labels, [1, 2], "jig's chat and goal templates, in order");
+    assert_eq!(jig.templates[0].number, 1);
+}
+```
+Tests, each under 20 ms:
+`the_example_engine_keeps_jigs_chat_and_goal_templates`,
+`a_chats_member_is_refused_as_unknown_naming_its_path` (the start
+refused with `engine.chats: unknown member`, as jig 09's reader refuses
+it). The engine world's tests keep their names and expected values.
+Proof: the one-process world, once: `heavy cargo nextest run -p
+temper-one-process-world -E
+'test(a_person_signs_in_by_the_printed_link_and_a_chat_is_answered)'`:
+`temper serve`'s system, started from configuration bytes that name
+jig's templates, answers the person's chat (about 1 s).
+Don't: add a template of temper's; read `templates` in temper's
+`application` reader; set a template's field by hand where jig's fixture
+gives it.
+Size: at most 40 lines (the repin's repairs counted apart, at most 200).
+Removes: the `chats` member in `ENGINE`.
+
+### 04.2 The forge's family on the collapsed wire
+
+Scope: the forge's outcome "refused by the core" encoded with the
+collapsed wire's refusal record, through jig's typed translation where
+jig 14 gives one (`client.md`, 4.6; STATUS); the served versions per
+family as jig 14 names them; the forge's form out of date on jig's typed
+answer that a version is not served (`client.md`, 4.4); the one-process
+referee reading the collapsed wire.
+Needs: jig 22's last increment (jig 14's records and version refusal
+and jig 22.1's `me` among it).
+Files: `crates/temper-service/src/family.rs` (192 lines: `answer`, its
+jig wire limits at :105), `crates/temper-service/src/family/refusals.rs`
+(230 lines: goes, or follows jig 14's diff of
+`crates/jig-protocol-engine-clients/src/translate/refusals.rs`, by the
+choice above), `crates/temper-service/src/clients.rs` (the served list
+at :78-91), `crates/temper-client-domain/src/forge.rs` (`Served`,
+`Event::Served`); tests `crates/temper-service/src/tests/{family.rs,
+clients.rs, clients/peer.rs}`, `tests/codecs/tests/client_wire.rs`,
+`tests/one-process/src/referee/client.rs` (198 lines) and
+`referee/client/cache.rs` (157), `tests/one-process/src/world.rs:353-354`
+(the `Frame` delivery and read, jig 22.1's `me`),
+`tests/client/src/translate/forge.rs`. Users of jig's client wire found
+by `git grep -n -w jig_client_protocol_wire -- '*.rs'` in temper (at the
+base, under its old name `jig_protocol_client_wire`: 11 files, 13 lines,
+`logs/w9/users-jig-client-crates.txt`).
+Shape:
+- `temper_service::family::answer(outcome:
+  Option<forge::ApplicationOutcome>, limits: &w::Limits, jig:
+  &jig_client_protocol_wire::<jig's current version>::Limits) ->
+  Option<Box<[u8]>>`, unchanged in form; its `CoreRefused` bytes are the
+  collapsed wire's `Refusal` record, the facts jig 14 adds among them
+  (no one to escalate to, not well formed, proposable by whom); a
+  compound request's failing position is the answer's, not the
+  refusal's, and an adoption is no compound request.
+- The forge side's version: `forge::Event::Served { versions }` also
+  from `jig-client`'s typed answer that the forge's version is not
+  served, under the adoption's key; `Served::OutOfDate` disables Adopt,
+  and the pending adoption stays kept (`client.md`, 4.4).
+Test shape: `crates/temper-service/src/tests/family.rs` (its fixtures at
+the top of the file) and `crates/temper-client-domain/src/tests/form.rs`
+(on `crates/temper-client-domain/src/tests/fixtures.rs`). The reference
+test:
+```rust
+#[test]
+fn a_core_refusal_is_carried_as_jigs_refusal_record() {
+    let outcome = forge::ApplicationOutcome::CoreRefused(jig_domain_people::Refusal::NotOffered);
+    let bytes = family::answer(Some(outcome), &fixtures::wire_limits(), &fixtures::jig_wire_limits()).unwrap();
+    let answer = w::AdoptAnswer::decode(&fixtures::wire_limits(), &mut Reader::new(&bytes)).unwrap();
+    let w::Outcome::CoreRefused(refused) = answer.outcome() else { panic!("a core refusal") };
+    assert_eq!(refused.refusal(), fixtures::NOT_OFFERED_RECORD, "jig's record for NotOffered, as a literal");
+}
+```
+Tests, each under 20 ms:
+`a_core_refusal_is_carried_as_jigs_refusal_record`,
+`a_refusal_naming_no_one_to_escalate_to_is_carried_with_its_facts`,
+`an_authority_refusal_keeps_whom_a_proposal_could_go_to`,
+`a_version_not_served_answer_marks_the_form_out_of_date`,
+`an_out_of_date_form_keeps_its_pending_adoption`. The base's family and
+form tests keep their names and expected values.
+Proof: the one-process world, once: `heavy cargo nextest run -p
+temper-one-process-world -E
+'test(an_adopted_repository_gets_its_change_pushed_through_git)'`: a
+person's adoption crosses the collapsed wire as the forge's bytes, the
+outcome comes back as "Adopted acme/app on forge 1 as owned.", and the
+referee decodes both sides (about 3 s).
+Don't: decode a refusal of jig's in temper beyond what the wire crate's
+decoder gives; keep a `v7` path; add a refusal of temper's own.
+Size: at most 120 lines.
+Removes: `refusals.rs` where jig 14 gives the typed translation.
+
+### 04.3 The engine's shapes of work gone, with jig's
+
+Scope: the engine root's arms, reads and restart keys for chats, goals
+and lists, and the store's `Disposal` refusal, gone with jig 16's; the
+tests' chats made from the chat template (`STATUS.md`, "temper on jig's
+client API"; code-organization.md, 6).
+Needs: jig 16's last increment.
+Files (production, found by `git grep -n -w -e StartChat -e SetGoal -e
+Prioritise -e SeenChat -e ForgetChat -e ReadChat -e SeenChatLoaded -e
+Disposal -e DisposalIssue -- '*.rs'` in temper: 79 lines in 30 files at
+the base, `logs/w9/users-shape-asks.txt`):
+- `crates/temper-engine-domain/src/store.rs:528-584` (the sizes of
+  `SetGoal` :541, `Prioritise` :545, `StartChat` :550, `Close`'s
+  disposals :556-557, `Stored::ReadChat` :584);
+- `crates/temper-engine-domain/src/archive.rs:200-220` (`EndedRead::SeenChat`,
+  `EndedRead::Chat`), `boundary.rs:578-584` (those variants),
+  `route/now.rs:141, 236` (`core::Now::SeenChat`), `restart.rs:420-432`
+  (the conversation and goal keys' arms);
+- `crates/temper-service/src/clients/translation.rs:66-67`
+  (`ForgetChat`, `SeenChatLoaded`);
+- the core's `Settings.chat` and `Settings.close_grace`, which jig 16
+  removes: `tests/engine/domain/src/walking.rs:254, 257` (test code);
+- `crates/temper-protocol-store/src/records/application/refusal.rs:5-17,
+  292-296, 328-330` (`Disposal`), and the store schema's `CoreRefused`
+  bound (store-v2, edited in place);
+- `crates/temper-service/src/family/refusals.rs:7-14`, if 04.2 kept it.
+Tests (not counted): `crates/temper-protocol-store/src/tests/records.rs`,
+`crates/temper-service/src/tests/{clients.rs, fixtures.rs}`,
+`tests/client/src/{fixtures.rs, translate.rs}`,
+`tests/conformance/src/{lib.rs, scenarios.rs, stories.rs}`,
+`tests/engine/domain/src/{direct.rs, escalation.rs, escalation_referee.rs,
+roles.rs, roles_referee.rs, walking.rs, walking_referee.rs}`,
+`tests/engine/domain/tests/{document_limits.rs, forge_routes.rs,
+fuzzy_endings.rs, root_routes.rs}`, `tests/system/src/{composed.rs,
+forge/stories.rs, goals.rs, world.rs}`. Shared:
+`crates/temper-engine-domain/src/store.rs` (README, "Shared files").
+The scripts on jig's reference pages, where jig 16.1 to 16.3 change
+what the person finds there (the conversations section and the goals
+board on task queries, the chat and goal acts through `shapes`):
+`tests/one-process/src/stories.rs:15-46`, `src/world.rs:209-222`,
+`crates/temper/tests/support/person.rs:16-27, 231-262`,
+`crates/temper/tests/process.rs:34-63`, `tests/client/tests/stories.rs`,
+their expected names followed as jig 16 follows its own worlds'.
+`root_routes.rs` and `forge_routes.rs` are over 800 lines: at most 40
+added lines each (code-organization.md, 7).
+Shape: no new type. Each removed arm is replaced by nothing; each test
+that sent `people::Ask::StartChat { project, words }` sends the chat
+template filled into jig's `Create`, by jig 16's helper or by
+`walking::chat(project, words)` (Choices).
+Test shape: the tests named above keep their names and expected values;
+none is added beyond `walking::chat`'s own, in
+`tests/engine/domain/tests/root_routes.rs`:
+```rust
+#[test]
+fn a_chat_made_from_the_chat_template_is_a_conversation_task() {
+    let mut driver = Driver::configured(Store::new(), walking::config(91), &walking::limits());
+    driver.hello(Token::new(7));
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    driver.send(walking::ask(1, walking::chat(1, b"hello")));
+    driver.settle();
+    let task = driver.task(1).expect("the chat's task");
+    assert_eq!((task.label, task.conversation), (1, true), "the chat template's label and flag");
+}
+```
+(under 20 ms; `walking::ask` and `driver.task` as the file's other tests
+use them, or their nearest names there).
+Proof: the one-process world, once, as 04.1's command: the person's
+chat, made from the chat template by the client, is answered by the run
+through bytes (about 1 s).
+Don't: rename a removed variant to something of temper's; keep a test
+of a removed mechanism (its behaviour moves to jig's tests, or the test
+goes, README, Rules, "a removed mechanism's tests").
+Size: at most 60 lines (mostly removals; `walking::chat` is test code).
+Removes: the arms and variants named in Files; `Disposal` in temper's
+store codec.
+
+### 04.4 The forge's deepest path in a task line
+
+Scope: a task naming the forge's deepest branch path is listed, not
+refused as too large, in its project's task query (the task line) and its `task` document under
+jig's small profile and under the process tier's override; where either
+is refused as too large, `documents.lines` is set in the configurations
+temper writes (`configuration.md`, 7; `later.md`'s row, which this
+increment closes either way).
+Needs: nothing beyond 04.3.
+Files: `tests/engine/domain/tests/forge_routes.rs` (over 800 lines: at
+most 40 added), on its `change_world` (`:633`); only where a check
+fails: `crates/temper/tests/support/configuration.rs:32` and
+`crates/temper/tests/support/forgejo.rs:137` (`documents.lines`, 2 at
+the base), and the test that holds them to the client,
+`crates/temper/tests/configuration.rs:18`.
+Shape: no type; at most the override's value, the deepest path's
+segments: 5 (`forge`, the host, the owner, the name, `branch`) plus a
+branch `temper/<number>/<words>`'s 3, so 8.
+Test shape: in `tests/engine/domain/tests/forge_routes.rs`, on
+`change_world(silent_ci, passes, approval)` (`:633`), whose producer
+works on a change branch of temper's namespace (the forge's deepest
+path: five segments, then the branch's), and one new helper in the file,
+`task_line(world, project, task) -> Option<Line>`: the party's read of
+the project's task query (jig 22.3's `Read` for task queries), the row of
+`task`, or none when the read is refused. The documents' limits come
+from `jig_protocol_config::profile(Profile::Small).core.documents`, as
+`tests/engine/domain/tests/document_limits.rs:10-14` takes them, and the
+process tier's `lines: 2` beside them, named with its source. The
+reference test, a table test of one behaviour, its rows in a `const`:
+```rust
+const LINES: &[(&str, u32)] = &[("jig's small profile", 4), ("the process tier's override", 2)];
+#[test]
+fn a_change_on_the_forges_deepest_branch_is_listed_in_a_task_query() {
+    for (source, lines) in LINES {
+        let (mut world, _chat, producer, _branch) = change_world_with_lines(*lines);
+        let row = task_line(&mut world, 1, producer.task);
+        assert_eq!(row.map(|line| line.task), Some(producer.task), "{source}: listed, not refused as too large");
+    }
+}
+```
+(`change_world_with_lines` is `change_world(true, 1000, None)` with the
+world's `documents.lines` set, new beside it.) Tests, each row under
+0.5 s (world): the one above, and
+`a_change_on_the_forges_deepest_branch_is_served_in_its_task_document`, the
+producer's `task` document read the same way.
+Proof: the world layer only: no page of temper's reads a task line
+before temper 06.4's Chats page, whose joint-world story then runs over
+the same configuration.
+Don't: raise `documents.lines` where the check passes; change jig's
+profile.
+Size: at most 10 lines of production code (none where the check passes).
+Removes: nothing in code. The retrospective's author removes
+`later.md`'s row "`documents.lines` override" once, when writing the
+retrospective.
+
+## Interface sketches
+
+None: this session adds no type. The shapes it follows are jig 09's,
+14's and 16's.
+
+## Questions to raise when reached
+
+- If jig 14 gives a typed translation of refusals that drops a fact
+  temper's `CoreRefused` shows today, raise it with the fact named.
+
+## Done when
+
+- 04.1 to 04.4 have landed on temper's `origin/main`.
+- `git -C <worktree> grep -n -w -e StartChat -e SetGoal -e Prioritise -e
+  SeenChat -e ForgetChat -e ReadChat -e Disposal -- crates tests testing`
+  prints nothing.
+- `git -C <worktree> grep -n -e '"chats"' -e close_grace -- crates tests`
+  prints nothing.
