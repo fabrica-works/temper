@@ -123,16 +123,16 @@ stays joined to temper's engine root throughout.
   ~/src/rust/jig merge-base --is-ancestor <that landing> <temper's
   present jig pin>` succeeds, no repin commit is made. The repin: `heavy
   cargo update -p jig-domain-core --precise <the landing>`, then `heavy
-  cargo update -p skein-lib --precise <its pin of skein, or skein-01.s1's
-  landing while that pin does not hold it>` and `heavy cargo update -p
-  smith-host-protocol --precise <its pin of smith>`; then `grep -o
+  cargo update -p skein-lib --precise <its pin of skein, or temper's
+  skein floor while that pin does not hold it>` and `heavy cargo update
+  -p smith-host-protocol --precise <its pin of smith>`; then `grep -o
   'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
   sort -u` prints three lines: `jig.git#<the landing>`, smith's line
   equal to that of `git -C ~/src/rust/jig show <the landing>:Cargo.lock`,
-  and skein's equal to it or, while it does not hold skein-01.s1's
-  landing, that landing (README, "Pins", "The terminal's room"); a second
-  revision of a source still there after a second `cargo update` is a
-  question.
+  and skein's equal to it or, while it does not hold temper's skein
+  floor, the floor (README, "Pins", "The terminal's room" and "The
+  print's room"); a second revision of a source still there after a
+  second `cargo update` is a question.
 - **A repin's repairs outside its Shape** follow jig's own diffs and
   are counted with `git diff --numstat origin/main...HEAD -- <the
   changed paths outside the increment's Files> ':!Cargo.lock'`, added
@@ -178,9 +178,12 @@ closes its application" (`ui-text.md`, 7): the host closes the client
 once `Terminal::closed()` is true, after the drain, not before it.
 temper 01.3 put the renderer and the command reader
 on `skein-ui-text`; this increment replaces the rest of `terminal::Loop`.
-Needs: the session's start (temper 02.1 on temper's `main`), and
+Needs: the session's start (temper 02.1 on temper's `main`),
 skein-01.s1's landing (the settings' lines and `Terminal::room`; README,
-"Pins", "The terminal's room").
+"Pins", "The terminal's room"), and forgejo-17's skein step's landing,
+temper's skein floor (each print's room from its own tree, so
+`Terminal::new` takes temper's view limits; README, "Pins", "The
+print's room").
 Files: `crates/temper-client-shell-terminal/src/` (names after temper
 01): `terminal.rs` (318 lines at the base: `Loop`'s reader, pacing,
 printing and output go; its notices' lines stay, said through the
@@ -203,8 +206,10 @@ tests), `tests/support/mod.rs` (271), `tests/fuzzy_terminal.rs`,
 which stays.
 Shape:
 - **The skein move,** 03.1's first commit, on its own (README, "Pins",
-  "The terminal's room"): `heavy cargo update -p skein-lib --precise
-  <skein-01.s1's landing>`; after it, `grep -o
+  "The terminal's room" and "The print's room"): `heavy cargo update -p
+  skein-lib --precise <temper's skein floor>`, none when temper's pin
+  already holds the floor (forgejo-17's temper step moved it first);
+  after it, `grep -o
   'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
   sort -u` prints three lines, jig's and smith's as before and skein's
   that landing, and `git show --stat --format= HEAD` lists `Cargo.lock`
@@ -299,7 +304,13 @@ waiting lines, under 20 ms, in `src/tests.rs`:
 `StoreFailed`, `SignInAgain`, two `Credential`s of two parties waiting,
 then a room of 1, then of 8: said `SignInAgain`, then `StoreFailed` and
 the two credentials, and nothing more). No world test of a held stdout:
-the room and the held input are skein's, tested by skein-01.s1.
+the room and the held input are skein's, tested by skein-01.s1. The
+unit test `the_native_limits_make_the_terminal` (`src/tests.rs`;
+`client.md`, 10), which forgejo-17's temper step lands on `Loop::new`,
+stays, on `Terminal::new` with this increment's `Settings` and
+`limits::view(&limits::native())`'s tree limits: it returns `Some`. If
+this increment lands first, it adds the test. Under ruling 111 it is
+the check of the print's room that runs on carbon-forge.
 Proof: the process tier, once: `heavy sh -c 'cargo build -p temper
 --bin temper && NEXTEST_DOUBLE_SPAWN=0 cargo nextest run -p temper
 --profile process -E "test(temper_open_signs_in_prints_the_inbox_and_exits_on_q)"'`:

@@ -567,8 +567,12 @@ never computes what a party may do.
 The view's limits are skein-ui's (skein's `ui.md`, section 15), derived
 from the domain's: each page's nodes at its windows' most rows, the
 forge's form and its outcome's lines, the kinds' list at its longest,
-and one paragraph per part not served. skein's text shell's print
-bounds derive from them (6.8).
+and one paragraph per part not served. Their text across a tree,
+`text_bytes`, is the nodes at a node's most text: a lower cap would be
+a guess, which skein-ui's builder turns into a panic on the page past
+it. skein's text shell counts its worst-case print from these limits,
+and reserves for each print only what that page's tree may print
+(6.8).
 
 temper's client takes every document within the bounds the engine's
 configuration gives its documents, and those bounds hold the forge's
@@ -738,8 +742,12 @@ command.
 
 The renderer and the command reader are skein's text shell's, step code
 under the subset, bounded by its `worst_case` (skein's `ui-text.md`,
-section 3). What temper decides is in its domain and its view, both
-step code; golden text fixes how temper's pages print (section 10).
+section 3), which the terminal adds to its memory and reserves for no
+print: each print takes the room its own tree gives. temper's view
+limits put that worst case past a u32 of bytes, and the terminal starts
+from them, as `temper open` makes it, in a unit test (section 10).
+What temper decides is in its domain and its view, both step code;
+golden text fixes how temper's pages print (section 10).
 
 ## 7. Signing in and the small store
 
@@ -896,7 +904,9 @@ The client's tiers, as testing.md places them (section 2):
   own tests (testing.md, section 7): the host against a scripted stdin
   and stdout and a scripted transport: signing in by the link and by a
   kept token, a page printed after an act, the end of stdin, an
-  interrupt, `q` drained.
+  interrupt, `q` drained. And, in a unit test, the terminal made from
+  `limits::native()`'s limits, as `temper open` makes it, so the gate
+  meets a refusal of temper's own limits before the process tier does.
 - **`tests/client`** (`temper-client-world`), the joint world, from the
   first increment (testing.md, 6.3): temper's client root and view, with
   skein's fake person acting on the tree, joined to temper's engine root

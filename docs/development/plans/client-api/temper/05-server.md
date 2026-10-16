@@ -105,10 +105,10 @@ reach the engine through the mapping from the first increment on.
   Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`,
   smith's line equal to that of `git -C ~/src/rust/jig show <the
   landing>:Cargo.lock`, and skein's equal to it or, while it does not
-  hold skein-01.s1's landing, that landing, which the repin's `cargo
+  hold temper's skein floor, the floor, which the repin's `cargo
   update -p skein-lib --precise` then takes (README, "Pins", "The
-  terminal's room"); a second revision of a source still there after a
-  second `cargo update` is a question.
+  terminal's room" and "The print's room"); a second revision of a
+  source still there after a second `cargo update` is a question.
 - **A repin's repairs outside its Shape** follow jig's own diffs of
   `jig-test-service`, counted with `git diff --numstat
   origin/main...HEAD -- <the changed paths outside the increment's

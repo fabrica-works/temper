@@ -91,7 +91,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
-| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, forgejo-17's skein step; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
@@ -253,6 +253,30 @@ per session are in each file.
     smith or temper crate names; skein-01.s1's one downstream `Settings`
     literal is jig's test world's, outside temper's build. A build
     failure in a jig or smith crate after temper's move is a question.
+  - **The print's room** (the design answer to forgejo-17's question of
+    2026-10-16T14:19:38Z): skein's text shell takes each print's room
+    from its own tree, and reserves no worst case (skein's `ui-text.md`,
+    3 and 4, at skein `054c06e1`), which forgejo-17's skein step builds,
+    after skein-01.s1. Before it, `Print::new` refuses temper's view
+    limits, whose worst-case print is 257,411,441,911 bytes, past its
+    u32, so every `temper open` panics
+    (`crates/temper-client-shell-terminal/src/terminal.rs:72`), and
+    03.1's `Terminal::new` would too; under ruling 111 no process Proof
+    of this plan meets it. temper's skein floor is that step's landing,
+    `git -C ~/src/rust/skein log origin/main --all-match
+    --grep='^Plan: forgejo-17$' --grep='^Step: skein-' --format=%H -1`,
+    which holds skein-01.s1's. Each skein move of this plan in temper
+    (03.1's, each temper repin's, the closing repin's) goes to the later
+    of its target and the floor, the one that holds the other (`git -C
+    ~/src/rust/skein merge-base --is-ancestor <one> <other>`), and is
+    not made when temper's pin already holds that commit: forgejo-17's
+    temper step may move it there first. Where this plan reads
+    skein-01.s1's landing as temper's skein (this section, the session
+    files), it reads the floor; jig's own pin of skein is unchanged. The
+    step keeps skein-ui-text's API (`Print`'s text a `List<u8>`,
+    `worst_case`'s `(u32, u64)`, both constructors' signatures), and
+    `temper-client-shell-terminal` is the one temper crate that names
+    `skein-ui-text`, so a move onto it is `Cargo.lock` alone.
   - **The closing repin, `temper-repin`:** temper's README-declared
     repin. The coordinator adds it at setup, `plan set temper-repin
     repo=temper state=waiting` (development.md 7.1 adds none, since the
