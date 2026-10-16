@@ -52,6 +52,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-boundary = { git = "https://github.com/forgetic/jig.git" }
 temper-fake-git = { path = "testing/temper-fake-git" }
 temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }
 skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
@@ -70,8 +71,8 @@ jig-protocol-worker-link = { git = "https://github.com/forgetic/jig.git" }
 jig-protocol-engine-clients = { git = "https://github.com/forgetic/jig.git" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
-jig-protocol-client-link = { git = "https://github.com/forgetic/jig.git" }
-jig-shell-native = { git = "https://github.com/forgetic/jig.git" }
+jig-client-protocol-link = { git = "https://github.com/forgetic/jig.git" }
+jig-client-shell-native = { git = "https://github.com/forgetic/jig.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }
 skein-http = { git = "https://github.com/forgetic/skein.git" }
 temper-engine-protocol-forge = { path = "crates/temper-engine-protocol-forge" }
@@ -80,9 +81,9 @@ jig-client-world = { git = "https://github.com/forgetic/jig.git" }
 skein-fake-person = { git = "https://github.com/forgetic/skein.git" }
 skein-ui = { git = "https://github.com/forgetic/skein.git" }
 skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
-jig-test-domain-client = { git = "https://github.com/forgetic/jig.git" }
+jig-client-test-domain = { git = "https://github.com/forgetic/jig.git" }
 temper-client-view = { path = "crates/temper-client-view" }
-jig-view = { git = "https://github.com/forgetic/jig.git" }
+jig-client-view = { git = "https://github.com/forgetic/jig.git" }
 temper-client-domain = { path = "crates/temper-client-domain" }
 jig-domain-client = { git = "https://github.com/forgetic/jig.git" }
 temper-service = { path = "crates/temper-service" }
@@ -92,7 +93,7 @@ temper-worker-protocol-git-world = { path = "tests/worker/protocol-git" }
 temper-forge-forgejo = { path = "crates/temper-forge-forgejo" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }
 temper-client-protocol-wire = { path = "crates/temper-client-protocol-wire" }
-jig-protocol-client-wire = { git = "https://github.com/forgetic/jig.git" }
+jig-client-protocol-wire = { git = "https://github.com/forgetic/jig.git" }
 temper-protocol-worker-wire = { path = "crates/temper-protocol-worker-wire" }
 skein-codec = { git = "https://github.com/forgetic/skein.git" }
 skein-codegen = { git = "https://github.com/forgetic/skein.git" }
