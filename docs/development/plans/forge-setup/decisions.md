@@ -225,6 +225,18 @@ run are appended after "For the user".
      `pub`, and `protocol.rs:63-66` keeps its copy. Sketches A to E compiled under clippy; no suite was reached. A further
      user of a reshaped `Hook` or `Change` found while working is updated, and named in the commit body.
 
+106. **12's Shapes against main** (ready check of temper-12.1).
+     Ruling 106, the ready check of temper-12.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/12-box-machine.md: jig-boundary is at the rev `Cargo.lock` locks (755e02e then, not 2900e9b); 12.2's
+     `io_limits` gives `skein_io::Limits`'s five other fields (`sends` 1, `accepts` 1, `backlog` 1, `close_timeout` 5 s,
+     `retry` 10 ms, as the terminal's `limits.rs:90-94`); the harness's root is `Sim::root(Handle::new(opened.raw()))`,
+     `Sim::now` is `sim.rs:191`, and each ask goes to `skein_fake_machine::step` alone, never `serve`, the spawn's
+     environment recorded from its `Ask::Spawn` first (`step` drops it, `face.rs:19`). The host in the `no_std` crate
+     under the subset's lints is the design's: setup.md 596-598, "its host (ordinary Rust) on skein-io's processes; …
+     one crate, under the subset's lints, its host written within the subset". Sketches 1-3 and the boundary test
+     compiled under clippy; the boundary test passed, 1 of 1. A further stale pin or limit found while working is
+     refreshed, and named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
