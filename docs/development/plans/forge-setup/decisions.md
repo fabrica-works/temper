@@ -370,6 +370,16 @@ run are appended after "For the user".
      - Do not weaken the story or its fixture, and do not defer the phase.
      - Unchanged: 06.2's Shape and tests; the README's "Sizes".
 
+116. **02.1 at up to 1100, 02.2 at 600** (plan defect, temper 02's block of 2026-10-16T23:47:27Z).
+     Ruling 116, a plan defect: 02.1's Size of 250 (codec) under-counted seven request variants with both codec sides,
+     two tables and a 21-capture recorder, and the exhaustive arms they reach, which ruling 109 found to be more than the
+     session file named (`server/writes.rs`, `client/writes.rs`, `client/start.rs`, `server/items.rs`, the fake's lists).
+
+     - 02.1 lands at up to 1100 production lines by code-organization.md 6's command, past the README's "Sizes" (3 times a
+       codec Size, 750). Past 1100, stop on a question again, with the count by file.
+     - 02.2 (four hook variants, the same lists) lands at up to 600, not 450: its arms meet the same lists as 02.1's.
+     - Unchanged: never trim a doc comment, a test or the formatting to meet a Size (implementer.md, 8.6); 02's proofs.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

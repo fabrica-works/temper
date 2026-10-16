@@ -163,7 +163,7 @@ heavy --gate -- sh -c 'cargo run -p forgejo-conformance -- --scratch target/forg
 Don't: no remove or delete request (reconcile only makes again); no request for `POST /orgs` (its two captures are
 probes); no `description`, `can_create_org_repo` or deprecated `units` sent; no credential in a `Request`; no route
 served by the fake; no hand-edited transcript or fact; no admin call captured under the `all` token.
-Size: 250 (codec).
+Size: 250 (codec); it lands at up to 1100 by the ruling of 2026-10-16T23:47:27Z's block.
 Removes: nothing.
 
 ### 02.2 Org hooks
@@ -210,7 +210,7 @@ runs the 7 tests of `src/tests/hooks.rs`, under 30 s built. As 02.1: temper 09.3
 Don't: no repository hook (the person's); no `workflow_run_*` or `action_run_*` event (the caller's list, forge.md 5);
 no delete but a hook's; the secret never in a `Debug`, a message or a test name; log or `{:?}` an `Encoded` of a hook
 request (its body holds the secret).
-Size: 150 (codec); the arms in `crates/` are about 90 of it (the delete adds about 20).
+Size: 150 (codec), landing at up to 600 by the same ruling; the arms in `crates/` are about 90 of it (the delete adds about 20).
 Removes: nothing.
 
 ## Interface sketches
