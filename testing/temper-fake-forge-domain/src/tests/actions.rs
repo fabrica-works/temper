@@ -1,5 +1,5 @@
 use super::*;
-use crate::api::{Job, JobRef, Order, Run};
+use crate::api::{Failing, Job, JobRef, Order, Run, Step, StepStatus};
 
 fn failing(reruns: u32) -> (Harness, u64) {
     let mut configured = setup();
@@ -72,24 +72,15 @@ fn a_commits_run_is_found_by_its_number_and_its_jobs_by_run() {
 #[test]
 fn a_job_log_is_read_by_job_id_and_attempt() {
     let (mut h, _) = failing(0);
-    for (job, attempt, max_bytes, expected) in [
-        (
-            1,
-            1,
-            256,
-            Ok(Answer::File(copy_of(
-                b"failing check ci 0\nfailing check ci 1\nfailing check ci 2\nfailing check ci 3\n",
-            ))),
-        ),
-        (1, 1, 8, Ok(Answer::File(copy_of(b"eck ci 3\n")))),
-        (1, 2, 8, Err(Error::Missing(What::Job))),
-        (2, 1, 8, Err(Error::Missing(What::Job))),
-        (1, 1, 0, Err(Error::TooLarge)),
+    for (job, attempt, expected) in [
+        (1, 1, Ok(Answer::File(copy_of(WHOLE_LOG)))),
+        (1, 2, Err(Error::Missing(What::Job))),
+        (2, 1, Err(Error::Missing(What::Job))),
     ] {
         assert_eq!(
-            h.call(PERSON, read(Read::Job { job, attempt, max_bytes })),
+            h.call(PERSON, read(Read::Log { job, attempt, step: None })),
             expected,
-            "job {job} attempt {attempt} bound {max_bytes}"
+            "job {job} attempt {attempt}"
         );
     }
 }
@@ -103,11 +94,8 @@ fn a_rerun_context_answers_its_second_attempt() {
     );
     let Answer::Checks(checks) = h.ok(PERSON, read(Read::Checks { commit: work })) else { unreachable!("checks") };
     assert_eq!(checks.first().unwrap().job, Some(JobRef { run: 1, job: 1, attempt: 2 }));
-    assert_eq!(h.call(PERSON, read(Read::Job { job: 1, attempt: 1, max_bytes: 8 })), Err(Error::Missing(What::Job)));
-    assert_eq!(
-        h.ok(PERSON, read(Read::Job { job: 1, attempt: 2, max_bytes: 8 })),
-        Answer::File(copy_of(b"eck ci 3\n"))
-    );
+    assert_eq!(h.call(PERSON, read(Read::Log { job: 1, attempt: 1, step: None })), Err(Error::Missing(What::Job)));
+    assert_eq!(h.ok(PERSON, read(Read::Log { job: 1, attempt: 2, step: None })), Answer::File(copy_of(WHOLE_LOG)));
 }
 
 #[test]
@@ -233,4 +221,84 @@ fn an_empty_pull_opens_only_when_opens_empty() {
         };
         assert_eq!(h.call(ENGINE, write(input)), expected, "head {head:?} opens_empty {opens_empty}");
     }
+}
+
+const WORKFLOW_LOG: &[u8] = b"failing check ci 0\nfailing check ci 1\nfailing check ci 2\nfailing check ci 3\n";
+const WHOLE_LOG: &[u8] =
+    b"set up ci\nfailing check ci 0\nfailing check ci 1\nfailing check ci 2\nfailing check ci 3\njob ci failed\n";
+
+#[test]
+fn a_failed_job_read_by_id_has_three_steps_failing_at_the_workflow() {
+    let (mut h, _) = failing(0);
+    assert_eq!(
+        h.ok(PERSON, read(Read::Job { job: 1 })),
+        Answer::Job {
+            job: Job { id: 1, run: 1, index: 0, attempt: 1 },
+            steps: Box::new([
+                Step {
+                    number: 0,
+                    name: copy_of(b"Set up job"),
+                    status: StepStatus::Success,
+                    log: copy_of(b"set up ci\n")
+                },
+                Step { number: 1, name: copy_of(b"Run ci"), status: StepStatus::Failure, log: copy_of(WORKFLOW_LOG) },
+                Step {
+                    number: 2,
+                    name: copy_of(b"Complete job"),
+                    status: StepStatus::Failure,
+                    log: copy_of(b"job ci failed\n")
+                },
+            ]),
+        }
+    );
+}
+
+#[test]
+fn a_cancelled_job_has_its_workflow_and_completion_steps_cancelled() {
+    let (mut h, _) = failing(0);
+    crate::set_failing(&mut h.domain, REPOSITORY, b"ci", Failing::NoStep);
+    let Answer::Job { steps, .. } = h.ok(PERSON, read(Read::Job { job: 1 })) else { unreachable!("job") };
+    assert_eq!(steps[0].status, StepStatus::Success);
+    assert_eq!(steps[1].status, StepStatus::Cancelled);
+    assert_eq!(steps[2].status, StepStatus::Cancelled);
+    assert_eq!(&*steps[2].log, b"job ci cancelled\n");
+}
+
+#[test]
+fn each_step_of_a_failed_jobs_log_is_a_slice_of_its_own() {
+    let (mut h, _) = failing(0);
+    for (step, expected) in [
+        (Some(0), b"set up ci\n".as_slice()),
+        (Some(1), WORKFLOW_LOG),
+        (Some(2), b"job ci failed\n"),
+        (None, WHOLE_LOG),
+    ] {
+        assert_eq!(
+            h.ok(PERSON, read(Read::Log { job: 1, attempt: 1, step })),
+            Answer::File(copy_of(expected)),
+            "{step:?}"
+        );
+    }
+}
+
+#[test]
+fn a_log_step_past_the_last_is_missing() {
+    let (mut h, _) = failing(0);
+    assert_eq!(h.call(PERSON, read(Read::Log { job: 1, attempt: 1, step: Some(3) })), Err(Error::Missing(What::Job)));
+}
+
+#[test]
+fn a_job_read_by_id_answers_its_latest_attempt() {
+    let (mut h, _) = failing(1000);
+    let Answer::Job { job, .. } = h.ok(PERSON, read(Read::Job { job: 1 })) else { unreachable!("job") };
+    assert_eq!(job, Job { id: 1, run: 1, index: 0, attempt: 2 });
+}
+
+#[test]
+fn a_passing_ci_jobs_read_by_id_is_missing() {
+    let mut h = Harness::with(CALM, setup());
+    let work = h.commit(FIRST, &[(b"src", b"one")]);
+    h.push(ENGINE, b"work", work).unwrap();
+    h.settle();
+    assert_eq!(h.call(PERSON, read(Read::Job { job: 1 })), Err(Error::Missing(What::Job)));
 }

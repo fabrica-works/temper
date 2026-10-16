@@ -530,6 +530,7 @@ fn execute(domain: &mut Domain, env: &Env<Config>, user: u64, repository: &[u8],
                 | Read::FirstPull { .. }
                 | Read::OpenPulls { .. }
                 | Read::Job { .. }
+                | Read::Log { .. }
                 | Read::PullFor { .. }
                 | Read::Statuses { .. }
                 | Read::Permission { .. }

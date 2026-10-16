@@ -1,4 +1,4 @@
-use super::fixtures::{at, boxed, config, limits};
+use super::fixtures::{at, boxed, config};
 use crate::{
     errors, route, routes,
     tally::{Route, Tally},
@@ -11,7 +11,7 @@ use temper_forge_forgejo::{
     request::{self as r, Request},
 };
 
-fn read_rows() -> [(Request, Route, Op); 24] {
+fn read_rows() -> [(Request, Route, Op); 26] {
     let p = r::Page { page: Some(2), limit: Some(3) };
     let oid = routes::object(9);
     [
@@ -98,10 +98,16 @@ fn read_rows() -> [(Request, Route, Op); 24] {
         ),
         (Request::Run { at: at(), run: 7 }, Route::Run, Op::Read(Read::Run { run: 7 })),
         (Request::Jobs { at: at(), run: 7 }, Route::Jobs, Op::Read(Read::Jobs { run: 7 })),
+        (Request::Job { at: at(), job: 8 }, Route::Job, Op::Read(Read::Job { job: 8 })),
+        (
+            Request::JobLog { at: at(), job: 8, attempt: 2, step: Some(1) },
+            Route::JobLog,
+            Op::Read(Read::Log { job: 8, attempt: 2, step: Some(1) }),
+        ),
         (
             Request::JobLog { at: at(), job: 8, attempt: 2, step: None },
             Route::JobLog,
-            Op::Read(Read::Job { job: 8, attempt: 2, max_bytes: 4096 }),
+            Op::Read(Read::Log { job: 8, attempt: 2, step: None }),
         ),
     ]
 }
@@ -110,7 +116,7 @@ fn each_read_route_names_one_domain_read() {
     for (input, name, expected) in read_rows() {
         assert_eq!(route(&input), name, "{name:?}");
         assert_eq!(routes::repository(&config(), &input).as_deref(), Some(&b"org/repo"[..]), "{name:?}");
-        assert_eq!(routes::op(&config(), &limits(), &input), Ok(expected), "{name:?}");
+        assert_eq!(routes::op(&config(), &input), Ok(expected), "{name:?}");
     }
 }
 
@@ -205,7 +211,7 @@ fn write_rows() -> [(Request, Route, Write); 14] {
 fn each_write_route_names_one_domain_write() {
     for (input, name, expected) in write_rows() {
         assert_eq!(route(&input), name, "{name:?}");
-        assert_eq!(routes::op(&config(), &limits(), &input), Ok(Op::Write(expected)), "{name:?}");
+        assert_eq!(routes::op(&config(), &input), Ok(Op::Write(expected)), "{name:?}");
     }
 }
 

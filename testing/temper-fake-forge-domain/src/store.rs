@@ -45,6 +45,7 @@ pub(crate) struct Repository {
     /// The last revision given to a wiki page.
     pub(crate) revisions: u64,
     pub(crate) checks: Checks,
+    pub(crate) failing: Box<[crate::api::Failing]>,
     pub(crate) protection: Option<Protection>,
     /// Whether a subscriber hears of its changes.
     pub(crate) hooked: bool,
@@ -135,6 +136,10 @@ impl Repository {
         protection: Option<Protection>,
         hooked: bool,
     ) -> Repository {
+        let mut failing = List::with_capacity(u32::try_from(checks.contexts.len()).expect("bounded contexts"));
+        for _ in &checks.contexts {
+            failing.push(crate::api::Failing::Workflow).expect("one per context");
+        }
         let mut repository = Repository {
             id: 0,
             name,
@@ -154,6 +159,7 @@ impl Repository {
             wiki: Map::with_capacity(limits.pages),
             revisions: 0,
             checks,
+            failing: failing.into_boxed(),
             protection,
             hooked,
             reachable: true,

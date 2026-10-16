@@ -77,13 +77,11 @@ fn copy_of_jobs(jobs: &List<Job>) -> Box<[Job]> {
     answer.into_boxed()
 }
 
-pub(crate) fn job(repository: &Repository, id: u64, attempt: u32) -> Result<(u64, &[u8]), Error> {
+pub(crate) fn latest(repository: &Repository, id: u64) -> Result<(u64, Job), Error> {
     for (&commit, kept) in &repository.runs {
         for job in &kept.jobs {
-            if job.id == id && job.attempt == attempt {
-                let index = usize::try_from(job.index).expect("a bounded context");
-                let name = repository.checks.contexts.get(index).expect("a configured context");
-                return Ok((commit, name));
+            if job.id == id {
+                return Ok((commit, *job));
             }
         }
     }
@@ -126,4 +124,110 @@ fn append(out: &mut List<u8>, bytes: &[u8]) {
 }
 fn decimal(out: &mut List<u8>, number: u64) {
     append(out, skein_lib::Decimal::of(number).as_bytes());
+}
+
+/// Where a context's failed job fails, set by the scenario.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Failing {
+    /// The workflow step and completion fail.
+    Workflow,
+    /// The workflow and completion are cancelled; no step fails.
+    NoStep,
+}
+
+/// One step's Forgejo fields and its separately served log slice.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Step {
+    pub number: u32,
+    pub name: Box<[u8]>,
+    pub status: StepStatus,
+    pub log: Box<[u8]>,
+}
+
+/// A step's outcome, in the fake's vocabulary.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StepStatus {
+    Success,
+    Failure,
+    Cancelled,
+}
+
+/// The number of the job's one workflow step.
+pub const WORKFLOW_STEP: u32 = 1;
+
+pub(crate) fn steps(context: &[u8], failing: Failing) -> Box<[Step]> {
+    let status = match failing {
+        Failing::Workflow => StepStatus::Failure,
+        Failing::NoStep => StepStatus::Cancelled,
+    };
+    Box::new([
+        Step {
+            number: 0,
+            name: skein_lib::bytes::copy_of(b"Set up job"),
+            status: StepStatus::Success,
+            log: log(context, failing, Some(0)).expect("set-up log"),
+        },
+        Step {
+            number: WORKFLOW_STEP,
+            name: joined(context, &[b"Run ", context]),
+            status,
+            log: log(context, failing, Some(1)).expect("workflow log"),
+        },
+        Step {
+            number: 2,
+            name: skein_lib::bytes::copy_of(b"Complete job"),
+            status,
+            log: log(context, failing, Some(2)).expect("completion log"),
+        },
+    ])
+}
+
+pub(crate) fn log(context: &[u8], failing: Failing, step: Option<u32>) -> Result<Box<[u8]>, Error> {
+    if let Some(number) = step
+        && number > 2
+    {
+        return Err(Error::Missing(What::Job));
+    }
+    let capacity = u32::try_from(context.len())
+        .expect("bounded context")
+        .checked_mul(6)
+        .expect("bounded log")
+        .checked_add(91)
+        .expect("bounded log");
+    let mut out = List::with_capacity(capacity);
+    if step.is_none() || step == Some(0) {
+        append(&mut out, b"set up ");
+        append(&mut out, context);
+        append(&mut out, b"\n");
+    }
+    if step.is_none() || step == Some(WORKFLOW_STEP) {
+        for line in 0_u8..4 {
+            append(&mut out, b"failing check ");
+            append(&mut out, context);
+            append(&mut out, b" ");
+            out.push(b'0'.checked_add(line).expect("four lines")).expect("log capacity");
+            append(&mut out, b"\n");
+        }
+    }
+    if step.is_none() || step == Some(2) {
+        append(&mut out, b"job ");
+        append(&mut out, context);
+        append(
+            &mut out,
+            match failing {
+                Failing::Workflow => b" failed\n",
+                Failing::NoStep => b" cancelled\n",
+            },
+        );
+    }
+    Ok(out.into_boxed())
+}
+
+fn joined(context: &[u8], parts: &[&[u8]]) -> Box<[u8]> {
+    let capacity = u32::try_from(context.len()).expect("bounded context").checked_add(4).expect("bounded name");
+    let mut out = List::with_capacity(capacity);
+    for part in parts {
+        append(&mut out, part);
+    }
+    out.into_boxed()
 }

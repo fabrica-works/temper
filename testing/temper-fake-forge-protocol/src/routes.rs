@@ -1,5 +1,5 @@
 //! Every non-table route is exactly one call to the fake domain.
-use crate::{Config, Limits};
+use crate::Config;
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, Time, Wall, Writer};
 use temper_fake_forge_domain::api::{self as a, Op, Read, Write};
@@ -140,7 +140,7 @@ pub fn check(state: d::StatusState) -> a::Check {
     }
 }
 /// Translates the document's fields; a bad count or user names a missing object.
-pub fn op(config: &Config, limits: &Limits, request: &Request) -> Result<Op, a::Error> {
+pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
     let missing = a::Error::Missing(a::What::Commit);
     let read = match request {
         Request::User | Request::ApiSettings | Request::UserSearch { .. } => return Err(a::Error::Refused),
@@ -214,9 +214,9 @@ pub fn op(config: &Config, limits: &Limits, request: &Request) -> Result<Op, a::
             Read::Runs { commit: commit(head_sha).ok_or(missing)?, number: *run_number }
         }
         Request::Run { run, .. } => Read::Run { run: *run },
-        Request::Job { .. } => return Err(a::Error::Missing(a::What::Job)),
+        Request::Job { job, .. } => Read::Job { job: *job },
         Request::Jobs { run, .. } => Read::Jobs { run: *run },
-        Request::JobLog { job, attempt, .. } => Read::Job { job: *job, attempt: *attempt, max_bytes: limits.raw_bytes },
+        Request::JobLog { job, attempt, step, .. } => Read::Log { job: *job, attempt: *attempt, step: *step },
         Request::CreateIssue { .. }
         | Request::OpenPull { .. }
         | Request::PostComment { .. }

@@ -6,7 +6,7 @@ use core::mem::size_of;
 
 use skein_lib::{Deadlines, Id, List, Map, Queue, Set, Slab, Time};
 
-use crate::actions::{Job, Kept as RunKept, Run};
+use crate::actions::{Failing, Job, Kept as RunKept, Run, Step};
 use crate::api::{
     ChangedFile, CheckSummary, Collaborator, Comment, File, Head, PageName, Permission, Pull, Review,
     Status as StatusView, Summary,
@@ -143,6 +143,7 @@ fn repository(limits: &Limits) -> Option<u64> {
     let setup = name
         .checked_mul(5)?
         .checked_add(names(limits.contexts, limits)?.checked_mul(2)?)?
+        .checked_add(times(limits.contexts, u64::try_from(size_of::<Failing>()).ok()?)?)?
         .checked_add(u64::from(limits.content_bytes))?;
     let permissions = Map::<u64, Permission>::worst_case(limits.users)?;
     let labels = Set::<Box<[u8]>>::worst_case(limits.labels)?.checked_add(times(limits.labels, name)?)?;
@@ -236,7 +237,11 @@ fn answer(limits: &Limits) -> Option<u64> {
     let pulls = times(limits.page_size, pull.checked_add(u64::try_from(size_of::<Pull>()).ok()?)?)?;
     let runs = u64::try_from(size_of::<Run>()).ok()?;
     let jobs = times(limits.contexts, u64::try_from(size_of::<Job>()).ok()?)?;
-    let log = name.checked_add(17)?.checked_mul(4)?;
+    let log = name.checked_mul(6)?.checked_add(91)?;
+    let job = u64::try_from(size_of::<Job>())
+        .ok()?
+        .checked_add(times(3, u64::try_from(size_of::<Step>()).ok()?)?)?
+        .checked_add(name.checked_mul(7)?.checked_add(117)?)?;
     let protection = name.checked_add(names(limits.contexts, limits)?)?;
     let collaborators = times(limits.users, u64::try_from(size_of::<Collaborator>()).ok()?)?;
     Some(
@@ -257,6 +262,7 @@ fn answer(limits: &Limits) -> Option<u64> {
             .max(pulls)
             .max(runs)
             .max(jobs)
+            .max(job)
             .max(log),
     )
 }

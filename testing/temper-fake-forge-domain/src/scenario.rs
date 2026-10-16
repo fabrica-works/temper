@@ -196,3 +196,18 @@ pub fn commit_tree(
     fits(message, message_limit(&config.limits)?)?;
     git::store(domain, Object { parent: Some(parent), merge_parent: merging, tree, message: copy_of(message) })
 }
+
+/// Sets where the context's failed jobs fail in the repository.
+pub fn set_failing(domain: &mut Domain, repository: &[u8], context: &[u8], failing: crate::api::Failing) {
+    let id = domain.id(repository);
+    let repository = domain.repositories.get_mut(id).expect("a repository of the forge");
+    let mut found = None;
+    for (index, name) in repository.checks.contexts.iter().enumerate() {
+        if name.as_ref() == context {
+            found = Some(index);
+            break;
+        }
+    }
+    *repository.failing.get_mut(found.expect("a context of the repository's checks")).expect("one entry per context") =
+        failing;
+}

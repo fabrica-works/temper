@@ -147,48 +147,43 @@ pub(crate) fn checks(repository: &Repository, limits: &Limits, commit: u64, ci_u
     Ok(Answer::Checks(summaries.into_boxed()))
 }
 
-pub(crate) fn job(
+pub(crate) fn job(repository: &Repository, id: u64, ci_user: u64) -> Result<Answer, Error> {
+    let (job, context, failing) = failed_job(repository, id, ci_user)?;
+    Ok(Answer::Job { job, steps: crate::actions::steps(context, failing) })
+}
+
+pub(crate) fn log(
     repository: &Repository,
-    job: u64,
+    id: u64,
     attempt: u32,
-    max_bytes: u32,
+    step: Option<u32>,
     ci_user: u64,
 ) -> Result<Answer, Error> {
-    let (commit, context) = crate::actions::job(repository, job, attempt)?;
+    let (job, context, failing) = failed_job(repository, id, ci_user)?;
+    if job.attempt != attempt {
+        return Err(Error::Missing(What::Job));
+    }
+    Ok(Answer::File(crate::actions::log(context, failing, step)?))
+}
+
+fn failed_job(
+    repository: &Repository,
+    id: u64,
+    ci_user: u64,
+) -> Result<(crate::api::Job, &[u8], crate::api::Failing), Error> {
+    let (commit, job) = crate::actions::latest(repository, id)?;
+    let index = usize::try_from(job.index).expect("a bounded context");
+    let context = repository.checks.contexts.get(index).expect("a configured context");
     let status = repository
         .statuses
         .get(&commit)
         .ok_or(Error::Missing(What::Job))?
-        .get(context)
+        .get(context.as_ref())
         .ok_or(Error::Missing(What::Job))?;
     if status.author != ci_user || status.state != Check::Failed {
         return Err(Error::Missing(What::Job));
     }
-    if max_bytes == 0 {
-        return Err(Error::TooLarge);
-    }
-    let Some(line_bytes) = b"failing check ".len().checked_add(context.len()) else { return Err(Error::TooLarge) };
-    let Some(line_bytes) = line_bytes.checked_add(3) else { return Err(Error::TooLarge) };
-    let Some(log_bytes) = line_bytes.checked_mul(4) else { return Err(Error::TooLarge) };
-    let Ok(capacity) = u32::try_from(log_bytes) else { return Err(Error::TooLarge) };
-    let mut log = List::with_capacity(capacity);
-    for line in 0_u8..4 {
-        for byte in b"failing check " {
-            log.push(*byte).expect("fixed fake log capacity");
-        }
-        for byte in context {
-            if log.push(*byte).is_err() {
-                return Err(Error::TooLarge);
-            }
-        }
-        log.push(b' ').expect("fixed fake log capacity");
-        log.push(b'0'.checked_add(line).expect("four fake lines have one-digit numbers"))
-            .expect("fixed fake log capacity");
-        log.push(b'\n').expect("fixed fake log capacity");
-    }
-    let length = usize::try_from(max_bytes).expect("u32 fits usize").saturating_add(1).min(log.as_slice().len());
-    let start = log.as_slice().len().checked_sub(length).expect("length capped at log");
-    Ok(Answer::File(Box::from(log.as_slice().get(start..).expect("start in log"))))
+    Ok((job, context, *repository.failing.get(index).expect("a configured context")))
 }
 
 pub(crate) fn settings(repository: &Repository) -> Answer {

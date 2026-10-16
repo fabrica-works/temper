@@ -444,7 +444,7 @@ fn decoded(server: &mut Server, service: &mut Service, env: &Env<Limits>, reques
         }
         return;
     }
-    let op = routes::op(&service.config, &env.limits, &request);
+    let op = routes::op(&service.config, &request);
     let select = match server.range {
         Ok(range) => response::select(&service.config, &request, range),
         Err(error) => Err(error),

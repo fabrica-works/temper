@@ -356,6 +356,7 @@ pub fn read(config: &Config, request: &Request, answer: &a::Answer) -> Result<An
             index_in_repo: value.number,
             commit_sha: routes::object(value.commit),
         })),
+        a::Answer::Job { job, steps } => Ok(job_answer(*job, steps)),
         a::Answer::Jobs(values) => {
             let mut out = List::with_capacity(u32::try_from(values.len()).expect("domain bound"));
             for value in values {
@@ -461,4 +462,23 @@ fn collaborators(config: &Config, request: &Request, values: &[a::Collaborator])
         out.push(routes::user(config, value.user)).expect("page cap");
     }
     Ok(Answer::Collaborators(out.into_boxed()))
+}
+
+/// A fake step's outcome in Forgejo's words.
+#[must_use]
+pub fn step(status: a::StepStatus) -> d::StepStatus {
+    match status {
+        a::StepStatus::Success => d::StepStatus::Success,
+        a::StepStatus::Failure => d::StepStatus::Failure,
+        a::StepStatus::Cancelled => d::StepStatus::Cancelled,
+    }
+}
+
+fn job_answer(job: a::Job, steps: &[a::Step]) -> Answer {
+    let mut out = List::with_capacity(u32::try_from(steps.len()).expect("domain bound"));
+    for value in steps {
+        out.push(d::Step { number: value.number, name: value.name.clone(), status: step(value.status) })
+            .expect("sized steps");
+    }
+    Answer::Job { job: d::Job { id: job.id, run_id: job.run, attempt: job.attempt }, steps: out.into_boxed() }
 }

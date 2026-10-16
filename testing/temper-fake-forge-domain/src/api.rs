@@ -101,12 +101,16 @@ pub enum Read {
     Checks {
         commit: u64,
     },
-    /// Bounded plaintext output of one the pinned Forgejo job attempt. The
-    /// existing byte answer carries one extra byte when truncated.
+    /// The job at its latest attempt, with its steps; missing unless CI failed it.
     Job {
         job: u64,
+    },
+    /// One job attempt's plaintext output, as the pinned Forgejo serves it.
+    /// A step selects its slice; none joins all three slices in order.
+    Log {
+        job: u64,
         attempt: u32,
-        max_bytes: u32,
+        step: Option<u32>,
     },
     /// Actions routes, bounded by the repository's retained CI history.
     Runs {
@@ -393,6 +397,11 @@ pub enum Answer {
     Runs(Box<[Run]>),
     Run(Run),
     Jobs(Box<[Job]>),
+    /// A job and its steps, each with the log served separately by the protocol.
+    Job {
+        job: Job,
+        steps: Box<[Step]>,
+    },
     PullFiles {
         head: u64,
         files: Box<[ChangedFile]>,
@@ -512,7 +521,7 @@ pub enum What {
     Job,
 }
 
-pub use crate::actions::{Job, Run};
+pub use crate::actions::{Failing, Job, Run, Step, StepStatus, WORKFLOW_STEP};
 
 /// The order of an item listing.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

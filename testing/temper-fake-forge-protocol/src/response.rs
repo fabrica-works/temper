@@ -36,6 +36,7 @@ fn number(answer: &Answer) -> Option<u64> {
         | Answer::Runs(_)
         | Answer::Run(_)
         | Answer::Jobs(_)
+        | Answer::Job { .. }
         | Answer::PullFiles { .. }
         | Answer::Comparison { .. }
         | Answer::Checks(_)
@@ -300,6 +301,7 @@ fn document(config: &Config, request: &Request, select: &Select, answer: &Answer
         | Answer::Runs(_)
         | Answer::Run(_)
         | Answer::Jobs(_)
+        | Answer::Job { .. }
         | Answer::PullFiles { .. }
         | Answer::Comparison { .. }
         | Answer::Protection(_)
@@ -355,6 +357,7 @@ pub fn answer(
         | Answer::Runs(_)
         | Answer::Run(_)
         | Answer::Jobs(_)
+        | Answer::Job { .. }
         | Answer::PullFiles { .. }
         | Answer::Comparison { .. }
         | Answer::Checks(_)
@@ -399,6 +402,7 @@ pub fn answer(
         | Answer::Runs(_)
         | Answer::Run(_)
         | Answer::Jobs(_)
+        | Answer::Job { .. }
         | Answer::Comparison { .. }
         | Answer::Checks(_)
         | Answer::Protection(_)
@@ -585,6 +589,19 @@ mod bounded {
             }
             Some(())
         }
+        fn rows(&mut self, len: usize) -> Option<()> {
+            for _ in 0..len {
+                self.row(0)?;
+            }
+            Some(())
+        }
+        fn steps(&mut self, steps: &[a::Step]) -> Option<()> {
+            self.row(0)?;
+            for step in steps {
+                self.row(step.name.len())?;
+            }
+            Some(())
+        }
         fn files(&mut self, files: &[a::ChangedFile]) -> Option<()> {
             for file in files {
                 self.row(file.path.len())?;
@@ -646,16 +663,9 @@ mod bounded {
                     budget.row(0)?;
                 }
             }
-            a::Answer::Runs(runs) => {
-                for _ in runs {
-                    budget.row(0)?;
-                }
-            }
-            a::Answer::Jobs(jobs) => {
-                for _ in jobs {
-                    budget.row(0)?;
-                }
-            }
+            a::Answer::Runs(runs) => budget.rows(runs.len())?,
+            a::Answer::Jobs(jobs) => budget.rows(jobs.len())?,
+            a::Answer::Job { steps, .. } => budget.steps(steps)?,
             a::Answer::PullFiles { files, .. } => budget.files(files)?,
             a::Answer::Comparison { files, commits, .. } => {
                 budget.files(files)?;

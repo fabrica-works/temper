@@ -73,6 +73,6 @@ pub use git::{Object, Tree};
 pub use limits::{Limits, worst_case};
 pub use observe::{Branches, Observation, Operation};
 pub use scenario::{
-    advance, commit, commit_tree, grant, merge_commit, repository, set_reachable, set_refusing, settings,
+    advance, commit, commit_tree, grant, merge_commit, repository, set_failing, set_reachable, set_refusing, settings,
     unborn_repository,
 };

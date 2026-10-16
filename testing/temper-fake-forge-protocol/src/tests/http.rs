@@ -221,3 +221,26 @@ fn an_unpaged_thread_past_the_projection_budget_is_refused() {
         Err(a::Error::TooLarge)
     );
 }
+
+#[test]
+fn a_failed_jobs_steps_and_failed_steps_log_are_served_over_http() {
+    let mut h = Harness::new(fixtures::config());
+    assert_eq!(h.push(b"work"), 2);
+    h.ask(b"GET", b"/api/v1/repos/org/repo/actions/jobs/1", b"");
+    assert_eq!(h.status(), 200);
+    let job = h.body();
+    for step in [
+        b"{\"number\":0,\"name\":\"Set up job\",\"status\":\"success\"}".as_slice(),
+        b"{\"number\":1,\"name\":\"Run build\",\"status\":\"failure\"}",
+        b"{\"number\":2,\"name\":\"Complete job\",\"status\":\"failure\"}",
+    ] {
+        assert!(bytes::find(&job, step).is_some(), "{step:?}");
+    }
+    h.ask(b"GET", b"/api/v1/repos/org/repo/actions/jobs/1/logs?attempt=1&step=1", b"");
+    assert_eq!(h.status(), 200);
+    assert_eq!(
+        &*h.body(),
+        b"failing check build 0\nfailing check build 1\nfailing check build 2\nfailing check build 3\n"
+    );
+    assert_eq!(h.domain_calls(), 2);
+}

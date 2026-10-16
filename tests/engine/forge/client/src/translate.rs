@@ -108,9 +108,7 @@ fn read_op(read: &client::Read, l: &Limits) -> forge::Read {
         }
         client::Read::File { head, path, .. } => forge::Read::File { commit: number(*head), path: path.clone() },
         client::Read::Checks { commit } => forge::Read::Checks { commit: number(*commit) },
-        client::Read::Job { attempt, max_bytes } => {
-            forge::Read::Job { job: attempt.job, attempt: attempt.attempt, max_bytes: *max_bytes }
-        }
+        client::Read::Job { attempt, .. } => forge::Read::Job { job: attempt.job },
         client::Read::Protection { branch } => forge::Read::Protection { branch: branch.clone() },
         client::Read::Settings => forge::Read::Settings,
         client::Read::Collaborators { .. } => forge::Read::Collaborators,
@@ -238,6 +236,7 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         }
         forge::Answer::Checks(checks) => checks_answer(asked, checks),
         forge::Answer::File(content) => byte_answer(asked, &content),
+        forge::Answer::Job { steps, .. } => byte_answer(asked, workflow_log(&steps)),
         forge::Answer::Protection(protection) => client::Answer::Protection(match protection {
             Some(p) => Some(client::Protection {
                 branch: p.branch,
@@ -493,6 +492,15 @@ pub fn digest(bytes: &[u8]) -> u64 {
         hash = (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
     }
     hash
+}
+
+fn workflow_log(steps: &[forge::Step]) -> &[u8] {
+    for step in steps {
+        if step.number == forge::WORKFLOW_STEP {
+            return &step.log;
+        }
+    }
+    &[]
 }
 
 fn byte_answer(asked: &client::Op, content: &[u8]) -> client::Answer {

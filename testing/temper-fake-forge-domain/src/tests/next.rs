@@ -160,32 +160,7 @@ fn a_manually_reported_failure_has_no_ci_job() {
     assert_eq!(&*check.description, b"CI failed");
     assert_eq!(&*check.link, b"");
     assert_eq!(check.job, None);
-    assert_eq!(h.call(PERSON, read(Read::Job { job: 0, attempt: 1, max_bytes: 64 })), Err(Error::Missing(What::Job)));
-}
-
-#[test]
-fn a_failed_ci_job_has_a_bounded_log_for_its_current_attempt() {
-    let mut setup = setup();
-    setup.checks.passes = 0;
-    let mut h = Harness::with(CALM, setup);
-    let work = h.commit(FIRST, &[(b"src", b"one")]);
-    h.push(ENGINE, b"work", work).unwrap();
-    opened(&mut h, b"work");
-    h.settle();
-    let Answer::Checks(checks) = h.ok(PERSON, read(Read::Checks { commit: work })) else { unreachable!("checks") };
-    let job = checks.first().unwrap().job.expect("CI job");
-    assert_eq!(job.run, 1);
-    let full = h.ok(PERSON, read(Read::Job { job: job.job, attempt: job.attempt, max_bytes: 256 }));
-    let Answer::File(log) = full else { unreachable!("full log") };
-    assert!(log.len() > 8);
-    let bounded = h.ok(PERSON, read(Read::Job { job: job.job, attempt: job.attempt, max_bytes: 8 }));
-    let Answer::File(bounded) = bounded else { unreachable!("bounded log") };
-    assert_eq!(bounded.len(), 9, "one extra byte signals truncation to the adapter");
-    assert_eq!(&*bounded, log.get(log.len() - 9..).unwrap());
-    assert_eq!(
-        h.call(PERSON, read(Read::Job { job: job.job, attempt: 2, max_bytes: 8 })),
-        Err(Error::Missing(What::Job))
-    );
+    assert_eq!(h.call(PERSON, read(Read::Log { job: 0, attempt: 1, step: None })), Err(Error::Missing(What::Job)));
 }
 
 #[test]

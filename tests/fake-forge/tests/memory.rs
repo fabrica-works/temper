@@ -312,6 +312,7 @@ fn outcome(result: Result<Answer, Error>) -> Result<Option<u64>, Error> {
         | Answer::Runs(_)
         | Answer::Run(_)
         | Answer::Jobs(_)
+        | Answer::Job { .. }
         | Answer::Comments(_)
         | Answer::Pulls(_)
         | Answer::Protection(_)
