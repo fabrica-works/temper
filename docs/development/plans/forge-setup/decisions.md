@@ -260,6 +260,18 @@ run are appended after "For the user".
      `#[must_use]` (clippy's `must_use_candidate`). Sketch A and the 09.1 reference test compiled under clippy; no suite
      ran. A further sketch function that clippy asks to mark `#[must_use]` is marked, and named in the commit body.
 
+109. **02's Shapes against main** (ready check of temper-02.1).
+     Ruling 109, the ready check of temper-02.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/02-orgs-hooks.md: 02.1 needs 01.2's `pub(crate)` `Recorder` and `send` (01-users-tokens.md:162), and makes
+     `w` (`cases.rs:33`) and the fields `orgs.rs` reads `pub(crate)` where 01.2 left them private; the sketch's `access`
+     and `access_text` are `#[must_use]`; 02.1's Files add the exhaustive lists the check's compile found:
+     `server/writes.rs:316-394,398-439`, `client/writes.rs:38-124,171`, `client/start.rs:135`, `server/items.rs:252`,
+     protocol-forge `actions.rs:232-242`, the fake's `routes.rs:235` (:321), and `tests/codecs/tests/forgejo_{files,
+     items,reviews,start,writes}.rs` (:153, :146, :112, :70, :169); "Done when" 3's fuzzy run passes, 2 tests, not 14.
+     The sketched types and arms compiled (`cargo check --workspace --all-targets`); the default profile of the four
+     crates passed 217 of 218, the one failure the `orgs` reference test with no encoder written; the fuzzy run passed,
+     2 of 2. A further exhaustive match the compiler finds is given its arm, and named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
