@@ -112,14 +112,14 @@ only jig 02.1.
   schema; the drift and memory tests then pass unchanged in name.
 - **Files over 800 lines at the base get at most 40 lines each**
   (code-organization.md, 7): here `jig-domain-tasks/src/boundary.rs`
-  (1794), `jig-domain-people/src/domain.rs` (1884),
+  (1804), `jig-domain-people/src/domain.rs` (1884),
   `jig-domain-core/src/reads/rows.rs` (1698),
-  `jig-domain-core/src/routing/tasks.rs` (1449), the tests files
-  `jig-domain-core/src/tests.rs` (2987), `jig-domain-people/src/tests.rs`
-  (1596), `tests/tasks/src/world.rs` (1204),
+  `jig-domain-core/src/routing/tasks.rs` (1459), the tests files
+  `jig-domain-core/src/tests.rs` (2993), `jig-domain-people/src/tests.rs`
+  (1596), `tests/tasks/src/world.rs` (1206),
   `tests/client/src/joint/wire/cursor.rs` (1063),
-  `tests/core/src/observations.rs` (1067),
-  `testing/jig-test-domain/src/lib.rs` (1108),
+  `tests/core/src/observations.rs` (1068),
+  `testing/jig-test-domain/src/lib.rs` (1125),
   `examples/ops/domain/src/route.rs` (1589). `jig-domain-people/src/inbox.rs`
   and `boundary.rs` are 791 lines: new people code goes in a new module,
   `jig-domain-people/src/ended.rs`. New core code goes in
@@ -147,8 +147,16 @@ Files:
   `Stored::EndedDelegate` at :379), `domain.rs` (`output_bound`'s
   `limits.tasks.checked_mul(26)`, :451, counts an ending's saves, 26
   since `EndedDelegate`: 27 with this row; at most 40 lines), `stored.rs`
-  (a restored row is refused, as `Stored::Result` at :790), `owned.rs`,
+  (a restored row is refused, as `Stored::Result` at :792), `owned.rs`,
   `lib.rs` (export), `tests/index.rs`.
+- The values derived from `tasks::max_out`, which `output_bound`'s
+  multiplier raises (27 here, 28 in 8.2): `route_room_checked`
+  (`jig-domain-core/src/routing/mod.rs:277`) and `room_max`, which size
+  the journal's room, and from them, under rulings 110 and 112, the
+  profiles' bounds (`crates/jig-protocol-config/src/profile/{small,
+  standard}.rs`), `What::Memory { over }` at
+  `crates/jig-protocol-config/src/tests/domain.rs:169` and their copies
+  in `testing/jig-test-service/src/tests.rs:24-25`, where they move.
 - `crates/jig-protocol-store/`: `src/keys/tasks.rs` (tag 19, both ways),
   `schema/tasks-v3.schema` (`record EndedByParty { party: u64 label: u32
   ended_at: u64 task: u64 }`, `ended_by_party` in `Value`),
@@ -379,7 +387,7 @@ Files:
   `Action`, `program`); the testing application's bindings,
   `tests/conformance/src/scenarios.rs` (`action`, `check`; its `ask` at
   :28), `tests/conformance/src/lib.rs` (`peers`' match over every
-  `Scenario`, :216-252: an arm for the new one),
+  `Scenario`, :216-253: an arm for the new one),
   `tests/conformance/tests/scenarios.rs`.
 - Downstream: 4 files name these variants (its engine root's archive
   and `now` routes, its service's translation, its client world's
@@ -387,8 +395,9 @@ Files:
   matches every `Option<Scenario>` (`tests/conformance/src/config.rs:132-138`
   there), which `ConversationEndsWhileRead` breaks at the repin.
 Shape:
-- `jig_domain_core::forget::forgets(row: &tasks::TaskRecord, flags:
-  tasks::Flags, reading: Reading) -> Option<u64>`, as sketched: the
+- `jig_domain_core::forget::forgets(row: &tasks::TaskRecord, reading:
+  Reading) -> Option<u64>`, as sketched, reading `row.flags` (jig
+  02.1's): the
   requesting party whose reading forgets the task now. `Reading {
   results, turns: Option<u64>, named }`: the requester's results
   position, its position over the task's turns (`None` when not flagged
@@ -489,8 +498,8 @@ Test shape:
   `chosen_cut` pattern, :18); the fuzzy sweep
   `every_shared_story_survives_every_commit_and_seeded_random_cuts`
   (`fuzzy_scenarios.rs`) runs it at each commit: aim to add at most 0.5 s
-  to the fuzzy suite (the eight scenarios' sweep runs in 1.4 s at the
-  base); past that, the sweep's cuts for it are made fewer first.
+  to the fuzzy suite (the eight scenarios' sweep ran in 1.4 s at the
+  base; jig 06.1's `RacingDecisions` makes nine); past that, the sweep's cuts for it are made fewer first.
 - Also there: `a_kept_chat_stays_after_its_party_read_it` (a
   `StartChat` chat, read through both marks: its ended record and its
   `EndedByParty` row stay),
@@ -573,11 +582,11 @@ Files:
   the generated family, the goldens, `src/tests/{intervals.rs, restore.rs,
   codec.rs, fixtures/keys.rs}` (`people_key`'s `below(7)`, :60, becomes
   `below(8)`).
-- The roots that hand a census row to the core: `testing/jig-test-domain/src/lib.rs:967`,
+- The roots that hand a census row to the core: `testing/jig-test-domain/src/lib.rs:982`,
   `examples/ops/domain/src/restart.rs:123` (each passes the record as it
   comes to `restore_inbox_row`), and `Now::LoadEndedRead`'s route in
   `examples/ops/domain/src/route.rs` and `testing/jig-test-domain/src/routes.rs`;
-  `tests/ops/src/conformance/mod.rs` (`census_owner`, :1069-1076, called
+  `tests/ops/src/conformance/mod.rs` (`census_owner`, :1071-1078, called
   at :428, maps a `ConversationOldest` or `Result` row to its owner: it
   hands up the `EndedRead` row and then its ended record; at most 40
   lines).
@@ -614,7 +623,7 @@ Shape:
   `Key::live` false for it alone (store.md 4.4: "ended conversations'
   read positions | task, then party | on demand").
 - The decision that ends a conversation whose requester is a party
-  (`Event::ChatState { live: false, .. }` from `routing/tasks.rs:776`):
+  (`Event::ChatState { live: false, .. }` from `routing/tasks.rs:784`):
   the people child removes `chats_seen[(party, task)]`, erases
   `Key::ReadChat`, and saves `EndedRead { task, party, through }`,
   `through` 0 when nothing was read.
@@ -748,7 +757,7 @@ Files:
 - `testing/jig-conformance/src/scenarios.rs`; the testing application's
   bindings, `tests/conformance/src/scenarios.rs` and its deliveries'
   routing in `tests/conformance/src/lib.rs` (and `peers`' match over
-  every `Scenario`, :216-252: an arm for the new one);
+  every `Scenario`, :216-253: an arm for the new one);
   `tests/conformance/tests/scenarios.rs`.
 - Downstream: its conformance configuration matches every
   `Option<Scenario>` (`tests/conformance/src/config.rs:132-138` there),
@@ -821,10 +830,10 @@ Needs: 8.4, earlier in this session (the `EndedRead` family).
 Files:
 - `testing/jig-conformance/src/referee.rs` (`Snapshot.read_positions`;
   the rule's call where a durable snapshot is observed; at most 40
-  lines, the file being 1108) and `testing/jig-conformance/src/referee/positions.rs`
+  lines, the file being 1116) and `testing/jig-conformance/src/referee/positions.rs`
   (new, the pattern of `referee/conversations.rs`).
 - The snapshots' builders, each filling the field from the store's
-  `ReadChat` and `EndedRead` rows: `tests/core/src/observations.rs:592`
+  `ReadChat` and `EndedRead` rows: `tests/core/src/observations.rs:593`
   (the core world's and the testing application's),
   `tests/ops/src/conformance/observations.rs:124`,
   `tests/one-process/src/referee.rs:144`; the tests building a snapshot
@@ -868,8 +877,7 @@ Removes: nothing.
 
 Compiled at the base under `heavy cargo clippy -p <scratch crate>
 --all-targets -- -D warnings`, in a scratch crate of jig with jig 02's
-and jig 05's types stubbed (`tasks::Flags`, `tasks::Retention`,
-`documents::TaskQuery` with its executor kind and order elided), as
+and jig 05's types stubbed (`documents::TaskQuery` with its executor kind and order elided), as
 their files name them: checked at the ready check. Bodies are
 `unreachable!("sketch")` but for the two `key` functions and the
 algorithms in comments.
@@ -882,6 +890,7 @@ algorithms in comments.
 pub struct EndedByParty { pub party: u64, pub label: u32, pub ended_at: Wall, pub task: u64 }
 impl EndedByParty {
     /// Its key: newest ended first within the party and label.
+    #[must_use]
     pub const fn key(self) -> Key {
         Key::EndedByParty {
             party: self.party,
@@ -895,7 +904,7 @@ impl EndedByParty {
 /// saved by the decision that ends a task flagged listed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct EndedByProject { pub project: u32, pub label: u32, pub ended_at: Wall, pub task: u64 }
-// impl EndedByProject { pub const fn key(self) -> Key } as above.
+// impl EndedByProject { #[must_use] pub const fn key(self) -> Key } as above.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)] // the base's
 pub enum Key {
     // ... the base's variants, then:
@@ -944,9 +953,10 @@ pub struct Reading {
     pub named: bool,
 }
 /// The requesting party whose reading forgets `row` now, if any (people.md 6).
-pub fn forgets(row: &tasks::TaskRecord, flags: tasks::Flags, reading: Reading) -> Option<u64> {
+#[must_use]
+pub fn forgets(row: &tasks::TaskRecord, reading: Reading) -> Option<u64> {
     // let tasks::Party::Person(party) = row.requester else { return None };   // not a party: kept
-    // if flags.retention != Retention::ForgottenOnceRead || reading.named { return None; }
+    // if row.flags.retention != Retention::ForgottenOnceRead || reading.named { return None; }
     // match row.phase {
     //     tasks::Phase::Ended(_) => {}
     //     tasks::Phase::Waiting
@@ -955,7 +965,7 @@ pub fn forgets(row: &tasks::TaskRecord, flags: tasks::Flags, reading: Reading) -
     //     | tasks::Phase::Closing(_) => return None,
     // }
     // if row.result_position == 0 || reading.results < row.result_position { return None; }
-    // match (flags.conversation, reading.turns) {
+    // match (row.flags.conversation, reading.turns) {
     //     (true, Some(seen)) if seen >= row.last_reply => Some(party),
     //     (true, _) => None,
     //     (false, _) => Some(party),
@@ -980,6 +990,7 @@ pub enum EndedPart {
     None,
 }
 /// Choose the index of `query`'s ended part (jig 05's `documents::TaskQuery`).
+#[must_use]
 pub fn ended_part(query: &TaskQuery) -> EndedPart {
     // if let Some(phase) = query.phase && phase != PhaseClass::Ended { return EndedPart::None; }
     // match (query.requester, query.parent) {
