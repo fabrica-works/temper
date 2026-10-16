@@ -408,9 +408,15 @@ Shape: sketch 1, with each field and variant it marks 03.2. In
   its own (ruling 156): a core `Request` keyed by the party request's
   `Token`, with its person, project and its bounded unique input task
   numbers, as `Request::HistoricalPersonTask` is keyed, and a matching
-  `Event` with the stubs `DelegateValidated` gives, or the failure
-  `DelegateInputFailed` gives, and `busy`; the core keeps the checked
-  creation until it returns. Each root that answers
+  `Event` carrying the rows the root loaded, as
+  `Event::HistoricalPersonTask` carries its `row`: each input's ended
+  `TaskRecord`, its tree's root's where that root has left live memory
+  (`None` for a row not found), and `busy` (ruling 157). The core judges
+  reach from them and builds the stubs, or refuses as
+  `DelegateInputFailed` does; no validator of the core's runs in a root
+  (root.md, 11). The shared historical transport loads the rows one
+  `Get` each, as it loads one today. The core keeps the checked creation
+  until it returns. Each root that answers
   `HistoricalPersonTask` answers it the same way (`git -C
   ~/src/rust/jig grep -l 'HistoricalPersonTask' -- '*.rs'` names them:
   `examples/ops/domain/src/route.rs`, `testing/jig-test-service/src/route.rs`,

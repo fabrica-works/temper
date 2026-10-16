@@ -643,6 +643,14 @@ choice would have been the user's (development.md, 10.4).
      4. **Downstream:** temper's root (`crates/temper-engine-domain/src/{archive.rs, route/now.rs}`, `crates/temper-service/src/clients/translation.rs`, `tests/client/src/translate.rs`, which answer `HistoricalPersonTask` today) follows at temper's first repin past jig 03.2's landing, as the README's "What a temper repin repairs" says. jig 03.2 does not name temper.
      5. **Unchanged:** `DelegateValidated` and `DelegateInputFailed` for an agent's delegates; the wire (v8); `routing/create.rs` past 80 lines of inputs is still raised in the report.
 
+157. **The inputs' load answers with rows; the core judges reach** (plan defect, jig 03's block of 2026-10-16T17:44:41Z).
+     Ruling 157, a plan defect: the implementer's preferred option. Ruling 156 gave the answer event the stubs; a stub (task, phase, result) cannot show reach, and a root must not judge it.
+
+     1. **The answer event carries the rows the root loaded,** as `Event::HistoricalPersonTask` carries its `row: Option<Box<tasks::TaskRecord>>`: each input's ended `TaskRecord`, its tree's root's where that root has left live memory, `None` for a row not found, and `busy`.
+     2. **The core judges reach from them and builds the stubs,** or refuses as `DelegateInputFailed` does. No validator of the core's runs in a root, and no root holds a pending loader state of its own beyond what it holds for `HistoricalPersonTask`. root.md, 11, "What a root never does": "decide anything of the core's or a connector's".
+     3. **The shared historical transport** (`crates/jig-protocol-store/src/historical.rs`) loads the rows one `Get` each, as it loads one today.
+     4. **Unchanged:** ruling 156's request (keyed by the party request's `Token`, with person, project and the bounded unique input task numbers), its roots, its 80-line aim and its downstream rule; the agent's delegate path.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
