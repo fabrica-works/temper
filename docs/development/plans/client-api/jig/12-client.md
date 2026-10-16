@@ -72,8 +72,11 @@ increment proves against the real engine.
 - **The link's limits derive from the client's.** The link's
   `Limits.client` becomes `jig_client_domain::Limits`, which gains the
   decoding bounds the link reads today from the page's limits (`rows`,
-  `text`, `projects`, `charters`, `fields`, `heartbeat`); its users build
-  them from the same values.
+  `text`, `projects`, `charters`, `fields`, `heartbeat`), and those it
+  reads today from `Limits.client` (`delegates`,
+  `crates/jig-client-protocol-link/src/limits.rs:100`; `records`, `kept`
+  and `parts`, `src/store.rs:36`); its users build them from the same
+  values.
 - **The small store's barrier is the client's, for keyed requests
   alone** (findings/wire-and-client.md, 5j): reads and watches leave at
   once; a step's records go in one `Save` or one `Erase`; `NotStored`
@@ -125,11 +128,17 @@ src/limits.rs, src/tests.rs, src/tests/fixtures.rs}`; workspace
 `crates/jig-client-domain/src/{boundary.rs, domain.rs, link.rs (new),
 watches.rs, limits.rs}`; `crates/jig-client-protocol-link/src/limits.rs`
 (`Limits.client`) and its users: `tests/client-protocol/src/fixtures.rs:102`,
-the link's `src/tests/fixtures.rs:37`, and downstream its terminal's
-`limits.rs`; `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}`
+the link's `src/tests/fixtures.rs:37`,
+`crates/jig-protocol-engine-clients/src/tests/fixtures.rs:740-770`
+(`client_limits()`, a literal of the old domain's `Limits` for the
+link), and downstream its terminal's `limits.rs`; `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}`
 (the small store's names, below) and their users: the native shell's
-`shell.rs:111-112, 246` and `files.rs` (`loaded`),
-`tests/client-protocol/src/{front.rs, front/persistence.rs:38,
+`shell.rs:85` (`loaded`), `shell.rs:111-112, 246`,
+`connections.rs:122-123` and `files.rs` (`loaded`); the link's
+`src/component.rs`, `src/tests/fixtures.rs:105, 139, 171`,
+`src/tests/fixtures/link_{deliveries,reads,store,stream}.rs` and
+`src/tests/store.rs:61`;
+`tests/client-protocol/src/{front.rs, front/persistence.rs:32, 38, 79,
 native.rs}`, the native shell's `src/tests.rs:257, 278`; downstream, its
 terminal's `client.rs:328`, `route.rs:52-53` and `tests.rs:53-82`; `tests/boundary/src/tests/graph.rs` (`client_step` gains
 `jig-client`; the new test below) (shared);
@@ -141,7 +150,9 @@ max_out, worst_case}` as the sketch (`Event::Up` and
 surface it names: `jig_client_domain`'s `contract`, `Asker`, `Handle`,
 `Key`, `Held`, `Ask`, `Family`, `Readable`, `Watchable`, `Readout`,
 `Answered`, `Outcome`, `Pending`, `Progress`, `State`, `Latest`,
-`Document`, `Why`, `Told`, `Link`, `Down`, `Up`, and the link's `With`,
+`Document`, `Why`, `Told`, `Link`, `Down`, `Up`, `Retry`, `Backoff`, its
+`Limits` as `DomainLimits` (the type of `jig_client::Limits.domain`), and
+the link's `With`,
 `Message`, `Streamed` and `Record`; `jig_client_domain::Link { SignedOut,
 Starting, Live, Offline, OutOfDate }`, `Told::Link { link }`,
 `Up::{SignedIn, Served { served: bool }}`. Starting on the link's
@@ -159,16 +170,24 @@ client gathers a step's `Save`s and `Erase`s into one `Request::Save {
 records }` and one `Request::Erase { records }`. The barrier is the
 link's, unchanged, until 12.2.
 Test shape: unit tests in `crates/jig-client/src/tests.rs` on
-`src/tests/fixtures.rs` (made here; limits from the client world's
-profile, as jig 11's fixtures take them: `jig_client_world::test::limits()`,
-tests/client/src/test.rs:18), for the composition: `step` routes each
+`src/tests/fixtures.rs` (made here; limits copied, as literals, from
+the client world's profile, as jig 11's fixtures copy them:
+`jig_client_world::test::limits()`, tests/client/src/test.rs:18, each
+with a comment naming that line; no dev-dependency on
+`jig-client-world`, which depends on `jig-client` from 12.5: a cycle),
+for the composition: `step` routes each
 `Event` once and each request once; reference test:
 ```rust
 #[test]
 fn a_watch_asked_of_the_client_leaves_as_one_opening_on_the_stream() {
     let mut c = fixtures::Client::signed_in(PARTY);
+    // `signed_in` has opened `me`, and with it the stream (the link's component.rs:349-357):
+    // a later watch leaves on the named stream as one exchange.
     c.step(Event::Watch { handle: TASK, subject: task(9) });
-    assert!(matches!(c.requests().as_slice(), [Request::OpenStream { credential: Some(_) }]));
+    assert!(matches!(
+        c.requests().as_slice(),
+        [Request::Exchange { credential: Some(_), message: Message::Watch(_), .. }]
+    ));
 }
 ```
 The story: `tests/client-protocol/src/client.rs`, `pub struct Story`
@@ -213,7 +232,8 @@ The story keeps a referee (`tests/client-protocol/src/client.rs`'s
 `Referee`), checked at each step, which this increment starts with one
 rule of testing.md, 6.1: a document told `Changed` for a handle never
 carries a lower revision than one told before for its subject; its
-referee test `a_document_older_than_one_told_is_caught` feeds it two
+referee test `a_document_older_than_one_told_is_caught`, in
+`tests/client-protocol/tests/client.rs` beside the stories, feeds it two
 documents out of order. Each story under 0.5 s, each unit test under
 20 ms.
 Proof: joint layer, the real engine over HTTP bytes: `heavy cargo
@@ -252,7 +272,12 @@ Files: `crates/jig-client/src/{client.rs, store.rs (new)}`;
 `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}` (the
 link's barrier holds `Message::Request` exchanges alone, findings 5j;
 `Request::NotKept { attempt }` for each held keyed attempt on
-`NotStored`); `tests/client-protocol/src/front.rs` (the old roots' map
+`NotStored`) and the users of its `Request::NotKept` and `Answer.why`:
+the link's `src/component.rs:241, 299` and `src/tests/fixtures.rs:126`,
+the native shell's exhaustive matches at `connections.rs:120-133` and
+`shell.rs:117-130`, and downstream its terminal's `route.rs:50-134`
+(`Answer` destructured at :84), `src/tests/family.rs:174` and
+`src/tests/fixtures.rs:77`; `tests/client-protocol/src/front.rs` (the old roots' map
 of `NotKept`); `tests/client-protocol/src/client.rs` (the story's
 `reload()`, `restart_engine(offline)` as front/faults.rs:35-42 restarts
 it, `refuse_next_save()`, a second client of the same party, and the
@@ -281,7 +306,7 @@ small store before the retry: `Kept` told for its key, the engine's
 (testing.md, 7: the story's store refuses the save),
 `the_engine_restarting_under_a_pending_stop_answers_it_once`,
 `two_clients_stopping_one_task_are_answered_once_each` (a fake party of
-the engine's world, party 1, starts a chat, as stories.rs:59's
+the engine's world, party 1, starts a chat, as stories.rs:67's
 `pressure()` scripts a party, and two clients of party 1 each send
 `Stop` of its task under their own keys: each key is made once, and the
 second is answered as the first decided, contract.md, 4); unit
@@ -295,7 +320,8 @@ second is answered as the first decided, contract.md, 4); unit
 `a_final_answer_that_does_not_decode_is_told_retrying_as_undecodable`. The story's referee gains client.md, 17's rules: no
 keyed exchange leaves before its record is stored, none for a party
 `me` has not confirmed, and no queue past its limit; its referee test
-`a_keyed_exchange_before_its_store_is_caught`. Reference story:
+`a_keyed_exchange_before_its_store_is_caught`, in
+`tests/client-protocol/tests/client.rs`. Reference story:
 ```rust
 #[test]
 fn a_stop_is_answered_once_after_its_commit_is_durable() {
@@ -397,7 +423,7 @@ Test shape: unit tests in `crates/jig-client-domain/src/tests/versions.rs`;
 story in `tests/client-protocol/tests/client.rs`. Tests: story
 `a_family_request_is_answered_as_its_owner_s_bytes`,
 `an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing`
-(the protocol world's `FrontFault::Versions` serving, front/faults.rs:44);
+(the protocol world's `FrontFault::Versions` serving, front/faults.rs:43-48);
 unit `a_family_owner_not_served_keeps_its_requests_unsent`,
 `a_family_owner_not_served_ends_its_watches_not_served`,
 `a_family_owner_served_again_sends_what_was_kept`,
@@ -428,7 +454,8 @@ Sign-in under it is `With::Transport`; the small store's records are the
 domain's (`RequestRecord<Held>`), kept by the world.
 Needs: 12.4's client.
 Files: `crates/jig-client/src/{client.rs, lib.rs}`,
-`src/tests/typed.rs`; `tests/client/src/joint/front.rs` (its front
+`src/tests/typed.rs`; `tests/client/Cargo.toml` (`jig-client-world`
+gains `jig-client`); `tests/client/src/joint/front.rs` (its front
 carries a typed client's `Down` and `Up` through its translation to the
 real core, `tests/client/src/joint/transport.rs`), `tests/client/tests/`
 (the joint story below).
@@ -464,9 +491,10 @@ deadlines.
 
 ```rust
 // crates/jig-client/src/lib.rs. The client's surface, re-exported (client.md, 3):
-// pub use jig_client_domain::{contract, Answered, Ask, Asker, Document, Down, Family, Handle,
-//     Held, Key, Latest, Link, Outcome, Pending, Progress, Readable, Readout, State, Told, Up,
-//     Watchable, Why};
+// pub use jig_client_domain::{contract, Answered, Ask, Asker, Backoff, Document, Down, Family,
+//     Handle, Held, Key, Latest, Link, Outcome, Pending, Progress, Readable, Readout, Retry,
+//     State, Told, Up, Watchable, Why};
+// pub use jig_client_domain::Limits as DomainLimits;
 // pub use jig_client_protocol_link::{Message, Record, Streamed, With};
 // `Record` is the link's (12.1: `StoreRead` renamed):
 // pub struct Record { pub key: Box<[u8]>, pub bytes: Box<[u8]> }, the keeper-tagged
@@ -515,10 +543,14 @@ pub struct LinkView<'a> {
     pub credential: Option<&'a Secret>,
 }
 pub enum Unusable { Limits }
-pub struct Limits { pub domain: jig_client_domain::Limits, pub exchanges: u32 }
+pub struct Limits { pub domain: DomainLimits, pub exchanges: u32 }
 pub struct Client { /* domain, link (none under `typed`), the map's state */ }
 impl Client {
+    /// # Errors
+    /// `Unusable::Limits` when the limits admit no client.
     pub fn new(limits: &Limits, seed: u64) -> Result<Client, Unusable>;
+    /// # Errors
+    /// `Unusable::Limits` when the limits admit no client.
     pub fn typed(limits: &Limits, seed: u64) -> Result<Client, Unusable>;
     pub fn step(&mut self, now: Time, wall: Wall, event: Event, out: &mut Queue<Request>);
     pub fn fire(&mut self, now: Time, wall: Wall, out: &mut Queue<Request>);
