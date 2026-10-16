@@ -202,8 +202,8 @@ Files:
   '[job log truncated]' -e 'failing check build 3' -- crates tests
   testing`: at the base, `brief.rs:309,313`, `forge_routes.rs:1236,1237`
   and `stories.rs:259`. The fake's own `failing check` lines,
-  `testing/temper-fake-forge-domain/src/next.rs:170-188` and
-  `src/tests/actions.rs:81`, are 03.1's. `[job log could not be read]`
+  `testing/temper-fake-forge-domain/src/actions.rs:200-210` and
+  `src/tests/actions.rs:226-228` (`WORKFLOW_LOG`; since temper 03.1), and `testing/temper-fake-forge-protocol/src/tests/http.rs:243`, which needs no change, are 03.1's. `[job log could not be read]`
   (`brief.rs:316`, `forge_routes.rs:1288`) and `[no pinned job log for
   this head]` (`brief.rs:403`) are kept. The agent's `job` tool and its
   `[log truncated]` (`crates/temper-engine-smith/src/answers.rs:527-535`)

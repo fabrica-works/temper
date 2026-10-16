@@ -303,6 +303,18 @@
      The `assert_eq!` on the attempt holds in every world: no world sets
      `reruns` and uses translate.
 
+108. **temper 05's Shapes against main** (ready check of temper-05.1).
+     temper/05-brief.md checked against origin/main 988ec48a5 (a ready check,
+     through heavy: the sketch passed clippy `-D warnings`; on a stand-in for
+     04.1, 275 tests passed, fuzzy 8 of 8, the domain world's CI section 352
+     bytes as the Shape says): the fake's own `failing check` lines are at
+     `testing/temper-fake-forge-domain/src/actions.rs:200-210` and
+     `src/tests/actions.rs:226-228` since temper 03.1, beside
+     `testing/temper-fake-forge-protocol/src/tests/http.rs:243`, which needs
+     no change. Notes: skein's `List` removes no first item, so the CI cut
+     shifts bytes with `get_mut`; the unit test needs `BriefWords`'s `bytes`,
+     `left` and `tail` `pub(crate)`.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
