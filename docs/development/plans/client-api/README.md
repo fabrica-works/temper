@@ -665,8 +665,9 @@ per session are in each file.
     become `check_amend`, bringing `check` under 100 lines), and pass the
     arguments that travel together as one struct (12:48Z, point 2). Only
     a codec table over a closed enum may carry
-    `#[expect(clippy::too_many_lines)]`, with its reason. A landed
-    function keeps its exception until a session widens it. Each report
+    `#[expect(clippy::too_many_lines)]`, with its reason. A function
+    already excused, at the base or since, keeps its exception when a
+    Shape widens it (as 04.7 widens `tag_tasks`, ruling 186). Each report
     names any such exception it adds and the function's length.
   - 23:45Z, point 2 (every session that adds or edits tests): Name each
     request id, duration and time in a test as a const beside the file's

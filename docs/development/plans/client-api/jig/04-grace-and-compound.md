@@ -936,7 +936,9 @@ Shape:
   the engine twice inside the grace, and the run finishes within it
   (`Action::Finish`) in one seed's half and not in the other; its check:
   done once, or cancelled once with the cancel's reason at or after the
-  grace's end. Each program has at most 8 commits.
+  grace's end. Each program has at most 8 commits after its
+  `Action::Ready`; the harness's start before it, shared by every
+  program, is not counted (ruling 186).
 - `Observed::CompoundAsked { tasks: Vec<u64> }`, declared by the
   scenario's action before each send of the compound (`Action::Compound`
   and `Action::CompoundAgain`): the referee keeps, for the first ask of
