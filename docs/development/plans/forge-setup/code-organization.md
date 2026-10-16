@@ -133,7 +133,10 @@ No increment:
 - signs in as the bot, or keeps its password (designer's answer 14);
 - makes the fake forge better than Forgejo: the fake answers what the
   conformance's facts record (`forge.md`, section 9);
-- moves temper's skein but in temper 05.1.
+- moves temper's skein but in temper 05.1;
+- writes a document or request literal in a third test of a crate without
+  a constructor for it in that crate's `tests/fixtures.rs` (steer of
+  the check of 2026-10-16T23:49Z).
 
 ## 6. Size limits and the count
 

@@ -380,6 +380,14 @@ run are appended after "For the user".
      - 02.2 (four hook variants, the same lists) lands at up to 600, not 450: its arms meet the same lists as 02.1's.
      - Unchanged: never trim a doc comment, a test or the formatting to meet a Size (implementer.md, 8.6); 02's proofs.
 
+117. **A literal a third time goes to the fixtures** (steer of the check of 2026-10-16T23:49Z).
+     Ruling 117, process, from the check of 2026-10-16T23:49Z: the same finding twice (the `User` literal in
+     temper-forge-forgejo's tests, the first check's steer; `Delivery::Ref { .. }`, `repository: 7` and the pushed head in
+     04.2's `src/tests/delivery.rs`) becomes a line of code-organization.md 5's "Don't" list: "writes a document or request
+     literal in a third test of a crate without a constructor for it in that crate's `tests/fixtures.rs`". delivery.rs is
+     converted when an increment next touches it. Unchanged: the plan's tables of literals written from the recordings
+     (04.2's `delivery_cases`); the fake's and the codec world's own fixtures.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
