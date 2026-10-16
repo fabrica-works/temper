@@ -237,6 +237,19 @@ run are appended after "For the user".
      compiled under clippy; the boundary test passed, 1 of 1. A further stale pin or limit found while working is
      refreshed, and named in the commit body.
 
+107. **08's Shapes against main** (ready check of temper-08.1).
+     Ruling 107, the ready check of temper-08.1 (against skein a1252d40, temper eab91b13), corrections to
+     temper/08-run.md: each shell test file declares `pub mod support;` (as `crates/temper/tests/configuration.rs:1`;
+     private, clippy finds unused helpers dead), in 08's sketch and 10's (10-reconcile.md, sketch E); `Programs::marker`
+     fills `descriptors` from `/proc/<pid>/fd` once `/proc/<pid>/comm` reads `sleep` (a script's own `/proc/$$/fd`
+     also lists its script and a pipe); 08.3's bound on the tier whole is 42.4 s plus the ceilings of the tests added to
+     the `process` binary since the base (08.1's 30 s, 08.2's 60 s, each other named in the report), not 90 s; the
+     signals are adopted by an `Io` (`Io::adopt_signals`, `layer.rs:198-206`), not a `Layer`; `support/live.rs:140`
+     spawns git, and the tier starts `temper` through skein-world's `Binary`; `crates/temper/Cargo.toml:69-84`. Sketch 5
+     compiled under clippy; the default profile of the throwaway, the conformance tool, git-transcripts and temper passed,
+     37 of 37. A further private `mod support;` in a test crate whose helpers some files leave unused is made `pub`, and
+     named in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
