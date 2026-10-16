@@ -158,6 +158,7 @@ impl Branches {
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::File(_)
                 | Kind::Action(_)

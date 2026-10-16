@@ -48,7 +48,7 @@ pub(super) fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Ro
     };
     match method {
         Method::Get => Ok(Route::Ready(request)),
-        Method::Post | Method::Patch | Method::Delete => Err(Unrouted::Method),
+        Method::Post | Method::Put | Method::Patch | Method::Delete => Err(Unrouted::Method),
     }
 }
 fn query(pairs: &[Pair], key: &[u8]) -> Option<Box<[u8]>> {
@@ -69,7 +69,18 @@ pub(super) fn user(json: &mut Encoder, user: &User) {
 }
 pub(super) fn write(json: &mut Encoder, answer: &Answer) {
     match answer {
-        Answer::User(value) => user(json, value),
+        Answer::User(value) => {
+            json.object_start();
+            json.key(b"id");
+            json.unsigned(value.id);
+            json.key(b"login");
+            json.string(&value.login);
+            json.key(b"is_admin");
+            json.boolean(value.is_admin);
+            json.key(b"full_name");
+            json.string(&value.full_name);
+            json.object_end();
+        }
         Answer::ApiSettings(value) => {
             json.object_start();
             json.key(b"max_response_items");

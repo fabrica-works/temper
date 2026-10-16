@@ -18,6 +18,7 @@ use files::FileKind;
 pub(crate) mod reviews;
 use branches::BranchKind;
 use reviews::ReviewKind;
+pub(crate) mod setup;
 mod start;
 pub(crate) mod writes;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -84,6 +85,7 @@ pub struct Decoder {
 enum DecoderState {
     Error(writes::Error),
     Start(start::Start),
+    Setup(setup::Setup),
     Items(Box<items::Items>),
     Files(Box<files::Files>),
     Actions(actions::Actions),
@@ -118,7 +120,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Permission { .. } => Kind::Branch(BranchKind::Permission),
         Request::Collaborators { .. } => Kind::Users,
         Request::Pulls { .. } => Kind::Item(Item::Pulls),
-        Request::User => Kind::User,
+        Request::User => Kind::Setup(setup::SetupKind::Account),
         Request::ApiSettings => Kind::Settings,
         Request::RepositoryById { .. } | Request::Repository { .. } => Kind::Repository,
         Request::UserSearch { .. } => Kind::Search,
@@ -129,6 +131,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
+        Kind::Setup(_) => DecoderState::Setup(setup::Setup::new()),
         Kind::Error => DecoderState::Error(writes::Error::new()),
         Kind::Write(_) => unreachable!("answer kind selection"),
         Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
@@ -156,6 +159,7 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
+            DecoderState::Setup(state) => state.step(movement),
             DecoderState::Error(state) => state.step(movement),
             DecoderState::Files(state) => state.step(movement, &decoder.walk),
             DecoderState::Actions(state) => state.step(movement, &decoder.walk),
@@ -170,7 +174,8 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
 pub fn keep_after(decoder: &mut Decoder, after: u64) {
     match &mut decoder.state {
         DecoderState::Items(state) => state.keep_after(after),
-        DecoderState::Error(_)
+        DecoderState::Setup(_)
+        | DecoderState::Error(_)
         | DecoderState::Files(_)
         | DecoderState::Actions(_)
         | DecoderState::Start(_)

@@ -28,6 +28,7 @@ pub(crate) enum Kind {
     Error,
     Write(crate::server::writes::WriteKind),
     User,
+    Setup(crate::client::setup::SetupKind),
     Settings,
     Repository,
     Search,
@@ -63,6 +64,7 @@ const fn optional(key: &'static [u8], read: Read) -> Field {
 }
 fn fields(kind: Kind) -> &'static [Field] {
     match kind {
+        Kind::Setup(kind) => crate::client::setup::fields(kind),
         Kind::Error => error_fields(),
         Kind::Write(kind) => crate::server::writes::fields(kind),
         Kind::File(kind) => crate::client::files::fields(kind),
@@ -175,7 +177,8 @@ fn element(kind: Kind) -> Option<Kind> {
         Kind::Item(Item::Comments) => Some(Kind::Item(Item::Comment)),
         Kind::Item(Item::Statuses) => Some(Kind::Item(Item::Status)),
         Kind::Item(Item::Labels) => Some(Kind::Item(Item::Label)),
-        Kind::Error
+        Kind::Setup(_)
+        | Kind::Error
         | Kind::User
         | Kind::Settings
         | Kind::Repository

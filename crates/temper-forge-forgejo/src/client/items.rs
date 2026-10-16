@@ -344,6 +344,7 @@ impl Items {
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users,
             ) => {
                 unreachable!("item root selection")
@@ -378,6 +379,7 @@ impl Items {
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Item(
                     Item::Pulls

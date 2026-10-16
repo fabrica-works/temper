@@ -194,6 +194,7 @@ impl Files {
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Item(_)
                 | Kind::Review(_)

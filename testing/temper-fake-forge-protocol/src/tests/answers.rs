@@ -18,7 +18,7 @@ fn repositories_keep_the_scenarios_id_path_and_domain_settings() {
             actual,
             Ok(Answer::Repository(d::Repository {
                 id: 2,
-                owner: d::User { id: 0, login: boxed(b"org") },
+                owner: d::User { id: 0, login: boxed(b"org"), is_admin: false, full_name: Box::from([]) },
                 name: boxed(b"repo"),
                 object_format: temper_forge_forgejo::id::ObjectFormat::Sha1,
                 default_branch: boxed(b"trunk"),
@@ -52,7 +52,7 @@ fn issue_documents_keep_the_domain_values() {
             number: 7,
             pull: false,
             state: d::IssueState::Closed,
-            user: d::User { id: 2, login: boxed(b"person") },
+            user: d::User { id: 2, login: boxed(b"person"), is_admin: false, full_name: Box::from([]) },
             labels: Box::new([boxed(b"label")]),
             updated_at: Wall::from_nanos(2_000_000_000),
             title: boxed(b"title"),
@@ -71,7 +71,7 @@ fn comment_documents_keep_the_domain_values() {
             answers::comment(&config(), &comment),
             d::Comment {
                 id: 8,
-                user: d::User { id: 17, login: boxed(b"u17") },
+                user: d::User { id: 17, login: boxed(b"u17"), is_admin: false, full_name: Box::from([]) },
                 created_at: Some(Wall::from_nanos(1_000_000_000)),
                 updated_at: expected,
                 body: d::Body::Kept(boxed(b"comment"))
@@ -101,7 +101,7 @@ fn review_documents_keep_the_head_verdict_and_official_flag() {
             answers::review(&config(), &input),
             d::Review {
                 id: 8,
-                user: d::User { id: 2, login: boxed(b"person") },
+                user: d::User { id: 2, login: boxed(b"person"), is_admin: false, full_name: Box::from([]) },
                 state: expected,
                 commit_id: temper_forge_forgejo::id::read(b"0000000000000007000000000000000000000000")
                     .expect("literal"),
@@ -190,7 +190,11 @@ fn statuses_combine_failed_before_pending_before_passed() {
         };
         assert_eq!(state, d::CombinedStatus { state: expected, total_count: 2 }, "{checks:?}");
         for row in &statuses {
-            assert_eq!(row.creator, Some(d::User { id: 2, login: boxed(b"person") }), "{checks:?}");
+            assert_eq!(
+                row.creator,
+                Some(d::User { id: 2, login: boxed(b"person"), is_admin: false, full_name: Box::from([]) }),
+                "{checks:?}"
+            );
         }
     }
 }

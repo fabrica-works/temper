@@ -171,7 +171,8 @@ impl Start {
                 }
                 None
                 | Some(
-                    Kind::User
+                    Kind::Setup(_)
+                    | Kind::User
                     | Kind::Error
                     | Kind::Write(_)
                     | Kind::Settings
@@ -189,6 +190,7 @@ impl Start {
                 | Kind::Settings
                 | Kind::Repository
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
                 | Kind::Branch(_)
@@ -205,7 +207,8 @@ impl Start {
                     }
                     Kind::Search => Document::Search { ok: self.ok },
                     Kind::Users => Document::Listed { skipped: 0 },
-                    Kind::Error
+                    Kind::Setup(_)
+                    | Kind::Error
                     | Kind::Write(_)
                     | Kind::Review(_)
                     | Kind::Branch(_)
@@ -237,6 +240,7 @@ impl Start {
                 Kind::Error
                 | Kind::Write(_)
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
                 | Kind::Branch(_)
@@ -269,6 +273,7 @@ impl Start {
                 | Kind::Write(_)
                 | Kind::Settings
                 | Kind::Search
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
                 | Kind::Branch(_)
@@ -290,6 +295,7 @@ impl Start {
                 | Kind::Error
                 | Kind::Write(_)
                 | Kind::Settings
+                | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
                 | Kind::Branch(_)

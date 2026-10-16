@@ -167,7 +167,7 @@ fn a_summary_keeps_its_marker_and_a_long_body_carries_no_key_or_bytes() {
             number: 7,
             pull: true,
             state: d::IssueState::Open,
-            user: d::User { id: 2, login: Box::from(&b"writer"[..]) },
+            user: d::User { id: 2, login: Box::from(&b"writer"[..]), is_admin: false, full_name: Box::from([]) },
             labels: Box::from([]),
             updated_at: Wall::from_nanos(3),
             title: Box::from(&b"title"[..]),

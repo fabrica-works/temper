@@ -151,7 +151,7 @@ fn repository(config: &Config, request: &Request, settings: &a::Settings) -> Res
     html.put(&full).expect("sized html URL");
     Ok(Answer::Repository(d::Repository {
         id: repository_id(config, request).ok_or(a::Error::Missing(a::What::Repository))?,
-        owner: d::User { id: 0, login: bytes::copy_of(owner) },
+        owner: d::User { id: 0, login: bytes::copy_of(owner), is_admin: false, full_name: Box::from([]) },
         name: bytes::copy_of(name),
         object_format: ObjectFormat::Sha1,
         default_branch: settings.default.clone(),

@@ -151,7 +151,7 @@ fn route_tail(
                     WriteKind::Reviewers,
                     Request::RemoveReviewers { at, number, reviewers: Box::from([]) },
                 ),
-                Method::Get | Method::Patch => return Err(Unrouted::Method),
+                Method::Get | Method::Put | Method::Patch => return Err(Unrouted::Method),
             }
         }
         [pulls, number, merge] if &**pulls == b"pulls" && &**merge == b"merge" => (
@@ -302,6 +302,9 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
     }
 }
 impl BodyDecoder {
+    fn flag(key: &'static [u8], _value: bool) -> Result<(), Malformed> {
+        Err(Malformed::Shape { field: key })
+    }
     fn scalar(&mut self, kind: Kind, key: &'static [u8], value: Value) -> Result<(), Malformed> {
         let text = match value {
             Value::Text(text) | Value::Body(crate::document::Body::Kept(text)) => Some(text),
@@ -310,7 +313,8 @@ impl BodyDecoder {
                 self.set_id(id.expect("required id"));
                 return Ok(());
             }
-            Value::Number(_) | Value::Boolean(_) | Value::Time(_) => return Err(Malformed::Shape { field: key }),
+            Value::Boolean(value) => return Self::flag(key, value),
+            Value::Number(_) | Value::Time(_) => return Err(Malformed::Shape { field: key }),
         };
         let text = text.expect("text field");
         if kind == Kind::Write(WriteKind::Login) {

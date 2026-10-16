@@ -388,9 +388,10 @@ fn entrance(server: &mut Server, service: &mut Service, env: &Env<Limits>, call:
     let method = match call.method {
         Method::Get => request::Method::Get,
         Method::Post => request::Method::Post,
+        Method::Put => request::Method::Put,
         Method::Patch => request::Method::Patch,
         Method::Delete => request::Method::Delete,
-        Method::Head | Method::Put | Method::Options => {
+        Method::Head | Method::Options => {
             server.requests.push(http::Request::Discard);
             fail(server, &env.limits, 405);
             return;

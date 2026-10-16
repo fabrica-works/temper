@@ -203,6 +203,7 @@ impl Connection {
         let method = match encoded.method {
             request::Method::Get => skein_http::Method::Get,
             request::Method::Post => skein_http::Method::Post,
+            request::Method::Put => skein_http::Method::Put,
             request::Method::Patch => skein_http::Method::Patch,
             request::Method::Delete => skein_http::Method::Delete,
         };

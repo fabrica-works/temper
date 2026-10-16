@@ -39,14 +39,14 @@ pub fn commit(id: &ObjectId) -> Option<u64> {
 pub fn user(config: &Config, id: u64) -> d::User {
     for (uid, login) in &config.users {
         if *uid == id {
-            return d::User { id, login: login.clone() };
+            return d::User { id, login: login.clone(), is_admin: false, full_name: Box::from([]) };
         }
     }
     let digits = Decimal::of(id);
     let mut login = Writer::new(digits.as_bytes().len().saturating_add(1));
     login.put(b"u").expect("sized login");
     login.put(digits.as_bytes()).expect("sized login");
-    d::User { id, login: login.finish() }
+    d::User { id, login: login.finish(), is_admin: false, full_name: Box::from([]) }
 }
 #[must_use]
 pub fn page(config: &Config, page: r::Page) -> (u32, u32) {

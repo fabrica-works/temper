@@ -1,3 +1,4 @@
+mod accounts;
 mod fixtures;
 mod pin;
 use crate::{
@@ -87,7 +88,12 @@ fn a_string_past_its_cap_is_malformed_and_a_body_past_its_cap_is_long() {
         if valid {
             assert_eq!(
                 result.document,
-                Ok(Document::User(crate::document::User { id: 2, login: Box::from(*b"12345678") }))
+                Ok(Document::User(crate::document::User {
+                    id: 2,
+                    login: Box::from(*b"12345678"),
+                    is_admin: false,
+                    full_name: Box::from([])
+                }))
             );
         } else {
             assert_eq!(result.document, Err(Malformed::TooLong { field: b"login" }));
@@ -122,7 +128,15 @@ fn unknown_nested_fields_are_skipped_without_retaining_their_strings() {
         br#"{"extra":{"login":"long unknown string","nested":[{}]},"id":1,"login":"fixture"}"#,
         &limits,
     );
-    assert_eq!(result.document, Ok(Document::User(crate::document::User { id: 1, login: Box::from(*b"fixture") })));
+    assert_eq!(
+        result.document,
+        Ok(Document::User(crate::document::User {
+            id: 1,
+            login: Box::from(*b"fixture"),
+            is_admin: false,
+            full_name: Box::from([])
+        }))
+    );
     assert!(result.rows.is_empty());
 }
 #[test]
@@ -160,7 +174,12 @@ fn a_comment_at_or_below_after_is_skipped_body_unread() {
         result.rows.as_slice(),
         &[crate::document::Row::Comment(crate::document::Comment {
             id: 5,
-            user: crate::document::User { id: 2, login: Box::from(*b"writer") },
+            user: crate::document::User {
+                id: 2,
+                login: Box::from(*b"writer"),
+                is_admin: false,
+                full_name: Box::from([])
+            },
             created_at: None,
             updated_at: None,
             body: Body::Kept(Box::from(*b"new"))
@@ -285,7 +304,12 @@ fn permission_owner_reads_without_mapping_it_to_admin() {
         decoded.document,
         Ok(Document::Permission(crate::document::CollaboratorPermission {
             permission: crate::document::Permission::Owner,
-            user: crate::document::User { id: 1, login: Box::from(*b"fixture") }
+            user: crate::document::User {
+                id: 1,
+                login: Box::from(*b"fixture"),
+                is_admin: false,
+                full_name: Box::from([])
+            }
         }))
     );
 }

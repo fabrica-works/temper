@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 pub enum Method {
     Get,
     Post,
+    Put,
     Patch,
     Delete,
 }

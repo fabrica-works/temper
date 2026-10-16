@@ -53,7 +53,7 @@ pub(super) fn route(method: Method, bytes: &[u8], limits: &Limits) -> Result<Rou
     };
     match method {
         Method::Get => Ok(Route::Ready(request)),
-        Method::Post | Method::Patch | Method::Delete => Err(Unrouted::Method),
+        Method::Post | Method::Put | Method::Patch | Method::Delete => Err(Unrouted::Method),
     }
 }
 fn run(json: &mut Encoder, value: &Run) {

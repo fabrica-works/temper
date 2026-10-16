@@ -64,7 +64,12 @@ fn a_json_response_is_decoded_through_its_body_end() {
     assert_eq!(
         heard.get(1),
         Some(&Heard::Done(crate::connection::Body::Document(temper_forge_forgejo::document::Document::User(
-            temper_forge_forgejo::document::User { id: 2, login: Box::from(&b"writer"[..]) }
+            temper_forge_forgejo::document::User {
+                id: 2,
+                login: Box::from(&b"writer"[..]),
+                is_admin: false,
+                full_name: Box::from([])
+            }
         )))),
         "decoded whole"
     );

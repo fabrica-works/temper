@@ -31,6 +31,7 @@ pub fn transcript(case: &str) -> Transcript {
     let method = match words.next().expect("method") {
         b"GET" => Method::Get,
         b"POST" => Method::Post,
+        b"PUT" => Method::Put,
         b"PATCH" => Method::Patch,
         b"DELETE" => Method::Delete,
         other => panic!("method {other:?}"),
@@ -221,6 +222,8 @@ pub fn user(id: u64) -> temper_forge_forgejo::document::User {
     temper_forge_forgejo::document::User {
         id,
         login: Box::from(if id == 1 { b"fixture".as_slice() } else { b"writer" }),
+        is_admin: false,
+        full_name: Box::from([]),
     }
 }
 #[must_use]

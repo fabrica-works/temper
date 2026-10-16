@@ -35,6 +35,8 @@ impl Body {
 pub struct User {
     pub id: u64,
     pub login: Box<[u8]>,
+    pub is_admin: bool,
+    pub full_name: Box<[u8]>,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ApiSettings {
@@ -176,7 +178,7 @@ pub struct CommitStatus {
     pub target_url: Box<[u8]>,
 }
 pub(crate) fn user() -> User {
-    User { id: 0, login: Box::from([]) }
+    User { id: 0, login: Box::from([]), is_admin: false, full_name: Box::from([]) }
 }
 pub(crate) fn repository() -> Repository {
     Repository {

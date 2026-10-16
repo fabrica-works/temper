@@ -9,7 +9,7 @@ use temper_forge_forgejo::{
 fn repository() -> Repository {
     Repository {
         id: 1,
-        owner: User { id: 1, login: Box::from(*b"fixture") },
+        owner: User { id: 1, login: Box::from(*b"fixture"), is_admin: false, full_name: Box::from([]) },
         name: Box::from(*b"specimen"),
         object_format: ObjectFormat::Sha1,
         default_branch: Box::from(*b"main"),
@@ -22,8 +22,16 @@ fn repository() -> Repository {
 }
 fn cases() -> [(&'static str, Request, Answer); 6] {
     [
-        ("user", Request::User, Answer::User(User { id: 2, login: Box::from(*b"writer") })),
-        ("user-fixture", Request::User, Answer::User(User { id: 1, login: Box::from(*b"fixture") })),
+        (
+            "user",
+            Request::User,
+            Answer::User(User { id: 2, login: Box::from(*b"writer"), is_admin: false, full_name: Box::from([]) }),
+        ),
+        (
+            "user-fixture",
+            Request::User,
+            Answer::User(User { id: 1, login: Box::from(*b"fixture"), is_admin: true, full_name: Box::from([]) }),
+        ),
         (
             "settings-api",
             Request::ApiSettings,
@@ -34,7 +42,15 @@ fn cases() -> [(&'static str, Request, Answer); 6] {
         (
             "users-search-uid",
             Request::UserSearch { uid: 1, limit: Some(1) },
-            Answer::Search { ok: true, data: Box::from([User { id: 1, login: Box::from(*b"fixture") }]) },
+            Answer::Search {
+                ok: true,
+                data: Box::from([User {
+                    id: 1,
+                    login: Box::from(*b"fixture"),
+                    is_admin: false,
+                    full_name: Box::from([]),
+                }]),
+            },
         ),
     ]
 }
