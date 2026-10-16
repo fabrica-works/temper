@@ -321,7 +321,14 @@ per session are in each file.
   09, 17, 18), and in it `tests/domain.rs`'s
   `memory_below_the_components_sum_is_refused` (`over`, the small
   profile's memory sum) by each session that changes a stored record's or
-  a component's worst case (jig 02 to 09, 16; ruling 110); `crates/jig-protocol-engine-clients/src/translate/` (jig 14, 16,
+  a component's worst case (jig 02 to 09, 16; ruling 110); and, by the
+  same sessions, the profiles' store bounds (`value`, commit, snapshot) in
+  `crates/jig-protocol-config/src/profile/{small,standard}.rs` and their
+  expected tuples in `testing/jig-test-service/src/tests.rs`
+  (`both_jig_profiles_have_a_bounded_service`): an increment that grows a
+  stored record's worst case raises them to what the build requires, and
+  sets the tuples to match, its report naming each old and new value
+  (ruling 112); `crates/jig-protocol-engine-clients/src/translate/` (jig 14, 16,
   17); `testing/jig-test-domain/` (jig 06, 07, 09);
   `testing/jig-conformance/` (jig 04.7, 06.1, 08.3 to 08.6, 23);
   `crates/jig-client-protocol-link/src/{boundary,component,store,lib}.rs`,
