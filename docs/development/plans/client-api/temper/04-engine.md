@@ -144,7 +144,11 @@ Needs: jig 09.4 (jig 09's last increment: `templates` and the
 policies' overrides; temper 03 is the session's start).
 Files (temper-03.3 carried `Limits.templates`, `core_limits` and the
 service's `templates: jig.core.templates`, ruling 164, and `ENGINE`'s `templates`
-at `fixtures.rs:46`, :65 and :436, ruling 169: 04.1 does what remains): `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46`
+at `fixtures.rs:46`, :68 and :441, ruling 169: 04.1 does what remains.
+Ruling 188: temper 03.4's repin onto jig 13.2 is the first past jig
+09.4, so it carries the repairs below that come "at the repin"; 04.1
+makes no repin commit when temper's jig pin holds jig 09.4's landing
+`3f2ae98ad` (README, Pins), and adds what 03.4 left of them): `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46`
 (`ENGINE`'s `"chats": {"charter": 1, "close_grace_ms": 5000}` becomes
 `"templates"`, jig's two defaults written out in jig 09.1's format, as
 jig 09's fixtures write them: "jig's defaults are written, not
@@ -188,18 +192,24 @@ which the world's other test limits derive. Users found by `git grep -n -e '"cha
 close_grace -e 'chat: 1' -e 'jig_domain_core::Limits {' -- '*.rs'` in
 temper: the three above at the base. jig 09's new refusals, at the
 repin (its 200 lines): `crates/temper-service/src/startup/problems.rs`'s
-two matches over `config::What` (:81-102, :139-163) gain arms for
-`What::Grace { template }` and `What::Operations { .. }`, the second
-printing their numbers as `Reserve` does, and
-`crates/temper-service/src/tests/startup.rs:117-140`'s
-`jig_refusals_print_words` a row for each. Shared:
+two matches over `config::What` (their `What::Grace` arms are in, :97
+and :144) gain `What::Operations { .. }`, printing its numbers
+(operations, delegates, goals) as `Reserve` does;
+`crates/temper-forge-setup/src/problem.rs`'s match (:34-49) gains it
+too; and `crates/temper-service/src/tests/startup.rs:117-140`'s
+`jig_refusals_print_words` a row for `Grace` and one for `Operations`. Shared:
 `crates/temper-engine-domain/src/store.rs` (README, "Shared files"),
 if the repin's repairs reach it.
 Shape: one field of temper's, `temper_engine_domain::Limits.templates`,
-taken as `documents` is; `temper-service`'s startup passes
-`engine.templates` to jig's reader and keeps nothing else of it.
+taken as `documents` is (in since 03.3); `temper-service`'s startup
+hands the whole `engine` member to `config::engine`
+(`crates/temper-service/src/startup.rs:60`), which reads `templates`:
+temper adds no code for it (ruling 188).
 Test shape: `crates/temper-service/src/tests/startup.rs`, on
-`fixtures::engine()` (`crates/temper-service/src/tests/fixtures.rs:76`).
+`fixtures::engine()` (`crates/temper-service/src/tests/fixtures.rs:79`).
+The chats test renames `ENGINE`'s first `"templates": [` alone
+(`replacen(…, 1)`): the project policy's `"templates": []` (:68) matches
+too (ruling 188).
 The reference test, its field names jig 09's:
 ```rust
 #[test]
@@ -224,7 +234,7 @@ Don't: add a template of temper's; read `templates` in temper's
 `application` reader; set a template's field by hand where jig's fixture
 gives it.
 Size: at most 40 lines (the repin's repairs counted apart, at most 200).
-Removes: the `chats` member in `ENGINE`.
+Removes: nothing (03.3 removed `chats` from `ENGINE`, ruling 169).
 
 ### 04.2 The forge's family on the collapsed wire
 

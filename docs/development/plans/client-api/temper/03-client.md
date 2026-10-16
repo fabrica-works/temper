@@ -512,6 +512,27 @@ naming `jig-domain-client` (`crates/temper-client-domain`,
 `crates/temper`, `tests/client`, `tests/one-process`). Found by `git grep
 -n -w -e jig_domain_client -e 'Saved::' -e 'StoreRead' -- '*.rs'` and
 `git grep -n jig-domain-client -- '*Cargo.toml'` in temper.
+Repin (ruling 188): temper's jig pin is `755e02e5`; the repin onto jig
+13.2 is the first past jig 03.1 to 09.4, and repairs them as the
+README's "What a temper repin repairs" says, within its 200 lines and
+jig 08.4's census (README). A re-check at jig `3f2ae98ad` found, in
+`temper-engine-domain`: `Event::ForgetChat` gone (`archive.rs`),
+`Now::LoadEndedChat` now `LoadEndedRead { request, task, party }`
+(`route/now.rs`), `Held::Load(_)` (`route/held.rs`), `Event::Application`'s
+`scope: ApplicationScope` (`route/applications.rs`), `restore_inbox_row`
+on a core `Record` (`restart.rs`), `Stored::EndedRead`, `Ask::Compound`
+and `Ask::Create` (`store.rs`); in `temper-protocol-store`,
+`src/records/application/refusal.rs:290-370` over people v3's
+`Refusal` (`NotWellFormed`, `proposable: Option<Accepter>`), and
+`CoreRefused`'s bound (`schema/store-v2.schema:177`, 23), which its
+drift test settles; `config::What::Operations` in
+`crates/temper-service/src/startup/problems.rs` and
+`crates/temper-forge-setup/src/problem.rs`; and
+`crates/temper/tests/support/forgejo.rs`'s overrides (:135-168) gain
+`("people.operations", 5)`. temper 04.1's Files name the last three;
+each 03.4 does, 04.1 then leaves. The crates downstream of
+`temper-engine-domain` were not compiled: fix any further error as the
+README says, and list it in the commit body.
 Shape: no new type. The root's `Request::Save` and `Erase` carry the
 table's records alone (until 03.5 gives them to the client); the
 reference UI's `Save` and `Erase` of its records are dropped by the root
