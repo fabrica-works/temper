@@ -163,39 +163,65 @@ terminal's loop: reading lines, the print interval, printing and the
 output, under temper's settings (the name `temper`, the longest line, a
 one-second interval, the status region the banner's link state); the
 host keeps temper's own lines (signing in, its retries, a refused link,
-the credential's and the store's notices, signed out, closed) and says
+the credential's and the store's notices, signed out) and says
 them with `Terminal::say` (`client.md`, 6.2, 6.3, 6.6, 6.7; skein's
-`ui-text.md`, 7). temper 01.3 put the renderer and the command reader
+`ui-text.md`, 7). `temper: closed` is the terminal's own line
+(`Terminal::close` says it): the host never says it. On `q`, the end of
+stdin or a termination signal the terminal "starts no new print, writes
+what it has begun, and says it is closed (`NAME: closed`); the host then
+closes its application" (`ui-text.md`, 7): the host closes the client
+once `Terminal::closed()` is true, after the drain, not before it.
+temper 01.3 put the renderer and the command reader
 on `skein-ui-text`; this increment replaces the rest of `terminal::Loop`.
 Needs: nothing beyond the session's start (temper 02.1 on temper's
 `main`).
 Files: `crates/temper-client-shell-terminal/src/` (names after temper
-01): `terminal.rs` (323 lines at the base: `Loop`'s reader, pacing,
+01): `terminal.rs` (318 lines at the base: `Loop`'s reader, pacing,
 printing and output go; its notices' lines stay, said through the
-terminal), `terminal/run.rs` (327: the host adopts the pipes through
+terminal), `lines.rs` (59) and `tests/lines.rs` (39), which go with
+`Lines`, the line reader, whose only user is `terminal.rs` (`:4`, `:76`,
+`:104`, `:110`), `terminal/run.rs` (327: the host adopts the pipes through
 `Terminal::adopt` and routes `Terminal::owns` completions; its own
 `Writing` and stdin buffer go), `terminal/native.rs`, `limits.rs`
-(`limits::terminal()`'s line and interval feed `Settings`), `lib.rs`;
+(`limits::terminal()`'s line and interval feed `Settings`), `lib.rs`,
+the crate's `Cargo.toml` (`skein-sim` as a dev-dependency, below) and
+`Cargo.lock`;
 `crates/temper/src/open.rs:74-120` (the loop made from
 `skein_ui_text::Settings`); tests: `tests/terminal.rs` (244 lines, 12
 tests), `tests/support/mod.rs` (271), `tests/fuzzy_terminal.rs`,
 `src/tests.rs`. Users found by `git grep -n -e 'terminal::Loop' -e
 'Loop::new' -e 'render::Frame' -e 'render::bounds' -- '*.rs'` in temper
-(at the base: `open.rs`, `terminal/run.rs`, `tests/support/mod.rs`).
+(at the base: `open.rs:101`, `tests/support/mod.rs:167`,
+`tests/terminal.rs:182`; `terminal/run.rs` writes `super::Loop`).
+`crates/temper/tests/support/person.rs:153` names `terminal::Notice`,
+which stays.
 Shape:
-- `skein_ui_text::Terminal::new(Settings { name: b"temper", longest,
-  interval: Duration::from_secs(1), status: Some(<the banner's link
-  region>) }, &view_limits)`; the host's iteration, in `ui-text.md`,
+- `skein_ui_text::Terminal::new(Settings { name: Box::from(*b"temper"),
+  longest, interval: Duration::from_secs(1), status: Some(<the banner's
+  link region>) }, &view_limits).expect("terminal settings")`
+  (`Settings.name` is a `Box<[u8]>`, `skein-ui-text/src/terminal.rs:17`;
+  `new` returns `Option<Terminal>`, and `open.rs` expects its other
+  startup parts the same way); the host's iteration, in `ui-text.md`,
   7's order: the client's steps, the view built, `Terminal::iterate(now,
   tree, changed)`, each `Command` from `Terminal::commands()` acted on
   the client (`Act` then, when `submit`, `Act::Submit`), the client's
   notices said as temper's lines (`temper: ...`, 6.3's form).
+- **Tags.** skein's terminal tags its operations with `1 << 62`
+  (`skein-ui-text/src/terminal.rs:12`), the bit `terminal/run.rs:13`'s
+  `TAG` uses today: the host's own io (the termination signals) takes
+  `1 << 61`, and the host gives a completion to the terminal when
+  `Terminal::owns` is true, before it reads its own tag.
 - temper's `terminal::Loop` keeps only what the text shell does not: the
   sign-in's retry and backoff (6.7), the exit status and its stderr line
   (6.1), the order in which temper's lines are said.
 Test shape: the machine world, `tests/terminal.rs` on
-`tests/support/mod.rs` (its limits from `limits::native()`, the shipped
-profile's). Its tests of the reader and of pacing
+`tests/support/mod.rs` (its limits from its own `tree_limits()`,
+`support/mod.rs:10`). The world drives skein's terminal through its
+pipes as skein's own tests do, on `skein_sim::Sim`
+(`tests/ui-text/tests/terminal.rs:20-42` at skein `f12f29d4`): the
+crate's dev-dependency `skein-sim`, by the git URL
+`tests/one-process/Cargo.toml:44` gives it, at temper's skein pin. Its
+tests of the reader and of pacing
 (`a_change_within_the_interval_prints_once_when_it_ends`,
 `an_act_prints_at_once_after_the_next_build`,
 `a_due_print_waits_for_stdout_then_shows_the_tree_then`,
@@ -209,18 +235,24 @@ tests keep their names and expected values
 `a_refused_link_exits_one_with_its_line`,
 `a_credential_and_store_notice_print_once_in_order`,
 `signing_in_cancels_the_pending_link_retry`,
-`a_refused_directory_exits_one_with_its_line`). One new test, under
-0.5 s:
+`a_refused_directory_exits_one_with_its_line`). One order changes, under
+`ui-text.md`, 7: in `the_end_of_stdin_closes_and_exits_zero_after_the_drain`,
+`assert!(world.client.closed, …)` (`tests/terminal.rs:59`) moves after
+`world.stdout_takes()`, since the host closes the client after the
+drain; its name, its assertions and their expected values stay. One new
+test, under 0.5 s (`World::signed_in()` has already printed at t=0, so
+both finds start after the output before the notice):
 ```rust
 #[test]
 fn temper_lines_are_said_before_the_next_print() {
     let mut world = support::World::signed_in();
+    let first = world.all_output().len();
     world.client.notice_at_once(Notice::StoreFailed);
     world.client.change_at(Duration::from_millis(10));
     world.run_until(Duration::from_secs(2));
     let output = world.all_output();
-    let line = skein_lib::bytes::find(&output, b"temper: cannot write the small store").expect("temper's line");
-    let page = skein_lib::bytes::find(&output, b"== ").expect("a print");
+    let line = skein_lib::bytes::find_from(&output, b"temper: cannot write the small store", first).expect("temper's line");
+    let page = skein_lib::bytes::find_from(&output, b"== ", first).expect("a print");
     assert!(line < page, "temper's line before the next print");
 }
 ```
