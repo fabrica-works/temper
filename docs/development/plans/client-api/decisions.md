@@ -898,6 +898,16 @@ choice would have been the user's (development.md, 10.4).
         - jig 13.4, jig 21.2 and temper 03.5 declare their families' owners.
      7. **Nothing is deferred:** no `later.md` row.
 
+181. **jig 04.6's compound answer stands, 04.7 goes on, until the designer answers** (design gap, jig 04's block of 2026-10-16T23:16:03Z).
+     Ruling 181, interim, until the designer's answer to `question.md` (asked 2026-10-16T23:17:18Z): a design gap, not a plan defect, as the plan's own "Questions to raise when reached" (jig 04, "A compound's answer") says. contract.md 3.4 says "done, with each operation's outcome in order", but names no value an operation's outcome holds beyond "made" for any kind but a message, so whether the landed `Outcome::Compound { project, operations, first_message }` carries it is the designer's.
+
+     Until the answer:
+     - 04.6's landing (jig 983862753) stands as it is: no change to `people::Outcome`, its `Copy`, or its codec.
+     - jig 04.7 goes on, with its Shape as written. Its conformance scenarios and stories judge a compound by "done" or "refused, at <place>", and by what the store holds after it; no assertion of 04.7's adds `first_message` or `operations` beyond what 04.6's tests already check, so a changed answer moves no test of 04.7's.
+     - jig 09.4 starts as the plan says; nothing in it rests on the answer.
+
+     If the answer changes the compound's answer, its plan change comes as a further unblock with its own step.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
