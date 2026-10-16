@@ -272,6 +272,19 @@ run are appended after "For the user".
      crates passed 217 of 218, the one failure the `orgs` reference test with no encoder written; the fuzzy run passed,
      2 of 2. A further exhaustive match the compiler finds is given its arm, and named in the commit body.
 
+110. **04.1's proof retried once** (process, temper 04's block of 2026-10-16T22:32:06Z).
+     Ruling 110, process: retry the whole prescribed recording proof once, with no code change. The README's
+     "The recording tools" lets a tool run "once more after each fix aimed at a cause their output names"; this failure
+     names no cause in the increment (the `--component` phase's existing pull fixture, which the first whole proof passed),
+     so one retry without a fix is allowed here, once.
+
+     - If the retry passes: amend the Proof trailer with it, and land.
+     - If the same `provisioning /api/v1/repos/fixture/specimen/pulls: HTTP 500` comes back: do not retry again. Make the
+       fixture's provisioning error keep the response body and keep the instance's log on failure (a fix aimed at the
+       cause's diagnosis, within 04.1's Files: `src/fixture.rs`), run once more, and if it fails a third time, block with
+       the body and the log's lines.
+     - Unchanged: the recording rule's "third failure with the same symptom is a question".
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
