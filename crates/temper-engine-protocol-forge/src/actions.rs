@@ -230,7 +230,8 @@ impl Plan {
                 }
                 Ok(())
             }
-            d::Row::User(_)
+            d::Row::Step(_)
+            | d::Row::User(_)
             | d::Row::Issue(_)
             | d::Row::Comment(_)
             | d::Row::Review(_)
@@ -297,7 +298,12 @@ impl Plan {
                 };
                 self.stage = Stage::Log;
                 Ok(Some(Step::Send(Exchange {
-                    request: r::Request::JobLog { at: self.at(), job: attempt.job, attempt: attempt.attempt },
+                    request: r::Request::JobLog {
+                        at: self.at(),
+                        job: attempt.job,
+                        attempt: attempt.attempt,
+                        step: None,
+                    },
                     range: Some(max),
                 })))
             }
@@ -314,6 +320,7 @@ impl Plan {
             | d::Document::Protection(_)
             | d::Document::Permission(_)
             | d::Document::Compare(_)
+            | d::Document::Job(_)
             | d::Document::Error(_) => Err(api::Error::InvalidAnswer),
         }
     }

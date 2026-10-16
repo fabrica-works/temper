@@ -97,10 +97,15 @@ fn target(request: &Request, out: &mut Target) {
             out.numbered(at, b"/actions/runs/", *run);
             out.put(b"/jobs");
         }
-        Request::JobLog { at, job, attempt } => {
+        Request::Job { at, job } => out.numbered(at, b"/actions/jobs/", *job),
+        Request::JobLog { at, job, attempt, step } => {
             out.numbered(at, b"/actions/jobs/", *job);
             out.put(b"/logs?attempt=");
             out.number(u64::from(*attempt));
+            if let Some(step) = step {
+                out.put(b"&step=");
+                out.number(u64::from(*step));
+            }
         }
         Request::User
         | Request::ApiSettings

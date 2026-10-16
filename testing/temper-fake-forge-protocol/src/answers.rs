@@ -209,6 +209,7 @@ fn pull_answer(config: &Config, request: &Request, value: &a::Pull) -> Result<An
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::CreateIssue { .. }
@@ -271,6 +272,7 @@ fn checks(config: &Config, request: &Request, values: &[a::CheckSummary]) -> Res
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::CreateIssue { .. }
@@ -433,6 +435,7 @@ fn collaborators(config: &Config, request: &Request, values: &[a::Collaborator])
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::CreateIssue { .. }

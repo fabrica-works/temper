@@ -32,6 +32,7 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::Reviews { .. }
@@ -102,6 +103,7 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::Reviews { .. }

@@ -143,10 +143,15 @@ pub enum Request {
         at: Repo,
         run: u64,
     },
+    Job {
+        at: Repo,
+        job: u64,
+    },
     JobLog {
         at: Repo,
         job: u64,
         attempt: u32,
+        step: Option<u32>,
     },
     CreateIssue {
         at: Repo,

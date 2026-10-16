@@ -107,6 +107,7 @@ pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Sel
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::RequestReviewers { .. }
@@ -154,6 +155,7 @@ pub fn select(config: &Config, request: &Request, range: Option<(u64, Option<u64
         | Request::Compare { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::CreateIssue { .. }
         | Request::OpenPull { .. }
@@ -201,6 +203,7 @@ fn status(request: &Request) -> u16 {
         | crate::Route::Raw
         | crate::Route::Runs
         | crate::Route::Run
+        | crate::Route::Job
         | crate::Route::Jobs
         | crate::Route::JobLog
         | crate::Route::PostReview

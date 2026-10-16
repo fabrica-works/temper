@@ -429,7 +429,7 @@ fn decoded(server: &mut Server, service: &mut Service, env: &Env<Limits>, reques
     let route = crate::route(&request);
     service.tally.unrouted = service.tally.unrouted.saturating_sub(1);
     let count = service.tally.routes.get(&route).copied().unwrap_or(0).saturating_add(1);
-    service.tally.routes.insert(route, count).expect("39 routes");
+    service.tally.routes.insert(route, count).expect("40 routes");
     server.followed = false;
     if let Request::Merge { style, .. } = &request
         && *style != document::MergeStyle::Squash
@@ -503,6 +503,7 @@ fn table(service: &Service, request: &Request, user: u64) -> Option<documents::A
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::CreateIssue { .. }

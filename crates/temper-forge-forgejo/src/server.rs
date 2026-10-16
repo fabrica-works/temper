@@ -88,6 +88,10 @@ pub enum Answer {
         runs: Box<[crate::document::Run]>,
     },
     Run(crate::document::Run),
+    Job {
+        job: crate::document::Job,
+        steps: Box<[crate::document::Step]>,
+    },
     Jobs(Box<[crate::document::Job]>),
     Pulls(Box<[PullRequest]>),
     Reviews(Box<[Review]>),
@@ -134,7 +138,7 @@ fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refu
             files::write(json, answer);
             Ok(())
         }
-        Answer::Runs { .. } | Answer::Run(_) | Answer::Jobs(_) => {
+        Answer::Runs { .. } | Answer::Run(_) | Answer::Job { .. } | Answer::Jobs(_) => {
             actions::write(json, answer);
             Ok(())
         }

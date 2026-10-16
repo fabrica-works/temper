@@ -1,4 +1,4 @@
-use crate::{Exchange, Failure, Outgoing};
+use crate::{Exchange, Failure, Outgoing, Range};
 use std::{
     fmt::Write as FmtWrite,
     io::{Read, Write},
@@ -13,8 +13,10 @@ pub(crate) fn request(port: u16, outgoing: &Outgoing<'_>, auth: Option<&str>) ->
     if let Some(body) = outgoing.body {
         write!(head, "Content-Type: application/json\r\nContent-Length: {}\r\n", body.len()).expect("string write");
     }
-    if let Some((start, end)) = outgoing.range {
-        write!(head, "Range: bytes={start}-{end}\r\n").expect("string write");
+    match outgoing.range {
+        Some(Range::Head(end)) => write!(head, "Range: bytes=0-{end}\r\n").expect("string write"),
+        Some(Range::Tail(length)) => write!(head, "Range: bytes=-{length}\r\n").expect("string write"),
+        None => {}
     }
     head.push_str("Connection: close\r\n\r\n");
     let mut bytes = head.into_bytes();

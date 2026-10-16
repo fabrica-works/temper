@@ -3,7 +3,10 @@ use temper_codecs_world::forgejo;
 use temper_forge_forgejo::{
     client,
     decode::Malformed,
-    document::{ChangedFile, CombinedStatus, CommitStatus, Compare, Document, FileStatus, Job, Row, Run, StatusState},
+    document::{
+        ChangedFile, CombinedStatus, CommitStatus, Compare, Document, FileStatus, Job, Row, Run, StatusState, Step,
+        StepStatus,
+    },
     request::Request,
     server::{self, Answer},
 };
@@ -33,8 +36,25 @@ fn status(context: &[u8], status: StatusState, description: &[u8], target_url: &
 fn raw() -> Request {
     Request::Raw { at: forgejo::specimen(), path: Box::from(*b"file-0.txt"), reference: forgejo::sha(4) }
 }
+fn failing_job() -> Answer {
+    Answer::Job {
+        job: Job { id: 2, run_id: 1, attempt: 1 },
+        steps: Box::from([
+            Step { number: 0, name: Box::from(*b"Set up job"), status: StepStatus::Success },
+            Step {
+                number: 1,
+                name: Box::from(*b"printf 'TEMPER_CONFORMANCE_FAILED_JOB\\n'\nexit 1\n"),
+                status: StepStatus::Failure,
+            },
+            Step { number: 2, name: Box::from(*b"Complete job"), status: StepStatus::Failure },
+        ]),
+    }
+}
+fn step_log(job: u64, step: u32) -> Request {
+    Request::JobLog { at: forgejo::specimen(), job, attempt: 1, step: Some(step) }
+}
 fn log() -> Request {
-    Request::JobLog { at: forgejo::specimen(), job: 2, attempt: 1 }
+    Request::JobLog { at: forgejo::specimen(), job: 2, attempt: 1, step: None }
 }
 fn cases() -> Vec<(&'static str, Request, Option<Answer>, u16)> {
     vec![
@@ -84,14 +104,14 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>, u16)> {
                         StatusState::Success,
                         b"Successful in 0s",
                         b"/fixture/specimen/actions/runs/1/jobs/0",
-                        1_577_817_012_000_000_000,
+                        1_577_817_013_000_000_000,
                     ),
                     status(
                         b"conformance / fail (push)",
                         StatusState::Failure,
                         b"Failing after 0s",
                         b"/fixture/specimen/actions/runs/1/jobs/1",
-                        1_577_817_013_000_000_000,
+                        1_577_817_014_000_000_000,
                     ),
                 ]),
             }),
@@ -112,6 +132,11 @@ fn cases() -> Vec<(&'static str, Request, Option<Answer>, u16)> {
         ("actions-jobs", Request::Jobs { at: forgejo::specimen(), run: 1 }, Some(Answer::Jobs(jobs())), 200),
         ("actions-job-log", log(), None, 200),
         ("actions-job-log-range", log(), None, 206),
+        ("actions-job", Request::Job { at: forgejo::specimen(), job: 2 }, Some(failing_job()), 200),
+        ("actions-job-log-step", step_log(2, 1), None, 200),
+        ("actions-job-log-step-suffix", step_log(2, 1), None, 206),
+        ("actions-job-log-past-last-step", step_log(2, 3), None, 404),
+        ("actions-job-log-empty-suffix", step_log(1, 1), None, 206),
     ]
 }
 fn expected(answer: Answer) -> (Document, Vec<Row>) {
@@ -125,6 +150,7 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::Runs { total_count, runs } => {
             (Document::Runs { total_count }, runs.into_vec().into_iter().map(Row::Run).collect())
         }
+        Answer::Job { job, steps } => (Document::Job(job), steps.into_vec().into_iter().map(Row::Step).collect()),
         Answer::Run(v) => (Document::Run(v), vec![]),
         Answer::Jobs(v) => (Document::Listed { skipped: 0 }, v.into_vec().into_iter().map(Row::Job).collect()),
         Answer::CombinedStatus { state, statuses, .. } => {
@@ -208,6 +234,8 @@ fn file_transcript_mutations_are_malformed_naming_the_field() {
         ("actions-run", "commit_sha", 2, Malformed::Missing { field: b"commit_sha" }),
         ("actions-jobs", "attempt", 3, Malformed::Range { field: b"attempt" }),
         ("actions-combined-status", "creator", 4, Malformed::Missing { field: b"creator" }),
+        ("actions-job", "status", 5, Malformed::Value { field: b"status" }),
+        ("actions-job", "number", 6, Malformed::Range { field: b"number" }),
     ] {
         let transcript = forgejo::transcript(case);
         let mut json: serde_json::Value = serde_json::from_slice(&transcript.body).expect("JSON");
@@ -221,6 +249,8 @@ fn file_transcript_mutations_are_malformed_naming_the_field() {
             4 => {
                 json["statuses"][0].as_object_mut().expect("status").remove(field);
             }
+            5 => json["steps"][0][field] = serde_json::json!("finished"),
+            6 => json["steps"][1][field] = serde_json::json!(4_294_967_296u64),
             _ => panic!("mutation"),
         }
         assert_eq!(

@@ -77,7 +77,7 @@ impl Fixture {
         target: &str,
         body: Option<&[u8]>,
         token: Option<&Token>,
-        range: Option<(u64, u64)>,
+        range: Option<temper_throwaway_forgejo::Range>,
     ) -> Result<Exchange> {
         self.instance.exchange(&Outgoing { method, target, token, body, range }).map_err(|e| failure(&e))
     }

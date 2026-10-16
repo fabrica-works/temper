@@ -385,7 +385,9 @@ impl Plan {
                 self.append(api::Answer::Remarks { remarks: Box::new([reading::remark(remark)]), more: false }, shared)
             }
             d::Row::Branch(branch) => self.append(api::Answer::Branches(Box::new([branch.name])), shared),
-            d::Row::File(_) | d::Row::Commit(_) | d::Row::Run(_) | d::Row::Job(_) => Err(api::Error::InvalidAnswer),
+            d::Row::File(_) | d::Row::Commit(_) | d::Row::Run(_) | d::Row::Step(_) | d::Row::Job(_) => {
+                Err(api::Error::InvalidAnswer)
+            }
         }
     }
     fn lookup_row(&mut self, pull: d::PullRequest) -> Result<(), api::Error> {
@@ -626,6 +628,7 @@ fn keep_row(row: &d::Row, forge: u16, tables: &mut Tables) {
         | d::Row::File(_)
         | d::Row::Commit(_)
         | d::Row::Run(_)
+        | d::Row::Step(_)
         | d::Row::Job(_) => {}
     }
 }
@@ -651,6 +654,7 @@ pub(crate) fn keep_document(document: &d::Document, forge: u16, tables: &mut Tab
         | d::Document::Protection(_)
         | d::Document::Compare(_)
         | d::Document::Runs { .. }
+        | d::Document::Job(_)
         | d::Document::Run(_)
         | d::Document::Error(_) => {}
     }
@@ -682,6 +686,7 @@ fn page_bound(request: &Request) -> Option<u32> {
         | Request::Compare { .. }
         | Request::Raw { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::CreateIssue { .. }
@@ -713,6 +718,7 @@ pub(crate) fn long(heard: &Heard) -> bool {
             | d::Row::File(_)
             | d::Row::Commit(_)
             | d::Row::Run(_)
+            | d::Row::Step(_)
             | d::Row::Job(_) => false,
         },
         Heard::Done(Body::Document(document)) => match document {
@@ -732,6 +738,7 @@ pub(crate) fn long(heard: &Heard) -> bool {
             | d::Document::Permission(_)
             | d::Document::Compare(_)
             | d::Document::Runs { .. }
+            | d::Document::Job(_)
             | d::Document::Run(_)
             | d::Document::Error(_) => false,
         },

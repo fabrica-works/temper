@@ -155,7 +155,7 @@ pub fn worst_case(limits: &Limits, config: &Config) -> Option<u64> {
         .checked_add(skein_lib::Queue::<skein_lib::stream::Down>::worst_case(1)?)?;
     tables
         .checked_add(Slab::<Call>::worst_case(limits.calls)?)?
-        .checked_add(Map::<crate::Route, u64>::worst_case(39)?)?
+        .checked_add(Map::<crate::Route, u64>::worst_case(40)?)?
         .checked_add(Map::<u64, u64>::worst_case(config.tokens.capacity())?)?
         .checked_add(per_connection.checked_mul(u64::from(limits.connections))?)
 }

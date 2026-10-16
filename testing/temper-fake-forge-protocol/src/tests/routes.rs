@@ -99,7 +99,7 @@ fn read_rows() -> [(Request, Route, Op); 24] {
         (Request::Run { at: at(), run: 7 }, Route::Run, Op::Read(Read::Run { run: 7 })),
         (Request::Jobs { at: at(), run: 7 }, Route::Jobs, Op::Read(Read::Jobs { run: 7 })),
         (
-            Request::JobLog { at: at(), job: 8, attempt: 2 },
+            Request::JobLog { at: at(), job: 8, attempt: 2, step: None },
             Route::JobLog,
             Op::Read(Read::Job { job: 8, attempt: 2, max_bytes: 4096 }),
         ),

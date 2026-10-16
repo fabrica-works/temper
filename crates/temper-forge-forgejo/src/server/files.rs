@@ -136,6 +136,7 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
         | Answer::Pulls(_)
         | Answer::Runs { .. }
         | Answer::Run(_)
+        | Answer::Job { .. }
         | Answer::Jobs(_) => unreachable!("file answer selection"),
     }
 }

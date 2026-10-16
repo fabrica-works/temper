@@ -275,6 +275,7 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
                     | Request::Raw { .. }
                     | Request::Runs { .. }
                     | Request::Run { .. }
+                    | Request::Job { .. }
                     | Request::Jobs { .. }
                     | Request::JobLog { .. }
                     | Request::User
@@ -386,6 +387,7 @@ impl BodyDecoder {
             | Request::Raw { .. }
             | Request::Runs { .. }
             | Request::Run { .. }
+            | Request::Job { .. }
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }
@@ -430,6 +432,7 @@ impl BodyDecoder {
             | Request::Raw { .. }
             | Request::Runs { .. }
             | Request::Run { .. }
+            | Request::Job { .. }
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }

@@ -214,6 +214,7 @@ impl Plan {
             | d::Row::Branch(_)
             | d::Row::Protection(_)
             | d::Row::Run(_)
+            | d::Row::Step(_)
             | d::Row::Job(_) => Err(api::Error::InvalidAnswer),
         }
     }
@@ -278,6 +279,7 @@ impl Plan {
             | d::Document::Protection(_)
             | d::Document::Permission(_)
             | d::Document::Runs { .. }
+            | d::Document::Job(_)
             | d::Document::Run(_)
             | d::Document::Error(_) => Err(api::Error::InvalidAnswer),
         }

@@ -669,6 +669,7 @@ fn raw_request(request: &request::Request) -> bool {
         | request::Request::Compare { .. }
         | request::Request::Runs { .. }
         | request::Request::Run { .. }
+        | request::Request::Job { .. }
         | request::Request::Jobs { .. }
         | request::Request::CreateIssue { .. }
         | request::Request::OpenPull { .. }

@@ -119,6 +119,7 @@ fn target(request: &Request, out: &mut Target) -> (Method, bool) {
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. } => unreachable!("write target selection"),
     }
@@ -241,6 +242,7 @@ fn write(json: &mut Encoder, request: &Request) {
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::Update { .. }

@@ -41,7 +41,11 @@ fn answers() -> Vec<(&'static str, Answer)> {
                 state,
                 user: forgejo::user(2),
                 labels: Box::from([]),
-                updated_at: at,
+                updated_at: if case == "close-issue" || case == "reopen-issue" {
+                    Wall::from_nanos(1_577_817_006_000_000_000)
+                } else {
+                    at
+                },
                 title: Box::from(title),
                 body: Body::Kept(Box::from(*b"<!-- temper:key 01000001 -->\nissue text")),
             }),
@@ -104,8 +108,8 @@ fn posted_answers() -> Vec<(&'static str, Answer)> {
                 state,
                 commit_id: forgejo::sha(4),
                 body: Body::Kept(Box::from(body.as_bytes())),
-                submitted_at: Some(at),
-                updated_at: Some(at),
+                submitted_at: Some(if id == 3 { Wall::from_nanos(1_577_817_006_000_000_000) } else { at }),
+                updated_at: Some(if id == 3 { Wall::from_nanos(1_577_817_006_000_000_000) } else { at }),
                 official,
                 dismissed: false,
             }),
@@ -119,7 +123,7 @@ fn posted_answers() -> Vec<(&'static str, Answer)> {
             case,
             Answer::Status(CommitStatus {
                 creator: Some(forgejo::user(2)),
-                updated_at: at,
+                updated_at: Wall::from_nanos(1_577_817_006_000_000_000),
                 context: Box::from(context),
                 status,
                 description: Box::from([]),
@@ -156,6 +160,7 @@ fn expected(answer: Answer) -> Document {
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
+        | Answer::Job { .. }
         | Answer::Jobs(_)
         | Answer::Pulls(_)
         | Answer::Reviews(_)
@@ -248,6 +253,7 @@ fn failure_cases() -> Vec<(&'static str, u16, &'static [u8], Option<Refusal>)> {
         ("delete-protected-branch", 403, b"can not delete default branch", None),
         ("archived-write", 423, b"<Repository 3:fixture/archived> is archived", None),
         ("missing-issue", 404, b"IsErrIssueNotExist", None),
+        ("actions-job-log-past-last-step", 404, b"step index out of range", None),
         ("raw-file-missing", 404, b"The target couldn't be found.", None),
         ("stranger-repository-by-path", 404, b"The target couldn't be found.", None),
         ("stranger-repository-by-id", 404, b"The target couldn't be found.", None),

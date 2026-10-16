@@ -88,6 +88,7 @@ impl Plan {
             | d::Document::Review(_)
             | d::Document::Compare(_)
             | d::Document::Runs { .. }
+            | d::Document::Job(_)
             | d::Document::Run(_)
             | d::Document::Error(_) => Err(api::Error::InvalidAnswer),
         }

@@ -135,6 +135,7 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
+        | Answer::Job { .. }
         | Answer::Jobs(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)

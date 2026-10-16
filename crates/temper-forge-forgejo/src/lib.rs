@@ -1,4 +1,4 @@
-//! the pinned Forgejo's documents (forge.md, sections 2, 3 and 9).
+//! The pinned Forgejo's documents (forge.md, sections 2, 3 and 9).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

@@ -12,13 +12,21 @@ use std::{
     process::{Child, Command},
     time::Duration,
 };
-const NAMES: [&str; 6] = [
+use temper_throwaway_forgejo::{Exchange, Range};
+const NAMES: [&str; 13] = [
     "actions-report-each-job-as-a-status-on-its-head",
     "actions-status-link-is-runs-n-jobs-i",
     "actions-status-link-names-no-attempt",
     "run-number-is-index-in-repo",
     "run-jobs-come-in-index-order",
     "job-log-range-answers-206",
+    "job-steps-number-from-0-set-up-first-complete-last",
+    "failed-workflow-step-and-completion-step-are-failure",
+    "step-log-holds-that-steps-lines-alone",
+    "step-log-suffix-range-answers-206-with-its-last-bytes",
+    "step-log-suffix-content-range-names-its-first-byte",
+    "empty-log-suffix-range-answers-206-empty",
+    "step-past-the-last-is-404",
 ];
 struct Runner {
     child: Option<Child>,
@@ -100,8 +108,9 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
     let job_id = job["id"].as_u64().ok_or("job id missing")?;
     let attempt = job["attempt"].as_u64().ok_or("job attempt missing")?;
     let log = format!("{R}/actions/jobs/{job_id}/logs?attempt={attempt}");
-    capture(f, out, mask, secrets, "actions-job-log", &log, None)?;
-    let response = f.exchange("GET", &log, None, Some(&f.writer.token), Some((0, 3)))?;
+    let whole = exchange(f, out, mask, secrets, "actions-job-log", &log, None)?;
+    let response =
+        f.exchange("GET", &log, None, Some(&f.writer.token), Some(temper_throwaway_forgejo::Range::Head(3)))?;
     record(out, mask, secrets, "actions-job-log-range", &response)?;
     let mut facts = Vec::new();
     facts::add(
@@ -133,6 +142,7 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
         &jobs.iter().map(|j| j["id"].to_string()).collect::<Vec<_>>().join(","),
     );
     facts::add(&mut facts, NAMES[5], response.status == 206, &format!("HTTP {}", response.status));
+    facts.extend(job_steps(f, out, mask, secrets, jobs, &whole)?);
     Ok((version, facts))
 }
 fn jobs_in_index_order(statuses: &[Value], jobs: &[Value]) -> bool {
@@ -166,11 +176,9 @@ fn capture(
     secrets: &Secrets,
     name: &str,
     target: &str,
-    range: Option<(u64, u64)>,
+    range: Option<temper_throwaway_forgejo::Range>,
 ) -> Result<Value> {
-    let response = f.exchange("GET", target, None, Some(&f.writer.token), range)?;
-    record(out, mask, secrets, name, &response)?;
-    Ok(serde_json::from_slice(&response.body).unwrap_or(Value::Null))
+    Ok(serde_json::from_slice(&exchange(f, out, mask, secrets, name, target, range)?.body).unwrap_or(Value::Null))
 }
 fn record(
     out: Option<&Path>,
@@ -225,4 +233,100 @@ fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, S
         .stderr(log)
         .spawn()?;
     Ok((Runner { child: Some(child) }, version))
+}
+
+fn exchange(
+    f: &Fixture,
+    out: Option<&Path>,
+    mask: &mut Mask,
+    secrets: &Secrets,
+    name: &str,
+    target: &str,
+    range: Option<Range>,
+) -> Result<Exchange> {
+    let response = f.exchange("GET", target, None, Some(&f.writer.token), range)?;
+    record(out, mask, secrets, name, &response)?;
+    Ok(response)
+}
+fn contains(hay: &[u8], needle: &[u8]) -> bool {
+    !needle.is_empty() && hay.windows(needle.len()).any(|part| part == needle)
+}
+fn content_range(exchange: &Exchange) -> Option<String> {
+    String::from_utf8_lossy(&exchange.head)
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .find(|(key, _)| key.eq_ignore_ascii_case("content-range"))
+        .map(|(_, value)| value.trim().to_owned())
+}
+fn job_steps(
+    f: &Fixture,
+    out: Option<&Path>,
+    mask: &mut Mask,
+    secrets: &Secrets,
+    jobs: &[Value],
+    whole: &Exchange,
+) -> Result<Vec<Fact>> {
+    const SUFFIX: u64 = 10;
+    let job = jobs.iter().find(|j| j["name"] == "fail").ok_or("failed job missing")?;
+    let id = job["id"].as_u64().ok_or("job id missing")?;
+    let attempt = job["attempt"].as_u64().ok_or("job attempt missing")?;
+    let read = capture(f, out, mask, secrets, "actions-job", &format!("{R}/actions/jobs/{id}"), None)?;
+    let steps = read["steps"].as_array().ok_or("job steps missing")?;
+    let failed = steps
+        .iter()
+        .find(|step| step["status"] == "failure")
+        .and_then(|s| s["number"].as_u64())
+        .ok_or("failed step missing")?;
+    let last = steps.iter().filter_map(|step| step["number"].as_u64()).max().ok_or("last step missing")?;
+    let log = format!("{R}/actions/jobs/{id}/logs?attempt={attempt}&step=");
+    let passing = jobs.iter().find(|j| j["name"] == "pass").ok_or("passing job missing")?;
+    let targets = [
+        ("actions-job-log-step", format!("{log}{failed}"), None),
+        ("actions-job-log-step-suffix", format!("{log}{failed}"), Some(Range::Tail(SUFFIX))),
+        ("actions-job-log-past-last-step", format!("{log}{}", last + 1), None),
+        (
+            "actions-job-log-empty-suffix",
+            format!("{R}/actions/jobs/{}/logs?attempt={}&step=1", passing["id"], passing["attempt"]),
+            Some(Range::Tail(SUFFIX)),
+        ),
+    ];
+    let mut captured = Vec::new();
+    for (name, target, range) in targets {
+        captured.push(exchange(f, out, mask, secrets, name, &target, range)?);
+    }
+    let [step, suffix, past, empty] = captured.as_slice() else { unreachable!("four captures") };
+    let n = step.body.len();
+    let tail = usize::try_from(SUFFIX)?;
+    let range = content_range(suffix);
+    let empty_range = content_range(empty);
+    let lengths = (whole.body.len(), n, suffix.body.len(), empty.body.len());
+    let statuses = (step.status, suffix.status, empty.status, past.status);
+    let seen =
+        format!("steps={steps:?}; lengths={lengths:?}; statuses={statuses:?}; suffix={range:?}; empty={empty_range:?}");
+    let numbered = steps.iter().enumerate().all(|(i, step)| step["number"].as_u64() == u64::try_from(i).ok());
+    let checks = [
+        steps.len() >= 3
+            && numbered
+            && steps.first().is_some_and(|s| s["name"] == "Set up job")
+            && steps.last().is_some_and(|s| s["name"] == "Complete job"),
+        steps.first().is_some_and(|s| s["status"] == "success")
+            && 0 < failed
+            && failed < last
+            && steps.last().is_some_and(|s| s["status"] == "failure"),
+        step.status == 200
+            && contains(&step.body, b"TEMPER_CONFORMANCE_FAILED_JOB")
+            && n < whole.body.len()
+            && contains(&whole.body, &step.body)
+            && !contains(&step.body, b"Run Main")
+            && !contains(&step.body, b"Job failed"),
+        suffix.status == 206 && n > tail && step.body.get(n.saturating_sub(tail)..) == Some(suffix.body.as_slice()),
+        n > tail && range == Some(format!("bytes {}-{}/{n}", n.saturating_sub(tail), n.saturating_sub(1))),
+        empty.status == 206 && empty.body.is_empty() && empty_range.as_deref() == Some("bytes 0--1/0"),
+        past.status == 404,
+    ];
+    let mut facts = Vec::new();
+    for (name, holds) in NAMES[6..].iter().zip(checks) {
+        facts::add(&mut facts, name, holds, &seen);
+    }
+    Ok(facts)
 }

@@ -66,3 +66,13 @@ fn a_runner_version_containing_the_pin_is_refused() {
         assert!(!names_runner(&line), "{line}");
     }
 }
+
+#[test]
+fn a_range_is_sent_as_a_head_or_a_suffix() {
+    use crate::Range;
+    for (range, line) in [(Range::Tail(10), "Range: bytes=-10\r\n"), (Range::Head(3), "Range: bytes=0-3\r\n")] {
+        let outgoing = Outgoing { range: Some(range), ..Outgoing::get("/api/v1/version", None) };
+        let sent = String::from_utf8(http::request(3000, &outgoing, None)).expect("UTF-8 request");
+        assert!(sent.contains(line), "{range:?}: {sent}");
+    }
+}

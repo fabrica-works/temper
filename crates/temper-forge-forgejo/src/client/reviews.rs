@@ -121,6 +121,7 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. }
         | Request::User

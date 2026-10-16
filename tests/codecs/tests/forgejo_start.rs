@@ -52,6 +52,7 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Compare { .. }
         | Answer::Runs { .. }
         | Answer::Run(_)
+        | Answer::Job { .. }
         | Answer::Jobs(_)
         | Answer::Reviews(_)
         | Answer::ReviewComments(_)

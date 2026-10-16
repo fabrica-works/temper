@@ -62,6 +62,13 @@ holds actions-status-link-names-no-attempt
 holds run-number-is-index-in-repo
 holds run-jobs-come-in-index-order
 holds job-log-range-answers-206
+holds job-steps-number-from-0-set-up-first-complete-last
+holds failed-workflow-step-and-completion-step-are-failure
+holds step-log-holds-that-steps-lines-alone
+holds step-log-suffix-range-answers-206-with-its-last-bytes
+holds step-log-suffix-content-range-names-its-first-byte
+holds empty-log-suffix-range-answers-206-empty
+holds step-past-the-last-is-404
 unchecked webhook-deliveries: webhooks are built after standalone
 holds component-start-ready
 holds component-start-other-user-stops

@@ -1,5 +1,6 @@
 //! Static object tables, required masks and a bounded container stack.
 use super::Malformed;
+use crate::client::actions::ActionKind;
 use crate::{document::Body, id::ObjectId, limits::Limits};
 use alloc::boxed::Box;
 use skein_json::{Token, tokenizer};
@@ -32,7 +33,7 @@ pub(crate) enum Kind {
     Search,
     Users,
     File(crate::client::files::FileKind),
-    Action(crate::client::actions::ActionKind),
+    Action(ActionKind),
     Item(Item),
     Review(crate::client::reviews::ReviewKind),
     Branch(crate::client::branches::BranchKind),
@@ -360,11 +361,13 @@ impl Walk {
                         self.want = Want::Value { field: *field, bit };
                         let demand = match field.read {
                             Read::Text | Read::Time | Read::Id { .. } => tokenizer::Request::Text(limits.string_bytes),
-                            Read::Body => tokenizer::Request::Text(if frame.kind == Kind::Error {
-                                limits.string_bytes
-                            } else {
-                                limits.body_bytes
-                            }),
+                            Read::Body => tokenizer::Request::Text(
+                                if frame.kind == Kind::Error || frame.kind == Kind::Action(ActionKind::Step) {
+                                    limits.string_bytes
+                                } else {
+                                    limits.body_bytes
+                                },
+                            ),
                             Read::Number | Read::Boolean | Read::Object(_) | Read::Array(_) => tokenizer::Request::Next,
                         };
                         return Ok(Move::Demand(demand));

@@ -29,7 +29,7 @@ masking. A leak reports the case and secret kind without printing its value.
 
 The same run writes `facts.txt`, with Forgejo and runner provenance followed
 by `holds`, `fails` or `unchecked` lines. Set `TEMPER_FORGEJO_RUNNER` to the
-pinned runner for Actions facts and six Actions transcripts.
+pinned runner for Actions facts and eleven Actions transcripts.
 The runner registers with this instance only and executes two inline host
 shell jobs, one succeeding and one failing; no actions or containers are
 downloaded. Without a runner those facts remain unchecked. Webhook facts

@@ -3,7 +3,7 @@ use super::{
     items::{number_value, page, query_value},
 };
 use crate::{
-    document::Run,
+    document::{self, Job, Run, Step},
     id,
     limits::Limits,
     path,
@@ -34,12 +34,20 @@ pub(super) fn route(method: Method, bytes: &[u8], limits: &Limits) -> Result<Rou
         }
         [runs, run] if &**runs == b"runs" => Request::Run { at, run: number_value(run)? },
         [runs, run, jobs] if &**runs == b"runs" && &**jobs == b"jobs" => Request::Jobs { at, run: number_value(run)? },
+        [jobs, job] if &**jobs == b"jobs" => Request::Job { at, job: number_value(job)? },
         [jobs, job, logs] if &**jobs == b"jobs" && &**logs == b"logs" => {
             let attempt = query_value(&target.query, b"attempt").ok_or(Unrouted::Malformed)?;
             let Ok(attempt) = u32::try_from(number_value(&attempt)?) else {
                 return Err(Unrouted::Malformed);
             };
-            Request::JobLog { at, job: number_value(job)?, attempt }
+            let step = match query_value(&target.query, b"step") {
+                Some(text) => Some(match u32::try_from(number_value(&text)?) {
+                    Ok(number) => number,
+                    Err(_) => return Err(Unrouted::Malformed),
+                }),
+                None => None,
+            };
+            Request::JobLog { at, job: number_value(job)?, attempt, step }
         }
         _ => return Err(Unrouted::NotFound),
     };
@@ -73,17 +81,11 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.array_end();
             json.object_end();
         }
+        Answer::Job { job: value, steps } => job(json, value, steps),
         Answer::Jobs(values) => {
             json.array_start();
             for value in values {
-                json.object_start();
-                json.key(b"id");
-                json.unsigned(value.id);
-                json.key(b"run_id");
-                json.unsigned(value.run_id);
-                json.key(b"attempt");
-                json.unsigned(u64::from(value.attempt));
-                json.object_end();
+                job(json, value, &[]);
             }
             json.array_end();
         }
@@ -112,4 +114,30 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
         | Answer::Files(_)
         | Answer::Compare { .. } => unreachable!("action answer selection"),
     }
+}
+
+fn job(json: &mut Encoder, value: &Job, steps: &[Step]) {
+    json.object_start();
+    json.key(b"id");
+    json.unsigned(value.id);
+    json.key(b"run_id");
+    json.unsigned(value.run_id);
+    json.key(b"attempt");
+    json.unsigned(u64::from(value.attempt));
+    if !steps.is_empty() {
+        json.key(b"steps");
+        json.array_start();
+        for step in steps {
+            json.object_start();
+            json.key(b"number");
+            json.unsigned(u64::from(step.number));
+            json.key(b"name");
+            json.string(&step.name);
+            json.key(b"status");
+            json.string(document::step_status_text(step.status));
+            json.object_end();
+        }
+        json.array_end();
+    }
+    json.object_end();
 }

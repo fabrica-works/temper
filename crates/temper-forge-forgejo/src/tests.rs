@@ -496,3 +496,105 @@ fn pull_files_decode_forgejos_changed_status_as_modified() {
         "Forgejo's changed file keeps both sides"
     );
 }
+
+fn job_request() -> Request {
+    Request::Job { at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") }, job: 2 }
+}
+fn job() -> crate::document::Job {
+    crate::document::Job { id: 2, run_id: 1, attempt: 1 }
+}
+fn setup() -> crate::document::Step {
+    crate::document::Step { number: 0, name: Box::from(*b"Set up job"), status: crate::document::StepStatus::Success }
+}
+#[test]
+fn a_job_reads_its_steps_numbers_names_and_statuses() {
+    use crate::document::{Row, Step, StepStatus};
+    let limits = fixtures::limits();
+    let body = br#"{"id":2,"run_id":1,"attempt":1,"name":"fail","status":"failure","steps":[{"number":0,"name":"Set up job","status":"success","started":"2020-01-01T00:00:14+05:30"},{"number":1,"name":"exit 1\n","status":"failure"},{"number":2,"name":"Complete job","status":"failure"}]}"#;
+    let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Ok(Document::Job(job())));
+    assert_eq!(
+        decoded.rows.as_slice(),
+        [
+            Row::Step(setup()),
+            Row::Step(Step { number: 1, name: Box::from(*b"exit 1\n"), status: StepStatus::Failure }),
+            Row::Step(Step { number: 2, name: Box::from(*b"Complete job"), status: StepStatus::Failure }),
+        ],
+        "each step goes up as a row, in Forgejo's order"
+    );
+}
+#[test]
+fn a_job_without_a_steps_member_reads_no_steps() {
+    let limits = fixtures::limits();
+    let body = br#"{"id":4,"run_id":2,"attempt":0,"status":"waiting"}"#;
+    let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Ok(Document::Job(crate::document::Job { id: 4, run_id: 2, attempt: 0 })));
+    assert_eq!(decoded.rows.as_slice(), []);
+}
+#[test]
+fn a_job_encodes_its_steps_only_when_it_has_some() {
+    use crate::server::{self, Answer};
+    let limits = fixtures::limits();
+    for (steps, expected) in [
+        (
+            Box::from([setup()]),
+            br#"{"id":2,"run_id":1,"attempt":1,"steps":[{"number":0,"name":"Set up job","status":"success"}]}"#
+                .as_slice(),
+        ),
+        (Box::from([]), br#"{"id":2,"run_id":1,"attempt":1}"#),
+    ] {
+        assert_eq!(server::encode(&Answer::Job { job: job(), steps }, &limits).unwrap().as_ref(), expected);
+    }
+}
+#[test]
+fn each_step_status_reads_back_from_the_servers_word() {
+    use crate::document::{Row, StepStatus};
+    let limits = fixtures::limits();
+    for status in [
+        StepStatus::Unknown,
+        StepStatus::Waiting,
+        StepStatus::Running,
+        StepStatus::Success,
+        StepStatus::Failure,
+        StepStatus::Cancelled,
+        StepStatus::Skipped,
+        StepStatus::Blocked,
+    ] {
+        let step = crate::document::Step { status, ..setup() };
+        let answer = crate::server::Answer::Job { job: job(), steps: Box::from([step.clone()]) };
+        let body = crate::server::encode(&answer, &limits).unwrap();
+        let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), &body, &limits);
+        assert_eq!(decoded.document, Ok(Document::Job(job())), "{status:?}");
+        assert_eq!(decoded.rows.as_slice(), [Row::Step(step)], "{status:?}");
+    }
+}
+#[test]
+fn a_step_status_outside_forgejos_words_is_malformed() {
+    let limits = fixtures::limits();
+    let body = br#"{"id":2,"run_id":1,"attempt":1,"steps":[{"number":0,"name":"x","status":"done"}]}"#;
+    let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Err(Malformed::Value { field: b"status" }));
+}
+#[test]
+fn a_job_reads_more_steps_than_inner_as_rows() {
+    let limits = crate::limits::Limits { inner: 2, ..fixtures::limits() };
+    let body = br#"{"id":2,"run_id":1,"attempt":1,"steps":[{"number":0,"name":"a","status":"success"},{"number":1,"name":"b","status":"failure"},{"number":2,"name":"c","status":"failure"}]}"#;
+    let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Ok(Document::Job(job())));
+    assert_eq!(decoded.rows.len(), 3);
+}
+#[test]
+fn a_step_name_past_string_bytes_reads_empty() {
+    use crate::document::{Row, Step, StepStatus};
+    let limits = crate::limits::Limits { string_bytes: 8, ..fixtures::limits() };
+    let body = br#"{"id":2,"run_id":1,"attempt":1,"steps":[{"number":0,"name":"12345678","status":"success"},{"number":1,"name":"123456789","status":"failure"}]}"#;
+    let decoded = fixtures::decode(client::decoder(&job_request(), &limits).unwrap(), body, &limits);
+    assert_eq!(decoded.document, Ok(Document::Job(job())));
+    assert_eq!(
+        decoded.rows.as_slice(),
+        [
+            Row::Step(Step { number: 0, name: Box::from(*b"12345678"), status: StepStatus::Success }),
+            Row::Step(Step { number: 1, name: Box::from([]), status: StepStatus::Failure }),
+        ]
+    );
+}

@@ -21,7 +21,7 @@ impl Recorder<'_> {
         target: &str,
         body: Option<&str>,
         token: Option<&Token>,
-        range: Option<(u64, u64)>,
+        range: Option<temper_throwaway_forgejo::Range>,
     ) -> Result<Exchange> {
         let exchange = self.f.exchange(method, target, body.map(str::as_bytes), token, range)?;
         write::check(name, &exchange.sent, &exchange.body, self.secrets)?;
@@ -198,7 +198,7 @@ fn reads(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
         ("raw-file-range", format!("/raw/file-0.txt?ref={head}")),
     ] {
         let token = if name.starts_with("branch-protection") { owner } else { writer };
-        let range = (name == "raw-file-range").then_some((0, 3));
+        let range = (name == "raw-file-range").then_some(temper_throwaway_forgejo::Range::Head(3));
         r.send(name, "GET", &format!("{R}{suffix}"), None, Some(token), range)?;
     }
     Ok(())

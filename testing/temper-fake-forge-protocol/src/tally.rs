@@ -29,6 +29,7 @@ pub enum Route {
     Runs,
     Run,
     Jobs,
+    Job,
     JobLog,
     CreateIssue,
     OpenPull,
@@ -71,6 +72,7 @@ pub fn route(request: &Request) -> Route {
         Request::Raw { .. } => Route::Raw,
         Request::Runs { .. } => Route::Runs,
         Request::Run { .. } => Route::Run,
+        Request::Job { .. } => Route::Job,
         Request::Jobs { .. } => Route::Jobs,
         Request::JobLog { .. } => Route::JobLog,
         Request::CreateIssue { .. } => Route::CreateIssue,
@@ -101,7 +103,7 @@ impl Tally {
     pub fn new(users: u32) -> Self {
         Self {
             total: 0,
-            routes: Map::with_capacity(39),
+            routes: Map::with_capacity(40),
             users: Map::with_capacity(users),
             unrouted: 0,
             unauthorized: 0,
@@ -111,7 +113,7 @@ impl Tally {
         self.total = self.total.saturating_add(1);
         if let Some(route) = route {
             let count = self.routes.get(&route).copied().unwrap_or(0).saturating_add(1);
-            self.routes.insert(route, count).expect("39 routes");
+            self.routes.insert(route, count).expect("40 routes");
         } else {
             self.unrouted = self.unrouted.saturating_add(1);
         }

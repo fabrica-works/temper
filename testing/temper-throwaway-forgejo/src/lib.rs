@@ -61,13 +61,21 @@ pub struct Made {
     pub owner: String,
     pub name: String,
 }
+/// A request's byte range.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Range {
+    /// The first `n + 1` bytes.
+    Head(u64),
+    /// The last `n` bytes.
+    Tail(u64),
+}
 #[derive(Clone)]
 pub struct Outgoing<'a> {
     pub method: &'a str,
     pub target: &'a str,
     pub token: Option<&'a Token>,
     pub body: Option<&'a [u8]>,
-    pub range: Option<(u64, u64)>,
+    pub range: Option<Range>,
 }
 impl fmt::Debug for Outgoing<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

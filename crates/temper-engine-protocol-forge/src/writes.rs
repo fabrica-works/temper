@@ -204,6 +204,7 @@ impl Plan {
                     | d::Row::File(_)
                     | d::Row::Commit(_)
                     | d::Row::Run(_)
+                    | d::Row::Step(_)
                     | d::Row::Job(_) => {}
                 }
                 Ok(None)
@@ -329,6 +330,7 @@ impl Plan {
             | d::Document::Permission(_)
             | d::Document::Compare(_)
             | d::Document::Runs { .. }
+            | d::Document::Job(_)
             | d::Document::Run(_)
             | d::Document::Error(_) => {}
         }

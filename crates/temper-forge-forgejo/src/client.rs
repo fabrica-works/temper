@@ -50,6 +50,7 @@ pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. } => files::encode(request, limits),
         Request::Reviews { .. }
@@ -103,6 +104,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Compare { .. } => Kind::File(FileKind::Compare),
         Request::Runs { .. } => Kind::Action(ActionKind::Listing),
         Request::Run { .. } => Kind::Action(ActionKind::Run),
+        Request::Job { .. } => Kind::Action(ActionKind::Job),
         Request::Jobs { .. } => Kind::Action(ActionKind::Jobs),
         Request::PostComment { .. } => Kind::Item(Item::Comment),
         Request::PostStatus { .. } => Kind::Item(Item::Status),

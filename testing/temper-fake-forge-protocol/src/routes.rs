@@ -95,6 +95,7 @@ pub fn repository(config: &Config, request: &Request) -> Option<Box<[u8]>> {
         | Request::Raw { at, .. }
         | Request::Runs { at, .. }
         | Request::Run { at, .. }
+        | Request::Job { at, .. }
         | Request::Jobs { at, .. }
         | Request::JobLog { at, .. }
         | Request::CreateIssue { at, .. }
@@ -213,6 +214,7 @@ pub fn op(config: &Config, limits: &Limits, request: &Request) -> Result<Op, a::
             Read::Runs { commit: commit(head_sha).ok_or(missing)?, number: *run_number }
         }
         Request::Run { run, .. } => Read::Run { run: *run },
+        Request::Job { .. } => return Err(a::Error::Missing(a::What::Job)),
         Request::Jobs { run, .. } => Read::Jobs { run: *run },
         Request::JobLog { job, attempt, .. } => Read::Job { job: *job, attempt: *attempt, max_bytes: limits.raw_bytes },
         Request::CreateIssue { .. }
@@ -314,6 +316,7 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::Raw { .. }
         | Request::Runs { .. }
         | Request::Run { .. }
+        | Request::Job { .. }
         | Request::Jobs { .. }
         | Request::JobLog { .. } => Err(a::Error::Refused),
     }

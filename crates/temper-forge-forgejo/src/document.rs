@@ -78,6 +78,7 @@ pub enum Row {
     Commit(ObjectId),
     Run(Run),
     Job(Job),
+    Step(Step),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
@@ -98,6 +99,7 @@ pub enum Document {
     Compare(Compare),
     Runs { total_count: u64 },
     Run(Run),
+    Job(Job),
     Error(ErrorBody),
 }
 /// An error message capped at `string_bytes`, retaining its length when long.
@@ -337,4 +339,50 @@ pub struct Job {
     pub id: u64,
     pub run_id: u64,
     pub attempt: u32,
+}
+
+/// One step of a job's latest attempt, delivered as a streaming row.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Step {
+    pub number: u32,
+    /// Empty when the name exceeds `string_bytes` (forge.md, 3.3).
+    pub name: Box<[u8]>,
+    pub status: StepStatus,
+}
+/// Forgejo's Actions status words.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StepStatus {
+    Unknown,
+    Waiting,
+    Running,
+    Success,
+    Failure,
+    Cancelled,
+    Skipped,
+    Blocked,
+}
+pub(crate) fn step_status(text: &[u8]) -> Option<StepStatus> {
+    match text {
+        b"unknown" => Some(StepStatus::Unknown),
+        b"waiting" => Some(StepStatus::Waiting),
+        b"running" => Some(StepStatus::Running),
+        b"success" => Some(StepStatus::Success),
+        b"failure" => Some(StepStatus::Failure),
+        b"cancelled" => Some(StepStatus::Cancelled),
+        b"skipped" => Some(StepStatus::Skipped),
+        b"blocked" => Some(StepStatus::Blocked),
+        _ => None,
+    }
+}
+pub(crate) fn step_status_text(status: StepStatus) -> &'static [u8] {
+    match status {
+        StepStatus::Unknown => b"unknown",
+        StepStatus::Waiting => b"waiting",
+        StepStatus::Running => b"running",
+        StepStatus::Success => b"success",
+        StepStatus::Failure => b"failure",
+        StepStatus::Cancelled => b"cancelled",
+        StepStatus::Skipped => b"skipped",
+        StepStatus::Blocked => b"blocked",
+    }
 }
