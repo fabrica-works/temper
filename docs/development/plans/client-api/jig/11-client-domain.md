@@ -216,8 +216,7 @@ The boundary test 11.1 adds, in `tests/boundary/src/tests/graph.rs`:
 ```rust
 #[test]
 fn client_domain_crate_links_only_the_foundation() {
-    let domains: Vec<_> =
-        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-client-domain")).collect();
+    let domains: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-client-domain")).collect();
     assert_eq!(domains.len(), 1, "one client domain");
     assert_eq!(domains[0].dependencies, ["skein-lib"]);
 }

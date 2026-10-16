@@ -291,8 +291,14 @@ Shape:
   holdings, as today; then one `tasks::Event::Procedure { decision }`
   with the parts.
 - `tasks::ProcedureDecision { batch: Box<[New]>, amendments:
-  Box<[(u64, Amendment)]>, messages: Box<[Word]>, end:
-  ProcedureEnd }` (`ProcedureEnd::{Wait, Hold(Hold), Result(TaskResult)}`):
+  Box<[ProcedureAmendment]>, messages: Box<[ProcedureMessage]>, end:
+  ProcedureEnd }` (`ProcedureEnd::{Wait, Hold(Hold), Result(TaskResult)}`;
+  `tasks::ProcedureMessage { task: u64, word: Word }`, the message's
+  target beside the `Word`, which has none, `boundary.rs:138`;
+  `tasks::ProcedureAmendment { task: u64, message: u64, stop_run: bool,
+  amendment: Amendment }`, the root-issued message number and stop that
+  `control.rs`'s `amend` admits a run's amendment with; both filled by
+  the core; ruling 115):
   the tasks child checks each part before it changes any, then applies
   them in that order; one failing check answers `Request::ProcedureRefused
   { task, step, problem }` and changes nothing.
