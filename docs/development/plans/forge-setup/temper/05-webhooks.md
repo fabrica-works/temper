@@ -82,8 +82,8 @@ routes::object(commit), pusher: by }`, or `Ref { created: false, .. }` when `com
 is `routes.rs:14`. `server::delivery::encode(&Delivery, &documents)` gives `Sent { event, body }`; the head is `POST
 <delivery::hook_target(forge)> HTTP/1.1`, then `Host`, `Content-Type: application/json`, `Content-Length`,
 `delivery::EVENT_HEADER` with `Sent.event`, `delivery::SIGNATURE_HEADER`, in that order. `sign` is
-`Hmac::new(secret.expose())`, `update(body)`, `finish`, in lowercase hexadecimal. `Server::down` (`server.rs:140`) keeps
-ignoring a `Hook`, as do the worlds that discard one (`tests/engine/forge/src/world.rs:358,530`); `Joint` (`joint.rs:197`)
+`Hmac::new(secret.expose())`, `update(body)`, `finish`, in lowercase hexadecimal. `server::down` (`server.rs:132`, its `Hook` arm :140) and
+`Service::target` (`service.rs:94`) keep ignoring a `Hook`, as do the worlds that discard one (`tests/engine/forge/src/world.rs:358,530`); `Joint` (`joint.rs:197`)
 changes in 05.2. temper 06.1 reshapes `Request::Hook` (a job's end for `Status`, bodies for issue, comment and review hooks, no
 `Wiki`): whichever of 05.1 and 06.1 lands second adapts the mapping in place, a body going in as `Body::Kept`.
 Test shape: `src/tests/deliveries.rs`, on `fixtures::config()` (`fixtures.rs:6`), `limits()` (:29) and `Harness::new` (:76), the
@@ -96,7 +96,7 @@ run once by the implementer and pasted beside the body. Reference test:
 fn a_push_hook_is_delivered_as_one_signed_post_to_the_forges_path() {
     let service = Service::new(fixtures::hooked_config(), &fixtures::limits(), 3).expect("service");
     let hook = domain::Request::Hook {
-        repository: boxed(b"org/repo"), change: raw::Change::Push, number: None,
+        repository: boxed(b"org/repo"), change: domain::api::Change::Push, number: None,
         branch: Some(boxed(b"main")), commit: Some(7), by: Some(2),
     };
     let delivery = service.delivery(&hook, &fixtures::limits()).expect("a hooked forge delivers");
@@ -131,9 +131,14 @@ Files:
 - literals the new members break (`git grep -n -e 'start_backoff_max:' -e 'Settings { forges' -- '*.rs'`, 9 lines with
   `limits.rs:44`: the crate's `src/tests/fixtures.rs:24,98`, the world's `src/fixtures.rs:25,99`, `temper-service/src/forge.rs:76,129`,
   the conformance's `component/hosted.rs:105,134`) and the matches on `kit::Event` that must name the new variants (the crate's
-  `src/tests/fixtures.rs:156`, the world's `machine.rs:180` and `joint.rs:204`);
+  `src/tests/fixtures.rs:156`, the world's `machine.rs:180` and `joint.rs:204`, the conformance's `component/hosted.rs:255`,
+  with its `Limits` literal at `hosted.rs:87`);
 - `temper-service`: `forge.rs` (`hinted` beside `event` :93; `back` :101), `engine.rs:385` `forge_pass` (hotspot, client-api 05.1),
-  `stop.rs` (`listener` beside `forge` :78), `lib.rs:46` (`Stop::Hooks`), `crates/temper/src/host.rs:57` (its words);
+  `stop.rs` (`hooks` beside `forge` :78; not `listener`: `Stop::Listener`, `lib.rs:49`, is the clients' listener's),
+  `lib.rs:46` (`Stop::Hooks`), `crates/temper/src/host.rs:57` (its words); `forge.rs` `problems` (:195, its matches :197
+  and :212) names both limits of each new `Unusable` and `Stacked` as :212-221 do (`SecretBytes`: `hook_secret_bytes`
+  alone; `ServerOverIo`: `hook_head_bytes`, `io.intake`), and `indexed` (:257) learns `Secret`: without them
+  temper-service stops compiling at 05.2;
 - the world: new `tests/engine/protocol-forge/src/hooks.rs`, `tests/{hooks,fuzzy_hooks}.rs`; `joint.rs` (:79 `hooked`, :197 the
   discarded `Hook`, :261 the `Listen` panic), `fixtures.rs`, `Cargo.toml`, `Cargo.lock` (a dependency `temper-service`); the
   crate's step tests in new `src/tests/hooks.rs`.
@@ -159,7 +164,8 @@ Shape (sketch 2):
   method other than `POST`: `Discard`, `405`; no `SIGNATURE_HEADER` of 64 hexadecimal digits: `Discard`, `403`. (2) The body is
   demanded in `read`-sized pieces, each into the `Hmac` and, if `decoder(EVENT_HEADER's value, ..)` is some, the tokenizer and
   `step`; a length past `hook_body_bytes` is skein-http's own `413` at the head. (3) At `End`, `sha256::equal` of the MAC in
-  hexadecimal (`marker::hex`, `marker.rs:53`) and the header: wrong, `403`; right and `step` ended `Malformed`, `400`; right,
+  hexadecimal (`marker::hex`, `marker.rs:53`, takes one nibble: call it on `byte / 16` and `byte % 16` of each
+  of the 32 bytes, as `marker.rs:23` does) and the header: wrong, `403`; right and `step` ended `Malformed`, `400`; right,
   `204`, and the hint if `step` ended in `Done` (an event of no row hints nothing). (4) `Respond` first; the hint goes up at
   `Done`. Every refusal ends the connection after its answer. The connection does not tell "not ready" from "no room": before the
   keep's restore `root::try_step` takes the hint (`Ok`, `admission.rs:46-52`) and `keep::hint` drops it (`keep.rs:642-646`, no
@@ -170,7 +176,7 @@ Shape (sketch 2):
   is none) or a repository id past `u32` hints nothing. The repository is `{ forge: n, repository }`.
 - Boundary: `Event::Hint(Hinted)`, `Event::ListenerLost`, `Request::RefusedHint(Hinted)`. Routing: `forge::hinted(Hinted) -> root::Event`
   (`Event::Forge(Box::new(forge::Event::Hint { hint }))`); `forge_pass` takes a `Hint` to `root::try_step` and returns a refusal as
-  `RefusedHint`; `ListenerLost` to `stop::listener`, which begins the drain as `stop::forge` does, recording `Stop::Hooks` (new);
+  `RefusedHint`; `ListenerLost` to `stop::hooks`, which begins the drain as `stop::forge` does, recording `Stop::Hooks` (new);
   `host.rs` words it `temper serve: webhooks listener failed`, exit 1.
 Test shape: step tests (each < 20 ms) in `src/tests/hooks.rs` (the crate's `Harness`, `fixtures.rs:101`; `limits()` :5):
 `a_hook_secret_past_its_bound_is_unusable_naming_the_forge`, `a_hook_secret_bound_below_32_is_unusable`,
@@ -228,7 +234,7 @@ Files (hotspots, README "Rules of this plan"; the checks after client-api 05.2):
 - `startup/application.rs` (:12 `Members`, :21 `Forge`, :175 `forge`, :223 its literal, :327 `parse` with the `NotBuilt` push at
   :343, :417 `files`, :482 `resolve`), `startup/checks.rs` (:249 `sockets`, :267 `socket_count`, :293 `process_io`; the uniqueness
   check beside client-api's loopback check), `startup.rs` (:116 `all_files`, :216 `settings::Engine`), `startup/problems.rs` (:14, :74,
-  :169), `settings.rs:71`, `limits.rs` (a `SOCKETS` constant beside :247), `forge.rs` (:21 `settings`, :195 `problems`, :249 `tag`),
+  :171), `settings.rs:71`, `limits.rs` (a `SOCKETS` constant beside :247), `forge.rs` (:21 `settings`, :195 `problems`, :249 `tag`),
   `limits/names.rs` (the arms beside :208);
 - the documents that gain `"webhooks": null` (beside `application.clients`) and `"webhook_secret": null` in each forge (`git grep
   -l '"forges"' -- '*.rs'` lists 8 files; three write a whole document): the `APPLICATION` fixture
@@ -255,9 +261,8 @@ Shape (05.2's `Webhooks`, sketch 2, is what the component takes; here the reader
 - The setup's view, by the names 07.1 and 07.3 give it (setup.md 8): `check::Forge` gains `webhook_secret`
   (`<directory>/webhook_secret` when `webhooks` is set), `Members.listeners` the webhooks' listener (an owned `listen` clashing
   with it is refused), `Named` carries `webhooks` and each secret's path, which the binary's `setup.rs` fills into the view.
-- Limits: the five names in `limits/names.rs` (`hook_deadline_ms` by `duration`); `forge::problems` names both limits of each
-  new `Unusable` and `Stacked` as :212-221 do (`SecretBytes`: `hook_secret_bytes` alone; `ServerOverIo`: `hook_head_bytes`,
-  `io.intake`); `forge::indexed` (:257) learns `Secret`.
+- Limits: the five names in `limits/names.rs` (`hook_deadline_ms` by `duration`); `forge::problems`' and `forge::indexed`'s arms
+  for the new `Unusable` and `Stacked` are 05.2's.
 - Hosting: `forge::settings` (:21) gains a `webhooks` parameter and builds `kit::Settings.webhooks`; `forge::tag` (:249) tags
   `Listen { owner }` and `Bind { owner, .. }` with `tokens::FORGE` as it tags `Connect`; `Layer::up` untags (`accounts.rs:470`);
   `system.rs:503` already routes prefix-5 events. `crates/temper/src` is untouched but for the setup's view and the wiring.
@@ -273,7 +278,7 @@ Test shape: temper-service rows in the existing files (each < 20 ms), built as `
 (`input.replace` on `fixtures::APPLICATION`) and run as `src/tests/checks.rs:6` runs them; limits from `limits::profile(Small)`
 (`fixtures::engine()`), none other. Tests: `the_webhooks_listener_and_a_forges_secret_file_are_read`;
 `a_null_webhooks_and_a_null_secret_read_as_none`; `a_missing_webhooks_or_webhook_secret_is_refused_naming_its_path` (the row
-at :43 becomes this; the test is `an_unknown_or_missing_member_is_named_by_its_path`);
+at :43 becomes this; the test is `an_unknown_missing_or_reserved_member_is_named_by_its_path`, `startup.rs:33`);
 `a_webhook_secret_while_webhooks_is_null_is_refused_naming_its_path`;
 `a_webhooks_listener_off_loopback_is_refused_naming_its_path`; `a_webhooks_listener_equal_to_the_clients_is_refused`;
 `a_secret_file_past_hook_secret_bytes_is_refused_naming_it`; `the_hook_limits_have_dotted_overrides`;
@@ -310,7 +315,7 @@ Don't: no handling of `webhooks` in the binary but the setup's view and the wiri
 default listener; no secret in a diagnostic (problems name paths); `setup`, `user` as a file and the owned `listen` check are
 07.1's, 07.3's and 10.1's.
 Size: at most 250 lines.
-Removes: `What::NotBuilt` with its words (`problems.rs:14,74,169`) and its uses in `src/tests/startup.rs:43,106,109,111`.
+Removes: `What::NotBuilt` with its words (`problems.rs:14,74,171`) and its uses in `src/tests/startup.rs:43,106,109,111`.
 
 ## Interface sketches
 
