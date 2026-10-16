@@ -246,7 +246,7 @@ private, never edited by hand:
 ### 6.3 The preparation
 
 `temper forge prepare CONFIG.json FORGE`, before Forgejo runs. It takes
-Forgejo's lock (6.4), checks the binaries, and decides by `state`:
+Forgejo's and the runner's locks (6.4), checks the binaries, and decides by `state`:
 
 1. **The first preparation:** the layout of section 3; `app.ini`;
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
@@ -287,16 +287,27 @@ Forgejo's lock (6.4), checks the binaries, and decides by `state`:
 
 - **Checks** the binary, and that `state` records a preparation at the
   pinned versions; refuses otherwise, naming what to run.
-- **Takes the lock,** an exclusive lock on a file of the forge's
-  directory, Forgejo's or the runner's, held across the exec for the
-  process's life, so two Forgejos never share a work path and no
-  preparation runs under one.
+- **Takes the lock,** an exclusive lock, taken without waiting, on a
+  file of the forge's directory, Forgejo's or the runner's, and hands it
+  across the exec as the process's standard input, so the process holds
+  it for its life. Two Forgejos never share a work path, and no
+  preparation runs under one: the preparation takes the same locks, and
+  refuses, naming the forge, while one is held.
 - **Replaces itself** (`execve`) by `forgejo web` or `forgejo-runner
   daemon`, with the spec's arguments and the spec's environment alone:
   cleared, then `HOME` in the forge's directory, `PATH`, and git's
   configuration isolated, as the throwaway Forgejo's is. The process a
   host supervises is then Forgejo's own, with its signals and its exit
   status.
+- **Outside skein's shell, in one module.** skein's shell spawns but
+  never execs, and its locks never pass to a child (skein's
+  programming-model.md, section 2.1; io.md, section 5). So the lock and
+  the exec are std's, `File::try_lock` and `CommandExt::exec`, with no
+  `unsafe`, in one module of `temper-forge-setup-shell`, which the
+  preparation's lock uses too. It is the one place temper locks a file
+  or uses `std::process` outside skein: a boundary test fails the gate
+  when either appears in another module. It moves onto skein when skein's
+  shell offers both (section 15).
 - **The runner's spec:** its configuration file (its registration's file,
   capacity, labels, timeouts, its jobs' directory, no cache), its `PATH`
   from the setup. Its jobs run as the user that runs it (section 15).
@@ -385,7 +396,10 @@ Each needs nothing below the commands to change:
 
 - **One document still,** `temper serve`'s (configuration.md, section 2).
   Every `temper forge` command and `temper box` read it whole, check it
-  whole as `temper serve` does, and act on their part.
+  as `temper sign-in` does, `setup` among it, and act on their part
+  (configuration.md, section 8): they read no file but their own part's,
+  since a set-up forge's files do not exist before reconcile makes
+  them.
 - **`application.setup`,** a list, at most one entry per forge:
 
   ```
@@ -517,21 +531,22 @@ temper-forge-setup           step code: the setup's types and checks; reconcile'
 │                              preparation's machine; app.ini and the runner's files; the processes'
 │                              specs; the configuration's steps. Names no host
 ├── temper-forge-forgejo
-└── skein-lib, skein-json
+└── jig-protocol-config, skein-lib, skein-json
 temper-forge-setup-shell     ordinary Rust: the hosts of prepare, run and reconcile: commands, files,
 │                              the forge's locks, the exec; HTTP on skein-http over skein-io
 ├── temper-forge-setup
 └── skein-io, skein-http, skein-tls, skein-shell
 temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
 │                              processes; nothing of setup but its steps (7.3)
-└── temper-forge-setup
+├── temper-forge-setup
+└── skein-lib, skein-io, skein-shell
 temper                       the binary: temper forge prepare|run|reconcile, temper box
 ```
 
-- **The binary checks the whole document** for every command:
-  temper-service's startup its part, `temper-forge-setup` `setup` and the
-  `setup.` limits, `temper-box` the `box.` limits. temper-service
-  depends on neither.
+- **The binary checks `setup` and its limits** for every command,
+  `temper serve`'s included: `temper-forge-setup` checks `setup` and the
+  `setup.` limits, and `temper-box` the `box.` limits, beside
+  temper-service's startup. temper-service depends on neither.
 - **Machines, not scripts.** Reconcile and the preparation decide from
   what they read, and say each request or command they need; a host runs
   it and hands back its outcome. Step tests drive them with answers;
@@ -679,6 +694,9 @@ Each waits for what it names; none is built by the order of section 14.
   is its scope, in place of teams. An installation's token expires within
   the hour, so it is a credential the forge component renews (forge.md,
   section 11). Owned: none. Waits for GitHub's build.
+- **A lock and an exec in skein's shell,** onto which 6.4's module
+  moves. Waits for skein's `Lock` (io.md, section 5), and for a second
+  service that execs.
 - **The binaries' digests,** an optional SHA-256 per binary beside the
   version's check. Waits for a deployment that installs binaries it did
   not build or download itself.

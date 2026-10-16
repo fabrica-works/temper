@@ -410,11 +410,13 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 ## 8. First start and every start
 
-- **Every command that reads the document checks it whole.** `temper
-  serve`, `temper sign-in`, every `temper forge` command and `temper box`
-  read it and check it as section 2 says, its steps 1 to 3, so a
-  document one of them takes, the others take (setup.md, section 8).
-  Each then reads the private files its own part needs alone: a `temper
+- **Every command that reads the document checks it.** `temper serve`
+  checks it whole, as section 2 says. `temper sign-in`, every `temper
+  forge` command and `temper box` check its structure, its members, the
+  limits and `setup`, and none of the checks that need a private file
+  read, since a set-up forge's files do not exist before reconcile makes
+  them (setup.md, section 8). Each reads the private files its own part
+  needs alone: a `temper
   forge` command its forge's, by setup.md, sections 5 and 6; `temper
   box` none; `temper serve` every one the document names but those that
   only `setup` names. A set-up forge's files that its members name, which
