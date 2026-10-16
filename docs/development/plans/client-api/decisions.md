@@ -868,6 +868,17 @@ choice would have been the user's (development.md, 10.4).
 178. **The 22:44Z steer's point 2 in the README's steers** (process, the coordinator's block of 2026-10-16T22:46:03Z).
      Ruling 178: the 22:44:00Z steer's point 2 holds until the run's end, so its Pass on text goes into the README's "The run's steers", as ruling 167 says ("A later steer's text that holds until the run's end lands here, by the supervisor, before the steer is sent"). It is there now, under "22:44Z, point 2 (jig 12)", word for word as the steer gave it. Points 1 and 3 end at the landings of jig 03.4 and 04.6 and stay out of the README. The coordinator gives point 2's text in no later prompt: jig 12's sessions read it in the README.
 
+179. **jig 12.4 goes on without the owner versions' declaration, until the designer answers** (design gap, jig 12's block of 2026-10-16T22:51:29Z).
+     Ruling 179, interim, until the designer's answer to `question.md` (asked 2026-10-16T22:53:02Z): a design gap, not a plan defect. client.md 8.2 says "The client speaks the one version of each owner its build holds", and client.md 6 that "a family's request" carries "its owner's number, its scope, its version and its record's bytes", but no design text says where the client learns its build's versions (declared at construction, or read from each family message) nor how its memory of owners and ranges is bounded. That a read of an owner not served is answered so is the design's own text ("its reads are answered and its watches end as version not served"), but the answer's shape goes to the designer with the rest.
+
+     Until the answer, jig 12.4 goes on only with work that does not rest on it:
+     - families as bytes under their owner, on the same table, watches and reads (client.md, 4 and 6), and the story `a_family_request_is_answered_as_its_owner_s_bytes` with its proof;
+     - the link's `Hello { family: Some(_), .. }` to `Up::FamilyServed { family, versions }`, carried to the domain, with no judgement of it yet;
+     - the fuzzy suite's `random_scripted_applications_keep_the_client_s_rules`;
+     - `a_family_document_past_the_bytes_limit_ends_its_handle`.
+
+     It adds none of these until the answer: a declaration of the build's owner/version pairs, in `Limits` or elsewhere; a memory of owners' ranges; `Readout::NotServed` or another read's answer; `Why::NotServed` and `Progress::NotServed`; `LinkView.not_served` filled; the three unit tests on an owner not served. 12.4 lands only after the answer, as one increment, unless the answer splits it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
