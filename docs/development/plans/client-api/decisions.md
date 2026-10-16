@@ -908,6 +908,18 @@ choice would have been the user's (development.md, 10.4).
 
      If the answer changes the compound's answer, its plan change comes as a further unblock with its own step.
 
+182. **jig 03.4 carries 23.1's party_proposals evidence** (plan defect, jig 03's block of 2026-10-16T23:18:01Z).
+     Ruling 182, a plan defect in the order of steps: 03.4's Shape says "creator: Party::Person(proposer), each member funded by the accepter's pool", and its proof reaches the referee's accepted-task check, which has no evidence of a pending party proposal until 23.1's `Snapshot.party_proposals`. The implementer's proposal is taken: 03.4 carries the minimum of it, and 23.1 keeps the rest.
+
+     jig 03.4 adds, beside its Shape:
+     - `Snapshot.party_proposals: BTreeMap<u64, u64>` in `testing/jig-conformance/src/referee.rs` (each pending party proposal's number and its proposing party), as 23.1's Shape gives it;
+     - its filling in the three adapters that build `Snapshot` (`tests/core/src/observations.rs`, `tests/conformance/src/lib.rs`, `tests/ops/src/conformance/observations.rs`), from the `Pending` `tasks::Stored::PersonProposal` rows alone (that type also holds accepted and rejected ones); `tests/one-process/src/referee.rs` unchanged;
+     - the party `ProposalDecisionRecord`'s `created` range for an accepted batch (`crates/jig-domain-core/src/proposals.rs:354`, `created: None` on main), so the core world's observations fill `Snapshot.accepted_tasks`;
+     - the referee's accepted-task check takes an accepted party batch's tasks by the pending party proposal's identity; its source-ceiling check against `accepted.by` (`referee.rs:437`) stays as it is, and the result-delivery check's `source` is not rewritten;
+     - one referee case in `tests/core/tests/referee.rs` that an accepted party batch funded by its accepter passes and one past the accepter's ceiling fails, then the joint proof `a_partys_batch_beyond_their_role_is_proposed_and_accepted` once.
+
+     23.1 keeps `Observed::{ProposeAsked, ProposeRefused}`, the ask credits and their rule, and uses `party_proposals` as 03.4 lands it. The referee and adapter lines are test support, outside 03.4's production count; the steer of 22:44Z, point 1 (1050 lines of production code at most, past it a question) stands.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

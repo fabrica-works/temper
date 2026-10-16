@@ -101,7 +101,8 @@ Needs: jig 03.5's explicit proposing (`people::Ask::Propose`; neither
 start.
 Files:
 - `testing/jig-conformance/src/referee.rs` (at most 40: `Observed::{ProposeAsked,
-  ProposeRefused}`, `Snapshot.party_proposals`, the dispatch in `observe`,
+  ProposeRefused}`, the dispatch in `observe`; `Snapshot.party_proposals`
+  and its adapters' filling land with jig 03.4 (ruling 182): use them,
   :855 on), `testing/jig-conformance/src/referee/proposals.rs` (new: the
   rule); shared with jig 04.7, 06.1, 08.3 to 08.6.
 - The adapters: `tests/core/src/observations.rs` (the core world:

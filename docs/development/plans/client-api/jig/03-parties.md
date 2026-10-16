@@ -587,6 +587,18 @@ the party's pool is refused, saying by whom it could be accepted, in
 place of `GoalProposed`.
 Needs: nothing beyond 3.3.
 Files:
+- From 23.1 (ruling 182): `testing/jig-conformance/src/referee.rs`
+  (`Snapshot.party_proposals: BTreeMap<u64, u64>`, each pending party
+  proposal's number and its proposing party; the accepted-task check
+  takes an accepted party batch's tasks from it, its source-ceiling check
+  against `accepted.by` unchanged), the three adapters that build
+  `Snapshot` (`tests/core/src/observations.rs`, `tests/conformance/src/lib.rs`,
+  `tests/ops/src/conformance/observations.rs`: the `Pending`
+  `tasks::Stored::PersonProposal` rows alone), a referee case for it in
+  `tests/core/tests/referee.rs`; and the party `ProposalDecisionRecord`'s
+  `created` range for an accepted batch
+  (`crates/jig-domain-core/src/proposals.rs:354`, `created: None` at
+  `983862753`). The asks and their credits stay 23.1's.
 - `crates/jig-domain-people/src/batch.rs` (`Action::Batch`),
   `boundary.rs` (`Ask::{Propose, Withdraw}`, `Outcome::{Proposed,
   Withdrawn}`; `Outcome::GoalProposed` goes), `refusals.rs`
