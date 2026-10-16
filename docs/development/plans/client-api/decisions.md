@@ -256,6 +256,12 @@ choice would have been the user's (development.md, 10.4).
 110. **The small profile's memory sum is a shared literal** (steer of the check of 2026-10-16T08:53:33Z).
      From the check of 2026-10-16T08:53:33Z, for the steer that follows: `crates/jig-protocol-config/src/tests/domain.rs:169`, `memory_below_the_components_sum_is_refused`, pins the small profile's memory sum (`What::Memory { over: 11_900_420_359 }` on `main`), which moves with each stored record's or component's worst case: it failed jig-02.1's gate 178 and jig-05.1's gate 191. The README's "Shared files" now name it, for jig 02 to 09 and 16. An increment whose Shape changes such a worst case runs that test alone in the build lane before `land` and sets `over` to the value it prints; the session that lands second rebases and sets it again from its own run.
 
+111. **The process tier on carbon-forge** (process, the check of 2026-10-16T08:53:33Z).
+     The process tier on carbon-forge, from the check of 2026-10-16T08:53:33Z: skein's tree keeper (`testing/skein-world/src/tree.rs:150-161`) returns `Error::Other(16)` when a second observer starts in one process without a cgroup it may manage; `Cgroup::prepare` (`:524-590`) needs a cgroup above the observer's own that the runner user owns, and here it owns none (pueued runs in root's `user-0.slice/session-c5.scope`, every level root:root 755; `loginctl show-user runner`: "not logged in or lingering"). temper's process stories start `temper serve` and then `temper open`, so they fail (`logs/20261016T083347-158.log:176`: "temper open starts: Tree(Other(16))"); jig's start one binary and pass (jig-protocol's `heavy.tsv`, 2026-10-13T16:52:29Z, exit 0).
+     - Until the machine gives the runner a cgroup, a temper Proof on the process tier runs one layer down, as implementer.md 8.8 says ("If the Proof line cannot be followed, say why in the report, run the same check one layer down … Do not stop for this"), and its report names this ruling. jig's Proofs on the process tier (jig 10, 18) run at their layer.
+     - The fix needs root and goes to the user (decisions.md, "For the user", E). Once it is in, the supervisor probes it and rules again; the process Proofs left run at their layer from then, and temper 01.1's process Proof runs once in the first temper increment that follows.
+     Unchanged: the gates, which run no process tier.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -275,3 +281,12 @@ under the user's delegation, and the user may veto it before the run:
   process, and the clients' listener off loopback with TLS. The
   alternative for the first is an increment in jig 18 (about 150 lines)
   with a test-only client.
+- **E. The process tier on carbon-forge** (ruling 111, 2026-10-16): the
+  runner user owns no cgroup here, so skein's tree keeper allows one
+  observer per process, and temper's process stories, which start two
+  binaries, fail with `Tree(Other(16))`. Until the machine gives it one,
+  temper's Proofs on the process tier run one layer down (implementer.md
+  8.8). The fix needs root, takes effect at once, needs no restart of
+  pueued, and lasts until the next reboot:
+  `sudo sh -c 'mkdir -p /sys/fs/cgroup/runner/pueued && echo "+cpu +memory" > /sys/fs/cgroup/runner/cgroup.subtree_control && chown -R runner:runner /sys/fs/cgroup/runner && pgrep -x pueued > /sys/fs/cgroup/runner/pueued/cgroup.procs'`.
+  Default: one layer down until the user runs it.
