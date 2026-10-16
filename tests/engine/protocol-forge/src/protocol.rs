@@ -50,6 +50,7 @@ impl Protocol {
                 fixtures::limits(),
                 fixtures::writer_settings(),
                 fixtures::protocol_shared(),
+                crate::joint::checks(1000),
             ),
             top_out: Queue::with_capacity(top::max_out(&LIMITS)),
             stored: Map::with_capacity(128),

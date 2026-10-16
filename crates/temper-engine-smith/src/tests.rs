@@ -282,3 +282,36 @@ fn a_charter_resumes_when_its_policy_does_and_turns_are_kept() {
         assert_eq!(crate::charter(&assignment).resume, expected, "resume={resume}, turns={turns}");
     }
 }
+
+#[test]
+fn a_job_answer_names_its_failed_step_before_its_log() {
+    use temper_engine_domain_forge_client::api;
+    let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
+    let step = Some(api::Step { number: 1, name: Box::from(&b"build"[..]) });
+    let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };
+    let rendered = answer(&engine::CallAnswer::ForgeRead(Box::new(Ok(read))));
+    assert_eq!(rendered.text(), b"Job 8 run 7, failed step 1 build:\nfailing check build 3\n");
+    assert!(!rendered.error(), "A read answer is no error");
+}
+
+#[test]
+fn a_job_answer_with_no_failed_step_says_none_failed() {
+    use temper_engine_domain_forge_client::api;
+    let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
+    let step = None;
+    let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };
+    let rendered = answer(&engine::CallAnswer::ForgeRead(Box::new(Ok(read))));
+    assert_eq!(rendered.text(), b"Job 8 run 7, no step failed:\nfailing check build 3\n");
+    assert!(!rendered.error(), "A read answer is no error");
+}
+
+#[test]
+fn a_job_answer_with_an_empty_step_name_names_its_number_alone() {
+    use temper_engine_domain_forge_client::api;
+    let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
+    let step = Some(api::Step { number: 1, name: Box::new([]) });
+    let read = api::Answer::Job { attempt, step, log: Box::from(&b"failing check build 3\n"[..]), truncated: false };
+    let rendered = answer(&engine::CallAnswer::ForgeRead(Box::new(Ok(read))));
+    assert_eq!(rendered.text(), b"Job 8 run 7, failed step 1:\nfailing check build 3\n");
+    assert!(!rendered.error(), "A read answer is no error");
+}

@@ -647,3 +647,18 @@ fn an_application_adopted_name_past_its_bound_fails_to_decode() {
     });
     assert_eq!(records::decode(&records::encode(&application(outcome)), &bounds), Err(crate::Undecodable));
 }
+
+#[test]
+fn a_job_steps_name_past_its_limit_fails_to_decode() {
+    use temper_engine_domain_forge_client::api::{Answer, JobAttempt, Step};
+    let answer = Answer::Job {
+        attempt: JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 },
+        step: Some(Step { number: 1, name: Box::new([b'x'; 4097]) }),
+        log: Box::new([]),
+        truncated: false,
+    };
+    let row = fixtures::named_call(forge::CallPayload::Read(Box::new(Ok(answer))));
+    let bytes = records::encode(&row);
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("Fixture limits fit");
+    assert_eq!(records::decode(&bytes, &bounds), Err(crate::Undecodable));
+}

@@ -102,7 +102,12 @@ fn actions(f: &Fixture, h: &mut Hosted, facts: &mut Vec<Fact>) -> Result<()> {
     let job = if let Ok(Answer::Checks(statuses)) = &checks { statuses.iter().find_map(|s| s.job) } else { None };
     facts.push(super::fact("component-read-checks", matches!(&checks, Ok(Answer::Checks(s)) if s.len() == 2 && s.iter().any(|s| s.check == api::Check::Passed) && s.iter().any(|s| s.check == api::Check::Failed && s.job.is_some_and(|j| j.head == head))), &checks));
     if let Some(attempt) = job {
-        facts.push(h.observe("component-read-job", repo, Read::Job { attempt, max_bytes: 65536 }.operation(), |a| matches!(a, Answer::Job { attempt: got, log, .. } if *got == attempt && log.windows(b"TEMPER_CONFORMANCE_FAILED_JOB".len()).any(|s| s == b"TEMPER_CONFORMANCE_FAILED_JOB"))));
+        let document = f.get(&format!("{R}/actions/jobs/{}", attempt.job))?;
+        let failed = document["steps"]
+            .as_array()
+            .and_then(|steps| steps.iter().find(|s| s["status"] == "failure"))
+            .ok_or("failed step")?;
+        facts.push(h.observe("component-read-job", repo, Read::Job { attempt, max_bytes: 65536 }.operation(), |a| matches!(a, Answer::Job { attempt: got, step: Some(step), log, .. } if *got == attempt && Some(u64::from(step.number)) == failed["number"].as_u64() && Some(step.name.as_ref()) == failed["name"].as_str().map(str::as_bytes) && log.windows(b"TEMPER_CONFORMANCE_FAILED_JOB".len()).any(|s| s == b"TEMPER_CONFORMANCE_FAILED_JOB"))));
     } else {
         facts.push(super::fact("component-read-job", false, &"checks contained no failed job attempt"));
     }

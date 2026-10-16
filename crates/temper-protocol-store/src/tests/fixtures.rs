@@ -455,7 +455,7 @@ pub fn payloads() -> List<top::CallPayload> {
 fn payload(outcome: Option<client::Outcome>) -> top::CallPayload {
     top::CallPayload::Effect { entry: 8, deadline: skein_lib::Wall::from_nanos(123), outcome }
 }
-pub fn answers_without_item_pieces() -> [client::api::Answer; 18] {
+pub fn answers_without_item_pieces() -> [client::api::Answer; 19] {
     use client::api::{Answer, BranchCreation, JobAttempt, Permission, Protection, Settings};
     [
         Answer::Pull(pull()),
@@ -463,8 +463,15 @@ pub fn answers_without_item_pieces() -> [client::api::Answer; 18] {
         Answer::Branches(Box::new([Box::new([0, 255]), Box::new([1])])),
         Answer::Job {
             attempt: JobAttempt { head: [10; 32], run: 11, job: 12, attempt: 13 },
+            step: Some(client::api::Step { number: 21, name: Box::new([22]) }),
             log: Box::new([14]),
             truncated: true,
+        },
+        Answer::Job {
+            attempt: JobAttempt { head: [10; 32], run: 11, job: 12, attempt: 13 },
+            step: None,
+            log: Box::new([14]),
+            truncated: false,
         },
         Answer::File { head: [15; 32], path: Box::new([16]), bytes: Box::new([17]), truncated: true },
         Answer::Protection(Some(Protection {

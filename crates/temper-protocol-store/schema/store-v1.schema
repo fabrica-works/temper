@@ -82,7 +82,8 @@ enum Permission { none, read, write, admin }
 enum BranchCreation { created, exists }
 record Pull { reviewers: list 65536 u64 number: u64 state: ItemState head: bytes 1048576 base: bytes 1048576 commit: fixed 32 base_commit: option fixed 32 merged: option fixed 32 mergeable: bool ci: Ci }
 record JobAttempt { head: fixed 32 run: u64 job: u64 attempt: u32 }
-record JobAnswer { attempt: JobAttempt log: bytes 1048576 truncated: bool }
+record Step { number: u32 name: bytes 1048576 }
+record JobAnswer { attempt: JobAttempt step: option Step log: bytes 1048576 truncated: bool }
 record FileAnswer { head: fixed 32 path: bytes 1048576 bytes: bytes 1048576 truncated: bool }
 record BranchesAnswer { branches: bytes 2097152 }
 record ProtectionAnswer { protection: option Protection }

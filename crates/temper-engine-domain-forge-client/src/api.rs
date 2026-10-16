@@ -153,7 +153,7 @@ pub enum Answer {
     /// Return checks.
     Checks(Box<[Status]>),
     /// Bytes from one pinned job attempt, cut to the requested byte budget.
-    Job { attempt: JobAttempt, log: Box<[u8]>, truncated: bool },
+    Job { attempt: JobAttempt, step: Option<Step>, log: Box<[u8]>, truncated: bool },
     /// One bounded file from the requested immutable head.
     File { head: Commit, path: Box<[u8]>, bytes: Box<[u8]>, truncated: bool },
     /// Return protection.
@@ -377,6 +377,12 @@ pub struct JobAttempt {
     pub run: u64,
     pub job: u64,
     pub attempt: u32,
+}
+/// The first failed step of a job attempt (forge.md, 3.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Step {
+    pub number: u32,
+    pub name: Box<[u8]>,
 }
 /// A changed file with content on either side when present.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

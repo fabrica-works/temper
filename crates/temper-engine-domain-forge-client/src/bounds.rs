@@ -149,7 +149,10 @@ fn answer_heap(value: &Answer, limit: u32) -> Option<u64> {
             }
             Some(held)
         }
-        Answer::Job { log, .. } => bytes(log),
+        Answer::Job { step, log, .. } => bytes(log)?.checked_add(match step {
+            Some(step) => bytes(&step.name)?,
+            None => 0,
+        }),
         Answer::File { path, bytes: value, .. } => bytes(path)?.checked_add(bytes(value)?),
         Answer::Remarks { remarks, .. } => {
             let mut held = rows(remarks.len(), size_of::<crate::api::Remark>(), limit)?;

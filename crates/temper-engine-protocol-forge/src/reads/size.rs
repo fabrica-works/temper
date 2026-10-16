@@ -110,7 +110,9 @@ pub(crate) fn answer(answer: &api::Answer, limit: u32) -> Result<u64, api::Error
         api::Answer::File { path, bytes, .. } => {
             total = length(path).checked_add(length(bytes)).ok_or(api::Error::TooLarge)?;
         }
-        api::Answer::Job { log, .. } => total = length(log),
+        api::Answer::Job { step, log, .. } => {
+            total = length(log).checked_add(step_name(step.as_ref())).ok_or(api::Error::TooLarge)?;
+        }
         api::Answer::PullFiles { files, .. } => total = files_size(files, limit)?,
         api::Answer::Compare { files, commits, .. } => {
             total = files_size(files, limit)?
@@ -138,4 +140,11 @@ fn files_size(files: &[api::File], limit: u32) -> Result<u64, api::Error> {
             .ok_or(api::Error::TooLarge)?;
     }
     Ok(total)
+}
+
+fn step_name(step: Option<&api::Step>) -> u64 {
+    match step {
+        Some(step) => length(&step.name),
+        None => 0,
+    }
 }

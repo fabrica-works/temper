@@ -524,11 +524,21 @@ fn forge_answer(text: &mut Text, answer: &api::Answer) -> Result<(), Problem> {
                 status_text(text, status)?;
             }
         }
-        api::Answer::Job { attempt, log, truncated } => {
+        api::Answer::Job { attempt, step, log, truncated } => {
             text.add(b"Job ")?;
             text.number(attempt.job)?;
             text.add(b" run ")?;
             text.number(attempt.run)?;
+            if let Some(step) = step {
+                text.add(b", failed step ")?;
+                text.number(u64::from(step.number))?;
+                if !step.name.is_empty() {
+                    text.add(b" ")?;
+                    text.add(&step.name)?;
+                }
+            } else {
+                text.add(b", no step failed")?;
+            }
             text.add(b":\n")?;
             text.add(log)?;
             if *truncated {

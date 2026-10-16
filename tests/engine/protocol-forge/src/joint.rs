@@ -44,7 +44,13 @@ impl Joint {
         settings.forges.get_mut(0).expect("forge").user = 1;
         let mut config = fixtures::protocol_config();
         config.faults = faults;
-        Self::with(seed, cut_chance, config, fixtures::limits(), settings, fixtures::shared())
+        Self::with(seed, cut_chance, config, fixtures::limits(), settings, fixtures::shared(), checks(1000))
+    }
+    #[must_use]
+    pub fn failing(seed: u64) -> Self {
+        let mut settings = fixtures::settings();
+        settings.forges.get_mut(0).expect("forge").user = 1;
+        Self::with(seed, 0, fixtures::protocol_config(), fixtures::limits(), settings, fixtures::shared(), checks(0))
     }
     #[must_use]
     pub fn with(
@@ -54,6 +60,7 @@ impl Joint {
         limits: Limits,
         settings: Settings,
         shared: Shared,
+        checks: raw::Checks,
     ) -> Self {
         let fake_config = temper_engine_forge_world::fake_config();
         let fake_limits = fixtures::fake_limits();
@@ -67,15 +74,7 @@ impl Joint {
                 default: Box::from(b"main".as_slice()),
                 tree: Box::from([]),
                 labels: Box::from([]),
-                checks: raw::Checks {
-                    contexts: Box::new([Box::from(b"build".as_slice())]),
-                    latency_min: Duration::ZERO,
-                    latency_max: Duration::ZERO,
-                    silent: 0,
-                    passes: 1000,
-                    reruns: 0,
-                    cue: None,
-                },
+                checks,
                 protection: None,
                 hooked: false,
             },
@@ -373,5 +372,17 @@ impl Joint {
         .expect("changed");
         self.direct(raw::Op::Git(raw::Git::Push { branch: Box::from(branch), commit, expected: None })).expect("push");
         commit
+    }
+}
+
+pub(crate) fn checks(passes: u32) -> raw::Checks {
+    raw::Checks {
+        contexts: Box::new([Box::from(b"build".as_slice())]),
+        latency_min: Duration::ZERO,
+        latency_max: Duration::ZERO,
+        silent: 0,
+        passes,
+        reruns: 0,
+        cue: None,
     }
 }

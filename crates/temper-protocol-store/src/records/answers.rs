@@ -73,6 +73,13 @@ pub(super) fn decode_pull(value: w::Pull) -> d::Pull {
         ci: topics::decode_ci(ci),
     }
 }
+fn encode_step(value: &d::Step) -> w::Step {
+    w::Step::new(&w::CEILINGS, w::StepParts { number: value.number, name: value.name.clone() }).expect(FITS)
+}
+fn decode_step(value: w::Step) -> d::Step {
+    let w::StepParts { number, name } = value.into_parts();
+    d::Step { number, name }
+}
 pub(super) fn encode_job_attempt(value: &d::JobAttempt) -> w::JobAttempt {
     let d::JobAttempt { head, run, job, attempt } = value;
     w::JobAttempt::new(&w::CEILINGS, w::JobAttemptParts { head: *head, run: *run, job: *job, attempt: *attempt })
@@ -112,10 +119,18 @@ pub(super) fn encode(value: &d::Answer) -> w::Answer {
             w::BranchesAnswer::new(&w::CEILINGS, w::BranchesAnswerParts { branches: names::encode_piece(values) })
                 .expect(FITS),
         ),
-        d::Answer::Job { attempt, log, truncated } => w::Answer::Job(
+        d::Answer::Job { attempt, step, log, truncated } => w::Answer::Job(
             w::JobAnswer::new(
                 &w::CEILINGS,
-                w::JobAnswerParts { attempt: encode_job_attempt(attempt), log: log.clone(), truncated: *truncated },
+                w::JobAnswerParts {
+                    attempt: encode_job_attempt(attempt),
+                    step: match step {
+                        Some(step) => Some(encode_step(step)),
+                        None => None,
+                    },
+                    log: log.clone(),
+                    truncated: *truncated,
+                },
             )
             .expect(FITS),
         ),
@@ -165,6 +180,7 @@ pub(super) fn encode(value: &d::Answer) -> w::Answer {
         d::Answer::Done => w::Answer::Done,
     }
 }
+#[expect(clippy::manual_map, reason = "Step translations use explicit matches without closures")]
 pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Undecodable> {
     Ok(match value {
         w::Answer::Located(value) => d::Answer::Located { repository: value.into_parts().repository },
@@ -221,8 +237,16 @@ pub(super) fn decode(value: w::Answer, bounds: &Bounds) -> Result<d::Answer, Und
             d::Answer::Branches(names::decode_contexts(&value.into_parts().branches, bounds)?)
         }
         w::Answer::Job(value) => {
-            let w::JobAnswerParts { attempt, log, truncated } = value.into_parts();
-            d::Answer::Job { attempt: decode_job_attempt(attempt), log, truncated }
+            let w::JobAnswerParts { attempt, step, log, truncated } = value.into_parts();
+            d::Answer::Job {
+                attempt: decode_job_attempt(attempt),
+                step: match step {
+                    Some(step) => Some(decode_step(step)),
+                    None => None,
+                },
+                log,
+                truncated,
+            }
         }
         w::Answer::File(value) => {
             let w::FileAnswerParts { head, path, bytes, truncated } = value.into_parts();

@@ -21,7 +21,7 @@ enum Stage {
     RunLookup,
     JobsLookup,
     Run,
-    Jobs,
+    Job,
     Log,
 }
 #[derive(Debug)]
@@ -37,7 +37,7 @@ pub(crate) struct Plan {
     run_number: u64,
     job_index: u32,
     run: Option<u64>,
-    found: bool,
+    step: Option<api::Step>,
     missing: bool,
     truncated: bool,
     size: u64,
@@ -83,7 +83,7 @@ impl Plan {
             run_number: 0,
             job_index: 0,
             run: None,
-            found: false,
+            step: None,
             missing: false,
             truncated: false,
             size: 0,
@@ -220,18 +220,20 @@ impl Plan {
                                 Some(api::JobAttempt { head, run: job.run_id, job: job.id, attempt: job.attempt });
                         }
                     }
-                    Mode::Job { attempt, .. } => {
-                        if self.stage != Stage::Jobs {
-                            return Err(api::Error::InvalidAnswer);
-                        }
-                        self.found |=
-                            job.run_id == attempt.run && job.id == attempt.job && job.attempt == attempt.attempt;
-                    }
+                    Mode::Job { .. } => return Err(api::Error::InvalidAnswer),
                 }
                 Ok(())
             }
-            d::Row::Step(_)
-            | d::Row::User(_)
+            d::Row::Step(step) => {
+                if self.stage != Stage::Job {
+                    return Err(api::Error::InvalidAnswer);
+                }
+                if self.step.is_none() && step.status == d::StepStatus::Failure {
+                    self.step = Some(api::Step { number: step.number, name: step.name });
+                }
+                Ok(())
+            }
+            d::Row::User(_)
             | d::Row::Issue(_)
             | d::Row::Comment(_)
             | d::Row::Review(_)
@@ -243,6 +245,7 @@ impl Plan {
             | d::Row::Commit(_) => Err(api::Error::InvalidAnswer),
         }
     }
+    #[expect(clippy::manual_map, reason = "Step functions use explicit matches without closures")]
     fn done(&mut self, document: d::Document) -> Result<Option<Step>, api::Error> {
         match document {
             d::Document::CombinedStatus(_) => {
@@ -279,30 +282,36 @@ impl Plan {
                 if head != attempt.head || run.id != attempt.run {
                     return Err(api::Error::MissingJob);
                 }
-                self.stage = Stage::Jobs;
-                Ok(Some(self.send(r::Request::Jobs { at: self.at(), run: attempt.run })))
+                self.stage = Stage::Job;
+                Ok(Some(self.send(r::Request::Job { at: self.at(), job: attempt.job })))
             }
             d::Document::Listed { .. } => {
-                if self.stage == Stage::JobsLookup {
-                    return self.next_check();
-                }
-                if self.stage != Stage::Jobs {
+                if self.stage != Stage::JobsLookup {
                     return Err(api::Error::InvalidAnswer);
                 }
-                if !self.found {
-                    return Err(api::Error::MissingJob);
+                self.next_check()
+            }
+            d::Document::Job(job) => {
+                if self.stage != Stage::Job {
+                    return Err(api::Error::InvalidAnswer);
                 }
                 let (attempt, max) = match self.mode {
                     Mode::Job { attempt, max } => (attempt, max),
                     Mode::Checks(_) => return Err(api::Error::InvalidAnswer),
                 };
+                if job.id != attempt.job || job.run_id != attempt.run || job.attempt != attempt.attempt {
+                    return Err(api::Error::MissingJob);
+                }
                 self.stage = Stage::Log;
                 Ok(Some(Step::Send(Exchange {
                     request: r::Request::JobLog {
                         at: self.at(),
                         job: attempt.job,
                         attempt: attempt.attempt,
-                        step: None,
+                        step: match &self.step {
+                            Some(step) => Some(step.number),
+                            None => None,
+                        },
                     },
                     range: Some(max),
                 })))
@@ -320,7 +329,6 @@ impl Plan {
             | d::Document::Protection(_)
             | d::Document::Permission(_)
             | d::Document::Compare(_)
-            | d::Document::Job(_)
             | d::Document::Error(_) => Err(api::Error::InvalidAnswer),
         }
     }
@@ -354,6 +362,13 @@ impl Plan {
         }
         Err(api::Error::InvalidAnswer)
     }
+    pub fn raw_room(&self, shared: &Shared) -> u32 {
+        let name = match &self.step {
+            Some(step) => step.name.len(),
+            None => 0,
+        };
+        shared.client.answer_bytes.saturating_sub(u32::try_from(name).expect("Bounded step name"))
+    }
     fn log(&mut self, value: Box<[u8]>, more: bool) -> Result<Option<Step>, api::Error> {
         if self.stage != Stage::Log {
             return Err(api::Error::InvalidAnswer);
@@ -366,6 +381,6 @@ impl Plan {
         let truncated = more || self.truncated || value.len() > length;
         let log =
             if length == value.len() { value } else { bytes::copy_of(value.get(..length).expect("bounded length")) };
-        Ok(Some(Step::Done(Ok(api::Answer::Job { attempt, log, truncated }))))
+        Ok(Some(Step::Done(Ok(api::Answer::Job { attempt, step: self.step.take(), log, truncated }))))
     }
 }

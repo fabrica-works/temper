@@ -305,7 +305,7 @@ pub(crate) fn brief_answer(
         }
         answer if fetch.stage == BriefStage::Job => {
             match answer {
-                Ok(client::api::Answer::Job { attempt, log, truncated }) if attempt.head == fetch.head.0 => {
+                Ok(client::api::Answer::Job { attempt, step: _, log, truncated }) if attempt.head == fetch.head.0 => {
                     append(&mut fetch.words, b"Job log tail:\n");
                     append(&mut fetch.words, &log);
                     append(&mut fetch.words, b"\n");

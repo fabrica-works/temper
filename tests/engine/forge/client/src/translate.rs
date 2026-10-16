@@ -236,7 +236,7 @@ pub fn answer(asked: &client::Op, answer: forge::Answer, l: &Limits) -> client::
         }
         forge::Answer::Checks(checks) => checks_answer(asked, checks),
         forge::Answer::File(content) => byte_answer(asked, &content),
-        forge::Answer::Job { steps, .. } => byte_answer(asked, workflow_log(&steps)),
+        forge::Answer::Job { job, steps } => job_answer(asked, &job, &steps),
         forge::Answer::Protection(protection) => client::Answer::Protection(match protection {
             Some(p) => Some(client::Protection {
                 branch: p.branch,
@@ -494,27 +494,28 @@ pub fn digest(bytes: &[u8]) -> u64 {
     hash
 }
 
-fn workflow_log(steps: &[forge::Step]) -> &[u8] {
+fn job_answer(asked: &client::Op, job: &forge::Job, steps: &[forge::Step]) -> client::Answer {
+    let client::Op::Read(client::Read::Job { attempt, max_bytes }) = asked else {
+        panic!("Job answer requires a job read")
+    };
+    assert_eq!(job.attempt, attempt.attempt, "Worlds read the pinned attempt");
+    let mut failed = None;
+    let mut content = Vec::new();
     for step in steps {
-        if step.number == forge::WORKFLOW_STEP {
-            return &step.log;
+        if step.status == forge::StepStatus::Failure {
+            failed = Some(client::Step { number: step.number, name: step.name.clone() });
+            content = step.log.to_vec();
+            break;
         }
+        content.extend_from_slice(&step.log);
     }
-    &[]
+    let cap = usize::try_from(*max_bytes).expect("world maximum fits usize");
+    let start = content.len().saturating_sub(cap);
+    client::Answer::Job { attempt: *attempt, step: failed, log: Box::from(&content[start..]), truncated: start > 0 }
 }
 
 fn byte_answer(asked: &client::Op, content: &[u8]) -> client::Answer {
     match asked {
-        client::Op::Read(client::Read::Job { attempt, max_bytes }) => {
-            let cap = usize::try_from(*max_bytes).expect("world maximum fits usize");
-            let truncated = content.len() > cap;
-            let start = content.len().saturating_sub(cap);
-            client::Answer::Job {
-                attempt: *attempt,
-                log: Box::from(content.get(start..).expect("bounded log")),
-                truncated,
-            }
-        }
         client::Op::Read(client::Read::File { head, path, max_bytes }) => {
             let cap = usize::try_from(*max_bytes).expect("world maximum fits usize");
             let truncated = content.len() > cap;

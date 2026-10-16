@@ -402,7 +402,12 @@ fn job_logs_are_bounded_and_pinned_to_the_failing_attempt() {
     let read = Read::Job { attempt, max_bytes: 64 };
     drop(h.step(Event::Read { owner: Token::new(1), repository: REPO, read: read.clone() }));
     let sent = h.one();
-    let answer = Answer::Job { attempt, log: Box::from(&b"failed job log"[..]), truncated: false };
+    let answer = Answer::Job {
+        attempt,
+        step: Some(api::Step { number: 1, name: Box::from(&b"build"[..]) }),
+        log: Box::from(&b"failed job log"[..]),
+        truncated: false,
+    };
     assert_eq!(
         h.answer(&sent, 1, Ok(answer.clone())).as_ref(),
         &[Request::Read { owner: Token::new(1), result: Ok(answer) }]
@@ -413,7 +418,12 @@ fn job_logs_are_bounded_and_pinned_to_the_failing_attempt() {
         &h.answer(
             &sent,
             1,
-            Ok(Answer::Job { attempt: api::JobAttempt { attempt: 3, ..attempt }, log: Box::new([]), truncated: false }),
+            Ok(Answer::Job {
+                attempt: api::JobAttempt { attempt: 3, ..attempt },
+                step: None,
+                log: Box::new([]),
+                truncated: false,
+            }),
         ),
         2,
         Error::InvalidAnswer,
@@ -421,7 +431,7 @@ fn job_logs_are_bounded_and_pinned_to_the_failing_attempt() {
     drop(h.step(Event::Read { owner: Token::new(3), repository: REPO, read: read.clone() }));
     let sent = h.one();
     terminal(
-        &h.answer(&sent, 1, Ok(Answer::Job { attempt, log: Box::from([b'x'; 65]), truncated: true })),
+        &h.answer(&sent, 1, Ok(Answer::Job { attempt, step: None, log: Box::from([b'x'; 65]), truncated: true })),
         3,
         Error::InvalidAnswer,
     );
@@ -704,4 +714,30 @@ fn file_reads_are_pinned_bounded_and_charged_to_the_fresh_lane() {
     });
     assert_eq!(refused.as_ref(), &[Request::Read { owner: Token::new(1), result: Err(Error::TooLarge) }]);
     assert!(h.send().is_none());
+}
+
+#[test]
+fn a_job_answers_step_name_counts_against_answer_bytes() {
+    let attempt = api::JobAttempt { head: [1; 32], run: 7, job: 8, attempt: 2 };
+    for (length, accepted) in [(4095, true), (4096, false)] {
+        let mut h = Harness::new(LIMITS);
+        drop(h.step(Event::Read {
+            owner: Token::new(1),
+            repository: REPO,
+            read: Read::Job { attempt, max_bytes: 4096 },
+        }));
+        let sent = h.one();
+        let answer = Answer::Job {
+            attempt,
+            step: Some(api::Step { number: 1, name: Box::new([b'x']) }),
+            log: Box::from(&[b'x'; 4096][..length]),
+            truncated: false,
+        };
+        let expected = if accepted { Ok(answer.clone()) } else { Err(Error::TooLarge) };
+        assert_eq!(
+            h.answer(&sent, 1, Ok(answer)).as_ref(),
+            &[Request::Read { owner: Token::new(1), result: expected }],
+            "Length {length}"
+        );
+    }
 }

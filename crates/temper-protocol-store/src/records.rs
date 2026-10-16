@@ -139,6 +139,7 @@ pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
         pull_reviewers: forge.client.rows,
         pull_head: forge.client.answer_bytes,
         pull_base: forge.client.answer_bytes,
+        step_name: forge.client.answer_bytes,
         job_answer_log: forge.client.answer_bytes,
         file_answer_path: forge.client.answer_bytes,
         file_answer_bytes: forge.client.answer_bytes,

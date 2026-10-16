@@ -257,7 +257,10 @@ impl Plan {
     pub fn raw_room(&self, shared: &Shared) -> u32 {
         match &self.contents {
             Some(plan) => plan.raw_room(shared),
-            None => shared.client.answer_bytes,
+            None => match &self.actions {
+                Some(plan) => plan.raw_room(shared),
+                None => shared.client.answer_bytes,
+            },
         }
     }
     pub fn take_cut(&mut self) -> bool {

@@ -262,8 +262,18 @@ fn contents_sizes_agree_with_the_clients_measure() {
         );
     }
 }
-fn measured_contents() -> [(&'static str, Answer, u64); 3] {
+fn measured_contents() -> [(&'static str, Answer, u64); 4] {
     [
+        (
+            "job with its step",
+            Answer::Job {
+                attempt: ATTEMPT,
+                step: Some(Step { number: 1, name: Box::from(&b"build"[..]) }),
+                log: Box::from(&b"abc"[..]),
+                truncated: false,
+            },
+            8,
+        ),
         (
             "file",
             Answer::File { head: HEAD, path: Box::from(&b"x"[..]), bytes: Box::from(&b"abc"[..]), truncated: false },
@@ -299,10 +309,11 @@ fn measured_contents() -> [(&'static str, Answer, u64); 3] {
         ),
     ]
 }
-use temper_engine_domain_forge_client::api::{Check, JobAttempt, Status};
+use temper_engine_domain_forge_client::api::{Check, JobAttempt, Status, Step};
 const ATTEMPT: JobAttempt = JobAttempt { head: HEAD, run: 7, job: 10, attempt: 3 };
 const RUN: &[u8] = br#"{"id":7,"index_in_repo":5,"commit_sha":"0100000000000000000000000000000000000000"}"#;
 const RUNS: &[u8] = br#"{"total_count":1,"workflow_runs":[{"id":7,"index_in_repo":5,"commit_sha":"0100000000000000000000000000000000000000"}]}"#;
+const JOB: &[u8] = br#"{"id":10,"run_id":7,"attempt":3,"steps":[{"number":0,"name":"Set up job","status":"success"},{"number":1,"name":"build","status":"failure"},{"number":2,"name":"Complete job","status":"failure"}]}"#;
 const JOBS: &[u8] = br#"[{"id":9,"run_id":7,"attempt":1},{"id":10,"run_id":7,"attempt":3}]"#;
 const FAILING: &[u8] = br#"{"state":"failure","total_count":1,"statuses":[{"creator":null,"updated_at":"1970-01-01T00:00:00Z","context":"build","status":"failure","description":"failed","target_url":"/fixture/specimen/actions/runs/5/jobs/1"}]}"#;
 fn failing(job: Option<JobAttempt>) -> Status {
@@ -419,12 +430,11 @@ fn a_job_log_at_another_head_is_missing_job() {
     assert_eq!((answer.cost, answer.result.clone()), (1, Err(Error::MissingJob)));
 }
 #[test]
-fn a_job_without_its_id_and_attempt_is_missing_job() {
+fn a_job_of_another_id_run_or_attempt_is_missing_job() {
     for (name, jobs) in [
-        ("no job", &b"[]"[..]),
-        ("other id", &br#"[{"id":9,"run_id":7,"attempt":3}]"#[..]),
-        ("other attempt", &br#"[{"id":10,"run_id":7,"attempt":2}]"#[..]),
-        ("other run", &br#"[{"id":10,"run_id":8,"attempt":3}]"#[..]),
+        ("other id", &br#"{"id":9,"run_id":7,"attempt":3}"#[..]),
+        ("other attempt", &br#"{"id":10,"run_id":7,"attempt":2}"#[..]),
+        ("other run", &br#"{"id":10,"run_id":8,"attempt":3}"#[..]),
     ] {
         let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
@@ -437,7 +447,7 @@ fn a_job_without_its_id_and_attempt_is_missing_job() {
 }
 #[test]
 fn a_job_read_answered_404_is_missing_job_at_each_exchange() {
-    for (name, before, cost) in [("run", &[][..], 1), ("jobs", &[RUN][..], 2), ("log", &[RUN, JOBS][..], 3)] {
+    for (name, before, cost) in [("run", &[][..], 1), ("job", &[RUN][..], 2), ("log", &[RUN, JOB][..], 3)] {
         let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         for document in before {
@@ -464,12 +474,12 @@ fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
         let mut h = fixtures::known();
         h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: 4 }));
         h.answer(fixtures::FORGE, &fixtures::ok(RUN));
-        h.answer(fixtures::FORGE, &fixtures::ok(JOBS));
+        h.answer(fixtures::FORGE, &fixtures::ok(JOB));
         let request = h.request_bytes(fixtures::FORGE);
         assert!(
             skein_lib::bytes::find(
                 &request,
-                b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3 HTTP/1.1\r\n"
+                b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=1 HTTP/1.1\r\n"
             )
             .is_some(),
             "{name}: log"
@@ -480,8 +490,195 @@ fn a_jobs_verified_log_uses_range_and_content_range_reports_more() {
         let answer = h.answered(1).expect("log");
         assert_eq!(
             (answer.cost, answer.result.clone()),
-            (3, Ok(Answer::Job { attempt: ATTEMPT, log: Box::from(log), truncated })),
+            (
+                3,
+                Ok(Answer::Job {
+                    attempt: ATTEMPT,
+                    step: Some(Step { number: 1, name: Box::from(&b"build"[..]) }),
+                    log: Box::from(log),
+                    truncated
+                })
+            ),
             "{name}"
         );
     }
+}
+
+fn job(statuses: [&str; 3]) -> Box<[u8]> {
+    let mut out = skein_lib::List::with_capacity(512);
+    for piece in [
+        b"{\"id\":10,\"run_id\":7,\"attempt\":3,\"steps\":[{\"number\":0,\"name\":\"Set up job\",\"status\":\""
+            .as_slice(),
+        statuses[0].as_bytes(),
+        b"\"},{\"number\":1,\"name\":\"build\",\"status\":\"",
+        statuses[1].as_bytes(),
+        b"\"},{\"number\":2,\"name\":\"Complete job\",\"status\":\"",
+        statuses[2].as_bytes(),
+        b"\"}]}",
+    ] {
+        for byte in piece {
+            out.push(*byte).expect("Fixture room");
+        }
+    }
+    out.into_boxed()
+}
+fn read_job(document: &[u8], log: &[u8], max: u32) -> fixtures::Harness {
+    let mut h = fixtures::known();
+    h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: max }));
+    h.answer(fixtures::FORGE, &fixtures::ok(RUN));
+    h.answer(fixtures::FORGE, &fixtures::ok(document));
+    h.answer(fixtures::FORGE, &fixtures::ok(log));
+    h.run(Duration::from_millis(10));
+    h
+}
+#[test]
+fn the_failed_step_is_the_first_whose_status_is_failure() {
+    type StepRow = (&'static str, [&'static str; 3], u32, &'static [u8], &'static [u8]);
+    let rows: [StepRow; 3] = [
+        (
+            "workflow before completion",
+            ["success", "failure", "failure"],
+            1,
+            b"build",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=1 HTTP/1.1",
+        ),
+        (
+            "set-up",
+            ["failure", "cancelled", "failure"],
+            0,
+            b"Set up job",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=0 HTTP/1.1",
+        ),
+        (
+            "completion alone",
+            ["success", "success", "failure"],
+            2,
+            b"Complete job",
+            b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=2 HTTP/1.1",
+        ),
+    ];
+    for (name, statuses, number, step, log) in rows {
+        let h = read_job(&job(statuses), b"abc", 4);
+        let lines = h.request_lines(fixtures::FORGE).into_boxed();
+        assert_eq!(lines[3].as_ref(), b"GET /api/v1/repos/fixture/specimen/actions/jobs/10 HTTP/1.1", "{name}: job");
+        assert_eq!(lines[4].as_ref(), log, "{name}: step log");
+        let expected = Answer::Job {
+            attempt: ATTEMPT,
+            step: Some(Step { number, name: Box::from(step) }),
+            log: Box::from(&b"abc"[..]),
+            truncated: false,
+        };
+        let answer = h.answered(1).expect("Job answer");
+        assert_eq!((answer.cost, answer.result.clone()), (3, Ok(expected)), "{name}");
+    }
+}
+#[test]
+fn a_job_with_no_failed_step_reads_its_log_without_a_step() {
+    let h = read_job(&job(["success", "cancelled", "cancelled"]), b"abc", 4);
+    assert_eq!(
+        h.request_lines(fixtures::FORGE).into_boxed()[4].as_ref(),
+        b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3 HTTP/1.1"
+    );
+    let expected = Answer::Job { attempt: ATTEMPT, step: None, log: Box::from(&b"abc"[..]), truncated: false };
+    let answer = h.answered(1).expect("Job answer");
+    assert_eq!((answer.cost, answer.result.clone()), (3, Ok(expected)));
+}
+#[test]
+fn a_step_name_is_read_up_to_string_bytes_and_empty_past_it() {
+    for (length, kept) in [(128, 128), (129, 0)] {
+        let name = &[b'x'; 129][..length];
+        let document = named_job(name);
+        let h = read_job(&document, b"abc", 4);
+        let expected = Answer::Job {
+            attempt: ATTEMPT,
+            step: Some(Step { number: 1, name: Box::from(&name[..kept]) }),
+            log: Box::from(&b"abc"[..]),
+            truncated: false,
+        };
+        let answer = h.answered(1).expect("Job answer");
+        assert_eq!((answer.cost, answer.result.clone()), (3, Ok(expected)), "Length {length}");
+    }
+}
+fn named_job(name: &[u8]) -> Box<[u8]> {
+    let mut out = skein_lib::List::with_capacity(512);
+    for piece in [
+        b"{\"id\":10,\"run_id\":7,\"attempt\":3,\"steps\":[{\"number\":1,\"name\":\"".as_slice(),
+        name,
+        b"\",\"status\":\"failure\"}]}",
+    ] {
+        for byte in piece {
+            out.push(*byte).expect("Fixture room");
+        }
+    }
+    out.into_boxed()
+}
+#[test]
+fn a_failed_step_after_more_steps_than_inner_is_found() {
+    let mut document = skein_lib::List::with_capacity(2048);
+    for piece in [b"{\"id\":10,\"run_id\":7,\"attempt\":3,\"steps\":[".as_slice()] {
+        for byte in piece {
+            document.push(*byte).expect("Fixture room");
+        }
+    }
+    for number in 0..12 {
+        if number > 0 {
+            document.push(b',').expect("Fixture room");
+        }
+        for byte in b"{\"number\":" {
+            document.push(*byte).expect("Fixture room");
+        }
+        if number >= 10 {
+            document.push(b'1').expect("Fixture room");
+        }
+        document.push(b'0' + (number % 10)).expect("Fixture room");
+        let suffix: &[u8] = if number < 10 {
+            b",\"name\":\"build\",\"status\":\"success\"}"
+        } else {
+            b",\"name\":\"build\",\"status\":\"failure\"}"
+        };
+        for byte in suffix {
+            document.push(*byte).expect("Fixture room");
+        }
+    }
+    for byte in b"]}" {
+        document.push(*byte).expect("Fixture room");
+    }
+    let h = read_job(&document.into_boxed(), b"abc", 4);
+    let expected = Answer::Job {
+        attempt: ATTEMPT,
+        step: Some(Step { number: 10, name: Box::from(&b"build"[..]) }),
+        log: Box::from(&b"abc"[..]),
+        truncated: false,
+    };
+    let answer = h.answered(1).expect("Job answer");
+    assert_eq!((answer.cost, answer.result.clone()), (3, Ok(expected)));
+    assert_eq!(
+        h.request_lines(fixtures::FORGE).into_boxed()[4].as_ref(),
+        b"GET /api/v1/repos/fixture/specimen/actions/jobs/10/logs?attempt=3&step=10 HTTP/1.1"
+    );
+}
+#[test]
+fn a_jobs_log_room_is_answer_bytes_less_its_steps_name() {
+    let mut shared = fixtures::shared();
+    // The 4096-byte fixture bound replaces the shipped 65536 to keep this test cheap.
+    shared.client.answer_bytes = 4096;
+    let max = shared.client.answer_bytes;
+    let log = Box::new([b'x'; 4096]);
+    let mut h = fixtures::Harness::with(fixtures::limits(), shared, fixtures::settings());
+    h.connected(fixtures::FORGE);
+    h.answer(fixtures::FORGE, &fixtures::user_ok());
+    h.answer(fixtures::FORGE, &fixtures::settings_ok());
+    h.known(fixtures::REPO, fixtures::specimen());
+    h.call(1, fixtures::REPO, Op::Read(Read::Job { attempt: ATTEMPT, max_bytes: max }));
+    h.answer(fixtures::FORGE, &fixtures::ok(RUN));
+    h.answer(fixtures::FORGE, &fixtures::ok(JOB));
+    h.answer(fixtures::FORGE, &fixtures::ok(log.as_slice()));
+    h.run(Duration::from_millis(10));
+    let expected = Answer::Job {
+        attempt: ATTEMPT,
+        step: Some(Step { number: 1, name: Box::from(&b"build"[..]) }),
+        log: Box::from(&log[..log.len() - 5]),
+        truncated: true,
+    };
+    assert_eq!(h.answered(1).expect("Job answer").result, Ok(expected));
 }

@@ -501,16 +501,38 @@ fn bounded_job_bytes_translate_to_a_truncated_attempt_log() {
         &asked,
         temper_fake_forge_domain::api::Answer::Job {
             job: temper_fake_forge_domain::api::Job { id: 7, run: 3, index: 0, attempt: 2 },
-            steps: Box::new([temper_fake_forge_domain::api::Step {
-                number: temper_fake_forge_domain::api::WORKFLOW_STEP,
-                name: Box::from(&b"Run build"[..]),
-                status: temper_fake_forge_domain::api::StepStatus::Failure,
-                log: Box::from(&b"error"[..]),
-            }]),
+            steps: Box::new([
+                temper_fake_forge_domain::api::Step {
+                    number: 0,
+                    name: Box::from(&b"Set up job"[..]),
+                    status: temper_fake_forge_domain::api::StepStatus::Success,
+                    log: Box::from(&b"set up\n"[..]),
+                },
+                temper_fake_forge_domain::api::Step {
+                    number: temper_fake_forge_domain::api::WORKFLOW_STEP,
+                    name: Box::from(&b"Run build"[..]),
+                    status: temper_fake_forge_domain::api::StepStatus::Failure,
+                    log: Box::from(&b"error"[..]),
+                },
+                temper_fake_forge_domain::api::Step {
+                    number: 2,
+                    name: Box::from(&b"Complete job"[..]),
+                    status: temper_fake_forge_domain::api::StepStatus::Failure,
+                    log: Box::from(&b"job failed\n"[..]),
+                },
+            ]),
         },
         &temper_engine_forge_client_world::LIMITS,
     );
-    assert_eq!(result, api::Answer::Job { attempt, log: Box::from(&b"rror"[..]), truncated: true });
+    assert_eq!(
+        result,
+        api::Answer::Job {
+            attempt,
+            step: Some(api::Step { number: 1, name: Box::from(&b"Run build"[..]) }),
+            log: Box::from(&b"rror"[..]),
+            truncated: true
+        }
+    );
 }
 #[test]
 fn adoption_reads_history_and_preserves_foreign_or_copied_marker_news() {
