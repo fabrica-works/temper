@@ -16,9 +16,11 @@ else.
 
 ## Read first
 
-- jig's `docs/design/README.md`: 15; temper's `STATUS.md`: section 3,
-  "temper on jig's client API" ("Its crates follow the client naming
-  rule"); temper's `client.md`: 2.
+- jig's `docs/design/README.md`: 15; temper's `STATUS.md`: section 2,
+  the `client.md` row ("the crates `temper-protocol-client-wire` renamed
+  `temper-client-protocol-wire` and `temper-shell-terminal`
+  `temper-client-shell-terminal`, by the client naming rule"); temper's
+  `client.md`: 2.
 - `code-organization.md`: 1 (jig's renames table), 3 (the check's
   owner), 4 (the check); `findings/renames.md`: 1 (temper's column) and
   5; `decisions.md`: 8; the README's Rules, "Pins" and "What a temper
@@ -32,10 +34,10 @@ else.
 - jig's README 15: "Every client crate, wherever it lives, is named
   `<project>-client-{domain,protocol,<kind>}-<...>`, so that everything
   client-related lives under `<project>-client`."
-- temper's `STATUS.md`: "Its crates follow the client naming rule:
-  `temper-protocol-client-wire` becomes `temper-client-protocol-wire`,
-  `temper-shell-terminal` becomes `temper-client-shell-terminal`" (temper
-  01 did both).
+- temper's `STATUS.md`, section 2, the `client.md` row: "the crates
+  `temper-protocol-client-wire` renamed `temper-client-protocol-wire` and
+  `temper-shell-terminal` `temper-client-shell-terminal`, by the client
+  naming rule" (temper 01 did both).
 - code-organization.md, 4: "**temper 02.1** adds the same check to
   temper: a test `client_crates_carry_the_client_prefix` in
   `tests/client/tests/names.rs` (`temper-client-world`, which takes
@@ -127,7 +129,8 @@ added of which 54 counted, `logs/w1/temper-02-files.txt` and
   tests/clients.rs, tests/clients/peer.rs, tests/family.rs}`;
 - `crates/temper-client-shell-terminal/src/{client.rs, limits.rs,
   route.rs, route/family.rs, terminal.rs, terminal/native.rs, tests.rs,
-  tests/family.rs, tests/fixtures.rs}`, `tests/support/mod.rs`;
+  tests/family.rs, tests/fixtures.rs}`,
+  `crates/temper-client-shell-terminal/tests/support/mod.rs`;
 - `crates/temper/src/open.rs`, `crates/temper/tests/support/person.rs`;
 - `crates/temper-client-protocol-wire/schema/client-wire-v1.schema` (a
   comment naming jig's wire);
