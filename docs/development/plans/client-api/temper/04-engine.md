@@ -104,10 +104,13 @@ profile, and sets `documents.lines` where it is not (`configuration.md`,
   ~/src/rust/jig merge-base --is-ancestor <that landing> <temper's
   present jig pin>` succeeds, no repin commit is made. After a repin,
   `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
-  Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`, and
-  skein's and smith's lines equal to those of `git -C ~/src/rust/jig
-  show <the landing>:Cargo.lock`; a second revision of a source still
-  there after a second `cargo update` is a question.
+  Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`,
+  smith's line equal to that of `git -C ~/src/rust/jig show <the
+  landing>:Cargo.lock`, and skein's equal to it or, while it does not
+  hold skein-01.s1's landing, that landing, which the repin's `cargo
+  update -p skein-lib --precise` then takes (README, "Pins", "The
+  terminal's room"); a second revision of a source still there after a
+  second `cargo update` is a question.
 - **jig 08.4's census:** the first increment of this session whose
   repin includes jig 08.4's landing repairs temper's census walk, as the
   README's "jig 08.4's census" says.

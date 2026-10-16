@@ -123,13 +123,16 @@ stays joined to temper's engine root throughout.
   ~/src/rust/jig merge-base --is-ancestor <that landing> <temper's
   present jig pin>` succeeds, no repin commit is made. The repin: `heavy
   cargo update -p jig-domain-core --precise <the landing>`, then `heavy
-  cargo update -p skein-lib --precise <its pin of skein>` and `heavy
-  cargo update -p smith-host-protocol --precise <its pin of smith>`;
-  then `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
-  Cargo.lock | sort -u` prints three lines: `jig.git#<the landing>`, and
-  skein's and smith's lines equal to those of `git -C ~/src/rust/jig
-  show <the landing>:Cargo.lock`; a second revision of a source still
-  there after a second `cargo update` is a question.
+  cargo update -p skein-lib --precise <its pin of skein, or skein-01.s1's
+  landing while that pin does not hold it>` and `heavy cargo update -p
+  smith-host-protocol --precise <its pin of smith>`; then `grep -o
+  'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
+  sort -u` prints three lines: `jig.git#<the landing>`, smith's line
+  equal to that of `git -C ~/src/rust/jig show <the landing>:Cargo.lock`,
+  and skein's equal to it or, while it does not hold skein-01.s1's
+  landing, that landing (README, "Pins", "The terminal's room"); a second
+  revision of a source still there after a second `cargo update` is a
+  question.
 - **A repin's repairs outside its Shape** follow jig's own diffs and
   are counted with `git diff --numstat origin/main...HEAD -- <the
   changed paths outside the increment's Files> ':!Cargo.lock'`, added
@@ -164,17 +167,20 @@ output, under temper's settings (the name `temper`, the longest line, a
 one-second interval, the status region the banner's link state); the
 host keeps temper's own lines (signing in, its retries, a refused link,
 the credential's and the store's notices, signed out) and says
-them with `Terminal::say` (`client.md`, 6.2, 6.3, 6.6, 6.7; skein's
-`ui-text.md`, 7). `temper: closed` is the terminal's own line
-(`Terminal::close` says it): the host never says it. On `q`, the end of
+them with `Terminal::say`, each only within `Terminal::room`, keeping
+what has no room, an equal line once, and taking no command while a
+line waits (`client.md`, 6.2, 6.3, 6.6, 6.7; skein's `ui-text.md`, 3, 4
+and 7). `temper: closed` is the terminal's own line (`Terminal::close`
+says it): the host never says it. On `q`, the end of
 stdin or a termination signal the terminal "starts no new print, writes
 what it has begun, and says it is closed (`NAME: closed`); the host then
 closes its application" (`ui-text.md`, 7): the host closes the client
 once `Terminal::closed()` is true, after the drain, not before it.
 temper 01.3 put the renderer and the command reader
 on `skein-ui-text`; this increment replaces the rest of `terminal::Loop`.
-Needs: nothing beyond the session's start (temper 02.1 on temper's
-`main`).
+Needs: the session's start (temper 02.1 on temper's `main`), and
+skein-01.s1's landing (the settings' lines and `Terminal::room`; README,
+"Pins", "The terminal's room").
 Files: `crates/temper-client-shell-terminal/src/` (names after temper
 01): `terminal.rs` (318 lines at the base: `Loop`'s reader, pacing,
 printing and output go; its notices' lines stay, said through the
@@ -183,9 +189,9 @@ terminal), `lines.rs` (59) and `tests/lines.rs` (39), which go with
 `:104`, `:110`), `terminal/run.rs` (327: the host adopts the pipes through
 `Terminal::adopt` and routes `Terminal::owns` completions; its own
 `Writing` and stdin buffer go), `terminal/native.rs`, `limits.rs`
-(`limits::terminal()`'s line and interval feed `Settings`), `lib.rs`,
-the crate's `Cargo.toml` (`skein-sim` as a dev-dependency, below) and
-`Cargo.lock`;
+(`limits::terminal()`'s line, interval and lines feed `Settings`),
+`lib.rs`, the crate's `Cargo.toml` (`skein-sim` as a dev-dependency,
+below) and `Cargo.lock` (the skein move, first, and the dev-dependency);
 `crates/temper/src/open.rs:74-120` (the loop made from
 `skein_ui_text::Settings`); tests: `tests/terminal.rs` (244 lines, 12
 tests), `tests/support/mod.rs` (271), `tests/fuzzy_terminal.rs`,
@@ -196,9 +202,18 @@ tests), `tests/support/mod.rs` (271), `tests/fuzzy_terminal.rs`,
 `crates/temper/tests/support/person.rs:153` names `terminal::Notice`,
 which stays.
 Shape:
+- **The skein move,** 03.1's first commit, on its own (README, "Pins",
+  "The terminal's room"): `heavy cargo update -p skein-lib --precise
+  <skein-01.s1's landing>`; after it, `grep -o
+  'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock |
+  sort -u` prints three lines, jig's and smith's as before and skein's
+  that landing, and `git show --stat --format= HEAD` lists `Cargo.lock`
+  alone. A build failure in a jig or smith crate after it is a question.
 - `skein_ui_text::Terminal::new(Settings { name: Box::from(*b"temper"),
   longest, interval: Duration::from_secs(1), status: Some(<the banner's
-  link region>) }, &view_limits).expect("terminal settings")`
+  link region>), lines: limits.lines }, &view_limits).expect("terminal
+  settings")` (`limits::terminal().lines`, 32, `limits.rs:181`: temper's
+  lines, `client.md`, 6.2)
   (`Settings.name` is a `Box<[u8]>`, `skein-ui-text/src/terminal.rs:17`;
   `new` returns `Option<Terminal>`, and `open.rs` expects its other
   startup parts the same way); the host's iteration, in `ui-text.md`,
@@ -211,9 +226,24 @@ Shape:
   `TAG` uses today: the host's own io (the termination signals) takes
   `1 << 61`, and the host gives a completion to the terminal when
   `Terminal::owns` is true, before it reads its own tag.
+- **temper's lines** (`client.md`, 6.3): the host takes every
+  `client.notice()` at each iteration, whatever the room (the client's
+  queue holds one iteration's notices, `client.rs:87`), in place of
+  today's `while self.lines.room() > 0` (`terminal.rs:169`); each
+  notice's effect (the retry's deadline and backoff, the failure, the
+  close) happens then. Its line goes to a queue of waiting lines; a
+  line equal to one already waiting adds none. Of the `Notice`s that
+  print a line, `SignInAgain`, `StoreFailed` and `SignedOut` are each
+  one line; a `Credential` is a line of its own for each request the
+  client sent, so the queue holds `table.requests` (16, `limits.rs:63`)
+  plus 3. The host says waiting lines in order while
+  `Terminal::room()` is above 0, says none once it has closed the
+  terminal, and pops no `Terminal::commands()` while a line waits (the
+  terminal then reads no further, `ui-text.md`, 7). Never `say` without
+  room: it panics.
 - temper's `terminal::Loop` keeps only what the text shell does not: the
   sign-in's retry and backoff (6.7), the exit status and its stderr line
-  (6.1), the order in which temper's lines are said.
+  (6.1), the waiting lines and the order in which they are said.
 Test shape: the machine world, `tests/terminal.rs` on
 `tests/support/mod.rs` (its limits from its own `tree_limits()`,
 `support/mod.rs:10`). The world drives skein's terminal through its
@@ -257,7 +287,13 @@ fn temper_lines_are_said_before_the_next_print() {
 }
 ```
 (`World::all_output`, the bytes written so far, is new in
-`tests/support/mod.rs`, beside `last_output`.)
+`tests/support/mod.rs`, beside `last_output`.) One unit test of the
+waiting lines, under 20 ms, in `src/tests.rs`:
+`an_equal_line_waits_once_in_the_order_it_came` (`SignInAgain`,
+`StoreFailed`, `SignInAgain`, two `Credential`s of two parties waiting,
+then a room of 1, then of 8: said `SignInAgain`, then `StoreFailed` and
+the two credentials, and nothing more). No world test of a held stdout:
+the room and the held input are skein's, tested by skein-01.s1.
 Proof: the process tier, once: `heavy sh -c 'cargo build -p temper
 --bin temper && NEXTEST_DOUBLE_SPAWN=0 cargo nextest run -p temper
 --profile process -E "test(temper_open_signs_in_prints_the_inbox_and_exits_on_q)"'`:
@@ -265,7 +301,9 @@ Proof: the process tier, once: `heavy sh -c 'cargo build -p temper
 through skein's terminal and exits 0 on `q` after a drained close (about
 1 minute; 1.1 s of test at the base, `logs/w9/nextest-process-base-private.txt`).
 Don't: copy any of skein's terminal into temper; add a command
-(`client.md`, 6.5); change one of temper's lines.
+(`client.md`, 6.5); change one of temper's lines; bound temper's lines
+by `Terminal::work_pending` or by a count of its own of what the terminal
+holds; move jig's pin.
 Size: at most 200 lines (mostly removals).
 Removes: `terminal::Loop`'s line reader, print pacing and output
 buffer, `terminal/run.rs`'s `Writing` and stdin buffer.

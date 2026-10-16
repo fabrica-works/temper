@@ -623,8 +623,8 @@ the forge's work is never refused as too large.
   loop routes each completion to its owner by the operation's token.
 - **The text shell's settings:** the name `temper`; the longest line,
   the client's longest words with a number and a space before them;
-  a print interval of one second, a guide; and the status region, the
-  banner's link state (5.1).
+  a print interval of one second, a guide; the status region, the
+  banner's link state (5.1); and temper's lines, 32 (6.3).
 - **Time and the seed** are skein-shell's: its clock once per
   iteration, and a seed from the kernel at each start (`seed`), from
   which the client root's children draw their keys' numbers (3.1).
@@ -641,6 +641,24 @@ the forge's work is never refused as too large.
 As skein's text shell prints (skein's `ui-text.md`, section 4), at the
 interval of 6.2. Before the first tree (signing in), only temper's own
 lines, each starting `temper: `.
+
+- **temper's lines wait for room.** The host says each of temper's lines
+  only within the room skein's terminal gives (`Terminal::room`; skein's
+  `ui-text.md`, section 4). A line with none waits in the host, in the
+  order they came; a line equal to one already waiting adds none (a
+  sign-in tried again, the small store refused again).
+- **While a line waits, the person's commands wait.** The host takes no
+  command from the terminal while one of temper's lines waits in it, so
+  the terminal reads no further (skein's `ui-text.md`, section 7) and no
+  act of the person's makes a new line; SIGINT and SIGTERM still close.
+  What waits is then at most one of each line but a service's
+  credential, and one credential for each request already sent, at most
+  the request table's requests.
+- **Notices are taken whatever the room.** The host takes each of its
+  client's notices at every iteration, so a held stdout delays temper's
+  lines and the person's commands, never the client: the sign-in's
+  retries keep their backoff (6.7). Lines that wait when the terminal
+  closes are not printed.
 
 ### 6.4 How it prints
 

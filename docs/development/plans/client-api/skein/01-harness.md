@@ -419,7 +419,8 @@ Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/skein log origin/main --grep='^Plan: client-api$'
   --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^skein-01\.'` prints 3.
+  '^skein-01\.[0-9]'` prints 3 (the supplement step skein-01.s1, the
+  terminal's room, is README's "Done when", 10).
 - `git -C ~/src/rust/skein grep -n -E 'listening_address|listening:'
   origin/main -- testing tests` prints nothing.
 - `git -C ~/src/rust/skein grep -n -i -w jig origin/main -- crates

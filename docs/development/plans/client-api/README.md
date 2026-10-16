@@ -74,7 +74,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15, jig 21 | |
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
-| `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01 |
+| `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s1 |
 | `jig/20-attack-stories.md` | jig 20: jig's stories for a browser shell, and its attack stories | jig 19 | |
 | `jig/23-referee.md` | jig 23: the conformance referee's rules for proposals and revisions | jig 03 | 23.2: jig 06.1, jig 06.2, jig 07.3 |
 
@@ -90,7 +90,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
-| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
@@ -168,11 +168,14 @@ per session are in each file.
     <repository>-NN.k$' --format=%H -1` prints (older plans reuse step
     names such as `jig-02.3`); for a whole session, its last step's.
   - jig moves skein once, never smith: jig 19's first increment that
-    needs skein 01 runs `heavy cargo update -p skein-lib --precise <skein
-    01.3's landing>`, in a commit of its own; after it, `grep -o
-    'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints that one commit,
-    and each later `cargo update` of a skein package holds it with
-    `--precise`. A failure in a smith crate is a question.
+    needs skein 01 runs `heavy cargo update -p skein-lib --precise
+    <skein-01.s1's landing>` (which holds skein 01.3's), in a commit of
+    its own with its one repair, `lines: 0` in jig's `skein_ui_text::Settings`
+    literal (`git -C ~/src/rust/jig grep -n 'skein_ui_text::Settings'`:
+    `tests/client-protocol/src/native/world.rs:232` at jig `7dc234d1b`);
+    after it, `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints
+    that one commit, and each later `cargo update` of a skein package
+    holds it with `--precise`. A failure in a smith crate is a question.
   - Each temper increment whose Needs name a jig capability starts with
     a repin commit of its own onto the landing of the newest jig step its
     Needs name, never jig's `origin/main`, so that one repin takes as few
@@ -180,15 +183,18 @@ per session are in each file.
     --is-ancestor <that landing> <temper's present jig pin>` succeeds,
     no repin commit is made. Otherwise: `heavy cargo update -p
     jig-domain-core --precise <that landing>`, then `heavy cargo update
-    -p skein-lib --precise <jig's pin of skein>` and `heavy cargo update
+    -p skein-lib --precise <jig's pin of skein, or skein-01.s1's landing
+    while that pin does not hold it (below)>` and `heavy cargo update
     -p smith-host-protocol --precise <jig's pin of smith>` (each read with
     `git -C ~/src/rust/jig show <that landing>:Cargo.lock | grep -o
     'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' | sort -u`).
     Then `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
     Cargo.lock | sort -u` prints three lines: `jig.git#<that landing>`,
     and skein's and smith's lines as jig's lock at that landing prints
-    them. A `cargo update` that leaves a second revision of a source is
-    run once more; a second revision still there after it is a question.
+    them, skein's being skein-01.s1's landing instead while jig's does
+    not hold it (below). A `cargo update` that leaves a second revision
+    of a source is run once more; a second revision still there after it
+    is a question.
   - **What a temper repin repairs:** the capability its increment's Needs
     name, by its Shape; and what else jig landed since temper's last
     repin, adapted the way jig adapted its own reference code
@@ -229,6 +235,23 @@ per session are in each file.
       `an_ended_chats_read_position_survives_a_restart` (a chat of two
       turns, the first marked, ends; after the restart its line reads
       one unread turn).
+  - **The terminal's room** (the design answer of 2026-10-16): skein's
+    `Terminal` gives the application's lines a room of their own (skein's
+    `ui-text.md`, 3 and 4: the settings' lines, `Terminal::room`), which
+    the supplement step skein-01.s1 builds and temper 03.1 needs. temper
+    takes it alone, ahead of jig: 03.1's first commit moves temper's
+    skein to skein-01.s1's landing (03.1's Shape), and jig's pin of skein
+    stays until jig 19's move above. From 03.1 on, while `git -C
+    ~/src/rust/skein merge-base --is-ancestor <skein-01.s1's landing>
+    <jig's pin of skein>` fails, each temper repin takes skein-01.s1's
+    landing in place of jig's pin of skein, and its check reads skein's
+    line as that landing; once it succeeds (jig 19's move), jig's pin
+    again. At skein `7e8fb700`, skein's code differs from jig's pin
+    `f12f29d4` only by skein 01's harness (`git -C ~/src/rust/skein diff
+    --stat f12f29d4 7e8fb700 -- crates` prints nothing), which no jig,
+    smith or temper crate names; skein-01.s1's one downstream `Settings`
+    literal is jig's test world's, outside temper's build. A build
+    failure in a jig or smith crate after temper's move is a question.
   - **The closing repin, `temper-repin`:** temper's README-declared
     repin. The coordinator adds it at setup, `plan set temper-repin
     repo=temper state=waiting` (development.md 7.1 adds none, since the
