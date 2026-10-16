@@ -848,6 +848,15 @@ choice would have been the user's (development.md, 10.4).
 
      04.6's Size becomes at most 420 lines (was 300). Unchanged: the rest of 04.6's Shape, Test shape and Proof, and 04.7.
 
+175. **jig 03.4's decided party proposal in its proposer's updates** (plan defect, jig 03's block of 2026-10-16T20:57:06Z).
+     Plan defect: 03.4's Files gave no way for a decided party proposal to reach its proposer's inbox, which the design asks and places. people.md, 5.1: "`Propose` asks, with a reason, and the party is its proposer: its decision, a rejection included, reaches them." store.md's reads: "a proposal | a party's: its record, by key, with its decision"; "an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first"; and the tasks family keeps "decided proposals" on demand, by "proposal", the core family "decisions on proposals" by "proposer, proposal".
+
+     Your proposal is approved, as the default and only path: `tasks::UpdateObject` gains a variant for a decided party proposal, indexed for its proposer in the updates group, in the tasks family's v3 schema and codec; the store's and the core's update join loads `Stored::DecidedProposal` with its `CoreRecord::ProposalDecision` for it, in place of a `TaskRecord`. A withdrawn proposal's entry is made the same way. Pending proposals stay out of `Group::Updates` (`Key::PersonProposal`, as now). Retention (`forget.rs`) removes the entry with the decided proposal it names, as it does a result's.
+
+     Don't: serve the entry by scanning decided proposals; add a second index for it; change the existing `Result` and `Reply` rows or their order ("A result sorts before a reply of the same task and time"). Add every exhaustive match the compiler names over `UpdateObject` an arm (jig only; temper names `UpdateObject` nowhere), and refresh any golden or fixture key the variant changes, listing each in the commit body.
+
+     03.4's Size becomes at most 420 lines (was 330), a codec increment. Unchanged: 03.4's Shape, Test shape and Proof (the acceptance in the proposer's inbox), and 03.5.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

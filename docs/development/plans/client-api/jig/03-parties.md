@@ -592,6 +592,15 @@ Files:
   Withdrawn}`; `Outcome::GoalProposed` goes), `refusals.rs`
   (`Malformed::ProposedAsAllowed`), `domain.rs` (at most 40), `capacity.rs`,
   `words.rs` (the reason within `words`).
+- The proposer's update for a decided party proposal (ruling 175):
+  `crates/jig-domain-tasks/src/index.rs` (`UpdateObject`, :28, a
+  variant for it), `crates/jig-protocol-store/schema/tasks-v3.schema`,
+  `src/codec/tasks/index.rs`, `src/keys/tasks.rs`, `src/reads/indexed.rs`
+  (the join to `Stored::DecidedProposal` with its
+  `CoreRecord::ProposalDecision`), the generated family and goldens;
+  `crates/jig-domain-core/src/{indexes.rs, reads/indexed.rs, forget.rs}`;
+  and the exhaustive matches over `UpdateObject` the compiler names
+  (jig only: temper names none), an arm each.
 - `crates/jig-domain-tasks/src/proposals.rs` (at most 40: `PersonProposal`
   at :143 holds `action` and `reason` in place of `goal`;
   `valid_person_proposal` :160 checks each member as a root's;
@@ -727,8 +736,10 @@ Run once, `heavy cargo nextest run -p jig-core-world -E
 passes, and nothing else is wanted.
 Don't: let a proposal wait for nobody; give a party's proposal an
 effect's or a widening of their own authority (a party makes no effect,
-and their authority is their role's); change a task's `Proposal`.
-Size: at most 330 lines (a codec increment).
+and their authority is their role's); change a task's `Proposal`;
+serve the proposer's update by scanning decided proposals, or put a
+pending proposal in `Group::Updates` (ruling 175).
+Size: at most 420 lines (a codec increment).
 Removes: `Outcome::GoalProposed` and the goal's proposing path
 (`CreationKind::Goal { direct: false }`, `GoalRoute::Proposing`).
 
