@@ -97,6 +97,7 @@ pub struct World {
     seed: u64,
     writes: u32,
     calls: u32,
+    hints: Vec<client::api::Hint>,
 }
 
 impl World {
@@ -107,6 +108,10 @@ impl World {
 
     #[must_use]
     pub fn with_facts(seed: u64, facts: u32) -> World {
+        Self::configured(seed, facts, false)
+    }
+
+    fn configured(seed: u64, facts: u32, hooked: bool) -> World {
         let limits = top::Limits { facts, client: client::Limits { facts, ..CLIENT }, ..LIMITS };
         let config = fake_config();
         let mut fake = forge::Domain::new(&config, seed);
@@ -129,7 +134,7 @@ impl World {
                     cue: None,
                 },
                 protection: None,
-                hooked: false,
+                hooked,
             },
         );
         forge::grant(&mut fake, b"org/repo", 1, raw::Permission::Admin);
@@ -162,9 +167,64 @@ impl World {
             seed,
             writes: 0,
             calls: 0,
+            hints: Vec::new(),
         };
         world.event(top::Event::Restored { clock: client::RecoveryClock::Monotonic });
         world
+    }
+
+    /// As `new`, hearing the repository's hooks.
+    #[must_use]
+    pub fn hooked(seed: u64) -> World {
+        Self::configured(seed, LIMITS.facts, true)
+    }
+
+    #[must_use]
+    pub fn hints(&self) -> &[client::api::Hint] {
+        &self.hints
+    }
+
+    #[must_use]
+    pub fn wall(&self) -> Wall {
+        self.env.wall
+    }
+
+    pub fn run_to(&mut self, until: Wall) {
+        let end = self
+            .env
+            .now
+            .saturating_add(Duration::from_nanos(until.as_nanos().saturating_sub(self.env.wall.as_nanos())));
+        for _ in 0..20_000 {
+            if !self.iterate(end) {
+                return;
+            }
+        }
+        panic!("world did not reach horizon");
+    }
+
+    pub fn issue(&mut self, body: &[u8]) -> u64 {
+        let raw::Answer::Created(number) = self.external(
+            raw::Op::Write(raw::Write::CreateIssue {
+                title: Box::from(&b"An issue"[..]),
+                body: Box::from(body),
+                labels: Box::new([]),
+            }),
+            2,
+        ) else {
+            panic!("issue creation")
+        };
+        number
+    }
+
+    pub fn check_pull(&mut self, number: u64, span: Duration) {
+        forge::check(&mut self.forge, &self.forge_env, b"org/repo", number, span);
+    }
+
+    fn hear(&mut self, hook: &forge::Request) {
+        if let Some(hint) = translate::hint(REPO, hook) {
+            self.to_top.push((self.generation, top::Event::Hint { hint: hint.clone() }));
+            self.hints.push(hint);
+        }
     }
 
     pub fn event(&mut self, event: top::Event) {
@@ -345,18 +405,18 @@ impl World {
             forge::Event::Call { reply_to: ReplyTo::new(token), user, repository: Box::from(&b"org/repo"[..]), op },
             &mut self.forge_out,
         );
-        for _ in 0..4 {
+        let mut answer = None;
+        for _ in 0..8 {
+            for _ in 0..self.forge_out.len() {
+                match self.forge_out.pop().expect("fake output") {
+                    forge::Request::Reply { result, .. } => answer = Some(result.expect("fixture succeeds")),
+                    hook @ forge::Request::Hook { .. } => self.hear(&hook),
+                }
+            }
             if !self.forge.is_due(env.now) {
                 break;
             }
             forge::fire(&mut self.forge, &env, &mut self.forge_out);
-        }
-        let mut answer = None;
-        for _ in 0..self.forge_out.len() {
-            match self.forge_out.pop().expect("fake output") {
-                forge::Request::Reply { result, .. } => answer = Some(result.expect("fixture succeeds")),
-                forge::Request::Hook { .. } => {}
-            }
         }
         self.forge.reclaim();
         answer.expect("fixture answered")
@@ -527,7 +587,7 @@ impl World {
                         top::Event::Client(client::Event::Answered { call: pending.client, cost: 1, result }),
                     ));
                 }
-                forge::Request::Hook { .. } => {}
+                hook @ forge::Request::Hook { .. } => self.hear(&hook),
             }
         }
     }

@@ -367,6 +367,10 @@ pub(crate) fn moved(
         pull.commit = to;
         repository.touch(number, domain::clock(env));
     }
+    for &number in &repository.on_branch(branch) {
+        let item = repository.items.get_mut(&number).expect("an open pull on the branch");
+        item.pull.as_mut().expect("a pull request").checked = domain::clock(env).saturating_add(crate::pulls::CHECK);
+    }
     domain::changed(domain, env, id, observation, Hook::push(branch, Some(to), by));
     for &number in &following {
         hooks::notify(domain, env, id, Hook::item(Change::Pull, number, by));

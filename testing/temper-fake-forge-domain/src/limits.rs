@@ -98,9 +98,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // lands, late.
     let held = answer(limits)?.max(call(limits)?);
     let calls = Slab::<Call>::worst_case(limits.calls)?.checked_add(times(limits.calls, held)?)?;
-    // A webhook about a push names its branch.
-    let hooks =
-        Slab::<Delivery>::worst_case(limits.hooks)?.checked_add(times(limits.hooks, u64::from(limits.name_bytes))?)?;
+    // A webhook carries a branch name or an item's body.
+    let hooks = Slab::<Delivery>::worst_case(limits.hooks)?
+        .checked_add(times(limits.hooks, u64::from(limits.name_bytes).checked_add(u64::from(limits.body_bytes))?)?)?;
     let windows = Map::<u64, Window>::worst_case(limits.users)?;
     let timers = Deadlines::<Alarm>::worst_case(timers(limits)?)?;
     let observations = Queue::<Observation>::worst_case(limits.observations)?

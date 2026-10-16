@@ -8,8 +8,8 @@
 
 use alloc::boxed::Box;
 
-use skein_lib::Env;
 use skein_lib::bytes::copy_of;
+use skein_lib::{Duration, Env};
 
 use crate::api::{Error, File, Permission, Setup, What};
 use crate::domain::{Config, Domain};
@@ -210,4 +210,12 @@ pub fn set_failing(domain: &mut Domain, repository: &[u8], context: &[u8], faili
     }
     *repository.failing.get_mut(found.expect("a context of the repository's checks")).expect("one entry per context") =
         failing;
+}
+
+/// Starts checking the pull's mergeability for `span` on the forge's clock.
+pub fn check(domain: &mut Domain, env: &Env<Config>, repository: &[u8], number: u64, span: Duration) {
+    let id = *domain.names.get(repository).expect("a scenario repository");
+    let repository = domain.repositories.get_mut(id).expect("a scenario repository");
+    let item = repository.items.get_mut(&number).expect("a scenario item");
+    item.pull.as_mut().expect("a scenario pull").checked = crate::domain::clock(env).saturating_add(span);
 }

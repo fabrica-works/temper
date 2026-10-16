@@ -9,8 +9,7 @@ use skein_lib::bytes::copy_of;
 use skein_lib::{Env, Id, List};
 
 use crate::api::{Answer, Error, Page as PageView, PageName, Permission, What};
-use crate::domain::{self, Config, Domain};
-use crate::hooks::Hook;
+use crate::domain::{Config, Domain};
 use crate::limits::Limits;
 use crate::observe::Observation;
 use crate::store::{Page, Repository, fits};
@@ -42,14 +41,14 @@ pub(crate) fn put(
         return Err(Error::Full);
     }
     repository.revisions = revision;
-    domain::changed(domain, env, id, observation, Hook::wiki(user));
+    domain.observations.push(observation);
     Ok(Answer::Revision(revision))
 }
 
 /// Deletes the page `name`.
 pub(crate) fn delete(
     domain: &mut Domain,
-    env: &Env<Config>,
+    _env: &Env<Config>,
     id: Id<Repository>,
     user: u64,
     name: &[u8],
@@ -68,7 +67,7 @@ pub(crate) fn delete(
         revision,
         by: user,
     };
-    domain::changed(domain, env, id, observation, Hook::wiki(user));
+    domain.observations.push(observation);
     Ok(Answer::Done)
 }
 

@@ -1,18 +1,12 @@
-//! Webhooks: a repository's subscriber hears of each change to it (which
-//! kind; the item it is about; for a push, the branch and where it went; for
-//! a status, the commit), after a drawn latency, late, or not at all, as a
-//! real forge's deliveries go. Each is its own request, so they may arrive in
-//! another order than the changes.
-//!
-//! As on Forgejo, a status reported on a pull request's head is heard as a
-//! status of its commit, not as a change to the pull request.
+//! Best effort webhooks: item bodies, branch moves and job ends, after a
+//! drawn latency, late, or lost. Commit statuses and wiki writes have none.
 
 use alloc::boxed::Box;
 
 use skein_lib::bytes::copy_of;
 use skein_lib::{Env, Id, Queue};
 
-use crate::api::Change;
+use crate::api::{Change, Ended};
 use crate::boundary::Request;
 use crate::domain::{Alarm, Config, Domain};
 use crate::faults;
@@ -26,27 +20,45 @@ pub(crate) struct Hook {
     branch: Option<Box<[u8]>>,
     commit: Option<u64>,
     by: Option<u64>,
+    body: Option<Box<[u8]>>,
+    ended: Option<Ended>,
 }
 
 impl Hook {
     /// A change of `change` to the item `number`.
     pub(crate) fn item(change: Change, number: u64, by: u64) -> Hook {
-        Hook { change, number: Some(number), branch: None, commit: None, by: Some(by) }
+        Hook { change, number: Some(number), branch: None, commit: None, by: Some(by), body: None, ended: None }
     }
 
     /// `branch` moved to `commit`, or was deleted.
     pub(crate) fn push(branch: &[u8], commit: Option<u64>, by: u64) -> Hook {
-        Hook { change: Change::Push, number: None, branch: Some(copy_of(branch)), commit, by: Some(by) }
+        Hook {
+            change: Change::Push,
+            number: None,
+            branch: Some(copy_of(branch)),
+            commit,
+            by: Some(by),
+            body: None,
+            ended: None,
+        }
     }
 
-    /// A status reported on `commit`.
-    pub(crate) fn status(commit: u64, by: u64) -> Hook {
-        Hook { change: Change::Status, number: None, branch: None, commit: Some(commit), by: Some(by) }
+    /// A text-bearing issue, comment or review; a pull carries no body.
+    pub(crate) fn body(change: Change, number: u64, by: u64, body: &[u8]) -> Hook {
+        Hook { body: Some(copy_of(body)), ..Self::item(change, number, by) }
     }
 
-    /// A wiki page written or deleted.
-    pub(crate) fn wiki(by: u64) -> Hook {
-        Hook { change: Change::Wiki, number: None, branch: None, commit: None, by: Some(by) }
+    /// A job ended with its run, commit and verdict.
+    pub(crate) fn job(ended: Ended, by: u64) -> Hook {
+        Hook {
+            change: Change::Job,
+            number: None,
+            branch: None,
+            commit: None,
+            by: Some(by),
+            body: None,
+            ended: Some(ended),
+        }
     }
 }
 
@@ -59,9 +71,14 @@ pub(crate) struct Delivery {
 
 /// Something changed in `repository`: its subscriber, if it has one, hears of
 /// it later, or never.
-pub(crate) fn notify(domain: &mut Domain, env: &Env<Config>, repository: Id<Repository>, hook: Hook) {
+pub(crate) fn notify(domain: &mut Domain, env: &Env<Config>, repository: Id<Repository>, mut hook: Hook) {
     if !domain.repositories.get(repository).expect("a repository of the forge").hooked {
         return;
+    }
+    if hook.change == Change::Issue {
+        let repository = domain.repositories.get(repository).expect("a repository of the forge");
+        let item = repository.items.get(&hook.number.expect("an issue number")).expect("a hooked issue");
+        hook.body = Some(copy_of(&item.body));
     }
     let config = &env.limits;
     if domain.rng.chance(config.hooks_lost) {
@@ -89,7 +106,7 @@ pub(crate) fn notify(domain: &mut Domain, env: &Env<Config>, repository: Id<Repo
 pub(crate) fn deliver(domain: &mut Domain, id: Id<Delivery>, out: &mut Queue<Request>) {
     let delivery = domain.deliveries.get(id).expect("a delivery lives until its timer fires");
     let repository = domain.repositories.get(delivery.repository).expect("a repository of the forge");
-    let Hook { change, number, branch, commit, by } = &delivery.hook;
+    let Hook { change, number, branch, commit, by, body, ended } = &delivery.hook;
     let hook = Request::Hook {
         repository: copy_of(&repository.name),
         change: *change,
@@ -97,6 +114,8 @@ pub(crate) fn deliver(domain: &mut Domain, id: Id<Delivery>, out: &mut Queue<Req
         branch: branch.clone(),
         commit: *commit,
         by: *by,
+        body: body.clone(),
+        ended: *ended,
     };
     out.push(hook);
     domain.deliveries.retire(id);

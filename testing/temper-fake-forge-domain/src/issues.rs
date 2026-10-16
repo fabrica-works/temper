@@ -96,9 +96,10 @@ pub(crate) fn comment(
     repository.comments.insert(comment, number).expect("the index has room for every comment");
     repository.touch(number, domain::clock(env));
     domain.comments = comment;
+    let hook = Hook::body(Change::Comment, number, user, &observed);
     let observation =
         Observation::Commented { repository: copy_of(&repository.name), number, id: comment, body: observed, by: user };
-    domain::changed(domain, env, id, observation, Hook::item(Change::Comment, number, user));
+    domain::changed(domain, env, id, observation, hook);
     Ok(Answer::Commented(comment))
 }
 
@@ -208,9 +209,10 @@ pub(crate) fn edit(
     if env.limits.edit_updates {
         repository.touch(number, domain::clock(env));
     }
+    let hook = Hook::body(Change::Comment, number, user, &observed);
     let observation =
         Observation::Edited { repository: copy_of(&repository.name), number, id: comment, body: observed, by: user };
-    domain::changed(domain, env, id, observation, Hook::item(Change::Comment, number, user));
+    domain::changed(domain, env, id, observation, hook);
     Ok(Answer::Done)
 }
 
@@ -232,13 +234,14 @@ pub(crate) fn remove(
     if author != user && !writer {
         return Err(Error::Forbidden);
     }
+    let hook = Hook::body(Change::Comment, number, user, &item.comments.get(&comment).expect("a comment").body);
     item.comments.remove(&comment);
     repository.comments.remove(&comment);
     if env.limits.edit_updates {
         repository.touch(number, domain::clock(env));
     }
     let observation = Observation::Removed { repository: copy_of(&repository.name), number, id: comment, by: user };
-    domain::changed(domain, env, id, observation, Hook::item(Change::Comment, number, user));
+    domain::changed(domain, env, id, observation, hook);
     Ok(Answer::Done)
 }
 

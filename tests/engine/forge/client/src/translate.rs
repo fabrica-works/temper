@@ -542,3 +542,26 @@ pub fn locate_name(op: &client::Op) -> Option<Box<[u8]>> {
         None
     }
 }
+
+/// Map a fake hook as the component maps a Forgejo delivery (forge.md 5).
+#[must_use]
+pub fn hint(repository: client::Repository, request: &temper_fake_forge_domain::Request) -> Option<client::Hint> {
+    let temper_fake_forge_domain::Request::Hook { change, number, branch, commit: head, by, body, ended, .. } = request
+    else {
+        return None;
+    };
+    let change = match change {
+        forge::Change::Push => match (branch, head, by) {
+            (Some(branch), Some(head), Some(actor)) => {
+                client::Change::BranchMoved { branch: branch.clone(), head: commit(*head), actor: *actor }
+            }
+            (Some(branch), _, _) => client::Change::Branch(branch.clone()),
+            _ => return None,
+        },
+        forge::Change::Job => client::Change::Commit(commit(ended.as_ref()?.commit)),
+        forge::Change::Issue | forge::Change::Pull | forge::Change::Comment | forge::Change::Review => {
+            client::Change::Item((*number)?)
+        }
+    };
+    Some(client::Hint { repository, change, key: body.as_deref().and_then(key_of) })
+}

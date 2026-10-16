@@ -726,12 +726,18 @@ pub enum Change {
     /// A comment posted, edited or deleted.
     Comment,
     Review,
-    /// A status reported on a commit.
-    Status,
+    /// A job ended, passed or failed; never a person's status.
+    Job,
     /// A branch moved, made or deleted.
     Push,
-    /// A wiki page written or deleted.
-    Wiki,
+}
+
+/// A job's end: the run's job, the commit and the verdict.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Ended {
+    pub job: JobRef,
+    pub commit: u64,
+    pub state: Check,
 }
 
 // A scenario: what a world sets the forge up with.

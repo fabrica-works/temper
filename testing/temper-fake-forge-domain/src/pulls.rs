@@ -66,6 +66,7 @@ pub(crate) fn open(
         head,
         base,
         commit,
+        checked: skein_lib::Time::ZERO,
         merged: None,
         requested: Set::with_capacity(limits.users),
         reviews: List::with_capacity(limits.reviews),
@@ -264,6 +265,7 @@ fn shown(domain: &mut Domain, env: &Env<Config>, id: Id<Repository>, number: u64
     let shown = shown.expect("the review shown is kept");
     pull.requested.remove(&shown.author);
     repository.touch(number, domain::clock(env));
+    let hook = Hook::body(Change::Review, number, shown.author, &shown.body);
     let observation = Observation::Reviewed {
         repository: copy_of(&repository.name),
         number,
@@ -273,7 +275,7 @@ fn shown(domain: &mut Domain, env: &Env<Config>, id: Id<Repository>, number: u64
         body: shown.body,
         by: shown.author,
     };
-    domain::changed(domain, env, id, observation, Hook::item(Change::Review, number, shown.author));
+    domain::changed(domain, env, id, observation, hook);
 }
 
 /// Merges the pull request `number` if its head is still `head`.
@@ -333,6 +335,9 @@ pub(crate) fn merge(
     Ok(Answer::Merged(commit))
 }
 
+/// How long a moved pull checks its mergeability.
+pub(crate) const CHECK: skein_lib::Duration = skein_lib::Duration::from_secs(2);
+
 /// The pull request `number` as a read shows it.
 pub(crate) fn view(domain: &Domain, limits: &Limits, repository: &Repository, number: u64) -> Result<Answer, Error> {
     Ok(Answer::Pull(pull(domain, limits, repository, number)?))
@@ -344,12 +349,13 @@ pub(crate) fn pull(domain: &Domain, limits: &Limits, repository: &Repository, nu
         return Err(Error::Missing(What::Pull));
     };
     let base_commit = repository.branches.get(&*pull.base).copied();
-    let mergeable = match base_commit {
-        Some(onto) if item.state == State::Open && !git::is_ancestor(domain, pull.commit, onto) => {
-            merged(domain, limits, pull.commit, onto).is_ok()
-        }
-        Some(_) | None => false,
-    };
+    let mergeable = domain.clock >= pull.checked
+        && match base_commit {
+            Some(onto) if item.state == State::Open && !git::is_ancestor(domain, pull.commit, onto) => {
+                merged(domain, limits, pull.commit, onto).is_ok()
+            }
+            Some(_) | None => false,
+        };
     let mut reviews = List::with_capacity(pull.reviews.len());
     for kept in &pull.reviews {
         if !kept.pending {

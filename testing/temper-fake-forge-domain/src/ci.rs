@@ -17,7 +17,7 @@ use alloc::boxed::Box;
 use skein_lib::bytes::{copy_of, find};
 use skein_lib::{Env, Id, Map};
 
-use crate::api::{Answer, Check, Error, Permission, What};
+use crate::api::{Answer, Check, Ended, Error, Permission, What};
 use crate::domain::{self, Alarm, Config, Domain};
 use crate::faults;
 use crate::hooks::Hook;
@@ -234,6 +234,18 @@ fn reported(
             repository.touch(number, domain::clock(env));
         }
     }
+    let job = crate::actions::reference(repository, commit, &context);
     let observation = Observation::Reported { repository: copy_of(&repository.name), commit, context, state, by };
-    domain::changed(domain, env, id, observation, Hook::status(commit, by));
+    let ended = match state {
+        Check::Passed | Check::Failed => true,
+        Check::Pending => false,
+    };
+    if by == env.limits.ci
+        && ended
+        && let Some(job) = job
+    {
+        domain::changed(domain, env, id, observation, Hook::job(Ended { job, commit, state }, by));
+    } else {
+        domain.observations.push(observation);
+    }
 }

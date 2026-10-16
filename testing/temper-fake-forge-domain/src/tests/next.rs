@@ -29,8 +29,14 @@ fn clean_update_keeps_two_parents_reports_hooks_and_checks_the_new_head() {
     assert_eq!(&**object.tree.get(&b"ci"[..]).unwrap(), b"red");
     h.settle();
     assert_eq!(h.pull(number).statuses[0].state, Check::Failed, "CI belongs to the new head");
-    assert!(h.hooks.iter().any(|hook| hook.0 == Change::Push && hook.3 == Some(pull.commit)));
-    assert!(h.hooks.iter().any(|hook| hook.0 == Change::Pull && hook.1 == Some(number)));
+    assert!(h.hooks.iter().any(|hook| match hook {
+        Request::Hook { change, commit, .. } => *change == Change::Push && *commit == Some(pull.commit),
+        Request::Reply { .. } => false,
+    }));
+    assert!(h.hooks.iter().any(|hook| match hook {
+        Request::Hook { change, number: heard, .. } => *change == Change::Pull && *heard == Some(number),
+        Request::Reply { .. } => false,
+    }));
     let remaining = h.domain.room().commits;
     assert_eq!(h.call(ENGINE, write(Write::Update { number })), Ok(Answer::Done));
     assert_eq!(h.domain.room().commits, remaining, "an already up-to-date update makes no extra commit");

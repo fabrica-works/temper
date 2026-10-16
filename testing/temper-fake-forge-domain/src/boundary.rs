@@ -20,7 +20,7 @@ use alloc::boxed::Box;
 
 use skein_lib::ReplyTo;
 
-use crate::api::{Answer, Change, Error, Op};
+use crate::api::{Answer, Change, Ended, Error, Op};
 
 /// protocol -> domain
 #[derive(PartialEq, Eq, Debug)]
@@ -36,8 +36,8 @@ pub enum Request {
     Reply { to: ReplyTo, result: Result<Answer, Error> },
     /// A webhook to `repository`'s subscriber: something of `change` changed,
     /// about the item `number` if it names one; a push names its `branch`
-    /// and the `commit` it moved to (none if it was deleted), and a status
-    /// its `commit`. No event answers it.
+    /// and the `commit` it moved to (none if it was deleted). A job names
+    /// its end; other items carry their body, except pulls. No event answers it.
     Hook {
         repository: Box<[u8]>,
         change: Change,
@@ -45,5 +45,7 @@ pub enum Request {
         branch: Option<Box<[u8]>>,
         commit: Option<u64>,
         by: Option<u64>,
+        body: Option<Box<[u8]>>,
+        ended: Option<Ended>,
     },
 }

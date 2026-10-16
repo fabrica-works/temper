@@ -10,8 +10,8 @@ use skein_lib::bytes::copy_of;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::api::{
-    Answer, Change, Check, Checks, Comment, Created, Cue, Error, File, Git, Head, Kind, Op, Order, Page, PageName,
-    Permission, Protection, Pull, Pushed, Read, Setup, State, Summary, Verdict, Want, What, Write,
+    Answer, Change, Check, Checks, Comment, Created, Cue, Ended, Error, File, Git, Head, JobRef, Kind, Op, Order, Page,
+    PageName, Permission, Protection, Pull, Pushed, Read, Setup, State, Summary, Verdict, Want, What, Write,
 };
 use crate::{
     Branches, Config, Domain, Event, Limits, MAX_OUT, Observation, Operation, Request, Skew, fire, step, worst_case,
@@ -244,7 +244,7 @@ fn checks(pull: &Pull) -> List<Check> {
 }
 
 /// A webhook: what changed, the item, the branch and the commit it names.
-type Heard = (Change, Option<u64>, Option<Box<[u8]>>, Option<u64>);
+type Heard = Request;
 
 /// The forge, its environment, room for one step's output, and the webhooks
 /// heard so far.
@@ -310,9 +310,7 @@ impl Harness {
                         self.domain.reclaim();
                         return result;
                     }
-                    Request::Hook { repository: _, change, number, branch, commit, by: _ } => {
-                        self.hooks.push((change, number, branch, commit));
-                    }
+                    hook @ Request::Hook { .. } => self.hooks.push(hook),
                 }
                 continue;
             }
@@ -337,9 +335,7 @@ impl Harness {
             fire(&mut self.domain, &self.env, &mut self.out);
             if let Some(request) = self.out.pop() {
                 match request {
-                    Request::Hook { repository: _, change, number, branch, commit, by: _ } => {
-                        self.hooks.push((change, number, branch, commit));
-                    }
+                    hook @ Request::Hook { .. } => self.hooks.push(hook),
                     Request::Reply { to, result: _ } => self.answered.push(to.into_token()),
                 }
             }
@@ -362,9 +358,7 @@ impl Harness {
             fire(&mut self.domain, &self.env, &mut self.out);
             if let Some(request) = self.out.pop() {
                 match request {
-                    Request::Hook { repository: _, change, number, branch, commit, by: _ } => {
-                        self.hooks.push((change, number, branch, commit));
-                    }
+                    hook @ Request::Hook { .. } => self.hooks.push(hook),
                     Request::Reply { to, result: _ } => self.answered.push(to.into_token()),
                 }
             }
@@ -494,7 +488,8 @@ impl Harness {
     /// The webhooks heard so far: what changed, and about which item.
     fn heard(&mut self) -> List<(Change, Option<u64>)> {
         let mut hooks = List::with_capacity(64);
-        while let Some((change, number, _, _)) = self.hooks.pop() {
+        while let Some(hook) = self.hooks.pop() {
+            let Request::Hook { change, number, .. } = hook else { unreachable!("a hook") };
             hooks.push((change, number)).expect("room");
         }
         hooks
@@ -1130,6 +1125,8 @@ fn a_merge_conflicts_where_head_and_base_changed_a_path_differently() {
     h.push(ENGINE, b"work", work).expect("pushed");
     h.open(b"work").expect("opened");
     crate::advance(&mut h.domain, &h.env, REPOSITORY, MAIN, b"src", b"one", MAINTAINER).expect("advanced");
+    h.wait(Duration::from_secs(2));
+    h.ok(PERSON, read(Read::Pull { number: 1 }));
     assert!(h.pull(1).mergeable, "the same change on both sides merges");
     crate::advance(&mut h.domain, &h.env, REPOSITORY, MAIN, b"README", b"theirs", MAINTAINER).expect("advanced");
     assert!(!h.pull(1).mergeable);
@@ -1415,10 +1412,9 @@ fn a_subscriber_hears_of_each_change_by_webhook() {
         ((Change::Issue, Some(1)), 2),
         ((Change::Comment, Some(1)), 2),
         ((Change::Push, None), 1),
-        ((Change::Status, None), 2),
+        ((Change::Job, None), 1),
         ((Change::Pull, Some(2)), 1),
         ((Change::Review, Some(2)), 1),
-        ((Change::Wiki, None), 1),
     ];
     for (hook, times) in expected {
         let mut count: u32 = 0;
@@ -1429,8 +1425,8 @@ fn a_subscriber_hears_of_each_change_by_webhook() {
         }
         assert_eq!(count, times, "each change heard once");
     }
-    assert_eq!(heard.len(), 10);
-    assert_eq!(h.domain.tally().hooks, 10);
+    assert_eq!(heard.len(), 8);
+    assert_eq!(h.domain.tally().hooks, 8);
     let mut setup = setup();
     setup.hooked = false;
     let mut h = Harness::with(CALM, setup);
@@ -1734,73 +1730,14 @@ fn observations_and_webhooks_follow_branches_pull_requests_and_the_wiki() {
     h.ok(ENGINE, delete_branch(b"work"));
     h.ok(ENGINE, put(b"home", b"notes"));
     h.ok(ENGINE, write(Write::DeletePage { name: copy_of(b"home") }));
-    let expected = [
-        Observation::Defined { repository: repository(), label: copy_of(b"later"), by: ENGINE },
-        moved(b"work", None, work),
-        pending(work),
-        Observation::Opened {
-            repository: repository(),
-            number: 1,
-            kind: Kind::Pull,
-            title: copy_of(b"change"),
-            body: copy_of(b"body"),
-            labels: names(&[]),
-            branches: Some(Branches { head: copy_of(b"work"), base: copy_of(MAIN), commit: work }),
-            by: ENGINE,
-        },
-        moved(b"work", Some(work), more),
-        pending(more),
-        Observation::Reviewed {
-            repository: repository(),
-            number: 1,
-            id: 1,
-            commit: more,
-            verdict: Verdict::Approve,
-            body: copy_of(b"looked"),
-            by: MAINTAINER,
-        },
-        Observation::Merged {
-            repository: repository(),
-            number: 1,
-            base: copy_of(MAIN),
-            head: more,
-            commit: merged,
-            by: ENGINE,
-        },
-        moved(MAIN, Some(FIRST), merged),
-        pending(merged),
-        Observation::Deleted { repository: repository(), branch: copy_of(b"work"), at: more, by: ENGINE },
-        Observation::Wiki {
-            repository: repository(),
-            name: copy_of(b"home"),
-            content: Some(copy_of(b"notes")),
-            revision: 1,
-            by: ENGINE,
-        },
-        Observation::Wiki { repository: repository(), name: copy_of(b"home"), content: None, revision: 2, by: ENGINE },
-    ];
-    assert_eq!(h.observations().as_slice(), expected);
-    let number = h.issue(PERSON, b"talk");
-    let id = h.comment(PERSON, number, b"oops");
-    h.ok(PERSON, write(Write::DeleteComment { id }));
-    h.ok(PERSON, write(Write::Close { number }));
-    h.ok(PERSON, write(Write::Reopen { number }));
-    let observed = h.observations();
-    let tail = observed.as_slice().get(2..).expect("the comment and its state");
-    let expected = [
-        Observation::Removed { repository: repository(), number, id, by: PERSON },
-        Observation::Closed { repository: repository(), number, by: PERSON },
-        Observation::Reopened { repository: repository(), number, by: PERSON },
-    ];
-    assert_eq!(tail, expected);
+    assert_eq!(h.observations().as_slice(), hooks::branch_observations(work, more, merged).as_ref());
+    let number = hooks::issue_observations(&mut h);
     h.settle();
     let heard = h.heard();
     for (hook, times) in [
         ((Change::Push, None), 4),
-        ((Change::Status, None), 3),
         ((Change::Pull, Some(1)), 3),
         ((Change::Review, Some(1)), 1),
-        ((Change::Wiki, None), 2),
         ((Change::Issue, Some(number)), 3),
         ((Change::Comment, Some(number)), 2),
     ] {
@@ -1823,13 +1760,8 @@ fn webhooks_name_the_branch_and_commit_a_push_or_status_is_about() {
     h.ok(ENGINE, delete_branch(b"work"));
     h.settle();
     let heard = h.heard_all();
-    let expected = [
-        (Change::Push, None, Some(copy_of(b"work")), Some(work)),
-        (Change::Status, None, None, Some(work)),
-        (Change::Status, None, None, Some(work)),
-        (Change::Push, None, Some(copy_of(b"work")), None),
-    ];
-    assert_eq!(heard.as_slice(), expected);
+    let expected = hooks::pushed_and_ended(work);
+    assert_eq!(heard.as_slice(), expected.as_ref());
 }
 
 #[test]
@@ -2148,3 +2080,5 @@ fn modify_and_delete_or_two_adds_conflict_unless_they_agree() {
     h.push(MAINTAINER, MAIN, gone).expect("the base moves");
     assert_eq!(h.call(ENGINE, merge(1, edited)), Err(Error::Conflict), "delete and modify");
 }
+
+mod hooks;

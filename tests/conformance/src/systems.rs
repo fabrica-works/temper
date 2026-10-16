@@ -206,10 +206,6 @@ impl FakeForge {
             self.send(clock, call, op, Some(key), true);
         }
     }
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one transport poll retains native replies, effects, lost answers and hooks together"
-    )]
     pub fn poll(&mut self, clock: Clock) -> Vec<engine::Event> {
         let env = Env { now: Time::from_nanos(clock.now), wall: Wall::from_nanos(clock.now), limits: self.config };
         if self.domain.is_due(env.now) {
@@ -221,27 +217,8 @@ impl FakeForge {
         }
         let mut events = Vec::new();
         while let Some(request) = self.out.pop_front() {
-            if let fake::Request::Hook { change, number, branch, commit, by, .. } = &request {
-                let change = match change {
-                    raw::Change::Push => branch.as_ref().map(|branch| match (commit, by) {
-                        (Some(commit), Some(actor)) => api::Change::BranchMoved {
-                            branch: branch.clone(),
-                            head: translate::commit(*commit),
-                            actor: *actor,
-                        },
-                        _ => api::Change::Branch(branch.clone()),
-                    }),
-                    raw::Change::Status => commit.map(|commit| api::Change::Commit(translate::commit(commit))),
-                    raw::Change::Issue | raw::Change::Pull | raw::Change::Comment | raw::Change::Review => {
-                        number.map(api::Change::Item)
-                    }
-                    raw::Change::Wiki => None,
-                };
-                if let Some(change) = change {
-                    events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint {
-                        hint: api::Hint { repository: temper_engine_forge_world::REPO, change, key: None },
-                    })));
-                }
+            if let Some(hint) = translate::hint(temper_engine_forge_world::REPO, &request) {
+                events.push(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Hint { hint })));
             }
             if let fake::Request::Reply { to, result } = request {
                 let call = to.into_token();

@@ -85,6 +85,8 @@ pub(crate) struct Pull {
     /// The head commit: where the head branch is, while the pull request is
     /// open and the branch is there.
     pub(crate) commit: u64,
+    /// Forge time until which mergeability is being checked.
+    pub(crate) checked: Time,
     /// The commit its merge made.
     pub(crate) merged: Option<u64>,
     /// The users asked to review it who have not yet.
