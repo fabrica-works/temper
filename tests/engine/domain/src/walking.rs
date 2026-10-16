@@ -12,7 +12,10 @@ use jig_domain_host as host;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::Write as _,
+};
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, JournalLimits, Record, loads};
 
@@ -800,6 +803,7 @@ impl World {
 pub fn run_replayed(settings: Settings) -> World {
     let mut first = World::new(settings);
     let mut replay = World::new(settings);
+    let (mut first_state, mut replay_state) = (String::new(), String::new());
     for _ in 0..600 {
         if first.settled() {
             assert!(replay.settled());
@@ -807,12 +811,11 @@ pub fn run_replayed(settings: Settings) -> World {
         }
         first.iterate();
         replay.iterate();
-        assert_eq!(
-            format!("{first:?}"),
-            format!("{replay:?}"),
-            "complete frozen state at iteration {}",
-            first.iteration
-        );
+        first_state.clear();
+        replay_state.clear();
+        write!(first_state, "{first:?}").expect("write to string");
+        write!(replay_state, "{replay:?}").expect("write to string");
+        assert_eq!(first_state, replay_state, "complete frozen state at iteration {}", first.iteration);
     }
     panic!("walking replay did not settle");
 }

@@ -127,8 +127,12 @@ fn drive(
     mut demand: tokenizer::Request,
     mut event: impl FnMut(&tokenizer::Event) -> Option<tokenizer::Request>,
 ) -> usize {
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.json };
-    let mut tokenizer = tokenizer::Tokenizer::new(&limits.json);
+    // No decoded string can exceed the complete input, including malformed
+    // mutations. Keep the configured bound while reserving only useful room.
+    let mut json = limits.json;
+    json.string = json.string.min(u32::try_from(body.len()).expect("body fits"));
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: json };
+    let mut tokenizer = tokenizer::Tokenizer::new(&json);
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
     let mut intake = Intake::with_capacity(
