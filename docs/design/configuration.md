@@ -352,8 +352,8 @@ top-level `workers`, in the same order; standalone has one. Each:
   | `setup.deadline_ms` | a reconcile's run, its wait for the forge among it |
   | `setup.backoff_ms`, `setup.backoff_max_ms` | reconcile's first request made again, doubling |
   | `box.backoff_ms`, `box.backoff_max_ms` | a long step restarted, doubling |
-  | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up |
-  | `box.grace_ms` | a long step's grace, between its stop's signal and its close |
+  | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up; `box.restarts` at most 64; the backoff counted from the exits within the window (setup.md, 7.2) |
+  | `box.grace_ms` | a long step's grace, after each of its stop's two signals (setup.md, 7.2) |
 - **Limits checked against each other at start,** each failure naming
   both limits:
   - the forge component's: its connections equal the forge client's
@@ -367,6 +367,12 @@ top-level `workers`, in the same order; standalone has one. Each:
   - the setup's and the box's: each backoff at most its maximum;
     `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
     below `box.window_ms`;
+  - the webhooks' listener's: each of its limits above 0;
+    `hook_secret_bytes` at least 32; `hook_head_bytes` at most the HTTP
+    server's head bound; `hooks` within the sockets the profile leaves
+    once the clients' listener and the forge's connections are counted.
+    `small`'s sockets hold a document with both listeners, as the owned
+    example has;
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest
     part the engine can send within what the worker's limits take; the

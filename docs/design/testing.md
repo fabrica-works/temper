@@ -402,24 +402,26 @@ sees.
   can move a branch under a run.
 - **Then a service:** its protocol layer,
   `testing/temper-fake-forge-protocol`, serves Forgejo's API over the
-  domain, the routes temper uses, on skein's HTTP server, from the server
-  side of `temper-forge-forgejo` (forge.md, section 9). The scenario
-  gives it each repository's id, which it answers by, and a table of API
-  tokens and the users they stand for; an unknown token is answered
-  `401`. It keeps Forgejo's quirks (its default order, its page cap, its
-  unpaged threads) and counts the requests it serves, by route, which the
-  engine's cost checks hold to ceilings (forge.md, sections 9 and 10).
-  The domain grows the reads its routes need that it lacks: Actions'
-  runs, as a commit's run by its number, a run by its id and a run's
-  jobs, with its CI's statuses linking their jobs as Forgejo's do
-  (forge.md, section 9). It is a client too: for each of the domain's
-  webhooks (`Request::Hook`) it sends a signed delivery to the engine's
-  webhooks' listener, as Forgejo sends one (forge.md, sections 5 and 9).
-  And it serves the setup's routes, for reconcile's world: admin users,
-  tokens under basic auth, orgs, teams and their members, and org hooks
-  (setup.md, sections 11 and 13.2), its domain growing what they keep;
-  a hook reconcile makes there is the one its deliveries go to.
-  GitHub's API comes after Forgejo's (forge.md, section 11).
+  domain, the routes temper uses, on skein's HTTP server, from the
+  server side of `temper-forge-forgejo` (forge.md, section 9). The
+  scenario gives it each repository's id, which it answers by, and a
+  table of API tokens and the users they stand for; an unknown token
+  is answered `401`. It keeps Forgejo's quirks (its default order, its
+  page cap, its unpaged threads) and counts the requests it serves, by
+  route, which the engine's cost checks hold to ceilings (forge.md,
+  sections 9 and 10). The domain grows the reads its routes need that
+  it lacks: Actions' runs, as a commit's run by its number, a run by
+  its id and a run's jobs, with its CI's statuses linking their jobs
+  as Forgejo's do (forge.md, section 9). For each of the domain's
+  webhooks (`Request::Hook`) it renders a signed delivery, which the
+  world writes on a connection to the engine's webhooks' listener, as
+  Forgejo sends one (forge.md, sections 5 and 9). And it serves the
+  setup's routes, for reconcile's world: admin users and their tokens,
+  orgs, teams and their members, and org hooks (setup.md, sections 11
+  and 13.2), from a store of its protocol layer's beside the routes,
+  not its domain's; a hook reconcile makes there is the one its
+  deliveries go to. GitHub's API comes after Forgejo's (forge.md,
+  section 11).
 - **No git over HTTP.** The fake forge's git is reached through its
   typed transport only: by the fake git program in the one-process world
   (4.3), as by the fake checkout in the domain worlds. Real git meets a

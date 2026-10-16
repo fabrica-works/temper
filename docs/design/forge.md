@@ -78,15 +78,15 @@ skein-io socket
 - **`temper-forge-forgejo`** depends on skein-lib and skein-json. It
   holds Forgejo's documents and nothing of temper's domains: each
   request's method, path, query and JSON body as a sized encoder; each
-  answer's decoder, a small state machine over JSON tokens; error bodies;
-  the deliveries' headers and each payload's decoder, of the fields a
-  hint reads (section 5); and the setup's documents, admin users, tokens
-  under basic auth, orgs, teams and their members, and org hooks, which
-  reconcile sends (setup.md, sections 5 and 11). Both sides live there,
-  the client's for the engine and reconcile and the server's for the fake
-  forge (section 9); for deliveries, the fake forge's encoder and the
-  engine's decoder. So the two are also fed transcripts of the real
-  Forgejo (section 10).
+  answer's decoder, a small state machine over JSON tokens; error
+  bodies; the deliveries' headers and each payload's decoder, of the
+  fields a hint reads (section 5); and the setup's documents, admin
+  users, tokens by the admin's routes, orgs, teams and their members,
+  and org hooks, which reconcile sends (setup.md, sections 5 and 11).
+  Both sides live there, the client's for the engine and reconcile and
+  the server's for the fake forge (section 9); for deliveries, the
+  fake forge's encoder and the engine's decoder. So the two are also
+  fed transcripts of the real Forgejo (section 10).
 - **The forge component,** `temper-engine-protocol-forge`, is a
   child of the engine's protocol layer, beside jig's components, with its
   own limits, worst case, deadlines and most outputs per entry point; the
@@ -638,8 +638,15 @@ alone until skein's TLS server side (setup.md, section 15).
 - **Bounded.** Connections (`hooks`), the head (`hook_head_bytes`) and
   the body (`hook_body_bytes`) are capped, and each request is read
   within `hook_deadline` (section 7). A body whose length passes its cap
-  is answered `413` and hints nothing. Push payloads list commits, which
-  the decoder skips.
+  is answered `413` and hints nothing; a method other than `POST` on a
+  forge's path, `405`; a verified body the decoder finds malformed,
+  `400`, with no hint; a request not read within `hook_deadline` is
+  closed with no answer. Push payloads list commits, which the decoder
+  skips.
+- **A listener that fails** while the engine runs stops the engine, as
+  the clients' listener's does: the service drains as at a shutdown, and
+  whatever starts `temper serve` again (the box, a service manager)
+  starts it with a listener again.
 - **Not sent again.** Forgejo does not resend a failed delivery: one
   lost while `temper serve` is down, refused for its size or its
   signature, or never sent is found by polling. A hint that arrives
@@ -799,7 +806,7 @@ connections, and no answer goes up once the root has stopped.
 
 | State | Holds | Demand | Deadline | On |
 |---|---|---|---|---|
-| Head | the head so far | a scan for the head's end | `hook_deadline` | a `POST` to the path of a forge with a secret, its length within `hook_body_bytes`: Body; its length past it: `413`, Closing; a path of no such forge: `404`, Closing; any other head: answered `4xx`, Closing |
+| Head | the head so far | a scan for the head's end | `hook_deadline` | a `POST` to the path of a forge with a secret, its length within `hook_body_bytes`: Body; its length past it: `413`, Closing; a path of no such forge: `404`, Closing; another method on a forge's path: `405`, Closing; any other head: answered `4xx`, Closing; past the deadline: Closing, with no answer |
 | Body | the HMAC state, the fields decoded | the body, as the decoder demands | `hook_deadline` | read and verified: Answering; the signature missing or wrong: `403`, Closing; a verified body that does not decode: `400`, Closing |
 | Answering | the hint, or none | room | `hook_deadline` | `204` queued: the hint offered up, and held while the root has no room (section 2); then Head (kept alive) or Closing |
 | Closing | nothing | none | io's close deadline | closed |
@@ -867,15 +874,17 @@ side of `temper-forge-forgejo`.
   Forgejo sends them: one `POST` per change to the URL of the
   repository's hook (the scenario's, or the org hook reconcile made),
   with section 5's event, headers and fields, its body signed with the
-  hook's secret, after the latency the fake draws, late, out of order or
-  never; the fake's protocol layer is the client then, on a connection
-  of its own. A status of the fake's CI is delivered as its job's end; a
-  status anyone else reports sends nothing, as on Forgejo.
+  hook's secret, after the latency the fake draws, late, out of order
+  or never: the fake's protocol layer renders the signed request, and
+  the world writes it on a connection to the listener. A status of the
+  fake's CI is delivered as its job's end; a status anyone else
+  reports sends nothing, as on Forgejo.
 - **The setup's routes** (setup.md, sections 11 and 13.2), for
-  reconcile's world: admin users, tokens under basic auth, orgs, teams
-  and their members, and org hooks, from the server side of
-  `temper-forge-forgejo`'s setup documents, the fake's domain growing
-  what they keep.
+  reconcile's world: admin users and their tokens, orgs, teams and their
+  members, and org hooks, from the server side of
+  `temper-forge-forgejo`'s setup documents. What they keep is the fake's
+  protocol layer's, a store beside its routes, not its domain's, whose
+  state is per repository.
 - **No git over HTTP.** The engine's protocol layer never speaks git. In
   the one-process world a run's git is the fake git program
   (`testing/temper-fake-git`, git.md, section 9), over the fake checkout

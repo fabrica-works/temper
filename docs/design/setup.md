@@ -155,24 +155,28 @@ managed or owned.
   1. **The admin.** `GET /api/v1/user` with the admin's token answers a
      site admin, or reconcile stops, naming the forge.
   2. **The bot.** The user of the bot's login, made when absent (`POST
-     /api/v1/admin/users`, with a random password that is never kept),
-     never a site admin, its profile's description carrying the marker
-     `temper:bot`. A user of that login without the marker is refused,
+     /api/v1/admin/users`, with a random password nobody keeps), never a
+     site admin, its full name carrying the marker `temper:bot`, set by
+     the request that makes it, so no run cut short leaves the bot
+     unmarked. A user of that login without the marker is refused,
      naming the login, so a login written wrong never takes over a
      person's account; one that is a site admin is refused too.
   3. **Its two tokens.** Each of `api_token` and `git_token` is kept when
      its file answers `GET /api/v1/user` as the bot. Otherwise it is made
-     again: the bot's password reset to a fresh random one (`PATCH
-     /api/v1/admin/users/{login}`), the token of its name (`temper-api`,
-     `temper-git`) deleted and made again under basic auth with that
-     password (`/api/v1/users/{login}/tokens`), with the scopes of
-     section 4, its file written, the password forgotten.
+     again by the admin's token alone: the bot's token of its name
+     (`temper-api`, `temper-git`) found among its tokens (`GET
+     /api/v1/admin/users/{login}/tokens`) and deleted (`DELETE
+     .../tokens/{token}`), then made again (`POST
+     /api/v1/admin/users/{login}/tokens`) with the scopes of section 4,
+     its file written. Reconcile never uses the bot's password and never
+     signs in as the bot.
   4. **The bot's id,** written to `user` when it differs.
   5. **Each org,** which must exist when managed, and is made, owned by
-     the person, when owned (6.5). In it, a team named the bot's login,
-     with write permission on every repository the org has or will have
-     (`includes_all_repositories`), the units temper uses (code, issues,
-     pull requests and actions), and the bot its member. Adopting any
+     the person and private, when owned (6.5). In it, a team named the
+     bot's login, on every repository the org has or will have
+     (`includes_all_repositories`), with `write` on the units temper uses
+     (`units_map`: code, issues, pull requests and actions), and the bot
+     its member. Adopting any
      repository of the org then finds the bot's write access with no
      admin act at runtime.
   6. **Each org's webhook,** when a webhooks' listener is configured:
@@ -181,7 +185,9 @@ managed or owned.
      reconcile with the secret, the events of forge.md, section 5, JSON
      and active, since Forgejo never shows a hook's secret. The secret is
      drawn into `webhook_secret` when that file is missing, and kept
-     otherwise. Another hook of the org is left alone.
+     otherwise. Of several hooks with that URL, the lowest id is patched
+     and the others deleted, since each would deliver every change
+     again. A hook of another URL is left alone.
 - **From Forgejo, every time.** Reconcile keeps no record of its own: the
   forge is its record. A second run with nothing changed writes only the
   hooks' patches. A bot deleted, a token revoked, a hook deleted or a
@@ -255,8 +261,10 @@ by `state`:
 1. **The first preparation:** the layout of section 3; `app.ini`;
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
    admin with a password Forgejo draws and nobody keeps, and its token
-   made by `admin user generate-access-token` into `admin_token`, under
-   a name that ends in a random suffix, since Forgejo refuses a second
+   made by `admin user generate-access-token` into `admin_token`, with
+   the scopes `write:admin`, `write:organization` and `write:user` (the
+   least that reconcile's routes take, 13.3), under a name that ends in
+   a random suffix, since Forgejo refuses a second
    token of one name; the
    person's account, a site admin with a password Forgejo draws into
    `person_password`, to change at their first sign-in; the runner's
@@ -280,9 +288,13 @@ by `state`:
    nothing else. It takes Forgejo's lock alone, so a box restarts a
    Forgejo, after its preparation, while the runner runs.
 3. **An upgrade:** a recorded Forgejo older than the pin is dumped
-   (`forgejo dump`) into `backups/`, named by both versions, then
-   migrated, then recorded. A recorded version newer than the pin
-   refuses: Forgejo's migrations only go forward.
+   (`forgejo dump`) into `backups/forgejo-<old>-to-<new>.zip`, written as
+   `.partial` and renamed, never overwritten (a dump already there is
+   not made again), then migrated, then recorded. A recorded runner
+   older than its pin has its files prepared again, under the runner's
+   lock too, with no dump, since the runner keeps no data. A recorded
+   version newer than its pin, Forgejo's or the runner's, refuses:
+   Forgejo's migrations only go forward.
 
 - **Forgejo's command line only,** on the work path, never its web: under
   the lock no Forgejo runs, so nothing writes its database beside the
@@ -370,15 +382,22 @@ temper box CONFIG.json
   reconciles, so a token revoked under a running engine, which stops it
   (credentials.md, section 5), is made again before the engine starts.
 - **Gives up,** exit 1, naming the step, when a once step fails or a long
-  one exits more than `box.restarts` times within `box.window_ms`.
+  one exits more than `box.restarts` times within `box.window_ms`. The
+  backoff is counted from a step's exits within the window, so it starts
+  again from `box.backoff_ms` once a step has run a window without
+  exiting.
 - **Stops** at a first termination signal: the long steps in reverse
-  order, each by a signal, `box.grace_ms`, then, for `temper serve`, a
-  second signal, which turns its drain into an abort (protocol.md,
-  section 4), then a close. A second termination signal closes them all.
-  It exits 0 after a stop it was asked for.
+  order, each by a signal, `box.grace_ms`, a second signal, which turns
+  `temper serve`'s drain into an abort (protocol.md, section 4),
+  `box.grace_ms` again, then a close. The machine knows a step only as
+  once or long, so every long step is sent both. A second termination
+  signal closes them all. It exits 0 after a stop it was asked for.
 - **Its streams:** `temper serve`'s stdout, the sign-in links, is the
-  box's stdout; each step's stderr is the box's, each line prefixed by
-  the step's name. Forgejo logs to its own files.
+  box's stdout, as is. Every other line a step writes, to its stdout or
+  its stderr, goes to the box's stderr prefixed `<step>: `; the box's own
+  lines are prefixed `box: `, such as `box: <step> gave up after <n>
+  restarts`. Each step gets the box's environment; `temper forge run`
+  clears it for Forgejo (6.4). Forgejo logs to its own files.
 - **Its children** are skein-io's (skein's `io.md`, section 6), each in a
   process group of its own; closing one kills its group, so nothing the
   box started outlives its stop.
@@ -481,7 +500,7 @@ Each needs nothing below the commands to change:
 | Credential | Mode | Made by | Kept | Read by |
 |---|---|---|---|---|
 | a site admin's token | managed; owned | the person; the preparation, by Forgejo's command line | a private file | `temper forge reconcile` alone |
-| the bot's password | managed, owned | reconcile, random, at each token it makes | nowhere | the requests that make that token |
+| the bot's password | managed, owned | reconcile, random, when it makes the bot | nowhere | nothing |
 | temper's admin's password | owned | Forgejo, random | nowhere | nothing |
 | the person's first password | owned | Forgejo, random, at the first preparation | `person_password` | the person |
 | the runner's secret | owned | the preparation | `runner/secret` | Forgejo's command line; the runner's connection, through the token's file it names |
@@ -543,7 +562,7 @@ engine on a box, and that they cover what its work waits on.
 ## 11. The crates
 
 ```
-temper-forge-forgejo         + the setup's documents: admin users, tokens under basic auth, orgs, teams
+temper-forge-forgejo         + the setup's documents: admin users and their tokens, orgs, teams
 │                              and their members, org hooks; both sides, as its others; the pins
 temper-forge-setup           step code: the setup's types and checks; reconcile's machine; the
 │                              preparation's machine; app.ini and the runner's files; the processes'
@@ -555,7 +574,8 @@ temper-forge-setup-shell     ordinary Rust: the hosts of prepare, run and reconc
 ├── temper-forge-setup
 └── skein-io, skein-http, skein-tls, skein-shell
 temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
-│                              processes; nothing of setup but its steps (7.3)
+│                              processes; nothing of setup but its steps (7.3); one crate, under the
+│                              subset's lints, its host written within the subset
 ├── temper-forge-setup
 └── skein-lib, skein-io, skein-shell
 temper                       the binary: temper forge prepare|run|reconcile, temper box
@@ -622,7 +642,8 @@ On the fake forge's protocol layer, serving the setup's routes:
 - an empty forge converged; a second run writing only the hooks'
   patches;
 - a deleted bot, a revoked token, a removed team member, a deleted hook,
-  each made again;
+  each made again; two hooks with the listener's URL, the lowest id
+  patched and the other deleted;
 - a missing org refused when managed, made when owned;
 - a person's account under the bot's login refused;
 - no secret in a failure's message or a log line.
@@ -647,12 +668,14 @@ before a machine relies on each:
   follow from the secret that `forgejo-cli actions register` registered,
   and that the runner started on that configuration alone takes the
   throwaway instance's jobs.
-- **The admin routes:** making a user, resetting its password (the
-  members `PATCH /admin/users/{login}` requires), its description; making
-  a token under basic auth, and deleting one by name; the scopes each
-  route of forge.md, section 3.2 needs.
-- **Orgs and teams:** making an org for a user, a team with
-  `includes_all_repositories` and its units, a member; that a repository
+- **The admin routes:** making a user with its full name; listing,
+  making and deleting a user's tokens by the admin's token (`/admin/users/
+  {login}/tokens`); the least scopes the admin's token needs for
+  reconcile's routes; the scopes each route of forge.md, section 3.2
+  needs; that Forgejo refuses a second token of one name.
+- **Orgs and teams:** making a private org for a user, a team with
+  `includes_all_repositories` and `units_map` of `write` on code, issues,
+  pull requests and actions, a member; that a repository
   made later in the org is writable by the team's members.
 - **Org hooks:** making one with its events, its secret never shown, and
   its patch; that `ALLOWED_HOST_LIST` refuses loopback by default and
