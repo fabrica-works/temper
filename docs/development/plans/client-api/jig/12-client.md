@@ -600,11 +600,16 @@ gains `jig-client`, and `"jig-client"` joins the allow list of
 carries an unlinked client's `Down` and `Up` through its translation to the
 real core, `tests/client/src/joint/transport.rs`), `tests/client/tests/`
 (the joint story below).
-Shape: `Client::unlinked`, `Event::Up { up }`, `Request::Down { down }`.
-Under `unlinked`, `Event::{Reply, Lost, Streamed, StreamGone}` are
-dropped, and under `new`, `Event::Up` is; each is a fact the client's
-host made a mistake of, and `assert!`s it (`debug_assert!` is banned
-in step crates, `clippy.toml:87`).
+Shape: `Client::unlinked`, `Event::Up { up }`, `Request::Down { down }`,
+and `Event::StartUnlinked { kept: List<RequestRecord<Held>> }` (ruling
+187): the unlinked host's start, before any other event, as `Start` is
+the linked host's; the client gives the domain `Event::Start { kept }`
+as the host gave it; its records leave in `Down::{Save, Erase}`, as
+on main.
+Under `unlinked`, `Event::{Start, Reply, Lost, Streamed, StreamGone}`
+are dropped, and under `new`, `Event::{StartUnlinked, Up}` are; each is
+a fact the client's host made a mistake of, and `assert!`s it
+(`debug_assert!` is banned in step crates, `clippy.toml:87`).
 Test shape: `crates/jig-client/src/tests/unlinked.rs`: tests
 `an_unlinked_client_gives_its_watch_as_the_domain_s_opening`,
 `an_unlinked_client_takes_an_answer_as_the_domain_s`,
@@ -619,7 +624,7 @@ once; it passes when the unlinked client's link goes live with party 1;
 nothing else is wanted. jig 13.4's test root then runs the client's
 world on it (`signing_in_and_starting_a_chat`, tests/client).
 Don't: no typed path in any shell; no `Down` or `Up` under `new`.
-Size: at most 100 lines.
+Size: at most 110 lines (ruling 187).
 Removes: nothing.
 
 ## Interface sketches
