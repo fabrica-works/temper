@@ -189,6 +189,31 @@ run are appended after "For the user".
        symptom is a question). If both facts of the pair still fail then, block with session 04's question 2.
      - Unchanged: 04.1 lands only with `holds webhook-deliveries` and 04's "Done when" counts.
 
+104. **04.1's cancelled job end, by the API's cancel** (designer's answer, temper 04's block of 2026-10-16T22:13:42Z).
+     Ruling 104: the designer's answer, landed in temper fbe1ceaed, replaces ruling 103's interim on question 1:
+
+     temper 04.1, the cancelled job's delivery: **record it through the API, with no web driver.** Landed in temper
+     fbe1ceaed (forge.md 5 and 13; plans/forge-setup/temper/04-deliveries.md).
+
+     The premise that no API route cancels a run does not hold. Forgejo v17's API description
+     (`tmp/forgejo-17-swagger.json:6556`, `CancelActionRun`) says: `POST /repos/{owner}/{repo}/actions/runs/{run_id}/cancel`,
+     "Pending or running jobs of the run are cancelled. A run that has already finished ... is left unchanged. In both cases
+     the endpoint responds with HTTP 204." forge.md 13 now lists it: "A run is cancelled, its waiting and running jobs with
+     it, by `POST actions/runs/{run_id}/cancel`: `204`, ...; temper never cancels one."
+
+     - **04.1, step 10:** `deliveries.yaml` gains job `held`, `runs-on: temper-held`, which no runner serves; once
+       `workflow_job_success`, `_failure` and `_skipped` are had, O cancels the run (`POST R/actions/runs/{job.run_id}/cancel`,
+       `204`): `workflow_job_cancelled` (`held`).
+     - **Facts, 22:** `job-ends-row` leaves the cancelled end aside; a new fact, `cancelled-job-end-is-delivered` (may fail),
+       checks it as `job-ends-row` checks the others. "Done when" counts 22, and lets that fact fail.
+     - **04.2:** `SUBSCRIBED` unchanged. `every_subscribed_event_has_a_recorded_delivery_the_decoder_knows` names
+       `workflow_job_cancelled` as the one unrecorded event only while `delivery-cancelled-job-end-is-delivered` fails.
+     - **If the cancel delivers nothing,** forge.md 5 now rules: "An event the tool records no delivery of stays as the
+       sources name it, its fields those of the events whose payload it shares, and the tool names it unrecorded: a hint only
+       brings a read sooner (`domain/forge.md`, 5.2), so a row that is wrong costs a poll's wait."
+     - forge.md 13's to-check list gains "a job's cancelled end, from cancelling the run of a job no runner takes".
+     - 05 (the component's hint for a job's end) is unchanged. Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
