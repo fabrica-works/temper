@@ -766,6 +766,20 @@ choice would have been the user's (development.md, 10.4).
         testing.md is unchanged.
      5. **Deferred:** jig's other point loads (`HistoricalProposal`, `HistoricalEscalation`, `HistoricalPersonTask`, `PartyInputs`) still go out `Now`, against engine.md 4.2. They have a `later.md` row, for a jig plan after this one, and jig's `STATUS.md` engine.md row lists them as not planned. jig is upstream of the plan, so no downstream `STATUS.md` needs a row.
 
+167. **The run's steers' Pass on texts in the README, out of context.md** (process, the coordinator's block of 2026-10-16T19:39:21Z).
+     Every steer's Pass on text leaves context.md. In their place context.md keeps one line: "Steers' Pass on texts: in the plan's README, its rules and 'The run's steers'; each session reads them there." development.md 7.5 has context.md hold "decisions in force from answers and steers that the plan does not yet say"; after this ruling the plan says each text.
+
+     1. Their Until has come, and nothing takes their place:
+        - 15:06Z (ruling 142, temper 03.1's process test): temper-03.1 landed `72e17bdab`.
+        - 17:52Z point 3 (jig 04.4's clippy rounds): jig-04.4 landed `5fc5d31f9`.
+        - 14:09Z point 1's sentences for jig 05 (the five renames): jig 05's five steps have landed.
+     2. The README says them already, under these rules: 10:08Z point 1 and 15:30Z point 3, "Named numbers in tests"; 12:48Z point 1, "Generated code"; 15:30Z point 1, "One land at a time in each repository"; 15:30Z point 2, "A test's helpers once"; 16:41Z point 2, "Every crate's lints in one round"; 17:17Z, "Pins", "temper's skein ahead".
+     3. The rest land now in the README's new rule "The run's steers", each as its steer gave it, with the sessions it applies to: 09:29Z points 1 to 3, 10:08Z point 2, 12:48Z point 2, 14:09Z point 1 without its jig 05 sentences, 16:41Z point 1, 17:52Z point 2, 18:42Z points 1 and 2, and 19:38Z points 1 and 2. Left out of them: the sentences of past counts ("In the first hour, …", "Since 15:55Z, …"), and 12:48Z point 2's "A commit you have already made lands as it is", which named the commits made by 12:48Z. 09:29Z point 2 now cites `domain.rs:166` (the test's line on main, not :169); 18:42Z point 2 says "Three were missing at jig `bb977c909`"; 19:38Z point 2 adds that `person_unchanged` and `fixtures::unchanged` come from jig 04.5.
+     4. The coordinator gives none of these texts again in a session's prompt: the README's first rule has every session read "this README". A running session has them from the coordinator's messages already.
+     5. The 19:38:33Z steer's points 1 and 2 are done: their texts reached the five jig sessions, and they are in the README now.
+     6. From now until the run's end, a steer's Pass on text that holds until the run's end lands in "The run's steers" before the steer is sent, and context.md names only its steer's time and point. A Pass on text with an earlier Until stays in context.md, as before.
+     7. Unchanged: each steer's Do, Stop and Until; the README's other rules; context.md's limit of 60 lines of at most 200 characters.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

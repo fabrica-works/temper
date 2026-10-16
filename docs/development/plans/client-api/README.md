@@ -516,6 +516,118 @@ per session are in each file.
 - **Files over 800 lines at the base** that an increment changes grow
   by at most 40 lines each, a rule with its count in code-organization.md
   7; their splits are `later.md`'s.
+- **The run's steers** (ruling 167, the coordinator's block of
+  2026-10-16T19:39:21Z): each "Pass on" text of the run's steers that
+  holds until the run's end and that no rule above says, as the steer gave
+  it, under the steer's time and point and the sessions it applies to.
+  They bind as this README's other rules do. The coordinator gives none of
+  them again in a prompt: each session reads them here. A later steer's
+  text that holds until the run's end lands here, by the supervisor,
+  before the steer is sent.
+  - 09:29Z, point 1 (every session): After adding a variant or a field,
+    find every match and literal of the type with `git grep -n '<Type>' --
+    crates testing tests examples`, and edit them all. Then build once
+    with `heavy cargo check --workspace --all-targets --keep-going
+    --message-format short`, which shows every crate's errors in one
+    round. Run scoped clippy only after it passes.
+  - 09:29Z, point 2 (jig 02 to 09, and 16):
+    `memory_below_the_components_sum_is_refused`
+    (`crates/jig-protocol-config/src/tests/domain.rs:166`) pins the small
+    profile's memory sum, which moves with every stored record's worst
+    case. If your Shape changes a record's or a component's size, run
+    `heavy cargo nextest run -p jig-protocol-config -E
+    'test(memory_below_the_components_sum_is_refused)'` before land, and
+    set `over` to the value it prints. Name the old and new values in your
+    report. If another session landed it first, rebase and set it again
+    from your own run.
+  - 09:29Z, point 3 (every session): Before `land`, run once in the build
+    lane the focused tests of each crate your diff changes (`git diff
+    --name-only origin/main...HEAD`): `heavy cargo nextest run
+    --no-fail-fast -p <crate> -p <crate> …`. Land only when it passes.
+    Never `--workspace` or the fuzzy profile: those stay in land's gate.
+    After a gate fails on a test, run that test alone before landing
+    again.
+  - 10:08Z, point 2 (jig 03 to 09, and 16):
+    `both_jig_profiles_have_a_bounded_service`
+    (`testing/jig-test-service/src/tests.rs:22-24`) pins the small and
+    standard profiles' store bounds, which move with every stored record's
+    worst case (ruling 112). If your Shape grows a record's or a
+    component's worst case, rebase on `origin/main`, then before land run
+    `heavy cargo nextest run -p jig-test-service -E
+    'test(both_jig_profiles_have_a_bounded_service)'` with the memory-sum
+    test. Raise the bounds (`value`, commit, snapshot) in
+    `crates/jig-protocol-config/src/profile/{small,standard}.rs` to what
+    it prints, and set both tuples to match. Name each old and new value
+    in your report and commit body. A bound that would fall is a question.
+  - 12:48Z, point 2 (every session): Add no new
+    `#[expect(clippy::too_many_arguments)]`. When clippy finds too many
+    arguments on a function you add or widen, pass the arguments that
+    travel together as one struct of plain fields, named for what they
+    are. Example: `ask(domain, env, number, by, until, message, words,
+    reason, out)` becomes `ask(domain, env, Finish { number, by, until,
+    message }, words, reason, out)`, with `pub(crate) struct Finish { pub
+    number: u64, pub by: Party, pub until: Wall, pub message: u64 }`. A
+    function excused at the base keeps its exception. Each report names
+    any lint exception its increment adds.
+  - 14:09Z, point 1 (every session): The plan forbids `legacy`, `compat`,
+    `hack`, `workaround`, `actual` and `genuine` in code, tests included
+    (code-organization.md, 6; the README's Pulse). Name a value for what
+    it holds, not as the other side of `expected`: `let answer =
+    lines(…).map(|_| ()); assert_eq!(answer, expected, …);`, `let mut
+    paged = Vec::new();`. Not `observed` or `got`: a synonym is the same
+    word. Leave base code and base test names as they are.
+  - 16:41Z, point 1 (jig): When your validation has passed on a rebase,
+    run `flock
+    /srv/data/git/runner/src/tmp/temper/client-api/land-jig.lock land …`
+    at once. If main has moved since, rebase, run only `heavy cargo
+    nextest run -p jig-protocol-config -p jig-test-service -E
+    'test(memory_below_the_components_sum_is_refused) |
+    test(both_jig_profiles_have_a_bounded_service)'`, set the values it
+    prints, and land: land's prebuild and gate check the rest. Run clippy
+    and your focused tests again only after a rebase that conflicted in a
+    file you changed, or after a gate that failed on something else.
+  - 17:52Z, point 2 (every session): In a new test, build a
+    `tasks::Amendment` that changes one field from your crate's fixtures
+    with struct update, never by writing its unchanged fields as `None`.
+    In jig's core world, the first of you to need it adds `pub fn
+    unchanged(reason: &[u8]) -> tasks::Amendment` (every change `None`,
+    the reason given) to `tests/core/src/fixtures.rs`, and writes
+    `tasks::Amendment { spec: Some(…), ..fixtures::unchanged(b"changed")
+    }`. Report each new test past 40 lines, with its length. Do not change
+    base tests for this.
+  - 18:42Z, point 1 (every session): A case table runs one behaviour over
+    several inputs. When a case needs its own setup (a `bool` or a tag
+    that picks it), each case is its own test with its own name, and the
+    shared decision and expected result go in a helper that takes the
+    cause (`assert_refused_whole(&mut world, cause)`), not in a loop with
+    `if pending { … } else { … }`.
+  - 18:42Z, point 2 (every session): Before a new test builds a value,
+    search the crate's fixtures for what it builds (README, "A test's
+    helpers once"). Three were missing at jig `bb977c909`. A pending
+    `tasks::Proposal`: add `pending_proposal(world, number)` to
+    `tests/tasks/src/world.rs`, moving 07.3's `proposal` from
+    `tests/tasks/tests/procedures.rs`. A words-only `Spec`: add
+    `spec(words)` beside `amendment()` in
+    `crates/jig-domain-tasks/src/tests/revisions.rs`. A commit's saved
+    live row: add `saved_live(commit, task)` to
+    `tests/core/src/fixtures.rs`. The first of you whose new test needs
+    one adds it, `pub`, and uses it; the rest take it.
+  - 19:38Z, point 1 (jig): Before a new test in tests/core defines a
+    helper, search the crate for the call it makes (`git grep -n
+    'End::Finished'`, `git grep -n 'Outcome::Refused('`). Two exist twice
+    now: `finish_chat(world, cumulative, words)` (in
+    `tests/core/tests/store.rs`, copied as `finish` in `parties.rs`) and
+    `refusal(world, why)` (in `parties.rs`). The first of you who needs
+    either moves it, `pub`, to `tests/core/src/fixtures.rs` and uses it
+    from there; the rest take it from the fixtures.
+  - 19:38Z, point 2 (jig): A commit that must edit a `tasks::Amendment` or
+    `people::Amendment` literal in a test (a field added, a type moved)
+    rebuilds the literal with struct update from your crate's fixture
+    (`..person_unchanged(b"reason")` in jig's core world,
+    `..fixtures::unchanged(b"reason")` in `jig-domain-core`'s tests; both
+    from jig 04.5), rather than adding the field by hand. Do this only for
+    the literals your commit edits anyway; a literal that maps every field
+    from another value keeps its fields.
 
 ## Prerequisites the run checks at its start
 
