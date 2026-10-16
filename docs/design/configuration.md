@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-15. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-16. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 with jig's parts as jig defines them and temper's own members beside
 them; the private files it names; the agent's configuration; what
@@ -383,9 +383,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   - `DIRECTORY` is the client's private directory, made 0o700 if absent,
     and refused unless it is a directory of the user's with no group or
     other permission bits (skein's `io.md`, 5.3). It holds the bearer
-    token, the terminal's file, and the small store,
-    `jig-client-shell-native`'s file (jig's `protocol/client.md`,
-    sections 8 and 10; client.md, section 7).
+    token and the small store, `jig-client-shell-native`'s files (jig's
+    `protocol/client.md`, sections 8, 10 and 12; client.md, section
+    7).
   - `LINK_OR_ADDRESS` is the link `temper serve` printed, the first
     time, by which the client signs in (jig's `protocol/client.md`,
     section 8; client.md, section 7); or the clients' listener's

@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-15. temper's client: temper's
+Provisional, 2026-10-14, revised 2026-10-16. temper's client: temper's
 own presentation on jig's client, `jig-client`. Its crates; its client
 root, which holds `jig-client` and temper's pages, after its mockups
 (`web/mockups/`); the forge's client family, its words and its one form;
@@ -56,9 +56,10 @@ section 11.
   transport (section 6).
 - **Signed in by jig's printed link,** on loopback, and kept signed in
   across restarts by its bearer credential, which `jig-client` holds and
-  the terminal keeps in the client's private directory, giving it back
-  as held (section 7). The forge as people's sign-in provider
-  is later, on temper's own routes (section 11).
+  the terminal keeps in the client's private directory, through
+  `jig-client-shell-native`, giving it back as held (section 7). The
+  forge as people's sign-in provider is later, on temper's own routes
+  (section 11).
 - **temper's server owns the clients' listener.** `temper-service` owns
   it, and mounts jig's clients' component on it with jig's default HTTP
   mapping, under `/jig`, with its example guards (section 8).
@@ -84,7 +85,7 @@ jig-protocol-transcript         turns decoded with smith's transcript crate, und
 the shell
 temper-client-shell-terminal    the terminal: temper's host, its settings and lines (section 6)
 ├── skein-ui-text               skein's text shell: the renderer, the command reader, the terminal
-└── jig-client-shell-native     jig's native transport: skein's HTTP client with jig-client-protocol-http; the small store's file
+└── jig-client-shell-native     jig's native transport: skein's HTTP client with jig-client-protocol-http; the small store's file and the credential's
 temper                          the binary; `temper open` runs the terminal (protocol.md, section 4)
 
 for tests
@@ -107,9 +108,10 @@ temper-client-world             tests/client: temper's client joined to temper's
 - **`temper-client-shell-terminal`** holds, as modules:
   - `host`: one host of skein's loop composing temper's client root,
     its view, `jig-client-shell-native`'s transport and skein's text
-    shell's terminal (6.2), and keeping the credential's file
-    (section 7). Ordinary Rust. The worlds put skein's fake
-    person where `temper open` puts the terminal (section 10);
+    shell's terminal (6.2), and saying when `jig-client-shell-native`
+    keeps the credential's file (section 7). Ordinary Rust. The worlds
+    put skein's fake person where `temper open` puts the terminal
+    (section 10);
   - `terminal`: the text shell's settings and temper's own lines (6.2,
     6.6, 6.7);
   - `limits`: the client's limits and their sum.
@@ -582,16 +584,16 @@ the forge's work is never refused as too large.
   component to `jig-client-shell-native`, whose files make it `0o700` if
   it is absent and refuse it unless it is a directory of this user's
   with no group or other bits (skein's `io.md`, 5.3). It holds the
-  bearer credential's file, the terminal's, and the small store's, the
-  native shell's (section 7).
+  bearer credential's file and the small store's, both the native
+  shell's (section 7).
 - **LINK_OR_ADDRESS** is one of:
   - the link `temper serve` printed,
     `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`: the client
     signs in by it first (section 7);
   - the engine's address, its clients' listener's `http://HOST:PORT`,
     with or without a final `/`: the client signs in with the credential
-    DIRECTORY holds. Before its loop, the terminal reads
-    `DIRECTORY/token` once with skein-shell's `read_private_file`, and
+    DIRECTORY holds. Before its loop, `jig-client-shell-native` reads
+    `DIRECTORY/token` once, as it loads the small store, and the host
     gives it to `jig-client` as held (section 7).
 
   HOST is an IP address, and must be on loopback (in `127.0.0.0/8`, or
@@ -675,11 +677,12 @@ command.
   the tree, so the page is printed again.
 - **Signing out** is the banner's "Sign out". The domain gives
   `jig-client` `SignOut`, which sends jig's sign-out. Signed out: the
-  terminal erases DIRECTORY's token, the main says "Signed out.", and
-  temper prints `temper: signed out; to sign in again, run temper open
-  DIRECTORY LINK with a link temper serve printed`. A sign-out that did
-  not reach the engine leaves the person signed in; the banner says so
-  and offers it again (jig's `client/domain/client.md`, section 12).
+  host has the native shell keep none, which erases DIRECTORY's token;
+  the main says "Signed out.", and temper prints `temper: signed out;
+  to sign in again, run temper open DIRECTORY LINK with a link temper
+  serve printed`. A sign-out that did not reach the engine leaves the
+  person signed in; the banner says so and offers it again (jig's
+  `client/domain/client.md`, section 12).
 - **Another party's kept work:** while the small store holds requests
   of a party other than the one `me` confirms, temper prints `temper:
   work of another party is kept in DIRECTORY, and waits for them` once.
@@ -737,13 +740,16 @@ step code; golden text fixes how temper's pages print (section 10).
   transport needs it in hand (jig's `client/domain/client.md`, section
   12), and gives it with every exchange and the stream, which
   `jig-client-shell-native` sends as `Authorization: Bearer`.
-- **The terminal keeps it across restarts.** Once signed in by a link,
-  the host reads the credential from `jig-client`'s `link()`, through
-  the client root, and writes it whole into `DIRECTORY/token` with
-  skein's io. A later `temper open DIRECTORY ADDRESS` reads it before
-  its loop (6.1) and gives it back as held (`SignIn { with:
-  Held(credential) }`). `jig-client-shell-native` keeps no credential
-  of its own.
+- **The terminal keeps it across restarts,** through
+  `jig-client-shell-native`'s keep: the native shell writes the file
+  where the host says, and the host says when. Once signed in by a
+  link, the host reads the credential from `jig-client`'s `link()`,
+  through the client root, and gives it to the native shell to keep,
+  which writes it whole into `DIRECTORY/token`, before anything is told
+  of the sign-in. A later `temper open DIRECTORY ADDRESS` has the native
+  shell read it before its loop (6.1), and the host gives it back as
+  held (`SignIn { with: Held(credential) }`). Neither temper's root nor
+  its view keeps it.
 - **The link's secret** is in the command line only until the sign-in
   spends it: it is single-use and short-lived (jig's
   `protocol/client.md`, section 8). The client root passes it on and
@@ -751,8 +757,8 @@ step code; golden text fixes how temper's pages print (section 10).
 - **The bearer token,** the sign-in's number beside 32 random bytes, is
   `DIRECTORY/token`, a private file (`0o600`). It is never printed and
   never an argument; `jig-client` holds it as a secret, never in its
-  small store. A new sign-in by a link writes it anew; the terminal
-  erases it when the client is signed out.
+  small store. A new sign-in by a link has it written anew; signed out,
+  the host has the native shell keep none, which erases it.
 - **The small store** is `DIRECTORY/store`, a private file that
   `jig-client-shell-native` writes whole and syncs before any request of
   the same step leaves (jig's `protocol/client.md`, section 10). It
