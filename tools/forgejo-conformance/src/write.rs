@@ -6,7 +6,7 @@ pub enum SecretKind {
     Password,
     ApiToken,
     GitHeader,
-    RegistrationToken,
+    RunnerSecret,
 }
 pub struct Secrets(Vec<(SecretKind, String)>);
 impl Secrets {

@@ -136,3 +136,33 @@ fn a_raw_token_is_forty_lowercase_digits_and_a_line_feed() {
         assert_eq!(crate::cli::raw_token(text), expected, "{text:?}");
     }
 }
+
+#[test]
+fn the_runner_configuration_names_one_connection_by_its_token_file() {
+    let text = crate::registration::configuration(
+        "http://127.0.0.1:3000",
+        "30313233-3435-3637-3839-616263646566",
+        std::path::Path::new("/scratch/runner/secret"),
+        std::path::Path::new("/scratch/runner/jobs"),
+    );
+    assert_eq!(
+        text,
+        "log:\n  level: info\nrunner:\n  capacity: 1\n  timeout: 1m\n  shutdown_timeout: 1s\n  fetch_interval: 100ms\n  report_interval: 100ms\ncache:\n  enabled: false\nhost:\n  workdir_parent: /scratch/runner/jobs\nserver:\n  connections:\n    forgejo:\n      url: http://127.0.0.1:3000/\n      uuid: 30313233-3435-3637-3839-616263646566\n      token_url: file:/scratch/runner/secret\n      labels:\n        - temper-host:host\n"
+    );
+}
+#[test]
+fn a_listed_runner_is_found_by_its_uuid() {
+    let body: serde_json::Value = serde_json::from_str(&r#"[{"id":1,"uuid":"30313233-3435-3637-3839-616263646566","owner_id":0,"repo_id":0,"name":"r1","status":"idle","version":"v@","labels":["temper-host"],"description":"","ephemeral":false}]"#.replace('@', temper_throwaway_forgejo::RUNNER_VERSION)).expect("row");
+    let row = crate::registration::listed(&body, "30313233-3435-3637-3839-616263646566").expect("found");
+    assert_eq!(row["name"], "r1");
+    assert_eq!(crate::registration::listed(&body, "absent"), None);
+}
+#[test]
+fn the_clone_workflow_runs_steps_only_and_names_the_jobs_token() {
+    let workflow = crate::job_clone::workflow();
+    assert!(!workflow.contains("uses:"));
+    assert_eq!(workflow.matches("github.token").count(), 1);
+    assert_eq!(workflow.matches("git clone").count(), 1);
+    assert!(workflow.contains("http.extraHeader=Authorization: basic $auth"));
+    assert!(workflow.contains("test -s b/README.md"));
+}

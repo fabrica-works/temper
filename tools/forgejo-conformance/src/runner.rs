@@ -3,6 +3,7 @@ use crate::{
     facts::{self, Fact, Outcome},
     fixture::{Fixture, R},
     mask::{self, Mask},
+    registration,
     write::{self, SecretKind, Secrets},
 };
 use serde_json::{Value, json};
@@ -39,13 +40,20 @@ impl Drop for Runner {
         }
     }
 }
-fn command(binary: &Path, scratch: &Path) -> Command {
+pub(crate) fn command(binary: &Path, scratch: &Path) -> Command {
     let mut cmd = Command::new(binary);
     cmd.env_clear().env("HOME", scratch.join("home")).env("PATH", "/usr/bin:/bin").current_dir(scratch);
     cmd
 }
 pub fn run(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) -> Result<(String, Vec<Fact>)> {
-    run_with(f, Some(out), mask, secrets)
+    let mut facts = if let Some(binary) = std::env::var_os("TEMPER_FORGEJO_RUNNER") {
+        registration::facts(f, Path::new(&binary), secrets)?
+    } else {
+        Vec::new()
+    };
+    let (version, actions) = run_with(f, Some(out), mask, secrets)?;
+    facts.extend(actions);
+    Ok((version, facts))
 }
 pub fn component(f: &Fixture, secrets: &mut Secrets) -> Result<()> {
     run_with(f, None, &mut Mask::new(f.instance.port()), secrets)?;
@@ -57,12 +65,14 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
             "none".into(),
             NAMES
                 .into_iter()
+                .chain(registration::NAMES)
                 .map(|name| Fact { name, outcome: Outcome::Unchecked("TEMPER_FORGEJO_RUNNER not set".into()) })
                 .collect(),
         ));
     };
     let binary = PathBuf::from(binary);
     let (_runner, version) = start(f, &binary, secrets)?;
+    let online = registration::online(f)?;
     f.api("PATCH", R, &json!({"has_actions":true}))?;
     f.branch(R, "actions", "landing")?;
     f.put(R,"actions",".forgejo/workflows/conformance.yaml","name: conformance\non: push\njobs:\n  pass:\n    runs-on: temper-host\n    steps:\n      - run: exit 0\n  fail:\n    runs-on: temper-host\n    steps:\n      - run: |\n          printf 'TEMPER_CONFORMANCE_FAILED_JOB\\n'\n          exit 1\n")?;
@@ -113,6 +123,7 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
         f.exchange("GET", &log, None, Some(&f.writer.token), Some(temper_throwaway_forgejo::Range::Head(3)))?;
     record(out, mask, secrets, "actions-job-log-range", &response)?;
     let mut facts = Vec::new();
+    connection_facts(&mut facts, statuses, online);
     facts::add(
         &mut facts,
         NAMES[0],
@@ -143,7 +154,24 @@ fn run_with(f: &Fixture, out: Option<&Path>, mask: &mut Mask, secrets: &mut Secr
     );
     facts::add(&mut facts, NAMES[5], response.status == 206, &format!("HTTP {}", response.status));
     facts.extend(job_steps(f, out, mask, secrets, jobs, &whole)?);
+    if out.is_some() {
+        facts.push(crate::job_clone::fact(f)?);
+    }
     Ok((version, facts))
+}
+fn connection_facts(facts: &mut Vec<Fact>, statuses: &[Value], online: bool) {
+    facts::add(
+        facts,
+        registration::NAMES[7],
+        online,
+        "connection did not come online in 30 seconds without a registration file",
+    );
+    facts::add(
+        facts,
+        registration::NAMES[8],
+        statuses.iter().any(|s| s["status"] == "success") && statuses.iter().any(|s| s["status"] == "failure"),
+        "connection jobs did not show both outcomes",
+    );
 }
 fn jobs_in_index_order(statuses: &[Value], jobs: &[Value]) -> bool {
     jobs.len() == 2
@@ -198,32 +226,19 @@ fn record(
 fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, String)> {
     let scratch = f.instance.scratch().join("runner");
     fs::create_dir_all(scratch.join("home"))?;
-    let output = command(binary, &scratch).arg("--version").output()?;
-    let version = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or_default().to_owned();
-    if !output.status.success() || !temper_throwaway_forgejo::names_runner(&version) {
-        return Err(format!("runner {}: {version}", binary.display()).into());
+    let version = version(binary, &scratch)?;
+    secrets.add(SecretKind::RunnerSecret, registration::RUNNER_SECRET);
+    let secret = scratch.join("secret");
+    registration::private(&secret, registration::RUNNER_SECRET)?;
+    let registered = registration::register(f, &secret, "temper-conformance", "temper-host:host")?;
+    if registered.code != Some(0) || !registered.stderr.is_empty() || registered.stdout != registration::RUNNER_UUID {
+        return Err(format!("runner registration: {registered:?}").into());
     }
-    let registration = f.get(&format!("{R}/actions/runners/registration-token"))?["token"]
-        .as_str()
-        .ok_or("runner registration token missing")?
-        .to_owned();
-    secrets.add(SecretKind::RegistrationToken, &registration);
     let config = scratch.join("config.yaml");
     fs::write(
         &config,
-        format!(
-            "log:\n  level: info\nrunner:\n  file: {}/registration.json\n  capacity: 1\n  timeout: 1m\n  shutdown_timeout: 1s\n  fetch_interval: 100ms\n  report_interval: 100ms\n  labels: [temper-host:host]\ncache:\n  enabled: false\nhost:\n  workdir_parent: {}/jobs\n",
-            scratch.display(),
-            scratch.display()
-        ),
+        registration::configuration(&f.instance.base(), registration::RUNNER_UUID, &secret, &scratch.join("jobs")),
     )?;
-    let mut register = command(binary, &scratch);
-    register.arg("--config").arg(&config).args(["register", "--no-interactive"]);
-    register.args(["--instance", &f.instance.base(), "--token", &registration]);
-    register.args(["--name", "temper-conformance", "--labels", "temper-host:host"]);
-    if !register.output()?.status.success() {
-        return Err("throwaway runner registration failed".into());
-    }
     let log = File::create(scratch.join("runner.log"))?;
     let child = command(binary, &scratch)
         .arg("--config")
@@ -233,6 +248,15 @@ fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, S
         .stderr(log)
         .spawn()?;
     Ok((Runner { child: Some(child) }, version))
+}
+
+pub(crate) fn version(binary: &Path, scratch: &Path) -> Result<String> {
+    let output = registration::capture(command(binary, scratch).arg("--version"))?;
+    let version = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or_default().to_owned();
+    if !output.status.success() || !temper_throwaway_forgejo::names_runner(&version) {
+        return Err(format!("runner {}: {version}", binary.display()).into());
+    }
+    Ok(version)
 }
 
 fn exchange(

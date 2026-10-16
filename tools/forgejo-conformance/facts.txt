@@ -56,6 +56,15 @@ holds unreadable-repository-by-id-is-404
 fails effective-protection-name-for-a-writer: effective_branch_protection_name=""
 holds effective-protection-name-for-an-admin
 holds no-rate-limit-headers
+holds runner-register-secret-file-prints-the-uuid
+holds runner-register-refuses-a-secret-of-another-length
+holds runner-register-refuses-a-secret-that-is-not-hexadecimal
+holds runner-register-again-keeps-one-global-runner
+holds runner-create-runner-file-takes-its-secret-only-as-an-argument
+holds runner-uuid-is-the-secrets-first-sixteen-characters-in-hex
+holds runner-token-is-the-secret
+holds runner-connection-with-a-token-file-comes-online
+holds runner-connection-alone-takes-the-jobs
 holds actions-report-each-job-as-a-status-on-its-head
 holds actions-status-link-is-runs-n-jobs-i
 holds actions-status-link-names-no-attempt
@@ -69,6 +78,7 @@ holds step-log-suffix-range-answers-206-with-its-last-bytes
 holds step-log-suffix-content-range-names-its-first-byte
 holds empty-log-suffix-range-answers-206-empty
 holds step-past-the-last-is-404
+holds runner-a-jobs-token-clones-its-private-repository
 holds compare-files-false-lists-no-commits-files
 holds compare-files-false-keeps-its-own-files-empty
 holds compare-verification-false-changes-nothing-kept
