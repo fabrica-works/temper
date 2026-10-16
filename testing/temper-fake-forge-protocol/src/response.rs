@@ -16,7 +16,7 @@ pub enum Select {
     Branches(Page),
     Review(u64),
     Status(Box<[u8]>),
-    Raw(Option<(u64, Option<u64>)>),
+    Raw(Option<Range>),
 }
 #[derive(PartialEq, Eq, Debug)]
 pub struct Reply {
@@ -119,7 +119,7 @@ pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Sel
     };
     Ok(Some(next))
 }
-pub fn select(config: &Config, request: &Request, range: Option<(u64, Option<u64>)>) -> Result<Select, a::Error> {
+pub fn select(config: &Config, request: &Request, range: Option<Range>) -> Result<Select, a::Error> {
     match request {
         Request::Branch { name, .. } => Ok(Select::Branch(name.clone())),
         Request::Branches { page, .. } => Ok(Select::Branches(*page)),
@@ -430,11 +430,28 @@ pub fn answer(
     }
     Ok(Reply { status: status(request), headers: headers.into_boxed(), body })
 }
-pub fn range(value: Option<&[u8]>) -> Result<Option<(u64, Option<u64>)>, a::Error> {
+/// One byte range, as the pinned Forgejo's plaintext routes serve it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Range {
+    /// A range with a first byte and an optional last byte.
+    From { first: u64, last: Option<u64> },
+    /// The last N bytes, with N at least one.
+    Suffix(u64),
+}
+
+/// Reads the request's single byte range, or refuses an unsupported form.
+pub fn range(value: Option<&[u8]>) -> Result<Option<Range>, a::Error> {
     let Some(value) = value else {
         return Ok(None);
     };
     let value = value.strip_prefix(b"bytes=").ok_or(a::Error::Refused)?;
+    if let Some(suffix) = value.strip_prefix(b"-") {
+        let count = temper_forge_forgejo::id::unsigned(suffix).ok_or(a::Error::Refused)?;
+        if count == 0 {
+            return Err(a::Error::Refused);
+        }
+        return Ok(Some(Range::Suffix(count)));
+    }
     let dash = bytes::find(value, b"-").ok_or(a::Error::Refused)?;
     let first =
         temper_forge_forgejo::id::unsigned(value.get(..dash).ok_or(a::Error::Refused)?).ok_or(a::Error::Refused)?;
@@ -446,13 +463,29 @@ pub fn range(value: Option<&[u8]>) -> Result<Option<(u64, Option<u64>)>, a::Erro
     {
         return Err(a::Error::Refused);
     }
-    Ok(Some((first, last)))
+    Ok(Some(Range::From { first, last }))
 }
-fn raw(limits: &Limits, body: &[u8], range: Option<(u64, Option<u64>)>) -> Result<Reply, a::Error> {
+fn raw(limits: &Limits, body: &[u8], range: Option<Range>) -> Result<Reply, a::Error> {
+    let total = u64::try_from(body.len()).expect("bounded body");
+    let range = match range {
+        Some(Range::From { .. }) if total == 0 => None,
+        Some(Range::From { first, last }) => Some((first, last)),
+        Some(Range::Suffix(_)) if total == 0 => {
+            return Ok(Reply {
+                status: 206,
+                headers: Box::new([skein_http::Header {
+                    name: bytes::copy_of(b"content-range"),
+                    value: bytes::copy_of(b"bytes 0--1/0"),
+                }]),
+                body: Box::new([]),
+            });
+        }
+        Some(Range::Suffix(count)) => Some((total.saturating_sub(count), None)),
+        None => None,
+    };
     let mut headers = List::with_capacity(1);
     let mut status = 200;
     let bytes = if let Some((first, last)) = range {
-        let total = u64::try_from(body.len()).expect("bounded body");
         if first >= total {
             return Ok(Reply { status: 416, body: Box::from([]), headers: Box::from([]) });
         }

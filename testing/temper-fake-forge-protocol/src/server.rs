@@ -45,7 +45,7 @@ pub struct Server {
     user: u64,
     request: Option<Request>,
     select: response::Select,
-    range: Result<Option<(u64, Option<u64>)>, api::Error>,
+    range: Result<Option<response::Range>, api::Error>,
     call: Option<Id<Call>>,
     followed: bool,
     reply: Option<Box<[u8]>>,

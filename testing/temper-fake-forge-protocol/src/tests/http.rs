@@ -244,3 +244,14 @@ fn a_failed_jobs_steps_and_failed_steps_log_are_served_over_http() {
     );
     assert_eq!(h.domain_calls(), 2);
 }
+
+#[test]
+fn a_steps_log_end_is_served_by_a_suffix_range() {
+    let mut h = Harness::new(fixtures::config());
+    assert_eq!(h.push(b"work"), 2);
+    h.request(b"GET /api/v1/repos/org/repo/actions/jobs/1/logs?attempt=1&step=1 HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: token 1111111111111111111111111111111111111111\r\nRange: bytes=-10\r\n\r\n");
+    h.run();
+    assert_eq!(h.status(), 206);
+    assert!(bytes::find(&h.head(), b"content-range: bytes 78-87/88\r\n").is_some());
+    assert_eq!(&*h.body(), b"k build 3\n");
+}

@@ -1,6 +1,6 @@
 use super::fixtures::{at, boxed, config, limits};
 use crate::{
-    response::{self, Select},
+    response::{self, Range, Select},
     routes,
 };
 use skein_lib::{Time, bytes};
@@ -130,9 +130,9 @@ fn raw_ranges_use_206_and_literal_content_range() {
     let request = Request::Raw { at: at(), path: boxed(b"src"), reference: routes::object(7) };
     for (range, status, body, content_range) in [
         (None, 200, b"abcdef".as_slice(), None),
-        (Some((1, Some(3))), 206, b"bcd", Some(b"bytes 1-3/6".as_slice())),
-        (Some((3, Some(99))), 206, b"def", Some(b"bytes 3-5/6".as_slice())),
-        (Some((9, None)), 416, b"", None),
+        (Some(Range::From { first: 1, last: Some(3) }), 206, b"bcd", Some(b"bytes 1-3/6".as_slice())),
+        (Some(Range::From { first: 3, last: Some(99) }), 206, b"def", Some(b"bytes 3-5/6".as_slice())),
+        (Some(Range::From { first: 9, last: None }), 416, b"", None),
     ] {
         let reply =
             response::answer(&config(), &limits(), &request, &Select::Raw(range), &a::Answer::File(boxed(b"abcdef")))
@@ -153,9 +153,11 @@ fn header_value(headers: &[skein_http::Header]) -> Option<&[u8]> {
 fn range_syntax_is_bounded_and_rejects_reversed_offsets() {
     for (input, expected) in [
         (None, Ok(None)),
-        (Some(b"bytes=1-3".as_slice()), Ok(Some((1, Some(3))))),
-        (Some(b"bytes=1-".as_slice()), Ok(Some((1, None)))),
-        (Some(b"bytes=-2".as_slice()), Err(a::Error::Refused)),
+        (Some(b"bytes=1-3".as_slice()), Ok(Some(Range::From { first: 1, last: Some(3) }))),
+        (Some(b"bytes=1-".as_slice()), Ok(Some(Range::From { first: 1, last: None }))),
+        (Some(b"bytes=-2".as_slice()), Ok(Some(Range::Suffix(2)))),
+        (Some(b"bytes=-0".as_slice()), Err(a::Error::Refused)),
+        (Some(b"bytes=-".as_slice()), Err(a::Error::Refused)),
         (Some(b"bytes=1-0".as_slice()), Err(a::Error::Refused)),
         (Some(b"items=1-3".as_slice()), Err(a::Error::Refused)),
         (Some(b"bytes=18446744073709551616-".as_slice()), Err(a::Error::Refused)),
@@ -174,4 +176,69 @@ fn pull_file_responses_carry_x_hasmore() {
         let header = reply.headers.first().expect("one");
         assert_eq!((&*header.name, &*header.value), (b"x-hasmore".as_slice(), expected), "more {more}");
     }
+}
+
+#[test]
+fn a_suffix_range_answers_206_with_the_slices_last_bytes() {
+    let request = Request::JobLog { at: at(), job: 1, attempt: 1, step: Some(3) };
+    let mut slice = [b'x'; 112];
+    for (place, byte) in slice[102..].iter_mut().zip(b"0123456789") {
+        *place = *byte;
+    }
+    let reply = response::answer(
+        &config(),
+        &limits(),
+        &request,
+        &Select::Raw(Some(Range::Suffix(10))),
+        &a::Answer::File(boxed(&slice)),
+    )
+    .expect("Suffix");
+    assert_eq!((reply.status, &*reply.body), (206, b"0123456789".as_slice()));
+    assert_eq!(header_value(&reply.headers), Some(b"bytes 102-111/112".as_slice()));
+}
+
+#[test]
+fn a_suffix_longer_than_the_slice_answers_it_all() {
+    let request = Request::JobLog { at: at(), job: 1, attempt: 1, step: Some(3) };
+    let slice = [b'x'; 112];
+    let reply = response::answer(
+        &config(),
+        &limits(),
+        &request,
+        &Select::Raw(Some(Range::Suffix(100_000))),
+        &a::Answer::File(boxed(&slice)),
+    )
+    .expect("Suffix");
+    assert_eq!((reply.status, &*reply.body), (206, slice.as_slice()));
+    assert_eq!(header_value(&reply.headers), Some(b"bytes 0-111/112".as_slice()));
+}
+
+#[test]
+fn a_suffix_range_over_an_empty_log_names_no_byte() {
+    let request = Request::JobLog { at: at(), job: 1, attempt: 1, step: Some(3) };
+    let reply = response::answer(
+        &config(),
+        &limits(),
+        &request,
+        &Select::Raw(Some(Range::Suffix(10))),
+        &a::Answer::File(boxed(b"")),
+    )
+    .expect("Suffix");
+    assert_eq!((reply.status, &*reply.body), (206, b"".as_slice()));
+    assert_eq!(header_value(&reply.headers), Some(b"bytes 0--1/0".as_slice()));
+}
+
+#[test]
+fn a_head_range_over_an_empty_log_answers_200() {
+    let request = Request::JobLog { at: at(), job: 1, attempt: 1, step: Some(3) };
+    let reply = response::answer(
+        &config(),
+        &limits(),
+        &request,
+        &Select::Raw(Some(Range::From { first: 0, last: Some(10) })),
+        &a::Answer::File(boxed(b"")),
+    )
+    .expect("Head");
+    assert_eq!((reply.status, &*reply.body), (200, b"".as_slice()));
+    assert_eq!(header_value(&reply.headers), None);
 }
