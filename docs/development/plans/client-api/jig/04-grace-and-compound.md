@@ -247,9 +247,14 @@ Shape:
   Option<Duration>, message: Option<u64> }`; `message` is `Some` when and only
   when `grace` is, else `Refusal::Read`; `grace` past `Limits::grace`
   is `Refusal::Grace`, nothing changed.
-- `jig_domain_tasks::Grace { by: Party, until: Wall, reason: Box<[u8]> }`
-  (no longer `Copy`), exported from `grace.rs`; `TaskRecord.grace:
-  Option<Grace>` in `chat_close`'s place.
+- `jig_domain_tasks::Grace { by: Party, until: Wall, reason: Box<[u8]>,
+  message: u64 }` (no longer `Copy`), exported from `grace.rs`;
+  `TaskRecord.grace: Option<Grace>` in `chat_close`'s place. `message`
+  is the ask to finish's number, the cancel's `message` (ruling 124):
+  `inbox::prepare`'s merge (its one key for `MessageKind::Amendment`,
+  `inbox.rs:31`) passes over the word of that number, which keeps its
+  slot, and `stored.rs`'s count of amendment words (`:395`) and the
+  restore admit it beside one ordinary amendment.
 - `grace::ask_to_finish(domain, env, number, by, until, message, reason,
   out) -> Result<(), Refusal>`: a task waiting or held is cancelled at
   once (`closing::cancel_tree` with the history `control::apply`
