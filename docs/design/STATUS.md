@@ -158,3 +158,4 @@ real forge, and what stands between the `protocol` plan and it, is
 | `factory.md` | the software factory: write, prove and run planes, the lab, on jig and os | not adopted: discuss; its section 13 changes `qa.md` |
 | `qa.md` | continuous QA on a running build of main | not adopted: discuss; its order of building (section 8) waits for a running build |
 | `tools.md` | temper for agents: tools over jig's plumbing, `temper ctl` first, an MCP endpoint of the engine later | not adopted; its questions settled (section 16); its stage 1 waits for client-api, and asks jig for a named key (section 14) |
+| `forge-setup.md` | the forge's setup in three modes, connected, managed and owned, each making the inputs of the one below; owned as commands, `temper box` their wiring; webhooks built with it | not adopted; its questions settled (section 17); built after the `protocol` plan, before the dogfood run (section 15) |
