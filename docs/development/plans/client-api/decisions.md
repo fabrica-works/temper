@@ -879,6 +879,25 @@ choice would have been the user's (development.md, 10.4).
 
      It adds none of these until the answer: a declaration of the build's owner/version pairs, in `Limits` or elsewhere; a memory of owners' ranges; `Readout::NotServed` or another read's answer; `Why::NotServed` and `Progress::NotServed`; `LinkView.not_served` filled; the three unit tests on an owner not served. 12.4 lands only after the answer, as one increment, unless the answer splits it.
 
+180. **jig 12.4: the family owners' versions declared at construction** (design answer, jig 12's block of 2026-10-16T22:51:29Z).
+     Ruling 180, the designer's answer, landed as jig b09e2239e and temper 21c0ec9a; it ends ruling 179's interim:
+
+
+     1. **The implementer's proposal: a declaration, at construction.** client.md, 8.2, now: "each family owner's, which the application declares as it makes the client, with its limits (section 14): each owner whose families it sends, by its number, with its wire's version ... Each family's request, read and subject names a declared owner, in its declared version; any other is the application's mistake, and loud, as a key conflict is". The client never learns a version from a message.
+     2. **Each hello judged whole.** "A declared owner is not served when the hello names no range of it, or one that leaves out its version. The judgement holds until the next hello, so `client.link()` names an owner not served from the hello on, before the application has asked anything of it. The client keeps, for each declared owner, its judgement and the range the hello named of it; of an owner it does not declare, nothing."
+     3. **The bound.** client.md, 14: "the family owners the application declares, each once, with its version (8.2): no more than a hello's ranges hold beside jig's". The wire's `Hello.served` holds 16 (`CEILINGS.hello_served`), so at most 15.
+     4. **A read of an owner not served.** client.md, 7: "a family's outside its owner's range or any read while the link is out of date, is answered at once and never sent: version not served, naming the owner and the range the last hello named of it, or none where it named none."
+     5. **A kept request of another version.** client.md, 11: "one whose owner the build does not declare, or whose version is not the one declared (8.2), is such a record", that is, dropped at start and the application told (protocol/client.md, 10).
+     6. **12.4's Shape (landed in the plan):**
+        - `jig_client_domain::Limits.owners: &'static [Spoken]`, with `Spoken { family: u16, version: u32 }`. The link's `Limits::new` refuses more than 15 owners, or one family twice.
+        - The link's `Request::Hello { family, versions: Option<VersionRange> }` comes once for jig and once per declared owner. At a hello, the link reopens only the watches in range.
+        - `Up::Served` gains jig's `versions`. `Up::FamilyServed { family, versions: Option<VersionRange> }`.
+        - `Readout::NotServed { family: Option<u16>, served: Option<VersionRange> }`. `LinkView.not_served: &[u16]` is unchanged.
+        - An undeclared owner or version on `Send`, `Read` or `Watch` `assert!`s. A kept one is dropped and told `Told::Dropped`.
+        - Five tests are added and two link tests change. Size goes from 150 to 210.
+        - jig 13.4, jig 21.2 and temper 03.5 declare their families' owners.
+     7. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
