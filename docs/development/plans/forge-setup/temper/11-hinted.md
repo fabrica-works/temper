@@ -1,0 +1,248 @@
+# Session 11: webhooks on the box
+
+The process tier's owned Forgejo (temper 10.2: provisioned by reconcile, with the runner and CI) gets the webhooks that
+setup.md 10 promises: the configuration names the listener and the forge's secret file, `app.ini` allows the listener,
+reconcile's org hook carries the secret, and Forgejo's deliveries reach `temper serve`. 11.1 turns webhooks on for every
+owned story and shows a real delivery leave the box signed; 11.2 adds the hinted story (setup.md 13.4): the landing story
+with `poll`, `poll_max` and `slow` raised past its budget, which lands only if every wait ends by a delivery. A wait no
+delivery ends is a question (below), not a fix here. Test code alone.
+
+## Read first
+
+- **Design:** setup.md 10 (the waits; "Checked"), 13.4, 5 (step 6), 6.2, 8; testing.md 2.6; forge.md 5, 7; configuration.md
+  6 (a secret file's final line feed), 7 (the keep's paces, the hooks' limits); skein's testing-strategy.md 2.9 and 9;
+  workflow.md 2; development.md 5.5, 5.6.
+- **Plan:** decisions.md 5, 12, 16, 19; findings/webhooks.md 6, forge-and-tiers.md 4, measurements.md 3; temper 05.3
+  (`support/webhooks.rs`, the wiring), 06.2 (`settle`), 08.1 (`support/owned.rs`), 10.2 (`owned::tier_configuration`).
+- **Code, at the base** (08.3 and 10.2 move lines in `support/`; find them again by name): process.rs:70-85;
+  support/forgejo.rs:8-40, :105, :114; support/mod.rs:5, :15-40, :432-436, :462-469, :492-494; temper-service
+  `src/limits.rs`:75-81, `src/limits/names.rs`:105-108; forge-client `src/limits.rs`:66, `src/keep.rs`:1193-1209; the
+  throwaway's `src/lib.rs`:73-93 (`Outgoing`), `src/instance.rs`:29, :73.
+
+## What the design asks
+
+- **setup.md 10, 13.4, testing.md 2.6:** "Checked" is the hinted story: a test of its own on the owned Forgejo with CI
+  and webhooks on, `poll`, `poll_max` and `slow` raised past its budget, no conflict resolved. It names the table's first
+  three rows; the other rows are checked from hints in the worlds. The tier aims at 3 minutes (Q1).
+- **forge.md 5, 7:** a delivery is signed with HMAC-SHA256 in `X-Forgejo-Signature` and named by `X-Forgejo-Event`; 11.1
+  checks both on a real one. Past `hooks` connections a delivery waits and none is refused: the cap raises no question.
+
+## Choices this plan makes
+
+- **Webhooks are on for every owned story** (`Throwaway::start`'s users: process.rs:36, :73, live.rs:8): one
+  provisioning, no flag to forget. The live test gets them too and is not run by this plan (decision 16).
+- **The hinted story is the landing story's function called with three overrides** (`forge.client.poll_ms`,
+  `poll_max_ms`, `slow_ms` = 600 000), no second scenario. `hinted_ms` (1 s), `settle_ms` (30 s) and the hooks' limits
+  stay the profile's.
+- **11.1's receiver is std's** and the signature is checked with skein's `Hmac` (05.3's `webhooks::signature`), so neither
+  the engine's listener nor temper's decoder reads Forgejo's delivery. The push is a contents-API commit, not git.
+- **`application.webhooks` reaches reconcile and Forgejo by 05.3's wiring** (05's file: whichever of 05.3 and 10.1, and of
+  05.3 and 08.1, lands second wires each); 11.1 proves both. An increment of 11 that lands after 14.1 takes the owned
+  members, 11.1's two included, from 14.1's `owned::application`; 14.1 converts those of 11 landed before it.
+
+## Rules that bind it
+
+- The tier needs `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER`, runs by `heavy --gate` (README), never in `scripts/check.sh`
+  (workflow.md 2), and a test refuses to run without either, naming it (testing.md 2.6). The exports, run before any
+  command here that needs the binaries:
+  ```sh
+  export TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 \
+    TEMPER_FORGEJO_RUNNER=$HOME/src/rust/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64
+  ```
+- A time below is read from nextest's `PASS [ t ]` line in heavy's log; a miss is noted in the landing report.
+- Limits come from the shipped profile (`limits.rs`:247; the hooks': `forge::small`, `forge.rs`:110). The hooks' are not
+  overridden; a value of the story's own is named beside the profile's, with its reason (11.2).
+- `process.rs` and `support/*` are client-api's hotspot until about 10-18 20Z (README): rebase, add beside, never reorder.
+- A Size here counts the support alone (code-organization.md 6): `git diff -M --numstat origin/main...HEAD --
+  crates/temper/tests/support | awk '{a+=$1} END {print a}'`; the tests of `process.rs` are not counted.
+
+## Increments
+
+### 11.1 The tier's owned Forgejo delivers, signed, to a listener
+Scope: the tier's owned document names the webhooks' listener and the forge's `webhook_secret` (setup.md 8), which 05.3's
+wiring hands to the preparation (`app.ini`'s `ALLOWED_HOST_LIST`, setup.md 6.2) and to reconcile (the org hook, setup.md 5
+step 6); one test shows the box's Forgejo deliver a push to that address, signed with the secret reconcile drew (decision
+19: reconcile's org hook is proved here, not in its world). That the engine takes the delivery is 11.2's.
+Needs: temper 05.3 (`application.webhooks`, `forges[].webhook_secret`, their wiring, `support/webhooks.rs` with
+`free_address` and `signature`; the ready check reads their signatures), 06.2 (`settle`: a pull read at once after its
+push is taken as conflicted today, domain.rs:2025-2029) and 10.2 (`owned::tier_configuration`, the owned `Throwaway`).
+Files: `crates/temper/tests/support/webhooks.rs` (05.3's: gains `Delivery`, `receive`), `support/owned.rs` (08.1's; 10.2's
+`tier_configuration`, `document`), `support/forgejo.rs` (`impl Throwaway`: fields `directory`, `webhooks`; `configuration`
+:114), `support/mod.rs` (`Forge::Throwaway`, which 10.2 trims of `token` and `user`: gains `webhooks: Option<SocketAddr>`),
+`crates/temper/tests/process.rs` (one test; hotspot). Users of what changes: `git grep -n 'Forge::Throwaway' --
+crates/temper/tests`; `git grep -n 'tier_configuration' -- crates/temper/tests` (13.1's tests then run with webhooks on).
+Shape: sketches below.
+- `owned::tier_configuration` (10.2's) writes `application.webhooks = {"listener": {"socket": <address>}}` and
+  `forges[0].webhook_secret = "forge-1/webhook_secret"` (setup.md 8's path), where 05.3 left `null`s (configuration.md 3,
+  10); the address is `webhooks::free_address()`, chosen beside Forgejo's `listen`. `Throwaway::start` reads it back from
+  that document and keeps it (`None` for `null`); `forge()` hands it to `Forge::Throwaway`, so `forgejo::configuration`
+  writes the same members for `temper serve`, both through `owned::document` (10.2's shape 3): one address for all.
+- `receive` accepts within `within` on a non-blocking listener (a 50 ms nap between tries, as instance.rs:73), reads one
+  request whole (the head to its blank line, then `Content-Length` bytes), answers `204`, and returns the two headers
+  by lower-cased name and the body.
+- `push` is the contents-API call of 10.2's shape 2: `POST /api/v1/repos/acme/widget/contents/<file>` on `main` through
+  `Instance::exchange(&Outgoing::json(..))` (lib.rs:91) under the person's `Token`, as `get` does (:36), the message
+  `Add <file>` and the content `aG9vawo=` (`hook` and a line feed).
+Test shape: `process.rs`, beside :70; one test, since each starts a Forgejo and a runner. Reuse `Scratch::new` (mod.rs:48),
+`Throwaway::start` (forgejo.rs:16, as 10.2 leaves it) and `stop` (:105), `support::WITHIN` (mod.rs:5),
+`skein_lib::bytes::find` (process.rs:13). The test listens after `start` returns: what Forgejo tried before (the
+repository's creation) met no listener and is not sent again (forge.md 5), and one still in flight is skipped by the
+loop. Limits: the profile's. The reference test, in full:
+
+```rust
+// crates/temper/tests/process.rs (11.1); `support` as the file's head has it
+#[test]
+fn a_push_is_delivered_signed_with_the_secret_reconcile_drew() {
+    let scratch = support::Scratch::new("hook_delivery");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    let listener = std::net::TcpListener::bind(forgejo.webhooks()).expect("nothing holds the address");
+    forgejo.push("hook.txt");
+    let delivery = loop {
+        let delivery = support::webhooks::receive(&listener, support::WITHIN);
+        if skein_lib::bytes::find(&delivery.body, b"Add hook.txt").is_some() {
+            break delivery;
+        }
+    };
+    assert_eq!(delivery.event, "push", "Forgejo names the event");
+    assert!(skein_lib::bytes::find(&delivery.body, b"refs/heads/main").is_some(), "a push to main");
+    assert_eq!(delivery.signature, support::webhooks::signature(&forgejo.secret(), &delivery.body));
+    forgejo.stop();
+    scratch.remove();
+}
+```
+
+Ceiling: 60 s (a box starts in about 15 s: adopt-by-commands takes 13.1 s, measurements.md 3); `receive` waits `WITHIN` (30 s).
+Proof: process, `a_push_is_delivered_signed_with_the_secret_reconcile_drew`, by the exports, then `heavy --gate cargo
+nextest run -p temper --profile process -E 'test(=a_push_is_delivered_signed_with_the_secret_reconcile_drew)'`, shows a
+push made through the API arrive at the configured address with `X-Forgejo-Event: push` and a signature equal to the
+HMAC of its body under `webhook_secret` less one final line feed; within 60 s. Then the landing story (process.rs:71),
+by the same command and `-E 'test(=a_persons_change_lands_on_the_forge_and_is_found_after_a_restart)'`, passes with
+webhooks on at the profile's paces within 180 s. Nothing runs higher (live needs an outside service, decision 16).
+Don't: hold the address from anywhere but this test's listener (no `temper serve` runs in it); read Forgejo's delivery
+log (no API; the page is HTML); set `ALLOWED_HOST_LIST` or the hook by hand (the preparation and reconcile do); compute
+the expected signature with temper's code.
+Size: 30 lines of support code; the receiver, the three methods and the members may take it to about 50 (tolerance).
+Removes: nothing.
+
+### 11.2 The hinted story
+Scope: setup.md 13.4's hinted story, the fourth test of testing.md 2.6: the landing story with `poll`, `poll_max` and
+`slow` raised past its budget, so it lands within the budget only if every wait it meets ends by a delivery and the
+reads after it. Its changes never conflict (one edit of `README.md` on an untouched `main`), so none is resolved (Q3).
+Needs: 11.1, and 06.2's `settle` (a hinted pull read before Forgejo settles its mergeability is not taken as conflicted).
+Files: `crates/temper/tests/process.rs` (the story's body moves into `fn landing`; hotspot), `support/mod.rs`
+(`LANDING`, `RAISED_MS`, `raise_paces`; `run_until_landed` :462-469 uses `LANDING` for its literal at :468).
+Shape: sketches below. `raise_paces` runs after `support::configuration`: it reads `config.json`, inserts the three
+names into `application.limits.overrides` and writes the file private (`write_private`, mod.rs:15). The names
+(names.rs:105-108) sit beside the profile's 5 s, 30 s and 40 s (limits.rs:75, :77, :81) at `RAISED_MS` = 600 000, because
+the story's budget is 180 s (`LANDING`; a compile-time assertion keeps the relation); `poll <= poll_max` holds
+(forge-client `src/limits.rs`:66). They act in the keep's `rest_resource` (keep.rs:1193-1209).
+Test shape: `process.rs`, one new test calling the existing story's function. Reuse `landing_scripts` (forgejo.rs:218),
+`person::adopt_and_change` (person.rs:233), `person::found` (:266), `ANSWER` and `EDIT` (mod.rs:339-340),
+`run_until_landed`, `merged_pull`, `main_readme`. `landing`'s body is the story's (process.rs:72-85) as 10.2 leaves it.
+
+```rust
+// crates/temper/tests/process.rs (11.2)
+#[test]
+fn a_persons_change_lands_on_the_forge_and_is_found_after_a_restart() {
+    landing("landed", false);
+}
+
+#[test]
+fn a_change_lands_by_deliveries_with_every_poll_raised() {
+    landing("hinted", true);
+}
+
+/// The landing story; `raised` sets the three paces to `RAISED_MS` before `temper serve` starts.
+fn landing(case: &str, raised: bool) { todo!() }
+```
+
+Ceiling: `LANDING` (180 s; the judge's deadline is 175 s, mod.rs:492-494).
+Proof: process, `a_change_lands_by_deliveries_with_every_poll_raised`, by the exports, then `heavy --gate cargo nextest
+run -p temper --profile process -E 'test(=a_change_lands_by_deliveries_with_every_poll_raised)'`, shows the change
+merged on the owned Forgejo after its CI passed, found again after the restart, with every poll at 600 s; within 180 s.
+Once, by hand, before landing, the control, a hinted story that could pass without deliveries proving nothing:
+`owned::tier_configuration` writes `application.webhooks` and `forges[0].webhook_secret` as `null` (the handle's
+`webhooks` is `None`; `forgejo::configuration` follows), committed on its own (`heavy --gate` takes a committed tree) and
+dropped after (`git reset --hard HEAD~1`). With the exports and `mkdir -p ~/src/rust/tmp/temper/forge-setup/logs/temper-11`
+done, the same command with `--tail 400` after `--gate` and `2>&1 | tee
+~/src/rust/tmp/temper/forge-setup/logs/temper-11/control.log` at its end exits non-zero (the pipe's status is tee's) and
+the log holds `native chat did not settle` (mod.rs:432-436) or `native person's chat did not finish and settle` (:446),
+the judge's deadline. If the story lands, it proves nothing: raise Q2. The landing report quotes the matching line.
+Don't: change `hinted_ms`, a hook limit, `LANDING` or the story's scripts to make it pass; add a sleep or a poll to the
+test; give the hinted story a scenario of its own; make a conflict.
+Size: 10 lines of support code; `LANDING` and its guard take it to about 16, inside the tolerance.
+Removes: nothing (the story's body moves to `landing`).
+
+## Interface sketches
+
+```rust
+// crates/temper/tests/support/webhooks.rs (11.1), appended to 05.3's module
+use skein_lib::Duration;
+use std::net::TcpListener;
+
+/// One delivery to the listener: its event, its signature (hex HMAC-SHA256 of the body) and the body whole.
+pub struct Delivery {
+    pub event: String,
+    pub signature: String,
+    pub body: Vec<u8>,
+}
+
+/// Accepts one connection within `within`, reads one request whole, answers `204`; panics if none arrives.
+#[must_use]
+pub fn receive(listener: &TcpListener, within: Duration) -> Delivery { todo!() }
+```
+
+```rust
+// crates/temper/tests/support/forgejo.rs (11.1), appended to the module: no new `use` lines
+impl Throwaway {
+    /// The address `application.webhooks.listener` names; nothing listens there until a test or `temper serve` does.
+    #[must_use]
+    pub fn webhooks(&self) -> SocketAddr { todo!() }
+    /// The bytes of `forge-1/webhook_secret` under the handle's `directory` less one final line feed (configuration.md 6).
+    #[must_use]
+    pub fn secret(&self) -> Vec<u8> { todo!() }
+    /// The person commits `file` to `main` of `acme/widget` through the contents API, message `Add <file>`.
+    pub fn push(&self, file: &str) { todo!() }
+}
+```
+
+```rust
+// crates/temper/tests/support/mod.rs (11.2), beside `run_until_landed`
+use skein_lib::Duration;
+use std::path::Path;
+
+/// The landing story's deadline: `run_until_landed`'s (a literal at :468 today).
+pub const LANDING: Duration = Duration::from_secs(180);
+/// The keep's `poll`, `poll_max` and `slow` in the hinted story, in milliseconds: past `LANDING`.
+pub const RAISED_MS: u64 = 600_000;
+const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
+
+/// Sets the three paces to `RAISED_MS` in `directory/config.json`, which stays private.
+pub fn raise_paces(directory: &Path) { todo!() }
+```
+
+## Questions to raise when reached
+
+- **Q1, which 3 minutes.** setup.md 13.4 aims the tier at 3 minutes; decisions.md 12 reads it as the landing story's
+  180 s. With two CI stories the tier's total may pass it (the profile stops at 10 minutes, `.config/nextest.toml`:30-33):
+  report README Done when 4's `Summary [ t ]` time; change neither number. Recommended: nothing.
+- **Q2, a wait that no delivery ends.** If the hinted story misses its deadline, or the control lands, name the wait
+  (setup.md 10's table) and the event from the run's log; do not raise a limit or lower a pace. Candidates: a job-end
+  event missing from the hook's list; a hint dropped before the domain was ready (forge.md 5); a connection closed at
+  `hook_deadline` (forge.md 8) or kept waiting behind `hooks` past Forgejo's own timeout.
+- **Q3, "no conflict resolved".** Read as a property of the scenario: the story asserts nothing about resolution. If the
+  design wants an assertion, which observable: the pull's commit count, or the fake LLM's queries?
+
+## Done when
+
+- The tier passes, in README Done when 4's run (this session does not run it): in the log whose path heavy's last line
+  printed, `grep -c -e 'PASS.*a_push_is_delivered_signed' -e 'PASS.*a_change_lands_by_deliveries' <log>` prints 2, and its
+  `Summary [ t ]` line gives the time, reported (Q1 if over 180 s).
+- Both tests exist: `grep -c -e 'fn a_push_is_delivered_signed_with_the_secret_reconcile_drew'
+  -e 'fn a_change_lands_by_deliveries_with_every_poll_raised' crates/temper/tests/process.rs` prints 2.
+- The three paces are named once each: `grep -rho -e 'forge\.client\.poll_ms' -e 'forge\.client\.poll_max_ms'
+  -e 'forge\.client\.slow_ms' crates/temper/tests | wc -l` prints 3.
+- They stay out of the gate: `grep -cF 'not binary(/^(process' .config/nextest.toml` prints 2.
+- No forbidden word: `! grep -rn -e actual -e genuine -e legacy -e compat -e workaround
+  crates/temper/tests/process.rs crates/temper/tests/support` prints nothing.
+- The control ran: `grep -q 'chat did not' ~/src/rust/tmp/temper/forge-setup/logs/temper-11/control.log` exits 0.

@@ -1,0 +1,178 @@
+# forge-setup: decisions
+
+The planner's decisions, each with its reason. Rulings and answers of the
+run are appended after "For the user".
+
+1. **The box first, on polling; webhooks join it.** Sessions are numbered
+   in setup.md 14's order and start by availability. The box needs
+   prepare, run and reconcile (temper 07 to 10, 13), and none of them
+   needs webhooks, while the webhooks' listener waits for client-api's
+   temper 05.1 (temper-service's `server.rs`, about 10-18 13Z) and
+   temper's skein move. So `temper box` and the process tier on an owned
+   Forgejo with CI (temper 10.2) land on polling, and webhooks reach them
+   in temper 11. The throwaway Forgejo's hook (setup.md 14, item 3)
+   serves the conformance's delivery facts (temper 04.1) alone: by the
+   time the engine has a listener, the process tier runs on owned.
+2. **temper's skein moves once, in temper 05.1,** after skein 01.2 and
+   after the director's client-api ruling lands (temper's skein may be
+   ahead of client-api's floor; its repins check `git merge-base
+   --is-ancestor`; none moves skein back). The director chose this on
+   2026-10-16; the ruling is client-api's ruling 154 (`c36858db7`), on
+   `main` at the plan's base, so 05.1 waits for skein 01.2 and temper
+   04.2 alone.
+3. **No repin but temper's.** skein 01 adds `skein_lib::sha256` and moves
+   three private copies onto it, keeping every public item. smith is
+   left alone (smith/wall-clock runs on hetzner); jig's pins are
+   client-api's to move; hearth's paused M1 plan takes skein at its next
+   repin, and its SHA-256 step is this plan's skein 01.
+4. **One pin, in temper-forge-forgejo** (setup.md 6.1; protocol.md 5):
+   `VERSION`, `RUNNER_VERSION` and their checks move there from
+   `testing/temper-throwaway-forgejo/src/binary.rs` (temper 03.1); the
+   throwaway re-exports them. forgejo-17's rule that only the test crate
+   names a version ends with this move.
+5. **The shipped profile's new limits** (configuration.md 7 names them
+   and gives no value): `setup.orgs` 8, `setup.deadline_ms` 120000,
+   `setup.backoff_ms` 100, `setup.backoff_max_ms` 5000; `box.backoff_ms`
+   500, `box.backoff_max_ms` 30000, `box.restarts` 5, `box.window_ms`
+   300000, `box.grace_ms` 10000; `forge_component.hooks` 4,
+   `hook_head_bytes` 8192, `hook_body_bytes` 1048576 (a push of many
+   commits; the body streams, so it costs no memory), `hook_deadline_ms`
+   10000, `hook_secret_bytes` 128 (reconcile draws 32 bytes, 64
+   hexadecimal digits); `forge.client.settle_ms` 30000; the profile's
+   sockets 48, so that `small` holds a document with both listeners
+   (designer's answer 30). Each satisfies configuration.md 7's
+   cross-checks. A test that needs another value
+   names it beside the profile's (development.md 5.6).
+6. **How the setup is checked** (the designer's answer of 2026-10-16;
+   setup.md 8): temper-service hands `application.setup` and the
+   `setup.`/`box.` overrides on undecoded, with the forges' and
+   identities' members; the binary calls temper-forge-setup's and
+   temper-box's checks for every command, `temper serve` included.
+   `temper forge …`, `temper box` and `temper sign-in` read no private
+   file to check.
+7. **The lock and the exec** (the designer's answer; setup.md 6.4): one
+   module of temper-forge-setup-shell, std's `File::try_lock` and
+   `CommandExt::exec`, the lock handed to the exec'd process as its
+   stdin. The module holds the lock and the exec alone; the
+   preparation's commands run on skein-io's processes in the host's
+   loop (the designer's answer 32). The boundary test that keeps
+   `std::process` and file locks in that module lands with the module's
+   first use (temper 08.1).
+8. **The `state` file** is a skein-json document with a `version` member
+   (1), the versions prepared, whether the first preparation ended, and
+   Forgejo's secrets. Pre-release: a reader refuses another version.
+9. **The box finds `temper`** by `std::env::current_exe()`, and gives
+   each step the configuration's path made absolute against its own
+   working directory.
+10. **The upgrade comes last** (temper 15.1): a box at the pinned
+    versions never meets it.
+11. **Facts are named by group:** `setup-…` (admin routes, tokens, orgs,
+    teams, hooks), `cli-…` (Forgejo's command line), `runner-…`,
+    `delivery-…`, so "Done when" counts each group.
+12. **The process tier aims at 180 s whole** (testing.md 2.6;
+    setup.md 13.4), CI, webhooks, the box and the upgrade included. If it
+    goes past, the slowest story becomes a test of its own, or the aim
+    moves, by a ruling for the user.
+13. **The suites' aims for the whole run:** at the base (temper
+    0ff45022, x1) the default suite takes 4.43 s and the fuzzy one
+    24.22 s (medians of three, `findings/measurements.md`); the run adds
+    at most 1.0 s to the first and 3.0 s to the second. No session has a
+    share. skein's suites take what skein 01 adds, at most 0.5 s to its
+    default suite.
+14. **The owned example is a file,** `docs/examples/owned.json`, the
+    whole document, with its non-secret files in `docs/examples/owned/`
+    (the designer's answer 12), which the guide and the tests read; the
+    guide is `docs/guide/box.md`.
+15. **A hint's key is not used to skip a read.** setup.md 10 has each
+    echo cost the keep one read, which the keep does today
+    (`keep.rs:638-641`); the domain drops what it already knows after
+    that read.
+16. **No live service.** The Forgejo and runner are the pinned local
+    binaries; the process tier's LLM is skein's fake peer; no agent
+    signs in. The guide's `temper sign-in` is the person's, and its
+    check stops before it.
+
+17. **Session 07 is split, and the upgrade is a session of its own.**
+    The drafts gave temper 07 589 lines, past development.md 5.2's 400;
+    `forges[].user` as a file (drafted as 10.1) must come before the
+    first command, since setup.md 8 requires it for a set-up forge. So:
+    temper 07 is the crate, Forgejo's files, the configuration (07.3:
+    `forges[].user` as a file, `application.setup`) and the preparation's
+    machine (07.4, which waits for temper 03.3, the configuration filling
+    that wait); temper 08 is `temper forge prepare`, `run` and the
+    process tier's Forgejo; temper 15 is the upgrade, which nothing waits
+    on.
+18. **temper 06 waits for temper 04.1,** so that the fake's hooks follow
+    the order and the mergeability the conformance recorded, not an
+    expectation (forge.md 9: the fake answers what the facts record).
+19. **The fake's deliveries are not sent to the hook reconcile made in a
+    world:** temper 11.1 proves Forgejo's delivery to reconcile's org
+    hook at the process layer, and the fake's world tests the listener
+    with the hook its scenario names.
+20. **The process tier's person** gets a token made on the admin's routes
+    (designer's answer 14), as the bot does; nothing signs in with a
+    password through the API.
+21. **No live service, in the example either:** temper 14's test and
+    its guide's script hand in an LLM account for skein's fake peer, as
+    the process tier does; the guide names the borrowed-login way for
+    people (designer's answer 13).
+22. **The increments whose Size is the process tier's support** (temper
+    08.3, 10.2, 11.1, 11.2, 13.2, 14.1) count that support's lines
+    (`code-organization.md`, 6), since the plan's count leaves `tests`
+    aside.
+
+23. **temper 10 starts after temper 08.3,** so that its proofs read the
+    owned Forgejo through the throwaway's `attach` (08.3), not through a
+    second HTTP helper of their own.
+24. **`box.` overrides are refused as unknown** until temper 13.1 wires
+    temper-box's checks into the binary's; no document of the plan
+    names one before.
+25. **The private org's CI clones with the job's token:** the runner is
+    offline, so a workflow runs `git` itself, not `actions/checkout`;
+    temper 03.3 records the fact that a job's token clones its private
+    repository.
+26. **The protocol world's late, reordered and lost deliveries wait**
+    (forge.md 9, 10; `later.md`): the fake sends each delivery on time;
+    the connector world's hinted stories (temper 06) and the process
+    tier's hinted story (temper 11.2) carry hints with polling as the
+    fallback.
+27. **The base's lint idioms bind the sketches** (`findings/base-runs.md`):
+    `#[expect(clippy::large_enum_variant, reason = …)]` on an enum that
+    carries a `Document`, never a `Box`; no `Default` derive in step code
+    (`User`'s literals name its two new fields).
+
+## For the user
+
+- 1: the box lands on polling before webhooks reach it.
+- 5: the limits' values.
+- 10: the upgrade after the box.
+- 14: the example's and the guide's places.
+- 15: echoes cost a read each; no skip by key.
+- `sha2` stays in temper-engine-domain-forge-issues (`later.md`).
+- 17: the upgrade in a session of its own, last.
+- 12: the process tier's 180 s, and a ruling if it goes past.
+- 19: no fake-world story of deliveries to reconcile's hook (`later.md`).
+- 26: the protocol world's late, reordered and lost deliveries wait
+  (`later.md`).
+- 20: the process tier's support reads `admin_token` (to attach and to
+  make the person's token), which setup.md 9 reserves to reconcile in
+  production.
+
+## Answers received
+
+- **The director,** 2026-10-16: temper's skein moves in temper 05.1
+  once client-api's ruling lands (decision 2; ruling 154); temper builds
+  on skein's `main` at the base (`findings/skein-main-in-temper.md`).
+- **The designer,** 2026-10-16, landed in temper `326cbded`, `0d67b373`,
+  `50c7dd0d`, `91ad7ef1`, `b05af1f7` and skein `121daa43`, `04c1562e`: 45 answers,
+  each now in the design, which the session files cite. Among them: the
+  lock and the exec by std, alone in one module (setup.md 6.4); the
+  admin token's fresh name and scopes, a cut-short first preparation
+  begun again from an empty layout, a later preparation taking Forgejo's
+  lock alone (6.3); the bot's tokens on the admin's routes, its marker
+  in its full name, private orgs (5); reconcile on plaintext loopback
+  alone (5, 15); settle's window as its own wait, in the change's
+  procedure (domain/forge.md 5.2); the box's signals, text and restarts
+  (7.2; configuration.md 7); the listener's answers (forge.md 5); an
+  absent option written `null`, never missing (configuration.md 3, 10);
+  SHA-256's sweep in the fuzzy suite (lib.md 10).
