@@ -30,10 +30,13 @@ Test shape, in `tests/ui-text/tests/terminal.rs`:
   commands: n, n words, p, q\n` twice; `room()` 2; after `close()`, 0.
   At the base the second line's feed fails: two application lines stop
   the read (63 places free, `:252` wants 64).
-- `untaken_commands_hold_the_input`: `start(32, 1)`; feed `1`, then
-  `\n`, leaving the command untaken; `sim.peer_feed` of `p` returns 1,
-  then of `\n` returns 0; once the command is popped and the terminal
-  driven, the `\n` fits.
+- `untaken_commands_hold_the_input` (ruling 137): `start(32, 1)`; feed
+  `1`, then `\n`, leaving the command untaken; then feed and drive 64
+  `p` bytes, which skein-io's pipe reads ahead into its intake whatever
+  the terminal demands (`crates/skein-io/src/pipe.rs:352-361`; the
+  terminal's `intake: BATCH`, `terminal.rs:77`); `sim.peer_feed` of `p`
+  returns 1 (the pipe's one byte), then of `\n` returns 0; once the
+  command is popped and the terminal driven, the `\n` fits (returns 1).
 Proof: skein's gate, by `land`.
 Don't: change `BATCH`, a refusal's text or `say`'s prefix; give `lines` a
 default; name a downstream repository (`git -C <worktree> diff
