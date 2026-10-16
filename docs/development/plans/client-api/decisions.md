@@ -651,6 +651,16 @@ choice would have been the user's (development.md, 10.4).
      3. **The shared historical transport** (`crates/jig-protocol-store/src/historical.rs`) loads the rows one `Get` each, as it loads one today.
      4. **Unchanged:** ruling 156's request (keyed by the party request's `Token`, with person, project and the bounded unique input task numbers), its roots, its 80-line aim and its downstream rule; the agent's delegate path.
 
+158. **jig 12's Shapes against main** (ready check of jig-12.1).
+     jig 12's Shapes against main, the re-check of jig-12.1 at jig `755e02e53`, temper `dceef129b` (a sub-agent's clippy and nextest runs in a scratch worktree, through heavy). Amends `jig/12-client.md`:
+
+     1. **Sketches:** `assert!(matches!(..))` (12.1's unit sketch, 12.2's story) becomes a `let [..] = .. else { panic!(..) };`: the root `clippy.toml:84` bans `core::matches` in step crates, tests included. 12.5's `debug_assert!` becomes `assert!` (`clippy.toml:87`).
+     2. **12.5's name:** `typed` becomes `unlinked` (`Client::unlinked`, `src/tests/unlinked.rs`, `an_unlinked_client_*`, the Proof's filter): `tests/boundary/src/names.rs:36` forbids "Typed" in any identifier; with the rename `kit_sources_keep_the_kit_vocabulary` passes.
+     3. **Files added:** 12.5, `tests/boundary/src/tests/graph.rs:297-341`'s allow list gains `"jig-client"`; 12.1, temper's terminal's `client.rs:88-100` (it copies the link's `store.rs:36` budget); 12.3, the link's `src/store.rs:170-172` and `jig-client-protocol-http/src/tests/fixtures.rs:15-21`; 12.2, the link's `src/tests/fixtures.rs:96-107, 130-141, 161-173`.
+     4. **Moved lines** in 12.1 and 12.2, refreshed. A further line that moved is followed by its name, and listed in the commit body.
+
+     Checked: the sub-agent's runs: clippy `-D warnings` on a scratch `jig-client` with 12.1's sketch failed on `matches!`, passed with the `let`-`else`; `debug_assert!` failed, `assert!` passed; nextest on `jig-boundary` and `jig-client` with 12.5's dependency failed `client_world_joins_only_the_client_and_test_roles`, then `kit_sources_keep_the_kit_vocabulary` on `typed`; after both corrections, 73 passed. Not checked: 12.3 to 12.5's code compiled; the workspace gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

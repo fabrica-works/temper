@@ -74,7 +74,7 @@ increment proves against the real engine.
   decoding bounds the link reads today from the page's limits (`rows`,
   `text`, `projects`, `charters`, `fields`, `heartbeat`), and those it
   reads today from `Limits.client` (`delegates`,
-  `crates/jig-client-protocol-link/src/limits.rs:100`; `records`, `kept`
+  `crates/jig-client-protocol-link/src/limits.rs:94`; `records`, `kept`
   and `parts`, `src/store.rs:36`); its users build them from the same
   values.
 - **The small store's barrier is the client's, for keyed requests
@@ -93,7 +93,7 @@ increment proves against the real engine.
   surface (client.md, 3), so an application, and the reference UI, depend
   on `jig-client` alone (view.md, 2); code-organization.md, 2's "no
   re-export" forbids only aliases kept for old paths.
-- **The typed transport** (`Client::typed`) carries the domain's `Down`
+- **The typed transport** (`Client::unlinked`) carries the domain's `Down`
   and `Up` instead of the link's bytes, for the client's world, whose
   scripted engine speaks the contract's types (testing.md, 4); no shell
   uses it (Questions).
@@ -127,19 +127,22 @@ src/limits.rs, src/tests.rs, src/tests/fixtures.rs}`; workspace
 `Cargo.toml` and `Cargo.lock` (shared);
 `crates/jig-client-domain/src/{boundary.rs, domain.rs, link.rs (new),
 watches.rs, limits.rs}`; `crates/jig-client-protocol-link/src/limits.rs`
-(`Limits.client`) and its users: `tests/client-protocol/src/fixtures.rs:102`,
-the link's `src/tests/fixtures.rs:37`,
+(`Limits.client`) and its users: `tests/client-protocol/src/fixtures.rs:103-104`,
+the link's `src/tests/fixtures.rs:7-35` (`CLIENT`) and `:38` (`limits()`),
 `crates/jig-protocol-engine-clients/src/tests/fixtures.rs:740-770`
 (`client_limits()`, a literal of the old domain's `Limits` for the
-link), and downstream its terminal's `limits.rs`; `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}`
+link), and downstream its terminal's `limits.rs` and `client.rs:88-100`
+(it copies the link's `store.rs:36` budget, `records + kept + parts`
+and `document_bytes`, from `bounds.client.jig`: it moves with
+`Limits.client`); `crates/jig-client-protocol-link/src/{boundary.rs, store.rs}`
 (the small store's names, below) and their users: the native shell's
-`shell.rs:85` (`loaded`), `shell.rs:111-112, 246`,
-`connections.rs:122-123` and `files.rs` (`loaded`); the link's
+`shell.rs:78` (`loaded`), `shell.rs:106-107, 239`,
+`connections.rs:112-113` and `files.rs` (`loaded`); the link's
 `src/component.rs`, `src/tests/fixtures.rs:105, 139, 171`,
 `src/tests/fixtures/link_{deliveries,reads,store,stream}.rs` and
-`src/tests/store.rs:61`;
-`tests/client-protocol/src/{front.rs, front/persistence.rs:32, 38, 79,
-native.rs}`, the native shell's `src/tests.rs:257, 278`; downstream, its
+`src/tests/store.rs:61, 71, 112`;
+`tests/client-protocol/src/{front.rs, front/persistence.rs:37, 43, 87,
+native.rs}`, the native shell's `src/tests.rs:174, 188, 198-199`; downstream, its
 terminal's `client.rs:328`, `route.rs:52-53` and `tests.rs:53-82`; `tests/boundary/src/tests/graph.rs` (`client_step` gains
 `jig-client`; the new test below) (shared);
 `tests/client-protocol/{Cargo.toml, src/lib.rs, src/client.rs (new),
@@ -172,7 +175,7 @@ link's, unchanged, until 12.2.
 Test shape: unit tests in `crates/jig-client/src/tests.rs` on
 `src/tests/fixtures.rs` (made here; limits copied, as literals, from
 the client world's profile, as jig 11's fixtures copy them:
-`jig_client_world::test::limits()`, tests/client/src/test.rs:18, each
+`jig_client_world::test::limits()`, tests/client/src/test.rs:19, each
 with a comment naming that line; no dev-dependency on
 `jig-client-world`, which depends on `jig-client` from 12.5: a cycle),
 for the composition: `step` routes each
@@ -181,13 +184,12 @@ for the composition: `step` routes each
 #[test]
 fn a_watch_asked_of_the_client_leaves_as_one_opening_on_the_stream() {
     let mut c = fixtures::Client::signed_in(PARTY);
-    // `signed_in` has opened `me`, and with it the stream (the link's component.rs:349-357):
+    // `signed_in` has opened `me`, and with it the stream (the link's component.rs:318-322, and `send_open` at :330-355):
     // a later watch leaves on the named stream as one exchange.
     c.step(Event::Watch { handle: TASK, subject: task(9) });
-    assert!(matches!(
-        c.requests().as_slice(),
-        [Request::Exchange { credential: Some(_), message: Message::Watch(_), .. }]
-    ));
+    let [Request::Exchange { credential: Some(_), message: Message::Watch(_), .. }] = c.requests().as_slice() else {
+        panic!("one watch exchange on the named stream: {:?}", c.requests());
+    };
 }
 ```
 The story: `tests/client-protocol/src/client.rs`, `pub struct Story`
@@ -273,9 +275,10 @@ Files: `crates/jig-client/src/{client.rs, store.rs (new)}`;
 link's barrier holds `Message::Request` exchanges alone, findings 5j;
 `Request::NotKept { attempt }` for each held keyed attempt on
 `NotStored`) and the users of its `Request::NotKept` and `Answer.why`:
-the link's `src/component.rs:241, 299` and `src/tests/fixtures.rs:126`,
-the native shell's exhaustive matches at `connections.rs:120-133` and
-`shell.rs:117-130`, and downstream its terminal's `route.rs:50-134`
+the link's `src/component.rs:197, 211, 268` and the exhaustive matches
+of `src/tests/fixtures.rs:96-107, 130-141, 161-173`,
+the native shell's exhaustive matches at `connections.rs:112-124` and
+`shell.rs:113-125`, and downstream its terminal's `route.rs:50-134`
 (`Answer` destructured at :84), `src/tests/family.rs:174` and
 `src/tests/fixtures.rs:77`; `tests/client-protocol/src/front.rs` (the old roots' map
 of `NotKept`); `tests/client-protocol/src/client.rs` (the story's
@@ -328,7 +331,9 @@ fn a_stop_is_answered_once_after_its_commit_is_durable() {
     let mut story = Story::live(fixtures::SEED);
     story.send(STOP, Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })));
     assert!(story.run_until(|s| !s.answered(STOP).is_empty(), Duration::from_secs(1)));
-    assert!(matches!(story.answered(STOP).as_slice(), [Outcome::Answered(Answered::Jig(contract::Answer::Refused(_)))]));
+    let [Outcome::Answered(Answered::Jig(contract::Answer::Refused(_)))] = story.answered(STOP).as_slice() else {
+        panic!("one refusal: {:?}", story.answered(STOP));
+    };
     assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
     assert!(story.told_at(STOP) >= story.durable_at(fixtures::FIRST_OWNER));
 }
@@ -367,7 +372,9 @@ Files: `crates/jig-client-protocol-link/src/{boundary.rs, sign_in.rs}`
 number); `crates/jig-client-protocol-http/src/call.rs`
 (`SignInService` to `<prefix>/v1/sign-in/deployment`);
 `crates/jig-client-domain/src/{boundary.rs, link.rs, domain.rs}`
-(`Up::SignedOut`, the ends and parking); `crates/jig-client/src/client.rs`;
+(`Up::SignedOut`, the ends and parking); the link's `src/store.rs:170-172`
+(an exhaustive match on `Message`) and `jig-client-protocol-http`'s
+`src/tests/fixtures.rs:15-21` (every `Message`); `crates/jig-client/src/client.rs`;
 `tests/client-protocol/src/client.rs`, `tests/client.rs`.
 Shape: `With` gains `Service(Secret)` and `Transport`; `Message` gains
 `SignInService`; `Up::SignedOut`; `LinkView.sign_out_lost`. A service's
@@ -446,7 +453,7 @@ Size: at most 150 lines.
 Removes: nothing.
 
 ### 12.5 A typed transport for the client's world
-Scope: `Client::typed(limits, seed)`: the domain with no link, its
+Scope: `Client::unlinked(limits, seed)`: the domain with no link, its
 `Down` given out as `Request::Down` and its `Up` taken as `Event::Up`,
 for a transport that carries them to an engine scripted in the
 contract's types (testing.md, 4; the client's world's scripted engine).
@@ -454,26 +461,29 @@ Sign-in under it is `With::Transport`; the small store's records are the
 domain's (`RequestRecord<Held>`), kept by the world.
 Needs: 12.4's client.
 Files: `crates/jig-client/src/{client.rs, lib.rs}`,
-`src/tests/typed.rs`; `tests/client/Cargo.toml` (`jig-client-world`
-gains `jig-client`); `tests/client/src/joint/front.rs` (its front
-carries a typed client's `Down` and `Up` through its translation to the
+`src/tests/unlinked.rs`; `tests/client/Cargo.toml` (`jig-client-world`
+gains `jig-client`, and `"jig-client"` joins the allow list of
+`tests/boundary/src/tests/graph.rs:297-341`,
+`client_world_joins_only_the_client_and_test_roles`); `tests/client/src/joint/front.rs` (its front
+carries an unlinked client's `Down` and `Up` through its translation to the
 real core, `tests/client/src/joint/transport.rs`), `tests/client/tests/`
 (the joint story below).
-Shape: `Client::typed`, `Event::Up { up }`, `Request::Down { down }`.
-Under `typed`, `Event::{Reply, Lost, Streamed, StreamGone}` are
+Shape: `Client::unlinked`, `Event::Up { up }`, `Request::Down { down }`.
+Under `unlinked`, `Event::{Reply, Lost, Streamed, StreamGone}` are
 dropped, and under `new`, `Event::Up` is; each is a fact the client's
-host made a mistake of, and `debug_assert!`s it.
-Test shape: `crates/jig-client/src/tests/typed.rs`: tests
-`a_typed_client_gives_its_watch_as_the_domain_s_opening`,
-`a_typed_client_takes_an_answer_as_the_domain_s`,
-`a_typed_client_s_records_are_the_table_s`. Each under 20 ms. The joint
-story `a_typed_client_sees_me_live_against_the_real_core` (tests/client,
+host made a mistake of, and `assert!`s it (`debug_assert!` is banned
+in step crates, `clippy.toml:87`).
+Test shape: `crates/jig-client/src/tests/unlinked.rs`: tests
+`an_unlinked_client_gives_its_watch_as_the_domain_s_opening`,
+`an_unlinked_client_takes_an_answer_as_the_domain_s`,
+`an_unlinked_client_s_records_are_the_table_s`. Each under 20 ms. The joint
+story `an_unlinked_client_sees_me_live_against_the_real_core` (tests/client,
 `jig-client-world`, the joint world: a scripted application in front of
-`Client::typed`, its `Down` and `Up` carried by the joint front to the
+`Client::unlinked`, its `Down` and `Up` carried by the joint front to the
 real core), under 0.5 s.
 Proof: joint layer, the real core: `heavy cargo nextest run -p
-jig-client-world -E 'test(a_typed_client_sees_me_live_against_the_real_core)'`,
-once; it passes when the typed client's link goes live with party 1;
+jig-client-world -E 'test(an_unlinked_client_sees_me_live_against_the_real_core)'`,
+once; it passes when the unlinked client's link goes live with party 1;
 nothing else is wanted. jig 13.4's test root then runs the client's
 world on it (`signing_in_and_starting_a_chat`, tests/client).
 Don't: no typed path in any shell; no `Down` or `Up` under `new`.
@@ -544,14 +554,14 @@ pub struct LinkView<'a> {
 }
 pub enum Unusable { Limits }
 pub struct Limits { pub domain: DomainLimits, pub exchanges: u32 }
-pub struct Client { /* domain, link (none under `typed`), the map's state */ }
+pub struct Client { /* domain, link (none under `unlinked`), the map's state */ }
 impl Client {
     /// # Errors
     /// `Unusable::Limits` when the limits admit no client.
     pub fn new(limits: &Limits, seed: u64) -> Result<Client, Unusable>;
     /// # Errors
     /// `Unusable::Limits` when the limits admit no client.
-    pub fn typed(limits: &Limits, seed: u64) -> Result<Client, Unusable>;
+    pub fn unlinked(limits: &Limits, seed: u64) -> Result<Client, Unusable>;
     pub fn step(&mut self, now: Time, wall: Wall, event: Event, out: &mut Queue<Request>);
     pub fn fire(&mut self, now: Time, wall: Wall, out: &mut Queue<Request>);
     pub fn next_deadline(&self) -> Option<Time>;
@@ -593,7 +603,7 @@ The map in `jig-client`, written once (an algorithm easy to get wrong):
 - **The client's world and the typed transport** (testing.md, 4): the
   design has the world play the transport to a scripted engine, which
   speaks the contract's types, while the client gives the transport
-  bytes. The plan adds `Client::typed` (12.5); if the designer wants the
+  bytes. The plan adds `Client::unlinked` (12.5); if the designer wants the
   scripted engine to read and write wire records instead, 12.5 goes and
   jig 13.4's and jig 21.2's client worlds change.
 
