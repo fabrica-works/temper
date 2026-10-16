@@ -137,6 +137,12 @@ fn a_family_readout_or_delivery_nobody_asked_for_is_a_notice() {
     }
 }
 #[test]
+fn the_native_limits_make_the_terminal() {
+    let (view, _, _) = limits::view(&limits::native()).expect("Usable native view limits");
+    let terminal = crate::terminal::Loop::new(&limits::terminal(), &view.tree, Box::from(*b"client"), None);
+    assert!(terminal.worst_case().is_some(), "The native terminal has a memory bound");
+}
+#[test]
 fn the_native_limits_pass_each_worst_case() {
     let limits = limits::native();
     let (view, jig, forge) = limits::view(&limits).expect("usable view");
