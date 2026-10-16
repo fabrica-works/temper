@@ -184,6 +184,8 @@ pub struct Facts {
     pub first: bool,
     pub may_merge: bool,
     pub queue_repair_active: bool,
+    /// The end of the window Forgejo is still settling in, when open.
+    pub settling: Option<Wall>,
 }
 
 /// Committed delegate and effect results supplied by the top.

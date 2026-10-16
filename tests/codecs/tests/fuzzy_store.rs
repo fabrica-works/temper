@@ -49,6 +49,7 @@ const LIMITS: forge::Limits = forge::Limits {
         poll_max: Duration::from_secs(30),
         hinted: Duration::from_secs(1),
         slow: Duration::from_secs(40),
+        settle: Duration::from_secs(30),
         facts: 16,
     },
     issue_policy: temper_engine_domain_forge_issues::Limits {

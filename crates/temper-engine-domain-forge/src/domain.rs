@@ -125,6 +125,7 @@ pub struct Domain {
     projection_due: Map<u64, skein_lib::Wall>,
     change_due: Map<u64, skein_lib::Wall>,
     procedure_wakes: Map<u64, bool>,
+    pub(crate) settling: Map<u64, crate::settle::Settle>,
 }
 
 impl Domain {
@@ -329,6 +330,7 @@ impl Domain {
             projection_due: Map::with_capacity(l.issues),
             change_due: Map::with_capacity(l.changes),
             procedure_wakes: Map::with_capacity(l.changes),
+            settling: Map::with_capacity(l.changes),
         })
     }
 
@@ -790,6 +792,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::Unsubscribe { task, topic } => unsubscribe(d, task, topic, out),
         Event::Hint { hint } => {
             let changes = d.changes_for(hint.repository, env.limits.changes);
+            crate::settle::hinted(d, env, &hint, &changes);
             for task in changes {
                 d.procedure_wakes.insert(task, true).expect("one pending wake per change");
             }
@@ -1940,6 +1943,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
             }
         }
     }
+    crate::settle::observe(d, env, &row, pending.pull.as_ref(), pending.ci);
     let facts = change_facts(d, env, &row, &pending, base_tip);
     let heard = change::Heard {
         effect: if row.pending.is_some() { change::EffectResult::Pending } else { row.effect },
@@ -1967,7 +1971,15 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
                 topics::head_changed(d, row.task, out);
                 topics::refresh(d, env, row.task, out);
-                emit(out, Request::ChangeDecision { task: row.task, decision, entry: None, evidence: None });
+                emit(
+                    out,
+                    Request::ChangeDecision {
+                        task: row.task,
+                        decision: crate::settle::cap(d, env, row.task, decision),
+                        entry: None,
+                        evidence: None,
+                    },
+                );
                 return;
             }
         }
@@ -1975,6 +1987,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
     emit(out, Request::Refused { task: row.task });
 }
 
+#[expect(clippy::manual_map, reason = "step code uses concrete matches, without callbacks")]
 fn change_facts(
     d: &Domain,
     env: &Env<Limits>,
@@ -2008,6 +2021,7 @@ fn change_facts(
         Some(repository) => repository.ci,
         None => true,
     };
+    let window = crate::settle::window(d, row.task);
     change::Facts {
         branch: pending.branch,
         expected_base: base_tip,
@@ -2024,6 +2038,7 @@ fn change_facts(
         contains_base: pending.contains_base,
         mergeable: match &pending.pull {
             Some(pull) if pull.mergeable => change::Status::Passed,
+            Some(_) if window.is_some() => change::Status::Pending,
             Some(_) => change::Status::Failed,
             None => change::Status::Unknown,
         },
@@ -2033,6 +2048,10 @@ fn change_facts(
         first: queue_first(d, row, env.wall, &env.limits),
         may_merge,
         queue_repair_active: pending.queue_repair_active,
+        settling: match window {
+            Some((_, end)) => Some(end),
+            None => None,
+        },
     }
 }
 
@@ -3354,6 +3373,8 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
             assert!(discarded.is_empty(), "restoration emits no output");
         }
         Stored::Change(row) => {
+            // Volatile waits are rebuilt by stepping every restored change (domain/forge.md, 16).
+            d.change_due.insert(row.task, env.wall).expect("a wake per restored change");
             d.changes.insert(row.task, row).expect("restored change within limits");
         }
         Stored::Issue(row) => {

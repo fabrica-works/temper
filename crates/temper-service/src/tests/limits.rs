@@ -35,9 +35,10 @@ fn no_two_component_prefixes_meet() {
 #[test]
 fn an_override_sets_the_field_its_dotted_name_names() {
     let mut limits = limits::profile(limits::Profile::Small);
-    let rows: [(&[u8], u64); 4] = [
+    let rows: [(&[u8], u64); 5] = [
         (b"forge.repositories", 3),
         (b"forge.client.calls", 5),
+        (b"forge.client.settle_ms", 2_000),
         (b"checkout.remote_timeout_ms", 7_000),
         (b"root.loads.rows", 9),
     ];
@@ -46,6 +47,7 @@ fn an_override_sets_the_field_its_dotted_name_names() {
     }
     assert_eq!(limits.forge.repositories, 3);
     assert_eq!(limits.forge.client.calls, 5);
+    assert_eq!(limits.forge.client.settle, Duration::from_secs(2));
     assert_eq!(limits.checkout.remote_timeout, Duration::from_millis(7_000));
     assert_eq!(limits.root.loads.rows, 9);
 }
@@ -120,4 +122,9 @@ fn each_git_component_limit_has_its_dotted_override() {
         );
         assert!(temper_worker_protocol_git::worst_case(&git, &limits.checkout).is_some(), "{name:?}");
     }
+}
+
+#[test]
+fn the_small_profile_gives_settle_thirty_seconds() {
+    assert_eq!(limits::profile(limits::Profile::Small).forge.client.settle, Duration::from_secs(30));
 }

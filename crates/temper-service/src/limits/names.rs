@@ -106,6 +106,7 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"forge.client.poll_max_ms" => limits.forge.client.poll_max = duration(value)?,
         b"forge.client.hinted_ms" => limits.forge.client.hinted = duration(value)?,
         b"forge.client.slow_ms" => limits.forge.client.slow = duration(value)?,
+        b"forge.client.settle_ms" => limits.forge.client.settle = duration(value)?,
         b"forge.client.facts" => limits.forge.client.facts = u32::try_from(value).or(Err(Refused::Range))?,
         b"forge.change_policy.repairs" => {
             limits.forge.change_policy.repairs = u32::try_from(value).or(Err(Refused::Range))?;

@@ -47,6 +47,7 @@ fn facts() -> Facts {
         first: false,
         may_merge: true,
         queue_repair_active: false,
+        settling: None,
     }
 }
 fn heard() -> Heard {
@@ -292,4 +293,24 @@ fn generated_queue_order_agrees_with_an_independent_rank_statement() {
         }
         assert_eq!(first(&ready, window, now), Some(expected.task), "seed {seed}");
     }
+}
+
+#[test]
+fn a_pending_wait_inside_the_settle_window_ends_with_it_and_never_stalls() {
+    let mut f = facts();
+    f.mergeable = Status::Pending;
+    f.settling = Some(at(50));
+    let decision =
+        step(&change(State::First { head: HEAD, ready_since: at(0) }), &f, &heard(), at(40), &LIMITS).decision;
+    assert_eq!(decision, Decision::Wait { until: Some(at(50)) });
+}
+
+#[test]
+fn a_pending_wait_past_the_settle_window_stalls_as_any_wait() {
+    let mut f = facts();
+    f.mergeable = Status::Pending;
+    f.settling = Some(at(40));
+    let decision =
+        step(&change(State::First { head: HEAD, ready_since: at(0) }), &f, &heard(), at(40), &LIMITS).decision;
+    assert_eq!(decision, Decision::Hold(Hold::Stalled));
 }

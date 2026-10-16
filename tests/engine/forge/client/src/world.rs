@@ -28,6 +28,7 @@ pub const LIMITS: Limits = Limits {
     poll_max: Duration::from_secs(30),
     hinted: Duration::from_secs(1),
     slow: Duration::from_secs(40),
+    settle: Duration::from_secs(30),
     facts: 8,
 };
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

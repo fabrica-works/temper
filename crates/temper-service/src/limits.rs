@@ -79,6 +79,8 @@ const CLIENT: client::Limits = client::Limits {
     hinted: Duration::from_secs(1),
     // Delay before a slow read, from the engine forge world fixture.
     slow: Duration::from_secs(40),
+    // Bound Forgejo's settling of mergeability and hinted CI after a move.
+    settle: Duration::from_secs(30),
     // Facts awaiting drain, from the engine forge world fixture.
     facts: 16,
 };

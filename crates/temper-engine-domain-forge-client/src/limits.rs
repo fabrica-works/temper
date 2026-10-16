@@ -38,6 +38,8 @@ pub struct Limits {
     pub poll_max: Duration,
     pub hinted: Duration,
     pub slow: Duration,
+    /// How long Forgejo may settle mergeability and a hinted job's CI.
+    pub settle: Duration,
     pub facts: u32,
 }
 /// Retained operations, four class queues, budget timers and diagnostics.
@@ -66,6 +68,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         || l.poll > l.poll_max
         || l.hinted == Duration::ZERO
         || l.slow == Duration::ZERO
+        || l.settle == Duration::ZERO
     {
         return None;
     }

@@ -30,6 +30,7 @@ const LIMITS: Limits = Limits {
     poll_max: Duration::from_secs(60),
     hinted: Duration::from_secs(1),
     slow: Duration::from_secs(60),
+    settle: Duration::from_secs(30),
     facts: 32,
 };
 const REPO: Repository = Repository { forge: 2, repository: 5 };
@@ -740,4 +741,9 @@ fn a_job_answers_step_name_counts_against_answer_bytes() {
             "Length {length}"
         );
     }
+}
+
+#[test]
+fn a_zero_settle_window_is_refused() {
+    assert_eq!(worst_case(&Limits { settle: Duration::ZERO, ..LIMITS }), None);
 }

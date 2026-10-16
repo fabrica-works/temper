@@ -24,6 +24,7 @@ pub mod items;
 mod judge;
 mod limits;
 pub mod resources;
+mod settle;
 #[cfg(test)]
 mod tests;
 mod topics;

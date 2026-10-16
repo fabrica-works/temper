@@ -74,3 +74,9 @@ fn person_words_recover_a_retained_live_run_word() {
 fn an_issue_creation_recovers_its_focused_commit_cuts() {
     crashed_at(Story::IssueCreation, [1, 7]);
 }
+
+#[test]
+fn a_ci_repair_keeps_its_settle_wait_across_restart() {
+    let outcome = stories::run(Story::RepairCi, Cut::AfterCommit(32), 101).expect("settling survives restart");
+    assert!(outcome.crashes.contains(&32));
+}

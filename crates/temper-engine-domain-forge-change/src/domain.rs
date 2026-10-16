@@ -180,6 +180,16 @@ fn waiting(change: Change, now: Wall, limits: &Limits) -> Stepped {
     }
 }
 
+fn settling(change: Change, facts: &Facts, now: Wall, limits: &Limits) -> Stepped {
+    if let Some(end) = facts.settling
+        && now < end
+    {
+        Stepped { change, decision: Decision::Wait { until: Some(end) } }
+    } else {
+        waiting(change, now, limits)
+    }
+}
+
 fn hold(mut change: Change, why: Hold) -> Stepped {
     if change.owns_turn {
         change.owns_turn = false;
@@ -324,7 +334,7 @@ fn checking(
                 change.state = State::Gating { head, asked: Box::new([]) };
                 Stepped { change, decision: Decision::None }
             } else {
-                waiting(change, now, limits)
+                settling(change, facts, now, limits)
             }
         }
     }
@@ -488,7 +498,7 @@ fn first(mut change: Change, head: [u8; 32], ready_since: Wall, facts: &Facts, n
             Stepped { change, decision: Decision::Effect(Effect::Merge { head, base: facts.expected_base }) }
         }
         Status::Failed => resolving_due(change, facts.base_tip, now, limits),
-        Status::Unknown | Status::Pending => waiting(change, now, limits),
+        Status::Unknown | Status::Pending => settling(change, facts, now, limits),
     }
 }
 
