@@ -857,6 +857,9 @@ choice would have been the user's (development.md, 10.4).
 
      03.4's Size becomes at most 420 lines (was 330), a codec increment. Unchanged: 03.4's Shape, Test shape and Proof (the acceptance in the proposer's inbox), and 03.5.
 
+176. **The check of 20:41Z's lasting steers in the README** (steer of 2026-10-16T21:01Z).
+     The check of 2026-10-16T20:41:43Z's steer of 21:01Z: its points 1 (a .rs file of at most 800 lines at `origin/main` stays at most 800, with the three that crossed it brought back when next edited) and 3 (`person_unchanged` taken from `jig_core_world::fixtures` where a crate can reach it) hold to the run's end, so their Pass on texts join the README's rule "The run's steers" (ruling 167), and the coordinator gives them in no prompt. Point 2 (a session past 150K hands over at its landing, development.md, section 7.3, step 4) is the coordinator's alone. Unchanged: the 18:42Z and 19:38Z points.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

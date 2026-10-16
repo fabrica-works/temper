@@ -634,6 +634,21 @@ per session are in each file.
     from jig 04.5), rather than adding the field by hand. Do this only for
     the literals your commit edits anyway; a literal that maps every field
     from another value keeps its fields.
+  - 21:01Z, point 1 (jig): A .rs file of at most 800 lines at origin/main
+    stays at most 800 after your commit: run `git diff --name-only
+    origin/main -- '*.rs' | xargs wc -l` before `land`, and put new code
+    in a module beside it. Three crossed 800 on 2026-10-16:
+    `jig-domain-people/src/boundary.rs` (806),
+    `tests/ops/tests/fuzzy_joint.rs` (805),
+    `jig-protocol-engine-clients/src/tests/fixtures.rs` (813). The next
+    increment that edits one brings it to 800 or less. Your report lists
+    every file over 800 after your commit, with base and now. Generated
+    code is exempt; files over 800 at the base keep their 40 lines.
+  - 21:01Z, point 3 (jig): `person_unchanged` is defined in six fixtures
+    modules. `tests/conformance` takes
+    `jig_core_world::fixtures::person_unchanged` and its copy goes. A crate
+    that cannot depend on `jig-core-world` keeps one copy and names why in
+    its commit body.
 
 ## Prerequisites the run checks at its start
 
