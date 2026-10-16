@@ -1,10 +1,11 @@
 //! The terminal's loop over a client, with time supplied by its host.
 use crate::{
-    command::{self, Command, Line, Lines, Refusal},
-    limits, render,
+    limits,
+    lines::{Line, Lines},
 };
 use skein_lib::{Duration, Queue, Secret, Time};
 use skein_ui::{Act, NodeId, Tree};
+use skein_ui_text::{Command, Print, Refusal};
 pub(crate) mod native;
 mod run;
 pub use run::Terminal;
@@ -40,18 +41,17 @@ enum Phase {
 /// A bounded command stream, one output in flight, and deferred whole-page prints.
 pub struct Loop {
     limits: limits::Terminal,
-    bounds: render::Bounds,
-    frame: render::Frame,
+    print: Print,
+    view_limits: skein_ui::Limits,
     directory: Box<[u8]>,
     link: Option<Secret>,
     reader: Lines,
-    numbers: Option<render::Numbers>,
     lines: Queue<Box<[u8]>>,
     output: Option<Box<[u8]>>,
     writing: bool,
     printed: u64,
     last: Option<Time>,
-    print: bool,
+    due: bool,
     changed: bool,
     acted: Option<u64>,
     retry: Option<Time>,
@@ -63,25 +63,23 @@ impl Loop {
     #[must_use]
     pub fn new(
         limits: &limits::Terminal,
-        bounds: render::Bounds,
-        frame: render::Frame,
+        view_limits: &skein_ui::Limits,
         directory: Box<[u8]>,
         link: Option<Secret>,
     ) -> Self {
         Self {
             limits: *limits,
-            bounds,
-            frame,
+            print: Print::new(view_limits).expect("print bounds"),
+            view_limits: *view_limits,
             directory,
             link,
             reader: Lines::new(limits.line),
-            numbers: None,
             lines: Queue::with_capacity(limits.lines),
             output: None,
             writing: false,
             printed: 0,
             last: None,
-            print: false,
+            due: false,
             changed: false,
             acted: None,
             retry: None,
@@ -103,8 +101,13 @@ impl Loop {
             taken += 1;
             if let Some(line) = self.reader.take(*byte) {
                 let command = match line {
-                    Line::Whole(line) => command::read(&line, self.numbers.as_ref(), client.tree()),
-                    Line::TooLong => Command::Refused(Refusal::TooLong),
+                    Line::Whole(line) => skein_ui_text::command(
+                        &line,
+                        (self.printed > 0).then(|| self.print.numbers.as_slice()),
+                        client.tree(),
+                        self.limits.line,
+                    ),
+                    Line::TooLong => Command::Refused { refusal: Refusal::TooLong, number: 0 },
                 };
                 self.command(command, client);
                 if self.phase == Phase::Closing {
@@ -117,10 +120,9 @@ impl Loop {
     }
     fn command<C: Client>(&mut self, command: Command, client: &mut C) {
         match command {
-            Command::Act { node, act } => self.act(node, act, client),
-            Command::Write { node, value, submit } => {
+            Command::Act { node, first, submit } => {
                 let before = client.built();
-                if client.act(node, Act::Input { value }) {
+                if client.act(node, first) {
                     if submit {
                         client.act(node, Act::Submit);
                     }
@@ -129,32 +131,20 @@ impl Loop {
                     self.gone(node);
                 }
             }
-            Command::Print => self.print = true,
+            Command::Print => self.due = true,
             Command::Close => self.close(client),
             Command::Nothing => {}
-            Command::Refused(refusal) => {
-                self.lines.push(command::refusal_line(refusal));
-                self.print |= refusal.reprints();
+            Command::Refused { refusal, number } => {
+                self.lines.push(skein_ui_text::refusal_line(b"temper", refusal, number));
+                self.due |= matches!(refusal, Refusal::NoNumber | Refusal::Gone);
             }
-        }
-    }
-    fn act<C: Client>(&mut self, node: NodeId, act: Act, client: &mut C) {
-        let before = client.built();
-        if client.act(node, act) {
-            self.acted = Some(before);
-        } else {
-            self.gone(node);
         }
     }
     fn gone(&mut self, node: NodeId) {
-        if let Some(numbers) = &self.numbers {
-            for number in 1..=numbers.count() {
-                if numbers.node(number) == Some(node) {
-                    self.lines.push(command::refusal_line(Refusal::Gone { number }));
-                    self.print = true;
-                    break;
-                }
-            }
+        if let Some(index) = self.print.numbers.iter().position(|id| *id == node) {
+            let number = u64::try_from(index).expect("printed index fits").checked_add(1).expect("number fits");
+            self.lines.push(skein_ui_text::refusal_line(b"temper", Refusal::Gone, number));
+            self.due = true;
         }
     }
     /// Close without signing out, retaining already queued output for its drain.
@@ -163,7 +153,7 @@ impl Loop {
             self.phase = Phase::Closing;
             self.link = None;
             self.retry = None;
-            self.print = false;
+            self.due = false;
             self.acted = None;
             client.close();
         }
@@ -193,11 +183,11 @@ impl Loop {
             }
             if self.acted.is_some_and(|built| client.built() > built) {
                 self.acted = None;
-                self.print = true;
+                self.due = true;
             }
             self.changed = client.built() > self.printed;
             if self.changed && self.last.is_none_or(|last| now >= last.saturating_add(self.limits.interval)) {
-                self.print = true;
+                self.due = true;
             }
         }
         if self.writing {
@@ -206,13 +196,17 @@ impl Loop {
         if let Some(line) = self.lines.pop() {
             self.output = Some(line);
             self.writing = true;
-        } else if self.print && self.phase == Phase::Active && client.built() > 0 {
-            let page = render::print(client.tree(), &self.frame, &self.bounds);
-            self.output = Some(page.text);
-            self.numbers = Some(page.numbers);
+        } else if self.due && self.phase == Phase::Active && client.built() > 0 {
+            skein_ui_text::render(
+                client.tree(),
+                b"temper",
+                Some(jig_view::regions::JigRegion::Link.region()),
+                &mut self.print,
+            );
+            self.output = Some(Box::from(self.print.text.as_slice()));
             self.printed = client.built();
             self.last = Some(now);
-            self.print = false;
+            self.due = false;
             self.changed = false;
             self.writing = true;
         }
@@ -304,12 +298,13 @@ impl Loop {
     #[must_use]
     pub fn worst_case(&self) -> Option<u64> {
         let line = u64::try_from(self.directory.len().checked_add(160)?).ok()?;
-        render::worst_case(&self.bounds)?
+        skein_ui_text::worst_case(&self.view_limits)?
+            .1
             .checked_mul(2)?
+            .checked_add(skein_lib::List::<NodeId>::worst_case(self.view_limits.nodes)?)?
             .checked_add(skein_lib::List::<u8>::worst_case(self.limits.line.checked_add(1)?)?)?
             .checked_add(Queue::<Box<[u8]>>::worst_case(self.limits.lines)?)?
             .checked_add(line.checked_mul(u64::from(self.limits.lines).checked_add(3)?)?)?
-            .checked_add(u64::try_from(self.frame.behind.len()).ok()?)?
             .checked_add(u64::try_from(self.link.as_ref().map_or(0, |link| link.expose().len())).ok()?)
     }
 }

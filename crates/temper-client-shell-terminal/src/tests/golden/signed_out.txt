@@ -1,6 +1,5 @@
 == Sign in == Offline
 Work:
-  Connection:
   What needs you:
     * Nothing known yet
   Who is signed in:

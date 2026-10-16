@@ -93,25 +93,24 @@ pub fn core_refusal() -> Box<[u8]> {
 
 pub fn tree_limits() -> skein_ui::Limits {
     skein_ui::Limits {
-        nodes: 1024,
-        depth: 48,
+        nodes: 256,
+        depth: 32,
         text_per_node: 1024,
-        text_bytes: 1_048_576,
+        text_bytes: 65_536,
         drawing_bytes: 16,
         scene_marks: 0,
         scene_bytes: 0,
         styles_per_node: 2,
-        patches: 5120,
-        bindings: 1024,
-        slots: 256,
+        patches: 1280,
+        bindings: 256,
+        slots: 64,
         markdown_depth: 3,
     }
 }
-pub fn bounds() -> crate::render::Bounds {
-    crate::render::bounds(&tree_limits()).expect("fixture print bounds")
-}
-pub fn frame() -> crate::render::Frame {
-    crate::render::Frame { behind: Box::from(*b"Behind: waiting for current facts") }
+pub(crate) fn print(tree: &skein_ui::Tree) -> skein_ui_text::Print {
+    let mut print = skein_ui_text::Print::new(&tree_limits()).expect("fixture print bounds");
+    skein_ui_text::render(tree, b"temper", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+    print
 }
 pub fn golden(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/golden").join(format!("{name}.txt"))
@@ -140,7 +139,9 @@ pub fn adoption_page(
     let mut builder = skein_ui::Builder::new(&limits);
     synthetic_header(&mut builder, None, false);
     let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
+    builder.open(skein_ui::Role::Main);
     temper_client_view::forge::page::page(&mut builder, form, b"Project: Shop", forge, jig, &mut bindings);
+    builder.close();
     builder.close();
     visible(builder.finish())
 }
@@ -164,6 +165,9 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
             open.pop();
         }
         builder.open(node.role);
+        if let Some(region) = node.region {
+            builder.region(region);
+        }
         if let Some(name) = &node.name {
             builder.name(name);
         }
@@ -202,6 +206,8 @@ pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> s
     let mut limits = crate::limits::native().client;
     limits.jig.text = 32;
     limits.jig.rows = 8;
+    limits.jig.document_bytes = 16_384;
+    limits.table.bytes = 4096;
     let env = Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits };
     let (jig, forge) = page_words();
     let mut view =
@@ -373,23 +379,26 @@ pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, b
     builder.open(Role::Page);
     builder.open(Role::Region);
     builder.name(b"Frame");
+    builder.region(jig_view::regions::JigRegion::Link.region());
     builder.open(Role::Status);
     builder.text(Run::Plain, b"Live");
     builder.close();
     if behind {
         builder.open(Role::Status);
-        builder.text(Run::Plain, &frame().behind);
+        builder.text(Run::Plain, b"Behind: waiting for current facts");
         builder.close();
     }
+    builder.close();
     builder.open(Role::Status);
     builder.text(Run::Plain, b"Signed in as Pat");
     builder.close();
-    builder.close();
+    builder.open(Role::Main);
     if let Some(title) = title {
         builder.open(Role::Heading { level: 1 });
         builder.text(Run::Plain, title);
         builder.close();
     }
+    builder.close();
 }
 pub fn header_page(title: Option<&[u8]>, behind: bool) -> skein_ui::Tree {
     let mut builder = skein_ui::Builder::new(&tree_limits());
@@ -552,50 +561,6 @@ pub fn control_text() -> skein_ui::Tree {
     builder.close();
     builder.close();
     visible(builder.finish())
-}
-pub fn controls() -> (skein_ui::Tree, crate::render::Numbers) {
-    let tree = visible(control_tree());
-    let numbers = crate::render::print(&tree, &frame(), &bounds()).numbers;
-    (tree, numbers)
-}
-pub fn control_tree() -> skein_ui::Tree {
-    control_tree_with(None, true)
-}
-pub fn control_tree_with(check_state: Option<skein_ui::State>, check_bound: bool) -> skein_ui::Tree {
-    use skein_ui::{Role, State};
-    let mut builder = skein_ui::Builder::new(&tree_limits());
-    synthetic_header(&mut builder, Some(b"Controls"), false);
-    for (role, name) in [
-        (Role::Button, b"Button".as_slice()),
-        (Role::Link, b"Link"),
-        (Role::Tab, b"Tab"),
-        (Role::Check, b"Check"),
-        (Role::Choice, b"Choice"),
-        (Role::TextField, b"Field"),
-        (Role::TextArea, b"Area"),
-    ] {
-        builder.open(role);
-        builder.name(name);
-        if role != Role::Check || check_bound {
-            builder.bind(binding());
-        }
-        if role == Role::Check
-            && let Some(state) = check_state
-        {
-            builder.state(state);
-        }
-        if role == Role::TextField {
-            builder.state(State::SubmitsOnEnter);
-        }
-        builder.close();
-    }
-    builder.open(Role::Button);
-    builder.name(b"Disabled");
-    builder.bind(binding());
-    builder.state(State::Disabled);
-    builder.close();
-    builder.close();
-    builder.finish()
 }
 fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
     use contract::{Read, ReadValue};

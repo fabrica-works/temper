@@ -1,6 +1,5 @@
 == Adopt a repository into Project: Shop == Live
-Frame:
-  * Signed in as Pat
+* Signed in as Pat
 [1] Forge number: 1
 [2] Owner: (empty)
 [3] Name: (empty)

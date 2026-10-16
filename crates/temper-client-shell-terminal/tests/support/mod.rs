@@ -3,7 +3,7 @@ use skein_lib::{Duration, Queue, Secret, Time, Token};
 use skein_ui::{Act, Builder, NodeId, Role, Tree};
 use std::collections::VecDeque;
 use temper_client_shell_terminal::{
-    limits, render,
+    limits,
     terminal::{Client, Loop, Notice},
 };
 
@@ -27,10 +27,12 @@ fn tree(revision: u64) -> Tree {
     let mut builder = Builder::new(&tree_limits());
     builder.open(Role::Page);
     builder.open(Role::Region);
+    builder.region(jig_view::regions::JigRegion::Link.region());
     builder.open(Role::Status);
     builder.text(skein_ui::Run::Plain, b"Live");
     builder.close();
     builder.close();
+    builder.open(Role::Main);
     builder.open(Role::Heading { level: 1 });
     builder.text(skein_ui::Run::Plain, format!("Revision {revision}").as_bytes());
     builder.close();
@@ -42,6 +44,7 @@ fn tree(revision: u64) -> Tree {
         builder.bind(skein_ui::Binding { owner: jig_view::Owner::Jig.opaque(), token: Token::new(1) });
         builder.close();
     }
+    builder.close();
     builder.close();
     builder.finish()
 }
@@ -117,8 +120,10 @@ impl Client for Script {
         if self.closed {
             return false;
         }
-        let numbers = render::print(&self.tree, &frame(), &bounds()).numbers;
-        let number = (1..=numbers.count()).find(|n| numbers.node(*n) == Some(node));
+        let mut print = skein_ui_text::Print::new(&tree_limits()).expect("world print envelope");
+        skein_ui_text::render(&self.tree, b"temper", Some(jig_view::regions::JigRegion::Link.region()), &mut print);
+        let number =
+            print.numbers.iter().position(|id| *id == node).map(|index| u32::try_from(index).expect("number fits") + 1);
         let Some(number) = number else {
             return false;
         };
@@ -138,12 +143,6 @@ impl Client for Script {
     fn close(&mut self) {
         self.closed = true;
     }
-}
-pub fn frame() -> render::Frame {
-    render::Frame { behind: Box::from(*b"Behind") }
-}
-pub fn bounds() -> render::Bounds {
-    render::bounds(&tree_limits()).expect("world print envelope")
 }
 pub struct World {
     pub terminal: Loop,
@@ -167,8 +166,7 @@ impl World {
         let mut world = Self {
             terminal: Loop::new(
                 &limits::terminal(),
-                bounds(),
-                frame(),
+                &tree_limits(),
                 Box::from(*b"client"),
                 (!signed_in).then(|| Secret::new(Box::from(*b"private-link"))),
             ),

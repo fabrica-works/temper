@@ -8,7 +8,7 @@ use skein_shell::{Clock, Config, Host, Kernel};
 use std::{ffi::OsString, net::SocketAddr, os::unix::ffi::OsStrExt, path::Path};
 use temper_client_shell_terminal::{
     client::{NativeClient, Settings, Start},
-    limits, render,
+    limits,
     terminal::{Loop, Terminal},
 };
 
@@ -89,8 +89,7 @@ pub(crate) fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, Refused
             }
         };
         let bounds = limits::native();
-        let (view, words, _) = limits::view(&bounds).expect("native view bounds");
-        let frame = render::Frame { behind: words.say(jig_view::phrases::jig::JigPhrase::Behind, &[]) };
+        let (view, _, _) = limits::view(&bounds).expect("native view bounds");
         let client = NativeClient::new(
             Settings { engine: skein_io::Addr::Ip(engine), directory: name.as_bytes().into(), limits: bounds },
             root,
@@ -99,13 +98,7 @@ pub(crate) fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, Refused
             start,
         )
         .map_err(|_| Refused::NotALink(argument.as_bytes().into()))?;
-        let state = Loop::new(
-            &limits::terminal(),
-            render::bounds(&view.tree).expect("print bounds"),
-            frame,
-            directory.as_os_str().as_bytes().into(),
-            link,
-        );
+        let state = Loop::new(&limits::terminal(), &view.tree, directory.as_os_str().as_bytes().into(), link);
         let signals = skein_shell::open_termination_signals().expect("termination signals");
         owned.push(signals);
         let mut terminal = Terminal::new(client, state, Fd::new(0), Fd::new(1), signals).expect("terminal descriptors");

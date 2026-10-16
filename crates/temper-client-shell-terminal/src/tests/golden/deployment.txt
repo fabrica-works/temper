@@ -1,6 +1,5 @@
 == Deployment == Live
 Work:
-  Connection:
   What needs you:
     Questions: 0; proposals: 0; escalations: 0; person tasks: 0
     Results read through 0

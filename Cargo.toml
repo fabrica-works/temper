@@ -79,6 +79,7 @@ jig-protocol-transcript = { git = "https://github.com/forgetic/jig.git" }
 jig-client-world = { git = "https://github.com/forgetic/jig.git" }
 skein-fake-person = { git = "https://github.com/forgetic/skein.git" }
 skein-ui = { git = "https://github.com/forgetic/skein.git" }
+skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
 jig-test-domain-client = { git = "https://github.com/forgetic/jig.git" }
 temper-client-view = { path = "crates/temper-client-view" }
 jig-view = { git = "https://github.com/forgetic/jig.git" }

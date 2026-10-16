@@ -1,6 +1,5 @@
 == Every role == Live
-Frame:
-  * Signed in as Pat
+* Signed in as Pat
 Region:
   child
 Figure:
@@ -49,11 +48,10 @@ one | two
 [-] Unbound
 Outside <https://example.test/>
 * Loading
-*
+* 
 Progress: half
 --
 Slot
 Drawing:
   fallback
-beforeafter
-[10] Nested
+beforeNestedafter

@@ -179,7 +179,7 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
         Start::Token,
     )
     .expect("native client");
-    let state = Loop::new(&limits::terminal(), support::bounds(), support::frame(), Box::from(*b"private"), None);
+    let state = Loop::new(&limits::terminal(), &support::tree_limits(), Box::from(*b"private"), None);
     let mut terminal = Terminal::new(native, state, Fd::new(1), Fd::new(2), Fd::new(3)).expect("terminal pipes");
     let mut pending = BTreeMap::new();
     for turn in 0..32 {

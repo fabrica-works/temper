@@ -6,9 +6,9 @@ use jig_domain_client::contract;
 use jig_protocol_client_link as link;
 use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
-mod command;
 mod family;
 mod fixtures;
+mod lines;
 mod render;
 
 #[test]
