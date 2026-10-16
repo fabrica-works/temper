@@ -30,7 +30,7 @@ pub struct Forge {
 /// The documents a forge speaks.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
-    /// Forgejo v16.0.5's API under `/api/v1`.
+    /// the pinned Forgejo's API under `/api/v1`.
     Forgejo,
 }
 

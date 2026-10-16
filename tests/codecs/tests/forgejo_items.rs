@@ -26,7 +26,7 @@ fn edited() -> Issue {
     issue(3, false, b"edited title", b"<!-- temper:key 01000001 -->\nissue text", 2, 1_577_817_005_000_000_000)
 }
 fn feature() -> Issue {
-    issue(1, true, b"feature/slash", b"fixture pull", 1, 1_577_817_008_000_000_000)
+    issue(1, true, b"feature/slash", b"fixture pull", 1, 1_577_817_009_000_000_000)
 }
 fn conflict() -> Issue {
     issue(2, true, b"conflict", b"fixture pull", 1, 1_577_817_007_000_000_000)
@@ -74,12 +74,12 @@ fn pull(merged: bool) -> PullRequest {
 fn cases() -> Vec<(&'static str, Request, Answer)> {
     vec![
         ("issues-page-1", listing(1, None, Wall::EPOCH), Answer::Issues(Box::from([conflict(), edited()]))),
-        ("issues-page-2", listing(2, None, Wall::EPOCH), Answer::Issues(Box::from([feature(), writer()]))),
+        ("issues-page-2", listing(2, None, Wall::EPOCH), Answer::Issues(Box::from([writer(), feature()]))),
         ("issues-type-issues", listing(1, Some(IssueKind::Issues), Wall::EPOCH), Answer::Issues(Box::from([edited()]))),
         (
             "issues-type-pulls",
             listing(1, Some(IssueKind::Pulls), Wall::EPOCH),
-            Answer::Issues(Box::from([conflict(), feature()])),
+            Answer::Issues(Box::from([conflict(), writer()])),
         ),
         (
             "issues-since-2554",

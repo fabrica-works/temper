@@ -1,11 +1,13 @@
 # Throwaway Forgejo conformance
 
-The Rust tool starts only the checked Forgejo v16.0.5 binary named by
+The Rust tool starts only the pinned Forgejo binary named by
 `TEMPER_FORGEJO`, with fresh SQLite state on loopback. It creates the
 fixture and removes its instance and scratch directory when it ends.
+`VERSION` and `RUNNER_VERSION` in
+`testing/temper-throwaway-forgejo/src/binary.rs` pin both binaries.
 
 ```sh
-TEMPER_FORGEJO=<absolute path to Forgejo v16.0.5> heavy --gate \
+TEMPER_FORGEJO=<absolute path to the pinned Forgejo> heavy --gate \
   cargo run -p forgejo-conformance -- \
   --scratch target/forgejo-conformance --out tools/forgejo-conformance
 ```
@@ -27,7 +29,7 @@ masking. A leak reports the case and secret kind without printing its value.
 
 The same run writes `facts.txt`, with Forgejo and runner provenance followed
 by `holds`, `fails` or `unchecked` lines. Set `TEMPER_FORGEJO_RUNNER` to the
-checked v12.13.2 runner for Actions facts and six Actions transcripts.
+pinned runner for Actions facts and six Actions transcripts.
 The runner registers with this instance only and executes two inline host
 shell jobs, one succeeding and one failing; no actions or containers are
 downloaded. Without a runner those facts remain unchecked. Webhook facts

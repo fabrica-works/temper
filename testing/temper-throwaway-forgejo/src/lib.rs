@@ -2,7 +2,7 @@
 mod binary;
 mod http;
 mod instance;
-pub use binary::{Forgejo, Refusal, VERSION};
+pub use binary::{Forgejo, RUNNER_VERSION, Refusal, VERSION, names_runner};
 pub use instance::Instance;
 use std::{fmt, path::PathBuf};
 #[derive(Debug, Clone)]

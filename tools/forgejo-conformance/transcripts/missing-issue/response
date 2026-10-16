@@ -5,6 +5,6 @@ X-Content-Type-Options: nosniff
 X-Frame-Options: SAMEORIGIN
 Date: Wed, 01 Jan 2020 00:00:00 GMT
 Connection: close
-Content-Length: 98
+Content-Length: 142
 
-{"message":"The target couldn't be found.","url":"http://127.0.0.1:3000/api/swagger","errors":[]}
+{"message":"IsErrIssueNotExist","url":"http://127.0.0.1:3000/api/swagger","errors":["issue does not exist [id: 0, repo_id: 1, index: 9999]"]}

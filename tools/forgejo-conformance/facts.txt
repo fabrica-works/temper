@@ -1,5 +1,5 @@
-# forgejo forgejo version 16.0.5+gitea-1.22.0 (release name 16.0.5) built with GNU Make 4.4.1, go1.26.8 : bindata, timetzdata, sqlite, sqlite_unlock_notify sha256 2c548bf1bfa09a441a3a674b1dd4959d77576816ad50534c23496908a3ea5a19
-# runner forgejo-runner version v12.13.2
+# forgejo forgejo version 17.0.0+gitea-1.22.0 (release name 17.0.0) built with GNU Make 4.4.1, go1.26.9 : bindata, timetzdata, sqlite, sqlite_unlock_notify sha256 5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca
+# runner forgejo-runner version v13.2.0
 holds api-default-page-cap-50-and-30
 holds pull-for-accepts-encoded-slash
 holds update-conflict-is-409-merge-failed

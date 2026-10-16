@@ -1,4 +1,4 @@
-//! Forgejo v16.0.5's refusal messages, as the committed transcripts spell them.
+//! the pinned Forgejo's refusal messages, as the committed transcripts spell them.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
     MergeClosed,

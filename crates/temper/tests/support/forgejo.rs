@@ -14,7 +14,7 @@ pub struct Throwaway {
 impl Throwaway {
     #[must_use]
     pub fn start(scratch: &Scratch) -> Self {
-        let binary = Forgejo::from_env().expect("TEMPER_FORGEJO must name Forgejo v16.0.5");
+        let binary = Forgejo::from_env().expect("TEMPER_FORGEJO must name the pinned Forgejo");
         let mut instance = binary
             .start(&scratch.path().join("forgejo"), &Settings { actions: false, ..Settings::small() })
             .expect("throwaway Forgejo starts without Actions");

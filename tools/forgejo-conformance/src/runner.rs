@@ -191,8 +191,8 @@ fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result<(Runner, S
     let scratch = f.instance.scratch().join("runner");
     fs::create_dir_all(scratch.join("home"))?;
     let output = command(binary, &scratch).arg("--version").output()?;
-    let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if !output.status.success() || !version.contains("12.13.2") {
+    let version = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or_default().to_owned();
+    if !output.status.success() || !temper_throwaway_forgejo::names_runner(&version) {
         return Err(format!("runner {}: {version}", binary.display()).into());
     }
     let registration = f.get(&format!("{R}/actions/runners/registration-token"))?["token"]

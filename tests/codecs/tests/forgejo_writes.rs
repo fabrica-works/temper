@@ -247,7 +247,7 @@ fn failure_cases() -> Vec<(&'static str, u16, &'static [u8], Option<Refusal>)> {
         ("writer-branch-protections", 403, b"user should be an owner or a collaborator with admin write of a repository", None),
         ("delete-protected-branch", 403, b"can not delete default branch", None),
         ("archived-write", 423, b"<Repository 3:fixture/archived> is archived", None),
-        ("missing-issue", 404, b"The target couldn't be found.", None),
+        ("missing-issue", 404, b"IsErrIssueNotExist", None),
         ("raw-file-missing", 404, b"The target couldn't be found.", None),
         ("stranger-repository-by-path", 404, b"The target couldn't be found.", None),
         ("stranger-repository-by-id", 404, b"The target couldn't be found.", None),

@@ -89,7 +89,7 @@ pub enum Read {
         page: u32,
         limit: u32,
     },
-    /// Compare exact commits. Forgejo 15 ignores these page arguments;
+    /// Compare exact commits. Forgejo ignores these page arguments;
     /// this fake returns the whole bounded comparison or `TooLarge`.
     Compare {
         base: u64,
@@ -101,7 +101,7 @@ pub enum Read {
     Checks {
         commit: u64,
     },
-    /// Bounded plaintext output of one Forgejo v16.0.5 job attempt. The
+    /// Bounded plaintext output of one the pinned Forgejo job attempt. The
     /// existing byte answer carries one extra byte when truncated.
     Job {
         job: u64,

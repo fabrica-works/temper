@@ -90,8 +90,8 @@ fn the_component_block_is_replaced_and_other_lines_kept() {
     let facts = [Fact { name: "component-read-items", outcome: Outcome::Fails("TooLarge".to_owned()) }];
     for (before, expected) in [
         (
-            "# forgejo 16.0.5\n# runner none\nholds merge\nholds component-read-items\n",
-            "# forgejo 16.0.5\n# runner none\nholds merge\nfails component-read-items: TooLarge\n",
+            "# forgejo pinned\n# runner none\nholds merge\nholds component-read-items\n",
+            "# forgejo pinned\n# runner none\nholds merge\nfails component-read-items: TooLarge\n",
         ),
         (
             "holds component-start-ready\nholds merge\nunchecked component-read-job: none\n",

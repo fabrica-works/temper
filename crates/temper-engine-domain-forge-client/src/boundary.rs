@@ -26,7 +26,7 @@ pub struct Effect {
     pub write: Write,
     pub condition: Condition,
 }
-/// How Forgejo v16.0.5 can recover a write whose answer was lost
+/// How the pinned Forgejo can recover a write whose answer was lost
 /// (jig's domain/connectors.md, section 4.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Recovery {
