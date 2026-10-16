@@ -374,6 +374,19 @@ Shape:
   refused as "no proposal could be accepted" refuses the step
   (`StepRefusal::Refused`), one beyond authority is proposed and the rest
   commits.
+- The admitted proposals cross into the tasks child on
+  `tasks::ProcedureDecision` (`crates/jig-domain-tasks/src/boundary.rs:277`),
+  which gains `proposals: Box<[tasks::Proposal]>` beside `amendments` and
+  `messages` (ruling 152): `tasks::procedure` checks and installs them
+  with the step's other parts, so a refusal, an existing proposal or an
+  inbox reservation refuses the whole step. `ProcedureDecision::new`
+  (`:305`) gives `Box::new([])`, so its `..ProcedureDecision::new(..)`
+  users change nothing; the whole literals gain `proposals:
+  Box::new([])` or the step's: `crates/jig-domain-core/src/routing/procedure_steps.rs:87`,
+  `crates/jig-domain-core/src/tests/acts/proposals.rs:80`,
+  `tests/tasks/tests/inbox.rs:517`, `tests/tasks/tests/procedures.rs:126`,
+  `:147`, `:176` (jig `055b8a547`); a further one gets the same, listed in
+  the commit body. temper names no `ProcedureDecision`.
 - The test connector: `Amend { words }` decides `StepDecision::Amend {
   task: <its delegate>, revision: <the revision it was told>, words }`;
   on `Event::StepRefused { why: Moved { revision } }` it records the
