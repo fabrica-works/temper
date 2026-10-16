@@ -94,6 +94,7 @@ fn words(what: What) -> &'static [u8] {
             config::What::Reserve { .. } => b"reserve does not fit charter ",
             config::What::Budget { .. } => b"budget does not fit charter ",
             config::What::Accounts { .. } => b"accounts do not fit charter ",
+            config::What::Grace { .. } => b"grace does not fit template ",
             config::What::Message => b"message bounds do not agree",
             config::What::Silence => b"heartbeat does not fit silence bound",
             config::What::StopBound => b"stop bound does not fit grace",
@@ -139,7 +140,8 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             What::Jig(
                 config::What::Reserve { charter }
                 | config::What::Budget { charter }
-                | config::What::Accounts { charter },
+                | config::What::Accounts { charter }
+                | config::What::Grace { template: charter },
             ) => {
                 put(writer, &mut length, measuring, Decimal::of(u64::from(charter)).as_bytes());
             }

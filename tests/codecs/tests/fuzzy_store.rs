@@ -95,7 +95,7 @@ fn golden(bytes: &[u8], bounds: &Bounds) {
 fn store_decoders_never_panic_and_reencode_the_same() {
     let bounds = temper_protocol_store::bounds(&LIMITS).expect("fixture limits fit");
     let mut rng = Rng::new(0x7e3d_0405);
-    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v1");
+    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v2");
     for _ in 0..2_000 {
         record(&temper_codecs_world::drawn(&mut rng, 512), &bounds);
         key(&temper_codecs_world::drawn(&mut rng, 512));

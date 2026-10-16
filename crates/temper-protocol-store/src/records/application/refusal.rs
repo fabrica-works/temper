@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v2 as w;
+use jig_protocol_store::people_v3 as w;
 use skein_lib::Wall;
 pub(super) fn encode_disposal_issue(value: p::DisposalIssue, _l: &w::Limits) -> w::DisposalIssue {
     match value {
@@ -316,6 +316,7 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
             w::Refusal::Ended(w::RefusalEnded::new(l, w::RefusalEndedParts { how: encode_ending(how, l)? })?)
         }
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(l, w::RefusalTakenParts { by: *by })?),
+        p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
@@ -344,6 +345,7 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
         w::Refusal::Moved(value) => p::Refusal::Moved { now: decode_moved(value.now().clone()) },
         w::Refusal::Ended(value) => p::Refusal::Ended { how: decode_ending(value.how().clone()) },
         w::Refusal::Taken(value) => p::Refusal::Taken { by: value.by() },
+        w::Refusal::NoEscalationHolder => p::Refusal::NoEscalationHolder,
         w::Refusal::NotWaiting => p::Refusal::NotWaiting,
         w::Refusal::NoFurther => p::Refusal::NoFurther,
         w::Refusal::Unknown => p::Refusal::Unknown,

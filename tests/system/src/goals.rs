@@ -65,7 +65,7 @@ fn configured() -> Driver {
     limits.brief.sections = 8;
     limits.forge.brief_sections = 80;
     limits.brief.brief_bytes = 1024;
-    limits.journal.writes = 3000;
+    limits.journal.writes = 4096;
     limits.journal.deliveries = 512;
     limits.journal.held = 1536;
     limits.journal.transcript_bytes = 32768;

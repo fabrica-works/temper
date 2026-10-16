@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v1};
+use crate::{records, v2};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v1::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v2::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -609,7 +609,7 @@ fn every_application_outcome_preserves_its_complete_record() {
         assert_eq!(bytes[2], 15, "the Application family tag");
     }
     assert!(
-        jig_protocol_store::people_v2::Refusal::worst_case_bytes(&jig_protocol_store::people_v2::CEILINGS)
+        jig_protocol_store::people_v3::Refusal::worst_case_bytes(&jig_protocol_store::people_v3::CEILINGS)
             .expect("bounded facts")
             <= 23
     );
@@ -618,14 +618,14 @@ fn every_application_outcome_preserves_its_complete_record() {
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v1::CoreRefused::new(&v1::CEILINGS, v1::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v1::Application::new(
-            &v1::CEILINGS,
-            v1::ApplicationParts { token: 9, until: 10, outcome: v1::ApplicationOutcome::CoreRefused(value) },
+        let value = v2::CoreRefused::new(&v2::CEILINGS, v2::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v2::Application::new(
+            &v2::CEILINGS,
+            v2::ApplicationParts { token: 9, until: 10, outcome: v2::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v1::Row::new(&v1::CEILINGS, v1::RowParts { value: v1::Value::Application(application) }).expect("row");
+            v2::Row::new(&v2::CEILINGS, v2::RowParts { value: v2::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }

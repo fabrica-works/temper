@@ -53,10 +53,10 @@ fn client_wire_schema_matches_generated_code_and_goldens() {
 #[test]
 fn store_schema_matches_generated_code_and_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/temper-protocol-store");
-    let source = fs::read_to_string(root.join("schema/store-v1.schema")).expect("store schema");
+    let source = fs::read_to_string(root.join("schema/store-v2.schema")).expect("store schema");
     let output = generate(&parse(&source).expect("schema valid"));
-    let code = root.join("src/generated/v1.rs");
-    let goldens = root.join("golden/v1");
+    let code = root.join("src/generated/v2.rs");
+    let goldens = root.join("golden/v2");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper-codecs-world --test drift";
     if write {

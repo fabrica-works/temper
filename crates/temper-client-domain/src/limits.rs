@@ -1,6 +1,6 @@
 //! Keep: the child/table routing shape and exhaustive owner variants.
 //! Replace: Ops connector sides with the forge's side and temper's navigation.
-use crate::{Ask, Request, forge, owner::Owner};
+use crate::{Request, forge, owner::Owner, store::Held};
 use skein_lib::{Queue, RequestLimits, RequestTable};
 /// Application-configured child and request-table bounds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,7 +33,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(limits.jig.document_bytes)?;
     // Held parts and the PartsLeft survivor list each own their part payloads.
     total = total.checked_add(u64::from(limits.forge.parts).checked_mul(limits.jig.document_bytes)?.checked_mul(2)?)?;
-    total = total.checked_add(RequestTable::<Owner, Ask>::worst_case(&limits.table)?)?;
+    total = total.checked_add(RequestTable::<Owner, Held>::worst_case(&limits.table)?)?;
     total = total.checked_add(limits.table.bytes.checked_mul(3)?)?;
     let jig_out = jig_domain_client::max_out(&limits.jig);
     let root_out = checked_max_out(limits)?;

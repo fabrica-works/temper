@@ -178,13 +178,6 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
                 Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants };
             run_prepared(domain, env, prepared);
         }
-        core::Now::ProcedureDelegateOutcome { task, step, child } => {
-            if let Some(kind) = domain.forge_delegating.remove(&(task, step))
-                && let Some(child) = child
-            {
-                domain.work.push(Work::Forge(super::forge::Event::Delegated { task, child, kind }));
-            }
-        }
         core::Now::DropAssignment { task } => drop(domain.assignments.remove(&task)),
         core::Now::EffectAnswer { to, key: _, part } => {
             let answer = CallAnswer::from_core(&part).expect("effect wait answer");

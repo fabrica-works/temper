@@ -6,13 +6,13 @@ use alloc::boxed::Box;
 pub mod keys;
 pub mod records;
 #[rustfmt::skip]
-#[path = "generated/v1.rs"]
-pub mod v1;
+#[path = "generated/v2.rs"]
+pub mod v2;
 #[cfg(test)]
 mod tests;
 
 /// One version for every durable family (store/README.md, section 4).
-pub const STORE_VERSION: u32 = 1;
+pub const STORE_VERSION: u32 = 2;
 
 /// Largest encodings under the forge's checked bounds, before jig's key tag.
 #[must_use]
@@ -21,7 +21,7 @@ pub fn application(limits: &temper_engine_domain_forge::Limits) -> Option<jig_pr
     Some(jig_protocol_store::sizes::Application {
         version: STORE_VERSION,
         key: keys::largest(limits)?,
-        value: u32::try_from(v1::Row::worst_case_bytes(bounds.limits())?).ok()?,
+        value: u32::try_from(v2::Row::worst_case_bytes(bounds.limits())?).ok()?,
     })
 }
 
@@ -32,13 +32,13 @@ pub struct Undecodable;
 /// Schema limits checked once alongside the forge's key bounds.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Bounds {
-    limits: v1::Limits,
+    limits: v2::Limits,
     forge: temper_engine_domain_forge::Limits,
 }
 impl Bounds {
     /// The generated decoder's limits.
     #[must_use]
-    pub const fn limits(&self) -> &v1::Limits {
+    pub const fn limits(&self) -> &v2::Limits {
         &self.limits
     }
     /// The domain limits for names and key decoding.
@@ -51,7 +51,7 @@ impl Bounds {
 /// Make schema bounds from the domain, refusing any ceiling overflow.
 #[must_use]
 pub fn bounds(forge: &temper_engine_domain_forge::Limits) -> Option<Bounds> {
-    let limits = v1::Limits {
+    let limits = v2::Limits {
         create_issue_key: forge.client.op_bytes,
         create_issue_title: forge.client.op_bytes,
         create_issue_body: forge.client.op_bytes,
@@ -88,7 +88,7 @@ pub fn bounds(forge: &temper_engine_domain_forge::Limits) -> Option<Bounds> {
         subscriber_paths_item: forge.name_bytes,
         ..records::limits(forge)?
     };
-    v1::check_limits(&limits).ok()?;
+    v2::check_limits(&limits).ok()?;
     Some(Bounds { limits, forge: *forge })
 }
 

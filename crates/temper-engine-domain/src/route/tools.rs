@@ -165,7 +165,10 @@ pub(crate) fn relay_payload(
                     domain.work.push(Work::Core(core::Event::NamedAction {
                         to: reply_to,
                         key,
-                        action: core::NamedAction::Control { target, control: tasks::Control::Cancel { reason } },
+                        action: core::NamedAction::Control {
+                            target,
+                            control: tasks::Control::Cancel { reason, grace: None, message: None },
+                        },
                     }));
                 }
                 Tool::Release { target, revision, again } => {

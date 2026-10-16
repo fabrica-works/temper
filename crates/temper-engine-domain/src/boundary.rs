@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
-use jig_domain_core::{Delegate, HistoricalResult, ProcedureAction, RunCharter};
+use jig_domain_core::{Delegate, HistoricalResult, ProcedureStep, RunCharter};
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_people as people;
@@ -366,7 +366,7 @@ pub enum PartyInput {
         step: u64,
         connector: u16,
         code: u32,
-        action: ProcedureAction,
+        decision: ProcedureStep,
     },
     SignedIn {
         /// Web-issued right to this one sign-in reply, moved through people to a durable terminal.

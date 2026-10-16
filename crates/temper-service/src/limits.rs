@@ -187,7 +187,7 @@ const ROOT: Root = Root {
         // At least deliveries * 3: the root's worst case.
         held: 1536,
         // At least `route_bound` plus `call_records`: the root's worst case.
-        writes: 6144,
+        writes: 8192,
         // At least jig small fleet.workers * fleet.max_out + 1: the root's worst case.
         deliveries: 512,
         // At least row_bound, including forge.client.answer_bytes: the root's worst case.
@@ -273,6 +273,7 @@ pub fn engine(jig: &jig_protocol_config::Limits, limits: &Limits) -> Option<engi
         accounts: jig.core.accounts,
         notes: jig.core.notes,
         documents: jig.core.documents,
+        templates: jig.core.templates,
         call_records: jig.core.call_records,
         forge: limits.forge,
     };

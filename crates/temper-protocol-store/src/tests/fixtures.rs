@@ -494,7 +494,7 @@ pub fn answers_without_item_pieces() -> [client::api::Answer; 19] {
         Answer::Located { repository: 27 },
     ]
 }
-pub fn encoded(value: &crate::v1::Error) -> Box<[u8]> {
+pub fn encoded(value: &crate::v2::Error) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measured error length"));
     value.encode(&mut writer).expect("measured room");
     writer.finish()
@@ -546,13 +546,13 @@ pub fn item_answers() -> [client::api::Answer; 3] {
         Answer::Reviews { reviews: Box::new([review(), review()]), more: true },
     ]
 }
-pub fn encoded_row(row: &crate::v1::Row) -> Box<[u8]> {
+pub fn encoded_row(row: &crate::v2::Row) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).expect("measured row length"));
     row.encode(&mut writer).expect("measured room");
     writer.finish()
 }
-pub fn item_piece_row(items: Box<[u8]>) -> crate::v1::Row {
-    use crate::v1 as w;
+pub fn item_piece_row(items: Box<[u8]>) -> crate::v2::Row {
+    use crate::v2 as w;
     let answer = w::Answer::Items(
         w::ItemsAnswer::new(&w::CEILINGS, w::ItemsAnswerParts { items, more: false, now: 1 }).expect("piece ceiling"),
     );

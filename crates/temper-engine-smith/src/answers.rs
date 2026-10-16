@@ -382,6 +382,8 @@ fn task_problem(text: &mut Text, problem: &jig_domain_tasks::Problem) -> Result<
         Refusal::Duplicate => text.add(b"duplicate"),
         Refusal::Empty => text.add(b"empty batch"),
         Refusal::Batch => text.add(b"batch limit"),
+        Refusal::Grace => text.add(b"finish grace"),
+        Refusal::Goals => text.add(b"goal limit"),
         Refusal::Live => text.add(b"live task limit"),
         Refusal::Project => text.add(b"project"),
         Refusal::Tree => text.add(b"task tree limit"),

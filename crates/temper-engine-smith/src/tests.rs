@@ -359,6 +359,7 @@ fn amend_and_release_calls_name_their_revision() {
                 target: CALL_TASK,
                 revision: 0,
                 amendment: tasks::Amendment {
+                    tracked: None,
                     addressed: None,
                     instructions: None,
                     release: None,

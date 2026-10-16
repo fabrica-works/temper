@@ -152,7 +152,7 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
     let body = peer::link_body(&service.engine, &link);
     let mut peer = peer::Peer::new(&mut service.engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
     peer.pump(&mut service.engine, true);
-    let jig_client_protocol_wire::v7::SignInAnswer::SignedIn(answer) = peer.sign_in_answer(&service.engine) else {
+    let jig_client_protocol_wire::v8::SignInAnswer::SignedIn(answer) = peer.sign_in_answer(&service.engine) else {
         panic!("signed in")
     };
     assert_eq!(answer.party(), 1);
@@ -186,7 +186,7 @@ fn a_request_before_decisions_open_is_answered_not_ready() {
     assert_eq!(engine.clients.early.len(), 1, "request staged during restoration");
     crate::engine::iterate(engine, skein_lib::Time::ZERO, skein_lib::Wall::EPOCH);
     peer.pump(engine, false);
-    assert_eq!(peer.sign_in_answer(engine), jig_client_protocol_wire::v7::SignInAnswer::NotReady);
+    assert_eq!(peer.sign_in_answer(engine), jig_client_protocol_wire::v8::SignInAnswer::NotReady);
     assert!(!engine.domain.ready());
 }
 #[test]

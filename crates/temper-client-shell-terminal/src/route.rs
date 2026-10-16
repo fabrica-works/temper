@@ -66,7 +66,11 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
             };
             let dropped = match &record {
                 link::Saved::Table {
-                    record: skein_lib::RequestRecord { request: jig_client_domain::Ask::Family(record), .. },
+                    record:
+                        skein_lib::RequestRecord {
+                            request: jig_client_domain::Held { request: jig_client_domain::Ask::Family(record), .. },
+                            ..
+                        },
                     ..
                 } => {
                     record.family == temper_client_protocol_wire::FORGE
@@ -123,7 +127,9 @@ pub fn up(request: link::Request, family: &mut family::Family) -> Up {
             jig_client_domain::Readout::Jig(result) => {
                 Up::Root(client::Event::Jig(jig_domain_client::Event::Read { read, result }))
             }
-            jig_client_domain::Readout::Family { .. } => Up::Notice(Notice::Unasked),
+            jig_client_domain::Readout::Limit | jig_client_domain::Readout::Family { .. } => {
+                Up::Notice(Notice::Unasked)
+            }
         },
         link::Request::Hello { family: None, versions } => {
             Up::Root(client::Event::Jig(jig_domain_client::Event::Hello { served: link::serves(versions) }))
@@ -207,9 +213,12 @@ pub fn saved(record: client::store::Record, family: &family::Family) -> Option<l
                 key: record.key,
                 scope: record.scope,
                 first_sent: record.first_sent,
-                request: match record.request {
-                    client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
-                    client::Ask::Forge(ask) => jig_client_domain::Ask::Family(family::request(&ask, &family.wire)?),
+                request: jig_client_domain::Held {
+                    key: record.request.key,
+                    request: match record.request.request {
+                        client::Ask::Jig(ask) => jig_client_domain::Ask::Jig(ask),
+                        client::Ask::Forge(ask) => jig_client_domain::Ask::Family(family::request(&ask, &family.wire)?),
+                    },
                 },
             },
         },
@@ -220,13 +229,18 @@ pub fn kept(saved: link::Saved, family: &family::Family) -> Option<client::store
     match saved {
         link::Saved::Jig(record) => Some(client::store::Record::Jig(record)),
         link::Saved::Table { version, record } => {
-            let request = match record.request {
+            let request = match record.request.request {
                 jig_client_domain::Ask::Jig(ask) => client::Ask::Jig(ask),
                 jig_client_domain::Ask::Family(record) => client::Ask::Forge(family::restored(&record, &family.wire)?),
             };
             Some(client::store::Record::Table {
                 version,
-                record: RequestRecord { key: record.key, scope: record.scope, first_sent: record.first_sent, request },
+                record: RequestRecord {
+                    key: record.key,
+                    scope: record.scope,
+                    first_sent: record.first_sent,
+                    request: client::store::Held { key: record.request.key, request },
+                },
             })
         }
         link::Saved::Family { .. } => None,

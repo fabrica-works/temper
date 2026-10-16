@@ -32,7 +32,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                         }
                     }
                     Record::Table { version, record } => {
-                        let size = crate::domain::ask_size(&env.limits, &record.request);
+                        let size = crate::domain::ask_size(&env.limits, &record.request.request);
                         let scope = record.scope;
                         if version != crate::store::VERSION
                             || root.table.restore(Owner::Kept { scope }, size, record).is_err()

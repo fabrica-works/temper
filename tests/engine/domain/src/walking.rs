@@ -28,6 +28,8 @@ pub fn limits() -> engine::Limits {
         tasks: 2,
         funders: 4,
         project_tasks: 2,
+        project_goals: 2,
+        grace: Duration::from_secs(5),
         tree_tasks: 2,
         depth: 1,
         delegates: 1,
@@ -117,6 +119,7 @@ pub fn limits() -> engine::Limits {
         + tasks.tasks
         + 6;
     engine::Limits {
+        templates: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.templates,
         documents: jig_domain_core::documents::DocumentLimits {
             rows: 4,
             text_bytes: 4_096,
@@ -254,6 +257,7 @@ pub fn config(seed: u64) -> engine::Config {
             }]),
             authority: domain,
             settings: jig_domain_core::Settings {
+                templates: crate::fixtures::templates(),
                 close_grace: Duration::from_secs(5),
                 deployment_provider: 1,
                 charters: Box::new([charter()]),
@@ -261,6 +265,7 @@ pub fn config(seed: u64) -> engine::Config {
                 resume_bytes: 256,
                 tools: jig_domain_core::ToolFamilies::JIG,
             },
+            template_overrides: skein_lib::Map::with_capacity(authority_limits().projects),
             projects,
             permission_roles: permission_roles(),
             // The forge is the deployment's one connector.

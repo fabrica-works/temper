@@ -31,7 +31,7 @@ use alloc::boxed::Box;
 pub use forge_route::adopt_repository_ask;
 use jig_domain_authority as authority;
 use jig_domain_core as core;
-use jig_domain_core::{Delegate, ProcedureAction};
+use jig_domain_core::{Delegate, ProcedureStep, StepEnd};
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -97,8 +97,8 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
         Event::Party(crate::PartyInput::Period { project, period, budget, next }) => {
             domain.work.push(Work::Core(core::Event::Period { project, period, budget, next }));
         }
-        Event::Party(crate::PartyInput::ProcedureStep { task, step, connector, code, action }) => {
-            domain.work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, action }));
+        Event::Party(crate::PartyInput::ProcedureStep { task, step, connector, code, decision }) => {
+            domain.work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, decision }));
         }
         Event::Party(crate::PartyInput::SignOut { reply_to, sign_in }) => {
             domain.work.push(Work::People(people::Event::SignOut { reply_to, sign_in }));

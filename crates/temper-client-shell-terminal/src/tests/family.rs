@@ -139,7 +139,13 @@ fn a_restored_adoption_of_another_version_is_dropped() {
             key: [9; 16],
             scope: 1,
             first_sent: None,
-            request: client::Ask::Forge(forge::Ask::Adopt(fixtures::adoption())),
+            request: client::store::Held {
+                key: jig_client_domain::Key {
+                    asker: jig_client_domain::Asker(u32::from(FORGE)),
+                    number: fixtures::ATTEMPT.raw(),
+                },
+                request: client::Ask::Forge(forge::Ask::Adopt(fixtures::adoption())),
+            },
         },
     };
     let saved = route::saved(record.clone(), &family).expect("bounded record");
@@ -147,11 +153,11 @@ fn a_restored_adoption_of_another_version_is_dropped() {
     let link::Saved::Table { version, mut record } = saved else {
         panic!("table saved");
     };
-    let jig_client_domain::Ask::Family(mut ask) = record.request else {
+    let jig_client_domain::Ask::Family(mut ask) = record.request.request else {
         panic!("forge saved");
     };
     ask.version = 2;
-    record.request = jig_client_domain::Ask::Family(ask);
+    record.request.request = jig_client_domain::Ask::Family(ask);
     let up = route::up(link::Request::Kept { record: link::Saved::Table { version, record } }, &mut family);
     assert!(
         matches!(up, Up::Notice(Notice::Dropped { keeper: link::Keeper::Family(FORGE) })),

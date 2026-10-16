@@ -63,6 +63,7 @@ pub fn tool_call(driver: &mut Driver, source: &engine::Assignment, call: u64, to
 #[must_use]
 pub fn task_amendment(words: Option<&[u8]>, authority: Option<tasks::Authority>, reason: &[u8]) -> tasks::Amendment {
     tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         release: None,
@@ -105,4 +106,38 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
     };
     let child = children[0];
     (driver, parent, child)
+}
+
+#[must_use]
+pub fn templates() -> Box<[jig_domain_core::Template]> {
+    use jig_domain_people::{TemplateBudget, TemplateDeadline, TemplateExecutor};
+    use jig_domain_tasks::{Contract, Flags, Retention};
+    Box::new([
+        jig_domain_core::Template {
+            number: 1,
+            name: Box::from(&b"chat"[..]),
+            executor: TemplateExecutor::Charter(1),
+            contract: Contract::Report { words: 32 },
+            shallower: 1,
+            budget: TemplateBudget::AsAllowed { cap: None },
+            deadline: TemplateDeadline::None,
+            tracked: None,
+            flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
+            label: 1,
+            grace: Some(skein_lib::Duration::from_millis(5000)),
+        },
+        jig_domain_core::Template {
+            number: 2,
+            name: Box::from(&b"goal"[..]),
+            executor: TemplateExecutor::Chosen,
+            contract: Contract::Report { words: 32 },
+            shallower: 1,
+            budget: TemplateBudget::Given,
+            deadline: TemplateDeadline::Given,
+            tracked: Some(1),
+            flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
+            label: 2,
+            grace: None,
+        },
+    ])
 }

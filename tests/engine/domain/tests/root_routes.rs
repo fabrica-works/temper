@@ -1656,7 +1656,10 @@ fn a_proposal_routed_past_a_procedure_to_a_person_is_accepted() {
         step: 1,
         connector: 1,
         code: 1,
-        action: engine::ProcedureAction::Delegate(Box::new([report_delegate(b"child", Box::new([]))])),
+        decision: engine::ProcedureStep {
+            batch: Box::new([report_delegate(b"child", Box::new([]))]),
+            ..engine::ProcedureStep::new(engine::StepEnd::Wait)
+        },
     }));
     driver.settle();
     let child = driver

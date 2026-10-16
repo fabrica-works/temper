@@ -2,9 +2,9 @@
 //! calls cross one root decision; the connector never owns the store.
 use super::{
     CallAnswer, CallKey, Decision, Delivery, Domain, Env, Family, ForgeRepository, ForgeStart, ForgeWorkspace, Id, Key,
-    Limits, List, ProcedureAction, Queue, Record, ReplyTo, Request, Token, Work, Write, authority, connector_answer,
-    core_call, decide_call, emit, escalation, forge, forge_change, forge_client, forge_issues, people, save,
-    save_connector_answer, tasks,
+    Limits, List, ProcedureStep, Queue, Record, ReplyTo, Request, StepEnd, Token, Work, Write, authority,
+    connector_answer, core_call, decide_call, emit, escalation, forge, forge_change, forge_client, forge_issues,
+    people, save, save_connector_answer, tasks,
 };
 use alloc::boxed::Box;
 use jig_domain_brief as brief;
@@ -1825,7 +1825,7 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
     }
     domain.forge.offered_change(task);
     let mut again = false;
-    let action = match choice {
+    let decision = match choice {
         forge_change::Decision::Finish { merge } => {
             let pull = match domain.forge.change(task) {
                 Some(row) => row.pull,
@@ -1837,16 +1837,16 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
                     step,
                     connector,
                     code,
-                    action: ProcedureAction::Hold(tasks::Hold::Effects),
+                    decision: ProcedureStep::new(StepEnd::Hold(tasks::Hold::Effects)),
                 }));
                 return;
             };
-            ProcedureAction::Result(tasks::TaskResult::Change {
+            ProcedureStep::new(StepEnd::Result(tasks::TaskResult::Change {
                 connector: domain.config.forge_connector,
                 kind: 1,
                 resource: pull,
                 words: Box::from(&merge[..]),
-            })
+            }))
         }
         forge_change::Decision::Hold(why) => {
             let why = match why {
@@ -1860,26 +1860,26 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
                 }
                 forge_change::Hold::Failed | forge_change::Hold::Rejected => tasks::Hold::EffectFailed,
             };
-            ProcedureAction::Hold(why)
+            ProcedureStep::new(StepEnd::Hold(why))
         }
         forge_change::Decision::Ready => {
             again = true;
-            ProcedureAction::Wait
+            ProcedureStep::new(StepEnd::Wait)
         }
         forge_change::Decision::QueueRepair => {
             if start_queue_repair(domain, env, task) {
                 domain.forge.wait_change(&super::environment_forge(env), task, None);
-                ProcedureAction::Wait
+                ProcedureStep::new(StepEnd::Wait)
             } else {
-                ProcedureAction::Hold(tasks::Hold::Effects)
+                ProcedureStep::new(StepEnd::Hold(tasks::Hold::Effects))
             }
         }
         forge_change::Decision::Wait { until } => {
             domain.forge.wait_change(&super::environment_forge(env), task, until);
-            ProcedureAction::Wait
+            ProcedureStep::new(StepEnd::Wait)
         }
         forge_change::Decision::None | forge_change::Decision::Effect(_) | forge_change::Decision::Cancel => {
-            ProcedureAction::Wait
+            ProcedureStep::new(StepEnd::Wait)
         }
         forge_change::Decision::Delegate(kind) => {
             let Some(delegate) = change_delegate(domain, env, task, kind) else {
@@ -1888,7 +1888,7 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
                     step,
                     connector,
                     code,
-                    action: ProcedureAction::Hold(tasks::Hold::Effects),
+                    decision: ProcedureStep::new(StepEnd::Hold(tasks::Hold::Effects)),
                 }));
                 return;
             };
@@ -1898,12 +1898,12 @@ fn change_decision(domain: &mut Domain, env: &Env<Limits>, task: u64, choice: fo
                 step,
                 connector,
                 code,
-                action: ProcedureAction::Delegate(Box::new([delegate])),
+                decision: ProcedureStep { batch: Box::new([delegate]), ..ProcedureStep::new(StepEnd::Wait) },
             }));
             return;
         }
     };
-    domain.work.push(Work::Core(jig_domain_core::Event::ProcedureStep { task, step, connector, code, action }));
+    domain.work.push(Work::Core(jig_domain_core::Event::ProcedureStep { task, step, connector, code, decision }));
     if again {
         domain.work.push(Work::Tasks(tasks::Event::WakeProcedure { task }));
     }

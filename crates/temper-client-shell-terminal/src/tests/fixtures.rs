@@ -25,7 +25,10 @@ pub fn table_record() -> client::store::Record {
             key: [9; 16],
             scope: SERVICE,
             first_sent: None,
-            request: client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
+            request: client::store::Held {
+                key: jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: ATTEMPT.raw() },
+                request: client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
+            },
         },
     }
 }

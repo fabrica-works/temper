@@ -4,7 +4,7 @@ use crate::{
     Ask, Event, Fact, Limits, Request, forge,
     owner::Owner,
     route,
-    store::{Key, Record},
+    store::{Held, Key, Record},
 };
 use skein_lib::{Env, Queue, RequestAnswered, RequestOut, RequestProgress, RequestTable, Rng, Time};
 /// The two children and their shared durable request table.
@@ -13,7 +13,7 @@ pub struct Domain {
     pub(crate) jig: jig_domain_client::Domain,
     pub(crate) forge: forge::Side,
     forge_number: u16,
-    pub(crate) table: RequestTable<Owner, Ask>,
+    pub(crate) table: RequestTable<Owner, Held>,
 }
 #[must_use]
 pub fn new(limits: &Limits, seed: u64, forge: forge::Config) -> Domain {
@@ -74,11 +74,11 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     record: Record::Table { version: crate::store::VERSION, record: record.clone() },
                 }),
                 Some(RequestOut::Erase(key)) => out.push(Request::Erase { key: Key::Table(key) }),
-                Some(RequestOut::Send { attempt, key, request }) => match request {
-                    Ask::Jig(_) => out.push(Request::Send { attempt, key, ask: request.clone() }),
+                Some(RequestOut::Send { attempt, key, request }) => match &request.request {
+                    Ask::Jig(_) => out.push(Request::Send { attempt, key, ask: request.request.clone() }),
                     Ask::Forge(_) => {
                         if !forge_out_of_date {
-                            out.push(Request::Send { attempt, key, ask: request.clone() });
+                            out.push(Request::Send { attempt, key, ask: request.request.clone() });
                         }
                     }
                 },
@@ -140,7 +140,15 @@ pub(crate) fn answered(
 }
 pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64, ask: Ask, out: &mut Queue<Request>) {
     let size = ask_size(&env.limits, &ask);
-    if root.table.ask(owner, scope, size, ask).is_err() {
+    let key = match owner {
+        Owner::Jig(token) => jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: token.raw() },
+        Owner::Forge(token) => jig_client_domain::Key {
+            asker: jig_client_domain::Asker(u32::from(root.forge_number)),
+            number: token.raw(),
+        },
+        Owner::Kept { .. } => unreachable!("restored requests do not ask"),
+    };
+    if root.table.ask(owner, scope, size, Held { key, request: ask }).is_err() {
         out.push(Request::Fact { fact: Fact::TableFull });
         route::progress(root, env, owner, RequestProgress::Unknown, out);
     }

@@ -70,6 +70,7 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         None => None,
     };
     Ok(tasks::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         release: None,

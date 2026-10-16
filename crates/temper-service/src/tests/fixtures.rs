@@ -43,7 +43,10 @@ pub const ENGINE: &[u8] = br#"{
 "turns": 4, "time_ms": 30000, "reserve_turns": 1, "reserve_time_ms": 5000, "spend": 20,
 "inspect": true, "modify": false, "shell": false, "agents": false, "call_timeout_ms": 10000
 }],
-"chats": {"charter": 1, "close_grace_ms": 5000},
+"templates": [
+{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 32}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000},
+{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
+],
 "clients": {
 "listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,
@@ -62,7 +65,7 @@ pub const ENGINE: &[u8] = br#"{
 "implies": [], "requirements": []
 },
 "projects": [{"number": 1, "roles": [{"connector": 1, "permission": 1, "role": 0}],
-"policy": {"escalation_role": 0, "period_spend": 100, "projections": [], "requirements": [],
+"policy": {"templates": [], "escalation_role": 0, "period_spend": 100, "projections": [], "requirements": [],
 "ceiling": {"tools": 1023, "grants": [],
 "delegation": {"kinds": [{"kind": "charter", "number": 1}], "tasks": 8, "depth": 8},
 "budget": {"spend": 100, "deadline_unix_seconds": null}, "notes": 7, "note_resources": []},
@@ -132,7 +135,7 @@ pub fn task_record(number: u64) -> jig_domain_tasks::TaskRecord {
         proposal_rows: Box::new([]),
         instructions: None,
         refused: Box::new([]),
-        chat_close: None,
+        grace: None,
         created_at: Wall::EPOCH,
         changed: Wall::EPOCH,
         phase_since: Wall::EPOCH,
@@ -435,8 +438,12 @@ fn start_with_worker(
     let first = settings.jig.projects.into_iter().next().unwrap();
     let mut configured = skein_lib::List::with_capacity(u32::try_from(projects.len()).unwrap());
     for (number, budget) in projects {
-        let mut project =
-            jig_protocol_config::Project { number: *number, roles: first.roles.clone(), policy: first.policy.clone() };
+        let mut project = jig_protocol_config::Project {
+            number: *number,
+            roles: first.roles.clone(),
+            templates: first.templates.clone(),
+            policy: first.policy.clone(),
+        };
         project.policy.period_spend = *budget;
         for role in &mut project.policy.roles {
             role.period_spend = *budget;

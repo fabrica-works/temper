@@ -83,6 +83,7 @@ pub(super) fn run_amend(world: &mut World) {
             target: target(world),
             revision: 0,
             amendment: tasks::Amendment {
+                tracked: None,
                 addressed: None,
                 instructions: None,
                 release: None,

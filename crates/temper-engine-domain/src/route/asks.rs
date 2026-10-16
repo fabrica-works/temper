@@ -16,6 +16,14 @@ use jig_domain_views as views;
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates the core's ask vocabulary")]
 pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, connector: u16, ask: core::Ask) {
     let request = match ask {
+        core::Ask::StepMade { task, step, first, .. } => {
+            step_made(domain, task, step, first);
+            None
+        }
+        core::Ask::StepRefused { task, step, .. } => {
+            step_made(domain, task, step, None);
+            None
+        }
         // temper's forge serves no client documents or application requests
         // yet: they are answered as unknown, as `examples/ops` answers what it
         // does not serve (brief D13; jig's `domain/connectors.md`, 5.5).
@@ -328,4 +336,12 @@ fn fleet_grants(grants: &[jig_domain_accounts::Grant]) -> Box<[fleet::Grant]> {
             .expect("grant room");
     }
     translated.into_boxed()
+}
+
+fn step_made(domain: &mut Domain, task: u64, step: u64, child: Option<u64>) {
+    if let Some(kind) = domain.forge_delegating.remove(&(task, step))
+        && let Some(child) = child
+    {
+        domain.work.push(Work::Forge(forge::Event::Delegated { task, child, kind }));
+    }
 }

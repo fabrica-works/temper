@@ -50,6 +50,8 @@ pub struct Limits {
     pub notes: notes::Limits,
     /// Configured typed document construction bounds and served versions.
     pub documents: jig_domain_core::documents::DocumentLimits,
+    /// Maximum configured templates accepted by the core.
+    pub templates: u32,
     /// Forge connector subtree and its bounded outbox.
     pub forge: forge::Limits,
 }
@@ -111,6 +113,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
         fill_mark: FILL_MARK,
         load_bytes: LOAD_BYTES,
         documents: limits.documents,
+        templates: limits.templates,
         connectors: 1,
         resume_bytes: limits.journal.transcript_bytes,
         run_bytes: limits.journal.run_bytes,

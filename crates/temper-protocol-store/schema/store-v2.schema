@@ -1,4 +1,4 @@
-family temper-store 1
+family temper-store 2
 
 # 04.2: values the families share (store/README.md, 2 and 3).
 record Repository { forge: u16 repository: u32 }
@@ -173,7 +173,7 @@ record Projected { opened: bool digest: option fixed 32 last_body: option u64 bo
 record IssueRow { goal: u64 repository: Repository state: Projected number: option u64 pending: option u64 before: option Projected failed: bool desired: option GoalView }
 # 02.4: family 15, the retained application outcome.
 record ApplicationAdopted { repository: Repository owner: bytes 4096 name: bytes 4096 role: Role home: bool kinds: Kinds protection: RepositoryProtection }
-# jig-protocol-store's people_v2 Refusal: at most 23 bytes, all facts preserved.
+# jig-protocol-store's people_v3 Refusal: at most 23 bytes, all facts preserved.
 record CoreRefused { refusal: bytes 23 }
 enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer }
 record ForgeRefused { reason: ForgeReason }

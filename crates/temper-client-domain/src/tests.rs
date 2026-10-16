@@ -48,7 +48,10 @@ fn kept(version: u16) -> List<Record> {
                     key: [key; 16],
                     scope,
                     first_sent: None,
-                    request: Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
+                    request: crate::store::Held {
+                        key: jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: u64::from(key) },
+                        request: Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
+                    },
                 },
             })
             .expect("kept fixtures fit");
@@ -159,7 +162,7 @@ fn a_table_record_of_another_version_is_dropped_as_invalid() {
         &env,
         Event::Start {
             address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
-            kept: kept(2),
+            kept: kept(3),
             offset: Offset { minutes: 0 },
         },
         &mut out,
@@ -208,4 +211,30 @@ fn temper_navigation_is_the_inbox_conversations_and_deployment() {
     );
     let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
     assert_eq!(crate::configure_navigation(&mut root, navigation), Ok(()));
+}
+
+#[test]
+fn a_restored_record_of_version_one_is_dropped_as_invalid() {
+    let limits = fixtures::limits();
+    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let env = fixtures::env(&limits);
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::step(
+        &mut root,
+        &env,
+        Event::Start {
+            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            kept: kept(1),
+            offset: Offset { minutes: 0 },
+        },
+        &mut out,
+    );
+    let mut invalid = 0_u32;
+    while let Some(request) = out.pop() {
+        if request == (Request::Fact { fact: Fact::InvalidRecord }) {
+            invalid += 1;
+        }
+    }
+    assert_eq!(invalid, 3);
+    assert_eq!(root.table.len(), 0, "version one restores no requests");
 }
