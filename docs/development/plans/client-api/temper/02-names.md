@@ -61,7 +61,7 @@ else.
   with `Cargo.lock`; the `.rs` files follow in the increment's commit.
 - **The root the test reads** is its package directory's `../..`,
   canonicalized, as jig's `kit_root` reads its own
-  (`tests/boundary/src/tests.rs:14-18`): a binary from the build cache
+  (`tests/boundary/src/tests.rs:8-12`): a binary from the build cache
   may have been built in a worktree since removed, so
   `env!("CARGO_MANIFEST_DIR")` is not used.
 
@@ -131,7 +131,7 @@ added of which 54 counted, `logs/w1/temper-02-files.txt` and
   route.rs, route/family.rs, terminal.rs, terminal/native.rs, tests.rs,
   tests/family.rs, tests/fixtures.rs}`,
   `crates/temper-client-shell-terminal/tests/support/mod.rs`;
-- `crates/temper/src/open.rs`, `crates/temper/tests/support/person.rs`;
+- `crates/temper/tests/support/person.rs`;
 - `crates/temper-client-protocol-wire/schema/client-wire-v1.schema` (a
   comment naming jig's wire);
 - `tests/client/src/{app.rs, fixtures.rs, translate.rs}`,
@@ -156,7 +156,9 @@ Shape:
    `jig_client_shell_native`, `jig_protocol_client_wire` to
    `jig_client_protocol_wire`, `jig_protocol_client_link` to
    `jig_client_protocol_link`, `jig_test_domain_client` to
-   `jig_client_test_domain`; nothing else in those lines changes.
+   `jig_client_test_domain`; nothing else in those lines changes, then
+   `cargo fmt`, which reorders the `use` lines the renames move (4
+   files, 17 lines at temper `f6f01026`).
 3. The repairs of what else jig landed between `a3b53546` and
    `<landing>`, each following
    jig's own commit for it, within the README's 200 lines.
