@@ -315,6 +315,17 @@
      shifts bytes with `get_mut`; the unit test needs `BriefWords`'s `bytes`,
      `left` and `tail` `pub(crate)`.
 
+109. **Remove plan downstream's worktrees for the release** (process, the release's block of 2026-10-16T16:01:31Z).
+     Remove the three worktrees `wt/smith-downstream`, `wt/jig-downstream`
+     and `wt/temper-downstream` with their `Cargo.lock` changes: they are
+     `plan downstream`'s type-check worktrees (skein's `scripts/dev/plan`,
+     `downstream()`, `dir=$run/wt/$repo-downstream`), detached, and their one
+     change moves each lock's skein source to skein's `main` for the check;
+     nothing lands from them. Remove each with `git -C <its repository>
+     worktree remove --force <path>`, then run `plan release` again. That
+     `plan downstream` leaves them, and so blocks `plan release`, is a
+     proposal for the retrospective, not a rule of this plan.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
