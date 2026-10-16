@@ -67,9 +67,12 @@ them onto the client.
   `RequestTable`" (root.md, 4).
 - A run's text (8.3): "The client keeps the text it holds of the turn
   being written, within the bound on a provisional turn's bytes, takes
-  each delivery's text past its offset, and says `Text { handle }`";
-  "Opened again, the watch starts from the beginning of the turn being
-  written".
+  each delivery's text past its offset, and says `Text { handle }`. It
+  holds that one turn alone, the newest delivered: a delivery naming a
+  later turn, or a later retry of the same turn, takes the place of what
+  it holds, from its own offset; one naming an earlier turn, or an
+  earlier retry, changes nothing, and nothing is told"; "Opened again,
+  the watch starts from the beginning of the turn being written".
 - One version constant: `jig_client_protocol_wire::VERSION` is the only
   definition of the client wire's version (code-organization.md, 2).
 
@@ -443,25 +446,41 @@ Size: at most 120 lines.
 Removes: nothing.
 
 ### 11.5 A run's text by handle
-Scope: a watch of `Subject::Run` keeps the provisional text of the turn
-being written within `turn_bytes`, takes each delivery's text past its
-offset, says `Text { handle }`; a later turn's text never resets an
-earlier one's; a later retry of the same turn takes the place of the
-earlier retries' text; opened again, the watch continues from the turn
-and the offset held (`Down::Continue`) (client.md, 8.3).
+Scope: a watch of `Subject::Run` keeps the provisional text of one
+turn, the turn being written, within `turn_bytes`, takes each delivery's
+text past its offset, says `Text { handle }`; a delivery naming a later
+turn, or a later retry of the same turn, takes the place of the text
+held, from its own `from`; one naming an earlier turn or retry changes
+nothing and tells nothing; a later turn's text never resets an earlier
+one's; opened again, the watch continues from the turn and the offset
+held (`Down::Continue`) (client.md, 8.3).
 Needs: 11.2's watches.
 Files: `crates/jig-client-domain/src/{boundary.rs, watches.rs, text.rs,
-limits.rs}`, `src/tests/{fixtures.rs, text.rs}`. The rules follow
-`jig-domain-client`'s `Conversation::stream` (conversation.rs:298),
-which keeps them for the page today and goes with jig 21.3.
+limits.rs}`, `src/tests/{fixtures.rs, text.rs}`. The offset rules for
+one turn follow `jig-domain-client`'s `Conversation::stream`
+(conversation.rs:298), which keeps them for the page today and goes
+with jig 21.3: text past the offset taken once, a gap only with a cut,
+a later retry replacing. Its list of live turns (`live`) and its fence
+on the committed turn are the thread's, not the client's (client.md,
+10; jig 15.4).
 Shape: `Told::Text { handle }`, `Down::Continue { watch, subject }`,
-`Domain::text(handle) -> Option<&RunText>`, `Limits.turn_bytes`.
+`Domain::text(handle) -> Option<&RunText>`, `Limits.turn_bytes`. One
+`RunText` held per engine watch of a run, its `turn` the newest
+delivered; no list of turns, and no bound on their number:
+`turn_bytes` is the one bound. A delivery is compared with the turn
+held by `ProvisionalTurnName`'s derived order (attempt, number, retry):
+the same name appends past the offset; a later one replaces from its
+own `from`; an earlier one is dropped, and nothing is told.
 Test shape: `crates/jig-client-domain/src/tests/text.rs`; fixtures gain
 `RUN` (a `Handle`, number 4), `run(task, turn, retry, from, text) ->
 Up`; `turn_bytes: 32` (the world's profile's `text`, copied). Tests:
 `a_run_s_text_is_held_past_its_offset_and_told`,
-`a_later_turn_s_text_never_resets_an_earlier_one`,
-`a_later_retry_replaces_the_turn_s_earlier_text`,
+`a_later_turn_s_text_never_resets_an_earlier_one` (turn 1 `ab` from 0,
+turn 2 `c` from 0, then turn 1 `d` from 2, `text(RUN)` read after each:
+turn 1's `ab`; turn 2's `c` from 0, neither `abc` nor under turn 1;
+turn 2's `c` still; `Text { handle: RUN }` told twice in all),
+`a_later_retry_replaces_the_turn_s_earlier_text` (then a delivery of
+the earlier retry: `text(RUN)` unchanged, nothing told),
 `a_dropped_run_watch_continues_from_the_offset_held`,
 `provisional_text_from_before_a_restart_is_dropped_at_the_next_delivery`
 (client.md, 8.2: "Provisional text streamed before it, never committed,
@@ -473,7 +492,9 @@ client, and its story
 `a_person_s_words_reach_a_running_run_through_bytes`
 (tests/client-protocol).
 Don't: no committed turn in the text (committed turns are the task's
-activity, contract.md, 7.3).
+activity, contract.md, 7.3); no list of turns and no fence on a
+committed turn in the client, which reads no activity (the thread's,
+jig 15.4).
 Size: at most 150 lines.
 Removes: nothing.
 

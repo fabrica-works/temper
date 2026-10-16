@@ -322,7 +322,9 @@ Removes: nothing.
 ### 15.4 `thread`
 Scope: `jig_client::thread` (client.md, 10): the conversation model,
 moved from the reference UI's conversation module onto the client's
-surface.
+surface. Its list of live turns stays: the thread keeps each turn's
+provisional text until its committed turn, from the one turn the
+client's `text(handle)` gives at each `Text` (client.md, 8.3).
 Needs: the session's start: jig 14's `Message` (14.3) and its outcome;
 jig 12's request keys and `client.pending(key)`.
 Files: `crates/jig-client/src/{lib.rs, thread.rs, thread/window.rs,
