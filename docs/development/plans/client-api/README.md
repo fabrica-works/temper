@@ -87,6 +87,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/01-s1-terminal-room.md` | skein-01.s1 (ruling 134): the terminal's room for the application's lines | nothing | |
 | `skein/01-s2-terminal-price.md` | skein-01.s2 (ruling 143): the terminal's worst case, operations and line bytes | nothing | |
 | `skein/01-s3-not-kept.md` | skein-01.s3 (ruling 170): the request table retires a request not kept, by its key | nothing | |
+| `skein/01-s4-close-after-closed.md` | skein-01.s4 (ruling 173): no Close after Closed in the browser harness's HTTP client | nothing | |
 
 ### temper
 

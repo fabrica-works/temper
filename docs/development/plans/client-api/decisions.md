@@ -831,6 +831,14 @@ choice would have been the user's (development.md, 10.4).
      5. **Size** goes from 395 to 410 lines.
      6. **Don't:** put the position in `related` or `linked`, or a second `Record` in `Row`.
 
+173. **skein 01's browser test's Close after Closed: skein-01.s4** (plan defect, skein 01's block of 2026-10-16T20:38:21Z).
+     Ruling 173: a plan defect of this plan's skein 01, fixed in a supplement step in the same session. The failing test is skein-01.3's (`b23380a`, "Await each person's expected trouble and chosen HTTP status"), and it panicked once, at `crates/skein-http/src/client.rs:899`, `State::Closed => unreachable!("a Close after Closed")`, in a gate whose other 37 browser tests passed. skein-01.s3's Shape touches neither.
+
+     1. **skein-01.s3 runs `land` once more, as is,** from its commit `083881ec`. If the gate passes, it lands, and its report names this ruling and the failed gate's log. Nothing else is wanted: no further retries.
+     2. **skein-01.s4** (`skein/01-s4-close-after-closed.md`) is skein 01's next step, after s3: it finds why `close` was reached in `Closed`, fixes the cause, and adds a test that drives that order without a browser, failing before the fix. Its proof adds the browser test 20 times, once, before landing.
+     3. **If s3's second gate fails too,** s3 waits: the session does s4 first, on a fresh branch from `origin/main`, lands it, then rebases s3 onto it and lands s3.
+     4. jig 12.2's move of jig's skein still waits for s3's landing (ruling 170); s4 does not hold it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
