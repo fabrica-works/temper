@@ -587,17 +587,19 @@ the forget's condition); `people::Domain::marked_chats` and its test
 
 ### 08.4 Ended read positions, and the census on them
 
-Scope: store.md 7.2, 7.4 and 15 items 2 and 8; people.md 6; engine.md 6
-and 11.4: a conversation's read position moves to the people child's
-ended family, `EndedRead { task, party, through }` at people tag 7, in
-the decision that ends it; the family is not restored at start; a mark
-on an ended conversation, the forget of 8.3, an ended conversation's
-line and the restart's census read it by a point read; a forget erases
-it.
+Scope: store.md 3, 7.2, 7.4 and 15 items 2 and 8; people.md 6;
+engine.md 4.2, 5.3, 6 and 11.4: a conversation's read position moves to
+the people child's ended family, `EndedRead { task, party, through }` at
+people tag 7, in the decision that ends it; the family is not restored
+at start; a mark on an ended conversation, the forget of 8.3, an ended
+conversation's line and the restart's census read it by a point read; a
+forget erases it; a mark's loads are held, and one mark on an ended
+conversation loads at a time.
 Needs: jig 02.3's people family at version 3.
 Files:
 - `crates/jig-domain-people/src/`: `ended.rs` (new: the move at the
-  end, the ended mark, the census's input), `boundary.rs`
+  end, the ended mark, `chat_mark_loading`, the census's input),
+  `boundary.rs`
   (`Forgettable.turns_read`, `Key::EndedRead`,
   `Stored::EndedRead`, `Key::live`, `Event::ChatState`'s
   `seen`), `domain.rs` (restore: an `EndedRead` row is refused; at most
@@ -612,7 +614,9 @@ Files:
   position its mark decides, a `Seen::Results`'s from
   `Forgettable.turns_read`), `inbox.rs` (`seen_chat_loaded`),
   `routing/vocabulary.rs` (`Now::LoadEndedRead`,
-  `Event::EndedReadLoaded`), `routing/mod.rs`, `stopping.rs`,
+  `Event::EndedReadLoaded`, `Held::Load`), `routing/people.rs` (the
+  `Seen::Results` arm, :279-289, and the ended `Seen::Chat`, :310: held
+  loads, one mark at a time), `routing/mod.rs`, `stopping.rs`,
   `documents/inbox_deployment.rs` (`conversation_from_row` takes the
   joined position for an ended row), `reads/indexed.rs` (:199),
   `reads/rows.rs` (:1189; at most 40 lines), `inbox.rs:132`,
@@ -632,8 +636,11 @@ Files:
   `below(8)`).
 - The roots that hand a census row to the core: `testing/jig-test-domain/src/lib.rs:982`,
   `examples/ops/domain/src/restart.rs:123` (each passes the record as it
-  comes to `restore_inbox_row`), and `Now::LoadEndedRead`'s route in
-  `examples/ops/domain/src/route.rs` and `testing/jig-test-domain/src/routes.rs`;
+  comes to `restore_inbox_row`), and `Held::Load`'s route in
+  `examples/ops/domain/src/route.rs` (held as the `Output::CoreLoad` that
+  :1368-1374 sends at once at the base), `testing/jig-test-domain/src/routes.rs`
+  and `testing/jig-test-service/src/route.rs` (beside `Held::ReadLoad`,
+  :214);
   `tests/ops/src/conformance/mod.rs` (`census_owner`, :1071-1078, called
   at :428, maps a `ConversationOldest` or `Result` row to its owner: it
   hands up the `EndedRead` row and then its ended record; at most 40
@@ -653,7 +660,13 @@ Files:
   `tests/people/tests/{memory.rs, simulation.rs}`: an arm each.
 - The exhaustive lists of `core::Now` (15 files at the base, from `git
   grep -l 'Now::RestoreRefused' -- ':!docs'`, 8.3's list among them):
-  an arm each for `Now::LoadEndedRead`; the users of
+  an arm each for `Now::LoadEndedRead`; the exhaustive lists of
+  `core::Held` (19 files at the base, from `git grep -l
+  'Held::NotesLoad' -- ':!docs'`): an arm each for `Held::Load`, which
+  the worlds that send a released `Held::ReadLoad` to their store
+  (`tests/core/src/effects/deliveries.rs:38`,
+  `tests/conformance/src/lib.rs:527`) send there as they send its `Now`
+  at the base (`tests/core/src/effects.rs:323-330`); the users of
   `people::Event::ChatState` (11 files, from `git grep -l ChatState --
   ':!docs'`): its `seen` field.
 - `tests/conformance/src/scenarios.rs`: 8.3's scenario check reads
@@ -661,7 +674,9 @@ Files:
 - `tests/people/tests/simulation.rs`.
 - Downstream: 3 files match `people::Stored` (its engine store, its
   engine world's roles and referee), its engine root's restart
-  (`restore_inbox_row`) and `now` routes (`Now`), and its client world's
+  (`restore_inbox_row`), `now` routes (`Now`) and `held` routes
+  (`Held::Load`, the `Now` it wraps routed as `route/now.rs:141` routes
+  `Now::SeenChat` at the base), and its client world's
   translation (`ChatState`), absorbed at its repin; and temper's census
   walk, which jig's reference code does not show, repaired as the
   README's "jig 08.4's census" says.
@@ -688,6 +703,26 @@ Shape:
   forgets in that decision, its `Reading.turns` the position the mark
   decides: no load follows the mark (people.md 6; the design answer of
   2026-10-16T19:02Z).
+- **The mark's two loads are held** (engine.md 4.2: "held: what must
+  wait for the decision's commit to be durable: ... a load (so that it
+  sees every commit before it)"; 5.3): `core::Held::Load(Box<Now>)`, "A
+  point load, sent once every commit before it is durable". `Seen::Chat`
+  on an ended conversation pushes `Now::SeenChat`, then
+  `Now::LoadEndedRead`, each in a `Held::Load`, never as `Request::Now`,
+  which the journal's door sends at once, ahead of the commits not yet
+  durable (skein's `journal.rs:252`). A root holds a `Held::Load` in the
+  decision and, once the journal releases it, routes the `Now` it wraps
+  as the base routes that load (`examples/ops/domain/src/route.rs:1368-1374`).
+  jig's other point loads stay `Request::Now` (`later.md`).
+- **One mark at a time on an ended conversation** (people.md 6: "One
+  such mark loads at a time"): while a `Seen::Chat` of a task waits on
+  its loads, the core answers `people::Outcome::Again(people::Again::Busy)`,
+  before any load, to another `Seen::Chat` of that task, and to a
+  `Seen::Results` whose forget would take that task.
+  `people::Domain::chat_mark_loading(&self, task: u64, except: Token) ->
+  bool` (`ended.rs`) reads the pending flights, as `seen_context`
+  (`inbox.rs:213`) does. 8.3's scenario's `MarkTurns` marks two
+  conversations, one mark each, so neither is busy.
 - `people::Forgettable` gains `turns_read: bool`, for a conversation:
   set where the ref is made (at the end, from the position that
   decision moves; at the census, from the joined `EndedRead`) and by a
@@ -759,6 +794,30 @@ Test shape:
   assertions on `EndedRead { task, party: 1 }` in `ReadChat`'s place.
 - `tests/core/tests/restart.rs`: `a_restart_restores_unread_results_and_chat_totals`
   passes unchanged.
+- `tests/core/tests/activity.rs`, with `world.store_delay = 3`, as
+  `tests/core/tests/application_documents.rs:76` sets it: each commit
+  waits three ticks before it reaches the store, while a `Request::Now`
+  load reaches it at once (`testing/jig-test-store-files/src/store.rs:117-138,
+  198-204`):
+  `a_mark_sent_as_its_chat_ends_waits_for_the_end` (a chat with two
+  turns, the first marked, ends; its party marks through 2 before the
+  end's commit reaches the store: the mark is answered `MarkedSeen`, and
+  the store then holds `EndedRead { through: 2 }`; what it catches: a
+  load sent as `Request::Now` finds no ended record, and the mark is
+  refused unknown);
+  `a_second_mark_on_an_ended_chat_while_the_first_loads_is_busy` (a chat
+  with three turns ends with none read; marks through 2 and through 1
+  sent back to back: the second is answered `Again(Busy)`; sent again
+  once the first is answered, it is answered `MarkedSeen`; the store
+  holds `EndedRead { through: 2 }`, and the conversation's line reads
+  one unread turn).
+- `tests/core/tests/forgetting.rs`, with `world.store_delay = 3`:
+  `a_results_mark_while_a_chat_mark_loads_is_busy` (the forgettable
+  conversation's turns marked, then it ends with its result unread; a
+  `Seen::Chat` through its last turn and a `Seen::Results`, back to
+  back: the results mark is answered `Again(Busy)`; sent again once the
+  first is answered, it forgets the task: no row of it is left,
+  `EndedRead` included).
 - `tests/core/tests/forgetting.rs`:
   `a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark`
   (the forgettable conversation's turns marked, then `world.restart`,
@@ -780,11 +839,14 @@ the unread results; under 1 s.
 Don't: restore an `EndedRead` row at start; hold ended positions in the
 people child; read an ended record in the census that no `EndedRead` row
 and no unread result row names; part an `EndedRead` row from its record
-across pages; load anything after a mark is decided.
-Size: at most 355 lines of production code (a codec increment; 40 of
+across pages; load anything after a mark is decided; send a mark's load
+as `Request::Now`; let two decisions on one ended conversation rest on
+loads made before either was decided.
+Size: at most 395 lines of production code (a codec increment; 40 of
 them for the census's pairs, places and once per party, by the design
 answer of 2026-10-16; 15 for `turns_read`, by the design answer of
-2026-10-16T19:02Z).
+2026-10-16T19:02Z; 40 for the held loads and one mark at a time, by
+the design answer of 2026-10-16T19:32Z).
 Removes: ended positions in `people::Domain::chats_seen` and the
 census's read of tag 15.
 
@@ -1094,10 +1156,10 @@ pub fn ended_part(query: &TaskQuery) -> EndedPart {
 
 Who owns what: the tasks child saves the two ended indexes and the
 store encodes them; the people child owns `EndedRead` and moves it at a
-conversation's end; the core loads it (`Now::LoadEndedRead`) for a mark
-on an ended conversation, and the store joins it for a read and the
-census. A forget ends a forgettable task's rows; retention (not
-planned) ends a kept one's.
+conversation's end; the core loads it (`Now::LoadEndedRead`, in a
+`Held::Load`) for a mark on an ended conversation, one mark at a time,
+and the store joins it for a read and the census. A forget ends a
+forgettable task's rows; retention (not planned) ends a kept one's.
 
 ## Questions to raise when reached
 

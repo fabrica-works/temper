@@ -229,6 +229,10 @@ per session are in each file.
       admits;
     - `restart.rs`, `census_page`: each core row goes to
       `restore_inbox_row` as it comes, a forge row refuses;
+    - `route/held.rs`: `core::Held::Load(now)`, a mark's load held
+      behind the commits before it (the design answer of
+      2026-10-16T19:32Z), routes the `Now` it wraps as `route/now.rs:141`
+      routes `Now::SeenChat` at the base;
     - the root's limits check (`limits.rs`, beside `loads.loads < 2`)
       refuses `loads.rows` below 2, and the small profile
       (`crates/temper-service/src/limits.rs`, `root.loads.rows`) and the
