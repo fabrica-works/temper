@@ -287,6 +287,11 @@ per session are in each file.
 - **A Proof's "Bound: N s"** is an aim for the test's time as nextest
   prints it, building aside; a bound missed is an aim missed: the report
   says so, and the landing stands.
+- **Named numbers in tests** (ruling 116): a new test names each number
+  that identifies a party, a task, a message, an entry or a token, when
+  an assertion names it, as a `const` at the test file's top or in the
+  crate's fixtures module (as `tests/core/src/fixtures.rs:2-3` does);
+  counts and expected values stay literals; base tests stay as they are.
 - **Test time** (findings/measurements.md):
   - jig: focused median 10.33 s, fuzzy 14.91 s. The run may add, as
     aims, at most 3.0 s to the focused suite (to about 13.3 s of its
