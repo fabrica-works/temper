@@ -150,10 +150,11 @@ per session are in each file.
   `code-organization.md`, and the rulings of `decisions.md` that name its
   session. Nothing else is read whole.
 - **The code graph:** the codebase-memory projects
-  `home-free-src-rust-jig`, `-temper`, `-skein`; never call
-  `list_projects`. The graph indexes each repository's `main` and may be
-  behind it: a file the graph's `check_index_coverage` does not cover is
-  read from source.
+  `home-free-src-rust-jig`, `-temper`, `-skein`, as implementer.md, 8.1,
+  says: never call `list_projects`, `index_status`,
+  `check_index_coverage` or `index_repository`. The graph indexes each
+  repository's `main`, never the session's worktree: check each name it
+  gives with `rg` in the worktree before relying on it.
 - **jig never names temper:** jig's session files say "the repository
   downstream of jig", and no file of jig's code names it: `git -C <the
   session's jig worktree> grep -n -i -w temper -- crates testing tests
