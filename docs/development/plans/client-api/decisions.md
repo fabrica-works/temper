@@ -676,6 +676,15 @@ choice would have been the user's (development.md, 10.4).
 
      Unchanged: every other native bound; the engine's `documents.rows` and `documents.lines`, 2, which `crates/temper/tests/configuration.rs:17-18` keep at most the native rows; every story assertion; ruling 155's combined landing; jig-13.s1 and its place. A further value derived from `rows` gets the same refresh, listed in the commit body.
 
+161. **temper 03 names the native operation that refuses rows 3, then reports** (plan defect, temper 03's block of 2026-10-16T18:16:16Z).
+     Ruling 161, a plan defect: ruling 160's step 2 met its stop. With `rows: 3`, `limits::worst_case(&bounds)` is `None` (`crates/temper-client-shell-terminal/src/client.rs:85`). Which operation refuses decides the repair: a native bound of temper's own (`limits.rs:28-60`) is a plan value the supervisor may change; a product inside jig at the pin (`94eaa034`) is not reachable from temper, which pins jig's `main`. So the repair waits on one diagnosis, at most 20 minutes:
+
+     1. In the temper-03-s1 worktree, `rows: 3` as it is, add one throwaway unit test to `crates/temper-client-shell-terminal` that evaluates from `limits::native()` each operand of `limits::worst_case` (`limits.rs:134-144`) in its order: `view`'s three (`english`, `Words::english`, `temper_client_view::Limits::of`), then `client::worst_case`, `temper_client_view::worst_case`, `link`, `link::worst_case`, `shell`, `Set::worst_case`; it prints each as `Some(n)` or `None`. Run it once: `heavy cargo nextest run -p temper-client-shell-terminal -E 'test(<its name>)' --no-capture`.
+     2. For the first `None`, follow its function into the code at the pin (jig's `Cargo.lock` pin, or temper's own) to the one checked operation that refuses: its file:line, the operation, its operands' values at `rows: 2` and at `rows: 3`, and the native bounds of `limits.rs:28-60` that enter each operand.
+     3. Report that as a question, with the test's output; delete the test; commit nothing new. Try no repair: no other bound changed, no expected value refreshed.
+
+     The supervisor then rules the repair from the report. Unchanged: ruling 160's `rows: 3` and its comment, uncommitted; ruling 155's combined landing; the private commits 6b487696, e6b3c96f, 5fbd0459.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
