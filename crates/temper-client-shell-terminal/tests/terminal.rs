@@ -3,49 +3,6 @@ use skein_lib::{Duration, Time};
 use temper_client_shell_terminal::terminal::Notice;
 
 #[test]
-fn a_change_within_the_interval_prints_once_when_it_ends() {
-    let mut world = support::World::signed_in();
-    world.client.change_at(Duration::from_millis(200));
-    world.client.change_at(Duration::from_millis(700));
-    world.run_until(Duration::from_millis(1500));
-    assert_eq!(world.prints_at(), vec![Duration::ZERO, Duration::from_secs(1)]);
-    assert!(world.shown_last(), "latest tree printed");
-    assert_eq!(world.terminal.next_deadline(), None, "settled tree has no print timer");
-}
-#[test]
-fn an_act_prints_at_once_after_the_next_build() {
-    let mut world = support::World::signed_in();
-    world.run_until(Duration::from_millis(100));
-    world.type_bytes(b"4\n");
-    assert_eq!(world.prints_at(), vec![Duration::ZERO], "waits for next build");
-    world.run_until(Duration::from_millis(110));
-    assert_eq!(world.prints_at(), vec![Duration::ZERO, Duration::from_millis(110)]);
-    assert_eq!(world.client.acts(), &[4]);
-}
-#[test]
-fn a_due_print_waits_for_stdout_then_shows_the_tree_then() {
-    let mut world = support::World::signed_in();
-    world.hold_stdout();
-    world.type_bytes(b"p\n");
-    world.client.change_at(Duration::from_millis(200));
-    world.client.change_at(Duration::from_millis(1200));
-    world.run_until(Duration::from_millis(1500));
-    assert_eq!(world.prints_at(), vec![Duration::ZERO, Duration::ZERO], "old output stays in flight");
-    world.stdout_takes();
-    assert_eq!(world.prints_at(), vec![Duration::ZERO, Duration::ZERO, Duration::from_millis(1500)]);
-    assert!(world.shown_last(), "waited print uses latest tree");
-}
-#[test]
-fn a_command_cut_at_any_byte_acts_once() {
-    for split in 0..=2 {
-        let mut world = support::World::signed_in();
-        world.type_bytes(&b"4\n"[..split]);
-        world.type_bytes(&b"4\n"[split..]);
-        world.run_until(Duration::from_millis(10));
-        assert_eq!(world.client.acts(), &[4], "split {split}");
-    }
-}
-#[test]
 fn the_end_of_stdin_closes_and_exits_zero_after_the_drain() {
     for (name, command) in [("eof", None), ("q", Some(b"q\n".as_slice()))] {
         let mut world = support::World::signed_in();
@@ -54,18 +11,18 @@ fn the_end_of_stdin_closes_and_exits_zero_after_the_drain() {
         if let Some(command) = command {
             world.type_bytes(command);
         } else {
-            world.terminal.close(&mut world.client);
+            world.terminal.close();
         }
-        assert!(world.client.closed, "{name}: client closes");
         assert_eq!(world.terminal.exit(), None, "{name}: output drains first");
         world.stdout_takes();
+        assert!(world.client.closed, "{name}: client closes");
         assert_eq!(world.terminal.exit(), Some((0, None)), "{name}: successful drain");
     }
 }
 #[test]
 fn an_interrupt_closes_without_signing_out() {
     let mut world = support::World::signed_in();
-    world.terminal.close(&mut world.client);
+    world.terminal.close();
     world.stdout_takes();
     assert!(world.client.closed);
     assert!(world.client.acts().is_empty(), "closing offers no sign-out act");
@@ -98,6 +55,7 @@ fn a_refused_link_exits_one_with_its_line() {
     let mut world = support::World::signing_in();
     world.client.notice_at_once(Notice::SignInRefused);
     world.terminal.iterate(Time::ZERO, &mut world.client);
+    world.stdout_takes();
     assert!(world.client.closed);
     assert_eq!(
         world.terminal.exit(),
@@ -127,14 +85,6 @@ fn signing_in_cancels_the_pending_link_retry() {
     world.run_until(Duration::from_secs(1));
     assert!(world.client.sign_ins.is_empty(), "no link exchange after signed in");
     assert_eq!(world.terminal.next_deadline(), None, "link retry removed");
-}
-#[test]
-fn a_full_shell_queue_preserves_the_unconsumed_input() {
-    let mut world = support::World::signed_in();
-    let input = b"x\n".repeat(80);
-    world.type_bytes(&input);
-    world.run_until(Duration::from_secs(1));
-    assert_eq!(world.shell_lines(), vec![Box::<[u8]>::from(*b"temper: commands: n, n words, p, q\n"); 80]);
 }
 #[test]
 fn a_refused_directory_exits_one_with_its_line() {
@@ -179,7 +129,13 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
         Start::Token,
     )
     .expect("native client");
-    let state = Loop::new(&limits::terminal(), &support::tree_limits(), Box::from(*b"private"), None);
+    let state = Loop::new(
+        &limits::terminal(),
+        &support::tree_limits(),
+        Box::from(*b"private"),
+        None,
+        limits::native().client.table.requests,
+    );
     let mut terminal = Terminal::new(native, state, Fd::new(1), Fd::new(2), Fd::new(3)).expect("terminal pipes");
     let mut pending = BTreeMap::new();
     for turn in 0..32 {
@@ -199,6 +155,7 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
                     links: 1,
                 })),
                 Op::Close { .. } => Ok(Done::Nothing),
+                Op::PipeWrite { bytes, .. } => Ok(Done::Count(u32::try_from(bytes.len()).expect("bounded line"))),
                 Op::PipeRead { .. } | Op::ReadSignal { .. } => {
                     pending.insert(submit.op, submit.kind);
                     continue;
@@ -229,8 +186,7 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
                 | Op::Wait { .. }
                 | Op::Signal { .. }
                 | Op::Usage
-                | Op::Window { .. }
-                | Op::PipeWrite { .. }) => panic!("refused directory starts no exchange: {other:?}"),
+                | Op::Window { .. }) => panic!("refused directory starts no exchange: {other:?}"),
             };
             terminal.completions().push(Complete { op: submit.op, kind: submit.kind, result });
         }
@@ -241,4 +197,18 @@ fn refused_directory() -> temper_client_shell_terminal::terminal::Terminal {
     assert!(pending.is_empty(), "all pending reads settled");
     fs::remove_dir(path).expect("world directory removed");
     terminal
+}
+
+#[test]
+fn temper_lines_are_said_before_the_next_print() {
+    let mut world = support::World::signed_in();
+    let first = world.all_output().len();
+    world.client.notice_at_once(Notice::StoreFailed);
+    world.client.change_at(Duration::from_millis(10));
+    world.run_until(Duration::from_secs(2));
+    let output = world.all_output();
+    let line =
+        skein_lib::bytes::find_from(output, b"temper: cannot write the small store", first).expect("temper's line");
+    let page = skein_lib::bytes::find_from(output, b"== ", first).expect("a print");
+    assert!(line < page, "temper's line before the next print");
 }

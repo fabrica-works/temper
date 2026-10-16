@@ -22,6 +22,7 @@ temper-client-view.workspace = true
 temper-client-protocol-wire.workspace = true
 
 [dev-dependencies]
+skein-sim = { git = "https://github.com/forgetic/skein.git" }
 jig-client-world.workspace = true
 
 [lints.rust]

@@ -153,8 +153,11 @@ pub struct World {
     pub terminal: Loop,
     pub client: Script,
     pub now: Time,
-    held: Option<Box<[u8]>>,
-    output: Vec<(Duration, Box<[u8]>)>,
+    sim: skein_sim::Sim,
+    pid: skein_sim::Pid,
+    stdin: skein_io::kernel::Fd,
+    stdout: skein_io::kernel::Fd,
+    output: Vec<u8>,
     automatic: bool,
     input: VecDeque<(Time, Box<[u8]>)>,
     typed: Vec<u32>,
@@ -168,16 +171,28 @@ impl World {
         Self::new(false)
     }
     fn new(signed_in: bool) -> Self {
+        let mut config = skein_sim::Config::calm();
+        config.buffer = 1;
+        let mut sim = skein_sim::Sim::new(3, config);
+        let pid = sim.spawn_process();
+        let stdin = sim.open_inherited_read(pid);
+        let stdout = sim.open_inherited_write(pid);
+        let mut terminal = Loop::new(
+            &limits::terminal(),
+            &tree_limits(),
+            Box::from(*b"client"),
+            (!signed_in).then(|| Secret::new(Box::from(*b"private-link"))),
+            limits::native().client.table.requests,
+        );
+        terminal.terminal.adopt(stdin, stdout).expect("terminal pipes");
         let mut world = Self {
-            terminal: Loop::new(
-                &limits::terminal(),
-                &tree_limits(),
-                Box::from(*b"client"),
-                (!signed_in).then(|| Secret::new(Box::from(*b"private-link"))),
-            ),
+            terminal,
             client: Script::new(signed_in),
             now: Time::ZERO,
-            held: None,
+            sim,
+            pid,
+            stdin,
+            stdout,
             output: Vec::new(),
             automatic: true,
             input: VecDeque::new(),
@@ -188,33 +203,30 @@ impl World {
         world
     }
     pub fn type_bytes(&mut self, bytes: &[u8]) {
-        let mut taken = 0;
-        while taken < bytes.len() {
-            let count = self.terminal.stdin(&bytes[taken..], self.now, &mut self.client);
-            taken += count;
-            if count == 0 {
-                self.stdout_takes();
-            }
+        for byte in bytes {
+            assert_eq!(self.sim.peer_feed(self.pid, self.stdin, &[*byte]), 1);
+            self.drive(self.automatic);
         }
-        self.capture();
     }
     pub fn hold_stdout(&mut self) {
         self.automatic = false;
     }
-    fn capture(&mut self) {
-        if let Some(bytes) = self.terminal.output() {
-            assert!(self.held.is_none(), "one stdout write in flight");
-            self.output.push((self.now.saturating_since(Time::ZERO), bytes.clone()));
-            self.held = Some(bytes);
+    fn drive(&mut self, drain: bool) {
+        self.sim.advance_to(self.now);
+        for _ in 0..4096 {
+            self.sim.reap(self.pid, self.terminal.terminal.completions());
+            self.terminal.iterate(self.now, &mut self.client);
+            self.sim.submit(self.pid, self.terminal.terminal.submissions());
+            if drain {
+                self.output.extend(self.sim.peer_drain(self.pid, self.stdout, 65536));
+            }
+            if self.sim.ready(self.pid) == 0 && !self.terminal.terminal.work_pending(self.now) {
+                break;
+            }
         }
     }
     pub fn stdout_takes(&mut self) {
-        self.capture();
-        if self.held.take().is_some() {
-            self.terminal.written();
-        }
-        self.terminal.iterate(self.now, &mut self.client);
-        self.capture();
+        self.drive(true);
     }
     fn turn(&mut self) {
         self.client.iterate(self.now);
@@ -222,11 +234,7 @@ impl World {
             let (_, input) = self.input.pop_front().expect("due input");
             self.type_bytes(&input);
         }
-        self.terminal.iterate(self.now, &mut self.client);
-        self.capture();
-        if self.automatic && (self.now.as_nanos() / 10_000_000).is_multiple_of(self.stdout_every) {
-            self.stdout_takes();
-        }
+        self.drive(self.automatic && (self.now.as_nanos() / 10_000_000).is_multiple_of(self.stdout_every));
     }
     pub fn run_until(&mut self, span: Duration) {
         let end = Time::ZERO.saturating_add(span);
@@ -235,19 +243,24 @@ impl World {
             self.turn();
         }
     }
-    pub fn prints_at(&self) -> Vec<Duration> {
-        self.output.iter().filter(|(_, bytes)| bytes.starts_with(b"== ")).map(|(at, _)| *at).collect()
+    pub fn all_output(&self) -> &[u8] {
+        &self.output
     }
     pub fn last_output(&self) -> &[u8] {
-        &self.output.last().expect("output exists").1
+        let end = self.output.len().saturating_sub(1);
+        let start = self.output[..end].iter().rposition(|b| *b == b'\n').map_or(0, |n| n + 1);
+        &self.output[start..]
     }
     pub fn shell_lines(&self) -> Vec<Box<[u8]>> {
-        self.output.iter().filter(|(_, bytes)| bytes.starts_with(b"temper: ")).map(|(_, bytes)| bytes.clone()).collect()
+        self.output
+            .split_inclusive(|b| *b == b'\n')
+            .filter(|line| line.starts_with(b"temper: "))
+            .map(Box::from)
+            .collect()
     }
     pub fn shown_last(&self) -> bool {
-        self.output.iter().rev().find(|(_, bytes)| bytes.starts_with(b"== ")).is_some_and(|(_, bytes)| {
-            bytes.starts_with(format!("== Revision {} == Live\n", self.client.built()).as_bytes())
-        })
+        let expected = format!("== Revision {} == Live\n", self.client.built());
+        self.output.split_inclusive(|b| *b == b'\n').rfind(|line| line.starts_with(b"== ")) == Some(expected.as_bytes())
     }
     pub fn typed(&self) -> &[u32] {
         &self.typed

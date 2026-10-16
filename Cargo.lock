@@ -1771,6 +1771,7 @@ dependencies = [
  "skein-io",
  "skein-lib",
  "skein-shell",
+ "skein-sim",
  "skein-ui",
  "skein-ui-text",
  "temper-client-domain",

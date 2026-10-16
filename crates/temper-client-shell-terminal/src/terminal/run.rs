@@ -3,34 +3,19 @@ use super::Loop;
 use crate::{client::NativeClient, limits};
 use skein_io::{
     self as io,
-    kernel::{Complete, Done, Exit, Fd, Op, Submit},
+    kernel::{Complete, Exit, Fd, Op, Submit},
 };
-use skein_lib::{
-    Duration, Env, Queue, Time, Token, Wall,
-    stream::{Delimiter, Down, Read, Up},
-};
+use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use skein_shell::Host;
-const TAG: u64 = 1 << 62;
+const TAG: u64 = 1 << 61;
 const ROOM: u32 = 64;
-struct Writing {
-    bytes: Box<[u8]>,
-    sent: usize,
-    taken: usize,
-    asking: bool,
-}
 /// Native transport and terminal io share the caller's kernel and clock.
 pub struct Terminal {
     client: NativeClient,
     state: Loop,
     io: io::Io,
     env: Env<io::Limits>,
-    input: Option<Token>,
-    output: Option<Token>,
     signals: Option<Token>,
-    reading: bool,
-    held: Option<Box<[u8]>>,
-    offset: usize,
-    writing: Option<Writing>,
     complete: Queue<Complete>,
     submit: Queue<Submit>,
     raw: Queue<Submit>,
@@ -41,9 +26,9 @@ pub struct Terminal {
 impl Terminal {
     /// # Errors
     /// Returns the descriptor io could not adopt; fixed capacities fit all three.
-    pub fn new(client: NativeClient, terminal: Loop, stdin: Fd, stdout: Fd, signals: Fd) -> Result<Self, Fd> {
+    pub fn new(client: NativeClient, mut terminal: Loop, stdin: Fd, stdout: Fd, signals: Fd) -> Result<Self, Fd> {
         let limits = io::Limits {
-            sockets: 3,
+            sockets: 1,
             names: 0,
             refusals: 1,
             intake: limits::terminal().read,
@@ -56,17 +41,18 @@ impl Terminal {
             retry: Duration::from_millis(1),
         };
         let mut io = io::Io::new(&limits);
-        let input = io.adopt_read_pipe(stdin)?;
-        let output = io.adopt_write_pipe(stdout, None)?;
+        terminal.terminal.adopt(stdin, stdout)?;
         let signals = io.adopt_signals(signals)?;
         let operations = client
             .operations()
-            .checked_add(io::operations(&limits).expect("terminal operations"))
+            .checked_add(io::operations(&limits).expect("signal operations"))
+            .and_then(|n| n.checked_add(terminal.terminal_operations))
             .expect("combined operations");
         let room = operations.checked_mul(2).expect("completion and submission room");
         let memory = client
             .worst_case()
             .checked_add(terminal.worst_case().expect("terminal envelope"))
+            .and_then(|n| n.checked_add(terminal.terminal_memory))
             .and_then(|n| n.checked_add(io::worst_case(&limits)?))
             .and_then(|n| n.checked_add(Queue::<Complete>::worst_case(room)?))
             .and_then(|n| n.checked_add(Queue::<Submit>::worst_case(room)?))
@@ -79,13 +65,7 @@ impl Terminal {
             state: terminal,
             io,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            input: Some(input),
-            output: Some(output),
             signals: Some(signals),
-            reading: false,
-            held: None,
-            offset: 0,
-            writing: None,
             complete: Queue::with_capacity(room),
             submit: Queue::with_capacity(room),
             raw: Queue::with_capacity(ROOM),
@@ -103,10 +83,11 @@ impl Terminal {
         assert!(self.io.takes() && self.raw.room() >= io::MAX_OUT_DOWN.submissions, "terminal request room");
         io::down(&mut self.io, &self.env, request, &mut self.raw);
     }
-    fn stream(&mut self, stream: Token, down: Down) {
-        self.request(io::Request::Stream { stream, down });
-    }
     fn complete(&mut self, mut complete: Complete) {
+        if skein_ui_text::Terminal::owns(complete.op) {
+            self.state.terminal.completions().push(complete);
+            return;
+        }
         if complete.op.raw() & TAG == 0 {
             self.client.completions().push(complete);
             return;
@@ -115,50 +96,13 @@ impl Terminal {
         if let Op::Cancel { target } = &mut complete.kind {
             *target = Token::new(target.raw() & !TAG);
         }
-        if matches!(complete.kind, Op::PipeWrite { .. })
-            && let Ok(Done::Count(count)) = complete.result
-        {
-            let writing = self.writing.as_mut().expect("stdout write owned");
-            writing.taken += usize::try_from(count).expect("write count fits");
-            if writing.taken == writing.bytes.len() {
-                self.writing = None;
-                self.state.written();
-            }
-        }
         io::up(&mut self.io, &self.env, complete, &mut self.told, &mut self.raw);
     }
-    fn event(&mut self, event: io::Event) {
+    fn event(&mut self, event: &io::Event) {
         match event {
-            io::Event::Stream { owner, up: Up::Bytes(bytes) } if Some(owner) == self.input => {
-                self.reading = false;
-                assert!(self.held.is_none(), "one stdin chunk held");
-                self.held = Some(bytes);
-                self.offset = 0;
-            }
-            io::Event::Stream { owner, up: Up::Room } if Some(owner) == self.output => {
-                let writing = self.writing.as_mut().expect("stdout room requested");
-                let end = (writing.sent + usize::try_from(self.env.limits.output).expect("output chunk fits"))
-                    .min(writing.bytes.len());
-                let bytes = Box::from(&writing.bytes[writing.sent..end]);
-                writing.sent = end;
-                writing.asking = false;
-                self.stream(owner, Down::Send(bytes));
-            }
-            io::Event::Stream { owner, up: Up::End | Up::Failed(_) } => {
-                if Some(owner) == self.output {
-                    self.discard_output();
-                }
-                self.state.close(&mut self.client);
-            }
-            io::Event::Shutdown { .. } | io::Event::Failed { .. } => self.state.close(&mut self.client),
+            io::Event::Shutdown { .. } | io::Event::Failed { .. } => self.state.close(),
             io::Event::Closed { owner } => {
-                if self.input == Some(owner) {
-                    self.input = None;
-                }
-                if self.output == Some(owner) {
-                    self.output = None;
-                }
-                if self.signals == Some(owner) {
+                if self.signals == Some(*owner) {
                     self.signals = None;
                 }
             }
@@ -175,61 +119,12 @@ impl Terminal {
             | io::Event::Window { .. } => panic!("terminal owns pipes and signals only"),
         }
     }
-    fn discard_output(&mut self) {
-        if self.writing.take().is_some() {
-            self.state.written();
-        }
-        self.state.close(&mut self.client);
-        for _ in 0..=limits::terminal().lines {
-            self.state.iterate(self.env.now, &mut self.client);
-            if self.state.output().is_none() {
-                break;
-            }
-            self.state.written();
-        }
-    }
     fn pump(&mut self) {
-        if let Some(bytes) = &self.held {
-            self.offset += self.state.stdin(&bytes[self.offset..], self.env.now, &mut self.client);
-            if self.offset == bytes.len() {
-                self.held = None;
-            }
-        }
         self.state.iterate(self.env.now, &mut self.client);
-        if self.writing.is_none()
-            && let Some(bytes) = self.state.output()
+        if self.state.exit().is_some()
+            && let Some(entity) = self.signals.take()
         {
-            self.writing = Some(Writing { bytes, sent: 0, taken: 0, asking: false });
-        }
-        if let Some(writing) = &mut self.writing
-            && !writing.asking
-            && writing.taken == writing.sent
-            && writing.sent < writing.bytes.len()
-        {
-            let room =
-                u32::try_from(writing.bytes.len() - writing.sent).unwrap_or(u32::MAX).min(self.env.limits.output);
-            writing.asking = true;
-            self.stream(self.output.expect("stdout open"), Down::Demand { read: Read::Nothing, room });
-        }
-        if self.state.closing() {
-            for entity in [self.input.take(), self.signals.take()].into_iter().flatten() {
-                self.request(io::Request::Abort { entity });
-            }
-            self.held = None;
-            if self.state.exit().is_some()
-                && let Some(entity) = self.output.take()
-            {
-                self.request(io::Request::Close { entity });
-            }
-        } else if !self.reading
-            && self.held.is_none()
-            && let Some(stream) = self.input
-        {
-            self.reading = true;
-            self.stream(
-                stream,
-                Down::Demand { read: Read::Scan { until: Delimiter::LF, max: limits::terminal().read }, room: 0 },
-            );
+            self.request(io::Request::Abort { entity });
         }
     }
     fn publish(&mut self) {
@@ -242,6 +137,10 @@ impl Terminal {
             if let Op::Cancel { target } = &mut submit.kind {
                 *target = Token::new(target.raw() | TAG);
             }
+            self.submit.push(submit);
+        }
+        while self.submit.room() > 0 {
+            let Some(submit) = self.state.terminal.submissions().pop() else { break };
             self.submit.push(submit);
         }
         while self.submit.room() > 0 {
@@ -279,7 +178,7 @@ impl Host for Terminal {
         }
         self.client.iterate(now, wall);
         while let Some(event) = self.told.pop() {
-            self.event(event);
+            self.event(&event);
         }
         self.pump();
         self.publish();
@@ -298,6 +197,7 @@ impl Host for Terminal {
             || self.io.is_due(now)
             || self.client.work_pending(now)
             || !self.submit.is_empty()
+            || self.state.terminal.work_pending(now)
             || self.state.next_deadline().is_some_and(|deadline| now >= deadline)
     }
     fn next_deadline(&self) -> Option<Time> {

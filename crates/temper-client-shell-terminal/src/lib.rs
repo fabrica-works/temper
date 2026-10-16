@@ -2,7 +2,6 @@
 #![forbid(unsafe_code)]
 pub mod client;
 pub mod limits;
-pub mod lines;
 pub mod route;
 pub mod terminal;
 #[cfg(test)]

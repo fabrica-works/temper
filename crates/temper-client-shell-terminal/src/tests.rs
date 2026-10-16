@@ -8,7 +8,6 @@ use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
 mod family;
 mod fixtures;
-mod lines;
 mod render;
 
 #[test]
@@ -137,12 +136,6 @@ fn a_family_readout_or_delivery_nobody_asked_for_is_a_notice() {
     }
 }
 #[test]
-fn the_native_limits_make_the_terminal() {
-    let (view, _, _) = limits::view(&limits::native()).expect("Usable native view limits");
-    let terminal = crate::terminal::Loop::new(&limits::terminal(), &view.tree, Box::from(*b"client"), None);
-    assert!(terminal.worst_case().is_some(), "The native terminal has a memory bound");
-}
-#[test]
 fn the_native_limits_pass_each_worst_case() {
     let limits = limits::native();
     let (view, jig, forge) = limits::view(&limits).expect("usable view");
@@ -167,4 +160,36 @@ fn the_native_limits_pass_each_worst_case() {
         "sum of all owners"
     );
     assert!(skein_io::worst_case(&limits.io).is_some(), "usable io");
+}
+
+#[test]
+fn an_equal_line_waits_once_in_the_order_it_came() {
+    let mut lines = crate::terminal::waiting::Waiting::new(19);
+    for line in [b"sign-in again".as_slice(), b"store failed", b"sign-in again", b"credential one", b"credential two"] {
+        lines.push(Box::from(line));
+    }
+    let mut said = Vec::<Box<[u8]>>::new();
+    lines.say(1, |line| said.push(Box::from(line)));
+    assert_eq!(said, [Box::<[u8]>::from(b"sign-in again".as_slice())]);
+    said.clear();
+    lines.say(8, |line| said.push(Box::from(line)));
+    assert_eq!(said, [b"store failed".as_slice(), b"credential one", b"credential two"].map(Box::<[u8]>::from));
+    assert!(lines.is_empty());
+}
+
+#[test]
+fn the_native_limits_make_the_terminal() {
+    let (view, _, _) = limits::view(&limits::native()).expect("native view limits");
+    let bounds = limits::terminal();
+    let settings = skein_ui_text::Settings {
+        name: Box::from(*b"temper"),
+        longest: bounds.line,
+        interval: bounds.interval,
+        status: Some(jig_client_view::regions::JigRegion::Link.region()),
+        lines: bounds.lines,
+        line_bytes: 166,
+    };
+    assert!(skein_ui_text::Terminal::worst_case(&settings, &view.tree).is_some(), "native terminal memory fits");
+    assert!(skein_ui_text::Terminal::operations(&settings, &view.tree).is_some(), "native terminal operations fit");
+    assert!(skein_ui_text::Terminal::new(settings, &view.tree).is_some(), "native terminal settings fit");
 }
