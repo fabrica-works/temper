@@ -446,6 +446,15 @@ per session are in each file.
   tests run before it, on the session's own rebase; when `land` stops on
   the memory literal, `over` is set from its gate log outside the lock,
   and `flock … land …` runs again (the steer of 2026-10-16T15:30Z).
+- **Every crate's lints in one round** (the steer of 2026-10-16T16:45Z,
+  the third sighting: jig 06 and 07, jig 10, jig 03): `--keep-going`
+  builds only crates whose dependencies built, so a crate failing under
+  `-D warnings` hides its dependents' lints. After `heavy cargo check
+  --workspace --all-targets --keep-going --message-format short` passes,
+  the first scoped clippy round caps lints at warnings: `heavy cargo
+  clippy --keep-going -p <crate> … --all-targets -- --cap-lints warn`;
+  every warning it prints is fixed, then the same command with `-- -D
+  warnings` runs once to confirm. land's prebuild keeps `-D warnings`.
 - **Shared files,** which parallel sessions may both change: jig's
   workspace `Cargo.toml` and `Cargo.lock` (jig 01, 10, 11, 12, 16, 17,
   19); `tests/boundary/src/tests/graph.rs` (jig 01, 10 to 13, 16, 17,

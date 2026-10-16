@@ -602,6 +602,9 @@ choice would have been the user's (development.md, 10.4).
      6. **11.5's Don't** gains: "no list of turns and no fence on a committed turn in the client, which reads no activity (the thread's, jig 15.4)".
      7. Nothing is deferred: no `later.md` row.
 
+151. **Every crate's lints in one round** (steer of 2026-10-16T16:45Z, from the check of 2026-10-16T16:24:41Z).
+     The check of 2026-10-16T16:24:41Z's third sighting of one-crate-a-round lint failures (jig 03.1's seven rounds since 15:55Z, each showing only the crates the last fix let build) becomes a README rule, "Every crate's lints in one round": after the workspace check, the first scoped clippy round runs with `-- --cap-lints warn`, every warning is fixed, then `-- -D warnings` once confirms; land's prebuild keeps `-D warnings`. Checked: in a scratch two-crate workspace whose second crate depends on the first, both with a denied clippy lint, `cargo clippy --keep-going -p a -p b -- -D warnings` printed `error: could not compile 'a'` and linted no `b` (exit 101); `cargo clippy --keep-going -p a -p b -- --cap-lints warn` printed the warning at `a/src/lib.rs:1:21` and at `b/src/lib.rs:1:21` (exit 0).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
