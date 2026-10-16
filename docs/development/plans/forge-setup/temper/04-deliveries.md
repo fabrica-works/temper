@@ -148,7 +148,7 @@ heavy --gate -- sh -c 'cargo run -p forgejo-conformance -- --scratch target/forg
 instances and the jobs). No live layer exists in this plan.
 Don't: change a case of `transcripts/`, record the hook's creation, wait by a fixed sleep (every wait is a deadline on
 an event), put the secret in a case, add a dependency.
-Size: 250. Removes: the Unchecked fact and the README sentence.
+Size: 300. Removes: the Unchecked fact and the README sentence.
 
 ### 04.2 The deliveries' documents (codec)
 Scope: forge.md 5's table as a document, both sides; the listener's path for a forge, `SUBSCRIBED` and the headers.
@@ -381,4 +381,4 @@ git diff $B --name-only -- crates/temper-forge-forgejo tools/forgejo-conformance
 git diff $B --name-only --diff-filter=A -- crates/temper-forge-forgejo tools/forgejo-conformance testing/temper-throwaway-forgejo tests/codecs | grep '\.rs$' | xargs -r wc -l | awk '$2 != "total" && $1 > 800'   # nothing
 ```
 Each landing's report gives its hand-written production lines by code-organization.md's command over its Files, against
-Size 250 and 220 (codec).
+Size 300 and 220 (codec).
