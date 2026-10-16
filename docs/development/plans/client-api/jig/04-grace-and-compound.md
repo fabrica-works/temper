@@ -625,7 +625,7 @@ compound until 04.6, which connects it at the joint layer.
 Don't: clone the domain or a task record to check; send any output
 before the last check passed; reuse `Event::CloseChat`'s path (jig 16
 removes it).
-Size: at most 260 lines.
+Size: at most 500 lines (ruling 159: the staged view its checks read; 886 counted at 14141fecd).
 Removes: nothing.
 
 ### 04.5 The party's cancel with a grace, and tracked and priority amended by a maintainer

@@ -661,6 +661,11 @@ choice would have been the user's (development.md, 10.4).
 
      Checked: the sub-agent's runs: clippy `-D warnings` on a scratch `jig-client` with 12.1's sketch failed on `matches!`, passed with the `let`-`else`; `debug_assert!` failed, `assert!` passed; nextest on `jig-boundary` and `jig-client` with 12.5's dependency failed `client_world_joins_only_the_client_and_test_roles`, then `kit_sources_keep_the_kit_vocabulary` on `typed`; after both corrections, 73 passed. Not checked: 12.3 to 12.5's code compiled; the workspace gate.
 
+159. **jig 04.4's Size is 500** (plan defect, jig 04's block of 2026-10-16T17:55:19Z).
+     Ruling 159: option A, a plan defect, as ruling 136 was for 07.2. 04.4's Size was set below what its Shape asks: "`Staged { closing, moved, reserved, revisions }` ... 4.3's checks take `staged: &Staged`", with tests that make an amendment then a release of one held task, and words then a stop release, in one request, under the Don't "clone the domain or a task record to check". The staged view those checks read, without a copy of a task record, is the work the report counts (`compound.rs` 303, `compound/staged.rs` 338 of 886), and the report names no capability beyond 04.4's Scope. Size is now at most 500 lines, so the 886 counted land within twice it, as code-organization.md, 7 says: "An increment lands within twice its Size without asking". Option B is not taken: it would split work already written, for no change in what lands.
+
+     Unchanged: the rule that a file over 800 lines at the base grows by at most 40 lines (`control.rs` 897 at the base, +50 −38; `domain.rs` 1283, +9; `boundary.rs` 1839, +14 −2: each within it); the 800-line aim; the Don't list; the Proof; the gate; implementer.md, 8.6: "Never trim a doc comment, a test or the formatting to meet a Size". A count that passes 1,000 is a question again, with the count by file.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
