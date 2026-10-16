@@ -422,6 +422,9 @@ choice would have been the user's (development.md, 10.4).
      - Checked: clippy on the sketches with the derives and on `jig-protocol-config` with the 09.1 reference test (a stub `What::Grace`) passed; the reference test compiles and panics at the base in `fixtures::with`, as it should before 09.1. Not captured: the channel worlds' runs with the corrected limits.
      A further user of a changed type or value that the Files miss, the implementer edits and lists in the commit body.
 
+127. **One land at a time, by a lock** (steer of the check of 2026-10-16T11:44:40Z).
+     From the check of 2026-10-16T11:44:40Z, for the steer that follows: ruling 119's poll of the queue lets two lands through, since a land has no task in the queue between its prebuild and its gate, nor between its tries (jig 07's gate 370 ended 11:42:19Z, its retry 374 was queued 11:42:26Z, jig 02's 375 at 11:42:29Z; jig 06's prebuild 356 at about 11:30:07Z, between jig 07's 351 and 355); 7 passed gates voided in the hour (317, 320, 333, 338, 348, 355, 370). The README's "One land at a time in each repository" now holds a lock for the whole of `land`, retries included: `flock /srv/data/git/runner/src/tmp/temper/client-api/land-<repository>.lock land …`, in place of the poll. Unchanged: the rule's scope (each repository) and its end (a `land` that holds its repository's lock from its rebase to its push); land's steps and gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

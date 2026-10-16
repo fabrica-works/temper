@@ -317,16 +317,16 @@ per session are in each file.
     is an aim, development.md 5.6's ceiling: nothing measures one test,
     and a test the gate's log flags `SLOW` is made cheaper before its
     increment lands.
-- **One land at a time in each repository** (ruling 119): a session
-  starts `land` only when no other land of its repository is queued,
-  running or paused, since `land` rebases before its queue wait and
-  each landing voids every land of that repository then queued. It
-  waits in one command, then lands: `until [ "$(pueue status --json |
-  jq '[.tasks[] | select(.label == "land jig" or .label == "land jig
-  prebuild") | select(.status | keys[0] | IN("Queued", "Running",
-  "Paused"))] | length')" = 0 ]; do sleep 30; done && land …`, with
-  `land temper` and `land temper prebuild` in temper, `land skein` and
-  `land skein prebuild` in skein. Until `land` rebases after its wait.
+- **One land at a time in each repository** (rulings 119 and 127): a
+  session runs `land` only under its repository's lock, held for the
+  whole of `land`, its retries included, since `land` rebases before its
+  queue wait and each landing voids every land of that repository then
+  queued: `flock /srv/data/git/runner/src/tmp/temper/client-api/land-jig.lock
+  land …` in jig, `land-temper.lock` in temper, `land-skein.lock` in
+  skein. The lock replaces ruling 119's poll of the queue, which let two
+  lands through in the gaps between a land's prebuild and its gate, and
+  between its tries. Until `land` holds its repository's lock from its
+  rebase to its push.
 - **Shared files,** which parallel sessions may both change: jig's
   workspace `Cargo.toml` and `Cargo.lock` (jig 01, 10, 11, 12, 16, 17,
   19); `tests/boundary/src/tests/graph.rs` (jig 01, 10 to 13, 16, 17,
