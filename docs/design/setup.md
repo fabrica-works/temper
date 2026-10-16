@@ -145,7 +145,9 @@ connected  temper serve             ◄── reads them, through the forges and
 managed or owned.
 
 - **Its inputs:** the forge's `api` and `transport` (configuration.md,
-  section 3); the admin's token, from the setup's file when managed, or
+  section 3), plaintext to loopback alone: a setup whose forge's
+  transport is TLS is refused, naming it (section 15); the admin's
+  token, from the setup's file when managed, or
   `admin_token` when owned; the bot's login and email; the orgs temper
   works in; the webhooks' listener, when configured.
 - **What it converges,** in this order, each read first and written only
@@ -246,12 +248,16 @@ private, never edited by hand:
 ### 6.3 The preparation
 
 `temper forge prepare CONFIG.json FORGE`, before Forgejo runs. It takes
-Forgejo's and the runner's locks (6.4), checks the binaries, and decides by `state`:
+Forgejo's lock (6.4), and the runner's too for a first preparation,
+which alone writes the runner's files; checks the binaries; and decides
+by `state`:
 
 1. **The first preparation:** the layout of section 3; `app.ini`;
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
    admin with a password Forgejo draws and nobody keeps, and its token
-   made by `admin user generate-access-token` into `admin_token`; the
+   made by `admin user generate-access-token` into `admin_token`, under
+   a name that ends in a random suffix, since Forgejo refuses a second
+   token of one name; the
    person's account, a site admin with a password Forgejo draws into
    `person_password`, to change at their first sign-in; the runner's
    secret drawn into `runner/secret` (40 hexadecimal digits, no line
@@ -259,11 +265,20 @@ Forgejo's and the runner's locks (6.4), checks the binaries, and decides by `sta
    --secret-file`, and the runner's connection written from it into the
    runner's configuration (`server.connections`), its token in a private
    file the connection names (`token_url: file:`); the work path's
-   repositories directory, which `forgejo dump` needs; `state` written
-   last, so a preparation cut short is made again from the start.
+   repositories directory, which `forgejo dump` needs. `state` records
+   the first preparation's start before anything else, and its end last.
+   A first preparation that `state` says began and did not end is cut
+   short: the next one removes what it left (the work path, the runner's
+   directory, `admin_token`, `person_password`) and begins again from an
+   empty layout, since Forgejo refuses a user made twice and never shows
+   a drawn password again. A forge's directory that holds Forgejo's files
+   with no `state` is refused, naming it: the preparation removes only
+   what a first preparation it recorded left.
 2. **A later preparation at the same versions:** `app.ini` written again,
    so a change of the setup reaches Forgejo; `admin_token` made again
-   when missing, and temper's admin with it; nothing else.
+   when missing, under a fresh suffix, and temper's admin with it;
+   nothing else. It takes Forgejo's lock alone, so a box restarts a
+   Forgejo, after its preparation, while the runner runs.
 3. **An upgrade:** a recorded Forgejo older than the pin is dumped
    (`forgejo dump`) into `backups/`, named by both versions, then
    migrated, then recorded. A recorded version newer than the pin
@@ -291,8 +306,9 @@ Forgejo's and the runner's locks (6.4), checks the binaries, and decides by `sta
   file of the forge's directory, Forgejo's or the runner's, and hands it
   across the exec as the process's standard input, so the process holds
   it for its life. Two Forgejos never share a work path, and no
-  preparation runs under one: the preparation takes the same locks, and
-  refuses, naming the forge, while one is held.
+  preparation runs under one: the preparation takes Forgejo's lock, and
+  a first preparation the runner's too, and refuses, naming the forge,
+  while one it needs is held.
 - **Replaces itself** (`execve`) by `forgejo web` or `forgejo-runner
   daemon`, with the spec's arguments and the spec's environment alone:
   cleared, then `HOME` in the forge's directory, `PATH`, and git's
@@ -308,7 +324,7 @@ Forgejo's and the runner's locks (6.4), checks the binaries, and decides by `sta
   or uses `std::process` outside skein: a boundary test fails the gate
   when either appears in another module. It moves onto skein when skein's
   shell offers both (section 15).
-- **The runner's spec:** its configuration file (its registration's file,
+- **The runner's spec:** its configuration file (its connection,
   capacity, labels, timeouts, its jobs' directory, no cache), its `PATH`
   from the setup. Its jobs run as the user that runs it (section 15).
 
@@ -372,9 +388,9 @@ temper box CONFIG.json
 - **Steps only:** each step's name, its arguments and whether it is once
   or long. Its policy is a small machine of its own (steps, exits and
   timers in; spawns, signals and closes out), hosted on skein-io.
-- **The binary hands it the steps.** `temper box` checks the document
-  whole, as `temper serve` does, asks `temper-forge-setup` for its steps,
-  and gives them to `temper-box`.
+- **The binary hands it the steps.** `temper box` checks the document as
+  section 8 says, asks `temper-forge-setup` for its steps, and gives them
+  to `temper-box`.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
   of it but `steps` and `Step`.
@@ -451,9 +467,11 @@ Each needs nothing below the commands to change:
   section 3; forge.md, section 5).
 - **`temper serve` checks `setup`** and acts on none of it: it reads no
   file that only `setup` names.
-- **An owned example** joins configuration.md's formats (section 10), for
-  a person, a test or QA's host to start from: one owned forge with a
-  runner, webhooks, one git identity, one worker and one LLM account.
+- **An owned example,** `docs/examples/owned.json` (configuration.md,
+  section 10), a whole document for a person, a test or QA's host to
+  start from: one owned forge with a runner, webhooks, one git identity,
+  one worker and one LLM account, handed in (credentials.md, section
+  3).
   Its three loopback addresses (Forgejo's, the clients' listener's and
   the webhooks' listener's) are the ones a host changes to run several
   boxes on one machine.
@@ -561,9 +579,10 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
 
 ## 12. Where it serves
 
-- **The first milestone's setup** (`draft/mvp.md`, 5.1): write the
-  document from the owned example, `temper sign-in`, `temper box`; make
-  a repository with Actions in an org on Forgejo's web, and adopt it.
+- **The first milestone's setup** (`draft/mvp.md`, 5.1): copy the owned
+  example, make the files that hold its secrets, hand in its LLM
+  account's, and run `temper box`; make a repository with Actions in an
+  org on Forgejo's web, and adopt it.
 - **CI for the first milestone** (`draft/mvp.md`, section 7): Actions on
   the owned runner.
 - **The process tier** (testing.md, 2.6), on owned mode in place of its
@@ -581,8 +600,10 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
   configuration for each setup, as golden text.
 - **The preparation's decisions:** a first preparation; one at the same
   versions; an upgrade, dumped before migrated; a newer recorded version
-  refused; another binary refused; a missing `admin_token` made again; a
-  preparation cut short made again from the start.
+  refused; another binary refused; a missing `admin_token` made again,
+  under a fresh name; a preparation cut short made again from an empty
+  layout; Forgejo's files with no `state` refused; a later preparation
+  taking Forgejo's lock alone.
 - **The specs:** each command's arguments and environment, and no secret
   of the preparation's in any argument.
 - **Reconcile's decisions** from answers: each step read, then written
@@ -700,6 +721,8 @@ Each waits for what it names; none is built by the order of section 14.
 - **The binaries' digests,** an optional SHA-256 per binary beside the
   version's check. Waits for a deployment that installs binaries it did
   not build or download itself.
+- **Reconcile over TLS,** managed mode against a forge on another host.
+  Waits for a plan that runs one and proves the path.
 - **Webhooks from another host,** over TLS (forge.md, section 5). Waits
   for skein's TLS server side.
 - **CI's isolation.** An owned runner's jobs in host mode run as the

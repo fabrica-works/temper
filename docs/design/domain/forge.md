@@ -200,17 +200,23 @@ Its capacity is a limit: a batch naming resources past it is refused.
   its head or its base, by branch or by commit: after `hinted`, the
   pause that gathers one change's hints into one read. Its backoff then
   starts again from `poll`.
-- **What Forgejo settles after it delivers** is read again sooner.
-  Forgejo checks a pull request's mergeability after a push moves its
-  head or base, and answers it not mergeable while it checks; a job's
-  commit status may be written after the job's end is delivered
+- **What Forgejo settles after it delivers** is read again sooner, by
+  the change procedure, which reads its pull request afresh (5.3), not
+  by the keep. Forgejo checks a pull request's mergeability after a push
+  moves its head or base, and answers it not mergeable while it checks;
+  a job's commit status may be written after the job's end is delivered
   (`docs/design/forge.md`, section 13). So, within `settle` of a move of
   its head or base (known by a hint, a read or temper's own push), a
   pull request that reads not mergeable is read again at `hinted`,
   doubling, until it reads mergeable or `settle` has passed; and a
   commit a job's hint named whose CI reads pending is read again the
-  same way. Until `settle` has passed, not mergeable is not known: the
-  change waits, and is never taken as conflicted on it (8.2).
+  same way. `settle` is a limit of the forge client's, above 0.
+- **The window is its own wait.** Until `settle` has passed since the
+  move, not mergeable is not known: the change waits until the window's
+  end at most, never stalls on it, and is never taken as conflicted on
+  it; once the window has passed, not mergeable is a conflict (8.2). A
+  move long before, such as a head pushed before a long CI, leaves no
+  window open.
 - **Landing branches' tips** are read on a hint naming them, or a
   commit at their tip, and on a slow pace otherwise.
 - **Hints** come from the forge's webhook deliveries
@@ -421,7 +427,8 @@ producing ─► opening ─► checking ─► gating ─► queued ─► firs
    its gates carried over; or in conflict, and it leaves the queue to be
    **resolved**, its new head checked again and its gates asked again.
    A pull request whose mergeability has not settled (5.2) is neither:
-   the change waits for it.
+   the change waits for it, until the window's end at most, and the
+   stall does not count that wait.
 7. **Landing:** merged at exactly its head, in the repository's merge
    style, squash by default, automatically: anything stricter is a rule
    (authority.md, section 10). Merged, the change is **landed**: its

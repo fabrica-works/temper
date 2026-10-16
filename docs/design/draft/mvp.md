@@ -236,7 +236,11 @@ say.
 - **CI for the milestone** is answered by `setup.md`, section 12:
   Actions on the owned runner.
 - **The milestone's model:** the account `temper sign-in` signs in,
-  against which provider. Default: the provider the live tier uses.
+  against which provider, and its registration (authorization URL,
+  redirect, scope, client). Default, until it is settled: the owned
+  example hands its account in, as the live tier does with a borrowed
+  Codex login (credentials.md, section 3; testing.md, 2.7), with the
+  live tier's model.
 - **Where a person's approval is set** (5.4): as a gate the plan adds to
   its changes when the person asks, or the configuration's landing
   rule. Default: the plan's; the configuration's `approvals` stays

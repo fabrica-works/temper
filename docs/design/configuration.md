@@ -342,7 +342,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 
   | Name | Bounds |
   |---|---|
-  | `forge.client.settle_ms` | after a move of a pull request's head or base, how long a not mergeable answer, or a hinted job's pending CI, is read again at `hinted` and not believed (`domain/forge.md`, 5.2) |
+  | `forge.client.settle_ms` | after a move of a pull request's head or base, how long a not mergeable answer, or a hinted job's pending CI, is read again at `hinted` and not believed, by the change procedure (`domain/forge.md`, 5.2); above 0, as `hinted` is |
   | `forge_component.hooks` | the webhooks' listener's connections in all |
   | `forge_component.hook_head_bytes` | a delivery's request head |
   | `forge_component.hook_body_bytes` | a delivery's body, hashed and decoded as it streams, so time and bytes, not memory; one past it is answered `413` and hints nothing |
@@ -617,76 +617,17 @@ not itself valid JSON):
 }
 ```
 
-**The owned example** (setup.md, section 8): the `application` member
-for one owned forge with a runner, webhooks, one git identity and one
-worker, complete, in place of the standalone one in the whole document
-above, whose `engine.llm` names the one LLM account `temper sign-in`
-signs in. A person, a test or QA's host starts from it; `temper box
-CONFIG.json` runs it (setup.md, section 7):
-
-```json
-"application": {
-  "forges": [{
-    "number": 1,
-    "kind": "forgejo",
-    "api": {"socket": "127.0.0.1:3000"},
-    "transport": "plaintext",
-    "git": "http://127.0.0.1:3000",
-    "api_token": "forge-1/api_token",
-    "user": {"file": "forge-1/user"},
-    "identity": 1,
-    "webhook_secret": "forge-1/webhook_secret"
-  }],
-  "identities": [{
-    "number": 1,
-    "token": "forge-1/git_token",
-    "login": "temper",
-    "author": {"name": "temper", "email": "temper@example.invalid"}
-  }],
-  "landing": {
-    "deployment": [],
-    "projects": [{
-      "project": 1,
-      "rules": [{
-        "connector": 1,
-        "kind": 4,
-        "pattern": {
-          "segments": ["forge", "127.0.0.1:3000", "acme", "widget", "branch"],
-          "last": "exact",
-          "value": "main"
-        },
-        "enforce": true,
-        "ci": true,
-        "up_to_date": true,
-        "gates": [{"number": 1, "blocking": true, "freshness": "clean"}],
-        "approvals": []
-      }]
-    }]
-  },
-  "charter": 2,
-  "clients": {"listener": {"socket": "127.0.0.1:7100"}},
-  "webhooks": {"listener": {"socket": "127.0.0.1:7101"}},
-  "setup": [{
-    "forge": 1,
-    "directory": "forge-1",
-    "bot": {"login": "temper", "email": "temper@example.invalid"},
-    "orgs": ["acme"],
-    "mode": {"owned": {
-      "forgejo": "/opt/forgejo/forgejo",
-      "runner": {
-        "binary": "/opt/forgejo/forgejo-runner",
-        "labels": ["temper-host:host"],
-        "capacity": 1,
-        "path": "/usr/local/bin:/usr/bin:/bin"
-      },
-      "listen": {"socket": "127.0.0.1:3000"},
-      "person": {"login": "ada", "email": "ada@example.invalid"}
-    }}
-  }],
-  "limits": {"profile": "small", "overrides": {}},
-  "workers": [{"root": "workspaces", "git": "/usr/bin/git"}]
-}
-```
+**The owned example** (setup.md, section 8) is a file,
+`docs/examples/owned.json`: a whole document, `engine` and `application`
+both, for one owned forge with a runner, webhooks, one git identity, one
+worker and one LLM account handed in (credentials.md, section 3), with
+the files it names that hold no secret beside it in
+`docs/examples/owned/` (the agent's configuration, the charters). The
+files that hold a secret, the worker's secret and its digest and the
+LLM account's file, are never shipped: the first milestone's setup
+document says how each is made. A person, a test or QA's host starts
+from a copy; `temper box CONFIG.json` runs it (setup.md, section 7),
+and the process tier's test of `temper box` runs one (setup.md, 13.4).
 
 - **The forge's members are its setup's, written out** (setup.md, section
   8): `api` and `git` from `listen`, plaintext; `api_token`, `user`,

@@ -632,7 +632,7 @@ alone until skein's TLS server side (setup.md, section 15).
   (whether a job's commit status is written before its delivery; whether
   a pull request's mergeability is settled when the push that moved its
   head or base is delivered), is read again at `hinted`, doubling,
-  within the keep's `settle` of the move, and a pull request that reads
+  within `settle` of the move, and a pull request that reads
   not mergeable within it is never taken as conflicted
   (`domain/forge.md`, 5.2).
 - **Bounded.** Connections (`hooks`), the head (`hook_head_bytes`) and
