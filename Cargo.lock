@@ -1776,9 +1776,11 @@ name = "temper-box"
 version = "0.0.0"
 dependencies = [
  "jig-boundary",
+ "skein-fake-machine",
  "skein-io",
  "skein-lib",
  "skein-shell",
+ "skein-sim",
  "temper-forge-setup",
 ]
 
