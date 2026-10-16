@@ -100,8 +100,8 @@ documents to the client.
   the query by one of them marks it. This is the "bounded comparison per
   watch" with no record of the keys as they were; it marks more watches
   than the design's, never fewer.
-- **Orders and their direction** (the design names the orders, not
-  their direction): number ascending; last change and last activity
+- **Orders and their direction** (contract.md, 6.1, at jig `0ec80c047`,
+  gives them; ruling 133): number ascending; last change and last activity
   latest first; priority ascending, tracked tasks before untracked;
   ended at latest first, and the live group, which has no end, by
   number ascending. Ties go by number ascending. The cursor is the last
@@ -710,10 +710,7 @@ for candidate in core.tasks.view_tasks().as_ref() {
 
 ## Questions to raise when reached
 
-- **The orders' directions** (contract.md, 6.1 names the orders, not
-  their directions): this plan takes those under Choices. Raise them
-  with 5.2's landing for the designer's word, since jig 22's wire and
-  each application's lists follow them.
+- None: the orders' directions are contract.md, 6.1's own (ruling 133).
 
 ## Done when
 
