@@ -141,6 +141,20 @@ run are appended after "For the user".
     carries a `Document`, never a `Box`; no `Default` derive in step code
     (`User`'s literals name its two new fields).
 
+## Rulings
+
+101. **04.1's Size at 300** (plan defect, temper 04's block of 2026-10-16T22:10:01Z).
+     Ruling 101, a plan defect: 04.1's Size of 250 under-counted the scenario the session file itself prescribes
+     (the listener, eleven steps, two probes, 21 facts and their roll-up, "Facts, 21, each named `delivery-` …" in 04.1's
+     Shape). 04.1's Size is now 300, the plan's largest (development.md, 5.2: "Every Size is at most about 300 lines"),
+     so its tolerance is 600 by implementer.md's 8.6 ("An increment lands within twice its Size without asking").
+
+     - 04.1 lands at its count of 523, plus what the recording's proof needs fixed, while the count by
+       code-organization.md 6's command stays at most 600.
+     - Past 600, stop on a question again, with the count by file.
+     - Unchanged: 04.2's Size (220, codec); the rule against trimming a doc comment, a test or the formatting to meet a
+       Size (implementer.md, 8.6); the proof, the recording whole, before landing.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
