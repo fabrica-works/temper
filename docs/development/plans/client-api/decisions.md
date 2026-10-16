@@ -626,6 +626,14 @@ choice would have been the user's (development.md, 10.4).
 
      Checked: `git -C temper show origin/main:Cargo.lock | grep -o 'forgetic/skein.git#[0-9a-f]*' | sort -u` → `skein.git#8a10437fa55735f83502cd189b0314fbcf3af5fc` (skein-01.s2's landing, `8a10437`); jig's at its 10.3 landing → `skein.git#f12f29d4…`; jig's and temper's `Cargo.toml` name skein as `{ git = "https://github.com/forgetic/skein.git" }`, no `rev`: one source, which temper's lock pins.
 
+155. **temper-03.s1 carries the client's repin repairs** (plan defect, temper 03's block of 2026-10-16T17:18:34Z).
+     Ruling 155, a plan defect, the implementer's proposal: yes. Ruling 153's Don't ("touch temper's client crates (03.2's)") missed that the 10.3 pin holds jig 11.1 and 11.2, which landed before jig 10.3: their client changes reach temper with this repin, not 03.3's.
+
+     1. **temper-03.s1 carries the client crates' repairs that the repin needs to compile and pass the gate,** taken from 03.2's draft on `client-api/temper-03-2`, within the README's 200 lines of a repin's repairs: the contract's path, `jig_domain_client::contract` to `jig_client_domain::contract` (jig 11.1's `sed`, as 03.3's Files count it: 21 files, 40 lines), `Event::Hello`'s users (it has `served` alone now), and the shell's repairs the compiler names next.
+     2. **Unchanged:** 03.2's behaviour beyond that (its tests and its process Proof) stays 03.2's; s1's engine Shape, its tests and its proof; the 200 lines.
+     3. **If the client's repairs pass 200 lines, or the gate needs more of 03.2's Shape:** land temper-03.s1 and 03.2 in one `land`, s1's commits first, each step's last commit with its own `Step:` trailer, rather than asking again.
+     4. **03.2 and 03.3** do not do again what s1 carried; 03.3's Files are what remains of them.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

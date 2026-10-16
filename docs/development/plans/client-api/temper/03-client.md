@@ -361,6 +361,8 @@ over `jig-client-protocol-http` in the shell (`client.md`, 6.1, 6.6,
 Needs: jig 10.3 (the link's vocabulary, `jig-client-protocol-http`, the
 native shell on it), and temper-03.s1's landing (ruling 153), whose repin
 holds jig 10.3: 03.2 makes no repin commit, and its lines are its Shape's.
+What temper-03.s1 carried of the client to compile (ruling 155) is not
+done again.
 Files: `crates/temper-client-shell-terminal/src/`: `client.rs` (391
 lines at the base: the sign-in at :110-116, `sign_in` and `signing` at
 :180-189), `route.rs` (:52-57, the link's requests to the shell;
@@ -431,7 +433,8 @@ Scope: temper follows jig 11: the contract's types from
 65536, the forge's side 1), as jig 11.3 changes the test root's records;
 the client wire at v8.
 Needs: jig 11.5 (11.3's `Held` and v8 among it).
-Files: the contract's path, `jig_domain_client::contract` to
+Files (the contract's path and `Event::Hello`'s users moved with
+temper-03.s1's repin, ruling 155: 03.3 does what remains): the contract's path, `jig_domain_client::contract` to
 `jig_client_domain::contract`: 21 files and 40 lines of temper at the
 base (`git grep -c 'jig_domain_client::contract' -- '*.rs'`,
 `logs/w9/counts.txt`; jig 11.1 counts 24 and 55 with the nested

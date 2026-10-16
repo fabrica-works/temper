@@ -45,6 +45,13 @@ Files, at temper `0ff45022`:
   to a part temper maps; `route.rs:320`'s and `forge_route.rs:2349`'s
   (`effect_answer`) matches take them as core-owned; `temper-engine-smith/src/answers.rs`
   (`answer`, `:96`) renders each to the run, naming its task and value;
+- the client crates, by ruling 155: what the repin needs to compile
+  and pass the gate, within the repin's 200 lines, taken from 03.2's
+  draft (`client-api/temper-03-2`): jig 11.1 moved the contract
+  (`jig_domain_client::contract` to `jig_client_domain::contract`, by
+  the `sed` jig 11.1 gives, as 03.3's Files count it), and `Event::Hello`
+  lost `versions` (`crates/temper-client-domain/src/tests/fixtures.rs:248`
+  among its users); the shell's repairs the compiler names next;
 - the tests' literals: `tests/engine/domain/tests/root_routes.rs:1893,
   :1928, :1947, :2024`, `crates/temper-service/src/tests/tools.rs:29`;
   a further user the compiler names gets the same, listed in the
@@ -70,8 +77,13 @@ Don't: change temper's store format (`store-v1.schema:120`'s
 `CallPayload` holds the connector's answers alone; jig's core v3 keeps
 these four); unify or rename temper's tools (`decide` and
 `decide_escalation` stay two); give `ProposedAction`'s `Amend` or
-`Release` a revision (jig's `proposals.rs:88, :92` have none); touch
-temper's client crates (03.2's).
+`Release` a revision (jig's `proposals.rs:88, :92` have none); add
+03.2's behaviour to the client crates beyond what compiling and the
+gate need (its tests and its process Proof stay 03.2's).
+If the client's repairs pass the repin's 200 lines, or the gate needs
+more of 03.2's Shape than they hold: land temper-03.s1 and 03.2 in one
+`land`, s1's commits first, each step's last commit with its own
+`Step:` trailer, rather than asking again (ruling 155).
 Done when: `git -C ~/src/rust/temper log origin/main --all-match
 --grep='^Plan: client-api$' --grep='^Step: temper-03.s1$' --format=%H
 -1` prints its landing.
