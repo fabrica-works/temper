@@ -279,13 +279,19 @@ command runs once, from the worktree's root:
    committed:
 
    ```sh
-   TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 heavy --gate scripts/proof-one-process.sh
+   TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temper --bin temper && cargo nextest run -p temper --profile process --no-fail-fast -E "not test(/^temper_open_/)"'
    ```
 
-   It exits 0, and its log's nextest `Summary` line reads `6 tests
-   run: 6 passed`. This shows the real `temper` binary on the throwaway
-   Forgejo 17.0.0: it adopts a repository and lands a change pushed by
-   real git, found after a restart (testing.md, 2.6). It aims at 3
+   It exits 0, and its log's nextest `Summary` line reads `4 tests
+   run: 4 passed`. The two `temper open` tests are left out: on
+   origin/main they panic at
+   `crates/temper-client-shell-terminal/src/terminal.rs:72`, "print
+   bounds", without this plan's changes (ruling 101; the designer's
+   question of 2026-10-16T14:19:38Z). The full
+   `scripts/proof-one-process.sh`, `6 tests run: 6 passed`, is the proof
+   of the step that lands the fix. This shows the real `temper` binary
+   on the throwaway Forgejo 17.0.0: it lands a change pushed by real
+   git, found after a restart (testing.md, 2.6). It aims at 3
    minutes (testing.md, 2.6); the `process` profile's `global-timeout`
    stops it at 10 minutes (`.config/nextest.toml:32`). The landing's
    report gives the log's path.
@@ -523,5 +529,5 @@ after `git fetch origin`.
    origin/main:tools/git-transcripts/transcripts/fetch-renamed/stderr |
    grep -c '^warning: redirecting to .*/fixture/renamed'` prints 1.
 7. The process tier passed on v17: 01.1's landing report names the log
-   of its `heavy --gate scripts/proof-one-process.sh` run, and `grep -c
-   '6 tests run: 6 passed' <that log>` prints 1.
+   of its process tier run (01.1's Proof, item 2, ruling 101), and `grep -c
+   '4 tests run: 4 passed' <that log>` prints 1.

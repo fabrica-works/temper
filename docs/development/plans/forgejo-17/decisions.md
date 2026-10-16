@@ -124,6 +124,36 @@
 
 (The supervisor appends the run's rulings here.)
 
+101. **temper 01.1's process tier without the two temper open tests, until the print bounds are fixed** (plan defect, temper 01's block of 2026-10-16T14:11:10Z).
+     An interim ruling, while the designer answers the question of
+     2026-10-16T14:19:38Z. The panic is on origin/main, not in 01.1:
+     `crates/temper-client-shell-terminal/src/terminal.rs:72`,
+     `Print::new(view_limits).expect("print bounds")`, came with f6f01026f
+     (client-api's temper 01.3), and temper's own view limits put
+     skein-ui-text's worst-case print at 257,411,441,911 bytes, past the u32
+     `Print::new` takes. 01.1's branch changes no client crate and no
+     `Cargo.lock`. Every `temper open` panics so, on any Forgejo.
+
+     1. temper 01.1 lands with its process tier run without the two `temper
+        open` tests (`temper_open_signs_in_prints_the_inbox_and_exits_on_q`,
+        `temper_open_adopts_a_repository_by_commands`), as `temper/01-pin.md`,
+        01.1's Proof, item 2, now says:
+
+        ```sh
+        TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temper --bin temper && cargo nextest run -p temper --profile process --no-fail-fast -E "not test(/^temper_open_/)"'
+        ```
+
+        It exits 0, and its log's nextest `Summary` line reads `4 tests run:
+        4 passed`. Run it once; the landing report names its log. Nothing
+        else is wanted for it.
+     2. The fix is not 01.1's: no change to `crates/temper-client-*`,
+        `crates/temper/src/open.rs` or `Cargo.lock` in session 01. It comes
+        as a supplement step once the designer has answered; that step's
+        proof is the full `scripts/proof-one-process.sh`, `6 tests run: 6
+        passed`, and README's "Done when" item 9 is unchanged.
+     3. If any of the four tests fails, or the run panics elsewhere, block
+        again with the log.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
