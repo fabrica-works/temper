@@ -1,12 +1,13 @@
 use skein_lib::Rng;
-use temper_codecs_world::{forgejo, mutated};
+use temper_codecs_world::{forgejo, mutated, mutated_into};
 #[test]
 fn forgejo_decoders_answer_every_mutated_transcript_without_panicking() {
     let mut rng = Rng::new(0x06_05);
     for (case, request) in forgejo::json_cases() {
         let body = forgejo::transcript(&case).body;
+        let mut bytes = Vec::new();
         for _ in 0..200 {
-            let bytes = mutated(&mut rng, &body);
+            mutated_into(&mut rng, &body, &mut bytes);
             let decoded = match &request {
                 Some(request) => forgejo::decode(request, &bytes),
                 None => forgejo::decode_error(&bytes),

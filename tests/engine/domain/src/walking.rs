@@ -811,11 +811,18 @@ pub fn run_replayed(settings: Settings) -> World {
         }
         first.iterate();
         replay.iterate();
+        // Compare the accumulated trace directly: formatting its strings anew
+        // at every iteration only repeats an exact comparison of the same data.
+        let first_trace = std::mem::take(&mut first.trace);
+        let replay_trace = std::mem::take(&mut replay.trace);
+        assert_eq!(first_trace, replay_trace, "trace at iteration {}", first.iteration);
         first_state.clear();
         replay_state.clear();
         write!(first_state, "{first:?}").expect("write to string");
         write!(replay_state, "{replay:?}").expect("write to string");
         assert_eq!(first_state, replay_state, "complete frozen state at iteration {}", first.iteration);
+        first.trace = first_trace;
+        replay.trace = replay_trace;
     }
     panic!("walking replay did not settle");
 }

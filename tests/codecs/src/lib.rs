@@ -22,7 +22,15 @@ pub fn drawn(rng: &mut Rng, most: u32) -> Vec<u8> {
 /// Flip, remove or insert one byte of a golden value.
 #[must_use]
 pub fn mutated(rng: &mut Rng, golden: &[u8]) -> Vec<u8> {
-    let mut bytes = golden.to_vec();
+    let mut bytes = Vec::new();
+    mutated_into(rng, golden, &mut bytes);
+    bytes
+}
+
+/// The same mutation, retaining scratch capacity between complete inputs.
+pub fn mutated_into(rng: &mut Rng, golden: &[u8], bytes: &mut Vec<u8>) {
+    bytes.clear();
+    bytes.extend_from_slice(golden);
     let length = u64::try_from(bytes.len()).expect("a byte length fits");
     match rng.below(3) {
         0 if !bytes.is_empty() => {
@@ -39,7 +47,6 @@ pub fn mutated(rng: &mut Rng, golden: &[u8]) -> Vec<u8> {
             bytes.insert(at, byte);
         }
     }
-    bytes
 }
 
 /// Forgejo transcript fixtures.
