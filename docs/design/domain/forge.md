@@ -216,7 +216,10 @@ Its capacity is a limit: a batch naming resources past it is refused.
   end at most, never stalls on it, and is never taken as conflicted on
   it; once the window has passed, not mergeable is a conflict (8.2). A
   move long before, such as a head pushed before a long CI, leaves no
-  window open.
+  window open. The window's start is the later of the change's own
+  last push, which it keeps, and the last move a hint or a read told
+  of, which it does not: after a restart, only its own push opens a
+  window.
 - **Landing branches' tips** are read on a hint naming them, or a
   commit at their tip, and on a slow pace otherwise.
 - **Hints** come from the forge's webhook deliveries

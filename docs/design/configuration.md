@@ -368,11 +368,13 @@ top-level `workers`, in the same order; standalone has one. Each:
     `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
     below `box.window_ms`;
   - the webhooks' listener's: each of its limits above 0;
-    `hook_secret_bytes` at least 32; `hook_head_bytes` at most the HTTP
-    server's head bound; `hooks` within the sockets the profile leaves
-    once the clients' listener and the forge's connections are counted.
-    `small`'s sockets hold a document with both listeners, as the owned
-    example has;
+    `hook_secret_bytes` at least 32; `hook_head_bytes` at most the
+    HTTP server's largest read within io's intake; `hooks` within the
+    sockets left once the clients' listener and the forge's connections
+    are counted. The sockets are temper's own, a constant of
+    `temper-service`'s limits module that its io check takes in place
+    of the sum of jig's engine's and worker's, and `small`'s hold a
+    document with both listeners, as the owned example has;
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest
     part the engine can send within what the worker's limits take; the

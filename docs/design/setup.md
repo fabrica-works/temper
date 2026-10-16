@@ -126,8 +126,9 @@ connected  temper serve             ◄── reads them, through the forges and
 - **What temper strictly needs,** for each forge: the bot's API token,
   its git token and its id (credentials.md, sections 4 and 5); for
   webhooks, their secret. The scopes, checked on v17.0 (section 13.3):
-  `read:user`, `write:issue` and `write:repository` for the API token,
-  `write:repository` alone for the git token.
+  `read:user`, `write:issue` and `write:repository` for the API token;
+  `write:repository` and `read:user` for the git token, the second so
+  that reconcile can ask whose it is (section 5, step 3).
 - **What the person does:** a Forgejo user for temper, not a site admin;
   its two tokens; its write access to each repository temper will adopt,
   as a collaborator or through a team; optionally, each repository's or
@@ -174,7 +175,8 @@ managed or owned.
   5. **Each org,** which must exist when managed, and is made, owned by
      the person and private, when owned (6.5). In it, a team named the
      bot's login, on every repository the org has or will have
-     (`includes_all_repositories`), with `write` on the units temper uses
+     (`includes_all_repositories`), its `permission` `write`, sent
+     explicitly, and `write` on the units temper uses
      (`units_map`: code, issues, pull requests and actions), and the bot
      its member. Adopting any
      repository of the org then finds the bot's write access with no
@@ -284,13 +286,15 @@ by `state`:
    what a first preparation it recorded left.
 2. **A later preparation at the same versions:** `app.ini` written again,
    so a change of the setup reaches Forgejo; `admin_token` made again
-   when missing, under a fresh suffix, and temper's admin with it;
-   nothing else. It takes Forgejo's lock alone, so a box restarts a
+   when missing, under a fresh suffix, for temper's admin, which
+   Forgejo's command line cannot make twice: an admin a person deleted
+   fails the preparation, naming it; nothing else. It takes Forgejo's lock alone, so a box restarts a
    Forgejo, after its preparation, while the runner runs.
 3. **An upgrade:** a recorded Forgejo older than the pin is dumped
    (`forgejo dump`) into `backups/forgejo-<old>-to-<new>.zip`, written as
-   `.partial` and renamed, never overwritten (a dump already there is
-   not made again), then migrated, then recorded. A recorded runner
+   `backups/dump.partial.zip` (Forgejo adds `.zip` to a name without it)
+   and renamed, never overwritten (a dump already there is not made
+   again), then migrated, then recorded. A recorded runner
    older than its pin has its files prepared again, under the runner's
    lock too, with no dump, since the runner keeps no data. A recorded
    version newer than its pin, Forgejo's or the runner's, refuses:
@@ -306,9 +310,14 @@ by `state`:
   preparation never runs it: it writes the runner's connection itself, in
   the runner's configuration, with its token in a file (13.3).
 - **Its commands run on skein-io's processes,** as the box's children
-  do, in the loop that runs reconcile's HTTP: each spawned with its
-  arguments and the spec's environment, its output read through pipes
-  within a bound, its exit status awaited.
+  do and as reconcile's HTTP runs: each spawned with its arguments and
+  the spec's environment, its output read through pipes within a bound,
+  its exit status awaited.
+- **Interrupted** by a termination signal while a command runs, it
+  kills the command's process group and exits 1, printing `forge <n>:
+  interrupted`. `state` is not marked ended, so the next preparation
+  begins again from an empty layout, for a first one, or repeats, for a
+  later one or an upgrade.
 - **Its commands' output,** kept for a failure's message, is masked of
   every secret it holds, as the throwaway Forgejo masks its own.
 
@@ -356,8 +365,8 @@ by `state`:
 - **The person** signs in on Forgejo's web as a site admin, makes
   repositories in the orgs, with Actions, and adopts them through
   temper's client. temper's admin is temper's; a person who deletes it
-  makes the next reconcile stop, naming the admin's token, and a
-  preparation with `admin_token` removed makes it again.
+  makes the next reconcile and the next preparation stop, naming it. A
+  preparation with `admin_token` removed makes a new token for it.
 - **The forge's members** are connected's, written out: `api` the
   address, `transport` plaintext, `git` `http://<address>` (section 8).
 
@@ -564,8 +573,11 @@ engine on a box, and that they cover what its work waits on.
   lost while `temper serve` is down, refused for its size, or never sent
   is found by them; Forgejo does not send a failed delivery again.
 - **Checked:** the process tier's hinted story (13.4) runs with the
-  keep's paces raised past its budget, so it lands only if every wait
-  ends by a delivery.
+  keep's paces raised past its budget, so it lands only if the waits it
+  meets, the table's first three rows (a landing branch's tip, a pull
+  request's head, base and state, CI on a head), each end by a
+  delivery. The others, comments, reviews, issues and drift, are
+  checked from hints in the worlds (testing.md, 2.2 and 6.3).
 
 ## 11. The crates
 
@@ -579,8 +591,8 @@ temper-forge-setup           step code: the setup's types and checks; reconcile'
 └── jig-protocol-config, skein-lib, skein-json
 temper-forge-setup-shell     ordinary Rust: the hosts of prepare, run and reconcile: commands, files,
 │                              the forge's locks, the exec; HTTP on skein-http over skein-io
-├── temper-forge-setup
-└── skein-io, skein-http, skein-tls, skein-shell
+├── temper-forge-setup, temper-forge-forgejo
+└── skein-io, skein-http, skein-tls, skein-json, skein-shell
 temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
 │                              processes; nothing of setup but its steps (7.3); one crate, under the
 │                              subset's lints, its host written within the subset
@@ -609,8 +621,11 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
 
 - **The first milestone's setup** (`draft/mvp.md`, 5.1): copy the owned
   example, make the files that hold its secrets, hand in its LLM
-  account's, and run `temper box`; make a repository with Actions in an
-  org on Forgejo's web, and adopt it.
+  account's, and run `temper box`; sign in on Forgejo's web with
+  `person_password` and change it, since Forgejo's API refuses the
+  person until then; make a repository with Actions in an org, and
+  adopt it. The example's charters ship as short texts a person
+  edits.
 - **CI for the first milestone** (`draft/mvp.md`, section 7): Actions on
   the owned runner.
 - **The process tier** (testing.md, 2.6), on owned mode in place of its
@@ -682,8 +697,10 @@ before a machine relies on each:
   reconcile's routes; the scopes each route of forge.md, section 3.2
   needs; that Forgejo refuses a second token of one name.
 - **Orgs and teams:** making a private org for a user, a team with
-  `includes_all_repositories` and `units_map` of `write` on code, issues,
-  pull requests and actions, a member; that a repository
+  `includes_all_repositories`, its `permission` `write` read back, and
+  `units_map` of `write` on code, issues, pull requests and actions, a
+  member; that a git token of `write:repository` alone is refused `GET
+  /user`, and one with `read:user` too answers it; that a repository
   made later in the org is writable by the team's members.
 - **Org hooks:** making one with its events, its secret never shown, and
   its patch; that `ALLOWED_HOST_LIST` refuses loopback by default and
