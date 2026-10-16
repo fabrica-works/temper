@@ -1771,6 +1771,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-box"
+version = "0.0.0"
+dependencies = [
+ "jig-boundary",
+ "skein-io",
+ "skein-lib",
+ "skein-shell",
+ "temper-forge-setup",
+]
+
+[[package]]
 name = "temper-client-domain"
 version = "0.0.0"
 dependencies = [
