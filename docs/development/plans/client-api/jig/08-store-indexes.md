@@ -144,15 +144,18 @@ Files:
 - `crates/jig-domain-tasks/src/`: `index.rs` (`EndedByParty`,
   `Key::EndedByParty`, `Key::live`), `boundary.rs` (`Stored::EndedByParty`,
   `Stored::key`; at most 40 lines), `closing.rs` (the save, beside
-  `Stored::EndedDelegate` at :379), `stored.rs` (a restored row is
-  refused, as `Stored::Result` at :790), `owned.rs`, `lib.rs` (export),
-  `tests/index.rs`.
+  `Stored::EndedDelegate` at :379), `domain.rs` (`output_bound`'s
+  `limits.tasks.checked_mul(26)`, :451, counts an ending's saves, 26
+  since `EndedDelegate`: 27 with this row; at most 40 lines), `stored.rs`
+  (a restored row is refused, as `Stored::Result` at :790), `owned.rs`,
+  `lib.rs` (export), `tests/index.rs`.
 - `crates/jig-protocol-store/`: `src/keys/tasks.rs` (tag 19, both ways),
   `schema/tasks-v3.schema` (`record EndedByParty { party: u64 label: u32
   ended_at: u64 task: u64 }`, `ended_by_party` in `Value`),
   `src/codec/tasks.rs` and `src/codec/tasks/index.rs` (both ways), the
   generated family, the goldens the drift test writes,
-  `src/tests/fixtures/keys.rs` (`tasks_key` draws the variant),
+  `src/tests/fixtures/keys.rs` (`tasks_key`, :100, draws the variant:
+  its `below(19)` at :102 becomes `below(20)`),
   `src/tests/codec/record.rs`, `src/historical.rs` and
   `src/reads/{indexed.rs, joins.rs}` (an arm each).
 - The exhaustive matches over `tasks::Key` and `tasks::Stored` (34 files
@@ -193,7 +196,7 @@ Test shape:
 - `crates/jig-protocol-store/src/tests/keys.rs` keeps
   `core_and_people_keys_sort_as_bytes_as_they_derive` and
   `every_generated_key_decodes_to_itself` unchanged; the generator
-  (`fixtures/keys.rs:101`) draws the new variant.
+  (`fixtures/keys.rs:100`) draws the new variant.
 - `tests/core/tests/ended_indexes.rs` (new; the core world on the real
   store). Fixtures: `jig_core_world::stories::reads::{world, request}`
   (`tests/core/src/stories/reads.rs:13, 44`), `World::end`
@@ -284,8 +287,10 @@ Needs: jig 02.1's flags on `tasks::TaskRecord` (`listed`), at the
 session's start.
 Files: 8.1's list, with `EndedByProject` in place of `EndedByParty`
 (tag 20; `record EndedByProject { project: u32 label: u32 ended_at: u64
-task: u64 }`, `ended_by_project` in `Value`), and the same 34 files'
-matches and the downstream's 3.
+task: u64 }`, `ended_by_project` in `Value`; `output_bound`'s
+multiplier, `domain.rs:451`, becomes 28, and `tasks_key`'s draw,
+`fixtures/keys.rs:102`, `below(21)`), and the same 34 files' matches and
+the downstream's 3.
 Shape:
 - `jig_domain_tasks::EndedByProject { project: u32, label: u32,
   ended_at: Wall, task: u64 }` with `const fn key(self) -> Key`;
@@ -300,7 +305,11 @@ Test shape:
 - `crates/jig-domain-tasks/src/tests/index.rs`:
   `a_newer_listed_task_sorts_first_within_project_and_label`.
 - `tests/core/tests/ended_indexes.rs`:
-  `an_ended_goal_is_indexed_by_its_project_and_label` (a goal made by
+  `an_ended_goal_is_indexed_by_its_project_and_label` (the read story's
+  chat ended first, as `a_restart_reads_no_ended_task_whose_result_was_read`
+  ends it before its `census_goal`, `tests/core/tests/restart.rs:464`: a
+  goal asked while the chat is live is never assigned, `world.assigned`
+  staying the chat; then a goal made by
   `jig_core_world::stories::offers::goal(100)`,
   `tests/core/src/stories/offers.rs:92`, listed with label 0 as jig 02
   makes `SetGoal`'s, ends: the store holds `EndedByProject { project: 1,
@@ -342,8 +351,9 @@ Files:
   `routing/mod.rs`, `stopping.rs`, `routing/watch_marks.rs`,
   `tests/completion_retry.rs` (the renamed arms), `lib.rs`.
 - `crates/jig-domain-people/src/`: `boundary.rs` (`Event::ForgetChat`
-  → `Event::Forget`, the same fields), `inbox.rs` (`forget_chat_event`'s
-  name; `marked_chats` goes, its one reader being the forget's
+  → `Event::Forget`, the same fields), `domain.rs` (the step's
+  `Event::ForgetChat` arm, :429; at most 40 lines), `inbox.rs`
+  (`forget_chat_event`'s name; `marked_chats` goes, its one reader being the forget's
   candidates), `tests.rs`, `tests/marked_chats.rs` (removed with it).
 - `crates/jig-protocol-store/src/historical.rs`, `src/tests/gets.rs`;
   `testing/jig-test-store/src/{route.rs, tests/routes.rs}`;
@@ -357,15 +367,25 @@ Files:
   renamed `Now`, core `Event` and people `Event` variants, an arm or a
   name each (from `git grep -n -E
   'LoadEndedChat|ForgetChat|SeenChatLoaded|Now::SeenChat|ChatSeen|marked_chats|\.chat_seen\('`).
+- `tests/core/src/effects.rs` (a `World.initial_ask: people::Ask`,
+  defaulting to the base's chat), `effects/constructors.rs`
+  (`World::configured_with(.., initial)` beside `configured`, :85),
+  `effects/deliveries.rs` (the first sign-in's hard-coded `StartChat`,
+  :153-158, reads `initial_ask`): for `forgettable_world`, about 25
+  lines.
 - `tests/core/tests/activity.rs`, `tests/core/tests/reads.rs`,
   `tests/core/tests/restart.rs`: the forgetting tests named below.
 - `testing/jig-conformance/src/scenarios.rs` (`Scenario`, `ALL`,
   `Action`, `program`); the testing application's bindings,
   `tests/conformance/src/scenarios.rs` (`action`, `check`; its `ask` at
-  :28), `tests/conformance/tests/scenarios.rs`.
+  :28), `tests/conformance/src/lib.rs` (`peers`' match over every
+  `Scenario`, :216-252: an arm for the new one),
+  `tests/conformance/tests/scenarios.rs`.
 - Downstream: 4 files name these variants (its engine root's archive
   and `now` routes, its service's translation, its client world's
-  translation), absorbed at its repin.
+  translation), absorbed at its repin; its conformance configuration
+  matches every `Option<Scenario>` (`tests/conformance/src/config.rs:132-138`
+  there), which `ConversationEndsWhileRead` breaks at the repin.
 Shape:
 - `jig_domain_core::forget::forgets(row: &tasks::TaskRecord, flags:
   tasks::Flags, reading: Reading) -> Option<u64>`, as sketched: the
@@ -387,7 +407,8 @@ Shape:
   `Erase(Key::Ended(task))`, the result's `Update` key, `EndedByParty`
   and, when listed, `EndedByProject` (8.1, 8.2), the tag 13 to 15 rows
   as at the base, and `people::Event::Forget`, which erases the read
-  position.
+  position. Its queue, `Queue::with_capacity(6)` at the base
+  (`inbox.rs:415`), becomes 8 with the two index erases.
 - The core's conversation test decides whether turns are read
   (`chat_requester`, or `conversation_requester` once jig 05.5 has keyed
   it on the flag); the class comes from jig 02's
@@ -399,8 +420,12 @@ Test shape:
   (`stories/reads.rs:17`) whose initial conversation is made by jig 03.1's
   `people::Ask::Create` (one member: an agent task under the world's charter 1,
   flagged conversation, label 1, retention forgotten once read) in place
-  of `StartChat`, `world.assigned` naming it (`World::configured_unassigned`,
-  `tests/core/src/effects/constructors.rs:93`, takes the initial ask).
+  of `StartChat`, `world.assigned` naming it. `World::configured_unassigned`
+  (`tests/core/src/effects/constructors.rs:93`) takes no initial ask: the
+  first sign-in sends a hard-coded `StartChat`
+  (`tests/core/src/effects/deliveries.rs:153-158`), so the helper builds
+  its world with `World::configured_with(.., initial)`, which sets
+  `World.initial_ask`, read there (Files).
   Reference test:
 
   ```rust
@@ -461,7 +486,7 @@ Test shape:
   row of the forgettable one (record, result update, index rows,
   position). `tests/conformance/tests/scenarios.rs`:
   `conversation_ends_while_read_chosen_cut_ends_the_story` (the
-  `chosen_cut` pattern, :12); the fuzzy sweep
+  `chosen_cut` pattern, :18); the fuzzy sweep
   `every_shared_story_survives_every_commit_and_seeded_random_cuts`
   (`fuzzy_scenarios.rs`) runs it at each commit: aim to add at most 0.5 s
   to the fuzzy suite (the eight scenarios' sweep runs in 1.4 s at the
@@ -546,11 +571,20 @@ Files:
   `related` is its `EndedRead`), `schema/people-v3.schema` (`record
   EndedRead { task: u64 party: u64 through: u64 }`), `src/codec/people.rs`,
   the generated family, the goldens, `src/tests/{intervals.rs, restore.rs,
-  codec.rs, fixtures/keys.rs}`.
+  codec.rs, fixtures/keys.rs}` (`people_key`'s `below(7)`, :60, becomes
+  `below(8)`).
 - The roots that hand a census row to the core: `testing/jig-test-domain/src/lib.rs:967`,
   `examples/ops/domain/src/restart.rs:123` (each passes the record as it
   comes to `restore_inbox_row`), and `Now::LoadEndedRead`'s route in
-  `examples/ops/domain/src/route.rs` and `testing/jig-test-domain/src/routes.rs`.
+  `examples/ops/domain/src/route.rs` and `testing/jig-test-domain/src/routes.rs`;
+  `tests/ops/src/conformance/mod.rs` (`census_owner`, :1069-1076, called
+  at :428, maps a `ConversationOldest` or `Result` row to its owner: it
+  hands up the `EndedRead` row and then its ended record; at most 40
+  lines).
+- `tests/core/src/effects/store.rs` (`census_ended`, :50-52, counts every
+  census row at the base): it counts only the census's `Stored::Ended`
+  rows, so `a_restart_reads_no_ended_task_whose_result_was_read`
+  (`tests/core/tests/restart.rs:497`) keeps expecting 3.
 - The users of `people::Key`/`Stored` (21 files at the base, from `git
   grep -l ReadChat -- ':!docs' ':!*/generated/*'`, the schema among them): `jig-domain-core/src/routing/{application_routes.rs,
   people.rs, watch_marks.rs}`, `jig-domain-core/src/tests/restore_admission.rs`,
@@ -713,8 +747,12 @@ Files:
 - `tests/core/tests/ended_indexes.rs`.
 - `testing/jig-conformance/src/scenarios.rs`; the testing application's
   bindings, `tests/conformance/src/scenarios.rs` and its deliveries'
-  routing in `tests/conformance/src/lib.rs`;
+  routing in `tests/conformance/src/lib.rs` (and `peers`' match over
+  every `Scenario`, :216-252: an arm for the new one);
   `tests/conformance/tests/scenarios.rs`.
+- Downstream: its conformance configuration matches every
+  `Option<Scenario>` (`tests/conformance/src/config.rs:132-138` there),
+  which `QueryWatchedWhileTasksEnd` breaks at the repin.
 Shape:
 - `jig_domain_core::reads::ended::{EndedPart, ended_part}` as sketched.
 - The ended group's positions are `Position::Owner(Key::Tasks(...))` of
@@ -792,6 +830,9 @@ Files:
   `tests/one-process/src/referee.rs:144`; the tests building a snapshot
   with `..Snapshot::default()` stay as they are.
 - `tests/conformance/tests/referee.rs`.
+- Downstream: its snapshots' builders, `tests/conformance/src/observations.rs`
+  and `tests/one-process/src/referee.rs` there, fill no `read_positions`,
+  so the rule checks nothing there; nothing breaks.
 Shape:
 - `jig_conformance::referee::Snapshot.read_positions: BTreeMap<(u64,
   u64), u64>`: by party, then task, the position's `through`.
@@ -837,6 +878,7 @@ algorithms in comments.
 // crates/jig-domain-tasks/src/index.rs (8.1, 8.2)
 /// A row of the index of ended tasks by requesting party (store.md 7.4),
 /// saved by the decision that ends a task whose requester is a party.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)] // as `Update`'s, index.rs:34
 pub struct EndedByParty { pub party: u64, pub label: u32, pub ended_at: Wall, pub task: u64 }
 impl EndedByParty {
     /// Its key: newest ended first within the party and label.
@@ -851,8 +893,10 @@ impl EndedByParty {
 }
 /// A row of the index of ended listed tasks by project (store.md 7.4),
 /// saved by the decision that ends a task flagged listed.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct EndedByProject { pub project: u32, pub label: u32, pub ended_at: Wall, pub task: u64 }
 // impl EndedByProject { pub const fn key(self) -> Key } as above.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)] // the base's
 pub enum Key {
     // ... the base's variants, then:
     /// An ended task of a requesting party: `(party, label, ended at reversed, task)`.
@@ -865,11 +909,13 @@ pub enum Key {
 
 ```rust
 // crates/jig-domain-people/src/boundary.rs (8.4)
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)] // the base's
 pub enum Key {
     // ... the base's variants, then:
     /// An ended conversation's read position, its requester's (store.md 7.4); not live.
     EndedRead { task: u64, party: u64 },
 }
+#[derive(Clone, PartialEq, Eq, Hash, Debug)] // the base's
 pub enum Stored {
     // ...
     /// Saved by the decision that ends a conversation; `through` 0 when nothing was read.
@@ -880,6 +926,7 @@ pub enum Stored {
 ```rust
 // crates/jig-domain-core/src/forget.rs (8.3; 8.4 adds AfterRead in routing/vocabulary.rs)
 /// What a load of an ended read position continues.
+#[derive(Debug)] // as `Now` and `Event`, which carry it
 pub enum AfterRead {
     /// A party's `Seen::Chat` on an ended conversation, by its request.
     Seen { request: Token },
@@ -887,6 +934,7 @@ pub enum AfterRead {
     Forget { row: Box<tasks::TaskRecord> },
 }
 /// What one ended task's forget needs to know, read before the decision.
+#[derive(Clone, Copy, Debug)]
 pub struct Reading {
     /// The requester's read position over results.
     pub results: u64,
@@ -899,7 +947,13 @@ pub struct Reading {
 pub fn forgets(row: &tasks::TaskRecord, flags: tasks::Flags, reading: Reading) -> Option<u64> {
     // let tasks::Party::Person(party) = row.requester else { return None };   // not a party: kept
     // if flags.retention != Retention::ForgottenOnceRead || reading.named { return None; }
-    // match row.phase { tasks::Phase::Ended(_) => {} _ => return None }
+    // match row.phase {
+    //     tasks::Phase::Ended(_) => {}
+    //     tasks::Phase::Waiting
+    //     | tasks::Phase::Active(_)
+    //     | tasks::Phase::Held { .. }
+    //     | tasks::Phase::Closing(_) => return None,
+    // }
     // if row.result_position == 0 || reading.results < row.result_position { return None; }
     // match (flags.conversation, reading.turns) {
     //     (true, Some(seen)) if seen >= row.last_reply => Some(party),
@@ -914,6 +968,7 @@ pub fn forgets(row: &tasks::TaskRecord, flags: tasks::Flags, reading: Reading) -
 /// The index serving a task query's ended part (store.md 7.3), chosen by
 /// the query's keys in this order: a requester party; a requester task or
 /// a parent; a project.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EndedPart {
     /// The ended-by-party index, from the party, and the label where named.
     ByParty { party: u64, label: Option<u32> },

@@ -110,17 +110,25 @@ puts it on each exchange and on the stream's opening (client.md, 3 and
 `With::Held`.
 Needs: jig 01's renames on `main`.
 Files: `crates/jig-client-protocol-link/src/{boundary.rs, component.rs,
-store.rs, lib.rs}`, a new `src/sign_in.rs`;
+store.rs, lib.rs}`, a new `src/sign_in.rs`; the link's `src/tests.rs`
+(`mod sign_in;`), a new `src/tests/sign_in.rs`, and the exhaustive
+matches on `Request` that `Request::Signing` breaks, in
+`src/tests/fixtures.rs:96,130,163` and
+`src/tests/fixtures/{link_deliveries.rs:117, link_reads.rs:27,61,86,
+link_store.rs:191,211, link_stream.rs:99-241}`;
 `crates/jig-client-shell-native/src/{connections.rs, shell.rs,
 sign_in.rs, files.rs, lib.rs}` (shared hotspot with 10.2 and 10.3).
 Users of the shell's sign-in API (found by `git grep -n -E
 'set_token|\.signing\(\)|Signing::|connections\.sign_in|\.sign_in\(&'`,
 log `search-jig10-jig.txt`): `tests/client-protocol/src/{front.rs,
-native.rs, native/world.rs}`, `tests/one-process/src/referee.rs:265`,
-`testing/jig-test/tests/support/mod.rs:83`; in the repository downstream
+front/persistence.rs:100, native.rs, native/world.rs}` (persistence.rs
+calls `set_token` and `connections.token()`),
+`tests/one-process/src/referee.rs:265`,
+`testing/jig-test/tests/support/mod.rs:169`; in the repository downstream
 of jig, its terminal's `client.rs`, `terminal.rs`, `terminal/native.rs`,
-its binary's `tests/support/person.rs` and its one-process world's
-`world.rs:302`, which its own sessions follow.
+`tests/support/mod.rs:128` (`sign_in -> Result<(), Unlinked>`) and
+`src/tests.rs:146`, its binary's `tests/support/person.rs` and its
+one-process world's `world.rs:302`, which its own sessions follow.
 Shape: in `jig_client_protocol_link::boundary`: `With { Link(Secret),
 Held(Secret) }`; `Signing { SignedIn { party }, Again, Refused, Lost,
 SignedOut }` (moved from the shell's `sign_in.rs`, without the exchange
@@ -137,12 +145,18 @@ bytes holds it; `NotReady` is `Again`; a non-200 or malformed answer is
 `set_token`, `token`, `sign_in`, `sign_out`, `signing` and its
 `Owner::{SignIn, SignOut}`; its bearer comes from each request's
 `credential`; `Shell::sign_in(printed) -> Result<Secret, Unlinked>`
-returns the secret for its host to give the link; `Shell::loaded()`
-returns the kept credential beside the records, `(Option<Secret>,
-Vec<StoreRead>)`, and `Shell::keep(credential: Option<Secret>)` writes
-it to its private file, which its host calls on `Signing::SignedIn` and
-`SignedOut`, before it tells anyone (as `saving_signing` orders it
-today).
+returns the secret for its host to give the link, and keeps today's
+address check and `Host` (connections.rs:82-85, :158): a printed link
+whose host is not the configured one, unless that is `localhost`, is
+`Unlinked::Address`; otherwise its host becomes the one each exchange's
+`Host` header names (protocol/client.md, 4.3: "There is no method, path
+or header here: those are the transport's"); `Shell::loaded()`
+returns the kept credential beside the records,
+`Option<(Option<Secret>, Vec<StoreRead>)>`, `None` until loaded as today
+(shell.rs:85; its user `tests/client-protocol/src/native.rs:301`), and
+`Shell::keep(credential: Option<Secret>)` writes it to its private file,
+which its host calls on `Signing::SignedIn` and `SignedOut`, before it
+tells anyone (as `saving_signing` orders it today).
 Test shape: `crates/jig-client-protocol-link/src/tests/sign_in.rs`, new,
 on `src/tests/fixtures.rs`'s `Harness` (fixtures.rs:84), which gains
 `sign_in(&mut self, with: With) -> Option<Token>` (the sign-in's
@@ -212,13 +226,30 @@ component.rs, store.rs, limits.rs}` (the paths at component.rs:144,
 178, 386, 453, 641 and store.rs:168-170, the statuses at 84-88, 193,
 244, 464; `Limits.deadline`); `crates/jig-client-shell-native/src/
 {connections.rs, shell.rs, sign_in.rs (removed)}`;
-`tests/boundary/src/tests.rs:344-352` (the native shell's dependency
+`tests/boundary/src/tests.rs:244-252` (the native shell's dependency
 list gains `jig-client-protocol-http`) and `tests/boundary/src/tests/
-graph.rs:139` (`client_step` gains it) (shared). Users of
-`link::Event::Answered`, `Event::Failed`, `Request::Abandon` and
-`link::Limits::new(.., deadline)`: `tests/client-protocol/src/{front.rs,
-fixtures.rs:102}`, the link's `src/tests/{attempts.rs, fixtures.rs}`;
-downstream, its terminal's `route.rs:52-57` and `tests.rs:86-92`.
+graph.rs:138` (`client_step` gains it) (shared). Users of
+`Request::Exchange { path, body }`, `link::Event::Answered`,
+`Event::Failed`, `Request::Abandon` and `link::Limits::new(..,
+deadline)` with its `limits().deadline`:
+`tests/client-protocol/src/{front.rs, fixtures.rs:102}`, the link's
+`src/tests/{attempts.rs, fixtures.rs, reads.rs:62,83,93, store.rs:172,
+pages.rs:174, stream.rs:250,253}` and
+`src/tests/fixtures/{documents.rs:322, link_reads.rs:26-87,289,
+link_store.rs:186-215, link_stream.rs:95-242, link_deliveries.rs:117,
+turns.rs:100}`, 10.1's `src/tests/sign_in.rs` (its `h.answer(.., 200,
+..)`), and the shell's
+`src/tests.rs:37,84,98,110,258,283-289`; the link's `Harness::answer(..,
+status: u16, ..)` (fixtures.rs:120) matches Done when's grep, so it loses
+`status`, and with it its callers (about 35). Users of the shell's
+`Limits`, which gains `deadline`:
+`tests/client-protocol/src/fixtures.rs:94-97` (`connections_limits()`,
+which reaches `front.rs:35`, `native/world.rs:183`,
+`testing/jig-test/tests/support/mod.rs:87` and
+`tests/one-process/src/fixtures.rs:73`) and the shell's `src/tests.rs:13`.
+Downstream, its terminal's `route.rs:52-57`, `tests.rs:86-92`,
+`limits.rs:71`, `limits.rs:100` (`link::Limits::new(.., DEADLINE)`) and
+`client.rs:263`.
 Shape: as the sketch: `Mapping::new(prefix) -> Result<Mapping,
 Unmapped>`, `Call { method, path, headers, body }`, `exchange(&Mapping,
 Option<&Secret>, Message) -> Call`, `answered(exchange, status, body) ->
@@ -228,9 +259,11 @@ Box<[u8]> }` and `Event::Lost { exchange }` replace `Answered { exchange,
 status, body }` and `Failed`; `Request::Abandon` goes; `Limits::new(client,
 exchanges)` (no deadline). The shell's `Limits` gains `deadline:
 Duration`, past which `Connections` closes the exchange and answers
-`Lost`. Dependencies: `skein-lib`, `skein-http` (its `Method` and
-`Header`), `jig-client-protocol-link` (its `Message` and `Heard`); the
-crate is `no_std` with `alloc`.
+`Lost`; `Shell::next_deadline` (shell.rs:327) includes each open
+exchange's deadline, which wakes `Connections` to answer it.
+Dependencies: `skein-lib`, `skein-http` (its `Method` and `Header`),
+`jig-client-protocol-link` (its `Message` and `Heard`); the crate is
+`no_std` with `alloc`.
 Test shape: `crates/jig-client-protocol-http/src/tests.rs` and
 `src/tests/fixtures.rs` (the crate's fixtures module,
 code-organization.md, 5): `fixtures::mapping()` (`/jig`),
@@ -242,8 +275,11 @@ fn a_keyed_request_is_a_post_under_the_prefix_with_its_bearer() {
     assert_eq!(call.method, skein_http::Method::Post);
     assert_eq!(call.path.as_ref(), b"/jig/v1/request");
     assert_eq!(call.body.as_ref(), b"keyed");
-    assert!(call.headers.iter().any(|h| h.name.as_ref() == b"Authorization"
-        && h.value.as_ref() == b"Bearer CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQ"));
+    let bearer = skein_http::Header {
+        name: Box::from(*b"Authorization"),
+        value: Box::from(*b"Bearer CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQ"),
+    };
+    assert!(call.headers.as_slice().contains(&bearer));
 }
 ```
 Tests: `a_keyed_request_is_a_post_under_the_prefix_with_its_bearer`,
@@ -350,6 +386,7 @@ Checked at the base with `heavy cargo clippy -p jig-w6-sketch
 // transport maps, carries, and keeps each exchange's deadline.
 
 /// One of jig's messages (protocol/client.md, 4.1), as the link encoded it.
+#[derive(Debug, PartialEq, Eq)]
 pub enum Message {
     /// A keyed request's `Keyed` record, answered by an `Answer`.
     Request(Box<[u8]>),
@@ -367,8 +404,18 @@ pub enum Message {
     SignOut,
 }
 /// One message of the stream, as the transport cut it (17.2).
+#[derive(Debug, PartialEq, Eq)]
 pub enum Streamed { Record(Box<[u8]>), Heartbeat }
+/// The transport's four events, which the link's `Event` carries as variants of its own.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Heard {
+    Reply { exchange: Token, message: Box<[u8]> },
+    Lost { exchange: Token },
+    Streamed { message: Streamed },
+    StreamGone,
+}
 /// How the link signs in (client.md, 12); jig 12.3 adds `Service(Secret)` and `Transport`.
+#[derive(Debug, PartialEq, Eq)]
 pub enum With {
     /// The printed link's 32-byte secret: the link sends the component's sign-in.
     Link(Secret),
@@ -376,6 +423,7 @@ pub enum With {
     Held(Secret),
 }
 /// A sign-in's or sign-out's outcome, told to the link's host once per exchange.
+#[derive(Debug, PartialEq, Eq)]
 pub enum Signing { SignedIn { party: u64 }, Again, Refused, Lost, SignedOut }
 // Event gains:   SignIn { with: With }, SignOut,
 //                Reply { exchange: Token, message: Box<[u8]> }, Lost { exchange: Token },
@@ -391,13 +439,16 @@ pub enum Signing { SignedIn { party: u64 }, Again, Refused, Lost, SignedOut }
 ```rust
 // crates/jig-client-protocol-http/src/lib.rs: it maps; it holds no
 // connection, no credential and no deadline.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Mapping { prefix: Box<[u8]> }
+#[derive(Debug, PartialEq, Eq)]
 pub enum Unmapped { Prefix }
 impl Mapping {
     /// A prefix of at most 64 bytes starting with `/`, with no trailing `/`.
     pub fn new(prefix: &[u8]) -> Result<Mapping, Unmapped>;
 }
 /// One HTTP call, whatever the shell's HTTP stack.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Call {
     pub method: skein_http::Method,
     /// `<prefix>/v1/<route>`.
@@ -411,10 +462,14 @@ pub fn stream(mapping: &Mapping, credential: Option<&Secret>) -> Call;
 pub fn answered(exchange: Token, status: u16, body: Box<[u8]>) -> Heard {
     if status == 200 { Heard::Reply { exchange, message: body } } else { Heard::Lost { exchange } }
 }
+#[derive(Debug, PartialEq, Eq)]
 pub struct Printed { pub host: Box<[u8]>, pub secret: Secret }
+#[derive(Debug, PartialEq, Eq)]
 pub enum Unlinked { NotHttp, NoSecret, Address }
 pub fn printed(mapping: &Mapping, url: &[u8]) -> Result<Printed, Unlinked>;
+#[derive(Debug, PartialEq, Eq)]
 pub struct Limits { pub record: u32, pub chunk: u32 }
+#[derive(Debug)] // alone: the sse reader and the base64 decoder it holds derive no `PartialEq`.
 pub struct Stream { /* skein_http::sse::Reader, skein_lib::base64::Decoder, moved from the link */ }
 impl Stream {
     pub fn new(limits: &Limits) -> Stream;
@@ -425,7 +480,7 @@ impl Stream {
 pub fn worst_case(limits: &Limits) -> Option<u64>;
 ```
 
-(`Heard` in the sketch is the link's four transport events, `Reply`,
+(`Heard`, in the link's sketch, is its four transport events, `Reply`,
 `Lost`, `Streamed` and `StreamGone`, which the link's `Event` carries as
 variants of its own; the crate pushes them as the link's `Event`.)
 
@@ -436,9 +491,11 @@ variants of its own; the crate pushes them as the link's `Event`.)
 ## Done when
 
 - `git -C ~/src/rust/jig grep -n -E 'v1/|status: u16|skein_http'
-  origin/main -- crates/jig-client-protocol-link crates/jig-client
-  crates/jig-client-domain` prints nothing (the clients' component keeps
-  its HTTP until jig 17, whose Done when checks it).
+  origin/main -- crates/jig-client-protocol-link` prints nothing (the
+  clients' component keeps its HTTP until jig 17, whose Done when checks
+  it; `crates/jig-client-domain` is jig 11's, which runs beside this
+  session, and `crates/jig-client` jig 12's, after it, so neither need
+  exist when this session ends).
 - `heavy cargo nextest run -p jig-boundary -E
   'test(client_step_crates_link_no_http_but_the_mapping)'` passes one
   test, in a worktree at `origin/main`.

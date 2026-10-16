@@ -161,20 +161,25 @@ included), whose blocks are split by hand where a moved name sits. Users of `Eve
 drafts.rs, pages.rs, pages/conversation_merge.rs, spine.rs, time.rs}`,
 `crates/jig-client-view/src/tests/{cards.rs:109, historical_objects.rs:353,
 history_pages.rs:89, owner_escalation.rs:303, owner_project.rs:514, 694,
-1071}`, `examples/ops/client-domain/src/tests.rs:120`,
+1071, pages.rs:68}`, `examples/ops/client-domain/src/tests.rs:120`,
+`examples/ops/client-view/src/tests.rs:102`,
 `testing/jig-client-test-domain/src/tests/root.rs`,
 `testing/jig-client-test-view/src/tests{.rs, /native_hold.rs}`,
 `testing/jig-client-scripted-engine/src/truth.rs:249`,
-`tests/client/src/{observe.rs:204, scripted.rs,
-harness/navigation_tests.rs, joint/front.rs, joint/session.rs,
-joint/transport.rs}`, `tests/client-protocol/src/{front.rs, native.rs}`,
-`tests/ops/src/client/{stories.rs:324, transport.rs}`; in the repository
-downstream of jig, its client domain's and client view's test fixtures
-and its terminal's `route.rs:121`; the contract path itself in 24 of its
-files (55 lines), which its own sessions follow. `tests/boundary/src/tests/graph.rs`
+`tests/client/src/{observe.rs:203, scripted.rs,
+harness/navigation_tests.rs, joint/engine.rs:170, joint/front.rs,
+joint/session.rs, joint/transport.rs}`,
+`tests/client-protocol/src/front.rs:126` (the one map of the link's
+hello), `tests/ops/src/client/{stories.rs:324, transport.rs}`; in the
+repository downstream of jig, its client domain's, client view's and
+terminal's test fixtures (the terminal's `tests/fixtures.rs:226`), its
+terminal's `route.rs:121`, and its client world's `front.rs:81-82`, which
+names `jig_domain_client::contract::CLIENT_VERSION` (11.1 removes it);
+the contract path itself in 21 of its files (40 lines, at temper `ed566100`), which its own
+sessions follow. `tests/boundary/src/tests/graph.rs`
 (shared): `client_domain_depends_on_foundation_alone` (graph.rs:122)
 lets `jig-domain-client` link `jig-client-domain`; `client_step`
-(graph.rs:139) gains it; `client_view_links_only_its_domain_and_foundation`
+(graph.rs:138) gains it; `client_view_links_only_its_domain_and_foundation`
 (graph.rs:103) and the scripted engine's, test root's and test view's
 dependency lists gain it.
 Shape: `jig_client_domain::contract` (the module as moved, its
@@ -238,7 +243,10 @@ payload types now `jig_client_domain`'s; shared with jig 10). Users of
 `link::{Family, Ask, Readable, Watchable, Readout, Answered}` (log
 `search-jig11-jig.txt`): `tests/client-protocol/src/{front.rs,
 front/persistence.rs, native.rs, family.rs}`; downstream, its terminal's
-`route.rs` and `route/family.rs`.
+`route.rs`, `route/family.rs`, `tests.rs:20, 122, 129`,
+`tests/family.rs:55, 57, 121, 125, 150, 154, 182, 183` and
+`tests/fixtures.rs:76`, and its one-process world's
+`referee/client.rs:148`.
 Shape: as the sketch: `Asker`, `Handle`, `State`, `Latest`,
 `Document<'_>`, `Why`; `Event::{Start, Watch, Unwatch, Up}`,
 `Up::{Watched, FamilyDelivered, WatchEnded}`, `Down::{Open, Close}`,
@@ -323,12 +331,14 @@ jig-client-wire-world --test drift`, which the drift test names);
 `tests/client-wire/tests/{drift.rs:7-12, fuzzy_client_wire.rs:721,
 test_client_wire.rs:7}` (the paths); the version sweep, `v7 as w` and
 `wire::v7` to `v8` (`git grep -n -E 'client_wire::v7|v7 as w|wire::v7'`:
-65 lines at the base, the link 20, the clients' component 18, the
-configuration 1, the native shell 2, the test records 1, the test
-service 1, the protocol world 3, the wire world 1, the clients'
-component's world 8; 8 lines downstream) and the served ranges `first:
+65 lines at the base, the link 20, the clients' component 21, the
+configuration 1, the native shell 4, the test records 1, the test
+service 4, the protocol world 3, the wire world 1, the clients'
+component's world 10; 8 lines downstream) and the served ranges `first:
 7, last: 7` (`crates/jig-protocol-engine-clients/src/tests/fixtures.rs:16`,
-`tests/client-protocol/src/fixtures.rs:58`); the link's
+`tests/client-protocol/src/fixtures.rs:60`,
+`tests/engine-clients/src/fixtures.rs:20`,
+`tests/engine-clients/tests/stream.rs:143`); the link's
 `translate/store.rs` (`table`, `restore_table`) and `boundary.rs`
 (`Saved::Table { version, record: RequestRecord<Held> }`); the test
 root's `store.rs` (`VERSION` 1 to 2) and `domain.rs` (its records carry
@@ -360,7 +370,7 @@ gain `KEY` (`Key { asker: Asker::JIG, number: 1 }`), `PARTY` (1),
 -> Up` (a `Frame` delivery for the client's `me`), and `Client::live()`
 (started, `me` delivered for `PARTY` with a retention of 1 s); the
 table's limits copy, as literals, the world's profile, `table` at
-tests/client/src/test.rs:69-77 (`requests: 4`, `bytes: 65536`, `out:
+tests/client/src/test.rs:70-77 (`requests: 4`, `bytes: 65536`, `out:
 16`, 10 ms to 80 ms, `margin: 1 s`). Reference test:
 ```rust
 #[test]
@@ -481,31 +491,42 @@ application owns handles' and keys' numbers and their askers.
 ```rust
 // crates/jig-client-domain/src/boundary.rs
 // Moved from jig_client_protocol_link::boundary (11.2), names kept:
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Family { pub family: u16, pub version: u32, pub bytes: Box<[u8]> }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask { Jig(Box<contract::Ask>), Family(Family) }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readable { Jig(contract::Read), Family(Family) }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Watchable { Jig(contract::Subject), Family(Family) }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readout {
     Jig(contract::ReadResult),
     Family { family: u16, record: Option<Box<[u8]>> },
     /// Refused by the client's limit on reads in flight (11.4).
     Limit,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered { Jig(contract::Answer), Family(Family) }
 
 /// The owner number of the root's child that asked (root.md, 15); kept, never read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Asker(pub u32);
 impl Asker {
     /// jig's reference UI, one past every `u16`.
     pub const JIG: Asker = Asker(65536);
 }
 /// The application's name for a watch or a read; 64 bits, so a child's token fits (jig 13.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Handle { pub asker: Asker, pub number: u64 }
 /// The application's name for a request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Key { pub asker: Asker, pub number: u64 }
 /// What the table keeps beside skein's record; mirrors `TableEntry`'s `asker` and `number` (v8).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Held { pub key: Key, pub request: Ask }
 /// A request's one answer.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
     /// Done or refused, once the engine's commit is durable.
     Answered(Answered),
@@ -518,16 +539,24 @@ pub enum Outcome {
     // jig 12.2 adds NotKept.
 }
 /// skein's four progresses, retrying with its reason; jig 12.4 adds `NotServed`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Progress { InFlight, Retrying { why: Retry }, Parked, Unknown }
 /// Why a request is sent again (client.md, 6; protocol/client.md, 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Retry { Busy, NotReady, Lost, Undecodable }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pending { pub progress: Progress, pub party: u64, pub owner: Option<u16> }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State { Opening, Live, Behind, Ended }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Latest { Jig(contract::Delivery), Family(Family) }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Document<'a> { pub state: State, pub latest: Option<&'a Latest> }
 /// Why a handle ended; `Dropped` and `Stopping` open again, `Closed` is `Unwatch`'s.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Why { Unknown, NotAllowed, Busy, SubjectEnded, SignedOut, Limit }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
     /// The table's records restored, before any other event.
     Start { kept: List<RequestRecord<Held>> },
@@ -538,6 +567,7 @@ pub enum Event {
     /// From its link, decoded.
     Up { up: Up },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered>, why: Option<Retry> },
     Watched { watch: Token, event: contract::WatchEvent },
@@ -545,7 +575,9 @@ pub enum Up {
     WatchEnded { watch: Token, end: contract::WatchEnd },
     ReadDone { read: Token, result: Readout },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Request { Down { down: Down }, Told { told: Told } }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Down {
     Save { record: RequestRecord<Held> },
     Erase { key: RequestKey },
@@ -557,6 +589,7 @@ pub enum Down {
     Close { watch: Token },
     Read { read: Token, what: Readable },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Told {
     Changed { handle: Handle },
     Text { handle: Handle },
@@ -568,7 +601,9 @@ pub enum Told {
     /// Kept records dropped at `Start`, unread or past the table's room (11.3).
     Dropped { count: u32 },
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Backoff { pub first: Duration, pub most: Duration }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     pub requests: RequestLimits,
     pub ask_bytes: u64,
@@ -579,18 +614,26 @@ pub struct Limits {
     pub turn_bytes: u32,
     pub backoff: Backoff,
 }
+#[derive(Debug)]
 pub struct Domain { /* handles, engine watches, reads, the table, timers, seed */ }
 impl Domain {
+    #[must_use]
     pub fn new(limits: &Limits, seed: u64) -> Domain;
+    #[must_use]
     pub fn pending(&self, key: Key) -> Option<Pending>;
+    #[must_use]
     pub fn document(&self, handle: Handle) -> Option<Document<'_>>;
+    #[must_use]
     pub fn text(&self, handle: Handle) -> Option<&contract::RunText>;
 }
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>);
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>);
+#[must_use]
 pub fn next_deadline(domain: &Domain) -> Option<Time>;
 pub fn reclaim(domain: &mut Domain);
+#[must_use]
 pub fn max_out(limits: &Limits) -> u32;
+#[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64>;
 ```
 

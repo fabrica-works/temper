@@ -174,16 +174,28 @@ Files:
   (`grace`), `lib.rs`.
 - `crates/jig-protocol-store/`: `schema/tasks-v3.schema` (the record's
   grace: by as a party, until, reason; `Refusal::Grace` in carried
-  refusals), `src/codec/tasks/{record.rs, carried.rs}`, the generated
-  family, `src/tests/{codec/record.rs, fixtures/record.rs}`, the goldens
-  the drift test writes.
+  refusals), `src/codec/tasks/{record.rs, carried.rs, phase.rs}`
+  (phase.rs:406-414: `grace`/`read_grace` take `{ by, until }`, `by` a
+  u64), the generated family, `src/tests/{codec/record.rs,
+  codec/phase.rs (:229-232), fixtures/record.rs}`, the goldens the drift
+  test writes.
 - `crates/jig-protocol-config/src/`: `profile/small.rs` (`grace:
   Duration::from_secs(600)`, and its module doc line), `overrides.rs`
-  (`set_tasks` names `grace`, in milliseconds), `charters.rs` (`chats`
-  takes the tasks child's `grace` and refuses `close_grace_ms` past it,
-  `What::Bound`), `tests/domain.rs`.
+  (`set_tasks` names `b"grace_ms"`, in milliseconds, as its other
+  durations), `charters.rs` (`chats` takes the tasks child's `grace` and
+  refuses `close_grace_ms` past it, `What::Bound`), `lib.rs` (:96-97,
+  `chats`' only caller, passes `limits.core.tasks.grace`),
+  `tests/domain.rs`, `tests/overrides.rs` (the `SMALL` table, :131, a
+  copy of the small profile's values: `(b"tasks.grace_ms", 600_000)`).
 - `crates/jig-domain-core/src/acts/objects/task.rs:164`
-  (`row.grace.is_some()`).
+  (`row.grace.is_some()`);
+  `crates/jig-domain-core/src/routing/refusals.rs` (`task_answer`, :23,
+  matches every `tasks::Refusal`: an arm for `Refusal::Grace`, mapped to
+  `people::Refusal::Limit { which: people::LimitKind::Spec }` until 04.5
+  points it at `LimitKind::Grace`; people's kinds are people v3's, which
+  04.1 does not take; no person's ask carries a grace before 04.5).
+- `crates/jig-protocol-tools/src/render.rs` (`task_problem`, :212,
+  matches every `tasks::Refusal`: a `Grace` arm).
 - Users of `Control::Cancel` (21 in 17 files; edited to `{ reason,
   grace: None, message: None }`): `jig-domain-core/src/routing/
   party_controls.rs`, `jig-domain-core/src/tests/{chip_phase.rs,
@@ -194,8 +206,10 @@ Files:
   `tests/core/tests/{effect_fences.rs, effects.rs}`,
   `tests/tasks/tests/{lifecycle.rs, lifecycle/goals.rs, memory.rs}`.
 - Users of `chat_close` and the chat's `Grace` (40 in 13 files):
-  `tests/core/src/stories/closing_chat.rs` (`.grace`, `by:
-  tasks::Party::Person(person)`), `tests/store/src/root.rs`,
+  `tests/core/src/stories/closing_chat.rs` (`.grace`; `.grace.clone()`
+  at :173 and `.grace.as_ref()` at :217, which move it out of
+  `&TaskRecord`; `by: tasks::Party::Person(person)`),
+  `tests/store/src/root.rs`,
   `jig-domain-tasks/src/tests/{deadlines.rs, revisions/chat.rs}`, and
   the files above.
 - Users of the tasks `Limits` literal (9 files), each gaining `grace:
@@ -206,7 +220,9 @@ Files:
   `jig-domain-core/src/tests.rs:31`, and the profile, `overrides.rs` and
   `limits.rs` themselves.
 - Downstream: the repository downstream of jig has 1 `Control::Cancel`,
-  1 `chat_close`, 1 tasks `Limits` literal and 2 `close_grace` users,
+  1 `chat_close`, 1 tasks `Limits` literal, 2 `close_grace` users and a
+  match over every `tasks::Refusal`
+  (`crates/temper-engine-smith/src/answers.rs:351`, a `Grace` arm),
   absorbed at its repin (README, Rules).
 Shape:
 - `jig_domain_tasks::Control::Cancel { reason: Box<[u8]>, grace:
@@ -239,8 +255,9 @@ Shape:
 - `jig_protocol_config::charters::chats(document, at, path, charters,
   grace: Duration, problems)`.
 Test shape:
-- `tests/tasks/tests/lifecycle/grace.rs` (new, `mod grace;` in
-  `lifecycle.rs`), the tasks world: `World::new` (src/world.rs:189),
+- `tests/tasks/tests/lifecycle/grace.rs` (new, `#[path =
+  "lifecycle/grace.rs"] mod grace;` in `lifecycle.rs`, as `goals` is at
+  :774), the tasks world: `World::new` (src/world.rs:189),
   `task` (:72), `World::make` (:822), `claim` (:859), `elapse` (:962),
   `restart` (:992), `settle` (:940), `record` (:796). Limits: the
   world's `LIMITS` (src/world.rs:17) gains `grace:
@@ -333,24 +350,33 @@ Files:
   generated family, the goldens.
 - `crates/jig-protocol-config/src/`: `profile/small.rs`
   (`project_goals: 8`), `profile/standard.rs` (`project_goals: 16`),
-  their module doc lines, `overrides.rs`.
+  their module doc lines, `overrides.rs`, `tests/overrides.rs` (`SMALL`:
+  `(b"tasks.project_goals", 8)`).
+- `crates/jig-domain-core/src/routing/refusals.rs` (`task_answer`'s arm
+  for `Refusal::Goals`, mapped to `people::Refusal::Limit { which:
+  people::LimitKind::ProjectLiveTasks }`, the project's bound on its
+  tasks, until 04.5 points it at `LimitKind::Goals`; a test of 04.2 that
+  reads a person's refused goal expects `ProjectLiveTasks`, and 04.5
+  changes it to `Goals`);
+  `crates/jig-protocol-tools/src/render.rs` (`task_problem`'s `Goals`
+  arm).
 - Users of the tasks `Amendment` literal (`tracked: None` added): in
   `jig-domain-tasks/src/{chat.rs, control.rs, tests/address.rs,
   tests/instructions.rs, tests/revisions.rs}`, `jig-domain-core/src/
   {acts/bounds.rs, amendments.rs, routing/party_decisions.rs,
-  routing/runs.rs, tests.rs, tests/acts.rs, tests/acts/kind_order.rs,
-  tests/document_offers.rs}`, `jig-protocol-tools/src/nested.rs`,
+  routing/runs.rs, tests.rs, tests/acts.rs, tests/acts/kind_order.rs}`,
+  `jig-protocol-tools/src/nested.rs`,
   `jig-protocol-store/src/{codec/tasks/proposals.rs, tests/fixtures.rs,
-  tests/codec/phase.rs, tests/codec/pieces.rs}`,
-  `tests/core/{src/stories/instructions.rs, tests/stories.rs}`,
-  `tests/people/tests/simulation.rs`; the tasks `Limits` literals of
-  4.1's list, each gaining `project_goals`: the small profile's 8, but 2
-  in `jig-domain-tasks/src/tests/revisions.rs:21`,
+  tests/codec/phase.rs}`, `tests/core/tests/stories.rs`; the tasks
+  `Limits` literals of 4.1's list, each gaining `project_goals`: the
+  small profile's 8, but 2 in `jig-domain-tasks/src/tests/revisions.rs:21`,
   `tests/tasks/src/world.rs:17` and `tests/core/src/world.rs:19`, where
   two goals are what the tests count to (and the core world's `tasks` is
   2).
-- Downstream: its tasks `Amendment` literals (in 5 files) and its tasks
-  `Limits` literal, at its repin.
+- Downstream: its 2 tasks `Amendment` literals
+  (`crates/temper-engine-smith/src/nested.rs:72`,
+  `tests/engine/domain/tests/root_routes.rs:1584`), its tasks `Limits`
+  literal and a `Goals` arm in `answers.rs:351`, at its repin.
 Shape:
 - `jig_domain_tasks::Tracking { Tracked { priority: u32 }, Untracked }`;
   `Amendment.tracked: Option<Tracking>`; `Settings.tracked: Option<u32>`.
@@ -364,7 +390,7 @@ Shape:
 Test shape:
 - `crates/jig-domain-tasks/src/tests/revisions/tracking.rs` (new, `mod
   tracking;` in tests/revisions.rs), with `Harness` (tests/revisions.rs:
-  104), `task` (:76), `amendment` (:206), `to` (:100), and `LIMITS`
+  94), `task` (:76), `amendment` (:206), `to` (:100), and `LIMITS`
   (:21) with `project_goals: 2`. Tests:
   `an_amendment_tracks_a_task_at_its_priority`,
   `an_amendment_untracks_a_goal_and_moves_no_spec_revision`,
@@ -484,7 +510,7 @@ Shape:
 Test shape:
 - `crates/jig-domain-tasks/src/tests/revisions/compound.rs` (new, `mod
   compound;`), with `Harness`, `task`, `amendment`, `to`, and `cohort`
-  (tests/revisions/chat.rs:5, made `pub(super)`). Reference test:
+  (tests/revisions/chat.rs:6, made `pub(super)`). Reference test:
 
   ```rust
   use super::*;
@@ -524,7 +550,8 @@ Test shape:
   `an_operation_on_another_projects_task_is_refused_at_its_place`
   (`CompoundRefused { at: 1, .. }` for a second operation on a task of
   project 2, `Refusal::Project`). Under 20 ms each.
-- `tests/tasks/tests/lifecycle/compound.rs` (new):
+- `tests/tasks/tests/lifecycle/compound.rs` (new; `#[path =
+  "lifecycle/compound.rs"] mod compound;` in `lifecycle.rs`, as :774 does):
   `a_compound_closing_a_task_and_moving_its_delegate_survives_a_restart`.
   Under 0.5 s.
 Proof: world, `heavy cargo nextest run -p jig-tasks-world -E
@@ -559,8 +586,8 @@ Files:
   message), `roles.rs` (`control_admit`: the grace's bound;
   `priorities_allowed`), `acts/standing.rs` (`Act::Prioritise` and a
   tracked or priority `Amend` for `Owner` and `Maintainer` only),
-  `amendments.rs` (translate tracked), `routing/refusals.rs`
-  (`tasks::Refusal::{Grace, Goals}` → `people::LimitKind`),
+  `amendments.rs` (translate tracked), `routing/refusals.rs` (4.1's and
+  4.2's arms → `people::LimitKind::{Grace, Goals}`),
   `routing/tasks.rs` (the projections' room counts an `Amend` that
   tracks; at most 15 lines).
 - `crates/jig-protocol-store/`: `schema/people-v3.schema`, `src/codec/
@@ -571,11 +598,24 @@ Files:
   carries them).
 - `testing/jig-fake-parties/src/lib.rs`, `tests/core/src/peers.rs`: a
   `Cancel { task, grace }` fake ask and its translation.
-- Users of `people::Ask::Cancel` and of the people `Amendment` literal,
-  and the exhaustive matches over `LimitKind` (21 in 15 files), as the
-  compiler names them.
-- Downstream: its 2 `Ask::Cancel`, 6 people `Amendment` literals and 4
-  `LimitKind` matches, at its repin.
+- Users of `people::Ask::Cancel` (12 literals and the store codec's
+  pattern at `codec/people/asks.rs:402`, in 10 files; `grace: None`
+  added): `jig-domain-core/src/{acts/objects/task.rs, tests/acts.rs,
+  tests/document_offers.rs}`, `jig-protocol-engine-clients/src/
+  {tests/fixtures.rs, translate/asks.rs}`, `jig-protocol-store/src/
+  {codec/people/asks.rs, tests/fixtures.rs}`,
+  `tests/client/src/joint/wire/asks.rs`, `tests/core/tests/{reads.rs,
+  stories.rs}`. Users of the people `Amendment` literal (`tracked: None`
+  added), among them `jig-domain-core/src/tests/document_offers.rs:79`,
+  `jig-protocol-store/src/tests/codec/pieces.rs:22`,
+  `tests/core/src/stories/instructions.rs:24` and
+  `tests/people/tests/simulation.rs:448, 574`, and the exhaustive matches
+  over `LimitKind`, as the compiler names them.
+- Downstream: its 2 `Ask::Cancel`, 3 people `Amendment` literals, and 2
+  matches over `people::LimitKind`
+  (`crates/temper-protocol-store/src/records/application/refusal.rs:212`,
+  `crates/temper-service/src/family/refusals.rs:99`) with the decode of
+  its own wire (`refusal.rs:251`), at its repin.
 Shape:
 - `people::Ask::Cancel { project: u32, task: u64, reason: Box<[u8]>,
   grace: Option<Duration> }`.
@@ -673,14 +713,16 @@ Files:
   priced in `ask_bytes`), `refusals.rs` (`LimitKind::Operations`),
   `domain.rs` and `capacity.rs`, `words.rs` (an arm each, at most 40
   lines in domain.rs), `lib.rs`.
-- `crates/jig-domain-core/src/`: `compound.rs` (new: the route,
-  `PersonTaskRoute::Compound`), `routing/people.rs` (the dispatch arm),
+- `crates/jig-domain-core/src/`: `compound.rs` (new: the route),
+  `run.rs` (`PersonTaskRoute::Compound`, :382), `routing/people.rs` (the
+  dispatch arm),
   `routing/tasks.rs` (`CompoundRefused` to the party; at most 20
   lines), `memory.rs` (`worst_case` is `None` when
   `people.operations > tasks.tasks`), `lib.rs`.
 - `crates/jig-protocol-config/src/`: `profile/small.rs`
   (`operations: 8`), `profile/standard.rs` (`operations: 16`), their doc
-  lines, `overrides.rs` (`set_people`).
+  lines, `overrides.rs` (`set_people`), `tests/overrides.rs` (`SMALL`:
+  `(b"people.operations", 8)`).
 - `crates/jig-protocol-store/`: `schema/people-v3.schema`,
   `src/codec/people/{asks.rs, outcomes.rs}`, the generated family, the
   goldens.
@@ -780,9 +822,13 @@ Files:
   rule under `Promise::Once`).
 - `tests/conformance/src/scenarios.rs` (both scenarios' configuration,
   actions and checks for the testing application),
-  `tests/conformance/tests/scenarios.rs` (their chosen cuts).
-- Downstream: its conformance configuration matches `Scenario`
-  (`tests/conformance/src/config.rs` there), and absorbs the two
+  `tests/conformance/src/lib.rs` (the worker script for each scenario,
+  :215, matches every `Scenario`: an arm each, the Grace scenario's a
+  script of its own), `tests/conformance/tests/scenarios.rs` (their
+  chosen cuts).
+- Downstream: its conformance configuration and checks match every
+  `Scenario` (`tests/conformance/src/config.rs:132` and
+  `tests/conformance/src/scenarios.rs:512` there), and absorb the two
   variants at its repin.
 Shape:
 - `people::Event::MoveChat { task: u64, project: u32, from: u64, to:
@@ -841,10 +887,11 @@ Removes: nothing.
 Compiled at the base in scratch modules (`src/sketch_w3.rs` of
 `jig-domain-tasks` and `jig-domain-people`, bodies `unimplemented!()`
 and parameters prefixed `_`, under `#![expect(clippy::unimplemented,
-dead_code, clippy::too_many_arguments)]`) with `heavy cargo clippy -p
-jig-domain-tasks -p jig-domain-people -p jig-domain-core --all-targets
--- -D warnings`; the variants shown inside existing enums were compiled
-as enums of their own (`AskSketch`, `OutcomeSketch`).
+dead_code, clippy::too_many_arguments, reason = "interface sketch")]`,
+with `use alloc::boxed::Box;` in these `no_std` crates) with `heavy
+cargo clippy -p jig-domain-tasks -p jig-domain-people -p jig-domain-core
+--all-targets -- -D warnings`; the variants shown inside existing enums
+were compiled as enums of their own (`AskSketch`, `OutcomeSketch`).
 
 ```rust
 // crates/jig-domain-tasks/src/control.rs (4.1, 4.2)
