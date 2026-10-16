@@ -271,7 +271,12 @@ them are rules, each with its check.
   once with `git diff -M -U0 origin/main...HEAD -- <the same paths and
   exclusions> | grep -E '^\+[^+]' | grep -c -E '<the new names and
   paths, joined by |>'`; its Size is checked against the difference.
-  Nothing else is counted.
+  Lines that rustfmt re-wraps because a path grew (a `use` list's
+  continuation lines, a signature or a call re-wrapped) are rewrite
+  lines too, though they name no new path (ruling 118). When the
+  difference passes twice the Size, the report lists, by file, the
+  difference's lines that are no such re-wrap; within twice the Size,
+  the increment lands without asking. Nothing else is counted.
 - An increment lands within twice its Size without asking (a codec or
   schema increment within 2.5 times); past that it asks, with the count
   by file.
