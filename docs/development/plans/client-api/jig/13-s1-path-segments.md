@@ -26,7 +26,7 @@ follow it by its name):
   (`jig_client_domain::Limits` after jig 12.1), set by the application in
   code; each literal of it gains `segments`, 4 in jig's (the small
   profile's `authority.segments`, `tasks.hold_segments` and
-  `tasks.authority_segments`, `profile/small.rs:46, :66, :117`): at
+  `tasks.authority_segments`, `profile/small.rs:47, :67, :119`): at
   `e1b483760`, `git grep -n 'conversation_words:' -- '*.rs'` prints 10
   literals of the page's limits, of which 12.1 makes the client's; list
   each one in the commit body;
@@ -38,11 +38,17 @@ follow it by its name):
 - view (`crates/jig-client-view/src/`): `owner_chip.rs:39-45, :95-97`,
   `jig-client-domain`'s `contract/resource_names.rs:9-11`
   (`resource_path_fits(path, rows, text)`), `owner_amendment.rs:27-29`,
-  `owner_historical.rs:571-573`, `sections/project/owner.rs:203-205`
-  take `segments`; the cut where paths are written (`words/held.rs:118-122`,
-  `owner_authority.rs:117-125`, `policy_edit.rs:107-108`);
+  `owner_historical.rs:487` (`path.capacity() > l.rows`) and `:571-573`,
+  `owner_authority.rs:95-103` (`worst_case_words` from `rows`),
+  `sections/project/owner.rs:203-205` take `segments`; the cut where
+  paths are written (`words/held.rs:118-122`, `owner_authority.rs:117-125`,
+  `policy_edit.rs:107-108`);
   `limits.rs:77-80`'s node text holds a phrase, the mark and
   `literal_segment::max_bytes(text)`;
+- `resource_path_fits` callers, which pass `segments`:
+  `examples/ops/client-domain/src/infrastructure.rs:955`,
+  `examples/ops/client-domain/src/observability.rs:678`,
+  `testing/jig-client-test-domain/src/first.rs:953`, `second.rs:44`;
 - core: `crates/jig-domain-core/src/documents/task_tree.rs`, `path`
   (`:328-340`, `documents.lines` today) and the approval part
   (`:404-411`), and `project_note.rs`' `path` calls (`:147-148`), by the

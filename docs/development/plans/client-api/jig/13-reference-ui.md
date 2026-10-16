@@ -87,7 +87,7 @@ they read from.
   (`testing/jig-test-service/src/family.rs`) and the world's
   (`tests/client/src/joint/wire/family.rs`), so that the root encodes
   what its family asks (root.md, 7).
-- **The client's world runs on `Client::typed`** (jig 12.5): the
+- **The client's world runs on `Client::unlinked`** (jig 12.5): the
   scripted engine keeps the contract's types; the world decodes the
   families' bytes with their wire crates.
 - **Not here:** `ops` and the reference UI's state on the client alone
@@ -136,11 +136,20 @@ pattern at drift.rs:6); `crates/jig-client-protocol-wire/schema/client-v8-part1.
 `src/generated/v8.rs`, `golden/v8` (regenerated);
 `crates/jig-client-protocol-link/src/{boundary.rs, store.rs,
 translate/store.rs}` (`Saved::{Jig, Family}`, `Erased::{Jig, Family}`,
-`Keeper`, `StoreVersion` go; a storage key is the table's 16-byte key);
+`Keeper`, `StoreVersion` go; `Event::Start.versions:
+List<StoreVersion>` (`boundary.rs:43`) and `Request::Dropped { keeper }`
+(`boundary.rs:101`) go with them; a storage key is the table's 16-byte
+key), and its tests `src/tests/fixtures/link_store.rs` and
+`src/tests/store.rs`;
 users (log `search-jig13-records.txt`): `tests/client-protocol/src/
 {front.rs, front/persistence.rs, native.rs, family.rs}`, the native
-shell's `connections.rs` and `shell.rs`; downstream, its terminal's
-`route.rs` (13 lines), which its own sessions follow.
+shell's `connections.rs` and `shell.rs`,
+`tests/client-wire/tests/fuzzy_client_wire.rs:25, :27-35` (ten `check!`
+on the removed types: the fuzzy test fails to compile otherwise) and
+`crates/jig-client-protocol-wire/src/tests.rs:229, :244-255`;
+downstream, its terminal's `route.rs` (21 lines naming `Saved`,
+`Erased`, `Keeper` or `StoreVersion`) and `tests/family.rs:147-157` (3
+more), which its own sessions follow.
 `tests/boundary/src/tests/graph.rs`:
 `client_view_links_only_its_domain_and_foundation` gains `skein-codec`.
 Shape: `jig_client_view::records::{Record, RecordKey, RECORDS_VERSION,
@@ -151,9 +160,9 @@ the table's record alone, `Saved { version: u16, record:
 RequestRecord<Held> }`, and the client wire's `Kept` is `versioned record
 Kept { store_version: u16 record: bytes 65536 }`.
 Test shape: unit tests in `crates/jig-client-view/src/tests/records.rs`;
-fixtures `src/tests/fixtures.rs` (the view's own, extended): `place()`
-and `draft()` records with the literals of the link's
-`src/tests/store.rs` today. Tests:
+new fixtures `src/tests/fixtures.rs`: `place()` and `draft()` records
+with the literals of the link's `src/tests/fixtures/link_store.rs:122-130`,
+`:232-275` today. Tests:
 `a_place_record_round_trips_through_its_bytes`,
 `a_draft_record_round_trips_through_its_bytes`,
 `a_record_of_another_version_is_dropped`,
@@ -169,8 +178,10 @@ Don't: no family's record encoded by the link; no translation of the
 old records (pre-release: dropped, protocol/client.md, 10).
 Size: at most 150 lines (the schema, the generated code and the goldens
 are not counted).
-Removes: the link's jig and family keepers and their codecs; seven
-records and two enums of the client wire.
+Removes: the link's jig and family keepers and their codecs; six
+records (`AddressInbox`, `AddressConversations`, `AddressTask`,
+`AddressProject`, `Place`, `Draft`) and five enums (`Keeper`, `Address`,
+`ProjectSection`, `TaskSection`, `JigRecord`) of the client wire.
 
 ### 13.2 `jig-domain-client` moved into `jig-client-view`; the naming check waits for nothing
 Scope: a move with paths rewritten: each module of `jig-domain-client`
@@ -187,20 +198,25 @@ workspace `Cargo.toml` and `Cargo.lock` (shared);
 loses `jig-domain-client`; `client_view_links_only_its_domain_and_foundation`
 becomes `["jig-client", "skein-codec", "skein-lib", "skein-ui"]`; the
 test root's, the test view's, `ops`'s and the scripted engine's
-dependency lists) and `tests/boundary/src/tests.rs`. The path rewrites:
+dependency lists; `:124-136`, `:180` and `:307` name the crate:
+`client_roles_cover_step_crates_and_exclude_the_world` (:180) names the
+merged crate; `client_domain_depends_on_foundation_alone` (:124-136)
+asserts on the merged crate rather than going vacuous) and
+`tests/boundary/src/tests.rs:142`. The path rewrites:
 `jig_client_domain::` to `jig_client::` inside `jig-client-view` and the
-moved files (220 and 189 counted lines at the base, jig 11.1's
-measures), so that the view names the API through `jig-client`'s
-re-exports (jig 12.1) and depends on `jig-client` alone (view.md, 2);
+moved files (277 lines in the view, 234 outside tests, and 325 in
+`jig-domain-client`, 261 outside tests, at `23e3fbbdb`), so that the
+view names the API through `jig-client`'s re-exports (jig 12.1) and
+depends on `jig-client` alone (view.md, 2);
 and `jig_domain_client::` to `jig_client_view::`, and inside
 `jig-client-view` to `crate::`:
-1,059 lines in 337 files in jig at the base, 449 of them in counted
-paths (the view 523, `ops` 146, the test root 106, the test view 37,
-`tests/client` 187, `tests/ops` 16, `tests/client-protocol` 13, the
-scripted engine 1, the clients' component's tests 2), and 15 manifests;
-inside the moved files, 235 counted `crate::` lines name a renamed
-module. Downstream, 175 lines in 42 files, which its own sessions
-follow.
+1,055 lines in 207 `.rs` files in jig at the base, 449 of them in
+counted paths (the view 523, `ops` 146, the test root 106, the test
+view 37, `tests/client` 186, `tests/ops` 16, `tests/client-protocol`
+13, the scripted engine 1, the clients' component's tests 2), and 14
+manifests with `Cargo.lock`; inside the moved files, 235 counted
+`crate::` lines name a renamed module. Downstream, 191 lines in 38
+files, which its own sessions follow.
 Shape: no type changes. `jig_client_view`'s root gains what
 `jig_domain_client`'s exported, by these lines: `pub use
 boundary::{Event, Request};`, `pub use ui::{Domain, fire, max_out,
@@ -212,7 +228,16 @@ the base (its root exports `JigStyle`, `JigBindings`, `JigMeaning`,
 lines at lib.rs:31, 41, 44-53 and 97 at the base); the view's
 own `limits` module keeps its functions (`of`, `of_words`, `compose`,
 `envelope`, `jig_worst_case`), the moved one beside them as
-`limits::ui`.
+`limits::ui`. Where both crates have a test module of one name, the
+moved crate's modules go under `src/tests/domain/`, keeping their
+names, and its `src/tests.rs` becomes `src/tests/domain.rs`; list each
+moved module in the commit body. The 15 shared names: `chip_facts`,
+`frame_facts`, `historical_objects`, `historical_pages`,
+`owner_deployment`, `owner_inbox`, `owner_person_task`, `owner_project`,
+`owner_proposal`, `owner_tree`, `pages`, `question_sender`,
+`task_context`, `task_ending`, `task_resources`. The Needs check
+("prints nothing first") needs 12.1's landing as well as 13.1's: the
+link names `jig_domain_client` in 25 lines in 6 files at `23e3fbbdb`.
 Test shape: the moved tests move with their modules, names kept;
 `client_crates_carry_the_client_prefix` (jig 01.4) runs with `PENDING`
 empty.
@@ -231,7 +256,7 @@ Scope: the test application's family codec moves into
 `jig-client-test-protocol-wire` (root.md, 7: "its records, in the
 application's wire crate ..., which encodes what the owner asks and
 decodes what the client hands back"): from
-`testing/jig-test-service/src/family.rs` (234 lines, on
+`testing/jig-test-service/src/family.rs` (235 lines, on
 `jig-test-connector`'s vocabulary) and from the world's
 `tests/client/src/joint/wire/family.rs` (264 lines, the test root's
 values to that vocabulary), which moves into the test root as
@@ -240,19 +265,26 @@ uses the same codec.
 Needs: 13.2.
 Files: `testing/jig-client-test-protocol-wire/{Cargo.toml (+
 jig-test-connector), src/lib.rs, src/codec.rs (moved), src/codec/**}`;
-`testing/jig-test-service/src/{family.rs, lib.rs}` (uses it);
+`testing/jig-test-service/src/{family.rs, lib.rs, clients.rs:220,
+clients/translation.rs:93-99, tests/clients.rs, tests/family.rs,
+tests/fixtures/family.rs}` (uses it);
 `testing/jig-client-test-domain/src/{family.rs, family/wire.rs (moved)}`;
 `tests/client/src/joint/wire/{family.rs (moved), mod.rs}`,
-`tests/client-protocol/src/family.rs` (uses them);
+`tests/client-protocol/src/{family.rs, engine.rs:89, :157, :164, :168,
+front/persistence.rs:63}` (uses them);
 `tests/boundary/src/tests/graph.rs`
 (`test_client_domain_links_only_its_child_owner_vocabulary_and_foundation`
 gains `jig-client-test-protocol-wire`).
 Shape: `jig_client_test_protocol_wire::codec::{request_record, request,
 outcome, outcome_value, subject, subject_value, read, read_value,
-document, Undecodable, DecodedRequest}`, as `jig_test_service::family`
-has them; `jig_client_test_domain::family::wire::{request, subject,
-answer, document, Invalid}`, as `jig_client_world::joint::wire::family`
-has them.
+document, document_value, read_answer, read_answer_value, limits,
+Undecodable, DecodedRequest}`, as `jig_test_service::family` has them;
+`limits`, `document_value`, `read_answer` and `read_answer_value` move
+with `request` (it needs `limits`); `to_root` (`family.rs:127`) uses
+`jig_domain_core` and the engine's clients, and stays in
+`jig-test-service`. `jig_client_test_domain::family::wire::{request,
+subject, answer, document, Invalid}`, as
+`jig_client_world::joint::wire::family` has them.
 Test shape: the moved tests move; `tests/client-protocol/tests/protocol.rs`'s
 `a_family_place_record_round_trips_through_its_owner_s_small_store_bytes`
 keeps its name.
@@ -274,17 +306,25 @@ their order and routes each tell by its asker, exhaustively, and
 `Link` to each child (root.md, 3 and 5). The reference UI's own watch
 spine stops reopening and timing silence (the client's, jig 11.2), and
 its link follows `Told::Link`. The client's world runs this root on
-`Client::typed`; the protocol world and the native host on
+`Client::unlinked`; the protocol world and the native host on
 `Client::new`.
 Needs: 13.3.
 Files: `testing/jig-client-test-domain/src/{domain.rs, boundary.rs,
-route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}`;
+route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}` (its 25
+`jig_client_domain` uses in 12 files go to `jig_client::`, as 13.2's
+do);
 `crates/jig-client-view/src/{bridge.rs (new), ui.rs (the spine's
-silence and reopen timers go), lib.rs}`; `testing/jig-client-test-view`
-(its `Request` routing); `tests/client/src/{harness/world.rs, scripted.rs,
-joint/front.rs, joint/transport.rs, observe.rs}`,
+silence and reopen timers go), lib.rs}`;
+`testing/jig-client-test-view/{src/tests.rs:72, :115,
+src/tests/native_hold.rs}` (its `Request` routing and the tests' uses
+of `Request::Send`, `JigOut::*`, `Event::Answer` and `Limits.table`);
+`tests/client/src/{harness/world.rs, scripted.rs, joint/front.rs,
+joint/transport.rs, observe.rs, test.rs:5, :71, :220,
+joint/requests.rs:43-53, joint/session.rs:364, :407, :419, :451,
+joint/packets.rs:358}`,
 `tests/client-protocol/src/{front.rs, front/persistence.rs, native.rs,
-native/world.rs}`, `tests/one-process` (its client), `testing/jig-test`'s
+native/world.rs, stories.rs:112-130}`, `tests/one-process` (its client),
+`testing/jig-test`'s
 `tests/support/mod.rs`; `tests/boundary/src/tests/graph.rs` (the test
 root links `jig-client`, `jig-client-view`,
 `jig-client-test-protocol-wire`, `jig-test-connector` and `skein-lib`).
@@ -309,10 +349,13 @@ Option<jig_client::Event>` (the reference UI's `Send`, `Read`, `Open`,
 `Close`, `SignOut` as the client's events under `Asker::JIG`, its
 tokens as numbers) and `told(domain, env, client: &Client, told: Told,
 out)` (a tell under `Asker::JIG` as the reference UI's present events:
-`Changed` as `Watch { Delivered(client.document(..)) }`, `Page` as
-`Read`, `Ended` as `Ended`, `Pending` as `Progress` from
-`client.pending(..)`, `Answered` as `Answered` (`NotKept`, `Limit`,
-`Unconfirmed` and `Unknown` as `Progress::Unknown` until jig 21.4),
+`Changed` as `Watch { Delivered(client.document(..)) }`,
+`Text { handle }` and `Dropped { count }` (`boundary.rs:116-117`) as
+the re-check after jig 12.5 settles them (view.md's names for them,
+by a supervisor's steer before 13.4 starts), `Page` as `Read`, `Ended` as `Ended`,
+`Pending` as `Progress` from `client.pending(..)`, `Answered` as
+`Answered` (`NotKept`, `Limit`, `Unconfirmed` and `Unknown` as
+`Progress::Unknown` until jig 21.4),
 `Kept` counted per party as `Kept { scope, requests }`, `Link` as the
 reference UI's link). The family sides' `Out::{Read, Open, Close}` and
 `Send` reach the client as `Read`, `Watch`, `Unwatch` and `Send` under
@@ -346,7 +389,7 @@ Proof: joint layer, the root's client against the real engine:
 'test(a_reload_restores_a_pending_request_from_the_small_store_s_bytes)
 | test(a_person_s_words_reach_a_running_run_through_bytes)'`, once,
 both passing with the root holding the client (under 2 s); it passes;
-nothing else is wanted. In the client's world, on `Client::typed`, the
+nothing else is wanted. In the client's world, on `Client::unlinked`, the
 gate runs `signing_in_and_starting_a_chat` (tests/client); nothing
 else.
 Don't: no map from handles or keys to children in the root; no `_` arm
@@ -369,11 +412,13 @@ its children.
 ```rust
 // crates/jig-client-view/src/records.rs (13.1)
 /// One of its records (view.md, 18.8); mirrors records-v1.schema's `Record` field by field.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Record {
-    Place { party: u64, address: Address },
-    Draft { party: u64, task: u64, words: Box<[u8]>, touched: u64 },
+    Place { version: u16, party: u64, address: Address },
+    Draft { version: u16, party: u64, task: u64, words: contract::Text, touched: u64 },
 }
 /// A record's key under the reference UI's own keys.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecordKey { Place, Draft { task: u64 } }
 /// Its records' version: a record of another is dropped.
 pub const RECORDS_VERSION: u16 = 1;

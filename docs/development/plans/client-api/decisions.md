@@ -685,6 +685,15 @@ choice would have been the user's (development.md, 10.4).
 
      The supervisor then rules the repair from the report. Unchanged: ruling 160's `rows: 3` and its comment, uncommitted; ruling 155's combined landing; the private commits 6b487696, e6b3c96f, 5fbd0459.
 
+162. **jig 13's Shapes against main** (ready check of jig-13.1).
+     Ruling 162, the ready check of jig-13.1: jig 13's Shapes against main (skein `04c1562ed`, jig `23e3fbbdb`, temper `0d67b373`; the check's 17 items are in supervision.md, "Ready check of jig-13.1, returned 2026-10-16T18:16:04Z"). Landed in `jig/13-reference-ui.md` and `jig/13-s1-path-segments.md`:
+     - 13.1: Removes six records and five enums, by name; the sketch's `Record` as the page's `store::Record` has it (`jig-domain-client/src/store.rs:16-24`), `version` included and `words` a `contract::Text`, with `#[derive(Clone, Debug, PartialEq, Eq)]`, and `Copy` on `RecordKey`; the view's `src/tests/fixtures.rs` is new; the missed users in Files (`fuzzy_client_wire.rs:25,27-35`, the wire's `tests.rs:229,244-255`, the link's `fixtures/link_store.rs` and `tests/store.rs`, `boundary.rs:43,101`); temper's `route.rs` 21 lines, and `tests/family.rs:147-157`.
+     - 13.2: a rename rule: where both crates have a test module of one name, the moved crate's go under `src/tests/domain/` with their names, its `src/tests.rs` becomes `src/tests/domain.rs`, and the commit body lists each; `tests/boundary/src/tests/graph.rs` and `tests.rs:142` in Files; the counts at `23e3fbbdb`; "prints nothing first" needs 12.1 and 13.1; temper downstream 191 lines in 38 files.
+     - 13.3: `limits`, `document_value`, `read_answer`, `read_answer_value` move with `request`; `to_root` stays in `jig-test-service`; the missed users in Files.
+     - 13.4: the missed users in Files, the root's 25 `jig_client_domain` uses in 12 files to `jig_client::`; `Client::unlinked` (12.5's name) for `Client::typed`; the bridge's `Told::Text` and `Told::Dropped` are named, their present events settled by the re-check after jig 12.5, as a steer before 13.4 starts.
+     - s1: `profile/small.rs:47, :67, :119`; the `resource_path_fits` callers and `owner_historical.rs:487`, `owner_authority.rs:95-103` in Files.
+     Not checked: 13.2's and 13.4's compiles and path-rewrite counts; a fresh check takes them after jig 12.5 lands. A further copy or user found when reached is refreshed and listed in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
