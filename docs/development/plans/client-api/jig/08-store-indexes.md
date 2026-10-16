@@ -77,14 +77,22 @@ only jig 02.1.
   tag 7; the people restore range becomes `[JIG, 2, 0]` to `[JIG, 2, 7]`.
   Each index row is a small `Stored` value holding its key's fields, as
   `Update` and `Edge` are, in tasks v3 and people v3, edited in place.
-- **The forget is made by the mark after which the task is read,** as
-  the base forgets an ended chat: a `Seen::Chat` on an ended conversation, and a
-  `Seen::Results` for the tasks the people child's cached unread results
+- **The forget is made in the decision of the mark after which the
+  task is read** (people.md 6: "in the `Seen`'s own decision: the mark
+  and the erase commit together, so no restart sees the task read and
+  not forgotten"): a `Seen::Chat` on an ended conversation, as the base
+  forgets an ended chat (`seen_chat_loaded` pushes the mark and the
+  forget into one decision); and a `Seen::Results` for the forgettable
+  tasks the people child's cached unread results
   (`people::Domain::cached_results`, at most `inbox_entries + 1` per
-  party) name at or below the mark. A task the cache does not name stays
-  until retention's pass, which is not planned (a question below). jig's
-  own templates are both kept (configuration.md 3.1), so a chat made by
-  `people::Ask::StartChat` is no longer forgotten once this lands.
+  party) name at or below the mark, from what each cached `ResultRef`
+  carries, with no load (08.3's Shape). A task the cache does not name,
+  or that a live task names when it is read, stays until retention's
+  pass, which is not planned (people.md 6: "Retention's next pass
+  forgets the others"; `later.md`'s row of what jig's `STATUS.md` leaves
+  not planned). jig's own templates are both kept (configuration.md
+  3.1), so a chat made by `people::Ask::StartChat` is no longer
+  forgotten once this lands.
 - **Each ended conversation gets an `EndedRead` row** at its end,
   `through: 0` when its party read nothing, so that the restart's census
   reads the ended read positions family and joins each row's ended
@@ -339,7 +347,8 @@ Removes: nothing.
 
 Scope: people.md 6 and store.md 7.4, 11.1: an ended task of retention
 class forgotten once read, requested by a party, is erased in the
-decision of the mark after which it is read: its record, its result's update,
+decision of the mark after which it is read, the mark and the erase in
+one commit: its record, its result's update,
 its rows in the two ended indexes and its read position, and, while
 they exist, its rows in the result and conversation indexes (tags 13 to
 15). The class replaces the chat's charter as what decides it; a kept
@@ -350,16 +359,20 @@ member with its label and flags), to make a conversation of class
 forgotten once read in the core world.
 Files:
 - `crates/jig-domain-core/src/`: `forget.rs` (new: `inbox.rs:406-450`'s
-  `forget_chat` moved and keyed on the class, `forgets` as sketched),
-  `inbox.rs` (`seen_chat_loaded`'s forget push at :386 goes through
-  `forget.rs`), `routing/people.rs` (`Seen::Results` at :271-282: the
-  candidates come from `people.cached_results(person)` in place of
-  `marked_chats`), `routing/vocabulary.rs` (`Now::LoadEndedChat` →
-  `Now::LoadForgettable`, `Event::ForgetChat` → `Event::Forget`),
+  `forget_chat` moved and keyed on the class, `Owner` and `forgets` as
+  sketched), `inbox.rs` (`seen_chat_loaded`'s forget push at :386 goes
+  through `forget.rs`), `routing/people.rs` (`Seen::Results` at
+  :271-282: the candidates come from `people.cached_results(person)` in
+  place of `marked_chats`, and are forgotten in the mark's step),
+  `routing/tasks.rs` (:716) and `inbox/census.rs` (:131), where a
+  `ResultRef` is made, `routing/vocabulary.rs` (`Now::LoadEndedChat`
+  goes, its one sender being `Seen::Results`; `Event::ForgetChat { row }`
+  → `Event::Forget { owner }`),
   `routing/mod.rs`, `stopping.rs`, `routing/watch_marks.rs`,
   `tests/completion_retry.rs` (the renamed arms), `lib.rs`.
 - `crates/jig-domain-people/src/`: `boundary.rs` (`Event::ForgetChat`
-  → `Event::Forget`, the same fields), `domain.rs` (the step's
+  → `Event::Forget`, the same fields; `Forgettable` and
+  `ResultRef.forgettable`, as sketched), `domain.rs` (the step's
   `Event::ForgetChat` arm, :429; at most 40 lines), `inbox.rs`
   (`forget_chat_event`'s name; `marked_chats` goes, its one reader being the forget's
   candidates), `tests.rs`, `tests/marked_chats.rs` (removed with it).
@@ -372,9 +385,12 @@ Files:
   `tests/ops/src/joint/{engine.rs, front.rs}`, `tests/people/src/world.rs`,
   `tests/people/tests/{memory.rs, simulation.rs}`,
   `testing/jig-test-service/src/{route.rs, clients/translation.rs}`: the
-  renamed `Now`, core `Event` and people `Event` variants, an arm or a
-  name each (from `git grep -n -E
+  removed `Now` variant and the renamed core and people `Event`
+  variants, an arm or a name each (from `git grep -n -E
   'LoadEndedChat|ForgetChat|SeenChatLoaded|Now::SeenChat|ChatSeen|marked_chats|\.chat_seen\('`).
+- The six test files that make a `ResultRef` (of the nine that `git
+  grep -l 'ResultRef {' -- ':!docs'` lists at the base, all but
+  `boundary.rs` and the two above): `forgettable: None` each.
 - `tests/core/src/effects.rs` (a `World.initial_ask: people::Ask`,
   defaulting to the base's chat), `effects/constructors.rs`
   (`World::configured_with(.., initial)` beside `configured`, :85),
@@ -395,24 +411,37 @@ Files:
   matches every `Option<Scenario>` (`tests/conformance/src/config.rs:132-138`
   there), which `ConversationEndsWhileRead` breaks at the repin.
 Shape:
-- `jig_domain_core::forget::forgets(row: &tasks::TaskRecord, reading:
-  Reading) -> Option<u64>`, as sketched, reading `row.flags` (jig
-  02.1's): the
-  requesting party whose reading forgets the task now. `Reading {
-  results, turns: Option<u64>, named }`: the requester's results
-  position, its position over the task's turns (`None` when not flagged
-  conversation), and whether `core.tasks.stub(row.number)` exists.
-- `Now::LoadForgettable { task }` (the former `LoadEndedChat`), keyed
-  `tasks::Key::Ended(task)` by `historical::key`; its answer
-  `Event::Forget { row }` (the former `ForgetChat`).
-- On `Seen::Results { through }`: for each `ResultRef` in
-  `core.people.cached_results(person)` with `position <= through`, read
-  before the mark applies, whose task is not live,
-  `Now::LoadForgettable { task }`. On `Seen::Chat` of an ended
-  conversation: as at the base (`Now::SeenChat`, then
-  `seen_chat_loaded`), which pushes `Event::Forget` once the mark is
-  decided.
-- `forget.rs::forget(core, env, work, row)` writes in one decision:
+- `jig_domain_core::forget::Owner`, as sketched: what one forget
+  erases, made by `Owner::of_row` from a loaded record, reading
+  `row.flags` (jig 02.1's), or by `Owner::of_result` from a cached
+  `ResultRef`. `forgets(owner: &Owner, reading: Reading) ->
+  Option<u64>`: the requesting party whose reading forgets the task
+  now. `Reading { results, turns: Option<u64>, named }`: the
+  requester's results position, its position over the task's turns
+  (`None` when not flagged conversation), and whether
+  `core.tasks.stub(task)` exists.
+- **The mark and its forgets are one decision** (people.md 6; the
+  design answer of 2026-10-16T19:02Z). The base's `Seen::Results`
+  decides the mark, then loads, and forgets in later decisions: a crash
+  between commits the mark and loses the forget, which no restart finds
+  again (the fuzzy sweep's `ConversationEndsWhileRead`, cut 17, seed
+  757).
+- `people::ResultRef` gains `forgettable: Option<people::Forgettable>`,
+  as sketched, `None` for a kept task, set where a ref is made from the
+  ended record (`routing/tasks.rs:716`, `inbox/census.rs:131`).
+- On `Seen::Results { through }`: in the mark's own step, after its
+  `people::Event::Decided { outcome: MarkedSeen }`, `Event::Forget {
+  owner }` for each `ResultRef` of `core.people.cached_results(person)`,
+  read before the mark applies, with `position <= through`,
+  `forgettable` set and a task not live, its owner
+  `Owner::of_result(person, &result)`. Nothing is loaded, and a mark
+  over kept results only, jig's own templates among them, is decided as
+  at the base. `Now::LoadEndedChat` goes.
+- On `Seen::Chat` of an ended conversation: as at the base
+  (`Now::SeenChat`, then `seen_chat_loaded`), which pushes `Event::Forget
+  { owner }`, from `Owner::of_row`, in the mark's decision.
+- `forget.rs::forget(core, env, work, owner)` writes in the mark's
+  decision, once `forgets` names the party:
   `Erase(Key::Ended(task))`, the result's `Update` key, `EndedByParty`
   and, when listed, `EndedByProject` (8.1, 8.2), the tag 13 to 15 rows
   as at the base, and `people::Event::Forget`, which erases the read
@@ -504,12 +533,26 @@ Test shape:
   `StartChat` chat, read through both marks: its ended record and its
   `EndedByParty` row stay),
   `a_forgettable_conversation_read_in_the_other_order_is_forgotten`
-  (results first, then the chat's turns).
+  (results first, then the chat's turns), and
+  `a_results_mark_forgets_in_the_commit_that_moves_its_position` (turns
+  marked, then `Seen::Results`: the one commit of `world.commits` that
+  erases `tasks::Key::Ended(task)` also saves the party's
+  `people::Stored::ReadResults`).
+- `conversation_ends_while_read_chosen_cut_ends_the_story` cuts after
+  the commit of the forgettable conversation's results mark
+  (`Cut::AfterCommit` at that commit, in place of `chosen_cut`'s 7), so
+  the focused gate meets what the fuzzy sweep met at cut 17, seed 757.
+  The scenario's `check` stays: the store holds no row of the
+  forgettable conversation.
 - `crates/jig-domain-core/src/tests/forget.rs` (new; `mod forget;` in
   tests.rs): one table test, `forgets_names_the_party_only_once_its_reading_releases_the_task`,
   its rows a const beside it: kept; requested by a task; a conversation
   with a turn unread; named by a live task (`Reading.named`); the result
-  unread; and the one row that forgets. Its record is a new fixture,
+  unread; and the one row that forgets, each through `Owner::of_row` and
+  then `forgets`. Beside it,
+  `an_owner_of_a_cached_result_is_the_owner_of_its_record`: the fixture's
+  `Owner::of_row` equals `Owner::of_result` of the `ResultRef` that
+  `routing/tasks.rs:716` makes for it. Its record is a new fixture,
   `fixtures::ended_report(number: u64, requester: tasks::Party) ->
   tasks::TaskRecord`, in `crates/jig-domain-core/src/tests/fixtures.rs`
   (result position 7, last reply 2). Under 20 ms.
@@ -532,10 +575,13 @@ with it, once its party read its turns and its result, while a kept chat
 read the same way stays; under 1 s.
 Don't: run retention's timers or passes; erase a reply's `Update` row;
 forget a task whose requester is not a party; forget on a read (a
-`Read`), only on a mark.
-Size: at most 175 lines of production code (about 25 of them in
-`testing/jig-conformance`).
-Removes: the chat-keyed forget (`forget_chat`'s `chat_requester` test as
+`Read`), only on a mark; decide a forget in any decision but its
+mark's; load anything for a `Seen::Results`.
+Size: at most 215 lines of production code (about 25 of them in
+`testing/jig-conformance`; 40 for `Owner` and the forget from a cached
+result, by the design answer of 2026-10-16T19:02Z).
+Removes: `Now::LoadEndedChat`, with nothing in its place; the
+chat-keyed forget (`forget_chat`'s `chat_requester` test as
 the forget's condition); `people::Domain::marked_chats` and its test
 `marked_chats_lists_only_that_persons_positions`.
 
@@ -552,7 +598,8 @@ Needs: jig 02.3's people family at version 3.
 Files:
 - `crates/jig-domain-people/src/`: `ended.rs` (new: the move at the
   end, the ended mark, the census's input), `boundary.rs`
-  (`Key::EndedRead`, `Stored::EndedRead`, `Key::live`, `Event::ChatState`'s
+  (`Forgettable.turns_read`, `Key::EndedRead`,
+  `Stored::EndedRead`, `Key::live`, `Event::ChatState`'s
   `seen`), `domain.rs` (restore: an `EndedRead` row is refused; at most
   40 lines), `inbox.rs` (`chat_state`, `chat_seen_decision`: their
   ended arms call `ended.rs`), `lib.rs`, `tests.rs`, `tests/ended.rs`
@@ -561,10 +608,11 @@ Files:
   `restore_inbox_row(&mut self, limits, record: &Record) -> bool`, one
   pending position), `restart/census.rs` (`Census::interval`, and
   `admits` on it), `restart.rs` (`restart_done`: a position pending
-  refuses), `forget.rs` (8.3's `Reading.turns`
-  from the loaded position), `inbox.rs` (`seen_chat_loaded`),
-  `routing/vocabulary.rs` (`Now::LoadEndedRead`, `Event::EndedReadLoaded`,
-  `AfterRead`), `routing/mod.rs`, `stopping.rs`,
+  refuses), `forget.rs` (8.3's `Reading.turns`: a `Seen::Chat`'s the
+  position its mark decides, a `Seen::Results`'s from
+  `Forgettable.turns_read`), `inbox.rs` (`seen_chat_loaded`),
+  `routing/vocabulary.rs` (`Now::LoadEndedRead`,
+  `Event::EndedReadLoaded`), `routing/mod.rs`, `stopping.rs`,
   `documents/inbox_deployment.rs` (`conversation_from_row` takes the
   joined position for an ended row), `reads/indexed.rs` (:199),
   `reads/rows.rs` (:1189; at most 40 lines), `inbox.rs:132`,
@@ -631,14 +679,20 @@ Shape:
   position for an ended conversation; `None` on the live path.
 - 8.3's `people::Event::Forget` erases `Key::EndedRead { task, party }`
   in `ReadChat`'s place.
-- `Now::LoadEndedRead { task: u64, party: u64, then: AfterRead }`, keyed
+- `Now::LoadEndedRead { request: Token, task: u64, party: u64 }`, keyed
   `people::Key::EndedRead { task, party }`; its answer
-  `Event::EndedReadLoaded { task, party, through: u64, then: AfterRead,
-  busy: bool }`, `through` 0 when absent; `AfterRead` as sketched.
-  `Seen::Chat` on an ended conversation: `SeenChat` loads the record,
-  then `LoadEndedRead { then: Seen }`, then the mark is decided against
-  that position and saves `EndedRead`. 8.3's forget of a conversation
-  loads its position with `then: Forget`.
+  `Event::EndedReadLoaded { request, task, party, through: u64, busy:
+  bool }`, `through` 0 when absent. `Seen::Chat` on an ended
+  conversation: `SeenChat` loads the record, then `LoadEndedRead`, then
+  the mark is decided against that position, saves `EndedRead`, and
+  forgets in that decision, its `Reading.turns` the position the mark
+  decides: no load follows the mark (people.md 6; the design answer of
+  2026-10-16T19:02Z).
+- `people::Forgettable` gains `turns_read: bool`, for a conversation:
+  set where the ref is made (at the end, from the position that
+  decision moves; at the census, from the joined `EndedRead`) and by a
+  `Seen::Chat` on the ended conversation, in its decision. 8.3's
+  forget from a cached result reads it in place of `chat_seen`.
 - `Core::restore_inbox_row(&mut self, limits: &Limits, record: &Record)
   -> bool`: an `EndedRead` row is held as the one pending position, and
   the next row, its ended record, takes it into `ChatState { live:
@@ -705,6 +759,11 @@ Test shape:
   assertions on `EndedRead { task, party: 1 }` in `ReadChat`'s place.
 - `tests/core/tests/restart.rs`: `a_restart_restores_unread_results_and_chat_totals`
   passes unchanged.
+- `tests/core/tests/forgetting.rs`:
+  `a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark`
+  (the forgettable conversation's turns marked, then `world.restart`,
+  then `Seen::Results`: no row of it is left, from the census's
+  `turns_read`).
 - The people world (domain/testing.md 3: "read positions over
   conversations, live and ended, across a restart"),
   `tests/people/tests/simulation.rs`:
@@ -721,10 +780,11 @@ the unread results; under 1 s.
 Don't: restore an `EndedRead` row at start; hold ended positions in the
 people child; read an ended record in the census that no `EndedRead` row
 and no unread result row names; part an `EndedRead` row from its record
-across pages.
-Size: at most 340 lines of production code (a codec increment; 40 of
+across pages; load anything after a mark is decided.
+Size: at most 355 lines of production code (a codec increment; 40 of
 them for the census's pairs, places and once per party, by the design
-answer of 2026-10-16).
+answer of 2026-10-16; 15 for `turns_read`, by the design answer of
+2026-10-16T19:02Z).
 Removes: ended positions in `people::Domain::chats_seen` and the
 census's read of tag 15.
 
@@ -933,16 +993,51 @@ pub enum Stored {
 ```
 
 ```rust
-// crates/jig-domain-core/src/forget.rs (8.3; 8.4 adds AfterRead in routing/vocabulary.rs)
-/// What a load of an ended read position continues.
-#[derive(Debug)] // as `Now` and `Event`, which carry it
-pub enum AfterRead {
-    /// A party's `Seen::Chat` on an ended conversation, by its request.
-    Seen { request: Token },
-    /// The forget of an ended task forgotten once read, its record loaded.
-    Forget { row: Box<tasks::TaskRecord> },
+// crates/jig-domain-people/src/boundary.rs (8.3; the design answer of 2026-10-16T19:02Z, not compiled at the ready check)
+/// What the forget of a task forgotten once read needs from its unread
+/// result's entry (people.md 6); 8.4 adds `turns_read`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Forgettable {
+    /// The task's label, for its row in the ended index by requester.
+    pub label: u32,
+    /// Whether the task is flagged listed, for its row in the ended index by project.
+    pub listed: bool,
+    /// Its last turn, for a conversation; `None` for any other task.
+    pub last_reply: Option<u64>,
 }
-/// What one ended task's forget needs to know, read before the decision.
+// `ResultRef` gains `pub forgettable: Option<Forgettable>`: `None` for a kept task.
+```
+
+```rust
+// crates/jig-domain-core/src/forget.rs (8.3; `Owner` and `forgets` by the design answer of 2026-10-16T19:02Z, not compiled at the ready check)
+/// What one forget erases: an ended task forgotten once read, requested by a
+/// party, from its loaded record (`Seen::Chat`) or its cached unread result
+/// (`Seen::Results`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Owner {
+    pub task: u64,
+    pub party: u64,
+    pub project: u32,
+    pub label: u32,
+    pub ended_at: Wall,
+    pub result_position: u64,
+    pub listed: bool,
+    /// Its last turn, for a conversation; `None` for any other task.
+    pub last_reply: Option<u64>,
+}
+impl Owner {
+    /// `None` unless `row` has ended with a result, is forgotten once read, and its requester is a party.
+    #[must_use]
+    pub fn of_row(row: &tasks::TaskRecord) -> Option<Owner> {
+        unreachable!("sketch")
+    }
+    /// `None` for a kept task's result.
+    #[must_use]
+    pub fn of_result(party: u64, result: &people::ResultRef) -> Option<Owner> {
+        unreachable!("sketch")
+    }
+}
+/// What one ended task's forget needs to know, read in the mark's decision.
 #[derive(Clone, Copy, Debug)]
 pub struct Reading {
     /// The requester's read position over results.
@@ -952,23 +1047,15 @@ pub struct Reading {
     /// Whether a live task names it (a stub exists).
     pub named: bool,
 }
-/// The requesting party whose reading forgets `row` now, if any (people.md 6).
+/// The requesting party whose reading forgets `owner` now, if any (people.md 6).
+/// `Owner::of_row` has checked the class, the requester, the phase and the result.
 #[must_use]
-pub fn forgets(row: &tasks::TaskRecord, reading: Reading) -> Option<u64> {
-    // let tasks::Party::Person(party) = row.requester else { return None };   // not a party: kept
-    // if row.flags.retention != Retention::ForgottenOnceRead || reading.named { return None; }
-    // match row.phase {
-    //     tasks::Phase::Ended(_) => {}
-    //     tasks::Phase::Waiting
-    //     | tasks::Phase::Active(_)
-    //     | tasks::Phase::Held { .. }
-    //     | tasks::Phase::Closing(_) => return None,
-    // }
-    // if row.result_position == 0 || reading.results < row.result_position { return None; }
-    // match (row.flags.conversation, reading.turns) {
-    //     (true, Some(seen)) if seen >= row.last_reply => Some(party),
-    //     (true, _) => None,
-    //     (false, _) => Some(party),
+pub fn forgets(owner: &Owner, reading: Reading) -> Option<u64> {
+    // if reading.named || reading.results < owner.result_position { return None; }
+    // match (owner.last_reply, reading.turns) {
+    //     (Some(last), Some(seen)) if seen >= last => Some(owner.party),
+    //     (Some(_), _) => None,
+    //     (None, _) => Some(owner.party),
     // }
 }
 ```
@@ -1008,20 +1095,12 @@ pub fn ended_part(query: &TaskQuery) -> EndedPart {
 Who owns what: the tasks child saves the two ended indexes and the
 store encodes them; the people child owns `EndedRead` and moves it at a
 conversation's end; the core loads it (`Now::LoadEndedRead`) for a mark
-or a forget, and the store joins it for a read and the census. A forget
-ends a forgettable task's rows; retention (not planned) ends a kept
-one's.
+on an ended conversation, and the store joins it for a read and the
+census. A forget ends a forgettable task's rows; retention (not
+planned) ends a kept one's.
 
 ## Questions to raise when reached
 
-- **A forgettable task the people child's cache does not name** (8.3):
-  `Seen::Results { through }` forgets the tasks its cached unread
-  results name, at most `inbox_entries + 1`; an older forgettable task
-  whose result the mark covers stays until retention's pass, which is
-  not planned. The design's "forgotten ... once read" puts the forget
-  "each on the domain's timer" (store.md 15 item 6). Raise it when 8.3
-  lands: cheapest, the design says the forget at a read covers what the
-  party's inbox holds, and retention's pass the rest.
 - **The census reads each ended conversation's position** (8.4), as the
   base reads each ended conversation: store.md 7.2 asks "never every
   ended task". Raise it when 8.4 lands, with `world.census_ended` (the
