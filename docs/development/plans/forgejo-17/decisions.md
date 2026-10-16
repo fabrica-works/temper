@@ -1,0 +1,117 @@
+# forgejo-17: decisions
+
+2026-10-16. The decisions the plan rests on, then the run's rulings
+(appended by the supervisor), then what the user may veto.
+
+## The plan's decisions
+
+1. **Scope: the rows `STATUS.md` names "the next plan".** `forge.md`,
+   sections 1, 10 and 13 (the pin on Forgejo v17.0 and forgejo-runner
+   v13.2, the throwaway Forgejo and runner, the conformance's
+   transcripts and facts), 3.2 (`Read::Job`'s failed step and its log's
+   end; the comparisons' `files` and `verification`) and 9 (the fake
+   forge's jobs with steps); `domain/forge.md`, 8.4 (the repair's brief
+   with the failed step and its log's end); `git.md`, section 9
+   (`tools/git-transcripts`' records and facts on v17.0). The agent's
+   `job` tool shows the failed step too (`domain/forge.md`, section 2,
+   "Tools": "a failed job's output, its failed step's end"): it renders
+   the same answer. Not in scope: webhooks (`forge.md`, section 5),
+   GitHub (section 11), and `draft/ci-on-forgejo-17.md` (re-runs, a
+   stall's reasons, the agents' step and search tools).
+2. **The pin is Forgejo 17.0.0 and forgejo-runner 13.2.0,** the newest
+   of each on 2026-10-16 (`findings/`, the spike's section 1):
+   - `forgejo-17.0.0-linux-amd64`, SHA-256
+     `5a3b07e124ed70b4e46ee3939515f003bd3cc85352257a9a4607a527251042ca`;
+   - `forgejo-runner-13.2.0-linux-amd64`, SHA-256
+     `fadaec897f5e6641c363f87ecaf75f866f99c81b7097ec6b433e4c48123fcad1`;
+
+   both at `~/src/rust/tmp/temper/forgejo/{v17.0.0,runner-v13.2.0}/` on
+   x1, each with its `.sha256`. A later patch released during the run
+   does not move the pin: moving it is a constant, the transcripts and
+   the facts (`forge.md`, section 10), for a later change.
+3. **The run's machine is x1,** beside client-api's run on carbon-forge
+   (the user, 2026-10-16): x1 holds both binaries, and Forgejo v16's
+   support ends on 2026-10-29. The two runs share temper's `main`;
+   `land` rebases each landing on the other's.
+4. **The store's version does not move in this plan** (the user,
+   2026-10-16). `JobAnswer` changes in place in the schema
+   `origin/main` holds at the increment's landing: `store-v1.schema` at
+   the base, `store-v2.schema` once client-api's temper 04 has moved it.
+   `STORE_VERSION` stays as `main` has it. client-api moves it once
+   (its README, "Format versions"), and that one move covers both
+   plans' changes: no temper store exists outside the tests' goldens,
+   and client-api's checks (`STORE_VERSION: u32 = 1` on `main`) keep
+   reading as its plan says. `docs/design/store/README.md` moves the
+   version "once per plan": see "For the user".
+5. **One constant pair pins both binaries,** in
+   `testing/temper-throwaway-forgejo/src/binary.rs`: `VERSION`
+   (`"17.0.0"`) and `RUNNER_VERSION` (`"13.2.0"`), each checked exactly
+   against the binary's first `--version` line, which the tool, the
+   throwaway instance and the process tier share (`forge.md`, section 10:
+   "a constant the throwaway Forgejo and the tool share"). Today the
+   runner's check is a substring of its own in the tool
+   (`findings/tools.md`, 1).
+6. **The answer names the failed step as a value of its own:**
+   `Answer::Job { attempt, step: Option<Step>, log, truncated }`, with
+   `Step { number: u32, name: Box<[u8]> }` in the forge client's
+   `api`. `step` is none when no step failed. The job's other steps are
+   not kept: the design reads only the failed one (`forge.md`, 3.2).
+7. **The failed step is found by the component,** from
+   `actions/jobs/<job>`'s steps: the first whose `status` is `failure`
+   (`forge.md`, 3.2, "A failed job's log is its failed step's end").
+   Nothing above the component reads the steps.
+8. **The log's end is a suffix range, and a `200` is read through,**
+   keeping its last `max_bytes` bytes as it streams (`forge.md`, 3.2).
+   The component's range becomes a choice of two, the head (`bytes=0-N`,
+   a file's) and the end (`bytes=-N`, a log's); `truncated` is
+   `Content-Range`'s first byte above 0, or bytes dropped from a `200`.
+9. **The fake forge's jobs have three steps,** `Set up job`, one
+   workflow step and `Complete job`, each with a log slice of its own.
+   Where a job fails is seeded per context: the workflow step (the
+   default), or no step (a cancelled job: its workflow and completion
+   steps `cancelled`). The completion step reports `failure` whenever a
+   step failed, as Forgejo's does (`forge.md`, section 9). The fake
+   models only what v17 was seen to do or what the design names: a
+   set-up failure and a completion failing alone are left to the
+   component's step tests, on documents, where the rule "the first
+   whose `status` is `failure`" is decided.
+10. **The proofs.** The real side is reached at three places: the two
+    recording tools, on the throwaway Forgejo and runner (sessions 01
+    and 02); the conformance's component mode, the real component on
+    the throwaway Forgejo (`forge.md`, section 10), for `Read::Job` and
+    the comparisons; and the process tier (`scripts/proof-one-process.sh`),
+    the real binary on v17, once, for the pin. The joint world of the
+    forge component (`tests/engine/protocol-forge`, the component on
+    the fake's HTTP layer) holds `Read::Job`'s story against the fake;
+    the engine's domain world and the system world hold the brief's.
+    The process tier has no runner and fails no CI: it proves the pin,
+    not the job read.
+11. **The plan's sessions are mostly in a line:** the pin, then the
+    documents, then the fake's jobs and the component's read, then the
+    brief. Only git's transcripts run beside the documents. It is a
+    small plan; nothing is gained by cutting the meeting point finer.
+12. **No repin:** temper is the last repository of the workspace's
+    order, and the plan changes no other repository.
+13. **Kept small.** `forge.md`, section 13's "that a job waiting for a
+    runner has no steps" is not checked here: nothing this plan builds
+    reads a waiting job, and the check needs the conformance to hold its
+    runner across its run; it goes with the stall's reasons, which read
+    pending jobs (`later.md`). The design questions found while planning
+    went to the designer before the run (`~/src/rust/tmp/temper/forgejo-17-plan/design-questions.md`,
+    not versioned); each session file carries its default under
+    "Questions to raise when reached" until the designer answers.
+
+## Rulings
+
+(The supervisor appends the run's rulings here.)
+
+## For the user
+
+- **The store's version (decision 4).** `docs/design/store/README.md`
+  moves `STORE_VERSION` "once per plan, at the first landing that
+  changes an encoding". With client-api running at once, this plan
+  leaves the move to client-api and changes `JobAnswer` in place; the
+  designer is asked to say how two plans that run at once share the
+  move (the plan's design questions, README).
+- **The pin (decision 2):** 17.0.0 and 13.2.0, not "the newest patch at
+  the run": the transcripts and facts name one binary each.
