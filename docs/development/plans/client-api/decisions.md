@@ -797,6 +797,27 @@ choice would have been the user's (development.md, 10.4).
      4. Any further copy of the `chats` member the repin's suites find: convert it the same way, and list it in the commit body. On temper's main only `fixtures.rs:46` holds one.
      5. Unchanged: ruling 164; 03.3's Shape, Test shape and Proof; 04.1's Don't ("set a template's field by hand where jig's fixture gives it").
 
+170. **jig 12.2's request not kept: skein-01.s3's `not_kept`** (design gap, jig 12's block of 2026-10-16T19:42:06Z).
+     Ruling 170: the designer's answer of 2026-10-16T20:03Z, landed as skein 1f71424d, jig 3b8bf1263 and temper b694e960; the supplement step is skein-01.s3 (`skein/01-s3-not-kept.md`, the answer's item 2), added by this ruling:
+
+
+
+     1. **Option A. The table gains `not_kept`, and client.md 11 stands, parked requests included.** lib.md 12, new: "a request whose record the asker's store did not write is retired by its key (`not_kept`), whatever its state: parked, ready, in flight or retrying ... It is never sent; an answer for its attempt changes nothing. Its erase is emitted, as any retired request's, since an earlier write may hold its record. Its owner value is handed back, as a final answer's, with no progress ... A key that names no request, or a retired one, hands back nothing." client.md 11, now: "each answered *not kept*, by its key ...: parked, or with its `Exchange` waiting for the write ... A record is whole in each write, so a request whose record a later write carries again is decided by that later write".
+     2. **skein-01.s3, the supervisor's to add.** Needs: nothing.
+        - Files: `crates/skein-lib/src/requests.rs`: `pub fn not_kept(&mut self, key: RequestKey) -> Option<O>`, beside `answered` (:268-:307 at `4e293b7`). It finds the entry by `self.index`. A key not held, or `State::Retired`, gives `None`. Otherwise it sets `state = State::Retired { erase: true }`, `save = false`, `changed = false` and returns `Some(owner)`. The module doc's table gains `| parked, ready, in flight, retrying | not kept | retired | owner value, erase |`.
+        - Tests in `crates/skein-lib/src/tests/requests.rs`:
+          - `not_kept_retires_a_parked_request_and_erases_it`: link down, `ask`, take its `Save` (`first_sent` `None`). `not_kept(key)` is `Some(owner(1))`, then `None`, and `progress()` is `None`. The next take gives `Erase(key)` alone. After `link(true)` and `confirmed(Some(7))`, a take gives nothing. `reclaim()` leaves `is_empty()` and `bytes()` 0.
+          - `not_kept_makes_a_held_attempt_stale`: `live()`, `ask`, `sent` gives the attempt. `not_kept(key)` is `Some`, then `answered(.., attempt, Final)` is `Stale`, and a take gives `Erase(key)`. A second request answered `Final` gives `None` from `not_kept`.
+        - Size: at most 30 lines. Proof: skein's gate, by `land`.
+        - Don't: change `answered`, `RequestOut`, `RequestAnswered`, `RequestProgress` or `tests/lib/src/request_table.rs`; name a downstream repository.
+     3. **jig 12.2's Shape (landed):**
+        - **The skein move.** 12.2 needs skein-01.s3. Its first commit moves jig's skein to s3's landing, with the one repair `lines: 0, line_bytes: 0` (`tests/client-protocol/src/native/world.rs:232`). This is the plan's one jig move of skein, moved forward from jig 19.4; jig 19 makes none (README, "Pins"; `jig/19-browser.md`, "No repin").
+        - **The client's bookkeeping.** `jig-client` numbers its writes; each is answered before the next (client.md, 16). Per table key, it keeps the number of the last `Save` that carried its record: at most `requests.requests` keys.
+        - **On `NotStored` of write `w`.** Before the link takes it, the domain gets `Up::NotKept { key }` for each key whose last write is `w`. It calls `table.not_kept(key)`, and for `Some(owner)` tells `Answered { key: owner, outcome: NotKept }`.
+        - **The link's `NotKept { attempt }`** then reaches the domain as `Lost`. That answer is stale for a request just retired, and a retry for a request whose record a later write carries.
+        - **Tests and Size.** New tests: `a_parked_request_whose_record_is_not_stored_is_answered_not_kept` and `a_failed_write_answers_only_the_requests_it_carried`. Size goes from 215 to 250.
+     4. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
