@@ -73,6 +73,23 @@ holds compare-files-false-lists-no-commits-files
 holds compare-files-false-keeps-its-own-files-empty
 holds compare-verification-false-changes-nothing-kept
 holds compare-files-false-keeps-total-commits-and-shas
+holds cli-migrate-runs-on-a-fresh-work-path
+holds cli-migrate-runs-again-on-a-migrated-work-path
+holds cli-user-create-prints-the-random-password-first
+holds cli-user-create-random-password-length-is-asked
+holds cli-user-create-again-is-refused-naming-the-user
+holds cli-user-list-prints-a-header-and-a-row-per-user
+holds cli-user-create-random-password-signs-in
+holds cli-token-raw-prints-the-token-alone
+holds cli-token-scopes-limit-what-the-token-reads
+holds cli-token-name-used-twice-is-refused
+holds cli-token-admin-scopes-comma-joined-are-taken-under-two-suffixes
+holds cli-user-made-to-change-its-password-is-refused-the-api-until-cleared
+holds cli-dump-needs-the-repositories-directory
+holds cli-dump-writes-the-database-and-app-ini
+holds cli-dump-appends-zip-to-a-file-name-without-it
+holds cli-dump-needs-its-tempdir-to-exist
+holds cli-dump-over-an-existing-file-overwrites-it
 unchecked webhook-deliveries: webhooks are built after standalone
 holds component-start-ready
 holds component-start-other-user-stops

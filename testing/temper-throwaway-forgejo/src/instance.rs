@@ -1,19 +1,16 @@
-use crate::{Account, Exchange, Failure, Forgejo, Init, Made, Outgoing, Settings, Token, binary::environment, http};
+use crate::{Account, Exchange, Failure, Forgejo, Init, Made, Outgoing, Settings, Token, WorkPath, http};
 use serde_json::{Value, json};
 use std::{
-    fmt::Write,
     fs::{self, File},
-    io::Read,
-    net::TcpListener,
-    os::unix::fs::{MetadataExt, PermissionsExt},
     path::{Path, PathBuf},
-    process::{Child, Command},
+    process::Child,
     time::Duration,
 };
 pub struct Instance {
     child: Option<Child>,
     port: u16,
     scratch: PathBuf,
+    work: WorkPath,
     admin: Account,
     settings: Settings,
     secrets: Vec<String>,
@@ -25,36 +22,48 @@ impl std::fmt::Debug for Instance {
 }
 impl Instance {
     pub(crate) fn start(forgejo: &Forgejo, scratch: &Path, settings: &Settings) -> Result<Self, Failure> {
-        let scratch = prepare(scratch)?;
-        let port = TcpListener::bind(("127.0.0.1", 0))?.local_addr()?.port();
+        let work = forgejo.work_path(scratch, settings)?;
+        let scratch = work.scratch().to_owned();
+        let port = work.port;
         let mut instance = Self {
             child: None,
+            work,
             port,
             scratch,
-            admin: Account { login: "fixture".into(), id: 0, token: Token::new(String::new()), password: random()? },
+            admin: Account {
+                login: "fixture".into(),
+                id: 0,
+                token: Token::new(String::new()),
+                password: crate::cli::random()?,
+            },
             settings: settings.clone(),
             secrets: Vec::new(),
         };
-        let secret = random()?;
-        let internal = random()?;
-        instance.secrets.extend([instance.admin.password.clone(), secret.clone(), internal.clone()]);
-        fs::create_dir(instance.scratch.join("home"))?;
-        fs::set_permissions(instance.scratch.join("home"), fs::Permissions::from_mode(0o700))?;
-        fs::write(instance.scratch.join("gitconfig"), b"")?;
-        fs::write(
-            instance.scratch.join("app.ini"),
-            ini(&instance.scratch, port, settings, &run_user()?, &secret, &internal),
+        instance.secrets.extend(instance.work.secrets.clone());
+        instance.secrets.push(instance.admin.password.clone());
+        instance.work.checked(&["migrate"], "migrate", &instance.secrets)?;
+        instance.work.checked(
+            &[
+                "admin",
+                "user",
+                "create",
+                "--username",
+                "fixture",
+                "--password",
+                &instance.admin.password,
+                "--email",
+                "fixture@example.invalid",
+                "--admin",
+                "--must-change-password=false",
+            ],
+            "admin",
+            &instance.secrets,
         )?;
-        instance.run(instance.command(forgejo).arg("migrate"), "migrate")?;
-        let mut create = instance.command(forgejo);
-        create.args(["admin", "user", "create", "--username", "fixture"]);
-        create.args(["--password", &instance.admin.password, "--email", "fixture@example.invalid"]);
-        create.args(["--admin", "--must-change-password=false"]);
-        instance.run(&mut create, "admin")?;
         let log = File::create(instance.scratch.join("server.log"))?;
         instance.child = Some(
             instance
-                .command(forgejo)
+                .work
+                .command()
                 .arg("web")
                 .stdout(log.try_clone()?)
                 .stderr(log)
@@ -81,24 +90,11 @@ impl Instance {
         instance.admin.id = value(&user)?["id"].as_u64().ok_or_else(|| Failure::Io("admin id missing".into()))?;
         Ok(instance)
     }
-    fn command(&self, forgejo: &Forgejo) -> Command {
-        let mut cmd = Command::new(forgejo.binary());
-        environment(&mut cmd, &self.scratch);
-        cmd.current_dir(&self.scratch)
-            .arg("--work-path")
-            .arg(&self.scratch)
-            .arg("--config")
-            .arg(self.scratch.join("app.ini"));
-        cmd
-    }
-    fn run(&self, cmd: &mut Command, step: &'static str) -> Result<(), Failure> {
-        let output = cmd.output().map_err(|e| Failure::Spawn { step, error: e.to_string() })?;
-        if !output.status.success() {
-            let status = output.status.to_string();
-            let log_tail = self.mask(&String::from_utf8_lossy(&output.stderr));
-            return Err(Failure::Exited { step, status, log_tail });
-        }
-        Ok(())
+    /// Runs Forgejo's command line on the running instance's work path.
+    /// # Errors
+    /// Returns a spawn failure.
+    pub fn cli(&self, args: &[&str]) -> Result<crate::Output, Failure> {
+        self.work.run(args)
     }
     fn log_tail(&self) -> String {
         let bytes = fs::read(self.scratch.join("server.log")).unwrap_or_default();
@@ -113,7 +109,10 @@ impl Instance {
         }
         text
     }
-    fn token(&mut self, login: &str, password: &str) -> Result<Token, Failure> {
+    /// Creates a token through the user's Basic-authenticated token route.
+    /// # Errors
+    /// Returns a masked provisioning or exchange failure.
+    pub fn token(&mut self, login: &str, password: &str) -> Result<Token, Failure> {
         let target = format!("/api/v1/users/{login}/tokens");
         let auth = format!("Basic {}", http::basic(&format!("{login}:{password}")));
         self.secrets.push(auth.clone());
@@ -158,7 +157,7 @@ impl Instance {
     /// # Errors
     /// Returns the API failure without any credential in its diagnostic.
     pub fn create_user(&mut self, login: &str) -> Result<Account, Failure> {
-        let password = random()?;
+        let password = crate::cli::random()?;
         self.secrets.push(password.clone());
         let body = json!({"username": login, "password": password, "email": format!("{login}@example.invalid"), "must_change_password": false}).to_string();
         let response =
@@ -225,38 +224,6 @@ impl Drop for Instance {
 }
 fn value(response: &Exchange) -> Result<Value, Failure> {
     serde_json::from_slice(&response.body).map_err(|_| Failure::Io("malformed provisioning JSON".into()))
-}
-fn random() -> Result<String, Failure> {
-    let mut bytes = [0; 32];
-    File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-    let mut hex = String::new();
-    for byte in bytes {
-        write!(hex, "{byte:02x}").expect("string write");
-    }
-    Ok(hex)
-}
-fn run_user() -> Result<String, Failure> {
-    let uid = fs::metadata("/proc/self")?.uid().to_string();
-    let passwd = fs::read_to_string("/etc/passwd")?;
-    let user = passwd.lines().find(|line| line.split(':').nth(2) == Some(uid.as_str()));
-    let missing = || Failure::Io("process uid is absent from /etc/passwd".into());
-    user.and_then(|line| line.split(':').next()).map(str::to_owned).ok_or_else(missing)
-}
-fn prepare(path: &Path) -> Result<PathBuf, Failure> {
-    let refuse = |why: &str| Failure::Scratch { path: path.into(), why: why.into() };
-    let absolute = std::path::absolute(path)?;
-    if absolute.starts_with("/tmp") {
-        return Err(refuse("scratch is under /tmp"));
-    }
-    fs::create_dir_all(&absolute)?;
-    let absolute = fs::canonicalize(absolute)?;
-    if absolute.starts_with("/tmp") {
-        return Err(refuse("scratch resolves under /tmp"));
-    }
-    if fs::read_dir(&absolute)?.next().is_some() {
-        return Err(refuse("scratch is not empty"));
-    }
-    Ok(absolute)
 }
 pub(crate) fn ini(scratch: &Path, port: u16, settings: &Settings, user: &str, secret: &str, internal: &str) -> String {
     let path = scratch.display();

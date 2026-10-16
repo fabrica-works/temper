@@ -41,3 +41,5 @@ ring against a fresh fixture. It replaces only the `component-` facts in
 Checks and Job through the component; without it those two facts are unchecked.
 Start requests are counted separately from logical calls. Every call's cost
 is compared with the HTTP request lines counted from socket sends.
+
+The `cli-` facts check migration, users, scoped tokens and dumps through Forgejo’s command line, on a fresh work path and the running fixture. They record only outcomes, never command output or credentials.

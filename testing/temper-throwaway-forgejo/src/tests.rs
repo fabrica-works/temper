@@ -36,3 +36,9 @@ fn a_range_is_sent_as_a_head_or_a_suffix() {
         assert!(sent.contains(line), "{range:?}: {sent}");
     }
 }
+
+#[test]
+fn an_output_shows_its_lengths_and_no_text() {
+    let output = crate::Output { code: Some(0), stdout: "secret-token\n".into(), stderr: String::new() };
+    assert_eq!(format!("{output:?}"), "Output { code: Some(0), stdout_bytes: 13, stderr_bytes: 0 }");
+}

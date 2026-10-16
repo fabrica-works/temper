@@ -112,3 +112,27 @@ fn a_sent_request_is_counted_by_its_request_line() {
         assert_eq!(crate::component::hosted::sent_requests(bytes), expected, "{name}");
     }
 }
+
+#[test]
+fn a_password_is_read_between_its_first_and_last_quote() {
+    for (text, expected) in [
+        ("generated random password is 'a'b'\nnext", Some("a'b")),
+        ("no quotes", None),
+        ("one'", None),
+        ("''", Some("")),
+    ] {
+        assert_eq!(crate::cli::password_of(text), expected, "{text}");
+    }
+}
+#[test]
+fn a_raw_token_is_forty_lowercase_digits_and_a_line_feed() {
+    for (text, expected) in [
+        ("0123456789abcdef0123456789abcdef01234567\n", Some("0123456789abcdef0123456789abcdef01234567")),
+        ("0123456789abcdef0123456789abcdef01234567", None),
+        ("0123456789abcdef0123456789abcdef0123456\n", None),
+        ("0123456789ABCDEF0123456789abcdef01234567\n", None),
+        ("0123456789abcdef0123456789abcdef01234567\n\n", None),
+    ] {
+        assert_eq!(crate::cli::raw_token(text), expected, "{text:?}");
+    }
+}

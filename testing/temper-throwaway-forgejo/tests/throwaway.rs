@@ -44,3 +44,58 @@ fn a_throwaway_forgejo_starts_serves_its_admin_and_is_removed() {
     instance.stop().expect("stopped");
     assert!(!scratch.exists(), "the scratch directory is removed");
 }
+
+/// A pinned Forgejo version followed by the supplied command body.
+fn forgejo_running(root: &Path, body: &str) -> Forgejo {
+    fs::create_dir_all(root).expect("root");
+    let binary = root.join("forgejo");
+    fs::write(
+        &binary,
+        format!("#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'forgejo version {VERSION}'; exit 0; fi\n{body}\n"),
+    )
+    .expect("script");
+    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).expect("executable");
+    Forgejo::from_path(&binary).expect("version accepted")
+}
+#[test]
+fn a_work_path_runs_commands_in_the_scratch_with_its_environment() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("work-path-run");
+    let forgejo = forgejo_running(&root, "pwd; echo \"$HOME $PATH $TZ\"; echo \"$@\"");
+    let work = forgejo.work_path(&root.join("work"), &Settings::small()).expect("prepared");
+    let output = work.run(&["admin", "user", "list"]).expect("ran");
+    let w = work.scratch().display();
+    assert_eq!(
+        output.stdout,
+        format!("{w}\n{w}/home /usr/bin:/bin Asia/Kolkata\n--work-path {w} --config {w}/app.ini admin user list\n")
+    );
+    assert!(work.scratch().join("tmp").is_dir());
+    fs::remove_dir_all(root).expect("removed");
+}
+#[test]
+fn a_failed_work_path_command_keeps_its_exit_code_and_both_streams() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("work-path-fail");
+    let forgejo = forgejo_running(&root, "echo output; echo diagnostic >&2; exit 7");
+    let work = forgejo.work_path(&root.join("work"), &Settings::small()).expect("prepared");
+    let output = work.run(&["migrate"]).expect("ran");
+    assert_eq!(output.code, Some(7));
+    assert_eq!(output.stdout, "output\n");
+    assert_eq!(output.stderr, "diagnostic\n");
+    fs::remove_dir_all(root).expect("removed");
+}
+#[test]
+fn a_work_path_is_refused_when_its_scratch_is_not_empty() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("work-path-occupied");
+    let forgejo = forgejo_running(&root, "exit 0");
+    let work = root.join("work");
+    fs::create_dir_all(&work).expect("work");
+    fs::write(work.join("keep"), b"kept").expect("file");
+    match forgejo.work_path(&work, &Settings::small()) {
+        Err(Failure::Scratch { path, why }) => {
+            assert_eq!(path, work);
+            assert_eq!(why, "scratch is not empty");
+        }
+        other => panic!("expected scratch refusal, got success: {}", other.is_ok()),
+    }
+    assert_eq!(fs::read(work.join("keep")).expect("retained"), b"kept");
+    fs::remove_dir_all(root).expect("removed");
+}

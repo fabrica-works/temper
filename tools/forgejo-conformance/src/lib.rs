@@ -1,5 +1,6 @@
 //! Records format-faithful exchanges against an isolated Forgejo (forge.md, 10).
 mod cases;
+mod cli;
 pub mod component;
 pub mod facts;
 mod fixture;
@@ -16,7 +17,7 @@ fn failure(error: &temper_throwaway_forgejo::Failure) -> Box<dyn Error> {
 /// Returns a refused binary, provisioning, exchange or secret-scan failure.
 pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     let forgejo = Forgejo::from_env().map_err(|e| format!("{e:?}"))?;
-    let fixture = fixture::Fixture::new(&forgejo, scratch)?;
+    let mut fixture = fixture::Fixture::new(&forgejo, scratch)?;
     let mut mask = mask::Mask::new(fixture.instance.port());
     let mut secrets = write::Secrets::from_instance(&fixture.instance);
     cases::record(&fixture, out, &mut mask, &secrets)?;
@@ -25,6 +26,7 @@ pub fn run(scratch: &Path, out: &Path) -> Result<()> {
     facts.extend(actions);
     cases::flags(&fixture, out, &mut mask, &secrets)?;
     facts.extend(facts::flags(out)?);
+    facts.extend(cli::facts(&forgejo, &mut fixture, &mut secrets)?);
     facts.push(facts::Fact {
         name: "webhook-deliveries",
         outcome: facts::Outcome::Unchecked("webhooks are built after standalone".into()),
