@@ -385,6 +385,26 @@ per session are in each file.
   an assertion names it, as a `const` at the test file's top or in the
   crate's fixtures module (as `tests/core/src/fixtures.rs:2-3` does);
   counts and expected values stay literals; base tests stay as they are.
+  A bit set or mask a new test passes is a `const` built from named bits
+  (`const ESCALATION: authority::Proposals = authority::Proposals(16);`,
+  then `Proposals(BATCH.0 | ESCALATION.0)`), never a bare number such as
+  `Proposals(17)`; `Proposals(0)` stays a literal; production types gain
+  no constants for it (the steer of 2026-10-16T15:30Z).
+- **A test's helpers once** (the steer of 2026-10-16T15:30Z): before a
+  helper goes into a test file, the session searches the crate's
+  fixtures module (`src/tests/fixtures.rs`, or a world's
+  `src/fixtures.rs`), its `tests.rs` and the world's `src/` for what the
+  helper sends or builds, not only for its name (`rg -n 'people::Event::Ask
+  \{' tests/core/src` finds `World::decide_proposal`). A helper a second
+  test file needs goes into the fixtures module, `pub`, and every new
+  user takes it. Base tests keep their own helpers. The first jig
+  increment that adds a test under `tests/core/tests/` moves `ask_holder`
+  (`tests/core/tests/fields.rs:63-70`, a copy of `ask_as` in
+  `refusals.rs:12-19` and `stories.rs:19-26`) into
+  `tests/core/src/fixtures.rs` as `pub fn ask_as`, uses it in
+  `fields.rs`, and uses `World::decide_proposal` where `fields.rs:178-188`
+  ask the same, keeping every assertion, its lines listed outside its
+  Files.
 - **Test time** (findings/measurements.md):
   - jig: focused median 10.33 s, fuzzy 14.91 s. The run may add, as
     aims, at most 3.0 s to the focused suite (to about 13.3 s of its
@@ -420,6 +440,12 @@ per session are in each file.
   lands through in the gaps between a land's prebuild and its gate, and
   between its tries. Until `land` holds its repository's lock from its
   rebase to its push.
+  The lock is taken only as that one command, which frees it when `land`
+  exits: no shell (`flock … bash`) and no other command runs under it.
+  Validation, the memory literal's run (ruling 110) and the focused
+  tests run before it, on the session's own rebase; when `land` stops on
+  the memory literal, `over` is set from its gate log outside the lock,
+  and `flock … land …` runs again (the steer of 2026-10-16T15:30Z).
 - **Shared files,** which parallel sessions may both change: jig's
   workspace `Cargo.toml` and `Cargo.lock` (jig 01, 10, 11, 12, 16, 17,
   19); `tests/boundary/src/tests/graph.rs` (jig 01, 10 to 13, 16, 17,

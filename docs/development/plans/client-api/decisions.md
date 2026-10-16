@@ -566,6 +566,9 @@ choice would have been the user's (development.md, 10.4).
      1. **Section 10 takes 09.1's form.** It had the template's form since jig `0ec80c047`, but not a verdict choice's `followups` and `fields`, which `tasks::Verdict` holds and 09.1 reads; it now reads `{"verdict": {"choices": [{"code": c, "words": n, "followups": n, "fields": [{"name": s, "max": n}]}]}}`, writes jig's goal beside its chat, and says "jig's defaults are written, never implied: the `templates` member holds each template the engine has, jig's among them, and an application drops one of jig's by leaving it out (3.1)".
      2. Nothing in 09.1 changes; nothing is deferred.
 
+144. **The land lock as one command; a test's helpers once; bit sets named** (steer of 2026-10-16T15:30Z, from the check of 2026-10-16T15:08:55Z).
+     The check of 2026-10-16T15:08:55Z's three findings become README rules, "Rules of this plan": "One land at a time in each repository" gains that the lock is taken only as the one `flock … land …` command, with no shell or other command under it, and validation before it; "Named numbers in tests" gains bit sets and masks as `const`s built from named bits; and a new rule, "A test's helpers once", has a session search the fixtures, `tests.rs` and the world's `src/` for what a helper sends or builds before writing one, with the first jig increment that adds a test under `tests/core/tests/` moving `ask_holder` (`tests/core/tests/fields.rs:63-70`) into `tests/core/src/fixtures.rs` as `pub fn ask_as`. Checked: `git -C jig grep -n 'fn ask_as\|fn ask_holder' origin/main -- tests/core/tests` printed `fields.rs:63`, `refusals.rs:12`, `stories.rs:19`; `pub fn decide_proposal` is `tests/core/src/effects.rs:472`; `rules.rs:165` documents bits 1, 2, 4, 8 and 16 as Batch, Effect, Widen, Amend and Escalation.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
