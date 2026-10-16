@@ -190,6 +190,50 @@
      the 800-line file rule, which no file of 02.1 meets (the largest it
      grows, `document.rs`, has 340 lines at the base).
 
+104. **The print's room: skein-00.s1 and temper-01.s1** (design question, temper 01's block of 2026-10-16T14:11:10Z).
+     The designer's answer, skein `054c06e1` and temper `551b1d2d`; the two supplement steps are skein-00.s1 and temper-01.s1:
+
+
+     Skein's, not a cap (skein `054c06e1`, temper `551b1d2d`): temper's view
+     limits stay, and skein's text shell stops reserving their worst case.
+     `ui-text.md`, 3: "`worst_case` is what the host counts in its memory
+     [...], never what the shell reserves [...] Each print's bytes are
+     reserved as it is made, by `worst_case`'s formula over that tree
+     alone"; past a u32 the page prints `NAME: page too long to print`; 4:
+     the output in pieces of 64 KiB, or the longest line with a node's text
+     and 64 bytes. temper's `client.md`, 5.4: "a lower cap would be a guess,
+     which skein-ui's builder turns into a panic on the page past it"; 10: a
+     unit test makes the terminal from `limits::native()`'s limits.
+
+     forgejo-17 lands it in two supplement steps (your names; the skein
+     one's `Step:` starts `skein-`, which client-api's floor query greps):
+     1. **The skein step**, needing nothing: `ui-text.md`, 3, 4 and 8, in
+        `crates/skein-ui-text/src/render.rs` (`Print::new` reserves no text;
+        `render` reserves by the tree's own room) and `terminal.rs`
+        (`Terminal::new`'s room, not `worst_case`'s; a print's rest waits as
+        the print and an offset). API unchanged: `Print.text: List<u8>`,
+        `worst_case`'s `(u32, u64)`, both constructors. Proof: skein's gate,
+        by `land`. Don't: name a downstream repository. Size: at most 80
+        production lines.
+     2. **temper-01.s1**, after it: first `heavy cargo update -p skein-lib
+        --precise <its landing>`, `Cargo.lock` alone, none when temper's
+        skein pin already holds it (`merge-base --is-ancestor`); then the
+        unit test `the_native_limits_make_the_terminal`
+        (`crates/temper-client-shell-terminal/src/tests.rs`): `Loop::new`
+        with `limits::view(&limits::native())`'s tree limits returns, its
+        `worst_case()` `Some`. No other temper code. Proof: the full
+        `scripts/proof-one-process.sh` on v17, `6 tests run: 6 passed`,
+        ending ruling 101. For this step only, it replaces decisions.md 12
+        and "This plan changes no dependency": a `Cargo.lock` conflict takes
+        `origin/main`'s and moves again (development.md, 5.7).
+
+     client-api never moves temper's skein back (README, "Pins", "The
+     print's room": each move "goes to the later of its target and the
+     floor"); its 03.1 needs the skein step and keeps the test on
+     `Terminal::new`, its only check under its ruling 111. Its run reads
+     this in its files alone: a one-line push to the user naming temper
+     `551b1d2d` reaches its supervisor sooner. Unchanged: "Done when", 9.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`

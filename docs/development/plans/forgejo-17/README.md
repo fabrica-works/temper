@@ -46,6 +46,8 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/03-fake-jobs.md` | temper 03: the fake forge's jobs with steps, their logs by step, suffix ranges | temper 02.1 (the job document, `Request::Job`, `JobLog`'s step) | 03.2's Proof: 03.1 |
 | `temper/04-job-read.md` | temper 04: `Read::Job` answers the failed step and its log's end | temper 02.1, temper 03.1 (the fake serves a job's steps) | 04.2: temper 03.2 (the fake's suffix ranges) |
 | `temper/05-brief.md` | temper 05: the repair's brief names the failed step and its log's end | temper 04.1 (the answer names the step) | |
+| `skein/00-s1-print-room.md` | skein-00.s1 (ruling 104): skein's print takes its room from its own tree | nothing | |
+| `temper/01-s1-print-room.md` | temper-01.s1 (ruling 104): temper's skein moved onto it; the full process tier | skein-00.s1 | |
 
 5 sessions, 9 increments; the increments per session are in each file.
 
@@ -87,7 +89,8 @@ it, and 02.2 (the comparisons' flags) lands after it.
   `crates/temper-protocol-store/schema/` takes `origin/main`'s file and
   applies this increment's change to it, then regenerates (the store's
   drift test, `findings/answer.md`, 2). This plan changes no
-  dependency: a conflict in `Cargo.lock` takes `origin/main`'s.
+  dependency but temper-01.s1's skein move (ruling 104): a conflict in
+  `Cargo.lock` takes `origin/main`'s, and temper-01.s1 moves again.
 - **The process tier runs where a Proof line or "Done when" says,**
   through `heavy --gate`, once; never in the gate.
 - **The suites' aims for the whole run** (development.md, 5.6): the
@@ -121,8 +124,10 @@ is called.
 
 ## Repin
 
-None: temper is the last repository of the workspace's order, and the
-plan changes no other (decisions.md, 12).
+None: temper is the last repository of the workspace's order. The plan
+changes skein in one step, skein-00.s1, and temper takes it in
+temper-01.s1's `Cargo.lock` alone (ruling 104); it changes no other
+(decisions.md, 12).
 
 ## Pulse
 
