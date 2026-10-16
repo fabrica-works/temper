@@ -140,11 +140,17 @@ highest layer that runs it.
   (`tests/engine/forge/client/src/world.rs:439-451`,
   `tests/engine/domain/src/forge_stand.rs:96-119`,
   `tests/system/src/forge.rs:339-417`, and the same at
-  `tests/engine/domain/tests/forge_routes.rs:438,524` and
-  `tests/conformance/src/systems.rs:164,311`). So `:111-113` sends `Read::Job {
+  `tests/engine/domain/tests/forge_routes.rs:438,524`,
+  `tests/conformance/src/systems.rs:164,311`, and
+  `tests/engine/forge/src/world.rs:506,520`, which compiles the same
+  `translate.rs` through `#[path]`, `lib.rs:4-5`). So `:111-113` sends `Read::Job {
   job: attempt.job }`, and a new arm of `answer` (`:188`) for
   `forge::Answer::Job { steps, .. }` passes the log of the step numbered
-  `WORKFLOW_STEP` to `byte_answer` (`:498-509`), which stays as it is:
+  `WORKFLOW_STEP` to `byte_answer` (`:498-509`): the arm is
+  `byte_answer(asked, workflow_log(&steps))`, with `fn workflow_log(steps:
+  &[forge::Step]) -> &[u8]`, a loop (the workspace forbids closures),
+  beside `byte_answer`, since `answer` is 92 of clippy's 100
+  `too_many_lines` at the base. `byte_answer` stays as it is:
   the last `max_bytes` bytes, `truncated` when the slice is longer. It
   answers today's `client::Answer::Job { attempt, log, truncated }`.
   That slice is today's log byte for byte, so the briefs of
@@ -172,8 +178,10 @@ highest layer that runs it.
   `Request::Raw` and `Request::JobLog` alike (`response.rs:135,334-345`),
   so an empty file read with `bytes=0-N` answers `200` with nothing, as
   v17's `ServeContent` does. No test at the base relies on the `416`:
-  `grep -rn 416 --include=*.rs crates tests testing tools` names only
-  the fake's own row with a non-empty body (`src/tests/response.rs:135`).
+  `grep -rnw 416 --include=*.rs crates tests testing tools` names the
+  fake's own row with a non-empty body (`src/tests/response.rs:135`),
+  the code (`response.rs:450`) and an unrelated number
+  (`tests/engine/domain/src/escalation.rs:296`).
 - **Faults reach the new reads unchanged.** `Read::Job` and `Read::Log`
   are domain calls like any other read. The domain's rate, unavailable,
   timeout and late draws reach them, and so do the protocol's reset, drop
@@ -261,18 +269,27 @@ Files:
 - `testing/temper-fake-forge-domain/src/tests/actions.rs` (the new tests,
   and `:72-111` rewritten) and `src/tests/next.rs` (`:163` rewritten,
   `:166-190` removed).
-- `testing/temper-fake-forge-protocol/src/`:
+- `testing/temper-fake-forge-protocol/src/` (its line numbers are
+  origin/main's before 02.1, 3ed817888; 02.1 added one line at each of
+  `response.rs:110`, `:158`, `:206`, `routes.rs:98`, `:217`, `:319`,
+  `answers.rs:212`, `:275`, `:438`, `server.rs:506`, `tally.rs:32`,
+  `:75`, so a line past one of them is that many lines on):
   - `routes.rs`: `:2`, the `Limits` import goes; `op` loses `limits`
     (`:142`); the arms `:215-217`, and `Request::Job` in `op`;
   - `answers.rs:296-394`: `a::Answer::Job`, and `step`;
   - `response.rs`: `Answer::Job { .. }` joins the lists at `:30-60`,
     `:292-319`, `:346-376` and `:390-422`, and gets an arm in
-    `bounded::answer` (`:599-692`);
+    `bounded::answer` (`:593`), which is 100 of clippy's 100
+    `too_many_lines` lines: the job is priced in a new
+    `Budget::steps(&[a::Step])` (row 0, then one row per step's name)
+    beside `files` (`:585`), and the `Runs` and `Jobs` arms
+    (`:646-655`) fold into a new `Budget::rows(len)` to make room;
   - `server.rs:447`, `routes::op`'s call;
   - `tally.rs`, if 02.1 left it as the assumptions above say it does
     not.
   These files are 02.1's first: it adds `Request::Job` there.
-- `testing/temper-fake-forge-protocol/src/tests/routes.rs` (`:14-107`,
+- `testing/temper-fake-forge-protocol/src/tests/routes.rs` (`:1`, the
+  fixtures' `limits` import goes once `op` loses `limits`; `:14-107`,
   `read_rows`; `routes::op`'s calls at `:113` and `:208`),
   `src/tests/answers.rs` and `src/tests/http.rs`.
 - Shared hotspots: the fake protocol's `src/answers.rs`,
@@ -287,7 +304,11 @@ Files:
     (`:240`) that calls `byte_answer` with the workflow step's log
     ("Choices"). temper 04.1 changes this file next;
   - `tests/fake-forge/tests/memory.rs:285-322`, where `outcome` gains
-    `Answer::Job { .. }`.
+    `Answer::Job { .. }`;
+  - `tests/engine/forge/client/tests/simulation.rs:495-505`
+    (`bounded_job_bytes_translate_to_a_truncated_attempt_log`), which
+    passes `Answer::File` for a `Read::Job`: it passes `Answer::Job`
+    with the workflow step's log, so that it reads the new arm.
 - Run unchanged, as regressions:
   - the domain world's job brief tests
     (`tests/engine/domain/tests/forge_routes.rs:1178-1294`) and the

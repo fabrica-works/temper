@@ -234,6 +234,33 @@
      this in its files alone: a one-line push to the user naming temper
      `551b1d2d` reaches its supervisor sooner. Unchanged: "Done when", 9.
 
+105. **temper 03's Shapes against main** (ready check of temper-03.1).
+     temper/03-fake-jobs.md corrected against origin/main 3ed817888 (a ready
+     check, through heavy: with these corrections, 03.1's types, `op`
+     without `limits`, the domain's reference test and both HTTP tests
+     passed clippy, and 474 tests of the fake forge, the forge worlds, the
+     domain, system, conformance and joint worlds passed, fuzzy 34) and 02.1's
+     landing 1b40922a1:
+     - Files: the fake protocol's `src/tests/routes.rs:1`, whose fixtures'
+       `limits` import goes once `op` loses `limits`; and
+       `tests/engine/forge/client/tests/simulation.rs:495-505`, which passes
+       `Answer::Job` with the workflow step's log in place of `Answer::File`.
+     - translate's arm is `byte_answer(asked, workflow_log(&steps))`, with
+       `fn workflow_log(steps: &[forge::Step]) -> &[u8]`, a loop, beside
+       `byte_answer`: `answer` is 92 of clippy's 100 lines.
+     - `bounded::answer` (`response.rs:593`) is at 100 lines: the job is
+       priced in a new `Budget::steps(&[a::Step])` beside `files`, and the
+       `Runs` and `Jobs` arms fold into a new `Budget::rows(len)`.
+     - translate's callers include `tests/engine/forge/src/world.rs:506,520`
+       (the same file through `#[path]`); the `416` grep prints three lines.
+     - The fake protocol's line numbers are 3ed817888's, before 02.1; the
+       file names 02.1's twelve one-line insertion points.
+     Noted, unchanged: translate's read by job id drops the attempt, so a
+     stale attempt reads the latest attempt's step log where the base
+     answered `MissingJob`; no world test reads a stale attempt, and temper
+     04.1 replaces the arm. A further copy of a corrected name is corrected
+     the same way, and listed in the commit body.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
