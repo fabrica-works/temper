@@ -16,6 +16,7 @@ members = [
     "crates/temper-service",
     "tests/worker/protocol-git",
     "crates/temper-forge-forgejo",
+    "crates/temper-forge-setup",
     "crates/temper-worker-protocol-git",
     "crates/temper-client-protocol-wire",
     "tools/forgejo-conformance",
@@ -52,6 +53,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+temper-forge-setup = { path = "crates/temper-forge-setup" }
 jig-boundary = { git = "https://github.com/forgetic/jig.git" }
 temper-fake-git = { path = "testing/temper-fake-git" }
 temper-fake-forge-protocol = { path = "testing/temper-fake-forge-protocol" }

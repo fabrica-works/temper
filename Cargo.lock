@@ -2133,6 +2133,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-forge-setup"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "skein-json",
+ "skein-lib",
+ "temper-forge-forgejo",
+]
+
+[[package]]
 name = "temper-one-process-world"
 version = "0.0.0"
 dependencies = [

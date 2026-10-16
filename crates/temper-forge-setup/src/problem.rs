@@ -1,0 +1,112 @@
+//! Bounded configuration problems; no input values enter diagnostic text.
+use alloc::boxed::Box;
+use jig_protocol_config::{self as config, Path};
+use skein_lib::{Decimal, List, Writer};
+/// A refusal's words, or another limit with which it must agree.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum What {
+    Reason(&'static [u8]),
+    Against(&'static [u8]),
+}
+/// The opaque, bounded collection returned by the checks.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Problems {
+    entries: List<(Path, What)>,
+    past: u32,
+}
+impl Problems {
+    #[must_use]
+    pub fn empty() -> Self {
+        Self { entries: List::with_capacity(config::PROBLEMS), past: 0 }
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty() && self.past == 0
+    }
+    pub(crate) fn push(&mut self, path: Path, what: What) {
+        if self.entries.push((path, what)).is_err() {
+            self.past = self.past.saturating_add(1);
+        }
+    }
+    pub(crate) fn append(&mut self, found: config::Problems) {
+        for p in &found.problems {
+            let words = match p.what {
+                config::What::Unknown => b"unknown member".as_slice(),
+                config::What::Missing => b"missing",
+                config::What::Duplicate => b"duplicate",
+                config::What::Kind => b"wrong value kind",
+                config::What::Bound => b"past its bound",
+                config::What::Unique => b"must be unique",
+                config::What::Refers => b"unknown reference",
+                config::What::Json
+                | config::What::Form
+                | config::What::Plaintext
+                | config::What::Digest
+                | config::What::HandedIn
+                | config::What::Reserve { .. }
+                | config::What::Budget { .. }
+                | config::What::Accounts { .. }
+                | config::What::Grace { .. }
+                | config::What::Message
+                | config::What::Silence
+                | config::What::StopBound
+                | config::What::Memory { .. }
+                | config::What::Override
+                | config::What::Unreadable => b"invalid form",
+            };
+            self.push(p.path.clone(), What::Reason(words));
+        }
+        self.past = self.past.saturating_add(found.past);
+    }
+}
+fn put(w: &mut Writer, n: &mut usize, measure: bool, b: &[u8]) {
+    *n = n.checked_add(b.len()).expect("bounded diagnostics");
+    if !measure {
+        w.put(b).expect("measured text");
+    }
+}
+fn render(ps: &Problems, w: &mut Writer, measure: bool) -> usize {
+    let mut n = 0;
+    for (path, what) in &ps.entries {
+        let mut member = false;
+        for segment in &path.segments {
+            match segment {
+                config::Segment::Member(name) => {
+                    if member {
+                        put(w, &mut n, measure, b".");
+                    }
+                    put(w, &mut n, measure, name);
+                    member = true;
+                }
+                config::Segment::Index(i) => {
+                    put(w, &mut n, measure, b"[");
+                    put(w, &mut n, measure, Decimal::of(u64::from(*i)).as_bytes());
+                    put(w, &mut n, measure, b"]");
+                }
+            }
+        }
+        put(w, &mut n, measure, b": ");
+        match what {
+            What::Reason(words) => put(w, &mut n, measure, words),
+            What::Against(other) => {
+                put(w, &mut n, measure, b"must agree with application.limits.overrides.");
+                put(w, &mut n, measure, other);
+            }
+        }
+        put(w, &mut n, measure, b"\n");
+    }
+    if ps.past > 0 {
+        put(w, &mut n, measure, b"and ");
+        put(w, &mut n, measure, Decimal::of(u64::from(ps.past)).as_bytes());
+        put(w, &mut n, measure, b" more\n");
+    }
+    n
+}
+/// A line per problem, each beginning with its document path.
+#[must_use]
+pub fn lines(problems: &Problems) -> Box<[u8]> {
+    let n = render(problems, &mut Writer::new(0), true);
+    let mut w = Writer::new(n);
+    assert_eq!(render(problems, &mut w, false), n, "same measure");
+    w.finish()
+}
