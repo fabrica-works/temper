@@ -541,10 +541,13 @@ bodies); add a second job type; change the workflow at
 `runner.rs:60`, whose jobs the transcripts' literals rest on; capture a
 log's search (`q`, `qi`) or its NDJSON form.
 
-Size: at most 290 lines (documents 45, the decoder 50, the server 30, the
-request and the encoder 10, the exhaustive arms 50, the recorder 15, the
-conformance 90). The step rows (design question 6) and the empty name
-(question 1) move lines between these parts; the total stays.
+Size: at most 370 lines (ruling 103; the plan said 290: documents 45,
+the decoder 50, the server 30, the request and the encoder 10, the
+exhaustive arms 50, the recorder 15, the conformance 90). The parts are
+a guide; the conformance came to about 110 once rustfmt laid out its
+captures and checks. The total is the rule, counted by
+code-organization.md, section 6's command, once before landing, less
+the three doc comment lines steer 1 corrects.
 
 Removes: the recorder's `Option<(u64, u64)>`.
 

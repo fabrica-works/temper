@@ -177,6 +177,19 @@
      A further copy of a corrected name is corrected the same way, and listed
      in the commit body.
 
+103. **02.1's Size at most 370 lines** (plan defect, temper 02's block of 2026-10-16T14:44:58Z).
+     02.1's Size is at most 370 lines, not 290, with no change of scope and
+     no split. `temper/02-documents.md` said "Size: at most 290 lines
+     (documents 45, the decoder 50, the server 30, the request and the
+     encoder 10, the exhaustive arms 50, the recorder 15, the conformance
+     90)"; the parts are a guide, and the total is the rule. It is counted
+     once before landing by code-organization.md, section 6's command, less
+     the three doc comment lines steer 1 corrects; the landing report gives
+     the number. Past 370, block again with the count by file. Unchanged:
+     02.1's Files, Shape, Don't and Proof; 02.2's Size, at most 70 lines;
+     the 800-line file rule, which no file of 02.1 meets (the largest it
+     grows, `document.rs`, has 340 lines at the base).
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`
