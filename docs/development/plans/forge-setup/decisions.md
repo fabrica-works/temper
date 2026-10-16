@@ -170,6 +170,25 @@ run are appended after "For the user".
      - For the retrospective: with Sizes at most about 300 and increments landing at about twice them (development.md,
        5.2), a tolerance of twice stops about half of them; this plan's two size blocks came in its first 11 minutes.
 
+103. **04.1's deletion by forge.md 5; cancelled, interim** (design gap and plan question, temper 04's block of 2026-10-16T22:13:42Z).
+     Ruling 103, interim on question 1, final on question 3 of temper/04-deliveries.md, "Questions to raise when
+     reached".
+
+     - **Question 3, the branch deletion: a plan question, answered by the design.** forge.md 5's table, row `push`:
+       "of a branch, `Change::BranchMoved { branch, head, actor }`, … ; of a branch deleted, `Change::Branch(branch)`".
+       So, as question 3 says, 04.2's document gains `Delivery::deleted()` (a push whose `after` is all zero), and the
+       deleted branch's hint comes from that push. 05.2's Shape already reads it so (05-webhooks.md:168-169: "`Push`,
+       `BranchMoved { … }`, or `Branch(branch)` when `after` is all zero"). `branch-deletion-sends-no-push` failing is
+       allowed: 04's "Done when" counts "2, or 3 with branch-deletion-sends-no-push".
+     - **Question 1, the cancelled job's delivery: a design gap, sent to the designer** (`question.md`, 22:14:42Z). Until
+       the answer, go on as question 1 says: "A delivery not had within the Size is left unrecorded (no fact;
+       `SUBSCRIBED` unchanged; the coverage test names it)". No web driver. The answer may change 04.2's coverage test
+       and `SUBSCRIBED`; it reaches you as a later ruling.
+     - **Question 2, the pull-ordering pair:** go on with your investigation. The recording rule holds (README, "The
+       recording tools": once more after each fix aimed at a cause the output names; the third failure with the same
+       symptom is a question). If both facts of the pair still fail then, block with session 04's question 2.
+     - Unchanged: 04.1 lands only with `holds webhook-deliveries` and 04's "Done when" counts.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
