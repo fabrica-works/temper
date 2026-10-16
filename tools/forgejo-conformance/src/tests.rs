@@ -268,3 +268,18 @@ fn a_fresh_password_in_a_body_leaves_its_transcript_masked() {
     assert_eq!(masked, br#"{"password":"0000000000000000000000000000000000000000000000000000000000000001"}"#);
     assert_eq!(write::check("new password", &masked, b"", &secrets), Ok(()));
 }
+
+#[test]
+fn a_provisioning_failure_keeps_at_most_two_hundred_body_bytes() {
+    let exchange = Exchange { sent: Vec::new(), status: 500, head: Vec::new(), body: vec![b'x'; 201] };
+    assert_eq!(
+        crate::fixture::api_answer("/pulls", &exchange).expect_err("HTTP 500").to_string(),
+        concat!(
+            "provisioning /pulls: HTTP 500: ",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        )
+    );
+}

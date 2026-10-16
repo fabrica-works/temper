@@ -101,10 +101,7 @@ impl Fixture {
     pub fn api(&self, method: &str, target: &str, body: &Value) -> Result<Value> {
         let body = body.to_string();
         let response = self.exchange(method, target, Some(body.as_bytes()), Some(&self.owner.token), None)?;
-        if !(200..300).contains(&response.status) {
-            return Err(format!("provisioning {target}: HTTP {}", response.status).into());
-        }
-        if response.body.is_empty() { Ok(Value::Null) } else { crate::json(&response) }
+        api_answer(target, &response)
     }
     pub fn get(&self, target: &str) -> Result<Value> {
         crate::json(&self.exchange("GET", target, None, Some(&self.owner.token), None)?)
@@ -113,7 +110,22 @@ impl Fixture {
         self.api("POST", &format!("{repo}/branches"), &json!({"new_branch_name":name, "old_ref_name":from}))
     }
     pub fn pull(&self, repo: &str, head: &str, base: &str) -> Result<Value> {
-        self.api("POST", &format!("{repo}/pulls"), &json!({"head":head,"base":base,"title":head,"body":"fixture pull"}))
+        let target = format!("{repo}/pulls");
+        let body = json!({"head":head,"base":base,"title":head,"body":"fixture pull"}).to_string();
+        for attempt in 0..=3 {
+            let response = self.exchange("POST", &target, Some(body.as_bytes()), Some(&self.owner.token), None)?;
+            eprintln!(
+                "provisioning {target}, attempt {}: HTTP {}: {}",
+                attempt + 1,
+                response.status,
+                body_preview(&response)
+            );
+            if response.status != 500 || attempt == 3 {
+                return api_answer(&target, &response);
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        unreachable!("the last attempt returns")
     }
     pub fn put(&self, repo: &str, branch: &str, path: &str, content: &str) -> Result<Value> {
         let route = format!("{repo}/contents/{path}");
@@ -137,6 +149,15 @@ impl Fixture {
         }
         Err("pull did not become mergeable".into())
     }
+}
+pub(crate) fn api_answer(target: &str, response: &Exchange) -> Result<Value> {
+    if !(200..300).contains(&response.status) {
+        return Err(format!("provisioning {target}: HTTP {}: {}", response.status, body_preview(response)).into());
+    }
+    if response.body.is_empty() { Ok(Value::Null) } else { crate::json(response) }
+}
+fn body_preview(response: &Exchange) -> String {
+    String::from_utf8_lossy(&response.body[..response.body.len().min(200)]).into_owned()
 }
 pub fn encode(text: &str) -> String {
     use std::fmt::Write;
