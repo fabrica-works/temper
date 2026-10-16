@@ -203,7 +203,7 @@ under; it must be the `number` of one of `engine.charters`. Feeds
   polls (setup.md, section 15).
 
 **`setup`:** the forges' setup, a list of at most one entry per forge,
-`[]` for none. Its members, their bounds and the checks of the forge's
+`[]` for none, and never missing (section 10). Its members, their bounds and the checks of the forge's
 own members against each entry are setup.md, section 8's. `temper serve`
 checks it whole, and acts on none of it: it reads no file that only
 `setup` names.

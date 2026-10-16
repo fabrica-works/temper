@@ -305,6 +305,10 @@ by `state`:
   `create-runner-file` takes its secret only as an argument, so the
   preparation never runs it: it writes the runner's connection itself, in
   the runner's configuration, with its token in a file (13.3).
+- **Its commands run on skein-io's processes,** as the box's children
+  do, in the loop that runs reconcile's HTTP: each spawned with its
+  arguments and the spec's environment, its output read through pipes
+  within a bound, its exit status awaited.
 - **Its commands' output,** kept for a failure's message, is masked of
   every secret it holds, as the throwaway Forgejo masks its own.
 
@@ -332,10 +336,14 @@ by `state`:
   programming-model.md, section 2.1; io.md, section 5). So the lock and
   the exec are std's, `File::try_lock` and `CommandExt::exec`, with no
   `unsafe`, in one module of `temper-forge-setup-shell`, which the
-  preparation's lock uses too. It is the one place temper locks a file
-  or uses `std::process` outside skein: a boundary test fails the gate
-  when either appears in another module. It moves onto skein when skein's
-  shell offers both (section 15).
+  preparation's lock uses too; the preparation's commands are not in
+  it, and run on skein-io (6.3). It is the one place temper locks a file
+  or uses `std::process` outside skein: a boundary test scans the
+  production crates' sources (`crates/*/src`, test files aside) and
+  fails the gate when either appears outside that module, but
+  `std::process::ExitCode` in the binary's `main`. Test crates
+  (`testing/`, `tools/`) are not scanned. It moves onto skein when
+  skein's shell offers both (section 15).
 - **The runner's spec:** its configuration file (its connection,
   capacity, labels, timeouts, its jobs' directory, no cache), its `PATH`
   from the setup. Its jobs run as the user that runs it (section 15).
