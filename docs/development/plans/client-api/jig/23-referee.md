@@ -73,7 +73,7 @@ here changes the engine.
 
 ## Rules that bind it
 
-- **`testing/jig-conformance/src/referee.rs` is 1,108 lines**: each
+- **`testing/jig-conformance/src/referee.rs` is 1,116 lines (jig `e1b483760`)**: each
   increment adds at most 40 lines to it (code-organization.md, 7, `git
   diff --numstat origin/main...HEAD -- <file>`, first column), its rule in
   a new module beside it, as `referee/conversations.rs` and
@@ -109,23 +109,39 @@ Files:
   from its inbound `people::Event::Ask` and `core::Event::NamedAction`
   and its workers' terminals), `tests/conformance/src/lib.rs` (the testing
   application), `tests/ops/src/conformance/observations.rs` (`ops`), each
-  building `Snapshot` with the new field.
+  building `Snapshot` with the new field; `party_proposals` takes the
+  `Pending` rows alone (`Stored::PersonProposal` also holds accepted and
+  rejected ones, `crates/jig-domain-core/src/proposals.rs:150`). The fourth
+  adapter, `tests/one-process/src/referee.rs:144-151`, takes its tasks
+  through `observations::task` and feeds no asks: unchanged, its suite in
+  the Proof.
 - `tests/core/tests/referee.rs` (`proposals_referee_cases()` called by
   `referee_scenario_family`, :712), `tests/core/tests/referee/proposals.rs`
   (new, `#[path]`-included as `tests/core/tests/stories.rs:11` includes
-  `stories/address.rs`).
+  `stories/address.rs`); in `tests/core/tests/referee.rs`, the three
+  existing tests that commit a task proposal nobody asked for (`:462-463`,
+  and `:594` and `:605` through `proposed_batch`, `:575`) each send
+  `Observed::ProposeAsked { proposer: Source::Task(1) }` before their
+  commit.
 Shape:
 - `Observed::ProposeAsked { proposer: Source }` and
   `Observed::ProposeRefused { proposer: Source }` (sketch); `Snapshot`
   gains `party_proposals: BTreeMap<u64, u64>`, each pending party
-  proposal's number and its proposing party.
+  proposal's number and its proposing party. With it `Observed` takes
+  `#[expect(clippy::large_enum_variant, reason = "…")]` (`referee.rs:276`),
+  as `crates/jig-protocol-tools/src/lib.rs:42` does. `Source`
+  (`referee.rs:76`) derives `PartialOrd, Ord`, so that the credits are a
+  `BTreeMap<Source, u32>`.
 - The rule, on each `Observed::Durable`: each proposal number first seen
   in the snapshot (a `Task.proposal`'s, proposer `Source::Task(<that
   task>)`, or a `party_proposals` entry, proposer `Source::Person`)
   consumes one credit of its proposer; none left is
   `Violation { promise: Authority, why: "proposal <n> of <proposer> waits
-  unasked" }`. A task proposal whose proposer's executor is a procedure is
-  counted as asked (Choices). `ProposeAsked` adds a credit,
+  unasked" }`, checked after `durable`'s Lost check (`referee.rs:550-558`),
+  so that `tests/core/tests/referee.rs:417` still passes. A task proposal
+  whose proposer's executor is a procedure, `task.executor.0 == 1` (the
+  code the adapters give a procedure, `tests/core/src/observations.rs:146`),
+  is counted as asked (Choices). `ProposeAsked` adds a credit,
   `ProposeRefused` takes one back. Credits and seen numbers survive
   `Observed::Restart`, as the referee's other evidence does.
 Test shape:
@@ -135,7 +151,8 @@ Test shape:
   `authority_catches_a_proposal_after_its_ask_was_refused`,
   `a_proposal_asked_by_its_party_is_valid`,
   `a_proposal_asked_by_its_run_is_valid`,
-  `a_procedures_proposal_needs_no_observed_ask`. Each under 20 ms.
+  `a_procedures_proposal_needs_no_observed_ask` (its task's `executor:
+  (1, _)`). Each under 20 ms.
   Reference:
 
   ```rust
@@ -152,7 +169,10 @@ jig-conformance-world -E
 once (`tests/conformance/tests/scenarios.rs:10`): each shared story,
 proposals among them, runs on the testing application's real root over
 the real core and store with the rule on, and none is caught; it passes,
-and nothing else is wanted; under 0.5 s. This is the highest layer for a
+and nothing else is wanted; under 0.5 s. Then, once each, under the default and
+fuzzy profiles, `heavy cargo nextest run -p jig-core-world -p
+jig-one-process-world`: every core-world story runs the referee, which
+panics on a violation (`tests/core/src/world.rs:470`), so they pass. This is the highest layer for a
 referee rule: the referee is the conformance world's. The violation tests
 show the rule can fail.
 Don't: read a domain's state in the referee; change the engine, a
@@ -179,7 +199,9 @@ Files:
   inbound asks and named actions; the testing application's adapter also
   from the test connector's durable `ProcedureState` (Choices).
 - The users of `referee::Task`'s literal, edited to the new form:
-  `tests/core/tests/referee.rs:51` (`task`) and the three adapters.
+  `tests/core/tests/referee.rs:51` (`task`) and
+  `tests/core/src/observations.rs:138` (`task`), which the testing
+  application's, `ops`'s and the one-process adapters reuse.
 - `tests/core/tests/referee/revisions.rs` (new), and
   `revisions_referee_cases()` in `tests/core/tests/referee.rs`.
 Shape:
@@ -219,7 +241,8 @@ jig-conformance-world -E
 'test(every_shared_adversarial_story_runs_on_the_testing_application)'`
 once: the shared stories, `RacingDecisions` among them, run with the rule
 on and none is caught. It passes, and nothing else is wanted. Under 0.5 s,
-at the layer and for the reason 23.1 gives.
+at the layer and for the reason 23.1 gives. Then 23.1's `jig-core-world` and
+`jig-one-process-world` runs, once each, under both profiles.
 Don't: count an accepted amendment proposal as unnamed (its proposer
 named the revision when it proposed, and that `Named` is consumed at the
 acceptance); read a task's revisions anywhere but the durable snapshot.
@@ -231,7 +254,9 @@ Removes: nothing.
 `testing/jig-conformance/src/referee.rs`, the additions (compiled at
 jig's base `a3b53546` as a scratch module of `jig-conformance`, under
 `heavy cargo clippy -p jig-conformance --all-targets -- -D warnings`:
-passed). The variants and fields join the existing `Observed`, `Snapshot`
+passed; only `Revision` compiled, the other additions being comments.
+At jig `e1b483760`, with the fields and variants in (ruling 149), the
+`#[expect(clippy::large_enum_variant)]` on `Observed` is needed: passed). The variants and fields join the existing `Observed`, `Snapshot`
 and `Task`.
 
 ```rust
