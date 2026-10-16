@@ -20,6 +20,7 @@ use skein_lib::List;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum WriteKind {
     Issue,
+    NewUser,
     Pull,
     Comment,
     Review,
@@ -36,6 +37,17 @@ const fn field(key: &'static [u8], read: Read, required: bool) -> Field {
 }
 pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
     match kind {
+        WriteKind::NewUser => {
+            const {
+                &[
+                    field(b"username", Read::Text, true),
+                    field(b"email", Read::Text, true),
+                    field(b"password", Read::Text, true),
+                    field(b"full_name", Read::Text, true),
+                    field(b"must_change_password", Read::Boolean, true),
+                ]
+            }
+        }
         WriteKind::Issue => const { &[field(b"title", Read::Text, true), field(b"body", Read::Body, true)] },
         WriteKind::Pull => {
             const {
@@ -72,7 +84,8 @@ pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
 pub(crate) fn element(kind: WriteKind) -> Option<Kind> {
     match kind {
         WriteKind::Logins => Some(Kind::Write(WriteKind::Login)),
-        WriteKind::Issue
+        WriteKind::NewUser
+        | WriteKind::Issue
         | WriteKind::Pull
         | WriteKind::Comment
         | WriteKind::Review
@@ -206,10 +219,10 @@ fn route_tail(
 }
 #[derive(Debug)]
 pub struct BodyDecoder {
-    walk: Walk,
-    request: Request,
-    logins: List<Box<[u8]>>,
-    terminal: bool,
+    pub(super) walk: Walk,
+    pub(super) request: Request,
+    pub(super) logins: List<Box<[u8]>>,
+    pub(super) terminal: bool,
 }
 #[must_use]
 pub fn body_first(_decoder: &BodyDecoder) -> tokenizer::Request {
@@ -251,6 +264,8 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
                     | Request::Update { .. }
                     | Request::PostStatus { .. }
                     | Request::CreateBranch { .. }
+                    | Request::UserOf { .. }
+                    | Request::CreateUser { .. }
                     | Request::DeleteBranch { .. }
                     | Request::RepositoryById { .. }
                     | Request::Repository { .. }
@@ -302,7 +317,11 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
     }
 }
 impl BodyDecoder {
-    fn flag(key: &'static [u8], _value: bool) -> Result<(), Malformed> {
+    fn flag(&mut self, key: &'static [u8], value: bool) -> Result<(), Malformed> {
+        if let Request::CreateUser { must_change_password, .. } = &mut self.request {
+            *must_change_password = value;
+            return Ok(());
+        }
         Err(Malformed::Shape { field: key })
     }
     fn scalar(&mut self, kind: Kind, key: &'static [u8], value: Value) -> Result<(), Malformed> {
@@ -313,7 +332,7 @@ impl BodyDecoder {
                 self.set_id(id.expect("required id"));
                 return Ok(());
             }
-            Value::Boolean(value) => return Self::flag(key, value),
+            Value::Boolean(value) => return self.flag(key, value),
             Value::Number(_) | Value::Time(_) => return Err(Malformed::Shape { field: key }),
         };
         let text = text.expect("text field");
@@ -322,6 +341,13 @@ impl BodyDecoder {
             return Ok(());
         }
         match &mut self.request {
+            Request::CreateUser { login, email, full_name, password, .. } => match key {
+                b"username" => *login = text,
+                b"email" => *email = text,
+                b"full_name" => *full_name = text,
+                b"password" => *password = skein_lib::Secret::new(text),
+                _ => unreachable!("new user fields"),
+            },
             Request::CreateIssue { title, body, .. } => {
                 if key == b"title" {
                     *title = text;
@@ -395,6 +421,7 @@ impl BodyDecoder {
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }
+            | Request::UserOf { .. }
             | Request::DeleteBranch { .. } => unreachable!("body text selection"),
         }
         Ok(())
@@ -440,6 +467,8 @@ impl BodyDecoder {
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }
+            | Request::UserOf { .. }
+            | Request::CreateUser { .. }
             | Request::DeleteBranch { .. } => unreachable!("body id selection"),
         }
     }

@@ -87,3 +87,23 @@ fn a_put_is_refused_by_every_family_of_routes() {
         assert_eq!(server::route(Method::Put, target, &limits).unwrap_err(), Unrouted::Method, "{target:?}");
     }
 }
+
+fn new_user() -> Request {
+    Request::CreateUser {
+        login: Box::from(*b"bot"),
+        email: Box::from(*b"bot@example.invalid"),
+        full_name: Box::from(*b"temper:bot"),
+        password: skein_lib::Secret::new(Box::from(*b"private-password")),
+        must_change_password: false,
+    }
+}
+#[test]
+fn a_requests_debug_shows_a_password_by_its_length_only() {
+    assert!(alloc::fmt::format(format_args!("{:?}", new_user())).contains("Secret { len: 16 }"));
+    assert!(!alloc::fmt::format(format_args!("{:?}", new_user())).contains("private-password"));
+}
+#[test]
+fn a_create_user_body_names_every_member_in_order() {
+    let encoded = client::encode(&new_user(), &fixtures::limits()).expect("user encoding");
+    assert_eq!(encoded.body.as_deref(), Some(br#"{"username":"bot","email":"bot@example.invalid","password":"private-password","full_name":"temper:bot","must_change_password":false}"#.as_slice()));
+}

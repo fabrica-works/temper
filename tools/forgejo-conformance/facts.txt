@@ -164,3 +164,13 @@ holds component-keys-found-on-read-back
 holds component-costs-equal-requests-sent
 holds component-read-pull-for-open-after-closed
 holds component-write-open-pull-no-changes
+holds setup-create-user-answers-201-with-login-email-and-full-name
+holds setup-created-user-is-no-site-admin-and-keeps-its-full-name
+holds setup-create-user-again-is-refused-with-a-message
+holds setup-user-of-a-login-reads-admin-flag-and-full-name
+holds setup-user-of-a-missing-login-is-404
+holds setup-a-non-admin-token-is-refused-the-admin-routes
+holds setup-the-admin-token-reads-user-as-a-site-admin
+holds setup-a-user-made-to-change-its-password-is-refused-the-api-under-basic-auth
+holds setup-a-user-made-to-change-its-password-is-refused-under-its-token-until-the-admin-clears-the-flag
+holds setup-every-recorded-user-carries-is-admin-and-full-name

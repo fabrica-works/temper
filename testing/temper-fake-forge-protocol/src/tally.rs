@@ -1,9 +1,12 @@
 //! Requests counted at their HTTP entrance (forge.md, section 9).
 use skein_lib::Map;
+pub(crate) const ROUTES: u32 = 64;
 use temper_forge_forgejo::request::Request;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Route {
     User,
+    UserOf,
+    CreateUser,
     ApiSettings,
     RepositoryById,
     Repository,
@@ -47,6 +50,8 @@ pub enum Route {
 #[must_use]
 pub fn route(request: &Request) -> Route {
     match request {
+        Request::UserOf { .. } => Route::UserOf,
+        Request::CreateUser { .. } => Route::CreateUser,
         Request::User => Route::User,
         Request::ApiSettings => Route::ApiSettings,
         Request::RepositoryById { .. } => Route::RepositoryById,
@@ -103,7 +108,7 @@ impl Tally {
     pub fn new(users: u32) -> Self {
         Self {
             total: 0,
-            routes: Map::with_capacity(40),
+            routes: Map::with_capacity(ROUTES),
             users: Map::with_capacity(users),
             unrouted: 0,
             unauthorized: 0,
@@ -113,7 +118,7 @@ impl Tally {
         self.total = self.total.saturating_add(1);
         if let Some(route) = route {
             let count = self.routes.get(&route).copied().unwrap_or(0).saturating_add(1);
-            self.routes.insert(route, count).expect("40 routes");
+            self.routes.insert(route, count).expect("route capacity");
         } else {
             self.unrouted = self.unrouted.saturating_add(1);
         }

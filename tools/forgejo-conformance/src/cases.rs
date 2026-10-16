@@ -2,19 +2,49 @@ use crate::{
     Result,
     fixture::{Fixture, R, encode},
     mask::{self, Mask},
-    write::{self, Secrets},
+    write::{self, SecretKind, Secrets},
 };
 use serde_json::json;
 use std::path::Path;
 use temper_throwaway_forgejo::{Exchange, Token};
-struct Recorder<'a> {
-    f: &'a Fixture,
-    out: &'a Path,
-    mask: &'a mut Mask,
-    secrets: &'a Secrets,
+pub(crate) struct Recorder<'a> {
+    pub(crate) f: &'a Fixture,
+    pub(crate) out: &'a Path,
+    pub(crate) mask: &'a mut Mask,
+    pub(crate) secrets: &'a mut Secrets,
+}
+#[derive(Clone, Copy)]
+pub(crate) enum Auth<'a> {
+    Token(&'a Token),
+    Basic(&'a str, &'a str),
 }
 impl Recorder<'_> {
-    fn send(
+    pub(crate) fn send_new(
+        &mut self,
+        name: &str,
+        method: &str,
+        target: &str,
+        body: Option<&str>,
+        auth: Auth<'_>,
+        fresh: &[(SecretKind, &str)],
+    ) -> Result<Exchange> {
+        for (kind, value) in fresh {
+            self.secrets.add(*kind, value);
+        }
+        let exchange = match auth {
+            Auth::Token(token) => self.f.exchange(method, target, body.map(str::as_bytes), Some(token), None)?,
+            Auth::Basic(login, secret) => {
+                self.secrets.add(SecretKind::GitHeader, &crate::fixture::base64(&format!("{login}:{secret}")));
+                self.f.exchange_basic(method, target, body.map(str::as_bytes), login, secret)?
+            }
+        };
+        let request = mask::request(self.mask, &exchange);
+        let response = mask::response(self.mask, &exchange);
+        write::case(self.out, name, &request, &response, self.secrets)?;
+        Ok(exchange)
+    }
+
+    pub(crate) fn send(
         &mut self,
         name: &str,
         method: &str,
@@ -40,7 +70,7 @@ struct Written {
     own_head: String,
     remark: u64,
 }
-pub fn record(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &Secrets) -> Result<()> {
+pub fn record(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) -> Result<()> {
     let mut r = Recorder { f, out, mask, secrets };
     start(&mut r)?;
     let written = writes(&mut r)?;
@@ -292,7 +322,7 @@ fn failures(r: &mut Recorder<'_>, written: &Written) -> Result<()> {
     Ok(())
 }
 
-pub fn flags(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &Secrets) -> Result<()> {
+pub fn flags(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) -> Result<()> {
     let mut r = Recorder { f, out, mask, secrets };
     for (name, before, after, flags) in [
         ("compare-verification-false", &f.main, &f.head, "verification=false"),

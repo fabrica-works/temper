@@ -259,3 +259,12 @@ fn the_pull_pair_records_any_checking_probe_that_settles() {
         assert_eq!(crate::deliveries::pull_pair(&reads, settled), expected, "{reads:?}, settled={settled}");
     }
 }
+#[test]
+fn a_fresh_password_in_a_body_leaves_its_transcript_masked() {
+    let password = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    let secrets = Secrets::of(&[(SecretKind::Password, password)]);
+    let body = format!("{{\"password\":\"{password}\"}}");
+    let masked = Mask::new(3000).bytes(body.as_bytes());
+    assert_eq!(masked, br#"{"password":"0000000000000000000000000000000000000000000000000000000000000001"}"#);
+    assert_eq!(write::check("new password", &masked, b"", &secrets), Ok(()));
+}

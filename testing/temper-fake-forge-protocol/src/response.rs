@@ -63,6 +63,7 @@ fn number(answer: &Answer) -> Option<u64> {
 }
 pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Select)>, a::Error> {
     let next = match request {
+        Request::UserOf { .. } | Request::CreateUser { .. } => return Err(a::Error::Refused),
         Request::CreateIssue { .. } => {
             (a::Read::Item { number: number(answer).ok_or(a::Error::Refused)?, after: 0 }, Select::Document)
         }
@@ -121,6 +122,7 @@ pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Sel
 }
 pub fn select(config: &Config, request: &Request, range: Option<Range>) -> Result<Select, a::Error> {
     match request {
+        Request::UserOf { .. } | Request::CreateUser { .. } => Err(a::Error::Refused),
         Request::Branch { name, .. } => Ok(Select::Branch(name.clone())),
         Request::Branches { page, .. } => Ok(Select::Branches(*page)),
         Request::Permission { login, .. } => {
@@ -179,7 +181,9 @@ fn status(request: &Request) -> u16 {
         | crate::Route::PostComment
         | crate::Route::PostStatus
         | crate::Route::CreateBranch => 201,
-        crate::Route::User
+        crate::Route::UserOf
+        | crate::Route::CreateUser
+        | crate::Route::User
         | crate::Route::ApiSettings
         | crate::Route::RepositoryById
         | crate::Route::Repository

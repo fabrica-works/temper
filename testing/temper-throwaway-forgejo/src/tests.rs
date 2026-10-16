@@ -50,3 +50,18 @@ fn the_app_ini_allows_the_webhook_host_it_is_given() {
     let rendered = ini(Path::new("/scratch"), 3000, &settings, "fixture", "secret", "internal");
     assert!(rendered.ends_with("[webhook]\nALLOWED_HOST_LIST = 127.0.0.1\n"));
 }
+#[test]
+fn a_fresh_secret_is_64_hexadecimal_digits_and_never_repeats() {
+    let a = crate::fresh_secret().expect("random source");
+    let b = crate::fresh_secret().expect("random source");
+    assert_eq!(a.len(), 64);
+    assert_eq!(b.len(), 64);
+    assert!(a.bytes().all(|v| v.is_ascii_digit() || (b'a'..=b'f').contains(&v)));
+    assert!(b.bytes().all(|v| v.is_ascii_digit() || (b'a'..=b'f').contains(&v)));
+    assert_ne!(a, b);
+}
+#[test]
+fn a_basic_request_records_its_scheme_and_holds_no_credential() {
+    let sent = http::request(3000, &Outgoing::get("/api/v1/user", None), Some("Basic MASKED"));
+    assert_eq!(sent, b"GET /api/v1/user HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: Basic MASKED\r\nConnection: close\r\n\r\n");
+}

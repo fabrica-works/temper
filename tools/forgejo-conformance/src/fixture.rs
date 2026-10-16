@@ -86,6 +86,18 @@ impl Fixture {
     ) -> Result<Exchange> {
         self.instance.exchange(&Outgoing { method, target, token, body, range }).map_err(|e| failure(&e))
     }
+    pub fn exchange_basic(
+        &self,
+        method: &str,
+        target: &str,
+        body: Option<&[u8]>,
+        login: &str,
+        secret: &str,
+    ) -> Result<Exchange> {
+        self.instance
+            .exchange_basic(&Outgoing { method, target, body, token: None, range: None }, login, secret)
+            .map_err(|e| failure(&e))
+    }
     pub fn api(&self, method: &str, target: &str, body: &Value) -> Result<Value> {
         let body = body.to_string();
         let response = self.exchange(method, target, Some(body.as_bytes()), Some(&self.owner.token), None)?;

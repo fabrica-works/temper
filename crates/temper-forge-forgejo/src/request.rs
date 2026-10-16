@@ -1,5 +1,6 @@
 //! A request value shared by the client and server.
 use alloc::boxed::Box;
+use skein_lib::Secret;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Method {
     Get,
@@ -220,6 +221,16 @@ pub enum Request {
     DeleteBranch {
         at: Repo,
         branch: Box<[u8]>,
+    },
+    UserOf {
+        login: Box<[u8]>,
+    },
+    CreateUser {
+        login: Box<[u8]>,
+        email: Box<[u8]>,
+        full_name: Box<[u8]>,
+        password: Secret,
+        must_change_password: bool,
     },
 }
 

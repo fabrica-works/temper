@@ -703,6 +703,8 @@ fn page_bound(request: &Request) -> Option<u32> {
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::UserOf { .. }
+        | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,
     }
 }

@@ -389,3 +389,45 @@ pub fn transcript_cases() -> Vec<String> {
     entries.sort_by_key(std::fs::DirEntry::file_name);
     entries.into_iter().map(|entry| entry.file_name().into_string().expect("transcript name")).collect()
 }
+
+#[must_use]
+pub fn profile_limits() -> Limits {
+    temper_engine_protocol_forge::limits::documents(
+        &temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component,
+    )
+}
+#[must_use]
+pub fn setup_cases() -> Vec<(&'static str, Request)> {
+    let bot = || Request::CreateUser {
+        login: Box::from(*b"bot"),
+        email: Box::from(*b"bot@example.invalid"),
+        full_name: Box::from(*b"temper:bot"),
+        password: skein_lib::Secret::new(Box::from(
+            *b"0000000000000000000000000000000000000000000000000000000000000001",
+        )),
+        must_change_password: false,
+    };
+    vec![
+        ("setup-user-create", bot()),
+        ("setup-user-create-again", bot()),
+        ("setup-user-create-by-writer", bot()),
+        ("setup-user-of", Request::UserOf { login: Box::from(*b"bot") }),
+        ("setup-user-missing", Request::UserOf { login: Box::from(*b"missing") }),
+        ("setup-user-admin", Request::User),
+        (
+            "setup-user-create-person",
+            Request::CreateUser {
+                login: Box::from(*b"person"),
+                email: Box::from(*b"person@example.invalid"),
+                full_name: Box::from(*b"Person"),
+                password: skein_lib::Secret::new(Box::from(
+                    *b"0000000000000000000000000000000000000000000000000000000000000002",
+                )),
+                must_change_password: true,
+            },
+        ),
+        ("setup-user-person-basic", Request::User),
+        ("setup-user-person-token", Request::User),
+        ("setup-user-person-cleared", Request::User),
+    ]
+}

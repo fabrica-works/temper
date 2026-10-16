@@ -126,3 +126,10 @@ impl From<std::io::Error> for Failure {
 }
 #[cfg(test)]
 mod tests;
+
+/// Draws 64 random hexadecimal digits.
+/// # Errors
+/// Returns a failure to read the system random source.
+pub fn fresh_secret() -> Result<String, Failure> {
+    cli::random()
+}

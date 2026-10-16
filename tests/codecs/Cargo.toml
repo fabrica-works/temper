@@ -8,6 +8,8 @@ publish.workspace = true
 
 [dependencies]
 temper-forge-forgejo.workspace = true
+temper-service.workspace = true
+temper-engine-protocol-forge.workspace = true
 skein-json.workspace = true
 serde_json.workspace = true
 skein-lib.workspace = true

@@ -34,6 +34,7 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
+        Request::UserOf { .. } | Request::CreateUser { .. } => setup::encode(request, limits),
         Request::CreateIssue { .. }
         | Request::OpenPull { .. }
         | Request::PostComment { .. }
@@ -120,7 +121,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Permission { .. } => Kind::Branch(BranchKind::Permission),
         Request::Collaborators { .. } => Kind::Users,
         Request::Pulls { .. } => Kind::Item(Item::Pulls),
-        Request::User => Kind::Setup(setup::SetupKind::Account),
+        Request::UserOf { .. } | Request::CreateUser { .. } | Request::User => Kind::Setup(setup::SetupKind::Account),
         Request::ApiSettings => Kind::Settings,
         Request::RepositoryById { .. } | Request::Repository { .. } => Kind::Repository,
         Request::UserSearch { .. } => Kind::Search,

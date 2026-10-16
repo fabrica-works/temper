@@ -70,3 +70,63 @@ impl Setup {
         Step::Demand(tokenizer::Request::Next)
     }
 }
+
+use super::{Encoded, Refusal, items::Target};
+use crate::{
+    limits::Limits,
+    request::{Method, Request},
+};
+use alloc::boxed::Box;
+use skein_json::writer::{self, Encoder};
+use skein_lib::Writer;
+pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
+    if let Request::UserOf { login } = request {
+        let mut measure = Target { length: 0, writer: None };
+        measure.put(b"/api/v1/users/");
+        measure.segment(login);
+        if measure.length > usize::try_from(limits.target_bytes).expect("u32 fits") {
+            return Err(Refusal::TooLong);
+        }
+        let mut out = Target { length: 0, writer: Some(Writer::new(measure.length)) };
+        out.put(b"/api/v1/users/");
+        out.segment(login);
+        return Ok(Encoded { method: Method::Get, target: out.writer.expect("writing pass").finish(), body: None });
+    }
+    let target = b"/api/v1/admin/users".as_slice();
+    if target.len() > usize::try_from(limits.target_bytes).expect("u32 fits") {
+        return Err(Refusal::TooLong);
+    }
+    let body = {
+        let mut measure = Encoder::measure(&limits.writer);
+        write(&mut measure, request);
+        let length = match measure.measured() {
+            Ok(length) => length,
+            Err(writer::Refusal::Text) => return Err(Refusal::Text),
+            Err(writer::Refusal::TooLong | writer::Refusal::TooDeep | writer::Refusal::Number) => {
+                return Err(Refusal::TooLong);
+            }
+        };
+        let mut out = Encoder::write(length, &limits.writer);
+        write(&mut out, request);
+        Some(out.finish())
+    };
+    Ok(Encoded { method: Method::Post, target: Box::from(target), body })
+}
+fn write(json: &mut Encoder, request: &Request) {
+    let Request::CreateUser { login, email, password, full_name, must_change_password } = request else {
+        unreachable!("user body selection")
+    };
+    json.object_start();
+    for (key, value) in [
+        (b"username".as_slice(), login.as_ref()),
+        (b"email", email),
+        (b"password", password.expose()),
+        (b"full_name", full_name),
+    ] {
+        json.key(key);
+        json.string(value);
+    }
+    json.key(b"must_change_password");
+    json.boolean(*must_change_password);
+    json.object_end();
+}

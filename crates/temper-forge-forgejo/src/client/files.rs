@@ -139,6 +139,8 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::UserOf { .. }
+        | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("file encoder selection"),
     }
 }

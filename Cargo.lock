@@ -1883,9 +1883,11 @@ dependencies = [
  "temper-engine-domain-forge-change",
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
+ "temper-engine-protocol-forge",
  "temper-forge-forgejo",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
+ "temper-service",
 ]
 
 [[package]]

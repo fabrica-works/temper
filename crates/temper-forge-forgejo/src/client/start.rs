@@ -61,6 +61,8 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::UserOf { .. }
+        | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("start encoder dispatch"),
     };
     if length > usize::try_from(limits.target_bytes).expect("u32 fits") {
@@ -131,6 +133,8 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::UserOf { .. }
+        | Request::CreateUser { .. }
         | Request::DeleteBranch { .. }
         | Request::CombinedStatus { .. } => unreachable!("start encoder dispatch"),
     }

@@ -65,7 +65,11 @@ fn full(at: &r::Repo) -> Box<[u8]> {
 #[must_use]
 pub fn repository(config: &Config, request: &Request) -> Option<Box<[u8]>> {
     match request {
-        Request::User | Request::ApiSettings | Request::UserSearch { .. } => None,
+        Request::UserOf { .. }
+        | Request::CreateUser { .. }
+        | Request::User
+        | Request::ApiSettings
+        | Request::UserSearch { .. } => None,
         Request::RepositoryById { id } => {
             for repo in &config.repositories {
                 if u64::from(repo.id) == *id {
@@ -143,7 +147,11 @@ pub fn check(state: d::StatusState) -> a::Check {
 pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
     let missing = a::Error::Missing(a::What::Commit);
     let read = match request {
-        Request::User | Request::ApiSettings | Request::UserSearch { .. } => return Err(a::Error::Refused),
+        Request::UserOf { .. }
+        | Request::CreateUser { .. }
+        | Request::User
+        | Request::ApiSettings
+        | Request::UserSearch { .. } => return Err(a::Error::Refused),
         Request::RepositoryById { .. } | Request::Repository { .. } => Read::Settings,
         Request::Issues { state, kind, since, sort, page: p, .. } => {
             let (page, limit) = page(config, *p);
@@ -291,7 +299,9 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
             Ok(Op::Write(Write::CreateBranch { branch: branch.clone(), commit: commit(from).ok_or(missing)? }))
         }
         Request::DeleteBranch { branch, .. } => Ok(Op::Write(Write::DeleteBranch { branch: branch.clone() })),
-        Request::User
+        Request::UserOf { .. }
+        | Request::CreateUser { .. }
+        | Request::User
         | Request::ApiSettings
         | Request::UserSearch { .. }
         | Request::RepositoryById { .. }

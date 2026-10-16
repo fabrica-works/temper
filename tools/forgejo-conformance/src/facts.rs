@@ -39,13 +39,13 @@ pub fn write(out: &Path, facts: &[Fact]) -> Result<()> {
 pub fn add(facts: &mut Vec<Fact>, name: &'static str, holds: bool, seen: &str) {
     facts.push(Fact { name, outcome: if holds { Outcome::Holds } else { Outcome::Fails(seen.into()) } });
 }
-struct Case {
-    status: u16,
-    body: Value,
+pub(crate) struct Case {
+    pub(crate) status: u16,
+    pub(crate) body: Value,
     raw: Vec<u8>,
     head: String,
 }
-fn case(out: &Path, name: &str) -> Result<Case> {
+pub(crate) fn case(out: &Path, name: &str) -> Result<Case> {
     let bytes = fs::read(out.join("transcripts").join(name).join("response"))?;
     let end = bytes.windows(4).position(|w| w == b"\r\n\r\n").ok_or("case head missing")?;
     let head = std::str::from_utf8(&bytes[..end])?.to_owned();

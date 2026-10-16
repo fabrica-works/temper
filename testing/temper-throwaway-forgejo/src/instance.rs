@@ -196,6 +196,13 @@ impl Instance {
         let auth = outgoing.token.map(|t| format!("token {}", t.value()));
         http::exchange(self.port, outgoing, auth.as_deref(), self.settings.answer_bytes)
     }
+    /// One basic-auth exchange with the credential masked in the recording.
+    /// # Errors
+    /// Returns a connection, framing or bounded-read failure.
+    pub fn exchange_basic(&self, outgoing: &Outgoing<'_>, login: &str, secret: &str) -> Result<Exchange, Failure> {
+        let auth = format!("Basic {}", http::basic(&format!("{login}:{secret}")));
+        http::exchange(self.port, outgoing, Some(&auth), self.settings.answer_bytes)
+    }
     #[must_use]
     pub fn secrets(&self) -> Vec<String> {
         self.secrets.clone()

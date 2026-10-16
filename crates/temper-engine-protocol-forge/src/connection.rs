@@ -724,6 +724,8 @@ fn raw_request(request: &request::Request) -> bool {
         | request::Request::Update { .. }
         | request::Request::PostStatus { .. }
         | request::Request::CreateBranch { .. }
+        | request::Request::UserOf { .. }
+        | request::Request::CreateUser { .. }
         | request::Request::DeleteBranch { .. } => false,
     }
 }

@@ -43,7 +43,14 @@ pub(crate) fn exchange(
     if received.len() > cap {
         return Err(Failure::Io("answer exceeds answer_bytes".into()));
     }
-    parse(&received, request(port, outgoing, auth.map(|_| "token MASKED")))
+    parse(
+        &received,
+        request(
+            port,
+            outgoing,
+            auth.map(|value| if value.starts_with("Basic ") { "Basic MASKED" } else { "token MASKED" }),
+        ),
+    )
 }
 pub(crate) fn parse(bytes: &[u8], sent: Vec<u8>) -> Result<Exchange, Failure> {
     let bad = || Failure::Io("malformed HTTP answer".into());

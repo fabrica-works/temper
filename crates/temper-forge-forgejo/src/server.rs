@@ -14,6 +14,7 @@ mod branches;
 mod files;
 mod items;
 mod reviews;
+mod setup;
 mod start;
 pub(crate) mod writes;
 use crate::decode::Malformed;
@@ -38,7 +39,10 @@ pub enum Route {
 }
 pub fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Unrouted> {
     match writes::route(method, target, limits) {
-        Err(Unrouted::NotFound) => read_route(method, target, limits),
+        Err(Unrouted::NotFound) => match read_route(method, target, limits) {
+            Err(Unrouted::NotFound) => setup::route(method, target, limits),
+            other => other,
+        },
         other => other,
     }
 }
