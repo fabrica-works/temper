@@ -504,6 +504,9 @@ choice would have been the user's (development.md, 10.4).
      - If the test still fails alone with the repair, or the logged 404 names another path: a question, with the run's output; no gate retried blind.
      This also serves jig 20's attack stories, whose pages are other origins.
 
+140. **The count leaves out tests_*.rs modules** (plan defect, jig 02's block of 2026-10-16T14:38:10Z).
+     Ruling 140: a plan defect in the count, neither option. code-organization.md, 7: "An increment's size is its hand-written production lines", and its jig command leaves out `tests.rs` and `tests/`, but not test modules named `tests_*.rs`: `jig-domain-authority`'s `tests_fixtures.rs`, `tests_numbers.rs`, `tests_party.rs` and `tests_policy.rs`, each `#[cfg(test)]` (`src/lib.rs:43-50`). The command now also leaves out `':!*/tests_*.rs'`. 02.4's count is then its 24 production lines (`allowed.rs` 14, `lib.rs` 2, `funding.rs` 8), within its Size of 40; Size stays 40, and the report gives the corrected command's number. Unchanged: every Size; the tests' and fixture's lines, which stay as written; the rule that a file over 800 lines grows by at most 40.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -254,9 +254,11 @@ them are rules, each with its check.
 - **An increment's size** is its hand-written production lines, counted
   once before it lands, in its worktree:
   - jig: `git diff -M --numstat origin/main...HEAD -- crates examples
-    testing ':!*/tests.rs' ':!*/tests/*' ':!*/generated/*' ':!*/golden/*'
-    ':!*/schema/*' | awk '{a+=$1} END {print a}'` (lines added; a pure
-    move counts 0, `-M` follows it);
+    testing ':!*/tests.rs' ':!*/tests_*.rs' ':!*/tests/*' ':!*/generated/*'
+    ':!*/golden/*' ':!*/schema/*' | awk '{a+=$1} END {print a}'` (lines
+    added; a pure move counts 0, `-M` follows it; `tests_*.rs` are
+    `#[cfg(test)]` modules, as `jig-domain-authority/src/lib.rs:43-50`
+    declares them, ruling 140);
   - temper: the same with `-- crates testing tools`;
   - skein: the same with `-- crates testing`.
   `tests/` (worlds), generated code, goldens and schemas are not
