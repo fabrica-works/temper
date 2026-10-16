@@ -323,14 +323,19 @@ top-level `workers`, in the same order; standalone has one. Each:
   are the client's. A test holds the example's and the process tier's
   configuration to temper's client's limits, so the two cannot drift
   apart unseen.
-- **The forge's paths fit a document.** `documents.lines` bounds a
-  document's short lists and also the segments of each part's path and
-  each pattern it holds; jig's core refuses a whole document past it. So
-  `engine.limits` names it at least the segments of the deepest path the
-  forge names: a branch's, the forge's five segments then the branch's
-  own (`domain/forge.md`, section 2), as temper's branches name them. The
-  example names it, and a page of the forge's work is never refused as
-  too large (client.md, 5.4).
+- **The forge's paths fit a document.** jig's documents carry a
+  resource's path and a pattern whole, with as many segments as the
+  engine admits in a name (jig's `client/domain/contract.md`, 5.3), and
+  `documents.lines` bounds a document's short lists alone, at most the
+  client's rows. So `engine.limits` names the bounds on a name's
+  segments, `authority.segments`, `tasks.hold_segments` and
+  `tasks.authority_segments`, at least the segments of the deepest path
+  the forge names: a branch's, the forge's five segments then the
+  branch's own (`domain/forge.md`, section 2), 8 as temper's branches
+  name them. The example names them 8. temper's client takes a path's
+  segments, 9, apart from its rows (jig's `client/domain/client.md`,
+  section 14), so a page of the forge's work is never refused for a
+  path, and a long path shows cut, with jig's mark (client.md, 5.4).
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
@@ -503,7 +508,7 @@ not itself valid JSON):
     "llm": ...,
     "clients": {"link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {"documents.lines": 8}},
+    "limits": {"profile": "small", "overrides": {"authority.segments": 8, "tasks.hold_segments": 8, "tasks.authority_segments": 8}},
     "memory_bytes": ...
   },
   "workers": [{

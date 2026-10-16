@@ -11,8 +11,8 @@ forge's form learns from jig's typed answer that a version is not served
 goals and lists go when jig's do, and the tests that started chats with
 `StartChat` make them from the chat template. A last increment checks that
 a task line of the forge's deepest path is served under the shipped
-profile, and sets `documents.lines` where it is not (`configuration.md`,
-7).
+profile, whatever `documents.lines`, and that temper's client takes a
+path's segments apart from its rows (`configuration.md`, 7).
 
 ## Read first
 
@@ -50,11 +50,11 @@ profile, and sets `documents.lines` where it is not (`configuration.md`,
   served ...), the page says 'This temper is out of date for adopting
   repositories: run the temper the engine runs.', the button is
   disabled, and a pending adoption stays in the small store."
-- **The forge's paths fit a document** (`configuration.md`, 7):
-  "`documents.lines` bounds a document's short lists and also the
-  segments of each part's path ... So `engine.limits` names it at least
-  the segments of the deepest path the forge names: a branch's, the
-  forge's five segments then the branch's own".
+- **The forge's paths fit a document** (`configuration.md`, 7): "jig's
+  documents carry a resource's path and a pattern whole, with as many
+  segments as the engine admits in a name ..., and `documents.lines`
+  bounds a document's short lists alone, at most the client's rows";
+  "temper's client takes a path's segments, 9, apart from its rows".
 
 ## Choices this plan makes
 
@@ -87,10 +87,10 @@ profile, and sets `documents.lines` where it is not (`configuration.md`,
   origin/main:crates/temper-protocol-store/src/lib.rs | grep
   'STORE_VERSION: u32 = 1'` prints a line); a later increment of this
   session edits `store-v2.schema` in place.
-- **`documents.lines`** is checked, not assumed: 04.4 serves a task line
-  of the forge's deepest path in the engine's domain world under jig's
-  small profile and under the process tier's override, and only where
-  one is refused does it set the override.
+- **A path is checked, not assumed:** 04.4 serves a task line of the
+  forge's deepest path in the engine's domain world under jig's small
+  profile and under the process tier's override, and holds the engine's
+  bounds on a name's segments to the client's.
 
 ## Rules that bind it
 
@@ -369,24 +369,34 @@ Size: at most 60 lines (mostly removals; `walking::chat` is test code).
 Removes: the arms and variants named in Files; `Disposal` in temper's
 store codec.
 
-### 04.4 The forge's deepest path in a task line
+### 04.4 The forge's deepest path in a task line, and in the client
 
 Scope: a task naming the forge's deepest branch path is listed, not
-refused as too large, in its project's task query (the task line) and its `task` document under
-jig's small profile and under the process tier's override; where either
-is refused as too large, `documents.lines` is set in the configurations
-temper writes (`configuration.md`, 7; `later.md`'s row, which this
-increment closes either way).
-Needs: nothing beyond 04.3.
+refused as too large, in its project's task query (the task line) and
+its `task` document under jig's small profile and under the process
+tier's override, whatever `documents.lines` (jig's
+`client/domain/contract.md`, 5.3: "A document carries each whole, with
+as many segments as the engine admits in a name"); and temper's client
+takes a path's segments apart from its rows (`client.md`, 5.4;
+`configuration.md`, 7; the design answer to the question of
+2026-10-16T14:55:38Z).
+Needs: 04.3, and the landing of jig's step for a path's segments (the
+supervisor's supplement step; README, "Pins": this increment's repin
+takes it).
 Files: `tests/engine/domain/tests/forge_routes.rs` (over 800 lines: at
-most 40 added), on its `change_world` (`:633`); only where a check
-fails: `crates/temper/tests/support/configuration.rs:32` and
-`crates/temper/tests/support/forgejo.rs:137` (`documents.lines`, 2 at
-the base), and the test that holds them to the client,
-`crates/temper/tests/configuration.rs:18`.
-Shape: no type; at most the override's value, the deepest path's
-segments: 5 (`forge`, the host, the owner, the name, `branch`) plus a
-branch `temper/<number>/<words>`'s 3, so 8.
+most 40 added), on its `change_world` (`:633`);
+`crates/temper-client-shell-terminal/src/limits.rs` (`segments: 9`
+beside `rows: 2`, `:51`: at least the forge's tier's names' bounds, 9,
+`crates/temper/tests/support/forgejo.rs:152-156`, and the example's 8,
+`configuration.md`, 7); `crates/temper/tests/configuration.rs:17-21`.
+Shape: no type. temper writes no `documents.lines` for a path: the
+process tier's `documents.lines`, 2 (`support/configuration.rs:32`,
+`support/forgejo.rs:137`), stays, at most the client's rows. In
+`tests/configuration.rs`, `:18`'s assertion says "every document's short
+list" in place of "every document path", and one more holds the most of
+the engine's `authority.segments`, `tasks.hold_segments` and
+`tasks.authority_segments` at most `native.segments`, "the native client
+can receive every document path".
 Test shape: in `tests/engine/domain/tests/forge_routes.rs`, on
 `change_world(silent_ci, passes, approval)` (`:633`), whose producer
 works on a change branch of temper's namespace (the forge's deepest
@@ -417,12 +427,10 @@ producer's `task` document read the same way.
 Proof: the world layer only: no page of temper's reads a task line
 before temper 06.4's Chats page, whose joint-world story then runs over
 the same configuration.
-Don't: raise `documents.lines` where the check passes; change jig's
-profile.
-Size: at most 10 lines of production code (none where the check passes).
-Removes: nothing in code. The retrospective's author removes
-`later.md`'s row "`documents.lines` override" once, when writing the
-retrospective.
+Don't: set `documents.lines` for a path; change jig's profile; cut a
+path in temper.
+Size: at most 10 lines of production code.
+Removes: nothing in code.
 
 ## Interface sketches
 

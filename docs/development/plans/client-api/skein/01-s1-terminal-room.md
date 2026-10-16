@@ -2,7 +2,8 @@
 
 Added by ruling 134, from the design answer of 2026-10-16T13:28Z (skein
 `d047b45a`, `docs/design/ui-text.md`, 3, 4 and 7). temper 03.1 needs its
-landing; jig 19.4 moves jig's skein onto it. Read first: skein's
+landing; jig 19.4 moves jig's skein onto skein-01.s2's, which holds
+it. Read first: skein's
 `AGENTS.md`, `docs/development/workflow.md`, `ui-text.md`, 3, 4 and 7;
 this plan's README, "Rules of this plan".
 

@@ -575,9 +575,14 @@ and reserves for each print only what that page's tree may print
 (6.8).
 
 temper's client takes every document within the bounds the engine's
-configuration gives its documents, and those bounds hold the forge's
-deepest paths and patterns (configuration.md, section 7), so a page of
-the forge's work is never refused as too large.
+configuration gives its documents. A path's segments have a bound of
+their own, 9, apart from the windows' rows (jig's
+`client/domain/client.md`, section 14), at least the most the engine
+admits in a name (configuration.md, section 7), so a page of the
+forge's work is never refused for a path. A path longer than a node's
+text shows its last segments after jig's mark (jig's
+`client/domain/view.md`, section 7), which adds nothing to the view's
+limits.
 
 ## 6. The terminal shell
 
@@ -628,7 +633,10 @@ the forge's work is never refused as too large.
 - **The text shell's settings:** the name `temper`; the longest line,
   the client's longest words with a number and a space before them;
   a print interval of one second, a guide; the status region, the
-  banner's link state (5.1); and temper's lines, 32 (6.3).
+  banner's link state (5.1); temper's lines, 32 (6.3); and their line
+  bytes, DIRECTORY's bytes and 160, as temper's terminal counts a line
+  today: 6.6's signed out holds DIRECTORY and 84 bytes, and a service's
+  credential's line its credential's base64 and at most 57.
 - **Time and the seed** are skein-shell's: its clock once per
   iteration, and a seed from the kernel at each start (`seed`), from
   which the client root's children draw their keys' numbers (3.1).
@@ -742,8 +750,12 @@ command.
 
 The renderer and the command reader are skein's text shell's, step code
 under the subset, bounded by its `worst_case` (skein's `ui-text.md`,
-section 3), which the terminal adds to its memory and reserves for no
-print: each print takes the room its own tree gives. temper's view
+section 3), which skein's terminal counts in its own worst case
+(`Terminal::worst_case`) and reserves for no print: each print takes
+the room its own tree gives. The host adds the terminal's worst case to
+its memory, and the terminal's operations (`Terminal::operations`) to
+its ring's, beside its client's and its own; it copies none of the
+terminal's count. temper's view
 limits put that worst case past a u32 of bytes, and the terminal starts
 from them, as `temper open` makes it, in a unit test (section 10).
 What temper decides is in its domain and its view, both step code;

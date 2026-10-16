@@ -67,7 +67,9 @@ and jig 04.1, as the session's start does.
   `TemplateOverride` are the people child's, beside `PolicyValue`;
   `Template` is the core's, since it holds a `tasks::Contract` and jig
   02's flags.
-- **The JSON an operator writes** (configuration.md 10 names none): a
+- **The JSON an operator writes** (configuration.md 10, which writes
+  this form, jig's chat and goal among it, since the design answer to
+  jig 09.1's question of 2026-10-16T14:57:59Z): a
   template is
   `{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract":
   {"report": {"words": 512}}, "shallower": 1, "budget": {"as_allowed":
@@ -574,10 +576,9 @@ and the store saves them; the core keeps both and merges them only into
   plan serves the template untracked and the priority unused. The other
   reading refuses such an override when the policy is changed. Raise it
   when 9.2 lands.
-- **The templates' JSON** (9.1): configuration.md 10 names the formats
-  an operator writes, and templates are not among them; this plan's form
-  is in "Choices". Raise it with 9.1's landing, for the designer to
-  write it into section 10 or change it.
+- **The templates' JSON** (9.1): answered (the design answer to jig
+  09.1's question of 2026-10-16T14:57:59Z): configuration.md 10 takes
+  "Choices"' form, as 9.1 built it; nothing in 9.1 changes.
 
 ## Done when
 

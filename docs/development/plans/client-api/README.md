@@ -74,7 +74,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15, jig 21 | |
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
-| `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s1 |
+| `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s2 |
 | `jig/20-attack-stories.md` | jig 20: jig's stories for a browser shell, and its attack stories | jig 19 | |
 | `jig/23-referee.md` | jig 23: the conformance referee's rules for proposals and revisions | jig 03 | 23.2: jig 06.1, jig 06.2, jig 07.3 |
 
@@ -91,7 +91,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
-| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, forgejo-17's skein step; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.2: jig 22; 04.3: jig 16 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
@@ -170,8 +170,9 @@ per session are in each file.
     names such as `jig-02.3`); for a whole session, its last step's.
   - jig moves skein once, never smith: jig 19's first increment that
     needs skein 01 runs `heavy cargo update -p skein-lib --precise
-    <skein-01.s1's landing>` (which holds skein 01.3's), in a commit of
-    its own with its one repair, `lines: 0` in jig's `skein_ui_text::Settings`
+    <skein-01.s2's landing>` (which holds skein-01.s1's, skein 01.3's
+    and forgejo-17's skein step's), in a commit of its own with its one
+    repair, `lines: 0, line_bytes: 0` in jig's `skein_ui_text::Settings`
     literal (`git -C ~/src/rust/jig grep -n 'skein_ui_text::Settings'`:
     `tests/client-protocol/src/native/world.rs:232` at jig `7dc234d1b`);
     after it, `grep -o 'skein.git#[0-9a-f]*' Cargo.lock | sort -u` prints
@@ -184,7 +185,7 @@ per session are in each file.
     --is-ancestor <that landing> <temper's present jig pin>` succeeds,
     no repin commit is made. Otherwise: `heavy cargo update -p
     jig-domain-core --precise <that landing>`, then `heavy cargo update
-    -p skein-lib --precise <jig's pin of skein, or skein-01.s1's landing
+    -p skein-lib --precise <jig's pin of skein, or skein-01.s2's landing
     while that pin does not hold it (below)>` and `heavy cargo update
     -p smith-host-protocol --precise <jig's pin of smith>` (each read with
     `git -C ~/src/rust/jig show <that landing>:Cargo.lock | grep -o
@@ -192,7 +193,7 @@ per session are in each file.
     Then `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*'
     Cargo.lock | sort -u` prints three lines: `jig.git#<that landing>`,
     and skein's and smith's lines as jig's lock at that landing prints
-    them, skein's being skein-01.s1's landing instead while jig's does
+    them, skein's being skein-01.s2's landing instead while jig's does
     not hold it (below). A `cargo update` that leaves a second revision
     of a source is run once more; a second revision still there after it
     is a question.
@@ -239,19 +240,29 @@ per session are in each file.
   - **The terminal's room** (the design answer of 2026-10-16): skein's
     `Terminal` gives the application's lines a room of their own (skein's
     `ui-text.md`, 3 and 4: the settings' lines, `Terminal::room`), which
-    the supplement step skein-01.s1 builds and temper 03.1 needs. temper
-    takes it alone, ahead of jig: 03.1's first commit moves temper's
-    skein to skein-01.s1's landing (03.1's Shape), and jig's pin of skein
-    stays until jig 19's move above. From 03.1 on, while `git -C
-    ~/src/rust/skein merge-base --is-ancestor <skein-01.s1's landing>
-    <jig's pin of skein>` fails, each temper repin takes skein-01.s1's
+    the supplement step skein-01.s1 builds; and each of those lines
+    bounded in bytes, with the terminal's worst case and operations,
+    which its host adds to its own (the design answer to temper 03.1's
+    question of 2026-10-16T14:54:59Z: `ui-text.md`, 3 and 4, the line bytes,
+    `Terminal::worst_case`, `Terminal::operations`), which skein-01.s2
+    builds, after forgejo-17's skein step. temper 03.1 needs both: its
+    host prices skein's terminal by them, and copies none of its count.
+    temper takes them alone, ahead of jig: 03.1's first commit moves
+    temper's skein to skein-01.s2's landing (03.1's Shape), and jig's pin
+    of skein stays until jig 19's move above. From 03.1 on, while `git -C
+    ~/src/rust/skein merge-base --is-ancestor <skein-01.s2's landing>
+    <jig's pin of skein>` fails, each temper repin takes skein-01.s2's
     landing in place of jig's pin of skein, and its check reads skein's
     line as that landing; once it succeeds (jig 19's move), jig's pin
-    again. At skein `7e8fb700`, skein's code differs from jig's pin
+    again. So jig's move takes skein-01.s2's landing, not skein-01.s1's:
+    the closing repin, which moves temper's skein to jig's pin, would
+    otherwise take temper back before skein-01.s2. At skein `7e8fb700`, skein's code differs from jig's pin
     `f12f29d4` only by skein 01's harness (`git -C ~/src/rust/skein diff
     --stat f12f29d4 7e8fb700 -- crates` prints nothing), which no jig,
-    smith or temper crate names; skein-01.s1's one downstream `Settings`
-    literal is jig's test world's, outside temper's build. A build
+    smith or temper crate names; skein-01.s1's and skein-01.s2's one
+    downstream `Settings` literal is jig's test world's, outside temper's
+    build (`git grep -n 'skein_ui_text::\(Settings\|Terminal\)' --
+    '*.rs'` prints nothing in temper at `e73d3d5f`). A build
     failure in a jig or smith crate after temper's move is a question.
   - **The print's room** (the design answer to forgejo-17's question of
     2026-10-16T14:19:38Z): skein's text shell takes each print's room
@@ -270,9 +281,11 @@ per session are in each file.
     of its target and the floor, the one that holds the other (`git -C
     ~/src/rust/skein merge-base --is-ancestor <one> <other>`), and is
     not made when temper's pin already holds that commit: forgejo-17's
-    temper step may move it there first. Where this plan reads
-    skein-01.s1's landing as temper's skein (this section, the session
-    files), it reads the floor; jig's own pin of skein is unchanged. The
+    temper step may move it there first. skein-01.s2 needs that step, so
+    its landing holds the floor: where this plan reads skein-01.s2's
+    landing as temper's skein (this section, the session files), the
+    later of the two is skein-01.s2's; jig's own pin of skein is
+    unchanged until jig 19's move. The
     step keeps skein-ui-text's API (`Print`'s text a `List<u8>`,
     `worst_case`'s `(u32, u64)`, both constructors' signatures), and
     `temper-client-shell-terminal` is the one temper crate that names

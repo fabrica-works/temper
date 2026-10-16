@@ -179,9 +179,11 @@ once `Terminal::closed()` is true, after the drain, not before it.
 temper 01.3 put the renderer and the command reader
 on `skein-ui-text`; this increment replaces the rest of `terminal::Loop`.
 Needs: the session's start (temper 02.1 on temper's `main`),
-skein-01.s1's landing (the settings' lines and `Terminal::room`; README,
-"Pins", "The terminal's room"), and forgejo-17's skein step's landing,
-temper's skein floor (each print's room from its own tree, so
+skein-01.s2's landing, which holds skein-01.s1's (the settings' lines
+and `Terminal::room`; the line bytes, `Terminal::worst_case` and
+`Terminal::operations`; README, "Pins", "The terminal's room"), and
+forgejo-17's skein step's landing, temper's skein floor, which
+skein-01.s2's holds (each print's room from its own tree, so
 `Terminal::new` takes temper's view limits; README, "Pins", "The
 print's room").
 Files: `crates/temper-client-shell-terminal/src/` (names after temper
@@ -216,9 +218,11 @@ Shape:
   alone. A build failure in a jig or smith crate after it is a question.
 - `skein_ui_text::Terminal::new(Settings { name: Box::from(*b"temper"),
   longest, interval: Duration::from_secs(1), status: Some(<the banner's
-  link region>), lines: limits.lines }, &view_limits).expect("terminal
-  settings")` (`limits::terminal().lines`, 32, `limits.rs:181`: temper's
-  lines, `client.md`, 6.2)
+  link region>), lines: limits.lines, line_bytes }, &view_limits)
+  .expect("terminal settings")` (`limits::terminal().lines`, 32,
+  `limits.rs:181`: temper's lines, `client.md`, 6.2; `line_bytes`
+  DIRECTORY's bytes and 160, the line `Loop::worst_case` counts today,
+  `terminal.rs:300`, `client.md`, 6.2)
   (`Settings.name` is a `Box<[u8]>`, `skein-ui-text/src/terminal.rs:17`;
   `new` returns `Option<Terminal>`, and `open.rs` expects its other
   startup parts the same way); the host's iteration, in `ui-text.md`,
@@ -251,7 +255,20 @@ Shape:
   `bounds.client.table.requests`, and `tests/support/mod.rs:172` and
   `tests/terminal.rs:182` pass `limits::native()`'s; `Loop::worst_case`
   (`terminal.rs:300-308`, added into the host's memory at
-  `run.rs:68-69`) charges that queue in place of `limits.lines`.
+  `run.rs:68-69`) charges that queue, each line at the settings' line
+  bytes, in place of `limits.lines`.
+- **The host's memory and ring** (`client.md`, 6.8; skein's
+  `ui-text.md`, 3, "Its worst case and its operations"): `run.rs`
+  (`Terminal::new`, `:62-76`) adds `skein_ui_text::Terminal::worst_case(&settings,
+  &view_limits)` to its memory and `skein_ui_text::Terminal::operations(&settings,
+  &view_limits)` to its operations, each read from the settings before
+  `Terminal::new` takes them, and expected as `Terminal::new` is. Of
+  `Loop::worst_case` stays only what `Loop` holds: the waiting lines,
+  the directory, the link and the failure line; skein's `worst_case` of
+  the view, the print's numbers, the line reader and the output buffer
+  leave it, being skein's terminal's. The host's own io, the termination
+  signals alone, counts by `skein_io::worst_case` and
+  `skein_io::operations` of its own limits, as now.
 - temper's `terminal::Loop` keeps only what the text shell does not: the
   sign-in's retry and backoff (6.7), the exit status and its stderr line
   (6.1), the waiting lines and the order in which they are said.
@@ -304,11 +321,13 @@ waiting lines, under 20 ms, in `src/tests.rs`:
 `StoreFailed`, `SignInAgain`, two `Credential`s of two parties waiting,
 then a room of 1, then of 8: said `SignInAgain`, then `StoreFailed` and
 the two credentials, and nothing more). No world test of a held stdout:
-the room and the held input are skein's, tested by skein-01.s1. The
+the room and the held input are skein's, tested by skein-01.s1, and the
+line bytes, the worst case and the operations by skein-01.s2. The
 unit test `the_native_limits_make_the_terminal` (`src/tests.rs`;
 `client.md`, 10), which forgejo-17's temper step lands on `Loop::new`,
 stays, on `Terminal::new` with this increment's `Settings` and
-`limits::view(&limits::native())`'s tree limits: it returns `Some`. If
+`limits::view(&limits::native())`'s tree limits: it returns `Some`, and
+so do `Terminal::worst_case` and `Terminal::operations` of the same. If
 this increment lands first, it adds the test. Under ruling 111 it is
 the check of the print's room that runs on carbon-forge.
 Proof: the process tier, once: `heavy sh -c 'cargo build -p temper
@@ -317,7 +336,9 @@ Proof: the process tier, once: `heavy sh -c 'cargo build -p temper
 `temper open`, its stdin and stdout piped, prints `== Inbox == Live`
 through skein's terminal and exits 0 on `q` after a drained close (about
 1 minute; 1.1 s of test at the base, `logs/w9/nextest-process-base-private.txt`).
-Don't: copy any of skein's terminal into temper; add a command
+Don't: copy any of skein's terminal into temper, its count among it
+(its worst case and operations are `Terminal::worst_case` and
+`Terminal::operations`); add a command
 (`client.md`, 6.5); change one of temper's lines; bound temper's lines
 by `Terminal::work_pending` or by a count of its own of what the terminal
 holds; move jig's pin.
