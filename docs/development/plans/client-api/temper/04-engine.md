@@ -143,27 +143,56 @@ Files: `Cargo.lock` (the repin); `crates/temper-service/src/tests/fixtures.rs:46
 (`ENGINE`'s `"chats": {"charter": 1, "close_grace_ms": 5000}` becomes
 `"templates"`, jig's two defaults written out in jig 09.1's format, as
 jig 09's fixtures write them: "jig's defaults are written, not
-implied"); `crates/temper-engine-domain/src/limits.rs:109-145`
+implied", their reports' `words` 32, within `ENGINE`'s
+`"tasks.result_bytes":32`; its policy at :65 gains `"templates": []`,
+and the `Project` literal at :436 `templates`);
+`crates/temper-engine-domain/src/limits.rs:29-54` (`Limits` gains
+`templates: u32`) and `:109-143`
 (`core_limits`, the one core `Limits` literal of temper's production
 code, gains `templates`, taken from the engine's limits as `documents`
-is at :113, through `temper_service::limits::engine`, never a literal);
+is at :113, through `temper_service::limits::engine`, never a literal;
+without it jig 09.1's core `worst_case` is `None`, `limits.rs:216`);
+`crates/temper-service/src/limits.rs:264-278` (`templates:
+jig.core.templates`);
 the configurations made from jig's `engine_document()`
 (`crates/temper/tests/support/configuration.rs:15`,
 `tests/one-process/src/fixtures.rs:78`) take jig 09's fixture
-unchanged. If no temper increment bumped `STORE_VERSION` before
+unchanged; the process tier's `crates/temper/tests/support/forgejo.rs`
+sets `tasks.delegates` 4 (:148) over jig's channel document, whose
+`people.operations` 2 after jig 09.4 is below 4 + 1 (`What::Operations`,
+refusing `process.rs:37`, `:74` and `live.rs:9`): its overrides
+(:135-168) gain `("people.operations", 5)`. If no temper increment bumped `STORE_VERSION` before
 (Choices), `crates/temper-protocol-store/` too: `src/lib.rs:15`
 (`STORE_VERSION` 2), `schema/store-v1.schema` moved to
 `store-v2.schema` with `CoreRefused`'s bound from jig's people v3
-ceilings, its generated code and goldens. The core's `Settings` literal at
-`tests/engine/domain/src/walking.rs:253-260` keeps `chat: 1` (:257) and
-`close_grace` (:254): jig 09 keeps both, filled from template 1, until
-jig 16 removes them (04.3). Users found by `git grep -n -e '"chats"' -e
+ceilings, its generated code and goldens (by `tests/codecs/tests/drift.rs`'s
+write mode, README "Generated code"), the generated module `v1` moved to
+`v2` as jig's people family moved to `people_v3.rs`, and their users:
+`src/lib.rs:8-10`, `src/tests/sizes.rs:48` (`STORE_VERSION` 2),
+`tests/codecs/tests/drift.rs:56-58` (the schema, `generated/v2.rs`,
+`golden/v2`), the `v1::` users in `src/records.rs`,
+`src/records/application.rs`, `src/tests/fixtures.rs`,
+`src/tests/records.rs` and `tests/codecs/tests/fuzzy_store.rs`. The
+core's `Settings` literal at `tests/engine/domain/src/walking.rs:256-263`
+keeps `chat: 1` (:260) and `close_grace` (:257): jig 09 keeps both,
+filled from template 1, until jig 16 removes them (04.3); it gains
+`templates` (:256), and the world's `Config` (:245)
+`template_overrides`, and its limits literal (:119) `templates:
+jig_protocol_config::profile(Profile::Small).core.templates`, from
+which the world's other test limits derive. Users found by `git grep -n -e '"chats"' -e
 close_grace -e 'chat: 1' -e 'jig_domain_core::Limits {' -- '*.rs'` in
-temper: the three above at the base. Shared:
+temper: the three above at the base. jig 09's new refusals, at the
+repin (its 200 lines): `crates/temper-service/src/startup/problems.rs`'s
+two matches over `config::What` (:81-102, :139-163) gain arms for
+`What::Grace { template }` and `What::Operations { .. }`, the second
+printing their numbers as `Reserve` does, and
+`crates/temper-service/src/tests/startup.rs:117-140`'s
+`jig_refusals_print_words` a row for each. Shared:
 `crates/temper-engine-domain/src/store.rs` (README, "Shared files"),
 if the repin's repairs reach it.
-Shape: no type of temper's changes; `temper-service`'s startup passes
-`engine.templates` to jig's reader and keeps nothing of it.
+Shape: one field of temper's, `temper_engine_domain::Limits.templates`,
+taken as `documents` is; `temper-service`'s startup passes
+`engine.templates` to jig's reader and keeps nothing else of it.
 Test shape: `crates/temper-service/src/tests/startup.rs`, on
 `fixtures::engine()` (`crates/temper-service/src/tests/fixtures.rs:76`).
 The reference test, its field names jig 09's:
@@ -171,8 +200,8 @@ The reference test, its field names jig 09's:
 #[test]
 fn the_example_engine_keeps_jigs_chat_and_goal_templates() {
     let jig = fixtures::engine().jig;
-    let labels: Vec<u32> = jig.templates.iter().map(|template| template.label).collect();
-    assert_eq!(labels, [1, 2], "jig's chat and goal templates, in order");
+    let labels: Box<[u32]> = jig.templates.iter().map(|template| template.label).collect();
+    assert_eq!(*labels, [1, 2], "jig's chat and goal templates, in order");
     assert_eq!(jig.templates[0].number, 1);
 }
 ```
@@ -283,7 +312,7 @@ the base, `logs/w9/users-shape-asks.txt`):
 - `crates/temper-service/src/clients/translation.rs:66-67`
   (`ForgetChat`, `SeenChatLoaded`);
 - the core's `Settings.chat` and `Settings.close_grace`, which jig 16
-  removes: `tests/engine/domain/src/walking.rs:254, 257` (test code);
+  removes: `tests/engine/domain/src/walking.rs:257, 260` (test code);
 - `crates/temper-protocol-store/src/records/application/refusal.rs:5-17,
   292-296, 328-330` (`Disposal`), and the store schema's `CoreRefused`
   bound (store-v2, edited in place);
