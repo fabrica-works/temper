@@ -712,6 +712,36 @@ choice would have been the user's (development.md, 10.4).
      3. **Counted:** both within the README's 200 added lines outside 03.3's Files, summed once as the README says, each item's lines given in the report. Past 200, land and give the count; a question only past 300.
      4. **Unchanged:** 03.3's Shape, Size (120, the path rewrite apart) and Proof; the forge's behaviour (each step makes what it made); temper's store format beyond what 03.3's Files already name; temper's tool names; 04.1's Needs and Shape.
 
+165. **jig 08.3's results mark forgets in its own decision** (design gap, jig 08's block of 2026-10-16T18:47:43Z).
+     Ruling 165: the designer's answer of 2026-10-16T19:14Z, landed as jig 134cbc189 and temper 4f86717c:
+
+
+     ### jig 08.3: a forget lost to a crash between the results mark and its loads, 2026-10-16T19:14Z
+
+     Landed: jig 134cbc189 (`docs/design/domain/people.md`, 6; `protocol/store.md`, 7.4, 11.1, 15 item 6; `STATUS.md`); temper 4f86717c (the plan's `jig/08-store-indexes.md`: Choices, 08.3, 08.4, the sketches, "Questions to raise when reached").
+
+     ### Decision
+
+     1. **The forget survives the crash: the mark and the erase are one decision.** people.md 6 now says: "The `Seen` after which it is read forgets it, while the party's inbox holds it (the bound below), in the `Seen`'s own decision: the mark and the erase commit together, so no restart sees the task read and not forgotten." This is the supervisor's reading. Ways 2 and 3 are not taken. testing.md 5 is unchanged, and the scenario's `check` stays: no row of the forgettable conversation.
+     2. **The way: neither loads nor a pending mark.** people.md 6: "A `Seen` over results loads nothing for it: the inbox's entry for an unread result carries what its forget needs (the task's class, its label and listing, and, for a conversation, its last turn and whether its turns are read)." 08.3's Shape:
+        - `people::ResultRef` gains `forgettable: Option<people::Forgettable { label, listed, last_reply: Option<u64> }>`, `None` for a kept task. It is set where a ref is made from the ended record: `routing/tasks.rs:730` and `inbox/census.rs:131` on jig's main at db13a6f18 (the plan's `:716` is at its base, 5fc5d31f9).
+        - `forget::Owner` (task, party, project, label, ended_at, result_position, listed, last_reply) holds what a forget erases. `Owner::of_row` makes it from a loaded record and `Owner::of_result` from a cached ref. `forgets(owner: &Owner, reading: Reading)`.
+        - On `Seen::Results { through }`: in the mark's own step, after its `Decided { MarkedSeen }`, the core pushes `Event::Forget { owner }` for each cached ref, read before the mark applies, with `position <= through`, `forgettable` set and a task not live. Nothing is loaded. A mark over kept results only, jig's own templates among them, is decided as at the base.
+        - `Now::LoadEndedChat` goes, with nothing in its place (no `LoadForgettable`). `Event::Forget` carries an `Owner`, and only the core's own routes push it.
+        - On `Seen::Chat` of an ended conversation: as at the base, `seen_chat_loaded` pushes the mark and `Event::Forget { owner }` (from `Owner::of_row`) into one decision.
+     3. **08.4** keeps this so:
+        - a `Seen::Chat`'s forget takes `Reading.turns` from the position its mark decides, with no load after the mark;
+        - `Forgettable.turns_read` takes `chat_seen`'s place for a cached ref. It is set at the end, at the census from the joined `EndedRead`, and by a `Seen::Chat` in its decision;
+        - `AfterRead` goes, and `Now::LoadEndedRead { request, task, party }` replaces it.
+     4. **Tests** (in the plan):
+        - 08.3: `a_results_mark_forgets_in_the_commit_that_moves_its_position` (the one commit of `world.commits` that erases `tasks::Key::Ended(task)` also saves `people::Stored::ReadResults`);
+        - 08.3: `conversation_ends_while_read_chosen_cut_ends_the_story` cuts after the commit of the results mark;
+        - 08.3: `an_owner_of_a_cached_result_is_the_owner_of_its_record`;
+        - 08.4: `a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark`.
+     5. **Size:** 08.3 goes from 175 to 215 lines of production code (40 for `Owner` and the forget from a cached result); 08.4 from 340 to 355 (15 for `turns_read`).
+     6. **The unlanded increment** (jig `6cf299600`) stands, but for its `Seen::Results` route. `Now::LoadForgettable` and its root arms go, `Event::Forget { row }` becomes `{ owner }`, and `ResultRef` gains its field: `forgettable: None` in the six test files that make one (`git grep -l 'ResultRef {' origin/main -- ':!docs' | wc -l` prints 9 at db13a6f18: all but `boundary.rs` and the two production sites).
+     7. **Nothing new is deferred.** A forgettable task the cache does not name, or one a live task names when it is read, is retention's, already not planned (jig's `STATUS.md` people.md row, client-api's `later.md` row of what that file leaves not planned). No `later.md` row is added. The plan's open question on the uncached task is answered and removed.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
