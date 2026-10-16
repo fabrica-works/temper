@@ -3,9 +3,13 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod check;
+pub mod ini;
 pub mod limits;
+pub mod place;
 pub mod problem;
+pub mod runner;
 pub mod setup;
+pub mod state;
 pub mod step;
 pub use setup::Setup;
 pub use step::{Step, steps};

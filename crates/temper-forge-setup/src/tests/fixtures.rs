@@ -59,3 +59,20 @@ pub fn changed(from: &[u8], to: &[u8]) -> Box<[u8]> {
     }
     w.finish()
 }
+pub fn owned() -> crate::setup::Owned {
+    match setup().entries[1].mode.clone() {
+        crate::setup::Mode::Owned(owned) => owned,
+        crate::setup::Mode::Managed { .. } => panic!("owned fixture"),
+    }
+}
+pub fn place() -> crate::place::Place {
+    crate::place::Place { directory: b"/srv/forge-2".as_slice().into(), user: b"ada".as_slice().into() }
+}
+pub fn secrets() -> crate::state::Secrets {
+    use skein_lib::Secret;
+    crate::state::Secrets {
+        secret_key: Secret::new(b"key-secret".as_slice().into()),
+        internal_token: Secret::new(b"internal-secret".as_slice().into()),
+        jwt_secret: Secret::new(b"jwt-secret".as_slice().into()),
+    }
+}
