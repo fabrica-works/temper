@@ -658,6 +658,26 @@ per session are in each file.
     reuse it. Name each time as a const, never
     `Time::from_nanos(100_000_000)` or `Duration::from_millis(10)` inline.
     When you next edit `tests/store.rs`, move it onto `fire` too.
+  - 23:45Z, point 1 (every session that adds production code): A
+    function clippy finds too long is split, not excused: extract its
+    largest arm into a function named for what it judges (as `check`'s
+    `Amend` arm, `crates/jig-domain-core/src/compound.rs:177-204`, would
+    become `check_amend`, bringing `check` under 100 lines), and pass the
+    arguments that travel together as one struct (12:48Z, point 2). Only
+    a codec table over a closed enum may carry
+    `#[expect(clippy::too_many_lines)]`, with its reason. A landed
+    function keeps its exception until a session widens it. Each report
+    names any such exception it adds and the function's length.
+  - 23:45Z, point 2 (every session that adds or edits tests): Name each
+    request id, duration and time in a test as a const beside the file's
+    others, by what it stands for: `const CLOSE: u8 = 11;`, `const GRACE:
+    Duration = Duration::from_secs(5);`, `const PAST_GRACE: Duration =
+    Duration::from_secs(601);`, `const RETRY_AT: Time =
+    Time::from_nanos(100_000_000);`. Never `request(&mut world, 11, …)` or
+    `Duration::from_secs(601)` inline. A line of a test you edit anyway
+    takes its numbers named, as jig-client's `tests/store.rs` :69, :91,
+    :111 and :120 do. Seeds passed to `world(…)` and expected values stay
+    literals.
 
 ## Prerequisites the run checks at its start
 

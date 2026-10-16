@@ -949,6 +949,9 @@ choice would have been the user's (development.md, 10.4).
      5. **jig 15.4 (in the plan):** `Thread::sending(key, by, words, place)`, with `place` 0 for a lone `Message`. `answered` marks the words sent with `first_message + place`, tested by `words_sent_in_a_compound_are_numbered_by_their_place`.
      6. **Unchanged:** 04.7, whose tests judge only made or refused at a place (ruling 181). Nothing is deferred: no `later.md` row.
 
+185. **The 23:45Z steer's two rules in the README** (steer of 2026-10-16T23:45:53Z).
+     The steer of 2026-10-16T23:45Z, from the check of 23:45:25Z: its points 1 (a function too long is split, not excused) and 2 (request ids, durations and times named in tests) hold until the run's end, so their Pass on texts are in the README's "The run's steers" (ruling 167), under "23:45Z, point 1" and "23:45Z, point 2". Unchanged: the 12:48Z `too_many_arguments` rule, the base's exceptions, 04.6's landed code (no rework step), ruling 149's `large_enum_variant`; seeds and expected values stay literals.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
