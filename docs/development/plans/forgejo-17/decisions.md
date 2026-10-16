@@ -286,6 +286,23 @@
      A further copy of a corrected name is corrected the same way, and listed
      in the commit body.
 
+107. **temper 04's Shapes after 03.1** (ready check of temper-04.1).
+     temper/04-job-read.md re-checked after temper 03.1's landing 00f6dc640,
+     for the parts that need it (translate's arm, the client-world tests, the
+     joint test; through heavy, with a stand-in for 04.1's client change:
+     workspace clippy `-D warnings` passed, 370 of 371 tests passed, the one
+     failure the joint reference test that 04.1's component work makes pass,
+     fuzzy 30 of 30):
+     - translate's arm is `forge::Answer::Job { job, steps } =>
+       job_answer(asked, &job, &steps)`; `byte_answer`'s `Read::Job` arm is
+       at `translate.rs:508-517` since 03.1.
+     - `simulation.rs` has 836 lines; its translate test is at `:495-514`.
+     - `Joint::failing(seed)` takes its other arguments as `Joint::cutting(seed,
+       0, no faults)` gives them; a `match` with a `None` arm is `if let ...
+       else`.
+     The `assert_eq!` on the attempt holds in every world: no world sets
+     `reruns` and uses translate.
+
 ## For the user
 
 - **The store's version (decision 4).** `docs/design/store/README.md`

@@ -197,7 +197,7 @@ and runner 13.2.0, through the conformance tool's component mode.
 - **Files over 800 lines at the base grow by at most 40 lines** in one
   increment (code-organization.md, 6): here
   `crates/temper-engine-domain-forge-client/src/api.rs` (844) and
-  `tests/engine/forge/client/tests/simulation.rs` (828); the landing's
+  `tests/engine/forge/client/tests/simulation.rs` (836); the landing's
   report gives `git diff --numstat origin/main...HEAD -- <file>` for
   each.
 
@@ -235,8 +235,8 @@ lines), `src/tests/records.rs:103-131`,
 `crates/temper-engine-smith/src/tests.rs`,
 `tests/engine/forge/client/src/translate.rs` (`answer`'s arm for
 `forge::Answer::Job`, which temper 03.1 adds, and `byte_answer`'s
-`Read::Job` arm, `:500-509`; temper 03.1 changes this file first) and
-`tests/simulation.rs:495-506` (828 lines),
+`Read::Job` arm, `:508-517` since temper 03.1) and
+`tests/simulation.rs:495-514` (836 lines),
 `tests/engine/protocol-forge/src/joint.rs:50-104`, `src/protocol.rs:46-53`,
 `tests/fake_protocol.rs`.
 Shape:
@@ -299,14 +299,15 @@ Shape:
   the attempt asked (`assert_eq!` on its `attempt`): the read by id
   drops the attempt, no world reads a stale one (every world's checks
   set `reruns: 0`), and the component answers `MissingJob` for one, so
-  a world that met one would diverge silently. The arm for
-  `forge::Answer::Job { steps, .. }` takes the first of `steps` whose
+  a world that met one would diverge silently. The arm is
+  `forge::Answer::Job { job, steps } => job_answer(asked, &job, &steps)`;
+  the helper takes the first of `steps` whose
   `status` is `forge::StepStatus::Failure`, and gives `step:
   Some(client::Step { number, name })` and that step's `log`; with none
   failed (`Failing::NoStep`), `step: None` and the steps' logs joined in
   order (the job's whole log). It then keeps the last `max_bytes` bytes,
   `truncated` when it cut, as `byte_answer`'s `Read::Job` arm
-  (`:500-509`) does at the base; that arm goes, `Read::Job` joins
+  (`:508-517`) does since temper 03.1; that arm goes, `Read::Job` joins
   `byte_answer`'s panic, and `byte_answer` keeps `Read::File`'s arm.
 - `reads.rs` (conformance) `actions()`: after `component-read-job`'s
   call, the tool reads `GET R/actions/jobs/<job>` itself (`f.get`) and
@@ -422,7 +423,7 @@ no step failed:\n` and the log), and
 `a_job_answer_with_an_empty_step_name_names_its_number_alone` (`Job 8
 run 7, failed step 1:\n` and the log; design question 1). In the forge client world:
 `bounded_job_bytes_translate_to_a_truncated_attempt_log`
-(`simulation.rs:495-506`) passes `translate::answer` a
+(`simulation.rs:495-514`) passes `translate::answer` a
 `temper_fake_forge_domain::api::Answer::Job` in place of its
 `Answer::File(b"error")`: steps 0 `Set up job` `Success` (log `set
 up\n`), 1 `Run build` `Failure` (log `error`), 2 `Complete job`
@@ -441,7 +442,10 @@ u32) -> raw::Checks`; its callers, `Joint::cutting` (`joint.rs:47`,
 which `Joint::new` calls) and `Protocol::cutting` (`protocol.rs:46`),
 pass `checks(1000)` as today; `Joint::failing(seed:
 u64) -> Joint` passes `checks(0)`, on temper 03.1's default
-`Failing::Workflow`. The joint test, in `tests/fake_protocol.rs`, under
+`Failing::Workflow`, and its other arguments as `Joint::cutting(seed, 0,
+no faults)` gives them (settings with `user = 1`, `fixtures::shared()`).
+A `match` on the failed step with a `None` arm is written `if let ...
+else` (clippy's `single_match_else`). The joint test, in `tests/fake_protocol.rs`, under
 0.5 s:
 ```rust
 #[test]
