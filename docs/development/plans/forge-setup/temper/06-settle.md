@@ -48,8 +48,10 @@ window's end; past it, not mergeable is a conflict. The hinted story (temper 11.
 - **The check is a scenario action** (`forge::check`): the world's scripted moves run at `Time::ZERO`
   (`world.rs:278-281`, `335-339`), so a span counted from a move would be over before the world's clock;
   the world calls it after a move, with its own clock.
-- **`translate::hint`** is the one mapping of a fake hook to a hint, for both worlds and the conformance
-  world, which repeats it now (`systems.rs:224-245`). The helpers of `simulation.rs` (1830 lines) that
+- **`translate::hint`** is the one mapping of a fake hook to a hint, for the forge world (`tests/engine/forge`)
+  and the conformance world, which repeats it now (`systems.rs:224-245`). The client world
+  (`tests/engine/forge/client/src/world.rs`: `hooked: false` `:125`, `Hook { .. } => {}` `:467`, `:645`) keeps
+  ignoring hooks, unchanged. The helpers of `simulation.rs` (1830 lines) that
   `settle.rs` needs move to the world crate's `src/changes.rs`.
 
 ## Rules that bind it
@@ -67,15 +69,18 @@ Needs: temper 04.1 (the paired timing facts).
 Files: `testing/temper-fake-forge-domain/src/{api,boundary,hooks,ci,git,issues,pulls,store,wiki,scenario,
 domain,lib}.rs` (`ci.rs:221` raises the status hook, `pulls.rs:347` computes `mergeable`, `store.rs:82` is
 `Pull`); `tests/engine/forge/client/src/translate.rs`; `tests/engine/forge/src/{world,lib,changes}.rs`;
-`tests/engine/forge/tests/{hooks,simulation}.rs`; `tests/conformance/src/systems.rs`. No `Config` field: its
-five literals stay. Hotspot with 05.1: the protocol layer matches `Request::Hook { .. }` (`server.rs:140`,
+`tests/engine/forge/tests/{hooks,simulation}.rs`; `tests/conformance/src/systems.rs`;
+`testing/temper-fake-forge-domain/src/tests/next.rs`. No `Config` field: its six literals stay (fake `tests.rs:46`,
+`:1576`, `tests/engine/forge/src/world.rs:563`, `client/src/world.rs:658`, `tests/fake-forge/tests/memory.rs:42`,
+`tests/worker/checkout/src/forge.rs:60`). Hotspot with 05.1: the protocol layer matches `Request::Hook { .. }` (`server.rs:140`,
 `service.rs:94`); whichever of 05.1 and 06.1 lands second adapts 05.1's rendering to the reshaped `Hook`.
 Users: `Request::Hook` with named fields only at fake `tests.rs:313,340,365`; `Change::Status` at
-`tests.rs:1418,1800,1828,1829` and `systems.rs:234`, `Wiki` at `tests.rs:1421,1803` and `systems.rs:238`.
+`tests.rs:1418,1800,1828,1829` and `systems.rs:234`, `Wiki` at `tests.rs:1421,1803` and `systems.rs:238`; the
+harness's hooks read by tuple position (`hook.0`, `.1`, `.3`) at fake `tests/next.rs:32,33`, reshaped with it.
 Shape: sketches A to D. `Change::Status` becomes `Job`, `Wiki` goes (the table subscribes none). A job hook
 is raised only when CI (`env.limits.ci`) reports `Passed` or `Failed`: `ci::reported` calls `domain::changed`
 with `Hook::job` (the `JobRef` from `actions::reference`, `actions.rs:91`), else pushes the observation alone,
-as `wiki.rs:45,71` now do. Issue hooks carry the issue's body, comment hooks the comment's, review hooks the
+as `wiki.rs:45,71` do once `Wiki` goes (they call `domain::changed(.., Hook::wiki(user))` now). Issue hooks carry the issue's body, comment hooks the comment's, review hooks the
 review's (`Hook::body`), pull hooks none. `Pull.checked: Time` (forge time, zero at open): `pulls::pull`
 answers `mergeable` false while `domain.clock < checked`. **The order follows 04.1's job pair**
 (the ready check runs `grep -E '^(holds|fails) delivery-job-end' tools/forgejo-conformance/facts.txt`, two lines): `delivery-job-end-follows-its-commit-status`:
@@ -87,7 +92,9 @@ does by hand. `World::hooked` sets `hooked: true` (`world.rs:132`); `take_forge`
 `external` (`:358`) pass each `Request::Hook` to `translate::hint`, queue the hint to the top and keep it.
 Test shape: fake `tests.rs` (harness `:249-258` keeps each hook whole, `heard` `:495`, `heard_all` `:504`;
 `setup()` `:147`, `CALM`): updated `a_subscriber_hears_of_each_change_by_webhook` (`:1401`; `Status` 2 becomes
-`Job` 1 per context) and `webhooks_name_the_branch_and_commit_a_push_or_status_is_about` (`:1818`); new
+`Job` 1 per context, and its totals `heard.len()` and `tally().hooks`, 10, at `:1431-1433`),
+`observations_and_webhooks_follow_branches_pull_requests_and_the_wiki` (`:1720`; its `Status` 3 and `Wiki` 2
+counts) and `webhooks_name_the_branch_and_commit_a_push_or_status_is_about` (`:1818`); new
 `a_job_ending_is_heard_with_its_run_job_and_commit` (asserts the order the fact names),
 `a_pending_report_and_a_persons_status_are_not_heard`, `an_issue_a_comment_and_a_review_are_heard_with_their_bodies`,
 `a_pull_reads_not_mergeable_until_the_check_span_passes` (starts its check as the fact says). World, new
@@ -144,7 +151,9 @@ Test shape: change crate `tests.rs` (`LIMITS` `:15` stall 30 s, `decide` `:55`, 
 `a_pending_wait_inside_the_settle_window_ends_with_it_and_never_stalls` (now 40 s, stall due at 30, window to 50:
 `Wait` to 50) and `a_pending_wait_past_the_settle_window_stalls_as_any_wait`. World, new
 `tests/engine/forge/tests/settle.rs`, over `changes::{change_row, change_step, reviewed_change}` (moved from
-`simulation.rs:140,315,334,368`), `World::new` (`world.rs:104`), `slow_calls(ZERO)` (`:222`), `adopt`, `produce`,
+`simulation.rs:140,315,334,368`, with `change_step_with_release` `:324`, which `change_step` calls;
+`change_step_task` is `pub`, as `simulation.rs:645-662` call it; `tests/engine/protocol-forge/tests/protocol.rs:63-66`
+keeps its own copy), `World::new` (`world.rs:104`), `slow_calls(ZERO)` (`:222`), `adopt`, `produce`,
 `status`, `open_pull`, `restart` (`:226`), `writes`, and the hint of `simulation.rs:1600`; each gives the change
 `since` = `world.wall()`, and waits are seconds from the read, `t0` the first. Tests: the reference; then
 `a_pull_not_mergeable_past_settle_is_taken_as_conflicted` (check 40 s: waits 1, 1, 2, 4, 8, 14, then
