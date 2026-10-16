@@ -72,47 +72,74 @@ fn setup_answers_the_server_encodes_decode_unchanged_with_the_transcripts_shape(
         assert!(forgejo::shape(&encoded).is_subset(&forgejo::shape(&forgejo::transcript(case).body)), "{case}");
     }
 }
-#[test]
-fn a_refused_setup_write_reads_its_status_and_message() {
+fn refused_answer(case: &str, status: u16, message: &[u8]) {
     let limits = forgejo::profile_limits();
-    for (case, status) in [
-        ("setup-user-create-again", 422),
-        ("setup-user-create-by-writer", 403),
-        ("setup-user-person-basic", 403),
-        ("setup-user-person-token", 403),
-    ] {
-        let t = forgejo::transcript(case);
-        assert_eq!(t.status, status, "{case}");
-        let result = forgejo::decode_answer(client::error_decoder(&limits), &t.body, &limits);
-        let Ok(Document::Error(message)) = result.document else { panic!("{case}: error document") };
-        let expected: serde_json::Value = serde_json::from_slice(&t.body).expect("error body");
-        assert_eq!(
-            message.message,
-            temper_forge_forgejo::document::Body::Kept(Box::from(
-                expected["message"].as_str().expect("message").as_bytes()
-            )),
-            "{case}"
-        );
-    }
+    let transcript = forgejo::transcript(case);
+    assert_eq!(transcript.status, status);
+    assert_eq!(
+        forgejo::decode_answer(client::error_decoder(&limits), &transcript.body, &limits).document,
+        Ok(Document::Error(temper_forge_forgejo::document::ErrorBody {
+            message: temper_forge_forgejo::document::Body::Kept(Box::from(message)),
+        }))
+    );
 }
 #[test]
-fn setup_bodies_enforce_members_types_and_bounds() {
-    let limits = forgejo::profile_limits();
-    let base = serde_json::json!({"username":"bot", "email":"bot@example.invalid", "password":"secret", "full_name":"temper:bot", "must_change_password":false});
-    for (key, value, expected) in [
-        ("must_change_password", Some(serde_json::json!("false")), "must_change_password"),
-        ("password", Some(serde_json::json!("x".repeat(513))), "password"),
-        ("full_name", None, "full_name"),
-    ] {
-        let mut body = base.clone();
-        match value {
-            Some(value) => body[key] = value,
-            None => {
-                body.as_object_mut().expect("object").remove(key);
-            }
-        }
-        let refusal = forgejo::decode_route(Method::Post, b"/api/v1/admin/users", body.to_string().as_bytes(), &limits)
-            .expect_err("bad body");
-        assert!(refusal.contains(&format!("field: {:?}", expected.as_bytes())), "{key}: {refusal}");
-    }
+fn creating_an_existing_user_reads_its_refusal() {
+    refused_answer("setup-user-create-again", 422, b"user already exists [name: bot]");
+}
+#[test]
+fn creating_a_user_as_a_writer_reads_the_admin_refusal() {
+    refused_answer("setup-user-create-by-writer", 403, b"user should be the site admin");
+}
+#[test]
+fn basic_auth_for_a_person_who_must_change_password_reads_the_refusal() {
+    refused_answer(
+        "setup-user-person-basic",
+        403,
+        b"You must change your password. Change it at: http://127.0.0.1:3000//user/change_password",
+    );
+}
+#[test]
+fn a_token_for_a_person_who_must_change_password_reads_the_refusal() {
+    refused_answer(
+        "setup-user-person-token",
+        403,
+        b"You must change your password. Change it at: http://127.0.0.1:3000//user/change_password",
+    );
+}
+fn user_body() -> serde_json::Value {
+    serde_json::json!({"username":"bot", "email":"bot@example.invalid", "password":"secret", "full_name":"temper:bot", "must_change_password":false})
+}
+fn refused(body: &serde_json::Value, expected: &str) {
+    assert_eq!(
+        forgejo::decode_route(
+            Method::Post,
+            b"/api/v1/admin/users",
+            body.to_string().as_bytes(),
+            &forgejo::profile_limits()
+        )
+        .expect_err("bad body"),
+        expected
+    );
+}
+#[test]
+fn a_text_must_change_password_is_refused_naming_its_field() {
+    let mut body = user_body();
+    body["must_change_password"] = serde_json::json!("false");
+    refused(
+        &body,
+        "body: Shape { field: [109, 117, 115, 116, 95, 99, 104, 97, 110, 103, 101, 95, 112, 97, 115, 115, 119, 111, 114, 100] }",
+    );
+}
+#[test]
+fn a_password_past_string_bytes_is_refused_naming_its_field() {
+    let mut body = user_body();
+    body["password"] = serde_json::json!("x".repeat(513));
+    refused(&body, "body: TooLong { field: [112, 97, 115, 115, 119, 111, 114, 100] }");
+}
+#[test]
+fn a_missing_full_name_is_refused_naming_its_field() {
+    let mut body = user_body();
+    body.as_object_mut().expect("object").remove("full_name");
+    refused(&body, "body: Missing { field: [102, 117, 108, 108, 95, 110, 97, 109, 101] }");
 }

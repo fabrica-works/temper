@@ -9,6 +9,12 @@ use skein_lib::{
     Env, Intake, List, Queue, Time, Wall,
     stream::{Down, Up},
 };
+pub fn bot() -> crate::document::User {
+    crate::document::User { id: 1, login: Box::from(*b"fixture"), is_admin: true, full_name: Box::from(*b"temper:bot") }
+}
+pub fn user(id: u64, login: &[u8]) -> crate::document::User {
+    crate::document::User { id, login: Box::from(login), is_admin: false, full_name: Box::from([]) }
+}
 pub fn limits() -> Limits {
     Limits {
         json: tokenizer::Limits { depth: 16, string: 65_536, number: 32, chunk: 4_096, length: 4_194_304 },

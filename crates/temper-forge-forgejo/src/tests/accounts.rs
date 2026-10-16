@@ -2,7 +2,7 @@ use super::fixtures;
 use crate::{
     client,
     decode::Malformed,
-    document::{Body, Comment, Document, User},
+    document::{Body, Comment, Document},
     request::{Method, Repo, Request},
     server::{self, Answer, Unrouted},
 };
@@ -14,7 +14,7 @@ fn a_top_level_user_keeps_admin_flag_and_full_name() {
     let body =
         br#"{"id":1,"login":"fixture","full_name":"temper:bot","email":"fixture@example.invalid","is_admin":true}"#;
     let decoder = client::decoder(&Request::User, &limits).unwrap();
-    let user = User { id: 1, login: Box::from(*b"fixture"), is_admin: true, full_name: Box::from(*b"temper:bot") };
+    let user = fixtures::bot();
     assert_eq!(fixtures::decode(decoder, body, &limits).document, Ok(Document::User(user)));
 }
 #[test]
@@ -29,7 +29,7 @@ fn an_embedded_user_keeps_id_and_login_alone() {
     let decoder = client::decoder(&request, &limits).unwrap();
     let comment = Comment {
         id: 3,
-        user: User { id: 1, login: Box::from(*b"fixture"), is_admin: false, full_name: Box::from([]) },
+        user: fixtures::user(1, b"fixture"),
         created_at: None,
         updated_at: None,
         body: Body::Kept(Box::from([])),
@@ -40,7 +40,7 @@ fn an_embedded_user_keeps_id_and_login_alone() {
 fn a_user_without_the_two_members_decodes_with_empty_defaults() {
     let limits = fixtures::limits();
     let decoder = client::decoder(&Request::User, &limits).unwrap();
-    let user = User { id: 1, login: Box::from(*b"fixture"), is_admin: false, full_name: Box::from([]) };
+    let user = fixtures::user(1, b"fixture");
     assert_eq!(fixtures::decode(decoder, br#"{"id":1,"login":"fixture"}"#, &limits).document, Ok(Document::User(user)));
 }
 #[test]
@@ -68,7 +68,7 @@ fn an_admin_flag_that_is_not_a_boolean_is_malformed_naming_it() {
 #[test]
 fn the_servers_user_answer_decodes_to_the_user_it_encodes() {
     let limits = fixtures::limits();
-    let user = User { id: 1, login: Box::from(*b"fixture"), is_admin: true, full_name: Box::from(*b"temper:bot") };
+    let user = fixtures::bot();
     let encoded = server::encode(&Answer::User(user.clone()), &limits).unwrap();
     let decoder = client::decoder(&Request::User, &limits).unwrap();
     assert_eq!(fixtures::decode(decoder, &encoded, &limits).document, Ok(Document::User(user)));
