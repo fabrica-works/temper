@@ -29,8 +29,8 @@ highest layer that runs it.
   `findings/fake-forge-and-brief.md` sections 1, 2, 5 and 6;
   `findings/measurements.md` sections 2 and 3; `findings/answer.md`
   section 1 (its last bullet: the fake has no `Answer::Job`).
-- `temper/02-documents.md`, 02.1's Shape: `d::Job`'s `steps`, `d::Step`,
-  `d::StepStatus`, `Document::Job`, `Request::Job`, `JobLog`'s `step`,
+- `temper/02-documents.md`, 02.1's Shape: `d::Step`, `d::StepStatus`,
+  `server::Answer::Job`, `Document::Job`, `Request::Job`, `JobLog`'s `step`,
   the server's route and encoder, and what 02.1 does to the fake
   protocol's matches. This file's assumptions about 02.1 are listed under
   "Assumed from temper 02.1" below.
@@ -209,15 +209,15 @@ These names are `code-organization.md`'s, section 2, and the README's
 Where 02.1 landed others, its names win, and the implementer reports the
 difference:
 
-- `d::Job { id, run_id, attempt, steps: Box<[d::Step]> }`, with empty
-  `steps` in a run's listing. 02.1 changes the fake's listing at
-  `testing/temper-fake-forge-protocol/src/answers.rs:357` to `steps:
-  Box::from([])`.
+- `d::Job { id, run_id, attempt }`, unchanged and `Copy`, as the fake's
+  listing at `testing/temper-fake-forge-protocol/src/answers.rs:357`
+  builds it (design question 6: a client reads a job's steps as rows).
 - `d::Step { number: u32, name: Box<[u8]>, status: d::StepStatus }`,
   where `d::StepStatus` has `Success`, `Failure` and `Cancelled` among
   its variants, written `success`, `failure` and `cancelled`.
-- `server::Answer::Job(d::Job)`, encoded with a step written
-  `{"number":…,"name":"…","status":"…"}`, in that order.
+- `server::Answer::Job { job: d::Job, steps: Box<[d::Step]> }`,
+  encoded with a step written `{"number":…,"name":"…","status":"…"}`,
+  in that order, and no `steps` member when there are none.
 - `Request::Job { at, job }` for `GET R/actions/jobs/<job>`, and
   `Request::JobLog { at, job, attempt, step: Option<u32> }`, both
   routed by `temper-forge-forgejo`'s server.
@@ -348,8 +348,8 @@ Shape:
   - `Request::JobLog { job, attempt, step, .. }` goes to `Read::Log {
     job, attempt, step }`.
 - `answers::read` maps `a::Answer::Job { job, steps }` to
-  `Answer::Job(d::Job { id: job.id, run_id: job.run, attempt:
-  job.attempt, steps })`, each `d::Step { number, name, status }` made
+  `Answer::Job { job: d::Job { id: job.id, run_id: job.run, attempt:
+  job.attempt }, steps }`, each `d::Step { number, name, status }` made
   from the fake's step, its `log` left out, its status through `pub fn step(status:
   a::StepStatus) -> d::StepStatus`, beside `status` (`answers.rs:16`).
   `bounded::answer` prices it as `budget.row(0)`, then `budget.row(<the
@@ -438,8 +438,8 @@ Test shape:
     `a_jobs_steps_keep_their_numbers_names_and_statuses`. Its input is
     `a::Answer::Job` with steps `Success`, `Cancelled` and `Failure`,
     each with a non-empty `log`; the expected value is
-    `Answer::Job(d::Job { … })` written out, its steps with no log, as
-    `d::Step` has none;
+    `Answer::Job { job: d::Job { … }, steps: … }` written out, its steps
+    with no log, as `d::Step` has none;
   - `http.rs`, on `Harness` (`src/tests/fixtures.rs:60-301`: `new` `:76`
     with context `build` failing, `push` `:283`, `ask` `:240`, `status`
     `:205`, `body` `:214`, `domain_calls` `:202`). Limits: `limits()`
@@ -697,7 +697,7 @@ not alone:
 
 // testing/temper-fake-forge-domain/src/api.rs, in `pub enum Answer`
     /// A job at its latest attempt and its three steps, in order, each with
-    /// its log slice; the protocol layer encodes it as `d::Job`, without the logs.
+    /// its log slice; the protocol layer encodes it as `server::Answer::Job`, without the logs.
     Job {
         job: Job,
         steps: Box<[Step]>,

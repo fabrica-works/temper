@@ -32,10 +32,13 @@
   or runner version; doc comments say "the pinned Forgejo"
   (`temper_throwaway_forgejo::VERSION`), never a number.
 - **Forgejo's documents** (`temper_forge_forgejo::document`, `d::` in
-  the component): the existing `d::Job` gains `steps: Box<[d::Step]>`,
-  empty in a run's listing, where Forgejo sends none; `d::Step {
-  number: u32, name: Box<[u8]>, status: d::StepStatus }`; the single
-  job is `Document::Job(d::Job)`. No second job type.
+  the component): the existing `d::Job { id, run_id, attempt }` is
+  unchanged, `Copy`; `d::Step { number: u32, name: Box<[u8]>, status:
+  d::StepStatus }`; a job read by its id is `Document::Job(d::Job)`,
+  its steps delivered before it as rows, `Row::Step(d::Step)`, as they
+  stream (design question 6: a job of any number of steps is read); the
+  server's `Answer::Job { job: d::Job, steps: Box<[d::Step]> }`. No
+  second job type.
 - **Requests** (`temper_forge_forgejo::request`): `Request::Job { at,
   job }` (`GET R/actions/jobs/<job>`); `Request::JobLog { at, job,
   attempt, step: Option<u32> }`; `Request::Compare { at, before, after,
@@ -63,7 +66,7 @@ Each is defined by one increment; the others use it by name.
 | Interface | Owner |
 |---|---|
 | `VERSION`, `RUNNER_VERSION` | temper 01.1 |
-| `d::Job`'s steps, `d::Step`, `d::StepStatus`, `Document::Job`, `Request::Job`, `JobLog`'s `step` | temper 02.1 |
+| `d::Step`, `d::StepStatus`, `Row::Step`, `Document::Job`, `Answer::Job`, `Request::Job`, `JobLog`'s `step` | temper 02.1 |
 | the recorder's suffix range (`testing/temper-throwaway-forgejo/src/http.rs`) | temper 02.1 |
 | `Request::Compare`'s `files`, and `verification=false` on every comparison | temper 02.2 |
 | the fake's `Failing`, its steps and their logs | temper 03.1 |

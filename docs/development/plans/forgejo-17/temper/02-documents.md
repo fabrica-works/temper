@@ -51,8 +51,11 @@ has no steps is not checked here: `later.md` (decisions.md, 13).
   those of its latest attempt: number 0 is the runner's set-up (`Set up
   job`), the last its completion (`Complete job`), and the workflow's own
   steps are between. The failed step is the first whose `status` is
-  `failure` [...]. Its log alone is read (`step`), and of it the end, by
-  a suffix range". The row `Read::Job` sends "`GET R/actions/jobs/<job>`;
+  `failure` [...]. The steps are read as they stream, and only the
+  failed one is kept, the others skipped as they pass: a job of any
+  number of steps is read, its steps costing time, not memory. Its log
+  alone is read (`step`), and of it the end, by a suffix range" (the
+  streaming: design question 6, answered 2026-10-16). The row `Read::Job` sends "`GET R/actions/jobs/<job>`;
   `GET R/actions/jobs/<job>/logs?attempt=<attempt>&step=<number>` with
   `Range: bytes=-<max_bytes>`, `step` the failed step's, absent when no
   step failed". This session puts those requests and the job document in
@@ -71,7 +74,11 @@ has no steps is not checked here: `later.md` (decisions.md, 13).
   it streams."
 - **Strings** (3.3): "a name, a title, a context, a description, a link
   or a path is kept within `string_bytes`; a longer one makes the answer
-  malformed"; a malformed answer "fails a read as `InvalidAnswer`".
+  malformed"; "but for a job step's name, which Forgejo makes of the
+  step's whole script when the workflow names none: a longer one is
+  carried empty, and the step is named by its number alone, so that a
+  long script never makes a job unreadable" (design question 1); a
+  malformed answer "fails a read as `InvalidAnswer`".
 - **Both sides** (10): "Step tests for `temper-forge-forgejo`: each
   decoder against transcripts of a throwaway Forgejo v17.0 [...]; golden
   bytes for each encoder [...]. Server encoders meet the client decoders,
@@ -100,25 +107,33 @@ has no steps is not checked here: `later.md` (decisions.md, 13).
 
 ## Choices this plan makes
 
-1. **One job document** (code-organization.md, 2): `d::Job` gains
-   `steps`, in Forgejo's order, empty where Forgejo sends none (a run's
-   listing; a job no runner took, whose `steps` is absent); it loses
-   `Copy`. One decoder table serves the job at the root and as a listing
-   row.
-2. **Bounds and words, as 06's other documents:** a job's steps past
-   `inner` are `Malformed::Bound { field: b"steps" }`, as a protection's
-   contexts are (`client/branches.rs:215`); a step's `name` past
-   `string_bytes` is `Malformed::TooLong { field: b"name" }`
-   (`decode/walk.rs:362,469-474`); a `status` outside Forgejo's eight
+1. **One job document, its steps as rows** (code-organization.md, 2;
+   design question 6): `d::Job { id, run_id, attempt }` is unchanged
+   and keeps `Copy`. A job read by its id answers `Document::Job(Job)`,
+   and each of its steps goes up before it as a `Row::Step(Step)` as it
+   streams, in Forgejo's order, as a comparison's commits and files do:
+   no list of steps is held, and no bound counts them. A job with no
+   `steps` member (no runner took it) has no step rows. A run's listing
+   of jobs gives no step rows: steps in its rows, if Forgejo sent any,
+   are skipped. One decoder table serves the job at the root and as a
+   listing row. The server's `Answer::Job { job: Job, steps: Box<[Step]>
+   }` holds the steps it writes.
+2. **Bounds and words, as 06's other documents:** a job's steps are
+   counted by no bound (Choices, 1); a step's `name` past `string_bytes`
+   is read empty, never refused (forge.md 3.3, design question 1): it is
+   read as `Read::Body`, which the walker caps at `string_bytes` for a
+   step as it does for `Kind::Error` (`decode/walk.rs:363-367`), and its
+   `Body::Long` (`:469-474`) is the empty name; a `status` outside Forgejo's eight
    words is `Malformed::Value { field: b"status" }`; a `number` past
    `u32` is `Malformed::Range { field: b"number" }`. The eight words are
    Forgejo's Actions statuses: `unknown`, `waiting`, `running`,
    `success`, `failure`, `cancelled`, `skipped`, `blocked`; the v17 API
    description's `ActionRunJobStep.status` names six of them ("success,
-   failure, running, waiting, skipped, cancelled, ..."). "Questions to
-   raise when reached" names what these bounds make unreadable.
-3. **The server writes `steps` only when the job has some:** Forgejo's
-   listing rows and a waiting job carry none, and the codecs world holds
+   failure, running, waiting, skipped, cancelled, ...").
+3. **The server writes `steps` only when the job has some**
+   (`Answer::Job`'s): a waiting job carries none, and a listing's rows
+   (`Answer::Jobs`, of `Job`) never do, as Forgejo's carry none; the
+   codecs world holds
    the server's answers to each transcript's shape
    (`tests/codecs/tests/forgejo_files.rs:188-202`).
 4. **`JobLog { step: None }` writes no `step`:** the job's log, as at the
@@ -248,11 +263,11 @@ Files:
   `transcripts/` and `facts.txt`, written by the tool.
 - `tests/codecs/tests/forgejo_files.rs` (the imports `:6`, `jobs()`
   `:20-22`, `log()` `:36-38`, `cases()` `:39-116`, `expected()`
-  `:117-155`, the mutations `:204-232`, `:253`, which borrows its row
-  since `Job` is no longer `Copy`); the `server::Answer` lists of
+  `:117-155`, the mutations `:204-232`); the `server::Answer` lists of
   `forgejo_items.rs:166`, `forgejo_reviews.rs:138`, `forgejo_start.rs:55`
   and `forgejo_writes.rs:159`; `forgejo_writes.rs`'s `failure_cases()`
-  (`:233-258`).
+  (`:233-258`). `Job` keeps `Copy` (design question 6), so
+  `client/actions.rs:79` and `forgejo_files.rs:253` do not change.
 
 The users above were found with `git grep -n -e 'Request::JobLog' -e
 'Answer::Jobs' -e 'Document::Runs' -e 'Job { id' -e '39' -e 'range:
@@ -260,13 +275,12 @@ Option<(u64, u64)>' -e 'Some((0, 3))' -e 'Row::Job(' -- '*.rs'` at the
 base; its other hits are the fake domain's own `Answer::Jobs` and `Job`
 (`testing/temper-fake-forge-domain`, `tests/engine/forge/client`,
 `tests/fake-forge`), which this session does not change. component.md, 1
-lists most, and leaves out `d::Job`'s `Copy` users
-(`client/actions.rs:79`, `forgejo_files.rs:253`) and `service.rs:158`.
+lists most, and leaves out `service.rs:158`.
 
 Shape:
-- `temper_forge_forgejo::document`: `Job { id, run_id, attempt, steps:
-  Box<[Step]> }`, `Step`, `StepStatus` and `Document::Job(Job)`, as the
-  sketch; `pub(crate) fn step_status(text: &[u8]) -> Option<StepStatus>`
+- `temper_forge_forgejo::document`: `Step`, `StepStatus`,
+  `Row::Step(Step)` and `Document::Job(Job)`, as the sketch; `Job`
+  unchanged; `pub(crate) fn step_status(text: &[u8]) -> Option<StepStatus>`
   and `pub(crate) fn step_status_text(status: StepStatus) -> &'static
   [u8]` beside `style`/`style_text`.
 - `request::Request::Job { at: Repo, job: u64 }` (`GET
@@ -280,22 +294,27 @@ Shape:
   there, so the document's is written `document::Step`): `ActionKind`
   gains `Steps` (an array) and `Step` (its element); `fields(Job)` adds
   `steps`, optional, `Read::Array(Kind::Action(ActionKind::Steps))`;
-  `fields(Step)` is `number` (`Read::Number`), `name` and `status`
-  (`Read::Text`), required; `element(Steps)` is `Step`.
-  `Actions::new(root, limits)` holds a `List<document::Step>` of capacity
-  `limits.inner` and the step being read. A step's end pushes it (a full
-  list: `Malformed::Bound { field: b"steps" }`); a job's end moves the
-  list into the job, and answers it as a row when the root is `Jobs`;
-  with the root `Job`, `Move::Done` answers `Document::Job`.
+  `fields(Step)` is `number` (`Read::Number`), `name` (`Read::Body`)
+  and `status` (`Read::Text`), required; `element(Steps)` is `Step`.
+  The walker's `Read::Body` cap (`decode/walk.rs:363-367`) is
+  `string_bytes` for `Kind::Action(ActionKind::Step)` as for
+  `Kind::Error`; a step's `Body::Kept(name)` is its name, a
+  `Body::Long(_)` an empty name. `Actions` holds the step being read. A
+  step's end, with the root `Job`, answers `Step::Row(Row::Step(step),
+  Request::Next)`, as a run's end answers its row with the root
+  `Listing`; with the root `Jobs` the step is dropped. A job's end
+  answers it as a row when the root is `Jobs`, as at the base; with the
+  root `Job`, `Move::Done` answers `Document::Job(job)`.
   `client::decoder` maps `Request::Job` to `Kind::Action(ActionKind::Job)`.
   If clippy's `large_enum_variant` names `DecoderState::Actions`, it is
   boxed, as its siblings are.
 - The server (`server/actions.rs`): the route `[jobs, job]` is
   `Request::Job`; `[jobs, job, logs]` reads `step` when present, as a
-  `u32` (`Unrouted::Malformed` otherwise). `server::Answer::Job(Job)`; one
-  `fn job(json: &mut Encoder, value: &Job)` writes `id`, `run_id`,
-  `attempt`, and `steps` (each `number`, `name`, `status`) only when there
-  are some; `Answer::Jobs` writes each row through it.
+  `u32` (`Unrouted::Malformed` otherwise). `server::Answer::Job { job: Job,
+  steps: Box<[Step]> }`; one `fn job(json: &mut Encoder, value: &Job,
+  steps: &[Step])` writes `id`, `run_id`, `attempt`, and `steps` (each
+  `number`, `name`, `status`) only when there are some; `Answer::Jobs`
+  writes each row through it with no steps.
 - The component: `raw_request` classes `Request::Job` with the JSON
   requests (`false`), and `page_bound` with the unpaged ones (`None`):
   each match classifies the shared enum's requests, and both answers are
@@ -303,22 +322,20 @@ Shape:
   a document the plan did not ask for (`InvalidAnswer` in `actions.rs`,
   `contents.rs` and `reads/done.rs`; nothing in `writes.rs`,
   `keep_document` and `long`), as `Document::Run` does in the plans that
-  never send `Request::Run`. `actions.rs:300` sends `step: None`. No arm
-  reads a job before temper 04.1. The component's `worst_case`
-  (`limits.rs:311`) is not changed: a job's steps are one list of
-  `inner` elements, each a `d::Step` and a name of at most
-  `string_bytes`, priced by its per-element envelope for "lists of
-  texts/users" (`:322-334`). No test at the base fails when a list's
-  element passes that envelope
-  (`the_worst_case_counts_answers_and_refuses_overflow`,
-  `src/tests.rs:307-315`, checks a floor and overflow only), so 02.1
-  adds one (Test shape).
+  never send `Request::Run`. `d::Row::Step(_)` joins each `d::Row`
+  match the same way: `InvalidAnswer` in `actions.rs`'s rows and
+  `reads.rs:388`, nothing in `reads.rs:624-629` and `:708-709`.
+  `actions.rs:300` sends `step: None`. No arm reads a job or a step
+  before temper 04.1. The component's `worst_case` (`limits.rs:311`) is
+  not changed: a step is one row being built and one delivered, its name
+  one string of at most `string_bytes`, within the envelope's 32 scalar
+  strings and its rows (`:322-334`).
 - The fake: `Route::Job`, so 40 routes (`tally.rs:104`, `:114`,
   `server.rs:432` and `service.rs:158` say 40); `routes::op` answers
   `Request::Job` with `Err(a::Error::Missing(a::What::Job))` (Choices, 5);
   `routes::repository` gives its path; `response.rs:204` answers it 200;
-  the other arms join their lists; `answers.rs:357` builds `d::Job { id,
-  run_id, attempt, steps: Box::from([]) }`.
+  the other arms join their lists; `answers.rs:357`'s `d::Job` is
+  unchanged.
 - The recorder: `temper_throwaway_forgejo::Range`, `Outgoing.range:
   Option<Range>` (the sketch); `http.rs` writes `Range: bytes=0-<n>` for
   `Head(n)` and `Range: bytes=-<n>` for `Tail(n)`; `fixture.rs:80`,
@@ -387,7 +404,7 @@ Test shape:
   ```rust
   #[test]
   fn a_job_reads_its_steps_numbers_names_and_statuses() {
-      use crate::document::{Job, Step, StepStatus};
+      use crate::document::{Job, Row, Step, StepStatus};
       let limits = fixtures::limits();
       let request = Request::Job {
           at: crate::request::Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") },
@@ -395,61 +412,37 @@ Test shape:
       };
       let body = br#"{"id":2,"run_id":1,"attempt":1,"name":"fail","status":"failure","steps":[{"number":0,"name":"Set up job","status":"success","started":"2020-01-01T00:00:14+05:30"},{"number":1,"name":"exit 1\n","status":"failure"},{"number":2,"name":"Complete job","status":"failure"}]}"#;
       let decoded = fixtures::decode(client::decoder(&request, &limits).unwrap(), body, &limits);
+      assert_eq!(decoded.document, Ok(Document::Job(Job { id: 2, run_id: 1, attempt: 1 })));
       assert_eq!(
-          decoded.document,
-          Ok(Document::Job(Job {
-              id: 2,
-              run_id: 1,
-              attempt: 1,
-              steps: Box::from([
-                  Step { number: 0, name: Box::from(*b"Set up job"), status: StepStatus::Success },
-                  Step { number: 1, name: Box::from(*b"exit 1\n"), status: StepStatus::Failure },
-                  Step { number: 2, name: Box::from(*b"Complete job"), status: StepStatus::Failure },
-              ]),
-          }))
+          decoded.rows.as_slice(),
+          [
+              Row::Step(Step { number: 0, name: Box::from(*b"Set up job"), status: StepStatus::Success }),
+              Row::Step(Step { number: 1, name: Box::from(*b"exit 1\n"), status: StepStatus::Failure }),
+              Row::Step(Step { number: 2, name: Box::from(*b"Complete job"), status: StepStatus::Failure }),
+          ],
+          "each step goes up as a row, in Forgejo's order"
       );
-      assert!(decoded.rows.is_empty(), "a job at the root is a document, not a row");
   }
   ```
 
   The others: `a_job_without_a_steps_member_reads_no_steps` (`{"id":4,
-  "run_id":2,"attempt":0,"status":"waiting"}`: `steps` empty);
+  "run_id":2,"attempt":0,"status":"waiting"}`: the document, no row);
   `a_job_encodes_its_steps_only_when_it_has_some` (golden bytes:
-  `server::encode(&Answer::Job(…one step…))` is
+  `server::encode(&Answer::Job { job, steps: …one step… })` is
   `{"id":2,"run_id":1,"attempt":1,"steps":[{"number":0,"name":"Set up
-  job","status":"success"}]}`, and `Answer::Jobs` of a job with no steps
-  is `[{"id":2,"run_id":1,"attempt":1}]`);
+  job","status":"success"}]}`, and `Answer::Job` with no steps is
+  `{"id":2,"run_id":1,"attempt":1}`);
   `each_step_status_reads_back_from_the_servers_word` (a table of the
   eight `StepStatus` values: a one-step job the server encodes decodes to
   the same job); `a_step_status_outside_forgejos_words_is_malformed`
   (`"status":"done"`: `Err(Malformed::Value { field: b"status" })`);
-  `a_jobs_steps_are_read_up_to_inner_and_refused_past_it` (`limits.inner
-  = 2`; two rows: two steps, at the limit, read as `Ok(Document::Job(…))`
-  with both steps; three steps, one past, `Err(Malformed::Bound { field:
-  b"steps" })`, as
-  `a_protection_with_inner_plus_one_contexts_is_past_its_bound`,
-  `:258-270`, does).
-- `crates/temper-engine-protocol-forge/src/tests.rs`, beside
-  `the_worst_case_counts_answers_and_refuses_overflow` (`:307-315`), on
-  `fixtures::limits()` and `fixtures::shared()` (`string_bytes` 128,
-  `inner` 8, `src/tests/fixtures.rs:15-17`), under 20 ms: the bound at
-  its limit (a step whose name is `string_bytes` long) and a floor for
-  the margin (twice that step: the row being built and the row
-  delivered, which the envelope's comment at `limits.rs:322-324` says it
-  covers):
-
-  ```rust
-  #[test]
-  fn each_inner_element_of_the_worst_case_holds_a_job_step_twice() {
-      let limits = fixtures::limits();
-      let shared = fixtures::shared();
-      let step = u64::try_from(size_of::<temper_forge_forgejo::document::Step>()).expect("fits")
-          + u64::from(limits.string_bytes);
-      let bound = limits::worst_case(&limits, &shared, 1).expect("fixture bound fits");
-      let more = limits::worst_case(&Limits { inner: limits.inner + 1, ..limits }, &shared, 1).expect("fits");
-      assert!(more - bound >= 2 * step, "one more element: {} bytes; a step at string_bytes: {step}", more - bound);
-  }
-  ```
+  `a_job_reads_more_steps_than_inner_as_rows` (`limits.inner = 2`: a
+  job of three steps reads `Ok(Document::Job(…))` and three step rows;
+  design question 6); `a_step_name_past_string_bytes_reads_empty`
+  (`limits.string_bytes = 8`; two rows: a step named `12345678`, at the
+  limit, keeps its name; one named `123456789`, one past, reads as a
+  step row with an empty name, its `number` and `status` kept, and the
+  document `Ok`; design question 1).
 - `testing/temper-throwaway-forgejo/src/tests.rs`, under 20 ms:
 
   ```rust
@@ -472,11 +465,9 @@ Test shape:
   the implementer reads them from its own `actions-job` transcript:
 
   ```rust
-  fn failing_job() -> Job {
-      Job {
-          id: 2,
-          run_id: 1,
-          attempt: 1,
+  fn failing_job() -> Answer {
+      Answer::Job {
+          job: Job { id: 2, run_id: 1, attempt: 1 },
           steps: Box::from([
               Step { number: 0, name: Box::from(*b"Set up job"), status: StepStatus::Success },
               Step {
@@ -492,16 +483,16 @@ Test shape:
       Request::JobLog { at: forgejo::specimen(), job, attempt: 1, step: Some(step) }
   }
   // cases(), after ("actions-job-log-range", log(), None, 206):
-  ("actions-job", Request::Job { at: forgejo::specimen(), job: 2 }, Some(Answer::Job(failing_job())), 200),
+  ("actions-job", Request::Job { at: forgejo::specimen(), job: 2 }, Some(failing_job()), 200),
   ("actions-job-log-step", step_log(2, 1), None, 200),
   ("actions-job-log-step-suffix", step_log(2, 1), None, 206),
   ("actions-job-log-past-last-step", step_log(2, 3), None, 404),
   ("actions-job-log-empty-suffix", step_log(1, 1), None, 206),
   // expected():
-  Answer::Job(v) => (Document::Job(v), vec![]),
+  Answer::Job { job, steps } => (Document::Job(job), steps.into_vec().into_iter().map(Row::Step).collect()),
   ```
 
-  `log()` gains `step: None`, `jobs()`'s rows `steps: Box::from([])`.
+  `log()` gains `step: None`; `jobs()` is unchanged.
   `file_transcript_mutations_are_malformed_naming_the_field` gains
   `("actions-job", "status", 5, Malformed::Value { field: b"status" })`
   (`5 => json["steps"][0][field] = serde_json::json!("finished")`) and
@@ -540,11 +531,12 @@ bodies); add a `Row::Step` or a second job type; change the workflow at
 `runner.rs:60`, whose jobs the transcripts' literals rest on; capture a
 log's search (`q`, `qi`) or its NDJSON form.
 
-Size: at most 290 lines (documents 55, the decoder 50, the server 30, the
-request and the encoder 10, the exhaustive arms 40, the recorder 15, the
-conformance 90).
+Size: at most 290 lines (documents 45, the decoder 50, the server 30, the
+request and the encoder 10, the exhaustive arms 50, the recorder 15, the
+conformance 90). The step rows (design question 6) and the empty name
+(question 1) move lines between these parts; the total stays.
 
-Removes: `d::Job`'s `Copy`; the recorder's `Option<(u64, u64)>`.
+Removes: the recorder's `Option<(u64, u64)>`.
 
 ### 02.2 The comparisons' flags
 
@@ -751,37 +743,28 @@ Removes: the component's comparisons without flags; the codecs world's
 `Request::Compare`'s `files`. temper 03.1 uses `Answer::Job` and
 `d::Step` in the fake (its arm for `Request::Job` replaces Choices 5's,
 and it reads `JobLog`'s `step`); temper 04.1 sends `Request::Job` and
-`JobLog { step: Some(_) }` from the component and reads
-`Document::Job`'s steps, the first whose `status` is
-`StepStatus::Failure` (decisions.md, 7).
+`JobLog { step: Some(_) }` from the component and keeps, of the job's
+`Row::Step`s, the first whose `status` is `StepStatus::Failure`
+(decisions.md, 7; design question 6).
 
 `Step`, `StepStatus` and `Range` compile standalone in their modules at
-the base. `Job` drops `Copy`, which compiles with 02.1's changes to
-`client/actions.rs:79` and `forgejo_files.rs:253`; the enum excerpts
-compile with the arms 02.1 and 02.2 add.
+the base. `Job` is unchanged; the enum excerpts compile with the arms
+02.1 and 02.2 add.
 
 ```rust
 // crates/temper-forge-forgejo/src/document.rs (02.1)
 
-/// An Actions job (06.4): `GET R/actions/jobs/<id>` with its latest attempt's steps, or a
-/// row of `GET R/actions/runs/<id>/jobs`, which sends none (forge.md 13).
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Job {
-    pub id: u64,
-    pub run_id: u64,
-    /// The job's latest attempt.
-    pub attempt: u32,
-    /// The latest attempt's steps, in Forgejo's order; empty in a run's listing and for a
-    /// job no runner took, where Forgejo sends none.
-    pub steps: Box<[Step]>,
-}
+// `Job { id, run_id, attempt }` is unchanged, `Copy`: a job read by its id sends its latest
+// attempt's steps up before it, each a `Row::Step` (design question 6).
 
-/// One step of a job's latest attempt (forge.md 3.2, "A failed job's log is its failed step's end").
+/// One step of a job's latest attempt, a row of `GET R/actions/jobs/<id>` (forge.md 3.2, "A
+/// failed job's log is its failed step's end").
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Step {
     /// `number`: 0 is `Set up job`, the last `Complete job`; what a log's `step=` names.
     pub number: u32,
-    /// `name`: the workflow's `name:`, or the step's command text; within `string_bytes`.
+    /// `name`: the workflow's `name:`, or the step's command text; empty when Forgejo's passed
+    /// `string_bytes` (forge.md 3.3).
     pub name: Box<[u8]>,
     /// `status`.
     pub status: StepStatus,
@@ -809,10 +792,13 @@ pub enum StepStatus {
 }
 
 // `Document` gains, after `Run(Run)`:
-//     /// `GET R/actions/jobs/<id>`.
+//     /// `GET R/actions/jobs/<id>`, its steps gone up before it as rows.
 //     Job(Job),
+// `Row` gains, after `Job(Job)`:
+//     /// A step of `GET R/actions/jobs/<id>`.
+//     Step(Step),
 // and `server::Answer`, after `Run(..)`:
-//     Job(crate::document::Job),
+//     Job { job: crate::document::Job, steps: Box<[crate::document::Step]> },
 ```
 
 ```rust
@@ -852,22 +838,15 @@ pub struct Outgoing<'a> {
 
 ## Questions to raise when reached
 
-- **A job of more steps than `inner`** (32 shipped,
-  `crates/temper-service/src/forge.rs:122`): 02.1 refuses it
-  `Malformed::Bound { field: b"steps" }`, as a protection's contexts past
-  `inner` are, so temper 04's `Read::Job` would answer `InvalidAnswer`
-  for a job of more than 30 workflow steps. forge.md names no bound on a
-  job's steps (section 7 names `string_bytes` and `body_bytes`, not a
-  list's length). Raise when 02.1 lands: whether such a job is refused,
-  or read with its steps past the bound skipped (the failed step may be
-  among them).
-- **A step named by its command text:** forge.md 3.3 makes "a name [...]
-  kept within `string_bytes`; a longer one makes the answer malformed",
-  and Forgejo names a step with no `name:` by its command text
-  (measurements.md, 2). So a job one of whose unnamed steps runs a script
-  longer than 512 bytes is unreadable, whatever step failed. 02.1 follows
-  3.3; raise whether a step's name is "a name" of 3.3, or text carried
-  cut.
+None. The designer answered the two found while planning, on
+2026-10-16 (forge.md 3.2 and 3.3):
+
+- **A job of more steps than `inner`** (design question 6): no bound
+  counts a job's steps; each goes up as a row as it streams, and the
+  component keeps the failed one (Choices, 1).
+- **A step named by its command text** (design question 1): a name past
+  `string_bytes` is read empty, never refused, and the step is named by
+  its number (Choices, 2).
 
 ## Done when
 

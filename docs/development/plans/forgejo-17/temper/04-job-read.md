@@ -32,7 +32,7 @@ and runner 13.2.0, through the conformance tool's component mode.
 - findings/component.md, sections 1, 3 and 4; findings/answer.md,
   sections 1, 2 and 3; findings/measurements.md, sections 2 and 3;
   findings/fake-forge-and-brief.md, sections 1, 2, 3 and 6.
-- temper 02's file: 02.1's Shape (`d::Job`'s `steps`, `d::Step`,
+- temper 02's file: 02.1's Shape (`d::Step`, `Row::Step`,
   `d::StepStatus`, `Document::Job`, `Request::Job`, `Request::JobLog`'s
   `step`, the job's decoder). temper 03's file: 03.1's Shape (the fake's
   three steps, their logs, `Failing`, the fake domain's job answer) and
@@ -59,20 +59,32 @@ and runner 13.2.0, through the conformance tool's component mode.
   workflow's own steps are between. The failed step is the first whose
   `status` is `failure`: the completion step reports `failure` whenever
   the job fails, so it is the failed step only when none before it
-  failed. Its log alone is read (`step`), and of it the end, by a suffix
-  range, since a step tells its failure last. A job with no step failed
+  failed. The steps are read as they stream, and only the failed one is
+  kept, the others skipped as they pass: a job of any number of steps is
+  read, its steps costing time, not memory. Its log alone is read
+  (`step`), and of it the end, by a suffix range, since a step tells its
+  failure last. A job with no step failed
   (one cancelled, or one whose runner was lost) is read whole, its end
   the same way; one never given to a runner has no log (`404`,
   `MissingJob`). The job's `attempt` is its latest: one other than the
   call's (the job ran again since) is `MissingJob`, as a log Forgejo no
   longer keeps is (`404`). A `200` is read through, its last `max_bytes`
-  bytes kept as it streams; a range over an empty log is an empty log
-  (13). The log's search (`q`) and its NDJSON form are not read: neither
+  bytes kept as it streams, within `body_bytes_in` like any body
+  (section 7); a range over an empty log is an empty log (13). The log's search (`q`) and its NDJSON form are not read: neither
   answers a range."
 - **Names past their cap** (3.3): "a name, a title, a context, a
   description, a link or a path is kept within `string_bytes`; a longer
-  one makes the answer malformed"; a malformed answer "fails a read as
-  `InvalidAnswer`".
+  one makes the answer malformed"; "but for a job step's name, which
+  Forgejo makes of the step's whole script when the workflow names none:
+  a longer one is carried empty, and the step is named by its number
+  alone, so that a long script never makes a job unreadable".
+- **Malformed answers** (3.3): "a document that does not decode, a field
+  missing, a number out of range, a commit id of the wrong length, a
+  string past its cap, a body past `body_bytes_in`, a log read through
+  included"; a malformed answer "fails a read as `InvalidAnswer`".
+- **The answer's bound** (3.3): "Raw contents are read within what is
+  left of `answer_bytes`: a file's after its path, a job's log after its
+  step's name, so the answer never passes it".
 - **Bounds** (7): "`head_bytes`, `body_bytes_in`: the largest response
   head and body read (the body is streamed, so this caps time and bytes,
   not memory)". (3.4): "an answer past the component's bounds |
@@ -103,11 +115,15 @@ and runner 13.2.0, through the conformance tool's component mode.
   `id`, `run_id` and `attempt` are checked against the call's attempt,
   each mismatch `MissingJob`, `id` included as the base's listing check
   includes it (`actions.rs:227-228`).
-- **The step is chosen once,** when the job document is done: the first
-  of `job.steps` whose `status` is `d::StepStatus::Failure`, moved into
-  an `api::Step` the plan holds until the log answers. A job whose
-  document has no steps (no runner took it) has no failed step: its log
-  is asked without `step`, and Forgejo's `404` is `MissingJob`.
+- **The step is kept as the rows stream** (design question 6): of the
+  job's `d::Row::Step`s (temper 02.1), the first whose `status` is
+  `d::StepStatus::Failure`, moved into an `api::Step` the plan holds
+  until the log answers; the others are dropped as they come, so a job
+  of any number of steps is read. A job with no step rows (no runner
+  took it) has no failed step: its log is asked without `step`, and
+  Forgejo's `404` is `MissingJob`. A step's name past `string_bytes`
+  comes empty from temper 02.1's decoder (design question 1): the
+  answer carries it so, never refused.
 - **04.1 reads the step's log from its start** (`Range: bytes=0-<max>`,
   as the base reads the job's log); between 04.1's landing and 04.2's,
   the answer is the failed step's first `max_bytes` bytes. 04.2 turns it
@@ -116,16 +132,19 @@ and runner 13.2.0, through the conformance tool's component mode.
   does: the client's `bounds.rs` and the component's `reads/size.rs` add
   its length to the log's. The client keeps no bound per field; the
   component's `string_bytes` caps the name when it is decoded (temper
-  02.1's decoder). The log's raw room stays `answer_bytes`
-  (`reads.rs:257-262`), as question 2's default says.
+  02.1's decoder). The log's raw room is `answer_bytes` less the step's
+  name, as a file's is less its path (`contents.rs:115-116`; design
+  question 2): the answer always fits the client's bound, and the
+  client and the agent's tool do not change.
 - **The store:** a record `Step { number: u32 name: bytes 1048576 }`
   beside `JobAnswer`, which gains `step: option Step` after `attempt`,
   in the schema file `ls crates/temper-protocol-store/schema/` names;
   the limit `step_name` is `forge.client.answer_bytes`, as
   `status_context` is.
 - **The agent's words** (`crates/temper-engine-smith/src/answers.rs`):
-  `Job <job> run <run>, failed step <number> <name>:` and a line feed,
-  or `Job <job> run <run>, no step failed:` and a line feed; then the
+  `Job <job> run <run>, failed step <number> <name>:` and a line feed
+  (`failed step <number>:` when the name is empty), or `Job <job> run
+  <run>, no step failed:` and a line feed; then the
   log. 04.1 keeps `\n[log truncated]` after the log, as today; 04.2,
   where the bytes dropped are the log's first ones, puts
   `[earlier log bytes cut]` and a line feed before the log instead.
@@ -137,7 +156,8 @@ and runner 13.2.0, through the conformance tool's component mode.
   answer's last `n` bytes as they stream, for a `206` and a `200` alike.
 - **A tail read past `body_bytes_in`** stops there and is a malformed
   answer, `InvalidAnswer`, as a JSON body past `body_bytes_in` is (the
-  tokenizer's `length`, `limits.rs:288`); question 3.
+  tokenizer's `length`, `limits.rs:288`), as forge.md 3.3 now says
+  (design question 5).
 - **A tail read that dropped bytes closes its connection** after its
   answer (forge.md, 8, quoted above); one that dropped none goes Idle.
 - **`Content-Range` gets an exclusive end,** so that the empty range has
@@ -225,21 +245,27 @@ Shape:
   Box<[u8]> }`, derives as `Answer`'s (`:129`), beside `JobAttempt`;
   `Answer::Job { attempt: JobAttempt, step: Option<Step>, log:
   Box<[u8]>, truncated: bool }` in place (sketch below). `Step` mirrors
-  one element of `d::Job`'s `steps` (temper 02.1), its `status` dropped.
+  a `d::Step` (temper 02.1), its `status` dropped; its `name` is empty
+  when Forgejo's passed `string_bytes`.
 - `actions.rs`: `Stage::Jobs` becomes `Stage::Job`; `Plan.found` goes;
   `Plan.step: Option<api::Step>` comes. `Mode::Job`'s `Run` arm sends
   `r::Request::Job { at, job: attempt.job }` at `Stage::Job`. A new arm
-  for `d::Document::Job(job)`, at `Stage::Job` only (else
-  `InvalidAnswer`): `job.id`, `job.run_id` or `job.attempt` other than
-  the attempt's is `MissingJob`; `self.step` is the first of `job.steps`
-  whose `status` is `d::StepStatus::Failure`, as `api::Step { number,
-  name }`, its name moved; then `Stage::Log` and `Exchange { request:
+  for `d::Row::Step(step)`, at `Stage::Job` only (else `InvalidAnswer`):
+  when `self.step` is none and `step.status` is
+  `d::StepStatus::Failure`, `self.step` becomes `api::Step { number,
+  name }`, its name moved; any other step is dropped. A new arm for
+  `d::Document::Job(job)`, at `Stage::Job` only (else `InvalidAnswer`):
+  `job.id`, `job.run_id` or `job.attempt` other than the attempt's is
+  `MissingJob`; then `Stage::Log` and `Exchange { request:
   r::Request::JobLog { at, job: attempt.job, attempt: attempt.attempt,
   step: <the step's number, none when no step> }, range: Some(max) }`.
   In `Mode::Job`, `d::Row::Job` and `d::Document::Listed` are
   `InvalidAnswer`. `log()` answers `Answer::Job { attempt, step:
   self.step.take(), log, truncated }`, the bytes and `truncated` as
-  today.
+  today. `actions::Plan::raw_room(&self, shared: &Shared) -> u32` is
+  `answer_bytes` less the kept step's name's length, as
+  `contents.rs:115-116`'s; `reads.rs:257-262` returns it when the read
+  holds an actions plan (design question 2).
 - `bounds.rs:152` and `reads/size.rs:113`: `Answer::Job` counts its
   log's length plus its step's name's length, 0 with no step.
 - The store: `record Step { number: u32 name: bytes 1048576 }` and
@@ -252,9 +278,9 @@ Shape:
   `decode_step(w::Step) -> d::Step` beside `encode_job_attempt`; the
   `Job` arms carry `step` both ways. `STORE_VERSION` unchanged.
 - `answers.rs` (smith): the `Job` arm writes `Job `, the job, ` run `,
-  the run, then `, failed step `, the step's number, a space and its
-  name, or `, no step failed`; then `:\n`, the log, and `\n[log
-  truncated]` when `truncated`.
+  the run, then `, failed step ` and the step's number, then a space and
+  its name when the name is not empty, or `, no step failed`; then
+  `:\n`, the log, and `\n[log truncated]` when `truncated`.
 - `brief.rs:308`: the pattern binds `step: _`; nothing else changes.
 - `translate.rs`: the client's `Read::Job { attempt, max_bytes }` maps
   to the fake's `Read::Job { job: attempt.job }`, as temper 03.1 leaves
@@ -329,11 +355,20 @@ steps' statuses given. Tests, each under 20 ms:
 `id` 9, `run_id` 8, `attempt` 2; cost 2);
 `a_job_read_answered_404_is_missing_job_at_each_exchange` (its rows
 `run`, `job`, `log`, costs 1, 2, 3);
-`a_step_name_is_read_up_to_string_bytes_and_invalid_past_it` (two rows
+`a_step_name_is_read_up_to_string_bytes_and_empty_past_it` (two rows
 at the fixture's `string_bytes` 128: a 128-byte name, at the limit,
 answers the step with that name and the log `abc`, cost 3; a 129-byte
-name, one past, is `InvalidAnswer`, cost 2; rests on temper 02.1's
-decoder refusing it, question 1);
+name, one past, answers the step with an empty name and the log `abc`,
+cost 3; design question 1);
+`a_failed_step_after_more_steps_than_inner_is_found` (the fixture's
+`inner` 8: a job of twelve steps, 0 to 9 `success`, 10 and 11
+`failure`, answers step 10, its log line ending
+`logs?attempt=3&step=10 HTTP/1.1`, cost 3; design question 6);
+`a_jobs_log_room_is_answer_bytes_less_its_steps_name` (`max_bytes`
+the fixture's client `answer_bytes`, step 1 `build`, and a `200` log of
+`answer_bytes` bytes: the log kept is `answer_bytes` less 5 bytes,
+`truncated`, and the answer is `Ok`, within the client's bound; design
+question 2);
 `contents_sizes_agree_with_the_clients_measure` gains the row `"job with
 its step"` (log `abc`, step 1 `build`: 8);
 `a_jobs_verified_log_uses_range_and_content_range_reports_more` and
@@ -364,8 +399,10 @@ fn a_job_answer_names_its_failed_step_before_its_log() {
     assert!(!rendered.error(), "a read's answer is no error");
 }
 ```
-and `a_job_answer_with_no_failed_step_says_none_failed` (`Job 8 run 7,
-no step failed:\n` and the log). In the forge client world:
+`a_job_answer_with_no_failed_step_says_none_failed` (`Job 8 run 7,
+no step failed:\n` and the log), and
+`a_job_answer_with_an_empty_step_name_names_its_number_alone` (`Job 8
+run 7, failed step 1:\n` and the log; design question 1). In the forge client world:
 `bounded_job_bytes_translate_to_a_truncated_attempt_log`
 (`simulation.rs:495-506`) passes `translate::answer` a
 `temper_fake_forge_domain::api::Answer::Job` in place of its
@@ -441,12 +478,14 @@ Proof: two, each once.
   transcript.
 Don't: read the job's listing in `Read::Job`; keep a job's other steps
 (decisions.md 6); read a step above the component (decisions.md 7);
-change the brief's words (temper 05); change the range (04.2); shrink
-the log's raw room by the step's name (question 2); add a per-field bound
-to the client; change `read_job`'s description or schema
+change the brief's words (temper 05); change the range (04.2); add a
+per-field bound to the client, or change its admission of `max_bytes`
+(design question 2: the component's raw room keeps the answer within
+the bound); change `read_job`'s description or schema
 (`crates/temper-engine-smith/src/calls.rs:35`); change the conformance's
 workflow (`runner.rs:60`) or record transcripts.
-Size: at most 100 lines.
+Size: at most 110 lines: 10 more than planned, for the log's raw room
+(design question 2) and an empty name's words (question 1).
 Removes: `actions.rs`'s `found` and its jobs-listing stage in
 `Mode::Job`.
 
@@ -747,41 +786,23 @@ record JobAnswer { attempt: JobAttempt step: option Step log: bytes 1048576 trun
 
 ## Questions to raise when reached
 
-The planner has sent the first two to the designer; their answers
-replace the defaults here.
+None. The designer answered the three found while planning, and a
+fourth that reaches this session, on 2026-10-16 (forge.md 3.2 and 3.3):
 
-1. **A step's name past `string_bytes`** (512 shipped,
-   `crates/temper-service/src/forge.rs:120`; a step with no YAML `name`
-   is named by its whole `run:` script, findings/measurements.md, 2).
-   forge.md, 3.3: "a name ... is kept within `string_bytes`; a longer one
-   makes the answer malformed". Default here: temper 02.1's decoder
-   refuses it as it refuses a longer text of any kind, and the read answers
-   `InvalidAnswer`; the repair's brief then shows `[job log could not be
-   read]` for that check (`brief.rs:316`, until temper 05's words), the
-   agent's tool `Forge read failed: invalid provider answer`, and the
-   repair still runs. Raise when 04.1's test
-   `a_step_name_is_read_up_to_string_bytes_and_invalid_past_it` is written.
-2. **`max_bytes` up to `answer_bytes`, plus the step's name.** The client
-   admits `max_bytes` up to `answer_bytes` (`bounds.rs:28-31`) and
-   refuses an answer past `answer_bytes` (`calls.rs:281-283`). Default
-   here: both as today, so a log of `max_bytes` bytes and a step's name
-   pass the bound and the read is `TooLarge`; after 04.2, an agent's read
-   with `max_bytes` equal to `answer_bytes` (65,536 shipped) of a failed
-   step whose log holds at least that many bytes is always `TooLarge`.
-   The brief asks at most half of `min(answer_bytes, ci_budget / 5)`
-   (`domain.rs:701`, `brief.rs:401`) and is not reached. The base's file
-   read takes the other way: its raw room is `answer_bytes` less its
-   path (`contents.rs:115-116`), so its answer is cut, `truncated`, and
-   stays within the bound. Raise when 04.1's
-   `a_job_answers_step_name_counts_against_answer_bytes` is written.
-3. **A `200` log past `body_bytes_in`** (16 MiB shipped). forge.md, 7:
-   `body_bytes_in` is "the largest response head and body read"; 3.4
-   names `TooLarge` for "an answer past the component's bounds" and
-   `InvalidAnswer` for a malformed answer, and a JSON body past
-   `body_bytes_in` is `InvalidAnswer` at the base (the tokenizer's
-   `TooLong`). Default here: `InvalidAnswer`, the connection closed.
-   Raise when 04.2's
-   `a_tail_read_past_body_bytes_in_is_malformed_and_closes` is written.
+1. **A step's name past `string_bytes`** (design question 1): carried
+   empty, never refused; the step is named by its number (Choices, "The
+   step is kept as the rows stream"; 04.1's tests).
+2. **`max_bytes` up to `answer_bytes`, plus the step's name** (design
+   question 2): the log's raw room is `answer_bytes` less the step's
+   name, as a file's is less its path; the client does not change
+   (Choices, "The step's name counts in the answer's bound").
+3. **A `200` log past `body_bytes_in`** (design question 5): the bound
+   holds for a log read through as for any body; past it the answer is
+   malformed, `InvalidAnswer`, the connection closed, as 04.2's
+   `a_tail_read_past_body_bytes_in_is_malformed_and_closes` holds.
+4. **A job of more steps than `inner`** (design question 6): read
+   whole, its steps as rows, the failed one kept (Choices, "The step is
+   kept as the rows stream").
 
 ## Done when
 

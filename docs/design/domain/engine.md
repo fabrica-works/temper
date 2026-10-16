@@ -1,6 +1,6 @@
 # The engine
 
-Provisional, 2026-10-04, revised 2026-10-15. What the temper engine is, as a domain layer:
+Provisional, 2026-10-04, revised 2026-10-16. What the temper engine is, as a domain layer:
 its parts and how they fit, how a decision reaches the store before
 anything leaves the engine, how it restarts, how it runs agents, and the
 capabilities it keeps from today (the fleet, briefs, notes, views,
@@ -538,8 +538,8 @@ The brief child domain builds every run's brief from typed sections,
 each within a budget, the brief within its own, and the agent's protocol
 layer renders them as text, as today: sections
 follow why the run runs, those it runs for are required, the rest
-optional; what does not fit is cut in its kind's order and says how
-much; sections are gathered within one deadline, while the task is
+optional; what does not fit is cut in its kind's order, at its gather
+as in the brief, and says how much; sections are gathered within one deadline, while the task is
 preparing, and a required one missing sends the task back to due after
 a backoff, no attempt spent (tasks.md, 5.2).
 

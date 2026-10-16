@@ -42,7 +42,10 @@
    plans' changes: no temper store exists outside the tests' goldens,
    and client-api's checks (`STORE_VERSION: u32 = 1` on `main`) keep
    reading as its plan says. `docs/design/store/README.md` moves the
-   version "once per plan": see "For the user".
+   version "once per plan", and says how plans that run at once share
+   the move (design question 3): "the plan whose README names it moves
+   the version, and the others change their records in place in the
+   schema `main` holds, before the move or after it".
 5. **One constant pair pins both binaries,** in
    `testing/temper-throwaway-forgejo/src/binary.rs`: `VERSION`
    (`"17.0.0"`) and `RUNNER_VERSION` (`"13.2.0"`), each checked exactly
@@ -98,8 +101,24 @@
     runner across its run; it goes with the stall's reasons, which read
     pending jobs (`later.md`). The design questions found while planning
     went to the designer before the run (`~/src/rust/tmp/temper/forgejo-17-plan/design-questions.md`,
-    not versioned); each session file carries its default under
-    "Questions to raise when reached" until the designer answers.
+    not versioned), and the designer answered all six on 2026-10-16.
+    The session files cite each as "design question <N>", in that
+    file's numbering:
+    1. a step's name past `string_bytes` is carried empty, the step
+       named by its number (forge.md 3.3; temper 02.1, 04.1, 05.1);
+    2. a job's log is read within `answer_bytes` less its step's name,
+       as a file's is less its path (forge.md 3.3; temper 04.1);
+    3. plans that run at once share one move of `STORE_VERSION`
+       (store/README.md, section 4; decision 4);
+    4. the gather cuts a section in its kind's order, a CI section from
+       its start; the shipped profile's numbers do not change
+       (domain/engine.md, 9; temper 05.1);
+    5. a log read through is bounded by `body_bytes_in` like any body,
+       and past it malformed, `InvalidAnswer` (forge.md 3.2, 3.3; temper
+       04.2, as planned);
+    6. a job's steps go up as rows as they stream, and the component
+       keeps the failed one, so no bound counts them (forge.md 3.2;
+       temper 02.1, 03.1, 04.1).
 
 ## Rulings
 
@@ -110,8 +129,8 @@
 - **The store's version (decision 4).** `docs/design/store/README.md`
   moves `STORE_VERSION` "once per plan, at the first landing that
   changes an encoding". With client-api running at once, this plan
-  leaves the move to client-api and changes `JobAnswer` in place; the
-  designer is asked to say how two plans that run at once share the
-  move (the plan's design questions, README).
+  leaves the move to client-api and changes `JobAnswer` in place, as
+  the user decided; the designer worded the README to match (design
+  question 3, decision 13).
 - **The pin (decision 2):** 17.0.0 and 13.2.0, not "the newest patch at
   the run": the transcripts and facts name one binary each.

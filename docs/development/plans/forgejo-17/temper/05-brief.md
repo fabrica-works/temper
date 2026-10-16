@@ -64,9 +64,15 @@ they are.
   no step failed; `truncated` when `Content-Range` names bytes before
   them".
 - **Cutting** (domain/engine.md, 9): "what does not fit is cut in its
-  kind's order and says how much". The CI kind is cut from its start
-  (`held.rs`, `render`, `tail`), so the log's end is the last thing it
-  loses.
+  kind's order, at its gather as in the brief, and says how much" (the
+  gather: design question 4, answered 2026-10-16). The CI kind is cut
+  from its start (`held.rs`, `render`, `tail`), so the log's end is the
+  last thing it loses; at the base the gather cuts every section from
+  its end (`append`, `brief.rs:61-69`; `brief_part`, `:79-91`), and
+  05.1 makes it cut a CI section from its start.
+- **A step's name** (forge.md, 3.3): "a job step's name [...] a longer
+  one is carried empty, and the step is named by its number alone"
+  (design question 1).
 - **The world** (domain/forge.md, 18) names "CI failing, repaired" among
   the connector world's stories. That story is
   `tests/engine/forge/tests/simulation.rs:674`
@@ -82,7 +88,7 @@ they are.
 
   | Case | Lines |
   |---|---|
-  | a step failed | `Failed step: <number> <name>\n`, then `End of its log:\n` |
+  | a step failed | `Failed step: <number> <name>\n` (`Failed step: <number>\n` when the name is empty), then `End of its log:\n` |
   | no step failed | `No step failed. End of the job's log:\n` |
   | the log truncated (either case) | `[log truncated before this]\n`, after the line above, before the log |
   | the log | its bytes, then `\n` |
@@ -112,17 +118,25 @@ they are.
   128, `brief_bytes` 384), which equal the shipped profile's
   (`crates/temper-service/src/limits.rs:212-243`, "from the root
   world"). Under those limits the new section is 301 bytes and passes
-  the 256 bytes the gather holds. `append` keeps the section's first
-  bytes (`brief.rs:61-69`), so the log's end goes, and with it `failing
-  check build 3`, which the story asserts at the base. The CI cut to 128
-  (`held.rs`, from the start) then keeps the step's line and a few bytes
-  of the log. 05.1 therefore sets the system world's `read_bytes` 512,
+  the 256 bytes the gather holds. With the gather's cut of a CI section
+  from its start (below), the gather keeps its last 256 bytes, and the
+  CI cut to 128 (`held.rs`, from the start) its last 128: the log's end
+  and the closing line, but not the step's line, which the story
+  asserts. 05.1 therefore sets the system world's `read_bytes` 512,
   CI 384 and `brief_bytes` 768, as `tests/engine/domain/tests/forge_routes.rs:103-107`
   sets them for its change stories, beside walking's values, with the
   reason. These figures are computed from the code, not run.
-- **The shipped profile and the gather's cut do not change in this
-  session** (raised with the planner; "Questions to raise when
-  reached").
+- **The gather cuts a CI section from its start** (domain/engine.md, 9;
+  design question 4). The CI section's `BriefWords` keeps its end: past
+  its room, `append` drops its first byte for each byte it adds, and
+  `brief_part` keeps its last `bytes`; each byte dropped is counted in
+  `left`, as today, so `held.rs`'s render says how much was cut. Every
+  other section keeps its start, as at the base.
+- **The shipped profile's brief limits do not change** (design question
+  4): its numbers wait for the first deployments' measurements
+  (configuration.md, section 11, "Profiles' numbers"). Under them a
+  failed check's section keeps its log's end, and may lose its step's
+  line.
 
 ## Rules that bind it
 
@@ -153,9 +167,10 @@ job was read now has the failed step's line and the end of its log,
 or, when no step failed, a line saying so and the end of the job's log.
 A truncated log is marked before the bytes kept. A failed read and an
 unpinned status keep their lines (domain/forge.md, 8.4 and 2, "Brief
-sections"). The engine's domain world's brief stories cover a failed
-workflow step and a cancelled job. The system world's failed-CI story
-asserts the step's line and the log's end.
+sections"). The CI section's gather keeps its end, as its kind's cut
+does (domain/engine.md, 9). The engine's domain world's brief stories
+cover a failed workflow step and a cancelled job. The system world's
+failed-CI story asserts the step's line and the log's end.
 Needs: nothing beyond the session's start, which is temper 04.1:
 `Answer::Job`'s `step`, and `translate.rs`'s job answer carrying it.
 Through 04.1 it also needs temper 03.1: the fake's three steps, a log
@@ -163,7 +178,9 @@ for each, and `Failing::NoStep`.
 Files:
 - `crates/temper-engine-domain-forge/src/brief.rs` (553 lines):
   `brief_answer`'s `BriefStage::Job` arm (`:306-322` at the base; 04.1
-  binds `step` there and ignores it).
+  binds `step` there and ignores it); `BriefWords` (`:29-39`), `append`
+  (`:61-69`), `brief_part` (`:79-91`) and where the CI section's words
+  are made. Tests: `crates/temper-engine-domain-forge/src/tests.rs`.
 - `tests/engine/domain/tests/forge_routes.rs` (2,886 lines, at most 40
   added net): the two brief tests (`:1177-1294`), rewritten on helpers
   placed beside `failed_ci_with_delayed_brief` (`:1296`), and one new
@@ -197,8 +214,8 @@ Shape:
   attempt, step, log, truncated }) if attempt.head == fetch.head.0`, it
   appends, through `append` and in this order:
   - with `Some(client::api::Step { number, name })`: `b"Failed step: "`,
-    `decimal(u64::from(number))`, `b" "`, `name`, then `b"\nEnd of its
-    log:\n"`;
+    `decimal(u64::from(number))`, then `b" "` and `name` when `name` is
+    not empty, then `b"\nEnd of its log:\n"`;
   - with `None`: `b"No step failed. End of the job's log:\n"`;
   - `b"[log truncated before this]\n"` when `truncated`;
   - `log`, then `b"\n"`.
@@ -206,6 +223,12 @@ Shape:
   Any other answer or error appends `b"[job log could not be read]\n"`,
   as at the base. After the arm, `next_failed_job` and the closing
   `Repair the failed check.\n` are unchanged.
+- The gather's cut (design question 4): `BriefWords` gains `tail:
+  bool`, true for the CI section's words and false for every other
+  section's. With `tail`, `append` at a full list drops the list's first
+  byte for each byte it adds, counting it in `left`; `brief_part` keeps
+  the last `bytes` of the words, the bytes before them counted in
+  `left`. Without it both are as at the base.
 - In the engine's domain world, the section reads as follows. `<head>`
   is the head's first 8 bytes in hex. `Run build` and the log lines are
   the assumed 03.1 literals: the workflow step's log is today's four
@@ -238,6 +261,16 @@ Shape:
   `start_change_world` (Files); the two this increment does not edit
   run unchanged in `land`'s gate.
 Test shape:
+- `crates/temper-engine-domain-forge/src/tests.rs`, one test of the
+  gather's cut, under 20 ms, `BriefWords`, `append` and `brief_part`
+  made `pub(crate)` where they are not:
+  `a_ci_sections_words_keep_their_end_and_others_their_start`, two rows
+  on words of room 8 given `abcdefghij`: with `tail`, `cdefghij` and
+  `left` 2, and `brief_part` at 4 bytes `ghij` with `left` 6; without,
+  `abcdefgh` and `left` 2, and `brief_part` at 4 bytes `abcd` with
+  `left` 6. A test at the base that asserts a CI section's first bytes
+  past its room takes its last bytes, and the landing's report names
+  it.
 - `tests/engine/domain/tests/forge_routes.rs`, on `change_world(false,
   0, None)` (`:633`) and `World::external` (`:363-390`),
   `World::tick` (`:495`) and `fail_job_reads` (`:414-425`). The limits
@@ -403,8 +436,9 @@ built binary. Nothing higher can fail CI: the process tier has no runner
 (decisions.md, 10), and the one-process world never fails CI
 (`findings/fake-forge-and-brief.md`, 6).
 Don't: change the share (`brief.rs:394-401`), `max_job_bytes`
-(`domain.rs:700-703`), `append`'s cut or the CI cut (`held.rs`); change
-the shipped profile's brief limits (`crates/temper-service/src/limits.rs:212-243`)
+(`domain.rs:700-703`), the cut of sections other than CI's at the
+gather, or the CI cut in the brief (`held.rs`); change the shipped
+profile's brief limits (`crates/temper-service/src/limits.rs:212-243`)
 or walking's (`tests/engine/domain/src/walking.rs:142-159`); write the
 job's other steps or any step's status into the brief; read a second
 log or the job again from the brief; answer `Answer::Job` by hand in a
@@ -412,7 +446,8 @@ world, as `fail_job_reads` answers its error: the step comes from the
 fake through `translate.rs`; write a CI status in a test in place of
 the fake CI's own (the helper's `Failed` by user 1, as the base's tests
 write it, stays).
-Size: at most 25 lines of production code.
+Size: at most 50 lines of production code: 25 more than planned, for
+the gather's cut of a CI section (design question 4).
 Removes: the words `Job log tail:` and `[job log truncated]`; the test
 name `a_failed_ci_repair_brief_contains_the_bounded_job_log` (renamed);
 the two base tests' repeated setup (moved into `failed_ci_repair`).
@@ -429,20 +464,10 @@ brief's words for the failed step").
 ## Questions to raise when reached
 
 - **The shipped profile's CI section cannot hold the step's line and its
-  log's end.** This file's writer has raised it with the planner, for a
-  ruling before the run. Until a ruling says otherwise, 05.1 changes
-  neither the shipped profile nor the gather's cut. The shipped profile
-  gives a section 256 bytes at the gather and 128 in the brief
-  (`crates/temper-service/src/limits.rs:220,227`). The section's head
-  line alone is 100 bytes, and a Forgejo status's context, description
-  and absolute link add about 130 more, so the text reaches 256 bytes by
-  the step's line, before the log. `append` keeps the first 256 bytes
-  (`brief.rs:61-69`), so the step's log end is the first thing lost. The CI cut to 128 then
-  keeps the end of what remains (`held.rs`, `render`). The design asks
-  for "the end of that step's log ... within the brief's byte budget",
-  and cuts "in its kind's order" (domain/engine.md, 9). If the session
-  starts with no ruling, raise it with these numbers before landing
-  05.1.
+  log's end** (design question 4): answered on 2026-10-16. The gather
+  cuts a CI section from its start, as the brief does (Choices; Shape,
+  "The gather's cut"), so the log's end is the last thing lost; the
+  shipped profile's numbers do not change.
 - **03.1's `NoStep` job does not fail CI, or its log is not served.**
   `a_failed_ci_with_no_failed_step_briefs_the_end_of_the_jobs_log`
   needs a `Failed` status by the CI user on a job whose steps name no

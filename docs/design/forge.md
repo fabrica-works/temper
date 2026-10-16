@@ -187,7 +187,7 @@ first failure, but where a row says otherwise.
 | `Read::PullFiles { number, head, page }` | `GET R/pulls/<number>`; `GET R/pulls/<number>/files?page=<page>&limit=<size>`; for each file, `GET R/raw/<path>?ref=<merge_base>` (but for `added`; at `previous_filename` for `renamed`) and `GET R/raw/<filename>?ref=<head>` (but for `deleted`) | `head`; each file's `filename` with its contents at the merge base and at the head, a side absent when the file's `status` says so or its read answers `404`; `more` from `X-HasMore`; a `head.sha` other than `head` fails the call `Stale` before any file is read |
 | `Read::Compare { before, after }` | `GET R/compare/<before>...<after>?verification=false`; `GET R/compare/<after>...<before>?files=false&verification=false`; for each file, `GET R/raw/<filename>?ref=<before>` and `?ref=<after>` | `files[].filename` with its contents at `before` and at `after`, a side absent when its read answers `404`; `commits[].sha`; `contains_before` when the second comparison's `total_commits` is 0; the whole comparison within the answer's bound, or `TooLarge` |
 | `Read::Checks { commit }` | `GET R/commits/<commit>/status?page=<n>&limit=<size>`, every page; for each failing status whose link names a run of this repository's Actions: `GET R/actions/runs?head_sha=<commit>&run_number=<n>&page=1&limit=1`, then `GET R/actions/runs/<id>/jobs` | each context's latest status as for `Statuses`, its `job` the commit, the run's `id`, the job's `id` and its `attempt` when found, none otherwise |
-| `Read::Job { attempt, max_bytes }` | `GET R/actions/runs/<run>`; `GET R/actions/jobs/<job>`; `GET R/actions/jobs/<job>/logs?attempt=<attempt>&step=<number>` with `Range: bytes=-<max_bytes>`, `step` the failed step's, absent when no step failed | the failed step, its `number` and `name`, none when no step failed; the last `max_bytes` bytes of that step's log, or of the job's whole log when no step failed; `truncated` when `Content-Range` names bytes before them; `MissingJob` when a read answers `404`, the run's `commit_sha` is not the attempt's head, or the job's `run_id` or `attempt` is not the attempt's |
+| `Read::Job { attempt, max_bytes }` | `GET R/actions/runs/<run>`; `GET R/actions/jobs/<job>`; `GET R/actions/jobs/<job>/logs?attempt=<attempt>&step=<number>` with `Range: bytes=-<max_bytes>`, `step` the failed step's, absent when no step failed | the failed step, its `number` and `name` (3.3), none when no step failed; the last `max_bytes` bytes of that step's log, or of the job's whole log when no step failed; `truncated` when `Content-Range` names bytes before them; `MissingJob` when a read answers `404`, the run's `commit_sha` is not the attempt's head, or the job's `run_id` or `attempt` is not the attempt's |
 | `Read::File { head, path, max_bytes }` | `GET R/raw/<path>?ref=<head>` with `Range: bytes=0-<max_bytes>` | the first `max_bytes` bytes; `truncated` when more came |
 | `Read::Protection { branch }` | `GET R/branches/<branch>`; then `GET R/branch_protections/<effective_branch_protection_name>` when it names a rule, or `GET R/branch_protections` when it names none | `rule_name`, `status_check_contexts` when `enable_status_check`, `required_approvals`, `dismiss_stale_approvals`; none when no rule applies; a `403` (a writer who is not an admin) `Forbidden` |
 | `Read::Settings` | `GET /api/v1/repositories/<id>` | `default_branch`; `allow_merge_commits`, `allow_squash_merge`, `allow_rebase`; the repository's row kept afresh (3.5) |
@@ -257,15 +257,19 @@ Notes on the table:
   (`Complete job`), and the workflow's own steps are between. The failed
   step is the first whose `status` is `failure`: the completion step
   reports `failure` whenever the job fails, so it is the failed step only
-  when none before it failed. Its log alone is read
+  when none before it failed. The steps are read as they stream, and only
+  the failed one is kept, the others skipped as they pass: a job of any
+  number of steps is read, its steps costing time, not memory. Its log
+  alone is read
   (`step`), and of it the end, by a suffix range, since a step tells its
   failure last. A job with no step failed (one cancelled, or one whose
   runner was lost) is read whole, its end the same way; one never given
   to a runner has no log (`404`, `MissingJob`). The job's `attempt` is its
   latest: one other than the call's (the job ran again since) is
   `MissingJob`, as a log Forgejo no longer keeps is (`404`). A `200` is
-  read through, its last `max_bytes` bytes kept as it streams; a range
-  over an empty log is an empty log (13). The log's search (`q`) and its
+  read through, its last `max_bytes` bytes kept as it streams, within
+  `body_bytes_in` like any body (section 7); a range over an empty log
+  is an empty log (13). The log's search (`q`) and its
   NDJSON form are not read: neither answers a range.
 - **Links are absolute.** A status's link goes to the domain whole: one
   relative to the forge's origin (a `target_url` that starts with one
@@ -351,6 +355,10 @@ Notes on the table:
   3.1). So:
   - a name, a title, a context, a description, a link or a path is kept
     within `string_bytes`; a longer one makes the answer malformed;
+  - but for a job step's name, which Forgejo makes of the step's whole
+    script when the workflow names none: a longer one is carried empty,
+    and the step is named by its number alone, so that a long script
+    never makes a job unreadable;
   - a body (an issue's, a comment's, a review's, a remark's) is kept
     whole within `body_bytes`. A longer one is carried empty, its key
     none, its provenance `Unknown`, and its revision made from its
@@ -364,7 +372,9 @@ Notes on the table:
   listing's largest rows within the client's `answer_bytes`, so a paged
   answer never passes it. An item's comments are kept until the next
   would pass `answer_bytes` or `rows`, and `more` is then set. Raw
-  contents are read within what is left of `answer_bytes`.
+  contents are read within what is left of `answer_bytes`: a file's
+  after its path, a job's log after its step's name, so the answer never
+  passes it.
 - **Revisions.** A comment's or a review's revision is the first eight
   bytes, big-endian, of the SHA-256 of its whole body as the forge
   returns it, computed as the string streams past; for a body not kept,
@@ -383,7 +393,8 @@ Notes on the table:
   listing's.
 - **A malformed answer** (a document that does not decode, a field
   missing, a number out of range, a commit id of the wrong length, a
-  string past its cap) fails a write as `Timeout`: the request reached
+  string past its cap, a body past `body_bytes_in`, a log read through
+  included) fails a write as `Timeout`: the request reached
   the forge, so what it asked may have been done. It fails a read as
   `InvalidAnswer`. Either way the connection is closed, since what
   followed on it can no longer be trusted. A repository id past the

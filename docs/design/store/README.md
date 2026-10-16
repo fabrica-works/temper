@@ -143,7 +143,10 @@ section 7).
 - **`STORE_VERSION`,** temper's store version: one number for all of
   temper's families, 1 at first, moved once per plan, at the first
   landing that changes an encoding of temper's in the store
-  (protocol.md, section 9). The routing gives it to jig's component,
+  (protocol.md, section 9). Plans that run at once share one move: the
+  plan whose README names it moves the version, and the others change
+  their records in place in the schema `main` holds, before the move
+  or after it. The routing gives it to jig's component,
   whose format row records it; a store written with another refuses to
   open, saying so, and nothing is translated before upgrades are
   designed (jig's `protocol/store.md`, 5.2 and 5.3).
