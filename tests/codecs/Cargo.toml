@@ -15,6 +15,8 @@ serde_json.workspace = true
 skein-lib.workspace = true
 
 [dev-dependencies]
+temper-service.workspace = true
+temper-engine-protocol-forge.workspace = true
 temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-client.workspace = true
 temper-engine-domain-forge-change.workspace = true

@@ -200,6 +200,7 @@ impl Files {
                 | Kind::Users
                 | Kind::Item(_)
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::Action(_),
             ) => unreachable!("file tables"),

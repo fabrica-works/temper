@@ -163,6 +163,7 @@ impl Branches {
                 | Kind::File(_)
                 | Kind::Action(_)
                 | Kind::Item(_)
+                | Kind::Delivery(_)
                 | Kind::Review(_),
             ) => unreachable!("branch tables"),
             Move::Done => {

@@ -11,6 +11,7 @@ use alloc::boxed::Box;
 use skein_json::tokenizer;
 pub(crate) mod actions;
 pub(crate) mod branches;
+pub mod delivery;
 pub(crate) mod files;
 pub(crate) mod items;
 use actions::ActionKind;
@@ -134,7 +135,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
     let state = match kind {
         Kind::Setup(_) => DecoderState::Setup(setup::Setup::new()),
         Kind::Error => DecoderState::Error(writes::Error::new()),
-        Kind::Write(_) => unreachable!("answer kind selection"),
+        Kind::Write(_) | Kind::Delivery(_) => unreachable!("answer kind selection"),
         Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
         Kind::Action(kind) => DecoderState::Actions(actions::Actions::new(kind)),
         Kind::Review(kind) => DecoderState::Reviews(Box::new(reviews::Reviews::new(kind))),

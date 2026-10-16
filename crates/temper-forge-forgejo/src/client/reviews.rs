@@ -230,6 +230,7 @@ impl Reviews {
                 | Kind::File(_)
                 | Kind::Action(_)
                 | Kind::Item(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_),
             ) => unreachable!("review tables"),
             Move::Done => {

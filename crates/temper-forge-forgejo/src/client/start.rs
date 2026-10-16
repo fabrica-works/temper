@@ -182,6 +182,7 @@ impl Start {
                     | Kind::Settings
                     | Kind::Search
                     | Kind::Review(_)
+                    | Kind::Delivery(_)
                     | Kind::Branch(_)
                     | Kind::File(_)
                     | Kind::Action(_)
@@ -197,6 +198,7 @@ impl Start {
                 | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::File(_)
                 | Kind::Action(_)
@@ -215,6 +217,7 @@ impl Start {
                     | Kind::Error
                     | Kind::Write(_)
                     | Kind::Review(_)
+                    | Kind::Delivery(_)
                     | Kind::Branch(_)
                     | Kind::File(_)
                     | Kind::Action(_)
@@ -247,6 +250,7 @@ impl Start {
                 | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::File(_)
                 | Kind::Action(_)
@@ -280,6 +284,7 @@ impl Start {
                 | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::File(_)
                 | Kind::Action(_)
@@ -302,6 +307,7 @@ impl Start {
                 | Kind::Setup(_)
                 | Kind::Users
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::File(_)
                 | Kind::Action(_)

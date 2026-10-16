@@ -431,3 +431,116 @@ pub fn setup_cases() -> Vec<(&'static str, Request)> {
         ("setup-user-person-cleared", Request::User),
     ]
 }
+
+/// A recorded webhook request's event header and JSON body.
+#[derive(Debug)]
+pub struct DeliveryRequest {
+    pub event: Vec<u8>,
+    pub body: Vec<u8>,
+}
+#[must_use]
+pub fn delivery(case: &str) -> DeliveryRequest {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tools/forgejo-conformance/deliveries").join(case);
+    let request = fs::read(root.join("request")).expect("delivery request");
+    let end = request.windows(4).position(|w| w == b"\r\n\r\n").expect("delivery head");
+    let event = request[..end]
+        .split(|b| *b == b'\n')
+        .find_map(|line| {
+            line.strip_prefix(temper_forge_forgejo::delivery::EVENT_HEADER).and_then(|rest| rest.strip_prefix(b": "))
+        })
+        .expect("event header")
+        .strip_suffix(b"\r")
+        .expect("CRLF")
+        .to_vec();
+    DeliveryRequest { event, body: body(&request) }
+}
+/// # Errors
+/// Returns the delivery's malformed fields or JSON.
+pub fn decode_delivery(
+    event: &[u8],
+    body: &[u8],
+    limits: &Limits,
+) -> Result<temper_forge_forgejo::delivery::Delivery, Malformed> {
+    use temper_forge_forgejo::client::delivery::{self, Step};
+    let mut decoder = delivery::decoder(event, limits).expect("recorded delivery event");
+    let mut result = None;
+    drive(body, limits, delivery::first(&decoder), |event| match delivery::step(&mut decoder, limits, event) {
+        Step::Demand(next) => Some(next),
+        Step::Done(value) => {
+            result = Some(Ok(value));
+            None
+        }
+        Step::Malformed(error) => {
+            result = Some(Err(error));
+            None
+        }
+    });
+    result.expect("terminal delivery")
+}
+#[must_use]
+pub fn delivery_cases() -> Vec<(&'static str, temper_forge_forgejo::delivery::Delivery)> {
+    use temper_forge_forgejo::{
+        delivery::{Delivery, JobEnd, RefType},
+        document::Body,
+        request::ReviewEvent,
+    };
+    let mut cases = Vec::new();
+    for name in ["issues", "issue_assign", "issue_label", "issue_milestone"] {
+        cases.push((
+            name,
+            Delivery::Issue { repository: 1, number: 1, body: Body::Kept(Box::from(*b"<!-- temper:key 01 -->\n")) },
+        ));
+    }
+    for name in [
+        "pull_request",
+        "pull_request_assign",
+        "pull_request_label",
+        "pull_request_milestone",
+        "pull_request_sync",
+        "pull_request_review_request",
+    ] {
+        cases.push((name, Delivery::Pull { repository: 1, number: 2 }));
+    }
+    for (name, number, text) in [
+        ("issue_comment", 1, b"<!-- temper:key 02 -->\n".as_slice()),
+        ("pull_request_comment", 2, b"<!-- temper:key 03 -->\n"),
+    ] {
+        cases.push((name, Delivery::Comment { repository: 1, number, body: Body::Kept(Box::from(text)) }));
+    }
+    for (name, event) in [
+        ("pull_request_review_approved", ReviewEvent::Approved),
+        ("pull_request_review_rejected", ReviewEvent::RequestChanges),
+        ("pull_request_review_comment", ReviewEvent::Comment),
+    ] {
+        cases.push((
+            name,
+            Delivery::Review {
+                event,
+                repository: 1,
+                number: 2,
+                body: Body::Kept(Box::from(*b"<!-- temper:key 04 -->\n")),
+            },
+        ));
+    }
+    cases.push((
+        "push",
+        Delivery::Push { repository: 1, reference: Box::from(*b"refs/heads/topic"), after: sha(13), pusher: 1 },
+    ));
+    for (name, created, reference, ref_type) in [
+        ("create", true, b"refs/heads/topic".as_slice(), RefType::Branch),
+        ("delete", false, b"refs/heads/gone", RefType::Branch),
+        ("create-tag", true, b"refs/tags/v1", RefType::Tag),
+        ("delete-tag", false, b"refs/tags/v1", RefType::Tag),
+    ] {
+        cases.push((name, Delivery::Ref { created, repository: 1, reference: Box::from(reference), ref_type }));
+    }
+    for (name, end) in [
+        ("workflow_job_success", JobEnd::Success),
+        ("workflow_job_failure", JobEnd::Failure),
+        ("workflow_job_cancelled", JobEnd::Cancelled),
+        ("workflow_job_skipped", JobEnd::Skipped),
+    ] {
+        cases.push((name, Delivery::Job { end, repository: 1, commit: sha(48) }));
+    }
+    cases
+}

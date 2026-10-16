@@ -26,6 +26,7 @@ pub(crate) enum Item {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Kind {
     Error,
+    Delivery(crate::client::delivery::DeliveryKind),
     Write(crate::server::writes::WriteKind),
     User,
     Setup(crate::client::setup::SetupKind),
@@ -66,6 +67,7 @@ fn fields(kind: Kind) -> &'static [Field] {
     match kind {
         Kind::Setup(kind) => crate::client::setup::fields(kind),
         Kind::Error => error_fields(),
+        Kind::Delivery(kind) => crate::client::delivery::fields(kind),
         Kind::Write(kind) => crate::server::writes::fields(kind),
         Kind::File(kind) => crate::client::files::fields(kind),
         Kind::Action(kind) => crate::client::actions::fields(kind),
@@ -178,6 +180,7 @@ fn element(kind: Kind) -> Option<Kind> {
         Kind::Item(Item::Statuses) => Some(Kind::Item(Item::Status)),
         Kind::Item(Item::Labels) => Some(Kind::Item(Item::Label)),
         Kind::Setup(_)
+        | Kind::Delivery(_)
         | Kind::Error
         | Kind::User
         | Kind::Settings
@@ -400,6 +403,9 @@ impl Walk {
         let frame = self.open.top_mut().expect("value inside object");
         let kind = frame.kind;
         if event == &tokenizer::Event::Token(Token::Null) {
+            if let Kind::Delivery(_) = kind {
+                return Err(Malformed::Shape { field: field.key });
+            }
             if field.key == b"statuses" || field.key == b"creator" {
                 frame.seen |= bit;
             }

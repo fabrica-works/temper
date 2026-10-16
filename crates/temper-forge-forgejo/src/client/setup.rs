@@ -63,6 +63,7 @@ impl Setup {
                 | Kind::Action(_)
                 | Kind::Item(_)
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_),
             ) => unreachable!("setup tables"),
             Move::Done => return Step::Done(Document::User(core::mem::replace(&mut self.user, document::user()))),

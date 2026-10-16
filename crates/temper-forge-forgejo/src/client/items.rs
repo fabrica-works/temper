@@ -340,6 +340,7 @@ impl Items {
                 Kind::File(_)
                 | Kind::Action(_)
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::Error
                 | Kind::Write(_)
@@ -374,6 +375,7 @@ impl Items {
                 Kind::File(_)
                 | Kind::Action(_)
                 | Kind::Review(_)
+                | Kind::Delivery(_)
                 | Kind::Branch(_)
                 | Kind::User
                 | Kind::Error
