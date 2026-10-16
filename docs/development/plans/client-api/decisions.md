@@ -780,6 +780,14 @@ choice would have been the user's (development.md, 10.4).
      6. From now until the run's end, a steer's Pass on text that holds until the run's end lands in "The run's steers" before the steer is sent, and context.md names only its steer's time and point. A Pass on text with an earlier Until stays in context.md, as before.
      7. Unchanged: each steer's Do, Stop and Until; the README's other rules; context.md's limit of 60 lines of at most 200 characters.
 
+168. **jig 12.2 goes on without the parked request's NotStored, until the designer answers** (interim, jig 12's block of 2026-10-16T19:42:06Z).
+     Interim, until the designer's answer: a design gap, not a plan defect. client.md 11 says "`NotStored` (a quota full, a disk failing) retires the requests the write carried, unsent, each answered *not kept*"; skein's lib.md 12 gives the request table no retirement but "*Final* retires the request" and the retention cutoff, and no text of either design says how a request with no attempt is retired. The question went to the designer at 19:46:42Z (`question.md`).
+
+     1. jig 12.2 goes on with the work that does not rest on the answer: the barrier (a step's records in one `Save`, a keyed request's first `Exchange` only after `Stored`), the link's `Request::NotKept { attempt }` for each held keyed attempt and the client's `answered(now, attempt, Final)` for it, `Start { kept }`, the reload and two-client stories, and the `why: Option<Retry>` and `Dropped` parts of its Shape.
+     2. It does not write the parked request's `NotStored` path or its offline regression, and changes no file of skein: the answer decides both (option A, a skein entrance; or option B, another behaviour in client.md 11).
+     3. 12.2 does not land before the answer's unblock. When the rest is done first, commit it on the branch, report, and wait for the unblock.
+     4. Unchanged: 12.2's Scope, Files, Shape and Tests; jig 12.3 to 12.5 wait for 12.2 as the plan says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
