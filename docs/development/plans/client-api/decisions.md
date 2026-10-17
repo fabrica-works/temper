@@ -1595,6 +1595,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Conflicts** at a landing in the shared files are the later step's to resolve at its rebase (generated code by regenerating it, as each increment's codec rule says), counted in its Size; a conflict in an item another running step changes is a block, naming both steps.
      4. **Unchanged:** jig 14 → 22 → 15 at the session level; jig 17 once all of jig 16 has; 18, 19, 20 in order; each step's Size, Proof and gate; each session's first step held for its ready check, and each step started early here gets one too (supervisor.md, section 5).
 
+249. **jig 22's and jig-14.s1's Shapes against main** (ready check of jig-22.1 and jig-14.s1).
+     Ruling 249 (ready checks of jig 22 and jig-14.s1, against jig `b6a63f8c1` and temper `fe8fcdf6b`): the two session files corrected against main.
+
+     1. **jig 22** (`jig/22-documents.md`, each passage marked "ruling 249"): 22.1's bounds are `jig_client_view::Limits::…`; its Files take the `me` watch's, the contract's, the link's, the component's, `OwnerProjectPolicy`'s, the core's, the wire tests' and the view's sites the check found, and the downstream repository's users; `DocumentLimits` gains `roles` and the frame's worst case a `Beyond` per project. 22.2: `task: u64` on `WaitsOnParty` and `WaitsOn::Party`; `PhaseClass` and `ExecutorKind` in `queries.rs`; `Debug` on the sketch's types; the `Amend` story's names are jig 14.2's; `translate/live.rs` and the engine-clients fixtures join its Files. 22.3: the core's read takes two groups with a cursor each (engine.md, 11.2: "its live tasks first, in its order, then its ended ones, each group with its own cursor"); Size aim 300, stop 380 (was 180). 22.4: `Impact` and `ReleaseEffect` in core `acts/effects.rs`; the `PhaseCounts` mapping; its missed Files. Done when counts trailers after `sort -u`.
+     2. **jig-14.s1** (`jig/14-s1-words-release.md`, "Corrections at jig `b6a63f8c1`"): the production, generated, derived-value, world, fake-party and downstream sites ruling 210's point 4 missed; ruling 210 stands.
+     3. **Open for the designer before 22.4:** what core state `live_runs`, `effects_pending`, `effects_settling` and pending proposals count, and `Impact.takeover_budget` in a cancel (question.md). 22.1 to 22.3 do not rest on it; 22.4 waits for its answer.
+     4. Any further user a session finds of a name these corrections change is refreshed the same way and listed in its commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

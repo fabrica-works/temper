@@ -112,7 +112,39 @@ goal forms (reading the transitional fields), the ops view's frame
 users, `testing/jig-client-scripted-engine/src/` (its frame document),
 `testing/jig-client-test-records`, `tests/client`'s and
 `tests/client-protocol`'s frame users (`Delivery::Frame`,
-`ReadValue::Frame`).
+`ReadValue::Frame`); and, at jig `b6a63f8c1`: the `me` watch in
+`crates/jig-client-domain/src/{link.rs (13, 63, 73), requests.rs (29)}`
+and its contract's `reads.rs` (47, 166) and `watches.rs` (11, 38); the
+link's `translate/documents.rs` (61, 67) and `documents_part2.rs` (77, 91,
+114: `goal_procedure_fields`, `Bounds::Goal`); the component's
+`translate/task.rs` (104-115: `Bounds::Goal`); `OwnerProjectPolicy`
+(`contract/owner_project.rs`: 16, 44), built by the component's
+`translate/objects/projects.rs` (96, 175) and decoded by the link's
+`translate/documents_part7.rs` (147-167); the core's tests
+`crates/jig-domain-core/src/tests.rs` (417-423) and
+`tests/frame_facts.rs` (166, 205: `owner_creating`), and
+`tests/core/tests/task_queries.rs` (100: `creating` read as
+`Bounds::Goal`); the wire's tests `src/tests/fixtures.rs` (209, 605, 612:
+the `frame_projects` limit that `list 7` removes); the reference UI's
+`crates/jig-client-view/src/{limits/ui.rs (103-109: the worst case over
+`ProjectRole` and `OfferedCharters`), frame/me.rs (35-38)}`; the
+callers of `document_worst_case` (core `acts.rs:164`, `documents.rs:339,
+453`, `documents/deployment.rs:450`, `tests.rs:509-514, 800`,
+`tests/deployment_connectors.rs:113`, `tests/inbox_selection.rs:440`) and
+the literals of `DocumentLimits` that take `roles` (core `tests.rs:127`
+and `documents/offers/tests.rs:60`; `jig-protocol-config`'s
+`profile/small.rs:157`, `profile/standard.rs:99` (its `roles: 8`, small's
+being 4) and `overrides.rs:392`, which destructures it;
+`jig-protocol-store`'s `src/tests/fixtures.rs:596`;
+`tests/core/src/world.rs:122`; `tests/store/src/root.rs:107`) (ruling
+249). Downstream, the repository downstream of jig follows at its
+repin, in its client domain's `src/tests/fixtures.rs` (2, 76, 77, 246),
+its client view's `src/tests/fixtures.rs` (171, 200, 209, 225) and
+`src/forge/page.rs` (26), its terminal shell's `src/tests/fixtures.rs`
+(297, 306, 608; 306 is 22.2's `Subject::Tasks`), `src/client/tests.rs`
+(17) and `src/client/tests/fixtures.rs` (25), and its own
+`tests/client/src/front/tests.rs` (63) and `tests/one-process/src/world.rs`
+(358-359) (ruling 249).
 Shape: wire: `MeParty` (was `FrameParty`); `Template { number: u32,
 name: DocumentText, executor: TemplateExecutor,
 contract: TaskContractDocument, shallower: u32, budget, deadline,
@@ -141,8 +173,21 @@ Core: `FrameProjectRole.creating` becomes `Option<acts::Creating>`,
 from the one judgement (`Admission::Bounded { within, beyond }`) jig 05.4
 reads; the core's `Bounds::Goal` keeps its name until jig 16.5 renames
 it with the goal form's code. The schema's
-header names `Me.projects` and `MeProject.templates` bounded by
-`jig_client_domain::Limits::document_bytes`.
+header (`client-v8.schema:2`) names `Me.projects` and `MeProject.templates`
+bounded by `jig_client_view::Limits::document_bytes`
+(`crates/jig-client-view/src/limits/ui.rs:28`), as it names every bound,
+not by `jig_client_domain::Limits` (ruling 249). The frame's worst
+case (`documents.rs:430-436`) counts a project's `creating` as its
+charters and procedures alone: it counts no `Beyond`, whose `Proposed {
+to: Recipient::Roles }` holds up to `authority.roles` role numbers
+(`acts/bounds.rs:13`), a bound that `DocumentLimits` (`documents.rs:90-97`)
+does not carry. So `DocumentLimits` gains `roles: u32` (the configured
+`authority.roles`), and the worst case adds, for each of `lines`
+projects, a `Beyond` with `List::<u32>::worst_case(limits.roles)`
+(ruling 249). `document_worst_case(&DocumentLimits)` keeps its
+signature: its ten callers call it as they do, and the seven literals
+that build a `DocumentLimits` take the field (both in Files) (ruling
+249).
 Test shape: the component's tests (fixtures
 `tests/engine-clients/src/fixtures.rs:61-80`, `frame_subject` and
 `frame_document`, renamed in place): `a_me_document_carries_each_project_s_templates_and_bounds`;
@@ -174,16 +219,35 @@ Scope: the task line (contract.md, 5.1), a task query's keys and orders
 fields of 3.2 (label, flags, last activity, what it waits on).
 Needs: the session's start: jig 05's `documents::TaskLine`,
 `TaskQuery`, `PhaseClass`, `QueryOrder`, `ConversationRead`,
-`waits::WaitsOn` (whom, how many entries, and the oldest entry's
-kind) and `documents::Task.waits_on`, its `Subject::Query`
+`waits::WaitsOn` (whom, how many entries, and the oldest entry's task
+and kind: `Party { whom, entries, task, kind }`, `waits.rs:13`)
+(ruling 249) and `documents::Task.waits_on`, its `Subject::Query`
 and `Document::Lines`; jig 02's label and flags.
 Files: the v8 schema; the component's `translate/{watches.rs (filter,
-41-79 at the base), task.rs, chips.rs}`; the contract's `queries.rs`
+41-79 at the base; the `Subject::Tasks` arm, 29-32, the `Document::Tasks`
+arm, 167, and the `Lines` arm, 178), task.rs, chips.rs, live.rs (155-210
+at `b6a63f8c1`: the old `task_line`, `tasks` and `filter`, which the
+query's lines replace)}` (ruling 249); the contract's `queries.rs`
 (new) and `documents.rs` (the task's fields, at most 40 lines: it is
-over 800); the link's `translate/{watches.rs, documents*.rs}`; users:
-the reference UI's project tasks section (pages.md, 6.3: phase class,
-executor kind, root, requester, by last change), the scripted engine's
-tasks subject and task document, test records, `tests/client`.
+over 800; its `Tasks`, 1142, loses `project` and `filter` and holds
+`rows: List<TaskLine>` of `queries.rs`, and `TaskFilter` and the old
+`TaskLine`, 1125-1141, go) (ruling 249); the link's
+`translate/{watches.rs, documents*.rs}`; the core keeps `Watched::Tasks`,
+`Document::Tasks` and `documents/project_tasks.rs` (`TaskFilter`,
+`ProjectTaskLine`): nothing on the wire reaches them from here, and jig
+16.4 removes them with the other shaped subjects (its Files; jig 05's
+Choices), so the component maps the wire's subject to `Watched::Query`
+and delivers `Document::Lines`, and `Document::Tasks` ends in the
+`Reason::Tag` arm beside the documents not on the wire (ruling
+249); tests: the component's
+`crates/jig-protocol-engine-clients/src/tests/fixtures/{live.rs
+(`tasks_document`, 79-88), watches.rs (the `Tasks` subject, 90-108)}` and
+the client wire's fuzzy `tests/client-wire/tests/fuzzy_client_wire/documents.rs`
+(42-44, 129: `TaskFilter`, `TaskLine`, `Tasks`, `SubjectTasks`) (ruling
+249); users: the reference UI's project tasks section (pages.md,
+6.3: phase class, executor kind, root, requester, by last change), the
+scripted engine's tasks subject and task document, test records,
+`tests/client`.
 Shape: wire, before `Read`: `enum PhaseClass { working, waiting, held,
 closing, ended }`, `enum ExecutorKind { agent, procedure, person }`,
 `enum QueryOrder { number, changed, activity, priority, ended }`,
@@ -193,9 +257,9 @@ PhaseClass, executor: option ExecutorKind, tracked: option bool, order:
 QueryOrder }`; before `Task`: `enum Whom { person: WhomPerson { value:
 u64 }, role: WhomRole { project: u32, role: u32 } }` (`people::Whom`),
 `enum WaitedFor { question, proposal, escalation, person_task }`,
-`WaitsOnParty { whom: Whom, entries: u32, kind: WaitedFor }` (the
-oldest entry's kind, which jig 05's `WaitsOn::Party` carries; its name
-there wins), `enum WaitsOn { party:
+`WaitsOnParty { whom: Whom, entries: u32, task: u64, kind: WaitedFor }`
+(the oldest entry's task and kind, which jig 05's `WaitsOn::Party`
+carries; its names there win) (ruling 249), `enum WaitsOn { party:
 WaitsOnParty, delegates, news, nothing }`, `ConversationRead { seen:
 u64, unread: Count }`; `Task` gains `label: u32`, `flags: TaskFlags`,
 `last_activity: u64`, `waits_on: WaitsOn` (its `priority` already says
@@ -217,7 +281,9 @@ Test shape: the component's tests: `a_task_query_subject_reaches_the_core_with_i
 of project 1, one tracked: the query `tracked: Some(true)` delivers one
 line, by priority; then the story amends the other task tracked, with
 priority 2, by `Amend { revision: None, change: Amendment { tracked:
-Some(true), priority: Some(2), .. } }`, and the next delivery holds two
+Some(true), priority: Some(2), .. } }` (jig 14.2 makes `Amend.revision`
+optional and gives `Amendment` `tracked` and `priority`; at `b6a63f8c1`
+it has neither) (ruling 249), and the next delivery holds two
 lines, the first one's first), `a_task_line_says_what_its_task_waits_on`;
 `tests/client/tests/stories.rs` (scripted):
 `a_project_s_tasks_section_watches_one_query_by_last_change` (pages.md,
@@ -240,13 +306,35 @@ Scope: a task query's page, live then ended in two groups, each with its
 cursor, the ended group cut or absent (contract.md, 6.1;
 protocol/client.md, 6).
 Needs: the session's start: jig 05's query read in the core with jig
-08's ended part through the store's indexes.
-Files: the v8 schema; the component's `translate/{reads.rs, pages.rs,
-pages/rows.rs}`; the contract's `queries.rs`; the link's
+08's ended part through the store's indexes (one stream with one cursor
+at `b6a63f8c1`: Shape, Core).
+Files: the v8 schema; the component's `translate/{reads.rs, pages.rs
+(27, 57, 97), pages/rows.rs, cursor.rs (288: `Scope::Tasks` has no
+cursor encoding)}`; the contract's `queries.rs`; the link's
 `translate/{reads.rs, pages*.rs}`; `jig-client`'s `Read` of a query;
 the scripted engine's read of a query (its live tasks; its ended group
-none until jig 16.1); test records.
-Shape: wire: `ReadTasks { query: TaskQuery, live: option Cursor, ended:
+none until jig 16.1); test records; the core's
+`crates/jig-domain-core/src/{reads.rs (the `Tasks` arms: 140, 157, 191,
+252, 297, 333), reads/{vocabulary.rs (`Read::Tasks { query, from }`,
+131; `Page.next`, 314; `Answer`), rows.rs (the `Lines` arm, 260-275;
+507, 943, 1502), cursors.rs, ended.rs}}` (ruling 249).
+Shape: Core (ruling 249): jig 05.3 and 08.5 left one stream:
+`Read::Tasks { query, from }` answers one `Page` of live rows, then
+stored rows, with one `next` (the `Lines` arm chains the last live page
+to a `Cursor::Store`, and answers no `next` for a query with no ended
+part). engine.md, 11.2 ("its live tasks first, in its order, then its
+ended ones, each group with its own cursor") and protocol/client.md, 6
+(a page "carries its two groups, live then ended, each with its cursor,
+and says whether the ended group was cut ... or has none") ask for two
+groups: `Read::Tasks { query, live: Option<Cursor>, ended:
+Option<Cursor> }`; a new `Answer::Tasks(Box<TaskPage>)` with `pub struct
+TaskPage { pub live: List<TaskLine>, pub live_next: Option<Cursor>, pub
+ended: EndedGroup }` and `pub enum EndedGroup { Rows { rows:
+List<TaskLine>, next: Option<Cursor>, cut: bool }, None }` (`None` when
+`ended::ended_part(&query)` is `EndedPart::None`); the `Lines` arm ends
+at the live group (a `Cursor::Live`, or none), and the ended group reads
+from `ended`, or from its start (`Cursor::Store { scope, after: None }`),
+through the store's indexes as 08.5 left them. Wire: `ReadTasks { query: TaskQuery, live: option Cursor, ended:
 option Cursor }` before `Read`; `Read.tasks: ReadTasks`; `EndedRows {
 rows: bytes 16777216, after: option Cursor, cut: bool }`, `enum
 EndedGroup { rows: EndedRows, none }`, `TaskPage { live: bytes
@@ -263,7 +351,9 @@ Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world -E
 once: the page's live group holds the live task, its ended group the
 ended one, read from the store. Bound: 1 s.
 Don't: merge the two groups or their cursors.
-Size: at most 180 lines.
+Size: aim 300 lines, stop at 380: 180 for the wire, the component and the
+view, as before, and 120 for the core's two groups with their cursors
+(ruling 249).
 Removes: nothing.
 
 ### 22.4 Offers and a decision's effect
@@ -279,7 +369,16 @@ translation; users: the reference UI's confirmation (it reads the
 effect, where it read `Impact` and `LiveDelegate.takeover_budget`), the
 proposal card's `Withdraw` act (offered to its proposer alone,
 objects.md, 4), the scripted engine's offers, test records. Shared
-hotspot: `crates/jig-domain-core/src/documents.rs`.
+hotspot: `crates/jig-domain-core/src/documents.rs`. At `b6a63f8c1` the
+`Act` renames and `AmendRelease`'s end reach also, in the core,
+`documents/offers.rs` (the `Offered` literals at 65 and 215 take
+`effect`; the act lists at 59-155), `acts/objects.rs` (20-105) and
+`acts/objects/{decisions.rs (47-187), task.rs (18-273)}`,
+`acts/requests.rs` (26, 62-66, 143), `acts/standing.rs` (20-43) and
+`compound.rs` (112-114); and, in `tests/client/src/joint/wire/`, the
+`Offered` literals and `Act` uses of `documents.rs` (491, 703-718),
+`escalations.rs` (27, 30), `notes.rs` (60, 63) and `projects/tests.rs`
+(151, 427), and the map of `offers.rs` (11-28) (ruling 249).
 Shape:
 - Core: `acts::Act` renames `Write` to `Message`, `TakeOver` to `Move`,
   `MarkSeen` to `Seen`, gains `Withdraw`, and loses `AmendRelease` (the
@@ -293,6 +392,19 @@ Shape:
   its effects pending and settling), a move's from the reservation the
   move takes (`tasks.takeover_budget`, as
   `documents/live_delegates.rs:33` reads it).
+- Core's `Impact` and `ReleaseEffect` are new, in `acts/effects.rs` (the
+  sketch: the core has no `Impact`). `Impact.tasks` is the core's
+  `documents::PhaseCounts` (`task_tree.rs:228`, ten fields), which
+  crosses as the wire's and the contract's `PhaseCounts`
+  (`client-v8.schema:578`, `documents.rs:648`, eight fields, `ended`
+  among them) by: `waiting`, `closing`, `held`, `done`, `failed` and
+  `cancelled` as they are; `running` the working class, `idle + starting
+  + running + backing_off`; `ended` 0 (the core counts each ending by
+  its outcome; `ended` is for chips whose source gives none). The
+  wire's `Impact.takeover_budget` has no source in a cancel's effect
+  (contract.md, 5.4 gives a move's reservation as `Effect::Move`): the
+  core's `Impact` has no such field, and the translation writes 0
+  (ruling 249).
 - Wire: `PhaseCounts` and `Impact` move before `Offered` (no byte
   change); `enum ReleaseEffect { judged, run_again, uncertain }`,
   `EffectRelease { what: ReleaseEffect }`, `EffectMove { reservation:
@@ -329,7 +441,10 @@ scratch worktree, generated with skein-codegen, `heavy cargo clippy -p
 jig-protocol-client-wire --lib -- -D warnings` clean; the Rust types in
 a scratch crate against the base's contract types, `heavy cargo clippy
 -p w7-sketch --all-targets -- -D warnings` clean). Names from jig 05 and
-jig 09 are checked at the ready check.
+jig 09 are checked at the ready check. The derives, `PhaseClass`,
+`ExecutorKind`, `task` of `WaitsOn::Party` and the core types of
+`acts/effects.rs` were added after, read against jig `b6a63f8c1`, not
+compiled (ruling 249).
 
 `crates/jig-client-protocol-wire/schema/client-v8*.schema`, this
 session's records, each declared before its first user (`PhaseCounts`
@@ -361,7 +476,7 @@ record WhomPerson { value: u64 }
 record WhomRole { project: u32 role: u32 }
 enum Whom { person: WhomPerson, role: WhomRole }
 enum WaitedFor { question, proposal, escalation, person_task }
-record WaitsOnParty { whom: Whom entries: u32 kind: WaitedFor }
+record WaitsOnParty { whom: Whom entries: u32 task: u64 kind: WaitedFor }
 enum WaitsOn { party: WaitsOnParty, delegates, news, nothing }
 record ConversationRead { seen: u64 unread: Count }
 record TaskLine { chip: Chip project: u32 requester: OwnerRequester tracked: option u32 label: u32 flags: TaskFlags changed: u64 last_activity: u64 ended_at: option u64 budget: OwnerBudget waits_on: WaitsOn phases: OwnerPhaseCounts held_below: u32 conversation: option ConversationRead }
@@ -389,21 +504,26 @@ reference UI through `jig_client`'s re-export of them:
 ```rust
 // contract/me.rs
 /// One template, merged with the project's overrides (its executor, budget and deadline jig 14.2's types).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Template {
     pub number: u32, pub name: DocumentText, pub executor: TemplateExecutor, pub contract: TaskContractDocument,
     pub shallower: u32, pub budget: TemplateBudget, pub deadline: TemplateDeadline, pub tracked: Option<u32>,
     pub flags: TaskFlags, pub label: u32, pub grace: Option<Duration>,
 }
 /// A procedure a party may create with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CreateProcedure { pub connector: u16, pub code: u32 }
 /// Creating's first bound and the project's ceiling past it (`Bounds::Create(CreateBounds)`).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CreateBounds {
     pub pool_left: u64, pub charters: List<u32>, pub procedures: List<CreateProcedure>, pub latest: Option<Wall>,
     pub budget: u64, pub maximum_budget: u64, pub maximum_deadline: Option<Wall>,
 }
 /// What the party may create in a project, and what lies between the bounds: proposable to whom, or refused.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Creating { pub within: CreateBounds, pub beyond: Beyond }
 /// One of the party's projects.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MeProject {
     pub project: u32, pub name: Option<DocumentText>, pub role: HeldRole, pub pool: Option<PoolLedger>,
     pub templates: List<Template>,
@@ -413,6 +533,7 @@ pub struct MeProject {
     pub chat_budget: u64,
 }
 /// The signed-in party's own document.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Me {
     pub party: MeParty, pub projects: List<MeProject>, pub needs: Needs, pub needs_total: u32, pub updates: Count,
     pub results_seen: u64,
@@ -422,24 +543,37 @@ pub struct Me {
 }
 // `OwnerProjectPolicy` gains `templates: List<TemplateOverride>` (jig 14.2's record): the policy's document carries its overrides.
 
-// contract/queries.rs
+// contract/queries.rs (every type here derives `Debug`: `missing_debug_implementations` is deny)
 /// A query's order; ties go by number (jig 05's directions).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum QueryOrder { Number, Changed, Activity, Priority, Ended }
+/// A phase class a query selects (mirrors jig 05's `PhaseClass`; `jig_client_domain` has neither it nor `ExecutorKind`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PhaseClass { Working, Waiting, Held, Closing, Ended }
+/// The kind of executor a query selects (mirrors jig 05's `ExecutorKind`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ExecutorKind { Agent, Procedure, Person }
 /// A task query: a conjunction of fixed keys, and an order (mirrors jig 05's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TaskQuery {
     pub project: Option<u32>, pub requester: Option<OwnerRequester>, pub root: Option<u64>, pub parent: Option<u64>,
     pub label: Option<u32>, pub phase: Option<PhaseClass>, pub executor: Option<ExecutorKind>, pub tracked: Option<bool>,
     pub order: QueryOrder,
 }
 /// Whom an entry waits for (mirrors `people::Whom`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Whom { Person(u64), Role { project: u32, role: u32 } }
 /// What kind of entry waits: the oldest's (jig 05's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WaitedFor { Question, Proposal, Escalation, PersonTask }
-/// What a task waits on, computed by the engine.
-pub enum WaitsOn { Party { whom: Whom, entries: u32, kind: WaitedFor }, Delegates, News, Nothing }
+/// What a task waits on, computed by the engine (`task`, `kind`: the oldest entry's, as jig 05's `WaitsOn::Party`, `waits.rs:13`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum WaitsOn { Party { whom: Whom, entries: u32, task: u64, kind: WaitedFor }, Delegates, News, Nothing }
 /// A conversation's read position over its turns, and what is unread.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ConversationRead { pub seen: u64, pub unread: Count }
 /// The one record of each list of tasks (mirrors jig 05's).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TaskLine {
     pub chip: Chip, pub project: u32, pub requester: OwnerRequester, pub tracked: Option<u32>, pub label: u32,
     pub flags: TaskFlags, pub changed: Wall, pub last_activity: Wall, pub ended_at: Option<Wall>,
@@ -447,17 +581,41 @@ pub struct TaskLine {
     pub conversation: Option<ConversationRead>,
 }
 /// A query's ended group: rows from one index, or none for its keys.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EndedGroup { Rows { rows: List<TaskLine>, after: Option<Cursor>, cut: bool }, None }
 /// One page of a task query: live, then ended.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TaskPage { pub live: List<TaskLine>, pub live_after: Option<Cursor>, pub ended: EndedGroup }
 
 // contract/effects.rs
 /// What lifting a hold does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ReleaseEffect { Judged, RunAgain, Uncertain }
-/// What a decision will do, from the engine's state as the document was made.
+/// What a decision will do, from the engine's state as the document was made (`Impact` is the contract's, `documents.rs:1099`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Effect { Release(ReleaseEffect), Cancel(Impact), Move { reservation: u64 } }
 /// One act the party may make now, its admission and its effect.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Offered { pub act: ActKind, pub admission: Admission, pub effect: Option<Effect> }
+```
+
+`crates/jig-domain-core/src/acts/effects.rs` (new), the core types that the
+contract's `Effect` mirrors (the core has no `Impact`; `acts::Offered` gains
+`effect: Option<Effect>`) (ruling 249):
+
+```rust
+/// What lifting a hold does: the task judged afresh, a run again, or an uncertain effect (made again or not, as the release says).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ReleaseEffect { Judged, RunAgain, Uncertain }
+/// What a cancel ends, from the task's live tree as the document is made (the wire's `Impact` less `takeover_budget`).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Impact {
+    pub tasks: documents::PhaseCounts, pub live_runs: u32, pub proposals: u32, pub effects_pending: u32,
+    pub effects_settling: u32,
+}
+/// What a decision will do.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Effect { Release(ReleaseEffect), Cancel(Impact), Move { reservation: u64 } }
 ```
 
 ## Questions to raise when reached
@@ -470,8 +628,10 @@ Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
   origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-22\.'` prints 4.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-22\.' | sort -u | wc -l` prints 4 (a step's trailer repeats
+  across the commits that make it, so the lines are made unique before
+  they are counted) (ruling 249).
 - The replaced records are gone: `git -C ~/src/rust/jig grep -n -E
   '^(record|enum) (Frame|FrameParty|ProjectRole|TaskFilter|BoundsGoal|GoalProcedure)\b'
   origin/main -- crates/jig-client-protocol-wire/schema` prints nothing.
