@@ -45,8 +45,10 @@ why, so that its diff reads alone (decisions.md, 6).
   (examples.md, 8; root.md, 15).
 - The reference UI: `jig_client_view::Ui: step(now, &Client, Event, &mut
   Queue<Request>), fire(now, &Client, &mut Queue<Request>),
-  next_deadline()`; "It keeps no document of its own: it reads each from
-  the client, by its handles"; "its handles and keys carry its asker,
+  next_deadline()`; "It keeps no copy of a watch's document: it reads
+  each from the client, by its handles"; a read's page, which the client
+  hands over once, it keeps "until the page that read it is left or the
+  handle's next page replaces it"; "its handles and keys carry its asker,
   jig's owner, 65536" (view.md, 18 and 18.1); "Handles, not
   generations" (18.2).
 - "`me`, always ... by a handle of its own" (view.md, 18.2); "A child
@@ -296,7 +298,16 @@ a `Fact` in four of the moved crate's test files (`git grep -c` at jig
 client ends `Limit`, or a read it answers `Limit`, is one the page left
 out (view.md, 18.2). `Continue` goes: the client continues a run's
 watch (client.md, 8.3). `Told::Dropped` reaches the Ui
-(`Event::Client`), which shows it from 21.4.
+(`Event::Client`), which shows it from 21.4. A read's page stays with
+the page that read it (view.md, 18 and 18.3, amended at jig
+`de4f80564`): each holder of one stays as `main` has it
+(`page/project.rs`'s `ProjectPage.owner`, `owner_spend` and read
+windows, the working set's bodies read to say how an object ended), and
+goes when the page is left or a page on the same handle replaces it; a
+read answered with none leaves it. Its pricing stays
+(`page::project::worst_case`, `windows::worst_case`). Nothing in
+`crates/jig-client` or `crates/jig-client-domain` changes for completed
+reads: no storage, accessor or limit.
 Test shape: the moved tests keep their names on the new surface; their
 fixtures (`src/tests/fixtures.rs`) hold a `jig_client::Client::unlinked`
 and feed its `Up` (jig 12.5) for documents. Added:
@@ -309,7 +320,10 @@ and feed its `Up` (jig 12.5) for documents. Added:
 `naming_the_same_sections_again_keeps_their_watches_open`,
 `each_named_section_says_behind_in_its_own_region`,
 `the_sign_in_page_leaves_a_slot_for_the_application_s_ways`,
-`a_handle_the_client_s_limit_ends_is_one_the_page_left_out`. The client
+`a_handle_the_client_s_limit_ends_is_one_the_page_left_out`,
+`a_read_s_page_stays_until_the_page_is_left_or_its_next_page_replaces_it`
+(a project's settings read, then another handle's `Changed`: the
+settings still show; the page left: they are gone). The client
 world's referee (tests/client, `harness/referee.rs`) gains testing.md,
 6.3's "A sign-out told: a sign-out the engine did not receive is never
 shown done", with its referee test
@@ -322,11 +336,13 @@ once (under 2 s); it passes; nothing else is wanted. In the client's
 world, the gate runs
 `a_dropped_watch_shows_the_page_behind_until_it_reopens` (tests/client);
 nothing else.
-Don't: no document kept by the Ui across steps (view.md, 18); no
-decision the client makes (whether the link is live, when to retry).
-Size: at most 300 lines (most of the change is removal; the sign-in
+Don't: no copy of a watch's document kept by the Ui across steps: it
+reads each from `client.document(handle)` (view.md, 18); a read's page
+is the page's to keep, never the client's (view.md, 18.3); no decision
+the client makes (whether the link is live, when to retry).
+Size: at most 320 lines (most of the change is removal; the sign-in
 slot, its "Sign in with Test" button and the sections' words about 60
-of them).
+of them; the read's page test about 20).
 Removes: the bridge; the moved `watches.rs`, `reads.rs`, `link.rs`,
 `versions.rs`; the page's generations; the Ui's `Request::{SignIn,
 Fact, Continue}`, `Act::SignIn`, `signin::Provider` and its list, and
