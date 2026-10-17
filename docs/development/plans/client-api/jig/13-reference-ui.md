@@ -439,7 +439,12 @@ and 18.6; client.md, 4, 8.3 and 11; line numbers at jig `5274ad08e`):
   its world instead, which answers it signed out or not reached, as the
   link does from the wire, so that
   `a_lost_sign_out_keeps_the_person_signed_in_and_says_so`
-  (`tests/client/tests/shell.rs:81`) runs on it.
+  (`tests/client/tests/shell.rs:81`) runs on it. Ruling 197: under
+  `unlinked`, `Event::SignOut` sets `signing_out` and pushes the unit
+  `Request::SignOut` to the world, which answers `Event::Up { up:
+  Up::SignedOut }` or the unit `Event::SignOutLost`, both
+  `jig_client`'s, unlinked only, as `Request::Down` and `Event::Up` are;
+  `Down` and `Up` do not change.
 - *Ends.* `Ended { why }` as `Ended { end }`: `Unknown`, `NotAllowed`,
   `Busy`, `SubjectEnded` and `SignedOut` by their names; `Limit` as
   `Closed`, so the watch retires as one past the UI's own limit does
@@ -508,9 +513,9 @@ gate runs `signing_in_and_starting_a_chat` (tests/client); nothing
 else.
 Don't: no map from handles or keys to children in the root; no `_` arm
 on an asker or an owner; no change to `ops` (jig 21.2).
-Size: at most 370 lines (the root about 120, the bridge about 170, the
+Size: at most 380 lines (the root about 120, the bridge about 170, the
 family sides about 40, the native shell about 25, `jig-client`'s
-sign-out about 15). The parts count together.
+sign-out about 25, ruling 197). The parts count together.
 Removes: the test root's `RequestTable` and its table owner `Owner`
 (with `Kept { scope }`), `KeptAnswered`; the reference UI's silence and
 reopen timers; the native shell's dependency on

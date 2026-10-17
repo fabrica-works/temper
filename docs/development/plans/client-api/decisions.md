@@ -1080,6 +1080,18 @@ choice would have been the user's (development.md, 10.4).
      3. **The report gives both numbers:** the command's 2,437, and the count with item 1 in place of `ui.rs`'s line.
      4. The plan's `code-organization.md`, 7 now says this for any such move (temper, this ruling's commit).
 
+197. **jig 13.4: the unlinked client asks its world to sign out** (plan defect, jig 13's block of 2026-10-17T01:28:40Z).
+     Plan defect. The design does not name `Client::unlinked`: its vocabulary is the plan's (`jig/12-client.md`: "The typed transport (`Client::unlinked`) carries the domain's `Down` and `Up` instead of the link's bytes, for the client's world ... no shell uses it"). Ruling 194 put in 13.4's Shape: "`Client::unlinked` answers `SignOut` at once (`client.rs:236`); it leaves the sign-out to its world instead, which answers it signed out or not reached, as the link does from the wire".
+
+     1. **Yes, the composition-only variants, as proposed:** the unit `jig_client::Request::SignOut`, to the world, and the unit `jig_client::Event::SignOutLost`, from it. Both are unlinked only, as `Request::Down` and `Event::Up` are. `jig-client-domain`'s `Down` and `Up` do not change.
+     2. **Under `unlinked`:** `Event::SignOut` sets `signing_out` and pushes `Request::SignOut`, in place of the answer at once (`client.rs:232`). The world answers `Event::Up { up: Up::SignedOut }` (signed out) or `Event::SignOutLost` (not reached). `SignOutLost` keeps the party and does what `signing()`'s `Again | Lost | Refused` arm does (`client.rs:272-277`: `sign_out_lost = signing_out`, `signing_out` cleared), then tells `Link`, as 13.4 has the linked arm tell it. An unlinked `Up::SignedIn` or `Up::SignedOut` clears `signing_out` and `sign_out_lost`, as `signing()`'s `SignedIn` and `SignedOut` arms do (`client.rs:248-262`).
+     3. **Under `new`:** `Event::SignOutLost` is a host's mistake and `assert!`s, as `Event::{StartUnlinked, Up}` do (12.5's Shape). `Request::SignOut` is never pushed. Linked clients keep the link's exchange and `signing()`.
+     4. **The matches it reaches:** each exhaustive match on `jig_client::Request` gains the arm: `tests/client-protocol/src/client.rs:148` (beside `Down`'s "linked clients emit wire work" panic), `tests/client/tests/unlinked.rs:49-55` (with the arms that panic), and the native shell's arms that 13.4 adds (a linked host: it panics with the others). The client's world takes `Request::SignOut` where it took the UI's sign-out (`tests/client/src/scripted.rs:587`'s `sign_out`): its `lose_sign_out` and `recovery` case answers `Event::SignOutLost`, and otherwise it acts the engine's `SignedOut` and answers `Event::Up { up: Up::SignedOut }`. Refresh any further match on `jig_client::{Request, Event}` the compiler finds, and list it in the commit body. temper names neither.
+     5. **Size:** 13.4 goes from at most 370 to at most 380 lines; `jig-client`'s sign-out about 25.
+     6. **Tests:** 13.4's `an_unlinked_sign_out_its_world_loses_keeps_the_party_signed_in` (`crates/jig-client/src/tests/`) covers it, with `a_lost_sign_out_keeps_the_person_signed_in_and_says_so` in the gate's client world. Nothing else is wanted.
+
+     Unchanged: ruling 187's drops (`Event::Lost` stays a wire event, never an unlinked one); 13.4's Don't.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
