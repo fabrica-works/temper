@@ -835,6 +835,17 @@ per session are in each file.
     use it in every new view test that builds a tree. Add a parameter to
     it if a test needs one; write no new copy. Report the move as a small
     fix outside your Files.
+  - 2026-10-17 15:00Z, point 1 (every session): Your landing report names
+    only what your commit changed: each test over 40 lines that it adds
+    or lengthens (name, base, now), each file over 800 lines that it
+    grows (base, now), and the lines outside Files as one count. The
+    complete lists go in `logs/<session>/audit-<step>.md`; give its path
+    in one line. Do not list a test or a file whose length your commit
+    leaves as it was. jig 14.2's report was 10,164 bytes, 7,658 of them
+    in lists its audit file repeats; keep yours under about 3,000. This
+    replaces 06:20Z point 1's 'each test function over 40 lines that your
+    commit leaves' and 21:01Z point 1's 'every file over 800 after your
+    commit' where they differ.
 
 ## Prerequisites the run checks at its start
 

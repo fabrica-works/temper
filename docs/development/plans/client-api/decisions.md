@@ -1760,6 +1760,9 @@ choice would have been the user's (development.md, 10.4).
         `TaskFilter.executor`; `LackingTaskKind.executor`. Nothing is
         deferred.
 
+263. **README: landing reports keep their lists in logs** (steer of 2026-10-17T15:00:35Z).
+     Ruling 263 (process, the check of 2026-10-17T15:00:35Z): the steer of 2026-10-17T15:00:35Z, point 1, holds until the run's end; its Pass on text lands in the README's "The run's steers" before the steer is sent (ruling 167, point 6), under "2026-10-17 15:00Z, point 1 (every session)": a landing report names only what its commit changed, with the complete lists in `logs/<session>/audit-<step>.md`, under about 3,000 bytes; it replaces 06:20Z point 1's and 21:01Z point 1's lists where they differ. Checked: `wc -c reports/jig-14-20261017T143008Z.md`: 10,164 bytes (the run's median report 1,998).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
