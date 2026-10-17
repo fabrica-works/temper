@@ -1519,6 +1519,9 @@ choice would have been the user's (development.md, 10.4).
      - **At either stop,** report the counts and the files left, and wait.
      - **Unchanged:** rulings 236 and 237's Decisions but their bound; 03.5's Shape, Files, Test shape and Proof; the 04:24Z steer's constant cleanup in `lifecycle.rs` and `queries.rs`, counted with the repairs.
 
+239. **A repin's boundary repairs, as a README rule** (standing rule, temper 03.5's blocks of 2026-10-17T08:14:33Z and 08:25:44Z).
+     A repin's boundary repairs, as a standing rule (the same block twice: temper 03.5's blocks of 2026-10-17T08:14:33Z and 08:25:44Z, answered by rulings 236 and 237). The README's Pins, "What a temper repin repairs", gains: "A boundary type of temper's (a field, a variant, a `CoreRange`) that carries what jig landed, as jig's reference roots and kit carry it (`ops`, `jig-test-service`, `jig_protocol_store`), is such a repair, not implementer.md 8.2's question: carry it losslessly, name each user in the commit body, and count it in the 200 (rulings 236 and 237 ...). A change jig did not make is still the question." It binds every temper repin to the run's end (temper 03.5, 03.6, the 04 and 06 repins, `temper-repin`); ruling 238's bounds stay 03.5's alone.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -221,6 +221,13 @@ per session are in each file.
     summed once before landing and given in the report. More is a
     question (development.md, 5.7), never a reason to pin a jig older
     than temper's present pin.
+    A boundary type of temper's (a field, a variant, a `CoreRange`) that
+    carries what jig landed, as jig's reference roots and kit carry it
+    (`ops`, `jig-test-service`, `jig_protocol_store`), is such a repair,
+    not implementer.md 8.2's question: carry it losslessly, name each
+    user in the commit body, and count it in the 200 (rulings 236 and
+    237, temper 03.5's blocks of 2026-10-17T08:14:33Z and 08:25:44Z).
+    A change jig did not make is still the question.
   - **jig 08.4's census** (the design answer of 2026-10-16): the first
     temper increment whose repin includes jig 08.4's landing (`git -C
     ~/src/rust/jig merge-base --is-ancestor <jig 08.4's landing> <the
