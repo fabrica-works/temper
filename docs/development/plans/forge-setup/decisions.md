@@ -596,6 +596,20 @@ run are appended after "For the user".
      - Unchanged: never trim a doc comment, a test or the formatting to meet a Size; the README's "Byte-stable
        recordings" check (two recordings in a row, `git status --short` empty); 02.2's proofs; the steer of 01:26Z.
 
+131. **02.2's narrowed hook keeps its workflow_job events** (plan defect, temper 02's block of 2026-10-17T01:31:26Z).
+     Ruling 131, a plan defect: the plan expected a hook PATCH to replace its events. The pinned Forgejo, patched from
+     the full set to `{"events":["push"],"active":false}`, answers 200 with `active` false and `events`
+     `["push","workflow_job_cancelled","workflow_job_failure","workflow_job_skipped","workflow_job_success"]`: it keeps the
+     four `workflow_job_*` subscriptions. The fact records what Forgejo does:
+
+     - `setup-hook-patch-narrows-events-but-keeps-the-workflow-job-ones` (capture `setup-hook-patched-narrow`, unchanged)
+       holds when the answer is 200, `active` is false, and `events` is `push` and those four. It replaces
+       `setup-hook-patch-changes-events-and-active`.
+     - Production is unaffected: reconcile always patches the full set, which holds the four, so a repaired hook reads back
+       as sent.
+     - Unchanged: the fake forge, which replaces a hook's events whole (no request of temper's narrows a hook, so no test
+       reaches the difference); the other eleven hook facts; the probe's request; ruling 130's 900.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

@@ -201,7 +201,8 @@ same body), `-hook-made-other` (`http://127.0.0.1:3000/other`, `push` alone), `-
 `setup-hook-lists-the-events-it-was-made-with` (the 22 names, as a set: Forgejo orders them);
 `setup-hook-answers-its-target-in-config-url`; `setup-hook-is-json-and-active`; `setup-hook-never-shows-its-secret`
 (no answer has a `secret` key at any depth, and a final live read through `Fixture::get` holds neither literal);
-`setup-hook-patch-changes-events-and-active`; `setup-hook-patch-leaves-the-orgs-other-hook` (a final live read);
+`setup-hook-patch-narrows-events-but-keeps-the-workflow-job-ones` (-hook-patched-narrow: 200, `active` false,
+`events` `push` and the four `workflow_job_*` of the full patch; ruling 131); `setup-hook-patch-leaves-the-orgs-other-hook` (a final live read);
 `setup-hook-patch-of-a-missing-id-is-404`; `setup-hook-listing-pages-by-limit`;
 `setup-hook-of-one-url-can-be-made-twice` (twin: 201, a new id, both listed);
 `setup-hook-delete-is-204-and-leaves-the-orgs-other-hooks` (deleted; a final live read);
