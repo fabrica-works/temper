@@ -1641,6 +1641,19 @@ choice would have been the user's (development.md, 10.4).
      2. The 05:20Z point already applies to every session whose commit changes more than 20 files: jig 21.3 now (257 files) and jig 14.1 at its rebase onto 21.4.
      3. The 11:32Z steer's point 2 (21.3's accessors) stands as sent; its Until is not the run's end.
 
+253. **jig 21.3: a sign-in the engine ended shows the sign-in page after a lost sign-out** (design answer, jig 21.3's block of 2026-10-17T11:46:44Z).
+     Ruling 253 (design answer, jig 21.3's block of 2026-10-17T11:46:44Z): the designer's answer, landed as jig bbb6303aa and temper 5b2faba9d; 21.3 goes on under it and lands when its Shape is done.
+
+     1. **A, as the supervisor read it.** A sign-in page that follows the engine's own end of the sign-in is not a lost sign-out shown done. testing.md, 6.3 now reads: "After a person asks to sign out, the sign-in page is a fault while the engine still holds the sign-in they asked to end. Once the engine has ended it, by that sign-out or by an end of its own (an expiry, a revocation, another client's sign-out of it), before the ask or after it, the page shows that end, whatever became of the ask. The world observes each end of a sign-in where the engine makes it, as it observes its commits, never from a client's link."
+     2. **The Ui stays as 21.3 has it (not B).** view.md, 18.6 now adds: "A sign-in the engine ends itself, before the sign-out or after it, ends what was asked: the link says signed out, and the reference UI shows the sign-in page, as above; it never keeps the work page once the link says signed out." `signed_out_shows_the_sign_in_page_and_keeps_the_place` stands.
+     3. **client.md, 12** now says what jig-client already does (`client.rs`, `signing`'s `link::Signing::SignedOut` and `Up::SignedOut`, both clear `sign_out_lost`): "Signed out meanwhile, whatever ended the sign-in, the client is signed out, as above, and the link no longer names the sign-out."
+     4. **The referee (21.3's Test shape, at jig `15266f311`):**
+        - `Observed::SignOutReceived { client }` becomes `Observed::SignInEnded { client }`. It is pushed where `SignOutReceived` is now: `scripted.rs:507`, `joint/session/signing.rs:37` (which the joint front's `SignedOut` fault already calls) and ops' `client/transport.rs:474`. It is also pushed in each scripted front's `FrontFault::SignedOut` arm: `scripted.rs:453` and ops' `client/transport.rs:417`. A scripted front pushes it once for each client bound to the ended sign-in's party.
+        - The referee keeps the clients whose sign-in the engine ended, beside `sign_out_asked`. A `SignInEnded` adds its client. `Seen::SignedOut` passes when its client has no sign-out asked, or is among the ended ones; the client then leaves both sets. Nothing else takes a client out of the ended ones. A reload does not, because the scripted engine keeps the sign-in it ended.
+        - Referee tests: `a_sign_out_shown_done_before_the_engine_received_it_is_caught` stays as it is. `a_sign_in_the_engine_ended_shows_the_sign_in_page_after_a_lost_sign_out` is added: `Truth(SignInEnded)`, then `SignOutAsked`, then `Seen::SignedOut`, giving `Verdict::Passed`. That is seed 101's order. Each test runs under 20 ms.
+        - No other referee rule or judge changes. 21.3's Size stands: aim 2,500, stop 3,000.
+     5. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
