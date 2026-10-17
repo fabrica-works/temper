@@ -663,6 +663,18 @@ run are appended after "For the user".
      - Done when 2 now reads `13 tests run: 13 passed`; README Done when's "at least" applies if a later session adds one.
      - Unchanged: the filter, 13's other items, and the landed tests.
 
+137. **The implementer runs the renamed Proof** (process, the coordinator's block of 2026-10-17T03:50:37Z).
+     Ruling 137, process: the steer's sentence was wrong; the coordinator checks reports with git only
+     (development.md, section 2.3: "It checks reports with git only, ... it reads no code").
+
+     - The implementer of 05.3 or 14.1 runs its increment's Proof with the new name, and its report gives the command run
+       and its last line, with "old name -> new name" for each test renamed.
+     - The coordinator checks each new name with git only, in the session's worktree: `git grep -c '<new name>' <commit>`
+       prints a count of at least 1. A report that renames a test but gives no Proof command for the new name is asked for
+       it once, as an incomplete report.
+     - Unchanged: the rest of the steer's point 1 (names of about eight words; `owned_example` kept in 14.1's names; its Pass
+       on text, word for word) and the coordinator's other report checks.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
