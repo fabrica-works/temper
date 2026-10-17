@@ -1634,6 +1634,13 @@ choice would have been the user's (development.md, 10.4).
         Size stays at most 300 lines (removed lines count nothing).
      6. **Nothing is deferred:** no `later.md` row.
 
+252. **the 11:32Z steer's point 1 is the README's 05:20Z point, sent again** (process, the coordinator's block of 2026-10-17T11:34:46Z).
+     Ruling 252 (process, the coordinator's block of 2026-10-17T11:34:46Z): the 11:32Z steer's point 1 is the README's "The run's steers", 05:20Z, point 1, sent again; it needs no new entry.
+
+     1. Its Pass on is the README's 05:20Z, point 1 text, word for word ("A failed `land` gate shows only its first one to five failures … `land`'s gate is unchanged."), which the coordinator has forwarded to w91. The 11:32Z point 1's own Pass on text is withdrawn; nothing takes its place but the README's.
+     2. The 05:20Z point already applies to every session whose commit changes more than 20 files: jig 21.3 now (257 files) and jig 14.1 at its rebase onto 21.4.
+     3. The 11:32Z steer's point 2 (21.3's accessors) stands as sent; its Until is not the run's end.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
