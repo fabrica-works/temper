@@ -3,6 +3,8 @@ use super::fixtures;
 use crate::startup::{Problems, What, application, lines};
 use jig_protocol_config::{self as config, Path, Segment};
 
+const REFUSED_TEMPLATE: u32 = 7;
+
 fn application(input: &[u8], jig: &config::Engine) -> (Option<application::Members>, Problems) {
     let document =
         config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 }).unwrap();
@@ -28,6 +30,20 @@ fn the_standalone_example_reads_into_its_members() {
     assert!(!fixtures::document().is_empty(), "complete example bytes");
     let document = fixtures::parsed();
     assert!(!document.is_empty(), "full standalone example is JSON");
+}
+#[test]
+fn the_example_engine_keeps_jigs_chat_and_goal_templates() {
+    let jig = fixtures::engine().jig;
+    let labels: Box<[u32]> = jig.templates.iter().map(|template| template.label).collect();
+    assert_eq!(*labels, [1, 2], "jig's chat and goal templates, in order");
+    assert_eq!(jig.templates[0].number, 1);
+}
+#[test]
+fn a_chats_member_is_refused_as_unknown_naming_its_path() {
+    let input = fixtures::document();
+    let input = core::str::from_utf8(&input).unwrap().replacen("\"templates\": [", "\"chats\": [", 1);
+    let problems = crate::named(input.as_bytes()).unwrap_err();
+    assert_eq!(&*lines(&problems), b"engine.templates: missing\nengine.chats: unknown member\n");
 }
 #[test]
 fn an_unknown_missing_or_reserved_member_is_named_by_its_path() {
@@ -131,6 +147,11 @@ fn jig_refusals_print_words() {
         (config::What::Reserve { charter: 7 }, b"at: reserve does not fit charter 7\n"),
         (config::What::Budget { charter: 7 }, b"at: budget does not fit charter 7\n"),
         (config::What::Accounts { charter: 7 }, b"at: accounts do not fit charter 7\n"),
+        (config::What::Grace { template: REFUSED_TEMPLATE }, b"at: grace does not fit template 7\n"),
+        (
+            config::What::Operations { operations: 4, delegates: 4, goals: 8 },
+            b"at: operations do not fit compound requests: operations 4, delegates 4, goals 8\n",
+        ),
         (config::What::Message, b"at: message bounds do not agree\n"),
         (config::What::Silence, b"at: heartbeat does not fit silence bound\n"),
         (config::What::StopBound, b"at: stop bound does not fit grace\n"),
