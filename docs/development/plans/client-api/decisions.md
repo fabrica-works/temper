@@ -1961,6 +1961,18 @@ choice would have been the user's (development.md, 10.4).
      3. **Make the diagnostic test's two wildcard arms exhaustive** (jig's `clippy.toml`; the 20:56Z report), or remove the test once the joint proof passes, if the joint test covers it.
      4. **Unchanged:** 15.1's Proof and its 1 s bound; ruling 229's rule; no change to a referee's or judge's check; the harness changes stay in `testing/jig-fake-workers/src/lib.rs` and jig 12's `Story`, each named in the commit body.
 
+284. **jig 16's Shapes against main** (ready check of jig-16.1).
+     Ruling 284 (plan defect, the ready check of jig 16 at jig `9f6f80839`, skein `b30cc95`, temper `8a0a0cbec`): jig 16's session file names paths and users that moved; corrected in `jig/16-shed.md`, "Corrections at jig `9f6f80839`": the gone `jig-domain-client` and `jig-view` paths read under `crates/jig-client-view/src/`; 16.1 gains the scripted engine's `queries.rs`, its joint test calls `jig_client_protocol_world::stories` as `bytes` (the test file's `stories` is `jig_client_world`'s), with `tests/client-protocol/src/{stories,front}.rs` in Files, and the inbox's reply entry keeps `ConversationLine` until 16.4, which makes it a `TaskLine` (schema, contract, core and reference UI files named); 16.3 removes the engine's `Bounds::Goal`, not the reference UI's; 16.4 gains the list records' users the check found; 16.5 renames the engine's `acts::GoalProcedure` to `CreateProcedure`, corrects the test service's and `tests/core`'s paths; Done when's grep counts 221 files at the base. 16.1 ready; its re-check follows 15.2 and 15.3's landings.
+
+     Checked:
+     - `git -C jig ls-tree -d origin/main crates/jig-domain-client crates/jig-view`: nothing; `crates/jig-client-view/src/sections/conversations.rs` exists.
+     - `tests/client-protocol/tests/protocol.rs:2: use jig_client_world::{Until, stories};`; `tests/client-protocol/src/stories.rs:17: pub fn ready`, `:24: pub fn finish`.
+     - `client-v8.schema:600: record InboxEntry { reply: option ConversationLine …`; `contract/documents.rs:654` and `owner_inbox.rs:26: pub reply: Option<Box<ConversationLine>>,`; `jig-domain-core/src/documents/inbox_deployment.rs:25` the same.
+     - `git -C jig grep 'Bounds::Goal' origin/main -- 'crates/jig-client-view/**'`: nothing; `page/project/goals.rs:169: Bounds::Create(jig_client::contract::CreateBounds { pool_left, .. })`.
+     - `jig-domain-core/src/acts.rs:93: pub struct GoalProcedure {`; `testing/jig-test-service/src/family/`: no such tree; `tests/core/src/stories/closing_chat.rs`, `tests/core/tests/stories/procedure_goals.rs` exist.
+     - Done when's third grep at `9f6f80839`: `| wc -l` prints 221.
+     - The check's sub-agent: the 16.1 sketch and its test (with `bytes`) clean under clippy; `jig-client-protocol-world` and `jig-client-view`: 625 of 626 focused (the new test, helpers stubbed), 2 of 2 fuzzy.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -95,6 +95,72 @@ for a chat, a goal or a list remains in the engine or the wire
   production, by this session's third "Done when" grep run there)
   follow these removals at its repin; code-organization.md, 6's grep for that name prints nothing.
 
+## Corrections at jig `9f6f80839` (ruling 284, the ready check of 2026-10-17)
+
+These take precedence over the Shapes, Test shapes and sketches below
+where they differ. Refresh any further copy of a moved or renamed item,
+and list it in the commit body.
+
+- **Every increment:** `crates/jig-domain-client` and `crates/jig-view`
+  are gone: their files are under `crates/jig-client-view/src/` (the
+  conversations section is `sections/conversations.rs`; `page/`,
+  `sections/`, `address*`). Read each such path below as its file there.
+- **16.1:**
+  - Files gain the scripted engine's `queries.rs` (`selects` refuses
+    ended phases at :10, `line` sets `ended_at: None` at :71,
+    `conversation_read` reads `Read::Conversations` at :121); its
+    `reads.rs` (:113 `EndedGroup::None`, :217 refuses an ended cursor) is
+    there already.
+  - The inbox's reply entry keeps `ConversationLine` until 16.4, and the
+    reference UI's reply rows read it until then: 16.1 removes the other
+    uses of `ConversationLine`.
+  - The joint test's `stories::` is `jig_client_world::stories` in
+    `tests/client-protocol/tests/protocol.rs:2`: the test writes `use
+    jig_client_protocol_world::stories as bytes;` and calls
+    `bytes::ready`, `bytes::start_chat`, `bytes::end_chat`,
+    `bytes::conversations` and `bytes::finish`. Files gain
+    `tests/client-protocol/src/stories.rs` (the three new helpers) and
+    `tests/client-protocol/src/front.rs` (`task_queries_read`).
+- **16.3:** Removes says "the engine's `Bounds::Goal`", not the reference
+  UI's: the reference UI reads `Bounds::Create(CreateBounds { .. })`
+  already (`page/project/goals.rs:169`); `Bounds::Goal` is left in the
+  engine (`jig-domain-core/src/acts/bounds.rs`, `documents/offers.rs`,
+  `jig-protocol-engine-clients/src/translate/task.rs`, and their tests),
+  for 16.5. `Operation::Amend` takes `project`, `task` and `reason`, and
+  `Amendment` has no `Default`: a `..` in a sketch is prose.
+- **16.4:**
+  - The inbox's reply entry holds a `TaskLine` where it held a
+    `ConversationLine`: the schema's `InboxEntry` (`client-v8.schema:600`),
+    the contract's `documents.rs:654` and `owner_inbox.rs:26, :157`, the
+    core's `documents/inbox_deployment.rs`, and the reference UI's reply
+    rows join Files.
+  - Files gain these users of the records that go: `tests/client/src/joint/**`,
+    `tests/client-wire/tests/fuzzy_client_wire.rs`,
+    `tests/ops/src/client/{stories,transport}.rs`,
+    `tests/core/src/{referee/offers,stories/reads,watches}.rs`,
+    `tests/core/tests/{activity,reads}.rs`, the component's
+    `translate/owner.rs`, `crates/jig-protocol-wire/src/tests/fixtures/read_values.rs`,
+    and `crates/jig-domain-core/src/{acts/objects,acts/requests,documents/offers,documents/deployment}.rs`.
+- **16.5:**
+  - The engine's `acts::GoalProcedure` becomes `acts::CreateProcedure`
+    (jig 22.1 renamed the wire's and the contract's alone): `acts.rs:93,
+    :113`, `acts/bounds.rs:59`, `documents.rs:432`,
+    `documents/offers.rs:236, :294`, `tests/acts.rs:737`,
+    `tests/frame_facts.rs:175`, `tests/client/src/joint/wire/offers.rs:168`.
+  - `testing/jig-test-service/src/family/facts.rs` does not exist: the
+    service's chat names are in `src/clients/translation.rs`,
+    `src/route.rs` and `src/clients.rs`.
+  - `closing_chat.rs` is `tests/core/src/stories/closing_chat.rs`, and
+    `procedure_goals.rs` is `tests/core/tests/stories/procedure_goals.rs`.
+- **Done when:** the third grep lists 221 files at jig `9f6f80839`, not
+  207.
+
+The check compiled the 16.1 interface sketch (as
+`crates/jig-client-view/src/queries.rs`) and, with the `bytes` import,
+its joint test under clippy, and ran `jig-client-protocol-world` and
+`jig-client-view`: 625 of 626 focused (the new test, its helpers
+stubbed), 2 of 2 fuzzy.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
