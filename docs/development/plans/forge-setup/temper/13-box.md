@@ -354,7 +354,7 @@ pub fn status(address: SocketAddr, target: &str) -> Option<u16> {
    --format='%(trailers:key=Step,valueonly,separator=)' | sort -u |
    grep -c '^temper-13\.[12]$'` prints 2.
 2. The focused tests: `heavy cargo nextest run -p temper -E
-   'test(/box/)'` ends `8 tests run: 8 passed`.
+   'test(/box/)'` ends `13 tests run: 13 passed`.
 3. The process tests, in one shell, the binaries exported first:
    `export TEMPER_FORGEJO=$HOME/src/rust/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64 TEMPER_FORGEJO_RUNNER=$HOME/src/rust/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64`
    then `heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temper --bin temper && cargo nextest run -p temper --profile process -E "test(/^temper_box_/)"'`

@@ -654,6 +654,15 @@ run are appended after "For the user".
        prints once, which was the point.
      - Unchanged: 10.1 as landed; 10.2 goes on.
 
+136. **13's box filter counts 13** (plan defect, hourly check of 2026-10-17T03:36Z).
+     Ruling 136, a plan defect in `temper/13-box.md`, Done when 2: `test(/box/)` reads `8 tests run: 8 passed`, and 13.1
+     landed 13 tests the filter selects under the default profile, all of them 13.1's (cf4cc9e4c): `src/tests.rs`'s three
+     `box_with…`/`box_without…` and `tests/startup.rs`'s ten `…box…` refusals. The process tier's `temper_box_*` and
+     `temper_open_…inbox…` are outside the default profile (`.config/nextest.toml:8`, `not binary(/^(process|live)$/)`).
+
+     - Done when 2 now reads `13 tests run: 13 passed`; README Done when's "at least" applies if a later session adds one.
+     - Unchanged: the filter, 13's other items, and the landed tests.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
