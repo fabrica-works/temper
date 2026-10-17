@@ -506,6 +506,13 @@ once; both pass; nothing else is wanted.
 Don't: no intent kept across a restart (view.md, 18.4: kept work has no
 card); no map in a root.
 Size: at most 300 lines (the dropped notice about 10).
+Ruling 258 re-estimates it, with ruling 257's Files in the count: aim
+800; past 800, the report gives the count by file and why, and the
+session goes on; at 950 added lines by code-organization.md, 7's
+command, stop and block with the count by file; no split. Ops' two
+families share one `me` module that takes the connector, in place of
+`infrastructure/me.rs` and `observability/me.rs`, which differ in the
+connector alone.
 Removes: the by-value hand-offs; `Kept { scope, requests }`.
 
 ## Interface sketches

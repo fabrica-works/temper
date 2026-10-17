@@ -1692,6 +1692,14 @@ choice would have been the user's (development.md, 10.4).
 
      Checked by a read-only sub-agent at jig `48a745eb9`: the sketch under `clippy -D warnings`, clean; both Proof commands passed (2 of 2 in 0.24 s; 1 of 1 under fuzzy, 1.13 s); the 8 packages 21.4 reaches, 1,119 of 1,119 (default) and 59 of 59 (fuzzy). Refresh any further copy of what 21.4 removes, and list it in the commit body.
 
+258. **21.4's Size: aim 800, stop 950, one ops me module** (plan defect, jig 21.4's block of 2026-10-17T12:48:44Z).
+     Ruling 258 (plan defect, jig 21.4's block of 2026-10-17T12:48:44Z): Size re-estimated, no split, and ops' two `me` modules made one.
+
+     1. **The estimate missed what ruling 257 added to the Files** (the Ui's local outcomes, the kept bounds, the notices and phrases, each family side's `me` handle): a plan defect. code-organization.md, 7: "An increment lands within twice its Size without asking (...); past that it asks, with the count by file."
+     2. **Size:** aim 800; past 800, the report gives the count by file and why, and the session goes on; at 950 added lines by code-organization.md, 7's command, stop and block with the count by file. No split: the family sides' own `me` handles and the Ui's boundary removals move together.
+     3. **Ops' two families share one `me` module** that takes the connector (`jig_ops_domain_connectors::Connector`), in place of `examples/ops/client-domain/src/infrastructure/me.rs` and `observability/me.rs`, which differ in the connector alone. Do it in the ops-only commit (`0b8a85a63`'s), which stays ops' one commit. The test root's `first/me.rs` stays its own.
+     4. **Unchanged:** no test, comment or formatting trimmed to fit; ruling 257; the factor 3's derivation in each commit body; Scope, Shape, Test shape and Proof.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
