@@ -204,7 +204,12 @@ list 16 TemplateOverride` (jig 14.2's record; contract.md, 5.1: "a
 project's, its policy (its templates' overrides among it)"), from jig
 09.2's `documents::Policy.templates`; `BoundsCreate` and `CreateProcedure` (were `BoundsGoal` and
 `GoalProcedure`, their fields kept: `pool_left`, `charters`,
-`procedures`, `latest`, `budget`, `maximum_budget`, `maximum_deadline`),
+`procedures`, `latest`, `budget`, `maximum_budget`, `maximum_deadline`;
+and `BoundsCreate` gains `authority: OwnerAuthorityDocument`, as
+`BoundsAmend.authority` (`client-v8.schema:496`), by the designer's
+answer of 2026-10-17T17:57Z: contract.md, 5.3, "the authority they may
+give it, from their role and their pool: whole", which jig 15.3's
+`shapes` fills a `Create` from),
 `Bounds.create` (was `goal`); `CreatingBounds { within: BoundsCreate,
 beyond: Beyond }`; `MeProject { project, name, role, pool, templates:
 bytes 16777216, creating: option CreatingBounds, chat_budget: u64 }`
@@ -220,7 +225,20 @@ Core: `FrameProjectRole.creating` becomes `Option<acts::Creating>`,
 `pub struct Creating { pub within: Bounds, pub beyond: Beyond }`, both
 from the one judgement (`Admission::Bounded { within, beyond }`) jig 05.4
 reads; the core's `Bounds::Goal` keeps its name until jig 16.5 renames
-it with the goal form's code. The schema's
+it with the goal form's code, and gains `authority:
+Box<documents::AuthorityLine>`: in `acts/bounds.rs`'s `goal`,
+`core.chat_authority(project, party, held, limits.tasks.tree_tasks)`
+(`funding.rs:40-57`) through `crate::task_authority` and
+`documents::act_authority`, refused as
+`Limit { which: Authority }` where it does not fit, as `amend` builds
+its own (`acts/bounds.rs:142-156`); counted in `offers.rs`'s heap as
+`Bounds::Amend`'s authority is (`documents/offers.rs:290-297`), and in
+the frame's worst case. The contract's `CreateBounds.authority:
+Box<OwnerAuthorityDocument>`. Test: `src/tests/frame_facts.rs`'s
+`me_carries_a_members_creating_bounds_per_project` asserts the bound's
+authority is `chat_authority`'s, once, and `owner_creating` (:166) gives
+one. Should 22.1 land before this reaches it, a step before jig 15.3
+adds it. The schema's
 header (`client-v8.schema:2`) names `Me.projects` and `MeProject.templates`
 bounded by `jig_client_view::Limits::document_bytes`
 (`crates/jig-client-view/src/limits/ui.rs:28`), as it names every bound,
@@ -559,7 +577,7 @@ enum QueryOrder { number, changed, activity, priority, ended }
 record TaskQuery { project: option u32 requester: option OwnerRequester root: option u64 parent: option u64 label: option u32 phase: option PhaseClass executor: option ExecutorKind tracked: option bool order: QueryOrder }
 record ReadTasks { query: TaskQuery live: option Cursor ended: option Cursor }
 record CreateProcedure { connector: u16 code: u32 }
-record BoundsCreate { pool_left: u64 charters: list 32 u32 procedures: list 32 CreateProcedure latest: option u64 budget: u64 maximum_budget: u64 maximum_deadline: option u64 }
+record BoundsCreate { pool_left: u64 charters: list 32 u32 procedures: list 32 CreateProcedure latest: option u64 budget: u64 maximum_budget: u64 maximum_deadline: option u64 authority: OwnerAuthorityDocument }
 enum ReleaseEffect { judged, run_again, uncertain }
 record EffectRelease { what: ReleaseEffect }
 record EffectMove { reservation: u64 }
@@ -616,6 +634,8 @@ pub struct CreateProcedure { pub connector: u16, pub code: u32 }
 pub struct CreateBounds {
     pub pool_left: u64, pub charters: List<u32>, pub procedures: List<CreateProcedure>, pub latest: Option<Wall>,
     pub budget: u64, pub maximum_budget: u64, pub maximum_deadline: Option<Wall>,
+    /// What the party may give a task alone: their role's, one level shallower, its tasks within a tree's.
+    pub authority: Box<OwnerAuthorityDocument>,
 }
 /// What the party may create in a project, and what lies between the bounds: proposable to whom, or refused.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -119,10 +119,11 @@ itself (15.6), held to the check, and the referee keeps offers.
 ## Corrections at jig `24f3bcc55` (ruling 272, the ready check of 2026-10-17)
 
 These take precedence over the Shapes, Test shapes and sketches below
-where they differ. Two points wait for the designer (`question.md`, ruling
-272): 15.1's `chat_status` for the chip's work phases the table does not
-name, and 15.3's sources for `NewTask`'s other fields; 15.1 starts once
-the answer lands.
+where they differ. The two points ruling 272 sent to the designer (15.1's
+`chat_status` for the chip's work phases the table does not name, and
+15.3's sources for `NewTask`'s other fields) are answered in "The
+designer's answer of 2026-10-17T17:57Z" below, which takes precedence in
+turn.
 
 - **Every increment:** each type in the sketches derives `Debug` (step
   code denies `missing_debug_implementations`); `dangerous` and `named`
@@ -189,6 +190,101 @@ and, with 15.2's and 15.5's graph pins applied, ran the workspace: 1,164
 of 1,164 focused (in two runs), 111 of 111 fuzzy, clippy clean. Refresh
 any further user of a moved or renamed item, and list it in the commit
 body.
+
+## The designer's answer of 2026-10-17T17:57Z (15.1's statuses, 15.3's fills)
+
+jig's `client/domain/pages.md`, 4 (the status table and its order),
+`client.md`, 19 and `contract.md`, 3.2, 3.6 and 5.3 now say these.
+
+- **15.1, `chat_status`:** `ChatStatus` gains `Working { since: Wall }`
+  after `Tool` ("working, and for how long"). The mapping is one
+  exhaustive match, the first that applies, in this order:
+  1. the chip's `OwnerChipPhase::Held { reason, .. }` is `Held(reason)`,
+     `Closing(_)` is `Closing`, `Ended` is `Ended { at }`;
+  2. `waits_on`'s `Party { whom, kind, entries, .. }` is `WaitingForYou
+     { kind, entries }` when `whom` is the reader or a role they hold in
+     `project`, otherwise `WaitingFor(whom)`, in any `Active` stage;
+  3. `Active(BackingOff { .. })` is `Retrying`, as ruling 272 has it;
+  4. `Active(Idle)` is `Parked`; `Active(Due | Preparing)`, `Waiting {
+     .. }` and `Person { .. }` (no chat's phase) are `Starting`;
+  5. `Active(Claimed { .. } | Running { .. })`, by
+     `details.observation`'s `work` where there is one: `Preparing`,
+     `Starting` are `Starting`; `Writing` is `Writing`; `Tool { tool, ..
+     }` is `Tool`; `Waiting` is `Parked`; `Active` and `Ending` are
+     `Working { since }`, the observation's `since`. With no
+     observation, `Claimed` is `Starting`, `Running` is `Working { since:
+     details.phase_since }`.
+
+  `chat_status_follows_the_pages_status_table` gains five rows: a
+  running chip whose work is `Active` (`Working`); a running chip with
+  no observation (`Working`); a running chip whose work is `Waiting`,
+  with `WaitsOn::News` (`Parked`); a claimed chip with no observation
+  (`Starting`); a chip whose work is `Writing`, with `WaitsOn::Party`
+  naming the reader (`WaitingForYou`). Size: at most 220 lines (was 200).
+- **15.2, `words`:** `StatusWord` gains `Working`, English "Working",
+  its span said as `Tool`'s is.
+- **15.3, `shapes`, its first commit, of its own:** the wire's `NewTask`
+  takes `wake: option OwnerWakePolicy` (v8, in place), and the
+  contract's `NewTask.wake: Option<OwnerWakePolicy>`. The engine's
+  translation (`crates/jig-protocol-engine-clients/src/translate/operations.rs:251`)
+  gives none the values of `tasks::WakePolicy::DEFAULT`, as an agent's
+  `delegate` without `wake` gets them
+  (`crates/jig-protocol-tools/src/nested.rs:44`); `people::Member`, the
+  store and the core are unchanged. Files: `client-v8.schema:314` and
+  its generated code, `contract/operations.rs:65`, the link's
+  `translate/operations.rs:227, :325`, the engine's
+  `translate/operations.rs:251`, and the `NewTask` fixtures:
+  `crates/jig-client-protocol-link/src/tests/fixtures/create.rs:15`,
+  `crates/jig-protocol-engine-clients/src/tests/fixtures/create.rs:81`,
+  `testing/jig-client-scripted-engine/src/payload/operations.rs:41`,
+  `tests/client-protocol/src/fixtures/create.rs:13`. Test: the engine's
+  create fixture sends no wake, and
+  `a_create_reaches_the_people_child_with_each_task_s_fields`
+  (`crates/jig-protocol-engine-clients/src/tests/create.rs:6`) asserts
+  the member's wake has `tasks::WakePolicy::DEFAULT`'s values. Size: at
+  most 60 lines outside generated code.
+- **15.3, `shapes`, the fill:** `chat(me, project, words, now: Wall)`
+  and `set_goal(me, project, draft, reason, now: Wall)`, `now` the
+  caller's wall clock, for a template's span. Both fill through one
+  private function, from the template (`template(me, project, n)`) and
+  the project's `creating` (none: `NotOffered::Creating`, for `chat`
+  too):
+  - *executor:* `Charter(n)` is `OwnerExecutor::Agent { charter: n }`,
+    and for `set_goal` a draft's other executor is
+    `NotOffered::Executor`; `Chosen` is the draft's for `set_goal`, and
+    `NotOffered::Template` for `chat`;
+  - *spec:* the words, no parameters, no inputs;
+  - *contract:* `TaskContractDocument::{Report, Change}` as
+    `NewContract`'s; `Verdict { choices, cut: false }` as `Verdict {
+    choices }`; a cut `Verdict` and `Approval` are `NotOffered::Template`;
+  - *authority:* `creating.within.authority.whole()` (jig 22.1's, by
+    this answer; none when cut: `NotOffered::Creating`), its
+    `delegation.depth` less `shallower - 1`, saturating; `shallower` 0
+    is `NotOffered::Template`; its `spend` the budget named, 0 for
+    `AsAllowed` (the engine replaces it: `routing/create.rs:351`); its
+    `deadline` the task's;
+  - *budget:* `Amount(n)` is `Named` with spend n; `AsAllowed { cap }`
+    is `AsAllowed { cap }`; `Given` is `Named` with the draft's budget
+    for `set_goal`, and `NotOffered::Template` for `chat`;
+  - *deadline:* `None` is none; `Span(span)` is `now` plus `span`;
+    `Given` is the draft's for `set_goal`, and `NotOffered::Template`
+    for `chat`;
+  - *wake* none; *dependencies* and *named* empty; *tracked* the
+    template's, its priority the draft's where both are some; *label*
+    and *flags* the template's.
+
+  `set_goal` calls `fall` on the draft as filled: its `budget` the
+  amount named (0 for `AsAllowed`, within any bound: contract.md, 5.3),
+  its `deadline` the filled one. The reference test passes
+  `Wall::from_nanos(0)` (the chat template's deadline is none). Tests
+  gain `a_template_shapes_cannot_fill_is_not_offered` (a table: an
+  approval contract, a cut verdict, `shallower` 0, and for `chat` a
+  chosen executor, a given budget, a given deadline: each
+  `NotOffered::Template`); `chat_fills_the_chat_template_into_one_as_allowed_task`
+  asserts no wake and the offer's depth. Size: at most 280 lines (was
+  230).
+- **Unchanged:** `close_chat`, `fall`'s comparison, `NotOffered`'s
+  variants, jig 15.4 to 15.6.
 
 ## Increments
 
@@ -612,6 +708,8 @@ pub enum ChatStatus {
     Writing,
     /// Running a tool, named when its host names it, since then.
     Tool { tool: Option<Text>, since: Wall },
+    /// Running, neither writing nor in a tool its host names, or nothing reported yet; since then.
+    Working { since: Wall },
     /// Waiting on the reader, or a role they hold in the task's project: for what (the oldest entry's kind), and how many.
     WaitingForYou { kind: WaitedFor, entries: u32 },
     /// Waiting on another person, or a role the reader does not hold.
@@ -665,9 +763,9 @@ pub struct GoalDraft { pub words: Text, pub executor: OwnerExecutor, pub budget:
 pub enum Judged { Create(Ask), Propose { ask: Ask, to: Recipient }, Refused(Refusal), NotOffered(NotOffered) }
 /// Where a draft falls against a project's creating bounds.
 pub enum Fall { Within, Proposable(Recipient), Refused(Refusal), NotOffered(NotOffered) }
-pub fn chat(me: &Me, project: u32, words: Text) -> Result<Ask, NotOffered>;
+pub fn chat(me: &Me, project: u32, words: Text, now: Wall) -> Result<Ask, NotOffered>;
 pub fn close_chat(me: &Me, project: u32, chat: u64, delegates: &[Delegate]) -> Result<Ask, NotOffered>;
-pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text) -> Judged;
+pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text, now: Wall) -> Judged;
 pub fn template(me: &Me, project: u32, number: u32) -> Option<&Template>;
 
 /// contract.md, 5.3's comparison, easy to get wrong.
