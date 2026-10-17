@@ -19,11 +19,16 @@ Files, at jig `795ca6bc3` (follow each by its name):
 - `testing/jig-client-test-protocol-wire/schema/test-client-v1.schema`:
   records for `testing/jig-client-test-domain/src/family.rs`'s `Item`
   (:37-47, with `ItemState`), `Parameters` and `PartDocument` (:48-61),
-  and the answers `Touched`, `Moved`, `Gone` and
-  `Refused(EntranceRefusal)` (:152-165), each field as `family.rs` holds
-  it. Default: `enum FamilyDocument { item, part, connector:
-  ClientDocument }` and `enum FamilyAnswer { touched, moved, gone,
-  refused, connector: ApplicationOutcome }`; `ClientDocument` and
+  and the answers `Touched`, `Moved` and `Gone` (:152-165), each field
+  as `family.rs` holds it. `Refused(EntranceRefusal)` gets no record
+  (ruling 208): an entrance refusal is jig's, "answered as jig's
+  are ... and never reaches its connector" (jig's
+  `client/domain/contract.md`, 234-240); it reaches the root as the
+  client's `contract::Answer::Refused`, which 13.4's root wraps as
+  `tests/ops/src/joint/front.rs:526-530` does. Default: `enum
+  FamilyDocument { item, part, connector: ClientDocument }` and `enum
+  FamilyAnswer { touched, moved, gone, connector: ApplicationOutcome
+  }`; `ClientDocument` and
   `ApplicationOutcome` stay as they are. v1 is edited in place, as jig
   `23e3fbbdb` edited it in this run; the README's "Format versions"
   names no owner for it.
@@ -32,19 +37,22 @@ Files, at jig `795ca6bc3` (follow each by its name):
 - the codec: `testing/jig-client-test-protocol-wire/src/codec.rs`, and a
   module of its own beside `codec/{documents,facts,parts}.rs`;
 - `testing/jig-client-test-domain/src/family/wire.rs`: maps
-  `family::Document` and `family::Answer`, every variant, to the wire and
-  back;
+  `family::Document`, every variant, and `family::Answer`, every variant
+  but `Refused`, to the wire and back; encoding `Refused` returns an
+  `Invalid` of its own (default name `Invalid::EntranceRefusal`), and
+  no `FamilyAnswer` decodes to it;
 - each match on a changed enum that `heavy cargo check --workspace
   --all-targets --keep-going --message-format short` names (the crate's
   users: `testing/jig-test-service`, `tests/client-protocol`,
   `tests/client-wire`); list each in the commit body.
 Shape: `family::wire`'s new functions return the family's value equal to
-the one encoded, for each variant. `request`'s `Invalid::MissingValue`
+the one encoded, for each variant on the wire. `request`'s `Invalid::MissingValue`
 for `Ask::Touch` without parameters (`family/wire.rs:60-61`) stays; a
 story that sends one is a question before `land`.
 Test shape: in `tests/client-wire/tests/test_client_wire.rs`, one round
 trip per new kind (item, part with and without parameters, touched,
-moved, gone, refused), its values as the scripted world's fixtures build
+moved, gone), and one test that encoding `Refused` returns its
+`Invalid`, its values as the scripted world's fixtures build
 them (`tests/client/src/scripted.rs:32-40`), request ids and revisions
 named (README, 23:45Z, point 2).
 Proof: the wire layer, `tests/client-wire`; 13.4 proves the root on it

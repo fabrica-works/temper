@@ -1191,6 +1191,15 @@ choice would have been the user's (development.md, 10.4).
      8. Downstream: the temper step that first pins a jig holding 13.4 drops the two fields at `temper-client-domain/src/tests/fixtures.rs:40, :44`, `temper-client-shell-terminal/src/limits.rs:55, :59` and `temper-client-view/src/tests/fixtures.rs:37, :41`, and lists them in its commit body.
      9. Unchanged: ruling 205 (the scripted family's values cross once jig-13.s2 has landed); 13.4's Don't.
 
+208. **jig 13.s2: entrance refusals stay on jig's wire, no test-wire record** (plan defect, jig 13.s2's block of 2026-10-17T02:15:13Z).
+     Ruling 208 (plan defect, jig 13.s2): neither a local refusal codec nor a shared one. The test client wire carries no record for `family::Answer::Refused(EntranceRefusal)`. The design puts an entrance refusal on jig's wire, not in the application's bytes: jig's `client/domain/contract.md`, 234-240: "**refused at admission with jig's refusal:** a request the people child refuses there ..., or one whose sign-in has ended, is answered as jig's are (section 4) and never reaches its connector. The client hands that answer to the application under the request's key and owner"; and `protocol/client.md`, 150-152: "**Each application's wire crate** holds its own: its families' asks and their outcomes, its subjects, reads and documents. It is generated the same way, and depends on no crate of jig's but `skein-codec`." 13.s2's Files named `Refused` because `family.rs` holds it, not because anything sends it as the family's bytes: no connector ever answers it.
+
+     - The schema's `FamilyAnswer` is `{ touched, moved, gone, connector: ApplicationOutcome }`; `FamilyDocument` is unchanged from the session file's default.
+     - `family/wire.rs` maps every `family::Document` variant, and every `family::Answer` variant but `Refused`, to the wire and back. Encoding `Refused` returns an `Invalid` of its own (default name `Invalid::EntranceRefusal`, beside `Invalid::MissingValue`, `family/wire.rs:10-13`); no `FamilyAnswer` decodes to `Refused`.
+     - Test shape: the round trips for item, part with and without parameters, touched, moved and gone, and one test that encoding `Refused` returns that `Invalid`. Size aim 220 stands.
+     - jig 13.4: an entrance refusal reaches its root as the client's `jig_client_domain::contract::Answer::Refused(why)`, and the root gives the family's asker `family::Answer::Refused(EntranceRefusal::new(why)...)`, as `tests/ops/src/joint/front.rs:526-530` does for temper's. If 13.4's draft already sends `Refused` through 13.s2's codec, it builds it so instead; nothing else in 13.4 changes.
+     - Unchanged: `EntranceRefusal`, jig's client wire (`v8::Refused`) and its link translation; the Don't list of 13.s2 (no change to `jig_test_connector` or its schema; no field dropped, defaulted or inferred). A further place that would put a jig refusal in the test client wire gets the same answer: no record; name it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
