@@ -1763,6 +1763,16 @@ choice would have been the user's (development.md, 10.4).
 263. **README: landing reports keep their lists in logs** (steer of 2026-10-17T15:00:35Z).
      Ruling 263 (process, the check of 2026-10-17T15:00:35Z): the steer of 2026-10-17T15:00:35Z, point 1, holds until the run's end; its Pass on text lands in the README's "The run's steers" before the steer is sent (ruling 167, point 6), under "2026-10-17 15:00Z, point 1 (every session)": a landing report names only what its commit changed, with the complete lists in `logs/<session>/audit-<step>.md`, under about 3,000 bytes; it replaces 06:20Z point 1's and 21:01Z point 1's lists where they differ. Checked: `wc -c reports/jig-14-20261017T143008Z.md`: 10,164 bytes (the run's median report 1,998).
 
+264. **the slowest tests, whoever added them; 14.4 goes on** (process, jig 14.3's block of 2026-10-17T15:28:39Z).
+     Ruling 264 (process, jig 14.3's block of 2026-10-17T15:28:39Z): yes, the slowest tests whoever added them, bounded; then 14.4 goes on.
+
+     1. **The README's rule, not the steer's narrowing:** README "Test time": "the session's next increment first makes the slowest tests cheaper, found once by the measure run of the suite that missed (...), until its own gate is back under the aim". The steer's "that 14.1 and 14.2 added" is dropped: the slowest tests of the measure run, base fixtures included (the native, channel and Ops fixtures), are in scope.
+     2. **Who and when:** jig 14.4, in its first commit, from 14.3's measure run (`a_terminal_in_front_of_the_native_client_starts_a_chat` 0.312 s, `a_resumed_run_is_sent_only_its_current_window` 0.274 s, `p_accepts_a_restart_from_the_incidents_page_with_a_second_seed` 0.266 s, and the next by the same run); no second measure run.
+     3. **Bound:** at most 45 minutes. Every assertion, seed and story stays; a fixture made cheaper keeps what it checks. Each change is a small fix outside the Files, listed in the report with the test's time before and after.
+     4. **If the focused gate is still over 13.3 s** after that commit, the report names the gate's time and the three slowest tests, and 14.4 goes on: the aim is a guide, missed (README "Test time": "the landing stands"). The stop of 15 s stays a rule.
+     5. **14.4 may start now:** ruling 262 (jig `ad3b26d04`, temper `510db3bd4`) answered the role executor.
+     6. **Unchanged:** README "Test time"'s Never list (no `global-timeout`, slow period or per-test ceiling raised; no focused test moved to the fuzzy suite); the steer of 15:00:35Z, points 1 and 3.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
