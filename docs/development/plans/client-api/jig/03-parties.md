@@ -760,12 +760,14 @@ Scope: people.md, 5.1 ("A party proposes a batch, or an amendment, a
 widening of a task's authority among them"; "Proposing is explicit");
 authority.md, 9 ("The proposer is whoever asked: the task, or the party,
 never the task an amendment would change"); tasks.md, 9 ("A party's
-proposal to amend a task is the party's, not that task's"). An `Amend`
-beyond the party's role is refused, saying by whom it could be accepted,
-in place of `AmendProposed`; the party proposes the amendment, and its
-decision reaches them. The reference UI's amendment beyond its party's
-role keeps working through the clients' component until jig 14.5
-(Choices).
+proposal to amend a task is the party's, not that task's"); authority.md,
+7 ("Whoever widens a task funds it": "From that commit, the giver is the
+task's funder"). An `Amend` beyond the party's role is refused, saying by
+whom it could be accepted, in place of `AmendProposed`; the party
+proposes the amendment, and its decision reaches them. An accepted
+amendment or widening, a party's or a task's, makes its accepter the
+task's funder. The reference UI's amendment beyond its party's role keeps
+working through the clients' component until jig 14.5 (Choices).
 Needs: nothing beyond 3.4.
 Files:
 - `crates/jig-domain-people/src/batch.rs` (`Action::Amend`),
@@ -777,12 +779,25 @@ Files:
 - `crates/jig-domain-core/src/routing/propose.rs` (an amendment's
   proposal), `routing/party_decisions.rs` (accepting a party's amendment
   applies it as `person_proposal_accept`'s `Amend` arm does, :238 on,
-  `by: Party::Person(proposer)`), `routing/party_controls.rs` (:62-86, the
+  `by: Party::Person(proposer)`, `funder: Some(<the accepter's pool>)`;
+  that function's `Amend` and `Widen` arms, :242 and :267, pass the
+  accepter's pool too), `routing/runs.rs` (`named_proposal_accept`'s
+  `Amend` and `Widen` arms, :123 and :143, pass
+  `Funder::Task(key.task)`), `routing/party_controls.rs` (:62-86, the
   rewrite to a proposal goes), `acts/bounds.rs` (`amendment_admit`
   answers a refusal), `routing/people.rs`, `routing/tasks.rs`,
   `routing/application_routes.rs`, `sibling_routes.rs` (`AmendProposed`'s
   arms, search S11), `run.rs` (`PersonTaskRoute::AmendProposed`, :392,
   goes).
+- The acceptance's funding, in the tasks child: `boundary.rs`
+  (`Event::Amend`'s `funder`, :1345), `domain.rs` (:535), `control.rs`
+  (`check_amend`, :250, and `apply_amend`, :401; at most 40), `funders.rs`
+  (the move's funding, factored out of `moving.rs`), `moving.rs` (calls
+  it). The tests that build `Event::Amend` gain `funder: None`:
+  `crates/jig-domain-tasks/src/tests/{revisions.rs, revisions/tracking.rs,
+  address.rs, instructions.rs}`, `crates/jig-domain-core/src/tests.rs`
+  (:937), `src/tests/{task_query.rs, acts/tracking.rs}`,
+  `tests/tasks/tests/lifecycle/{grace.rs, goals.rs}`.
 - `crates/jig-protocol-store`: the people codec of `Action::Amend`; the
   tasks codec of `PersonAction::Amend` (in place).
 - The transitional piece: `crates/jig-protocol-engine-clients/src/component.rs`
@@ -807,9 +822,34 @@ party's reach (`Core::reaches`), its revision as `Amend` names it, the
 widening's needs (`authority::needs(&Action::Amend(..))`), refused
 `Approver`/`Nobody` when no role decides `ProposalKind::Amend`, then
 `ProposePerson`, answered `Proposed`. Accepted, the amendment is the
-proposer's, funded by the accepter; rejected, the reason reaches the
-party's inbox. A party's pending proposal to amend a task that ends is
-withdrawn in the decision that ends it.
+proposer's, funded by the accepter (below); rejected, the reason reaches
+the party's inbox. A party's pending proposal to amend a task that ends
+is withdrawn in the decision that ends it.
+
+The acceptance's funding (authority.md, 7: "*when it already was,* its
+reservation is resized to the task's new budget; *otherwise,* the task is
+funded anew from it, as a moved task is"), for every acceptance of an
+amendment or a widening, whoever proposed it and whoever accepts it:
+- `tasks::Event::Amend` gains `funder: Option<Funder>`. `None` is an
+  amendment made directly (`party_controls.rs`, an agent's `amend` at
+  `runs.rs:624`), its present funder resized as on main. `Some(f)` is an
+  acceptance, `f` the accepter's: `Funder::Pool { project, person,
+  period: core.period(project) }` for a party, opened first as the batch
+  arms open it (`party_decisions.rs:50`, `:220`); `Funder::Task(key.task)`
+  for a task.
+- `check_amend`: when `f` is the task's funder, `can_resize` as now
+  (`control.rs:340`); otherwise the move's funding preflight
+  (`moving.rs:198-229`) at the amendment's budget, refused `Funding` when
+  it fails. `apply_amend`: `resize` as now (:412), or the move's funding
+  (`moving.rs:347-368`, `:403-408`): the old funder's reserved less the
+  task's budget, its spent below plus what the task spent; `f`'s reserved
+  plus the new budget less what the task spent; the task's funder `f`,
+  its budget that amount, its authority's spend the same, its spent and
+  spent below 0. The move and the amendment share that code, in
+  `funders.rs`. The task's requester, root, depth and delegates are
+  unchanged.
+- The acceptance's authority check is unchanged: the accepter covers the
+  whole widened authority (`jig-domain-authority/src/check.rs:653`).
 
 The transitional piece, from this increment to jig 14.5: the clients'
 component keeps the `people::Ask::Amend` it translated from a v8
@@ -826,6 +866,14 @@ reference UI's amend confirmation onto `Propose` and removes this piece.
 Test shape:
 - `tests/tasks/tests/proposals.rs`: `a_partys_amendment_proposal_names_the_party_as_proposer`,
   `an_amendment_proposal_whose_task_ends_is_withdrawn`.
+- `tests/tasks/tests/funding.rs` (helpers `turn`, :14, and `ledger`, :38):
+  `an_amendment_accepted_by_another_funder_funds_its_task_anew`. A task
+  funded by one pool with 10 spends 3 in a turn. An `Event::Amend` to 15
+  with `funder: Some(<a second pool>)` leaves the first pool's ledger
+  with 10 less reserved and 3 more spent below, and the second's with 12
+  more reserved; the task's funder is the second pool, its budget 12.
+  Then an amendment to 14 with `funder: Some(<the second pool>)` resizes
+  it to 14, its funder unchanged.
 - `tests/core/tests/parties.rs`: the Proof's test and
   `a_widening_amendment_beyond_the_role_is_refused_naming_who_may_accept`,
   `a_rejected_amendment_proposal_reaches_the_party_not_the_task`.
@@ -843,8 +891,10 @@ Proof: joint layer, `tests/core/tests/parties.rs`,
 member's `Amend` widening a task's budget past their role is refused
 proposable by role 0; their `Propose` of it is answered `Proposed`, and
 the proposal's document names the member, not the task, as its proposer;
-the owner accepts it, and the task's authority is the widened one, its
-widening funded by the owner's pool. Under 0.5 s. Run once, `heavy cargo
+the owner accepts it, and the task's authority is the widened one. Its
+funder is the owner's pool, which reserves the widened budget (the task
+spent nothing), and its funder before is given back the budget it had
+reserved for it. Under 0.5 s. Run once, `heavy cargo
 nextest run -p jig-core-world -E
 'test(a_partys_widening_amendment_is_proposed_by_the_party_and_accepted)'`,
 and once `heavy cargo nextest run -p jig-engine-clients-world -E
@@ -853,8 +903,11 @@ for the transitional piece; each passes, and nothing else is wanted.
 Don't: keep any path in the engine that commits a proposal its proposer
 did not ask for, but a result's follow-ups (tasks.md, 5.6); turn into a
 `Propose` any v8 ask but `Amend`, or an `Amend` refused on anything but a
-proposable authority finding.
-Size: at most 260 lines (a codec increment).
+proposable authority finding; charge an accepted amendment or widening to
+its task's present funder when the accepter is another; change the
+funding of an amendment made directly (`funder: None`; `later.md`).
+Size: at most 320 lines (a codec increment, and the acceptance's
+funding).
 Removes: `Outcome::AmendProposed` and `party_controls.rs`'s rewrite to a
 proposal.
 
