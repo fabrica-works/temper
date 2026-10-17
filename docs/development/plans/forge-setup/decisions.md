@@ -577,6 +577,16 @@ run are appended after "For the user".
      - Line references: `prepare.rs:90-91`, `place.rs:35-36`, `tests/support/mod.rs:6,44-71,518`.
      - Unchanged: Size 230, Done when's counts, the process tests' names.
 
+129. **temper-15.s1: JWT_SECRET as Forgejo reads it** (plan defect, temper 15's block of 2026-10-17T01:16:08Z).
+     Ruling 129, a plan defect: 15.1 landed (temper a2b4c07bc) as ruling 128 reached it. What ruling 128 asks that 15.1
+     did not do is step **temper-15.s1**, `temper/15.s1-jwt-secret.md`, in session temper 15: `JWT_SECRET` drawn as base64
+     in the URL alphabet of its 32 bytes, `Register` read by `first_line` again, and a third preparation in 08.1's
+     `forge_prepare_makes_an_owned_forge_then_remakes_nothing` that removes `admin_token` and checks the token and `app.ini`.
+
+     - Not asked any more: ruling 128's `Added { secret: bool }` and its inline runner-less `state`. 15.1 keeps the secret
+       in `Prepare.runner_secret: Option<Secret>` (`prepare.rs:147`), not a fourth `bool`, and passed the gate so.
+     - Unchanged: 15.1 as landed; Done when's counts; 15's Size of 230 is 15.1's.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
