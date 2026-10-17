@@ -161,6 +161,98 @@ its joint test under clippy, and ran `jig-client-protocol-world` and
 `jig-client-view`: 625 of 626 focused (the new test, its helpers
 stubbed), 2 of 2 fuzzy.
 
+## Corrections at jig `738c20adc` (ruling 287, the ready check of 16.2 and the re-check of 16.1, 2026-10-17)
+
+After jig 15.1 to 15.4. These take precedence over the corrections above
+and the Shapes below where they differ. The reference UI's paths below
+are under `crates/jig-client-view/src/`.
+
+- **16.1:** the older edge's button is "Read earlier"
+  (`JigPhrase::ReadEarlier`, `pages.rs:48`), not "Older": the test
+  presses it. The sketch's `pub const fn`s take `#[must_use]`
+  (`clippy::must_use_candidate`), and `Box` is `alloc::boxed::Box` (the
+  crate is `no_std`). `page/conversations.rs` is 591 lines. The
+  Conversations entry is gated at `page/navigation.rs:54-61` on
+  `frame.charters[].chats`: it gates on `me`'s chat template, as "Choices
+  this plan makes" says, and the file joins Files.
+- **16.1 and 16.2, users of the subjects they leave:** `page/shown.rs:262-298,
+  :381-388`, `page/project.rs:243-262`, `ui/borrowed/project.rs:34-60`,
+  `page/replies.rs:25-30`, `page/routing.rs:889`, `page/opening.rs:26-27,
+  :46-52`, `application.rs:135, :195, :226`, `ui/borrowed.rs:90, :244`
+  join Files where they name the subject the increment leaves.
+- **16.2, Files:** the goals code is `page/project/goals.rs` (344 lines),
+  `sections/project/goals.rs` (371), `page/project/owner_goals.rs` (82)
+  and `page/project.rs`. The move act is `ActKind::Prioritise`:
+  `acts.rs:142, :250-253, :317, :449`, `confirm.rs:461, :548, :653`,
+  `confirmation.rs:275`, `outcome.rs:37` (`OwnerOutcome::Prioritised`).
+  Users of `Goals`, `GoalLine`, `GoalPage` and `Ask::Prioritise`:
+  `sections/project/owner.rs:569` (`GOALS_WINDOW`) and the exhaustive
+  `Ask::Prioritise` arms of `sections/project/owner.rs`,
+  `page/project/owner_form.rs` and `activity/sending.rs`;
+  `sizes/pages.rs:158-231`; `tests/domain/pages.rs:806-916, :1649-1661,
+  :2594-2608, :2692-2714, :2948-2949`, `tests/work_pages.rs:336-344`,
+  `tests/page_capacity/project.rs:33-86`, `tests/domain/drafts.rs:127`;
+  the scripted engine's `reads.rs:20, :90, :134` and
+  `testing/jig-client-test-records/src/page_reads.rs`. temper's
+  `crates/temper-client-shell-terminal/src/tests/fixtures.rs:305, :618`
+  match contract variants the contract keeps: no change there.
+- **16.2, the arrows' offer:** the move arrows stay gated on the
+  project's `Prioritise` offer, which the engine gives in the project's
+  document as in the goals' (`Subject::Goals { project } |
+  Subject::Project { project }`, `jig-domain-core/src/acts/objects.rs:48-49,
+  :86`): the board reads it from the project's document once it stops
+  reading `Goals`, and `acts.rs:250-253` builds the compound in place of
+  `Ask::Prioritise`.
+- **16.2, the compound:** each operation is the whole `Operation::Amend`
+  (`contract/operations.rs:9`); `Amendment` has seven fields and no
+  `Default` (`contract/asks.rs:31-40`):
+
+  ```rust
+  Operation::Amend {
+      project,
+      task: goal,
+      revision: None,
+      change: Box::new(Amendment {
+          addressed: None, spec: None, wake: None, dependencies: None,
+          authority: None, instructions: None,
+          tracked: Some(Tracking::Tracked { priority }),
+      }),
+      reason, // as the reference UI's other amendments give it
+  }
+  ```
+
+  The scripted engine admits a compound of priority-only amendments:
+  today it refuses as `NotOffered` any compound but `[Message, Release]`
+  and `[Amend, Release]` (`testing/jig-client-scripted-engine/src/requests.rs:95-98`,
+  `:319-325`, `:683-697`, `compound_target`); all three change.
+- **16.2, the overview:** it shares the board's watch of
+  `queries::goals(project)` and shows its first rows: both open it
+  (`page/opening.rs:46, :50`) and `open_once` keeps one watch per
+  subject (`page/routing.rs:49-59`). "Under its own handle" goes.
+- **16.2, the refusal:** the reference UI's type is `Refusal::Authority {
+  lacking, proposable: Option<bool> }` (`words/refusals.rs:40`), not the
+  wire's `RefusalAuthority`. "Propose instead" is a new phrase: Files gain
+  `phrases/jig.rs` (the variant near `:668`, its id near `:1432`, its
+  classification and its list) and `phrases/english.rs`; temper names
+  `JigPhrase` variants alone, and a new one breaks nothing there.
+- **16.2, what it proposes:** its stories propose a refused `Amend`
+  (naming its revision: `ProposeAction::Amendment.revision` is required,
+  and a priority-only amendment is never beyond the party). A refused
+  `Create` cannot be proposed yet: the scripted engine refuses `Create`
+  and a batch's `Propose` as `NotOffered` (`requests.rs:90-94`), and the
+  goal form sends `Ask::SetGoal` until 16.3 (`page/project/goals.rs:220`).
+  "Propose instead" for a refused `Create` lands in 16.3, with a story of
+  its own, once the engine models `Create`.
+- **16.2, Needs** gains 16.1's scripted-engine reads: the ended goals
+  rest on its `queries.rs:10` and `reads.rs:217` changes.
+- **16.2, Proof:** "one keyed request" is a delta: `requests_made()`
+  after the move less before it is 1, as `tests/client-protocol/tests/protocol.rs:216-220`
+  counts (`front/faults.rs:107` counts every People answer, and `ready`
+  starts a chat).
+- **16.2, Size:** the 300 lines count the board, the overview, the
+  refusal and the engine's compound; the users' edits listed above count
+  apart, as one count in the report.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query

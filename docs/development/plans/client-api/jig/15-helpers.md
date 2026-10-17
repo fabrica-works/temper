@@ -274,6 +274,48 @@ below, where they differ.
   `jig-client-test-kit` becomes `jig-client, jig-client-test-domain,
   jig-test-connector, skein-lib, skein-ui` (`:326` stays).
 
+## Corrections at jig `738c20adc` (ruling 287, the re-check of 15.5 and the ready check of 15.6, 2026-10-17)
+
+After jig 15.2 to 15.4. These take precedence over the corrections above
+and the Shapes below where they differ.
+
+- **15.5:** `ReadValue::Escalation` and `ReadValue::PersonTask`
+  (`tests/client/src/observe.rs:121, :132`) carry the party's
+  `Escalation` and `PersonTask`, not the owner forms: `Delivered` gains a
+  variant for each, recorded under the same `Object`s. No identifier
+  says "legacy": `tests/boundary/src/names.rs:259` refuses the word in
+  the kit's sources (`vocabulary::kit_sources_*`). With ruling 285's
+  corrections and these, the check saw the two `person_confirmation`
+  controls pass, the workspace's default profile 4,179 of 4,179 and the
+  fuzzy profile 111 of 111.
+- **15.6, Files:** the test view is `testing/jig-client-test-view`
+  (`family.rs:32`, `page`, its proposal slot near `:52-54`), not
+  `testing/jig-test-view`. `family::page` takes `root.first()` alone
+  (`src/root.rs:63`): the proposal's document (`acts`, `funding`) is read
+  from `root.jig().borrow(root.client())`, so `page` gains an argument and
+  `root.rs` joins Files, with the counts the new words and nodes move:
+  `src/words.rs` (`ALL: [Word; 29]`), `family.rs:20` (`PART_NODES = 39`),
+  `src/limits.rs:25, :81`, `src/tests/world_limits.rs:65`.
+- **15.6, the view's dependency:** `facts::effect` is `jig-client`'s,
+  which the test view has as a dev-dependency only
+  (`testing/jig-client-test-view/Cargo.toml:19`): it becomes a normal
+  one, and the view's exact pin at `tests/boundary/src/tests/graph.rs:276-279`
+  gains `jig-client`. Both join Files.
+- **15.6, the answer's outcome:** nothing in the world carries made or
+  proposed yet (`Receipt::Answer { attempt, final_answer, words }`,
+  `tests/client/src/harness/observation.rs:52`). It reaches the referee
+  as a new `Receipt` variant (made, or proposed to whom), which
+  `tests/client/src/observe.rs` produces from the answer: a new variant
+  breaks none of `Receipt::Answer`'s users, a field on it would break
+  nine (`observe.rs:232, :603`, `tests/client/tests/referee.rs:150`,
+  `tests/client-protocol/src/native/wire.rs:124, :129`,
+  `wire/compound.rs:41`, `wire/tests.rs:72`,
+  `tests/ops/src/client/app.rs:418`, `tests/ops/src/joint/bytes.rs:97`).
+- **15.6, the variant that hides the effect:** a setter on the test
+  view, not a parameter of `View::new`, whose five callers
+  (`tests/client/src/test.rs:169` and four in the crate's tests) stay as
+  they are.
+
 ## The designer's answer of 2026-10-17T17:57Z (15.1's statuses, 15.3's fills)
 
 jig's `client/domain/pages.md`, 4 (the status table and its order),
