@@ -208,13 +208,13 @@ impl Store {
             Request::CreateOrg { person, name } => self.create_org(person, name, limits),
             Request::Teams { org, page } => self.list_teams(org, *page, config, limits),
             Request::CreateTeam { org, spec } => self.create_team(org, spec, limits),
-            Request::EditTeam { team, spec } => self.edit_team(*team, spec, limits),
+            Request::EditTeam { team, spec } => self.patch_team(*team, spec, limits),
             Request::TeamMembers { team, page } => self.members(*team, *page, config, limits),
             Request::AddMember { team, login } => self.add_member(*team, login, limits),
             Request::OrgHooks { org, page } => self.list_hooks(org, *page, config, limits),
             Request::CreateOrgHook { org, hook } => self.create_hook(org, hook, limits),
             Request::EditOrgHook { org, id, hook } => self.edit_hook(org, *id, hook, limits),
-            Request::DeleteOrgHook { org, id } => self.delete_hook(org, *id, limits),
+            Request::DeleteOrgHook { org, id } => self.remove_hook(org, *id, limits),
             Request::User
             | Request::ApiSettings
             | Request::RepositoryById { .. }
@@ -285,6 +285,7 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         )?,
     )?;
     account
+        .checked_mul(2)?
         .checked_add(issued.checked_mul(2)?)?
         .checked_add(orgs::worst_case(limits)?)?
         .checked_add(hooks::worst_case(limits)?)
@@ -310,4 +311,88 @@ fn absent(limits: &Limits) -> Reply {
 }
 fn full(limits: &Limits) -> Reply {
     refusal(503, b"setup store is full", limits)
+}
+
+impl Store {
+    /// Removes a scenario account and its tokens and memberships.
+    pub fn delete_account(&mut self, login: &[u8]) {
+        for index in 0..self.accounts.len() {
+            let account = self.accounts.get(index).expect("account index");
+            if account.login.as_ref() == login {
+                let id = account.id;
+                remove(&mut self.accounts, index);
+                for index in (0..self.tokens.len()).rev() {
+                    if self.tokens.get(index).expect("token index").user == id {
+                        remove(&mut self.tokens, index);
+                    }
+                }
+                for index in 0..self.teams.len() {
+                    let team = self.teams.get(index).expect("team index").id;
+                    self.remove_member(team, id);
+                }
+                return;
+            }
+        }
+    }
+    /// Revokes one scenario token by its secret.
+    pub fn revoke(&mut self, secret: &[u8]) {
+        for index in 0..self.tokens.len() {
+            if self.tokens.get(index).expect("token index").secret.expose() == secret {
+                remove(&mut self.tokens, index);
+                return;
+            }
+        }
+    }
+    /// Adds a scenario member to an existing team.
+    pub fn member(&mut self, id: u64, user: u64) {
+        for index in 0..self.teams.len() {
+            let team = self.teams.get_mut(index).expect("team index");
+            if team.id == id {
+                team.members.push(user).expect("member capacity");
+                return;
+            }
+        }
+    }
+    /// Removes one member without changing the team's grants.
+    pub fn remove_member(&mut self, id: u64, user: u64) {
+        for index in 0..self.teams.len() {
+            let team = self.teams.get_mut(index).expect("team index");
+            if team.id == id {
+                for index in 0..team.members.len() {
+                    if team.members.get(index) == Some(&user) {
+                        remove(&mut team.members, index);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    /// Deletes one scenario hook by id.
+    pub fn delete_hook(&mut self, id: u64) {
+        for index in 0..self.hooks.len() {
+            if self.hooks.get(index).expect("hook index").id == id {
+                remove(&mut self.hooks, index);
+                return;
+            }
+        }
+    }
+    /// Changes the grants a person has edited on a scenario team.
+    pub fn edit_team(&mut self, id: u64, spec: document::TeamSpec) {
+        assert!(spec.name.len() <= self.string_bytes, "scenario team name bound");
+        for index in 0..self.teams.len() {
+            let team = self.teams.get_mut(index).expect("team index");
+            if team.id == id {
+                team.spec = spec;
+                return;
+            }
+        }
+    }
+}
+fn remove<T>(rows: &mut List<T>, at: u32) {
+    let old = core::mem::replace(rows, List::with_capacity(rows.capacity()));
+    for (index, row) in old.into_boxed().into_iter().enumerate() {
+        if index != usize::try_from(at).expect("u32 fits") {
+            rows.push(row).ok().expect("same table capacity");
+        }
+    }
 }

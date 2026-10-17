@@ -112,7 +112,7 @@ impl Store {
         self.add_team(org, spec.clone());
         encoded(201, Answer::Team(document(self.teams.last().expect("team added"))), limits)
     }
-    pub(super) fn edit_team(&mut self, id: u64, spec: &TeamSpec, limits: &Limits) -> Reply {
+    pub(super) fn patch_team(&mut self, id: u64, spec: &TeamSpec, limits: &Limits) -> Reply {
         for index in 0..self.teams.len() {
             let team = self.teams.get_mut(index).expect("table index");
             if team.id == id {

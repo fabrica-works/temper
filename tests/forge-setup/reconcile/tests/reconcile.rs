@@ -85,6 +85,7 @@ fn a_managed_forge_missing_an_org_is_refused_naming_it() {
         Ended::Stop(Failure { forge: 1, step: Stage::Org, subject: b"absent".as_slice().into(), why: Why::OrgMissing })
     );
     assert_eq!(world.requests().last(), Some(&Request::Org { name: b"absent".as_slice().into() }));
+    assert!(world.secrets_absent());
 }
 #[test]
 fn a_team_named_for_the_bot_is_made_with_write_on_every_repository() {
@@ -179,4 +180,96 @@ fn two_hooks_with_the_listeners_url_keep_the_lowest_patched_and_the_rest_deleted
         (b"http://elsewhere.invalid/hook".as_slice(), b"other-secret".as_slice(), false)
     );
     assert!(world.requests().contains(&Request::DeleteOrgHook { org: b"acme".as_slice().into(), id: high }));
+}
+#[test]
+fn a_second_run_writes_only_the_hooks_patches() {
+    let mut world = fixtures::converged(7);
+    let since = world.requests().len();
+    let files = fixtures::file_writes(&world);
+    assert_eq!(world.reconcile(), Ended::Done);
+    assert_eq!(fixtures::write_routes(&world, since), vec![Route::EditOrgHook, Route::EditOrgHook]);
+    assert_eq!(fixtures::file_writes(&world), files);
+}
+#[test]
+fn a_deleted_bot_is_made_again() {
+    let mut world = fixtures::converged(7);
+    let since = world.requests().len();
+    world.store_mut().delete_account(b"temper");
+    assert_eq!(world.reconcile(), Ended::Done);
+    assert_eq!(world.store().find(b"temper").expect("replacement bot").id, 4);
+    assert_eq!(world.file(File::User).expect("replacement id file").expose(), b"4");
+    assert_eq!(world.store().token_user(world.file(File::ApiToken).expect("replacement API token").expose()), Some(4));
+    assert_eq!(fixtures::write_routes(&world, since).iter().filter(|route| **route == Route::CreateUser).count(), 1);
+}
+#[test]
+fn a_revoked_token_is_made_again() {
+    let mut world = fixtures::converged(7);
+    let old = world.file(File::ApiToken).expect("first API token").clone();
+    world.store_mut().revoke(old.expose());
+    assert_eq!(world.reconcile(), Ended::Done);
+    let replacement = world.file(File::ApiToken).expect("replacement API token");
+    assert_ne!(replacement, &old);
+    assert_eq!(world.store().token_user(replacement.expose()), Some(3));
+}
+#[test]
+fn a_removed_team_member_is_added_again() {
+    let mut world = fixtures::converged(7);
+    let team = world.store().team(b"acme", b"temper").expect("team").id;
+    let since = world.requests().len();
+    world.store_mut().remove_member(team, 3);
+    assert_eq!(world.reconcile(), Ended::Done);
+    assert_eq!(world.store().team(b"acme", b"temper").expect("repaired team").members.as_slice(), &[3]);
+    assert_eq!(fixtures::write_routes(&world, since), vec![Route::AddMember, Route::EditOrgHook, Route::EditOrgHook]);
+}
+#[test]
+fn a_deleted_hook_is_made_again() {
+    let mut world = fixtures::converged(7);
+    let id = world.store().subscriptions(b"acme").next().expect("first hook").id;
+    world.store_mut().delete_hook(id);
+    assert_eq!(world.reconcile(), Ended::Done);
+    let hooks: Vec<_> = world.store().subscriptions(b"acme").collect();
+    assert_eq!(hooks.len(), 1);
+    assert_ne!(hooks[0].id, id);
+    assert_eq!(hooks[0].url.as_ref(), fixtures::URL);
+    assert_eq!(&hooks[0].secret, world.file(File::WebhookSecret).expect("webhook secret"));
+}
+#[test]
+fn a_team_edited_by_a_person_is_repaired() {
+    let mut world = fixtures::converged(7);
+    let id = world.store().team(b"acme", b"temper").expect("team").id;
+    let since = world.requests().len();
+    world.store_mut().edit_team(id, fixtures::stale_team());
+    assert_eq!(world.reconcile(), Ended::Done);
+    assert_eq!(world.store().team(b"acme", b"temper").expect("repaired team").spec, fixtures::team(b"temper"));
+    assert_eq!(fixtures::write_routes(&world, since), vec![Route::EditTeam, Route::EditOrgHook, Route::EditOrgHook]);
+}
+#[test]
+fn a_person_under_the_bots_login_is_refused() {
+    use temper_forge_setup::reconcile::{Failure, Stage, Why};
+    let mut world = World::owned(7);
+    world.store_mut().account(b"temper", false, b"A person");
+    assert_eq!(
+        world.reconcile(),
+        Ended::Stop(Failure { forge: 1, step: Stage::Bot, subject: b"temper".as_slice().into(), why: Why::Unmarked })
+    );
+    assert_eq!(world.requests().last(), Some(&Request::UserOf { login: b"temper".as_slice().into() }));
+    assert!(world.secrets_absent());
+}
+#[test]
+fn no_secret_is_in_any_failure_debug_or_trace() {
+    use temper_forge_setup::reconcile::{Failure, Stage, Why};
+    let mut world = World::owned(7);
+    fixtures::bot_tokens(&mut world);
+    world.put(File::AdminToken, fixtures::secret(b"unrecognized-admin-token"));
+    assert_eq!(
+        world.reconcile(),
+        Ended::Stop(Failure {
+            forge: 1,
+            step: Stage::Admin,
+            subject: b"temper-admin".as_slice().into(),
+            why: Why::Refused(401)
+        })
+    );
+    assert_eq!(world.requests(), &[Request::User]);
+    assert!(world.secrets_absent());
 }

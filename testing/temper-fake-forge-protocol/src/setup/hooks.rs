@@ -86,7 +86,7 @@ impl Store {
         }
         absent(limits)
     }
-    pub(super) fn delete_hook(&mut self, org: &[u8], id: u64, limits: &Limits) -> Reply {
+    pub(super) fn remove_hook(&mut self, org: &[u8], id: u64, limits: &Limits) -> Reply {
         let old = core::mem::replace(&mut self.hooks, List::with_capacity(limits.documents.inner));
         let mut found = false;
         for hook in old.into_boxed() {

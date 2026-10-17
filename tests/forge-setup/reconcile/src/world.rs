@@ -67,7 +67,7 @@ impl World {
         self.files.iter().find(|(f, _)| *f == file).map(|(_, value)| value)
     }
     pub fn put(&mut self, file: File, bytes: Secret) {
-        if matches!(file, File::ApiToken | File::GitToken | File::WebhookSecret) {
+        if matches!(file, File::AdminToken | File::ApiToken | File::GitToken | File::WebhookSecret) {
             self.secrets.push(bytes.clone());
         }
         if let Some((_, value)) = self.files.iter_mut().find(|(f, _)| *f == file) {
@@ -97,9 +97,18 @@ impl World {
     }
     #[must_use]
     pub fn secrets_absent(&self) -> bool {
-        self.secrets.iter().chain(self.service.setup().issued().iter().map(|token| &token.secret)).all(|secret| {
-            self.trace.iter().all(|text| !text.as_bytes().windows(secret.len()).any(|bytes| bytes == secret.expose()))
-        })
+        let mut checked = Vec::new();
+        for secret in self.secrets.iter().chain(self.service.setup().issued().iter().map(|token| &token.secret)) {
+            if secret.is_empty() || checked.contains(&secret) {
+                continue;
+            }
+            if self.trace.iter().any(|text| text.as_bytes().windows(secret.len()).any(|bytes| bytes == secret.expose()))
+            {
+                return false;
+            }
+            checked.push(secret);
+        }
+        true
     }
     pub fn reconcile(&mut self) -> Ended {
         self.secrets.extend(self.service.setup().issued().iter().map(|token| token.secret.clone()));
