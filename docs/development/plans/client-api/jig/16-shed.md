@@ -286,6 +286,11 @@ where they differ.
   expected offers-kept failure 15.6 gave it goes (15-helpers.md, ruling
   290). If 16.3 lands before 15.6, 16.3 changes the story so, and 15.6
   gives it nothing.
+- **16.1 and 16.2:** where a landing moves only the time of that
+  expected failure (`Time::from_nanos(8_416_106)`, `proposed_story.rs:54`
+  on jig `25fd50d50`), it takes the time the story's failure prints, keeps
+  the fault and its words, and lists it in the commit body (the steer of
+  2026-10-17T23:27Z). Any other difference is a block.
 
 ## Increments
 

@@ -2051,6 +2051,9 @@ choice would have been the user's (development.md, 10.4).
         - a cause in the observer (`tests/channel/src/world/`) or in `skein-kv`'s recovery: a block with the logs, naming the file, the line and the arithmetic at fault, with no repair; the supervisor then rules who repairs it.
      4. **Unchanged:** the check at `store.rs:257`, and every referee's and judge's check; the fuzzy draws; the gate story's repair under ruling 291. Aim to spend at most 30 minutes on steps 1 to 3; past that, report what the logs show.
 
+293. **jig 16: ruling 290's expected failure may take a moved time** (steer of 2026-10-17T23:27Z).
+     Ruling 293 (steer of 2026-10-17T23:27Z, from the check of 2026-10-17T23:25:34Z): ruling 290's expected failure in `tests/client/src/joint/role_stories/proposed_story.rs` names the time of the referee's failure (`at: Time::from_nanos(8_416_106)`, `:54` on jig `25fd50d50`), which 16.1's or 16.2's changes to the core and the reference UI may move. Until 16.3 lands, a landing that moves only that time takes the time the story's failure prints, keeps the fault and its words, and lists it in the commit body; any other difference is a block. `jig/16-shed.md`'s ruling 290 section gains this.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
