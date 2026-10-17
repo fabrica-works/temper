@@ -1829,6 +1829,15 @@ choice would have been the user's (development.md, 10.4).
      2. **jig 14's** prints 5 on `origin/main` (below): mark the session done.
      3. **Unchanged:** the landed history; README Done-when 10; jig 14's other Done-when commands, which 14.5's log shows passed.
 
+272. **jig 15's Shapes against main** (ready check of jig-15.1).
+     Ruling 272 (plan defect, the ready check of jig 15 at jig `24f3bcc55`, temper `6a62c1fe7`): jig 15's session file misses what main and jig 14 landed; corrected in `jig/15-helpers.md`, "Corrections at jig `24f3bcc55`", which takes precedence over its Shapes and sketches: 15.1's `Retrying { until, notice: RetryNotice }` and `dangerous` with delete-note; 15.2's test home, "Task stopped" and its Files; 15.3's `Created { first, last, given }`, `Text::new` and `close_chat`'s reason; 15.4's module paths and what its sketch keeps; 15.5's `Revision { value }`, `Verdict::Failed` and `named` as a list; 15.6's Needs gain 15.3; every sketch derives `Debug`. Two points are the designer's (`question.md`): 15.1's status for the chip's `Active` and `Waiting` work and no observation, and 15.3's sources for `NewTask`'s authority, wake, parameters, dependencies and grants. jig 15.1 holds in `check` until the answer lands.
+
+     Checked:
+     - `git -C jig grep -n 'Created {' origin/main -- crates/jig-client-domain/src/contract`: `owner_outcome.rs:37: Created { first: u64, last: u64, given: Option<super::CreatedGiven> }`.
+     - `english.rs:263`: `JigPhrase::HoldStopped => … b"Task stopped"`; `confirm.rs:202`: `let dangerous = act == ActKind::Cancel || act == ActKind::Reject || act == ActKind::DeleteNote;`.
+     - `crates/jig-client-view/src/conversation.rs` 602 lines, `conversation/words.rs` 238 (`wc -l`); `conversation.rs:554: pub fn worst_case`; `phrases/jig.rs` 3,093 lines; `testing/jig-fake-workers/src/lib.rs:46-53`: `Call { Opaque, ProposeGoal, Choose }`, no question.
+     - The check's sub-agent compiled the corrected sketches under `clippy -D warnings` with jig 22's types stubbed, and with the graph pins (`graph.rs:259`, `:713`) applied ran 1,164 focused tests (two runs) and 111 fuzzy, all passing; clippy clean.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

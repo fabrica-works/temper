@@ -116,6 +116,80 @@ itself (15.6), held to the check, and the referee keeps offers.
 - **jig never names the repository downstream of jig** (code-organization.md, 6's grep for that name prints
   nothing).
 
+## Corrections at jig `24f3bcc55` (ruling 272, the ready check of 2026-10-17)
+
+These take precedence over the Shapes, Test shapes and sketches below
+where they differ. Two points wait for the designer (`question.md`, ruling
+272): 15.1's `chat_status` for the chip's work phases the table does not
+name, and 15.3's sources for `NewTask`'s other fields; 15.1 starts once
+the answer lands.
+
+- **Every increment:** each type in the sketches derives `Debug` (step
+  code denies `missing_debug_implementations`); `dangerous` and `named`
+  are exhaustive matches (no `matches!`, closure or wildcard arm). The
+  `tests.rs` `mod` lines of `crates/jig-client/src/tests.rs` join 15.1 to
+  15.4's Files.
+- **15.1:** `ChatStatus::Retrying { until: Wall, notice: RetryNotice }`,
+  in place of `{ at, try_number, tries, class }`: the chip sends
+  `ChipPhase::Owner` alone, and its `RetryNotice`
+  (`contract/run_facts.rs:32`, `OwnerFailed { class, count, allowance }`)
+  carries pages.md, 4's "retrying, when, and why: 'host lost, try 2 of
+  3'". `Tool { tool }` holds the owner chip's `tool: Box<[u8]>`, not a
+  `Text`. `dangerous` is true for cancel, reject and delete-note, as the
+  reference UI's `confirm.rs:202` marks them (the user is `confirm.rs`,
+  not `confirmation.rs`). The joint test's question needs a question call
+  in `testing/jig-fake-workers/src/lib.rs` (`Call`, :46-53, has none):
+  it joins Files.
+- **15.2:** `english_loads_beside_the_reference_ui_s_phrases_in_one_phrasebook`
+  goes to `crates/jig-client-view/src/tests/phrases.rs` (in
+  `crates/jig-client/src/tests/words.rs` it names `jig_client_view`, and
+  Done-when 3 would print it). `a_stopped_task_s_hold_reads_in_jig_s_words`
+  expects "Task stopped", the English `HoldCategory::Stopped` has
+  (`phrases/english.rs:263`); `Word::hold` takes no `me`. Files gain
+  `tests/boundary/src/tests/graph.rs:713` (`jig-client`'s pinned
+  dependencies gain `skein-ui`), the view's `owner_words.rs:8-30, :56,
+  :124`, `phrases.rs:10` (`jig_capacity`, and its users), the cards
+  (`cards/{chip,common,escalation,hold,result}.rs`), `confirmation.rs`,
+  `pages/work.rs`, `sections/project/{tasks,owner}.rs`,
+  `sections/conversations.rs` and `words/{held,refusals}.rs`. The 40
+  added lines count against `jig.rs` at the session's base (3,093 lines).
+- **15.3:** `OwnerOutcome::Created { first, last, given }` on main: the
+  reference test asserts `assert_eq!(first, last)` and reads
+  `story.line(first)`. Text is made with `Text::new(Box::from(..),
+  32).expect(..)` (`Text` has no `From<&[u8]>`). `close_chat` takes a
+  `reason: Text`, which each `Cancel` and `Move` carries
+  (`contract/operations.rs`). `Ask` in the sketch is `contract::Ask`
+  (`jig_client::Ask` is the outer enum).
+- **15.4:** the module is `crates/jig-client-view/src/conversation.rs`
+  (602 lines) and `conversation/words.rs` (238 lines). The sketch keeps
+  what the module has: `Words::Read { message }` (the tests at
+  `tests/domain/conversations.rs:383, :386, :413` assert it),
+  `Line::Words` keeps `Sent.by: Party`, `by_name_cut` and
+  `KeptWords::bind(scope)`; `Fold`, `CallName` and `worst_case`
+  (`conversation.rs:554`) move with the module into `thread`. Users
+  joining Files: `ui.rs`, `ui/client.rs`, `ui/borrowed*.rs`,
+  `intents.rs:191, :200, :270`, `drafts.rs:244`, `action.rs:47`,
+  `pages.rs:11`, `pages/work.rs:92`, `page/task.rs:479, :618`,
+  `turns.rs:196`, `limits/ui.rs:74, :92`. No temper user.
+- **15.5:** `Revision { value: 99 }`, not `Revision(99)`. A breach reads
+  as `Verdict::Failed(Failure { why, .. })` (`referee.rs:465-474`):
+  `Outcome.faults` is a count (`world.rs:74`) and `harness::Fault` the
+  injected fault, so `Fault::Check` and `.faults.as_slice()` go. `named`
+  returns a list: a `Compound` names a revision per piece, an `Amend` its
+  `change.addressed.revision`, a `Propose` of an amendment its spec's;
+  a priority-only `Amend` (revision `None`, ruling 260) names nothing.
+  The world's limits are at `test.rs:21`. Files gain
+  `tests/boundary/src/tests/graph.rs:259` (the kit's pinned dependencies
+  gain `jig-client` and `skein-ui`).
+- **15.6:** Needs gains 15.3 (`Seen::Draft` uses `Fall`, ruling 248).
+
+The check compiled the corrected `facts`, `shapes`, `words`, `thread`
+and `check` sketches under `clippy -D warnings` (jig 22's types stubbed),
+and, with 15.2's and 15.5's graph pins applied, ran the workspace: 1,164
+of 1,164 focused (in two runs), 111 of 111 fuzzy, clippy clean. Refresh
+any further user of a moved or renamed item, and list it in the commit
+body.
+
 ## Increments
 
 ### 15.1 `facts`
