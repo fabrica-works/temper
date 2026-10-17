@@ -537,6 +537,15 @@ run are appended after "For the user".
      600; 121: 01.3 at 720; 124: 02.1 at 1160) stands where it is larger. Unchanged: the count by file in each report; the
      stop past the tolerance; never trim a doc comment, a test or the formatting to meet a Size.
 
+126. **Ruling 125 applies to increments in progress** (process, temper 05's block of 2026-10-17T00:46:54Z).
+     Ruling 126, process: ruling 125's tolerance (the README's "Sizes": "within 3.5 times its Size without asking, a
+     Size marked \"(codec)\" within 4.5 times") applies to every increment not yet landed, those in progress included; the
+     steer's "from their next increment" was the supervisor's slip. 05.2 (Size 280, not codec) lands at 764 production
+     lines, within 980.
+
+     - Unchanged: the count by file in each report; the stop past the tolerance; never trim a doc comment, a test or the
+       formatting to meet a Size.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
