@@ -49,7 +49,8 @@ that keep it compiling.
   covers `CreateOrg` on both sides, so the probes are no `setup_cases()` rows (01.3's `-git-discovery` is the precedent).
 - **A team is one value:** `TeamSpec` is what a make and an edit send and what `Team.spec` holds, so reconcile
   compares by `==`. Units go in `units_map` (answer 16; `units` is deprecated), each of the four at its access; an
-  edit always carries `name`, which v17 requires. `permission` `write` is sent beside `units_map` (setup.md 5, step 5;
+  edit always carries `name` (v17 keeps a team's name when an edit omits it, a fact; ruling 119). `permission` `write`
+  is sent beside `units_map` (setup.md 5, step 5;
   designer's answer 35), and a fact reads it back.
 - **A hook is `type` `forgejo`, `content_type` `json`,** both fixed by the encoder. The read hook has no secret; its
   target is `config.url` (the answer also has a top-level `url`, not read; a fact records the target). **Twins**
@@ -143,7 +144,8 @@ route-orgs-made: 201, `private`); `setup-org-made-for-a-user-takes-write-admin-a
 `private`); `setup-org-starts-with-only-the-owners-team` (team-list-new-org);
 `setup-team-made-with-write-all-repositories-and-four-units` (team-made: the answer's `permission` `write`, as sent, and
 the four units `write`); `setup-team-listing-reads-back-what-was-made` (team-list: both again);
-`setup-team-made-again-is-422`; `setup-team-edit-without-a-name-is-422` (team-edit-nameless);
+`setup-team-made-again-is-422`; `setup-team-edit-without-a-name-keeps-the-name` (team-edit-nameless: 200, the
+answer's `name` the team's before the edit);
 `setup-team-edit-replaces-units-and-flags` (team-edit: `includes_all_repositories` false, pulls `read`, actions omitted
 so `none`); `setup-team-member-put-is-204` (member-added); `setup-team-members-list-the-added-user` (members);
 `setup-team-member-put-of-a-missing-user-is-404`; `setup-team-member-writes-in-a-repository-made-later`

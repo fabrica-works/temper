@@ -408,6 +408,19 @@ run are appended after "For the user".
        09.1 to 09.4, temper 01 (no `PATCH /admin/users/{login}`) or the fake's `Account`.
      - Session 09's question is marked answered. Nothing is deferred: no `later.md` row.
 
+119. **02.1's nameless team edit keeps the name** (plan defect, temper 02's block of 2026-10-17T00:10:55Z).
+     Ruling 119, a plan defect: 02.1's Choices said "an edit always carries `name`, which v17 requires", and its facts
+     named `setup-team-edit-without-a-name-is-422`. Neither the design nor the findings say so (`git grep` below); the
+     pinned Forgejo answered the nameless edit `PATCH /api/v1/teams/4` `{"permission":"write"}` with 200 and kept the name
+     `writer`. The fact records what Forgejo does.
+
+     - The fact is `setup-team-edit-without-a-name-keeps-the-name` (capture `setup-team-edit-nameless`, unchanged): it holds
+       when the answer is 200 and the answer's `name` is the team's name before the edit (`writer`). It replaces
+       `setup-team-edit-without-a-name-is-422`.
+     - 02.1's proof stands as written: the record command shows 18 new `holds`, no `fails`, and 21 new directories.
+     - Unchanged: `TeamSpec` is one value, and every make and edit sends its `name`; the encoder, the cases and the other
+       17 facts.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
