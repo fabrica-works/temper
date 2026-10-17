@@ -71,6 +71,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/13-s1-path-segments.md` | jig-13.s1 (ruling 143): a path's segments bounded apart from the rows; the view cuts a long path | jig 13.2 | |
 | `jig/13-s2-scripted-wire.md` | jig-13.s2 (ruling 205): the test client wire carries the scripted family's records | jig 13.3 | |
 | `jig/14-wire.md` | jig 14: the wire collapsed, its requests: the version refusal, scopes and windows, the operations, the compound request | jig 03 to 09, jig 21 (the fence below) | |
+| `jig/14-s1-words-release.md` | jig-14.s1 (ruling 210): words release nothing; the words' release leaves the engine | jig 14.3 | |
 | `jig/22-documents.md` | jig 22: the wire's documents: `me`, the task line and queries, offers and a decision's effect | jig 14 | |
 | `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | |
 | `jig/21-ops-and-ui.md` | jig 21: `ops` and the reference UI's state on the client alone; `ops`'s wire crate | jig 13 | |

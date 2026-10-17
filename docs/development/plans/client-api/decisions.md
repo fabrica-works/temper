@@ -1208,6 +1208,49 @@ choice would have been the user's (development.md, 10.4).
      - The users of `referee::Task`'s literal, at jig `795ca6bc3`, are four, not two: `tests/core/tests/referee.rs:56`, `tests/core/src/observations.rs:140`, `testing/jig-conformance/src/referee/compound/tests.rs:6` and `tests/conformance/tests/referee.rs:219` (`position_snapshot`). Refresh any further literal the compiler names, and list it in the commit body.
      - Unchanged: the rest of 23.2's session file; its second question (a procedure's named revision) stands as written.
 
+210. **jig 23.2: words release nothing; jig-14.s1 removes the words' release** (design answer, jig 23.2's block of 2026-10-17T02:15:23Z).
+     Ruling 210 (design answer, jig 23.2): the designer's answer, landed as jig 5a9a97485 and temper 3cd97ab2; the step its point 4 asks for is jig-14.s1 (`jig/14-s1-words-release.md`, needs jig 14.3). Its decision:
+
+
+     1. **The first reading: every release names its hold's revision, a release with words too, and the referee exempts none.** No words release a task. people.md, 5.1 now says: "Words release nothing: a `Message` adds words to the inbox, and words to a task the party stopped come with a `Release` in one compound request (below), naming the hold's revision as it would alone." It rests on text the design already had:
+        - contract.md, 3.2: `Message` names "a task; the words", and `Release` names "a held task; its hold's revision".
+        - contract.md, 3.4: "each names its revision where it would alone".
+        - pages.md, 4: "Words to a chat the person stopped release it too: one compound request, the words and the release".
+        - people.md, 11: "a person stops a run, then writes to its task and releases it in one compound request".
+        - tasks.md, 7: "a release its hold's (5.5), whoever makes it".
+
+        `Ask::Say { release }` and `Operation::Message { release }` (`crates/jig-domain-people/src/boundary.rs:272`, `compound.rs:13`) diverge from it.
+     2. **jig 23.2 (in the plan).** The rule stays as its Shape had it: no `Task.stopper`, no `Observed::OwnStopRelease`, no flag on a hold.
+        - The adapters read a compound's `Release` and `Amend` as they read the lone asks.
+        - The story `tests/core/tests/peers.rs:197` becomes the compound. The fake parties' `Ask::Say.release` becomes `Option<u64>`, the hold's revision. The core world's peers kit sends `Some(hold)` as `Compound [Message { release: false }, Release { revision: hold, again: None }]`. The story reads `hold` from `jig_core_world::fixtures::live_row(&world, task).revisions.hold`, and checks `Reply::Done` where it checked `Reply::Said`.
+        - Nothing under `crates/` changes, and the Size stays 60 (`testing/jig-conformance` only). This ends ruling 209's interim.
+     3. **jig 14.3 (in the plan).**
+        - `OwnerOutcomeSaid` loses `released`.
+        - A `Message` translates to `people::Ask::Say { .., release: false }`.
+        - The reference UI's words to a stopped chat name the hold's revision their page showed.
+        - Size 310 (was 280).
+     4. **A step after jig 14.3 (the supervisor's to add) removes the words' release from the engine.**
+        - Files, at jig `5a9a97485`:
+          - people: `boundary.rs:272, 443`; `compound.rs:13, 27`; `domain.rs:1332, 1385-1386`.
+          - core: `sibling_routes.rs:59-114, 443-476`; `routing/party_controls.rs:273-306`; `routing/people.rs:410-411`; `routing/tasks.rs:153-155`; `compound.rs:204-217`.
+          - tasks: `inbox.rs:213-262, 396-506, 668`; `boundary.rs:1378-1380, 1651`; `domain.rs:619-623`; `compound.rs:15, 297-305`.
+          - store: `people-v3.schema:113, 140, 223`, edited in place as jig 03.5 and 04.6 did, and `codec/people/{asks,compound,outcomes}.rs`.
+          - `jig-protocol-engine-clients`: `translate/{asks,answers}.rs`.
+        - Shape:
+          - people: `Ask::Say { project, task, words }`, `Operation::Message { task, words }`, `Outcome::Said { task, message }`.
+          - core and tasks: `PersonMessage`, `inbox::Message`, `Event::Message` and `Event::AuthorizedMessage` lose `release`. `Request::Sent` loses `released`, and `MessagePlan` loses its release plan.
+        - Tests:
+          - `crates/jig-domain-tasks/src/tests/revisions/compound.rs:125` holds the task `StoppedBy` first, as `:105` does, then sends `[Message, Release]`.
+          - The tests of words that release go or send a `Release`: `crates/jig-domain-people/src/tests.rs:1334-1336`, `crates/jig-domain-tasks/src/tests/revisions.rs:593-673`, `tests/people/tests/simulation.rs:512`.
+          - The other literals lose the field.
+        - Proof: `heavy cargo nextest run -p jig-core-world -E 'test(=peers_scenarios)'`, once, under 1 s; nothing else is wanted.
+        - Size: at most 150 lines of production code. Its 17 engine files hold 122 lines naming `release` or `released`, other releases among them.
+        - Don't: touch `Amend.release` or a lone `Release`.
+     5. **temper absorbs both at its repins.**
+        - Past 23.2, the fake parties' `Say`: `tests/system/src/composed.rs:391, 441-442` and `tests/system/tests/composed.rs:42`.
+        - Past the step, people's `Say`: `tests/conformance/src/stories.rs:220, 241`, `tests/engine/domain/src/direct.rs:347`, `tests/engine/domain/tests/forge_routes.rs:2068` and `tests/system/src/world.rs:244`.
+     6. **Unchanged:** people's `Amend { release: Option<u64> }` names its revision, and stays. Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
