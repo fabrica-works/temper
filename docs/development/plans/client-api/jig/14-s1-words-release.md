@@ -70,11 +70,15 @@ already name it:
   `routing/party_controls.rs:273-277, 306` (`say_request`),
   `compound.rs:204-217`.
 - The fake parties' `Ask::Say { release: Option<u64> }`
-  (`testing/jig-fake-parties/src/lib.rs:82-83`, translator :408) goes
-  too, with its users `tests/core/src/peers.rs:216`,
-  `tests/core/tests/peers.rs:215`, `tests/channel/src/world.rs:284`,
+  (`testing/jig-fake-parties/src/lib.rs:82-83`) stays, as the fixture's
+  instruction (ruling 266): its translators into the engine's asks
+  (`tests/core/src/peers.rs:216`, `tests/channel/src/world.rs:284`) send
+  `Some(revision)` as one `Compound` of the words and a `Release` naming
+  that revision, and `None` as the words alone; its doc says so. Its
+  other users (`tests/core/tests/peers.rs:215`,
   `tests/channel/src/referee.rs`, `tests/channel/src/fixtures.rs:414`,
-  `tests/conformance/src/actions.rs:41`, `tests/core/src/faults.rs:56`.
+  `tests/conformance/src/actions.rs:41`, `tests/core/src/faults.rs:56`)
+  change only where the engine's removed fields reach them.
 - Tests: `tests/core/src/observations.rs:734`, `tests/client/src/joint/truth.rs:197`,
   `tests/client/src/joint/wire/{answers.rs, outcomes.rs}` (:116, :170),
   the engine-clients component's `src/tests/fixtures.rs:271`,

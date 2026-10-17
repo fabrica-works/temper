@@ -1776,6 +1776,14 @@ choice would have been the user's (development.md, 10.4).
 265. **jig-14.s1's Files against main** (ready check of jig-14.s1).
      Ruling 265 (plan defect, the re-check of jig-14.s1 at jig `a37b5fe12`, after 14.3; temper `c1111fcc2`): 14.s1's Files miss users of the removed release fields that a compile of the change found, in `jig-domain-people`, the store's people codec, the engine-clients translators (14.3's `release: false`), `jig-domain-tasks`, `jig-domain-core`, the fake parties' `Ask::Say { release }` and its users, and their tests; corrected in `jig/14-s1-words-release.md`, "Corrections at jig `a37b5fe12`". `tests/people/tests/simulation.rs`'s `words_to_a_stopped_chat_release_it_in_one_request` becomes `words_to_a_stopped_chat_release_nothing`. temper's further sites join ruling 210's point 5. Unchanged: ruling 210's point 4 and ruling 249's corrections; Size at most 150 production lines. Checked by a read-only sub-agent with the edits applied in a scratch worktree: 473 of 473 default and 14 of 14 fuzzy in the four crates it reached; the rest not compiled. Refresh any further user of the removed fields, and list it in the commit body.
 
+266. **14.s1: the fake party keeps its Say.release instruction** (plan defect, jig 14.s1's block of 2026-10-17T15:45:36Z).
+     Ruling 266 (plan defect, jig 14.s1's block of 2026-10-17T15:45:36Z): the fake party keeps `Ask::Say { release: Option<u64> }`, as the fixture's instruction; no `Ask::Compound` is added.
+
+     1. **Why:** the fake kit's `Ask` is the fixture's own vocabulary, not the engine's (`testing/jig-fake-parties/src/lib.rs:79-84`). Ruling 210, point 2, asks that the fake party *send* its words and `Release` as one `Compound`; that is its translators' work. Ruling 265 read the field as an engine release path, which it is not.
+     2. **Do:** the translators into the engine's asks (`tests/core/src/peers.rs:216`, `tests/channel/src/world.rs:284`) send `Some(revision)` as one `Compound` of the words and a `Release` naming that revision, and `None` as the words alone. The field's doc says "a Release of this hold revision, sent with the words in one Compound". `peers_scenarios` checks `Reply::Done`, as ruling 210, point 2, says.
+     3. **The fake's other users** (`tests/core/tests/peers.rs:215`, `tests/channel/src/referee.rs`, `tests/channel/src/fixtures.rs:414`, `tests/conformance/src/actions.rs:41`, `tests/core/src/faults.rs:56`) change only where the engine's removed fields reach them.
+     4. **Unchanged:** the rest of ruling 265; ruling 210's point 4; Size at most 150 production lines.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
