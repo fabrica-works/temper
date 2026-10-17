@@ -110,6 +110,12 @@ src/codec.rs}`; workspace `Cargo.toml` and `Cargo.lock` (shared);
 `tests/boundary/src/tests/graph.rs` (a rule as
 `client_wire_links_only_its_codec_and_foundation`, graph.rs:560, for
 it).
+Ready check (ruling 192, jig `73734dd6f`): the codec takes and returns
+the wire crate's own `v1` records, never `jig-ops-client-domain`'s types
+(`infrastructure::Ask` and the rest): 21.2 makes that crate depend on
+this one, and `cargo metadata` reports a cycle, which
+`client_wire_links_only_its_codec_and_foundation` forbids too. The wire
+rule is at `graph.rs:589`.
 Shape: `jig_ops_client_protocol_wire::{v1, VERSION, codec::{ask,
 answer, subject, document, Undecodable}}`: `ask(&infrastructure::Ask)
 -> Box<[u8]>`, `answer(&[u8]) -> Result<infrastructure::Answer,
@@ -145,7 +151,7 @@ Files: `examples/ops/client-domain/src/{domain.rs, boundary.rs,
 route.rs, owner.rs, limits.rs, store.rs, infrastructure.rs,
 observability.rs}`; `examples/ops/client-view/src/**` (its routing);
 `tests/ops/src/client/{transport.rs, app.rs, script.rs}`,
-`tests/ops/src/joint/**` (their transport: `Client::typed` in the
+`tests/ops/src/joint/**` (their transport: `Client::unlinked` in the
 scripted world, bytes in the joint world through the clients'
 component); `tests/boundary/src/tests/graph.rs`
 (`ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary`
@@ -153,6 +159,14 @@ and `ops_client_view_is_step_code_with_only_client_and_connector_vocabulary`,
 graph.rs:337 and 350, gain `jig-client` and
 `jig-ops-client-protocol-wire`; `jig-client-domain` is reached through
 `jig-client`'s re-exports, jig 12.1).
+Ready check (ruling 192): `ops`'s root maps its values to the wire
+crate's `v1` records and back in a module of its own, as jig 13.3 does
+for the test family (`family/wire.rs`), which joins the Files; so do the
+manifests `examples/ops/client-domain/Cargo.toml`,
+`examples/ops/client-view/Cargo.toml` and `tests/ops/Cargo.toml` (each
+gains `jig-client`), `lib.rs:11` (`pub mod owner`), and
+`tests/ops/tests/fuzzy_joint.rs:561` (`joint::infrastructure::ask(Ask)`
+for the digest). The ops rules are at `graph.rs:360` and `:373`.
 Shape: as jig 13.4's: `ops`'s table owner, `owner::Owner` (with `Kept {
 scope }`), goes, and no owner enum takes its place; a tell routes by
 `jig_client_view::Owner::of_asker` (jig 13.4), `Jig` to the reference
@@ -200,6 +214,17 @@ lines 830-1167 at the base); both roots' `route.rs` (the Ui stepped
 with `&Client`; `ops`'s in its own commit); `testing/jig-client-test-view`,
 `examples/ops/client-view` (they read `ui.sections()`, `ui.shown()`);
 the worlds' fronts.
+Ready check (ruling 192): the watch spine's `open`, `retire` and
+`close_*` are at `crates/jig-domain-client/src/domain.rs:479, :502,
+:528-583` (13.2 moves them), `watch_event` at :838; `ui.sections()` is
+read by `crates/jig-client-view/src/pages.rs:107-219` and
+`sections/task.rs:61` (the examples call `shown()` alone). The sketch
+derives `Debug`, `PartialEq` and `Eq` on `Request` and on
+`jig_client::Event` (`crates/jig-client/src/client.rs`, which joins the
+Files: it derives `Debug` alone), and `How` derives `Copy, PartialEq,
+Eq`; `Request` is not `Clone` (`With` is not). `step`'s `wall`, and
+`Request::{SignIn, Fact}`, are the designer's question of 2026-10-17
+(question.md).
 Shape: as the sketch: `Ui`, `Event::{Start, Went, Left, Act, Named,
 Client { told }}`, `Request::{Client { asked }, Show, Save, Erase,
 ShowPart, PartsLeft}`, `How`, `Refused`. `Named` replaces
@@ -218,7 +243,7 @@ slot for the application's own ways of signing in (pages.md, 8 and 9;
 view.md, 4.1), owned by the application, `Owner::Application`, and
 filled by its view root.
 Test shape: the moved tests keep their names on the new surface; their
-fixtures (`src/tests/fixtures.rs`) hold a `jig_client::Client::typed`
+fixtures (`src/tests/fixtures.rs`) hold a `jig_client::Client::unlinked`
 and feed its `Up` (jig 12.5) for documents. Added:
 `a_page_reads_its_documents_from_the_client_by_handle`,
 `a_handle_the_page_no_longer_holds_is_dropped`,
@@ -270,6 +295,14 @@ page/**, frame/me.rs, boundary.rs, ui.rs}`;
 `testing/jig-client-test-domain/src/{first.rs, second.rs, route.rs}`;
 `examples/ops/client-domain/src/{infrastructure.rs, observability.rs,
 route.rs}`; the worlds' fronts.
+Ready check (ruling 192): the Files gain `limits.rs` in ops (:42-80) and
+in the test root (:39-49), whose factor 3 comes from the frame hand-offs
+this increment removes; the tests that build `Event::Link` and
+`Event::Confirmed` (ops client-domain `tests.rs:1414-1465`, ops
+client-view `tests.rs:1621`, the test domain's
+`tests/family_terminals.rs:54, :265`); and the family sides'
+`Request::Frame` (ops `infrastructure.rs:97`, `observability.rs:82`;
+`first.rs:63`) and `FrameShown`, which go and join the Done-when grep.
 Shape: `Event::Ask { ask: ByValue }`, `Event::Frame { asked }`,
 `Request::FrameIs`, `Request::Answered { asked }`, `Request::Unknown {
 asked }`, `Event::Kept { scope, requests }`, `Event::KeptGone`,
