@@ -1159,6 +1159,9 @@ choice would have been the user's (development.md, 10.4).
 
      A further user of a type these items change, which the Files miss, is edited and listed in the commit body.
 
+204. **The 02:00Z steer's run-end texts in the README** (process, jig 13.4's block of 2026-10-17T02:01:28Z).
+     The block is right. Ruling 167, instruction 6, says "a steer's Pass on text that holds until the run's end lands in 'The run's steers' before the steer is sent", and the 02:00Z steer's points 1 to 3 hold until the run's end. They are in the README now, word for word as the steer gave them, under "02:00Z, point 1 (jig)", "02:00Z, point 2 (jig)" and "02:00Z, point 3 (jig, tests under `tests/engine-clients/tests/`)". Point 2's Do is done too: 21:01Z, point 1 lists the four files over 800 at jig `795ca6bc3` (`tests/ops/tests/fuzzy_joint.rs` 805, `jig-protocol-engine-clients/src/tests/fixtures.rs` 814, `jig-protocol-engine-clients/src/component.rs` 808, `tests/core/tests/parties.rs` 816), and drops `jig-domain-people/src/boundary.rs`, back to 796. Point 4 was sent (the coordinator's 02:00Z line) and ended with jig 23.1's landing at 02:03:13Z.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

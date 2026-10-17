@@ -638,11 +638,13 @@ per session are in each file.
   - 21:01Z, point 1 (jig): A .rs file of at most 800 lines at origin/main
     stays at most 800 after your commit: run `git diff --name-only
     origin/main -- '*.rs' | xargs wc -l` before `land`, and put new code
-    in a module beside it. Three crossed 800 on 2026-10-16:
-    `jig-domain-people/src/boundary.rs` (806),
-    `tests/ops/tests/fuzzy_joint.rs` (805),
-    `jig-protocol-engine-clients/src/tests/fixtures.rs` (813). The next
-    increment that edits one brings it to 800 or less. Your report lists
+    in a module beside it. Over 800 at jig `795ca6bc3` (the 02:00Z steer,
+    point 2): `tests/ops/tests/fuzzy_joint.rs` (805),
+    `jig-protocol-engine-clients/src/tests/fixtures.rs` (814),
+    `jig-protocol-engine-clients/src/component.rs` (808) and
+    `tests/core/tests/parties.rs` (816);
+    `jig-domain-people/src/boundary.rs` is back to 796. The next increment
+    that edits one brings it to 800 or less. Your report lists
     every file over 800 after your commit, with base and now. Generated
     code is exempt; files over 800 at the base keep their 40 lines.
   - 21:01Z, point 3 (jig): `person_unchanged` is defined in six fixtures
@@ -703,6 +705,33 @@ per session are in each file.
     and keep a literal message as it is. A trace stays typed and is
     formatted in the failing branch; the first session to edit
     `lifecycle.rs` fixes its three sites.
+  - 02:00Z, point 1 (jig): README 23:45Z, point 2 binds every new test
+    line: a request id, a duration and a time are consts. jig 03.5 left
+    `9100` at `tests/core/tests/parties.rs:795` and `30` at
+    `tests/engine-clients/tests/requests.rs:175`. Before `land`, run
+    `git diff -U0 origin/main -- '*.rs' | grep -nE '^\+ +[0-9]{2,5},$|ask_as\([^)]*, *[0-9]+ *,'`
+    and name what it prints for your lines
+    (`const READ_PROPOSAL: u64 = 9100;`). The first of you to edit either
+    file names its site and reports it as a small fix outside your Files.
+  - 02:00Z, point 2 (jig): README 21:01Z, point 1 is a stop, not an aim: a
+    .rs file of at most 800 lines at origin/main stays at most 800 after
+    your commit
+    (`git diff --name-only origin/main -- '*.rs' | xargs wc -l` before
+    `land`). jig 03.5 left `component.rs` at 808 and
+    `tests/core/tests/parties.rs` at 816; `tests/ops/tests/fuzzy_joint.rs`
+    (805) and `crates/jig-protocol-engine-clients/src/tests/fixtures.rs`
+    (814) are over too. The next of you to edit one puts new code in a
+    module beside it and brings it to 800 or less; a crossed 800 you
+    cannot avoid is a question before `land`.
+  - 02:00Z, point 3 (jig, tests under `tests/engine-clients/tests/`):
+    README 'A test's helpers once': before a helper goes into a test file
+    under `tests/engine-clients/tests/`, search
+    `tests/engine-clients/src/fixtures.rs` and the other test files for
+    what it builds. `closing.rs:44` has
+    `answer(peer, socket) -> w::Answer` and jig 03.5 added `final_answer`
+    in `requests.rs:159` beside an inline copy at :62-66. The first of you
+    to add a test there moves `answer` into `fixtures.rs`, `pub`, builds
+    `final_answer` on it, and uses both.
 
 ## Prerequisites the run checks at its start
 
