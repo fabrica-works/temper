@@ -1313,6 +1313,9 @@ choice would have been the user's (development.md, 10.4).
      3. **jig 21.2** removes the marks and runs the three once (its Files and Proof say so now), and calls `bridge::closed` after a bridge-routed `Close`, as 13.4's commit body records.
      4. **Unchanged:** ruling 215's Size (784 of aim 850, stop 950); 13.4's Shape, Removes and Proof; ruling 207.
 
+219. **a failed gate is followed by the touched crates' tests, every failure at once** (steer of 2026-10-17T05:20Z).
+     Steer of 2026-10-17T05:20Z, from the check of 2026-10-17T05:20Z, point 1: after a failed `land` gate, a session whose commit changes more than 20 files (and jig 13.4) runs its touched crates' tests with `--no-fail-fast`, default and fuzzy profiles, and fixes every failure before `land` again. Recorded in the README as "05:20Z, point 1".
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

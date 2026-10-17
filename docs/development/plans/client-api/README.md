@@ -746,6 +746,16 @@ per session are in each file.
     `queries.rs` or `lifecycle.rs` names these sites and reports it as a
     small fix outside your Files. Base lines elsewhere, seeds and
     expected values keep their literals.
+  - 05:20Z, point 1 (every session whose commit changes more than 20
+    files, and jig 13.4): A failed `land` gate shows only its first one
+    to five failures: it stops at the first. jig 13.4 ran 19 gates in 46
+    minutes, each fixing the next failure, and two fixes were undone by
+    later edits. After a failed gate, run the tests of the crates your
+    diff touches, in the build lane, every failure listed: `heavy cargo
+    nextest run --no-fail-fast -p <crate> …`, and the same with
+    `--profile fuzzy` (the gate's second half). Fix all that fail, then
+    `land` again. `land` is not your test loop. `land`'s gate is
+    unchanged.
 
 ## Prerequisites the run checks at its start
 
