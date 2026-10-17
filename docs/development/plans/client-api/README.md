@@ -867,6 +867,11 @@ per session are in each file.
     your commit removes or renames, run `git grep -n -E
     'fn [a-z0-9_]*<word>' -- <the crates you change>` and rename each
     test it prints whose name names the old thing (ruling 277).
+  - 2026-10-17 20:13Z, point 2 (every session): After your landing
+    remove your worktree's `target/` with `cargo clean`, never `rm -rf
+    target`: Codex's command review refuses it and drops the rest of its
+    cell. Run Python as `python3`, the only name on this machine, never
+    `python`.
 
 ## Prerequisites the run checks at its start
 

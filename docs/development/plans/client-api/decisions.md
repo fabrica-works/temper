@@ -1936,6 +1936,11 @@ choice would have been the user's (development.md, 10.4).
      3. **Name it** in the commit body and the report as the judge's migration under this ruling, with the two rows before and after.
      4. **Unchanged:** the README rule for every other referee and judge check; 22.4's Scope, Shape, Proof and Size.
 
+281. **README: cargo clean and python3** (steer of the check of 2026-10-17T20:13:00Z).
+     Ruling 281 (process, the check of 2026-10-17T20:13:00Z): the run takes skein `b30cc95`'s points 2 and 6 (development.md 11.4; implementer.md 8.1, 8.3), docs alone, so the run's kit stays at its commit. Point 6's Pass on text lands in the README's "The run's steers", under "2026-10-17 20:13Z, point 2 (every session)": `cargo clean`, never `rm -rf target`; `python3`, never `python`. Point 2 (a session's `target/` removed with `cargo clean` once `pueue status` shows no heavy task from its path) is the coordinator's, in the steer; its Pass on is nothing. Unchanged: the disk and memory thresholds; kache's order.
+
+     Checked: `ls logs/jig-22/*.py | wc -l` in the run's directory: 29 scripts (the check of 20:13Z); `which python` prints nothing on carbon-forge, `which python3` prints `/usr/bin/python3`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
