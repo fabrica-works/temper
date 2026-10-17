@@ -622,9 +622,8 @@ Re-check at jig `447ddfdf4` (ruling 261): `Ask::TaskHoldings` is at
 `crates/jig-domain-core/src/routing/parties.rs:612`. For
 `AdmissionLimit`'s `goals`, the same view words, phrases and contract
 file as 14.2's `grace` (`JigPhrase::EngineLimitGoals`). A role executor
-whose `ExecutorRole.project` is not the `Create`'s project
-(`people::PersonAddress::Role(u32)` names none) is a question with the
-designer (question.md of 2026-10-17): 14.4 starts once it is answered.
+names no project: `NewTask.executor` is `OwnerExecutor` (the designer's
+answer of 2026-10-17T14:05Z, jig ad3b26d04, below).
 Shape: wire, in this order before `Ask`: `FieldRule` and
 `VerdictChoice` move up (no byte change); `TaskRef { member: u32 |
 task: u64 }`; `NewContract { report: ContractReport { words } |
@@ -632,7 +631,7 @@ verdict: ContractVerdict { choices: list 32 VerdictChoice } | change:
 ContractChange { connector, kind, words } }`; `NewBudget { named |
 as_allowed: BudgetAsAllowed { cap: option u64 } }`; `enum Retention {
 kept, forgotten_once_read }`; `TaskFlags { conversation: bool, listed:
-bool, retention: Retention }`; `NewTask { executor: Executor, spec:
+bool, retention: Retention }`; `NewTask { executor: OwnerExecutor, spec:
 Specification, contract: NewContract, authority: OwnerAuthority,
 budget: NewBudget, wake: OwnerWakePolicy, dependencies: list 32
 TaskRef, named: bytes 16777216, tracked: option u32, label: u32,
@@ -643,6 +642,15 @@ spend and deadline are the task's budget and deadline ..., that budget
 as named there or `AsAllowed`"): a `NewBudget::Named` budget is
 `authority.spend` (`routing/create.rs:188`), the deadline is
 `authority.deadline`;
+`executor` is `OwnerExecutor` (`client-v8.schema:91-94`), field for
+field `people::TaskExecutor` (`batch.rs:44-49`), its role a
+`PersonAddress::Role(u32)` of the `Create`'s project (contract.md, 3.2:
+"a person, or a role, which is the project's: roles are per project"),
+as `Amend`'s `AddressChange.address` names one (`client-v8.schema:213`);
+the component maps it to `people::TaskExecutor`, its person arm as
+`translate/asks.rs`'s `address` maps a `PersonAddress` (`:326-329` at
+`447ddfdf4`), and no refusal is added for it; the chips' `Executor`
+keeps its `ExecutorRole.project`;
 `named` is the grants named after the task, pieces of `OwnerGrant` as
 `OwnerAuthority.grants` are (`Member.named`, resolved at
 `routing/create.rs:179`); no approval contract ("an approval is a
@@ -662,7 +670,9 @@ dependencies"); `Refusal.no_escalation_holder`;
 `TaskRef`, `NewContract`, `NewBudget`, `TaskFlags`, `Retention`,
 `Malformed`, `Ask::Create`.
 Test shape: the component's tests:
-`a_create_reaches_the_people_child_with_each_task_s_fields`,
+`a_create_reaches_the_people_child_with_each_task_s_fields` (one task
+an agent's, one a role's: `OwnerExecutor::Person(PersonAddress::Role(2))`
+reaches it as `TaskExecutor::Person(PersonAddress::Role(2))`),
 `an_as_allowed_answer_names_what_was_given`; the link's:
 `a_create_s_tasks_cross_as_pieces_within_the_request_s_bytes`;
 `tests/client-protocol/tests/client.rs` (jig 12's story file):
@@ -676,7 +686,8 @@ Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world -E
 once: the engine makes both tasks at once and answers their numbers, the
 `AsAllowed` one with the amount it gave. Bound: 1 s.
 Don't: compute `AsAllowed` or check a draft's authority in the client;
-let the scripted engine make tasks from `Create` before jig 16.3.
+let the scripted engine make tasks from `Create` before jig 16.3; name a
+project in `NewTask`'s executor, or add a refusal for a role's project.
 Size: at most 300 lines.
 Removes: nothing.
 
@@ -813,7 +824,7 @@ record BudgetAsAllowed { cap: option u64 }
 enum NewBudget { named, as_allowed: BudgetAsAllowed }
 enum Retention { kept, forgotten_once_read }
 record TaskFlags { conversation: bool listed: bool retention: Retention }
-record NewTask { executor: Executor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
+record NewTask { executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }
 record ProposeAmendment { task: u64 revision: Revision change: Amendment }
@@ -882,7 +893,7 @@ pub enum Retention { Kept, ForgottenOnceRead }
 pub struct TaskFlags { pub conversation: bool, pub listed: bool, pub retention: Retention }
 /// One task of a `Create` or a proposed batch, field for field `people::Member`; `named` holds the grants named after it.
 pub struct NewTask {
-    pub executor: Executor, pub spec: Specification, pub contract: NewContract, pub authority: OwnerAuthority,
+    pub executor: OwnerExecutor, pub spec: Specification, pub contract: NewContract, pub authority: OwnerAuthority,
     pub budget: NewBudget, pub wake: OwnerWakePolicy, pub dependencies: List<TaskRef>,
     pub named: List<OwnerGrant>, pub tracked: Option<u32>, pub label: u32, pub flags: TaskFlags,
 }

@@ -586,7 +586,7 @@ pub enum NotOffered { Project, Template, Executor, Ceiling, Creating }
 pub enum Fate { Cancel, Move }
 pub struct Delegate { pub task: u64, pub fate: Fate }
 /// What the person wrote in a goal's form.
-pub struct GoalDraft { pub words: Text, pub executor: Executor, pub budget: u64, pub deadline: Option<Wall>, pub priority: Option<u32> }
+pub struct GoalDraft { pub words: Text, pub executor: OwnerExecutor, pub budget: u64, pub deadline: Option<Wall>, pub priority: Option<u32> }
 /// What a goal's draft will be, said before anything is sent.
 pub enum Judged { Create(Ask), Propose { ask: Ask, to: Recipient }, Refused(Refusal), NotOffered(NotOffered) }
 /// Where a draft falls against a project's creating bounds.
@@ -613,8 +613,8 @@ pub fn fall(creating: &Creating, draft: &GoalDraft) -> Fall {
         Beyond::Refused(why) => Fall::Refused(why.clone()),
     }
 }
-/// An agent's charter among `charters`, or a procedure among `procedures`; a person or a role never.
-fn listed(within: &CreateBounds, executor: &Executor) -> bool;
+/// An agent's charter among `charters`, or a procedure among `procedures`; a person never.
+fn listed(within: &CreateBounds, executor: &OwnerExecutor) -> bool;
 /// A task with no deadline is beyond any bound that has one.
 const fn no_later(deadline: Option<Wall>, bound: Option<Wall>) -> bool {
     match (deadline, bound) {
