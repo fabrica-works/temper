@@ -587,6 +587,15 @@ run are appended after "For the user".
        in `Prepare.runner_secret: Option<Secret>` (`prepare.rs:147`), not a fourth `bool`, and passed the gate so.
      - Unchanged: 15.1 as landed; Done when's counts; 15's Size of 230 is 15.1's.
 
+130. **02.2 at up to 900** (plan defect, temper 02's block of 2026-10-17T01:27:20Z).
+     Ruling 130, a plan defect: 02.2's Size of 150 (codec) under-counts the four hook variants with both codec sides,
+     their exhaustive arms, twelve captures and facts and the recorder, as 02.1's did (ruling 116; 02.1 landed at 1153 of
+     250). 02.2 lands at up to 900 production lines by code-organization.md 6's command, the proof's fixes included. Past
+     900, stop on a question again, with the count by file. No split: 09.3 waits on 02.2, and the run's path is serial.
+
+     - Unchanged: never trim a doc comment, a test or the formatting to meet a Size; the README's "Byte-stable
+       recordings" check (two recordings in a row, `git status --short` empty); 02.2's proofs; the steer of 01:26Z.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
