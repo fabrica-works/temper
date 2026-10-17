@@ -426,7 +426,7 @@ Removes: nothing.
 Scope: each object's acts offered in the operations' names, and what a
 decision will do as data (contract.md, 5.3, 5.4; engine.md, 11.5).
 Needs: the session's start: jig 03's offers "proposable, and to whom".
-Files: `crates/jig-domain-core/src/{acts.rs (Act, Offered), documents.rs,
+Files: `tests/client/src/joint/offered_acts.rs` (the judge's composed control, ruling 280); `crates/jig-domain-core/src/{acts.rs (Act, Offered), documents.rs,
 documents/objects.rs}` and a new `crates/jig-domain-core/src/acts/effects.rs`;
 the v8 schema; the component's `translate/{objects.rs, task.rs,
 objects/*.rs}`; the contract's `effects.rs` (new) and `documents.rs`

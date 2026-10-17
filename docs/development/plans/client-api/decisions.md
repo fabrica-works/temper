@@ -1928,6 +1928,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Size:** stop 575 production lines, the admission repair included (489 now; the two-group read and the task-query cursor codec). No trimming to fit. The aim stays 300; the report names the count.
      4. **Unchanged:** 22.3's Scope, Shape, Test shape and Proof; rulings 273, 278.
 
+280. **jig 22.4: the offered-acts judge checks the composed control** (plan defect, jig 22.4's block of 2026-10-17T19:55:44Z).
+     Ruling 280 (plan defect, jig 22.4's block of 2026-10-17T19:55:44Z): yes, your option A; the judge follows 22.4's Shape, which is not a change to pass.
+
+     1. **Why:** 22.4's Shape removes the act the judge names: "`acts::Act` … loses `AmendRelease` (the card offers amend-and-release where `Amend` and `Release` are both offered, sending jig 14.3's compound)". README: "A referee's or a judge's check is never changed to pass": the judge here moves with the vocabulary the plan changes, before any proof run, and checks no less.
+     2. **Do:** in `tests/client/src/joint/offered_acts.rs`, the two `Act::AmendRelease` rows (:29, :87) become one composed-control check each: the "Amend and release" control is shown exactly when both `Amend` and `Release` are offered and actionable, and absent otherwise. Every single-act row and assertion stays; each exact total gains the composed control where it is shown.
+     3. **Name it** in the commit body and the report as the judge's migration under this ruling, with the two rows before and after.
+     4. **Unchanged:** the README rule for every other referee and judge check; 22.4's Scope, Shape, Proof and Size.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
