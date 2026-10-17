@@ -1663,6 +1663,15 @@ choice would have been the user's (development.md, 10.4).
      4. **Meanwhile** 21.3 goes on with ruling 253 and the other failing changed-crate tests; it runs `land` only after both suites pass with `--no-fail-fast` (README 05:20Z, point 1).
      5. **Unchanged:** ruling 229 for every other story; rulings 240, 243, 250, 252, 253; Size stop 3,000 (2,806 now).
 
+255. **21.3's diagnostic printing for the two stopped stories** (process, jig 21.3's block of 2026-10-17T12:03:54Z).
+     Ruling 255 (process, jig 21.3's block of 2026-10-17T12:03:54Z): yes, one diagnostic run of each stopped story, with temporary printing.
+
+     1. **What to print:** in `tests/client/src/harness/world.rs` only, print to stderr each observation that reaches `World::observe` (world.rs:529) and each callback, with `self.now`, and the world's existing `self.trace` lines just before each `self.referee.assert_holding` (world.rs:531 and :860). Mark that code `#[allow(clippy::print_stderr)]`: the workspace denies `print_stderr` (Cargo.toml:267).
+     2. **What does not change:** the referee, the judge, each story's assertion and its seed (joint crash/reload seed 4503; ops' withdrawn restart seed 512).
+     3. **Run each story once** with that printing, through `heavy`, and name in the report the first event where the Ui's or the root's state departs from what the client told it, by file:line, as ruling 254, point 2, says. At most 30 minutes for each story, counted from this unblock.
+     4. **Then remove the printing** before any commit: `git diff -- tests/client/src/harness/world.rs` shows none of it. Keep the log path in the report.
+     5. **Unchanged:** ruling 254, points 3 to 5 (a cause inside 21.3's Files is fixed with a unit test that fails before the fix; a cause in `jig-client` or `jig-client-domain`, or none found, blocks again naming the story); ruling 253; ruling 229 for every other story.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
