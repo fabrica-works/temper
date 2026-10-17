@@ -1169,6 +1169,15 @@ choice would have been the user's (development.md, 10.4).
 
      13.4's other block, of 01:40:04Z (the view's `Limits.backoff`/`heartbeat` and timer-only states), is not answered here.
 
+206. **jig-13.s1: the scripted engine bounds a path by segments** (plan defect, jig 13.s1's block of 2026-10-17T02:12:28Z).
+     A plan defect, answered by the design in its own words. jig's `client/domain/client.md`, 727-729: "a path's segments: the most segments of a resource's path or a pattern a document may carry, a bound of its own, never a window's rows". s1's Files kept the scripted engine's `payload.rs:80-91` on `bounds.rows` on the premise "s1's tests do not run on it"; the joint role stories admit through it (`tests/client/src/joint/wire/documents.rs:19-26`), so the premise is wrong.
+
+     1. The scripted engine's `Bounds` (`testing/jig-client-scripted-engine/src/lib.rs:38`) gains `segments: u32`. Its `Default` (`lib.rs:51-59`) sets it to its `rows`, 32.
+     2. `payload.rs:80-91` bounds a path's or a pattern's list by `bounds.segments`, and every other list by `bounds.rows`, as today. Name in the report where the payload tells a path's list from another.
+     3. The joint admission's `bounds` (`tests/client/src/joint/wire/documents.rs:19-26`) passes the client's `segments` beside `rows`. The full literals set it: `tests/client/src/stories.rs:81`, `tests/client/src/stories/client_construction.rs:43`, `tests/ops/src/client/stories.rs:328`. An engine test that pins a path refused by `rows` sets `segments` beside it. Refresh any further literal or such test the compiler or the suite names, and list each in the commit body.
+     4. Size: the scripted engine's `segments` counts apart from the 160 and the 80: aim for at most 40 lines; past it, report the count and go on.
+     5. Unchanged: s1's Don't ("change what `rows` bounds besides paths" among them); the 13 role stories keep `rows = 2` (`tests/client/src/joint/role_stories.rs:10`) and pass with the gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

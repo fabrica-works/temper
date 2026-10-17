@@ -30,12 +30,19 @@ ruling 198 (follow each by its name):
   `tasks.authority_segments`, `profile/small.rs:47, :67, :120`); the
   literals are the ones the compiler names (the example and test
   domains' `Limits` among them: `infrastructure.rs:106`,
-  `observability.rs:91`, `first.rs:73`, `second.rs`'s `Side::new`); the
-  scripted engine's `Bounds` (`tests/client/src/stories.rs:79`,
-  `testing/jig-client-scripted-engine/src/lib.rs:38`) is not one, and
-  its `payload.rs:80-91`, which bounds every list by `bounds.rows`,
-  stays: s1's tests do not run on it, and a story on it that refuses a
-  path is reported; list each literal in the commit body;
+  `observability.rs:91`, `first.rs:73`, `second.rs`'s `Side::new`); list each literal in the commit body;
+- the scripted engine (ruling 206): its `Bounds`
+  (`testing/jig-client-scripted-engine/src/lib.rs:38`) gains `segments`,
+  which its `Default` (`lib.rs:51-59`) sets to its `rows` (32);
+  `payload.rs:80-91` bounds a path's or a pattern's list by
+  `bounds.segments`, every other list by `bounds.rows` as today; the
+  joint admission (`tests/client/src/joint/wire/documents.rs:19-26`)
+  passes the client's `segments` beside `rows`; the full literals
+  (`tests/client/src/stories.rs:81`,
+  `tests/client/src/stories/client_construction.rs:43`,
+  `tests/ops/src/client/stories.rs:328`) set it; an engine test that
+  pins a path refused by `rows` sets `segments` beside it; list each in
+  the commit body;
 - link: `crates/jig-client-protocol-link/src/limits.rs:41, :51, :89`
   (`part_resource_path`, `owner_part_key_path_value`,
   `owner_pattern_segments`, each `client.rows` today),
@@ -113,7 +120,9 @@ step sets `segments` in `temper-client-shell-terminal/src/limits.rs:52-59`,
 (ruling 198), and lists them in its commit body.
 Size: aim for at most 160 production lines; past it, report why. The
 bound's threading to the writers counts apart: aim for at most 80 lines
-of it; past it, report the count and go on (ruling 200).
+of it; past it, report the count and go on (ruling 200). The scripted
+engine's `segments` counts apart too: aim for at most 40 lines; past
+it, report the count and go on (ruling 206).
 Don't: cut a path in the client's data or the engine's documents; change
 what `rows` bounds besides paths; raise `compose`; give the engine a
 configured limit for a path; name temper (`git -C <worktree> grep -n -i
