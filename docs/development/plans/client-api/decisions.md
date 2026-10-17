@@ -1920,6 +1920,14 @@ choice would have been the user's (development.md, 10.4).
      2. **Point 2:** the rename of `a_frame_at_its_ceilings_round_trips_unchanged` (`crates/jig-client-protocol-wire/src/tests.rs:115`, row `:342`) goes in 22.3's first commit. Until: jig 22.3 lands.
      3. **Unchanged:** both points' Pass on texts, with "your first commit" read as 22.3's; ruling 277's README sentence.
 
+279. **jig 22.3: a projectless query admitted for the party's own tasks; Size stop 575** (plan defect, jig 22.3's block of 2026-10-17T19:34:14Z).
+     Ruling 279 (plan defect, jig 22.3's block of 2026-10-17T19:34:14Z): yes to both; your proposal A.
+
+     1. **The admission repair joins 22.3's Files.** engine.md, 11.2: "The core admits it on the party's role in the project it names, or, naming none, for tasks whose requester the party is"; contract.md, 6.1: "A query naming none of these [a requester party; a requester task or a parent; a project] has no ended group, and its page says so". A query naming no project and no requester is served, so the core admits it: in `crates/jig-domain-core/src/documents/task_query.rs` (`admission`, :47), a query naming no project and no requester is admitted, and every live scan of a query naming no project keeps only the tasks whose requester is the authenticated party. A query naming no project and a requester other than the party is refused, as now; a deployment requester stays `Unknown`.
+     2. **Its test:** a focused isolation test beside the core's task-query tests: two parties' tasks, a projectless query with no requester returns the asking party's tasks alone. `a_query_naming_no_index_key_reads_no_ended_group` stands as the plan names it.
+     3. **Size:** stop 575 production lines, the admission repair included (489 now; the two-group read and the task-query cursor codec). No trimming to fit. The aim stays 300; the report names the count.
+     4. **Unchanged:** 22.3's Scope, Shape, Test shape and Proof; rulings 273, 278.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

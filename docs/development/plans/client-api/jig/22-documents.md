@@ -374,7 +374,7 @@ protocol/client.md, 6).
 Needs: the session's start: jig 05's query read in the core with jig
 08's ended part through the store's indexes (one stream with one cursor
 at `b6a63f8c1`: Shape, Core).
-Files: the v8 schema; the component's `translate/{reads.rs, pages.rs
+Files: the core's `crates/jig-domain-core/src/documents/task_query.rs` (`admission`, :47, ruling 279) and its tests; the v8 schema; the component's `translate/{reads.rs, pages.rs
 (27, 57, 97), pages/rows.rs, cursor.rs (288: `Scope::Tasks` has no
 cursor encoding)}`; the contract's `queries.rs`; the link's
 `translate/{reads.rs, pages*.rs}`; `jig-client`'s `Read` of a query;
@@ -417,7 +417,7 @@ Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world -E
 once: the page's live group holds the live task, its ended group the
 ended one, read from the store. Bound: 1 s.
 Don't: merge the two groups or their cursors.
-Size: aim 300 lines, stop at 380: 180 for the wire, the component and the
+Size: aim 300 lines, stop at 575 (ruling 279, the admission repair included; was 380): 180 for the wire, the component and the
 view, as before, and 120 for the core's two groups with their cursors
 (ruling 249).
 Removes: nothing.
