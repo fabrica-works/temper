@@ -405,7 +405,9 @@ beside `rows: 2`, `:51`: at least the forge's tier's names' bounds, 9,
 `crates/temper/tests/support/forgejo.rs:152-156`, and the example's 8,
 `configuration.md`, 7); `crates/temper/tests/configuration.rs:17-21`;
 `tests/one-process/tests/one_process.rs:43` (ruling 163's `#[ignore]`
-removed: the story runs in the gate again).
+removed: the story runs in the gate again); `tests/one-process/tests/fuzzy_one_process.rs:39`
+(ruling 216's `#[ignore]` on `a_merge_in_progress_is_pushed_with_both_parents`
+removed: it runs in the gate's fuzzy profile again).
 Shape: no type. temper writes no `documents.lines` for a path: the
 process tier's `documents.lines`, 2 (`support/configuration.rs:32`,
 `support/forgejo.rs:137`), stays, at most the client's rows. In
@@ -446,6 +448,14 @@ before temper 06.4's Chats page, whose joint-world story then runs over
 the same configuration. And, once, the story ruling 163 deferred: `heavy cargo
 nextest run -p temper-one-process-world -E
 'test(an_adopted_repository_gets_its_change_pushed_through_git)'`.
+And, once, the merge story ruling 216 deferred: `heavy cargo nextest run
+-p temper-one-process-world --profile fuzzy -E
+'test(a_merge_in_progress_is_pushed_with_both_parents)'`. At jig
+`40d1bec49` with `segments` 8, a scratch run of it passed step 11 and
+failed at step 18 (`world.rs:442`: `person step 18: Missing { find: Text
+"@plan Fix the adopted repository" }`, the task's document never read),
+cause not found (ruling 216): if it still fails, diagnose it at most 30
+minutes, then block with the first failing line and its file:line.
 Don't: set `documents.lines` for a path; change jig's profile; cut a
 path in temper.
 Size: at most 10 lines of production code.

@@ -29,6 +29,10 @@ not bind this step; they bind 03.4 again from its next commit.
 Don't: 03.4's new unit test and its Proof (they follow on this
 landing); keep `jig-domain-client` in a manifest or alias its paths; a
 lint exception; a skipped or ignored scenario.
+Ruling 216: the pin stays at jig `c92d4a09d`; the fuzzy merge story
+`a_merge_in_progress_is_pushed_with_both_parents` takes ruling 163's
+`#[ignore]` (its point 2), and temper 04.4 removes it. That mark is not
+a conformance scenario's skip.
 Done when: `git -C ~/src/rust/temper log origin/main --all-match
 --grep='^Plan: client-api$' --grep='^Step: temper-03.s2$' --format=%H -1`
 prints its landing.

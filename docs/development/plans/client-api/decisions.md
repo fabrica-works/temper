@@ -1293,6 +1293,15 @@ choice would have been the user's (development.md, 10.4).
      4. **The fixes outside Files** (`cards::contains` widened to `pub(crate)`; the test view's dev dependency on the wire crate) stand, within the README's 20 lines each; list each in the commit body, and each further one.
      5. **Unchanged:** 13.4's Shape, Removes, Test shape and Proof; the 02:57:44Z steer's points 2 and 3; ruling 211.
 
+216. **temper 03.s2: the pin stays; the merge story takes ruling 163's mark until temper 04.4** (plan defect, temper 03.s2's block of 2026-10-17T03:28:34Z).
+     Ruling 216, plan defect in the order of steps, as ruling 163 (`decisions.md`, 163, point 2): "A further test that fails only on a forge path's segments gets the same mark, listed in the commit body and the report; past three such tests, stop and report." At s2's pin, jig `c92d4a09d`, the core bounds an adopted path by `documents.lines` (`task_tree.rs:329`); the merge story's branch resource has 8 segments by construction (`forge_route.rs:271-300`: 4, `branch`, and `temper/1/c2`'s 3), so no path of 4 segments carries it, and `documents.lines` 8 passes the v8 wire's ceiling of 4. The designed fix is jig 13.s1's `segments`, which temper 04.4 takes.
+
+     1. **The pin stays** at jig `c92d4a09d` (ruling 199). A repin to `40d1bec49` was tried in a scratch worktree: 19 production and 8 test lines of repairs, and the story still failed, at step 18 (`world.rs:442`, `person step 18: Missing { find: Text "@plan Fix the adopted repository" }`), with jig 23.1's and 03.5's proposal changes in the pin. The README's Pins take "as few other jig landings as it can".
+     2. **s2 marks** `a_merge_in_progress_is_pushed_with_both_parents` (`tests/one-process/tests/fuzzy_one_process.rs:39`) `#[ignore = "a forge branch's eight segments need jig 13.s1's segments, temper 04.4 (ruling 216)"]`, with `documents.lines` at 4 as now, and names it in the commit body and the report. It is the second test under ruling 163's point 2; a third that fails only on a forge path's segments takes the same mark; past three, stop and report.
+     3. **Then s2 lands** by temper's gate, the fuzzy profile included, with the cache observer's fix in `tests/one-process/src/referee/client/cache.rs`.
+     4. **temper 04.4** removes this mark too, and its Proof runs the story once (its Files and Proof say so now, with the step-18 failure seen at `40d1bec49`).
+     5. **Unchanged:** rulings 199, 201, 202 and 213's points 1 and 5; s2's Don't, whose "a skipped or ignored scenario" means the conformance scenarios; every assertion of the story; 03.4's turn after s2.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
