@@ -1672,6 +1672,15 @@ choice would have been the user's (development.md, 10.4).
      4. **Then remove the printing** before any commit: `git diff -- tests/client/src/harness/world.rs` shows none of it. Keep the log path in the report.
      5. **Unchanged:** ruling 254, points 3 to 5 (a cause inside 21.3's Files is fixed with a unit test that fails before the fix; a cause in `jig-client` or `jig-client-domain`, or none found, blocks again naming the story); ruling 253; ruling 229 for every other story.
 
+256. **21.3's typed callback trace for ops' seed 512** (process, jig 21.3's block of 2026-10-17T12:12:07Z).
+     Ruling 256 (process, jig 21.3's block of 2026-10-17T12:12:07Z): yes, a typed callback trace at the Ops front, for ops' withdrawn restart (seed 512) alone.
+
+     1. **Where:** the Ops front in `tests/ops/src/client/` (in 21.3's Files: "the worlds' fronts"). Print to stderr each callback's typed payload (what the front hands the client, and what the client hands back), with the time, beside ruling 255's printing in `World::observe`. Mark that code `#[allow(clippy::print_stderr)]`. The referee, the judge, the story's assertion and its seed do not change.
+     2. **Bound:** at most 30 minutes, counted from this unblock, for the typed-trace runs, the fix and the unit test that fails before it. Run the story once after a fix.
+     3. **Then remove the printing** before any commit: `git diff` of the files it touched shows none of it.
+     4. **If no cause is found in 30 minutes,** or the cause is in `jig-client` or `jig-client-domain` (ruling 235): report the trace log's path and the lines from the engine's withdrawal to the card's drop, and block again naming the story; do not run it again. 21.3 goes on meanwhile with the lost-answer failures and both changed-crate suites.
+     5. **Unchanged:** the crash/reload story (seed 4503) is done under ruling 255; ruling 254, points 3 to 5; rulings 229 and 253; Size stop 3,000.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
