@@ -1579,6 +1579,14 @@ choice would have been the user's (development.md, 10.4).
         - Don't: hold back the root's `Start`; give `SignIn` before it; change the referee's 200 rule.
      5. **Nothing is deferred:** no `later.md` row.
 
+247. **jig 14.1 built beside jig 21.3 and 21.4, landed after jig 21** (steer of 2026-10-17T10:31:20Z).
+     Ruling 247 (order, the user's "speed up the plan, without compromising its outcome", 2026-10-17T10:13Z): jig 14.1 is built now, beside jig 21.3 and 21.4, and lands only after jig 21's last landing.
+
+     1. **The fence keeps its aim, not its start.** README, "The fence": "jig 14 starts only after jig 21's last landing, so that no repin of temper 03 (onto jig 10.3, 11.5, 13.2, 21.2, 21.4) takes the collapsed wire". Landing, not building, is what a repin takes: 14.1 starts now and does not run `land` before jig 21.4 has landed on jig's origin/main; then it rebases onto it and lands. 14.2 starts once 14.1 has landed, as before (14.2 and 14.3 share about 20 view files with 21.3).
+     2. **14.1's text at jig `b6a63f8c1`** (a re-check of what main moved since its check of 06:11Z at `5c06a7e98`): `sign_in.rs (29)` is now 52; `native/wire.rs` 106-111 is now 117-122; the module jig 21.2 added is `examples/ops/client-domain/src/family.rs`; two users of the wire's `Answer`, `Keyed`, `Owned` and `ReadAnswer` it missed, `tests/ops/src/joint/bytes.rs` and `tests/ops/src/client/app.rs:314-320`, join its Files; the drift test also regenerates ops' `v1` (no lines counted). Refresh any further user of those types the same way, and list it in the commit body.
+     3. **Overlap at the rebase** (the re-check, against 21.3's worktree and 21.4's Files): `tests/client/src/{test.rs, scripted.rs, observe.rs}` and `tests/client-protocol/src/client.rs`, at items other than 21.3's; `crates/jig-client-view/src/bridge.rs`, which 21.3 deletes, holds only 14.1's wildcard arms (they move to 21.3's `ui/client.rs`). Conflicts there are 14.1's to resolve at its rebase, counted in its Size.
+     4. **Unchanged:** 14.1's Size (300) and the 2.5 times codec rule; jig 22 after jig 14; temper 03.6's repin onto 21.4's landing; rulings 222 and 224.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

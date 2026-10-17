@@ -71,7 +71,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/13-reference-ui.md` | jig 13: the reference UI on the public client; `ops`'s and the test application's roots by asker; `jig-domain-client` gone | jig 12 | |
 | `jig/13-s1-path-segments.md` | jig-13.s1 (ruling 143): a path's segments bounded apart from the rows; the view cuts a long path | jig 13.2 | |
 | `jig/13-s2-scripted-wire.md` | jig-13.s2 (ruling 205): the test client wire carries the scripted family's records | jig 13.3 | |
-| `jig/14-wire.md` | jig 14: the wire collapsed, its requests: the version refusal, scopes and windows, the operations, the compound request | jig 03 to 09, jig 21 (the fence below) | |
+| `jig/14-wire.md` | jig 14: the wire collapsed, its requests: the version refusal, scopes and windows, the operations, the compound request | jig 03 to 09, jig 21.2; lands nothing before jig 21's last landing (the fence below; ruling 247) | |
 | `jig/14-s1-words-release.md` | jig-14.s1 (ruling 210): words release nothing; the words' release leaves the engine | jig 14.3 | |
 | `jig/22-documents.md` | jig 22: the wire's documents: `me`, the task line and queries, offers and a decision's effect | jig 14 | |
 | `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | |
@@ -132,10 +132,11 @@ per session are in each file.
   jig 04 and jig 08 once jig 02.1 has; jig 03 once jig 02 has; jig 09
   once jig 02.1 and 04.1 have; jig 12 once jig 10 and 11 have; jig 13
   once jig 12 has; jig 21 once jig 13 has; jig 14 once jig 03 to 09 and
-  jig 21 have; jig 22 once jig 14 has; jig 15, 16, 17, 18, 19, 20 in
+  jig 21.2 have (it lands after jig 21, the fence below); jig 22 once jig 14 has; jig 15, 16, 17, 18, 19, 20 in
   that order, jig 16 once jig 21 has too; jig 23 once jig 03 has; the
   temper sessions as their rows say.
-- **The fence:** jig 14 starts only after jig 21's last landing, so that
+- **The fence:** jig 14 lands nothing before jig 21's last landing (14.1
+  is built beside jig 21.3 and 21.4, ruling 247), so that
   no repin of temper 03 (onto jig 10.3, 11.5, 13.2, 21.2, 21.4) takes
   the collapsed wire (decisions.md, 12).
 - **When slots are short** (eight running, or 11.4's bounds holding

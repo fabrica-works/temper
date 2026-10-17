@@ -107,6 +107,9 @@ Each increment regenerates the codec once from the edited schema:
 `SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world
 --test drift`, then runs the drift test without the variable. Schema,
 generated code and goldens count no lines (code-organization.md, 7);
+the drift test also runs ops' wire (`v1`), so 14.1's edit of ops' schema
+rewrites `examples/ops/client-protocol-wire/src/generated/v1.rs` and
+`golden/v1`, which are 14.1's (ruling 247);
 each increment is a codec increment, landing within 2.5 times its Size
 without asking.
 
@@ -116,8 +119,9 @@ protocol/client.md, 9; client.md, 8.2), and the scope and window of an
 application's read and subject, and the scope of its keyed request, at
 jig's level (contract.md, 3.3 and 7.5; protocol/client.md, 4.1 and 11;
 client.md, 7 and 8.1).
-Needs: the session's start: jig 03 to 09, and jig 21's last landing
-(the fence, decisions.md 12), so `jig_client::Client`
+Needs: the session's start: jig 03 to 09 and jig 21.2's landing; 14.1 is
+built beside jig 21.3 and 21.4 and lands only after jig 21's last landing
+(the fence, decisions.md 12; ruling 247), so `jig_client::Client`
 with the link's states and per-owner versions from the hello (jig 12),
 its family reads and watches as bytes under an owner (jig 12), and
 `ops`'s root on it with its families' records in
@@ -152,16 +156,25 @@ and `src/codec.rs`, v1 edited in place): the scope of its families'
 into the family `Watch` and `Read`, in the module of
 `examples/ops/client-domain/src/` that jig 21.2 adds to map its values to
 `Family` (`git grep -n -w Family -- examples/ops` at the increment's start
-finds it; no line at jig `1350b6564`) (ruling 222); the wire's
+finds it; no line at jig `1350b6564`) (ruling 222): at jig `b6a63f8c1` it is
+`examples/ops/client-domain/src/family.rs` (`owned()` 9-11, `send` 20-37),
+with the subject encoders at `wire.rs:46` and `:118` and `wire::ask` at
+`:186` (ruling 247); the wire's
 users of `Answer`, 7 production files at the base (the link's
 `component.rs` and `translate/answers.rs`; the component's
 `component.rs`, `limits.rs`, `routes.rs`, `sign_in.rs`,
 `translate/answers.rs`); tests: the wire crate's `src/tests.rs`,
 `tests/engine-clients/tests/{requests,closing}.rs`, and the users of
 `Answer` and of the family record that these missed:
-`tests/client-protocol/src/native/wire.rs` (106-111, an exhaustive match
-on `Answer`), `crates/jig-client/src/tests/{fixtures.rs (293), sign_in.rs
-(29), store.rs (191)}`, `crates/jig-protocol-engine-clients/src/tests/{asks.rs,
+`tests/client-protocol/src/native/wire.rs` (117-122 at jig `b6a63f8c1`, an
+exhaustive match on `Answer` at :116; the other `w::Answer::decode` at :149),
+`crates/jig-client/src/tests/{fixtures.rs (293), sign_in.rs
+(52 at `b6a63f8c1`), store.rs (191)}`, `tests/ops/src/joint/bytes.rs` (58-59
+`Owned`, 64 `Keyed`, 96-99 `w::Answer::FinalAnswer`, 104-107
+`ReadAnswer::Value` and `.record()`, 113-114 a delivery's
+`.document().record()`), `tests/ops/src/client/app.rs` (314-320: `Keyed`,
+`keyed.request()` to `ask_value`, which unwraps `FamilyRequest.record`)
+(ruling 247), `crates/jig-protocol-engine-clients/src/tests/{asks.rs,
 watches.rs, reads.rs}` with their `fixtures/` (`asks.rs:95` and `:155` send
 raw bytes, `b"abc"` and `[255]`, as the keyed request, which becomes a
 `FamilyRequest` holding them; the digest constant stays) (ruling 222). Shared hotspot:
