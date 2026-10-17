@@ -1530,6 +1530,15 @@ choice would have been the user's (development.md, 10.4).
      3. **At the stop,** report the count by file and the work left, and wait.
      4. **Unchanged:** 21.3's Shape, Files, Test shape, Proof and Don't (rulings 234 and 235); code-organization.md, 7's 40-line rule for files over 800 at the base; the 08:2xZ steer's points 1 and 3 (ruling 234).
 
+241. **temper 03.5: the repin's repairs aim 400, stop 450** (plan defect, temper 03.5's block of 2026-10-17T08:57:21Z).
+     Ruling 241 (plan defect, temper 03.5's block of 2026-10-17T08:57:21Z): the implementer's proposal. Ruling 238 said "The repairs outside 03.5's Files: aim 300 added lines, stop at 350"; they are 355, five over, with the engine's clippy repairs left (`crates/temper-engine-domain/src/boundary.rs`'s two grown enums, `route/forge_route.rs`'s 102-line helper, `route/proposals.rs`'s two closures) and the native and world lints not yet reached.
+
+     1. **The repairs outside the Files:** aim 400, stop at 450, counted as ruling 238 says, and given in the report.
+     2. **03.5's Size stays:** aim 750, stop at 850 (737 now).
+     3. **A clippy repair splits, it does not excuse:** the 102-line helper becomes functions under clippy's line limit; no `allow` or `expect` for `too_many_lines` or the closures.
+     4. **At either stop,** report the counts and the files left, and wait. Trim nothing to fit.
+     5. **Unchanged:** rulings 236 to 239; 03.5's Shape, Files, Test shape and Proof (its two proofs under ruling 229).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
