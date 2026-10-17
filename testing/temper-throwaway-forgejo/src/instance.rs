@@ -10,7 +10,7 @@ pub struct Instance {
     child: Option<Child>,
     port: u16,
     scratch: PathBuf,
-    work: WorkPath,
+    work: Option<WorkPath>,
     admin: Account,
     settings: Settings,
     secrets: Vec<String>,
@@ -27,7 +27,7 @@ impl Instance {
         let port = work.port;
         let mut instance = Self {
             child: None,
-            work,
+            work: Some(work),
             port,
             scratch,
             admin: Account {
@@ -39,10 +39,10 @@ impl Instance {
             settings: settings.clone(),
             secrets: Vec::new(),
         };
-        instance.secrets.extend(instance.work.secrets.clone());
+        instance.secrets.extend(instance.work.as_ref().expect("prepared work path").secrets.clone());
         instance.secrets.push(instance.admin.password.clone());
-        instance.work.checked(&["migrate"], "migrate", &instance.secrets)?;
-        instance.work.checked(
+        instance.work.as_ref().expect("prepared work path").checked(&["migrate"], "migrate", &instance.secrets)?;
+        instance.work.as_ref().expect("prepared work path").checked(
             &[
                 "admin",
                 "user",
@@ -63,6 +63,8 @@ impl Instance {
         instance.child = Some(
             instance
                 .work
+                .as_ref()
+                .expect("prepared work path")
                 .command()
                 .arg("web")
                 .stdout(log.try_clone()?)
@@ -70,31 +72,50 @@ impl Instance {
                 .spawn()
                 .map_err(|e| Failure::Spawn { step: "web", error: e.to_string() })?,
         );
-        let mut ready = false;
-        for _ in 0..settings.ready_polls {
-            if let Some(status) = instance.child.as_mut().expect("web started").try_wait()? {
-                return Err(Failure::Exited { step: "web", status: status.to_string(), log_tail: instance.log_tail() });
-            }
-            if instance.exchange(&Outgoing::get("/api/v1/version", None)).is_ok_and(|x| x.status == 200) {
-                ready = true;
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        if !ready {
-            return Err(Failure::NotReady { polls: settings.ready_polls, log_tail: instance.log_tail() });
-        }
+        instance.ready()?;
         let password = instance.admin.password.clone();
         instance.admin.token = instance.token("fixture", &password)?;
         let user = instance.exchange(&Outgoing::get("/api/v1/user", Some(&instance.admin.token)))?;
         instance.admin.id = value(&user)?["id"].as_u64().ok_or_else(|| Failure::Io("admin id missing".into()))?;
         Ok(instance)
     }
+    /// Attaches an owned Forgejo child without taking ownership of its files.
+    /// # Errors
+    /// Returns a readiness or administrator lookup failure; the child is reaped.
+    pub fn attach(child: Child, port: u16, scratch: &Path, admin: Token, settings: &Settings) -> Result<Self, Failure> {
+        let secrets = vec![admin.value().to_owned()];
+        let mut instance = Self {
+            child: Some(child),
+            port,
+            scratch: scratch.into(),
+            work: None,
+            admin: Account { login: "temper-admin".into(), id: 0, token: admin, password: String::new() },
+            settings: settings.clone(),
+            secrets,
+        };
+        instance.ready()?;
+        let user = instance.exchange(&Outgoing::get("/api/v1/user", Some(&instance.admin.token)))?;
+        instance.expect("/api/v1/user", &user, 200)?;
+        instance.admin.id = value(&user)?["id"].as_u64().ok_or_else(|| Failure::Io("admin id missing".into()))?;
+        Ok(instance)
+    }
+    fn ready(&mut self) -> Result<(), Failure> {
+        for _ in 0..self.settings.ready_polls {
+            if let Some(status) = self.child.as_mut().expect("web started").try_wait()? {
+                return Err(Failure::Exited { step: "web", status: status.to_string(), log_tail: self.log_tail() });
+            }
+            if self.exchange(&Outgoing::get("/api/v1/version", None)).is_ok_and(|x| x.status == 200) {
+                return Ok(());
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        Err(Failure::NotReady { polls: self.settings.ready_polls, log_tail: self.log_tail() })
+    }
     /// Runs Forgejo's command line on the running instance's work path.
     /// # Errors
     /// Returns a spawn failure.
     pub fn cli(&self, args: &[&str]) -> Result<crate::Output, Failure> {
-        self.work.run(args)
+        self.work.as_ref().ok_or_else(|| Failure::Io("attached instance has no offline work path".into()))?.run(args)
     }
     fn log_tail(&self) -> String {
         let bytes = fs::read(self.scratch.join("server.log")).unwrap_or_default();
@@ -218,7 +239,7 @@ impl Instance {
             let wait = child.wait();
             kill.and(wait.map(|_| ()))
         });
-        let remove = fs::remove_dir_all(&self.scratch);
+        let remove = if self.work.is_some() { fs::remove_dir_all(&self.scratch) } else { Ok(()) };
         child_result?;
         remove?;
         Ok(())

@@ -1,12 +1,17 @@
 //! The process tier's isolated Forgejo, credentials and landing scripts.
-use super::{Forge, Scratch, write_private};
+use super::{Forge, Scratch, owned, write_private};
 use serde_json::{Value, json};
-use std::{fs, net::SocketAddr, path::Path};
-use temper_throwaway_forgejo::{Account, Forgejo, Init, Instance, Made, Outgoing, Settings};
+use std::{
+    fs,
+    net::{SocketAddr, TcpListener},
+    path::{Path, PathBuf},
+};
+use temper_throwaway_forgejo::{Account, Forgejo, Init, Instance, Made, Outgoing, Settings, Token};
 pub type BranchHead = (Box<[u8]>, Box<[u8]>);
 
 pub struct Throwaway {
     instance: Instance,
+    forgejo: PathBuf,
     acme: Account,
     bot: Account,
     widget: Made,
@@ -15,18 +20,40 @@ impl Throwaway {
     #[must_use]
     pub fn start(scratch: &Scratch) -> Self {
         let binary = Forgejo::from_env().expect("TEMPER_FORGEJO must name the pinned Forgejo");
-        let mut instance = binary
-            .start(&scratch.path().join("forgejo"), &Settings { actions: false, ..Settings::small() })
-            .expect("throwaway Forgejo starts without Actions");
+        let port = TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
+        owned::configuration(
+            scratch.path(),
+            &owned::Names {
+                forgejo: binary.binary(),
+                runner: None,
+                port,
+                bot: "temper-bot",
+                person: "ada",
+                orgs: &["workshop"],
+            },
+        );
+        let prepared = owned::prepare(scratch.path(), 1);
+        assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
+        let log = fs::File::create(scratch.path().join("server.log")).expect("server log");
+        let child = owned::run(scratch.path(), "forgejo")
+            .stdout(log.try_clone().expect("log clone"))
+            .stderr(log)
+            .spawn()
+            .expect("owned Forgejo starts");
+        let token = fs::read_to_string(scratch.path().join("forge-1/admin_token")).expect("admin token");
+        let mut instance =
+            Instance::attach(child, port, scratch.path(), Token::new(token.trim().into()), &Settings::small())
+                .expect("owned Forgejo answers");
         let acme = instance.create_user("acme").expect("repository owner");
         let bot = instance.create_user("temper-bot").expect("forge user");
         let widget = instance.create_repository(&acme, "widget", Init::Readme).expect("initialized repository");
         instance.add_collaborator(&acme, "widget", &bot, "write").expect("bot may write");
-        Self { instance, acme, bot, widget }
+        Self { instance, forgejo: binary.binary().into(), acme, bot, widget }
     }
     #[must_use]
     pub fn forge(&self) -> Forge<'_> {
         Forge::Throwaway {
+            forgejo: &self.forgejo,
             api: SocketAddr::from(([127, 0, 0, 1], self.instance.port())),
             git: self.instance.base(),
             token: self.bot.token.value(),
@@ -103,7 +130,7 @@ impl Throwaway {
         )
     }
     pub fn stop(self) {
-        self.instance.stop().expect("throwaway Forgejo stopped and removed");
+        self.instance.stop().expect("owned Forgejo stopped");
     }
     #[must_use]
     pub fn repository(&self) -> u64 {
@@ -112,13 +139,21 @@ impl Throwaway {
 }
 
 pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
-    let Forge::Throwaway { api, git, token, user } = forge else { return };
-    write_private(&directory.join("secrets/forge-1.api-token"), token.as_bytes());
-    write_private(&directory.join("secrets/forge-1.git-token"), token.as_bytes());
-    value["application"]["forges"][0]["api"] = json!({"socket":api.to_string()});
-    value["application"]["forges"][0]["git"] = git.clone().into();
-    write_private(&directory.join("secrets/forge-1.user"), format!("{user}\n").as_bytes());
-    value["application"]["identities"][0]["login"] = "temper-bot".into();
+    let Forge::Throwaway { api, git: _, token, user, forgejo } = forge else { return };
+    owned::document(
+        value,
+        &owned::Names {
+            forgejo,
+            runner: None,
+            port: api.port(),
+            bot: "temper-bot",
+            person: "ada",
+            orgs: &["workshop"],
+        },
+    );
+    write_private(&directory.join("forge-1/api_token"), token.as_bytes());
+    write_private(&directory.join("forge-1/git_token"), token.as_bytes());
+    write_private(&directory.join("forge-1/user"), format!("{user}\n").as_bytes());
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",api.to_string()],"last":"open","value":"acme"}});
     let grants =
         json!([grant(1), grant(2), grant(3), grant(4), grant(7), grant(8), grant(10), grant(11), grant(12), grant(13)]);

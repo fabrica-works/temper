@@ -11,7 +11,7 @@ use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub enum Forge<'a> {
     Unreached,
-    Throwaway { api: std::net::SocketAddr, git: String, token: &'a str, user: u64 },
+    Throwaway { forgejo: &'a Path, api: std::net::SocketAddr, git: String, token: &'a str, user: u64 },
 }
 pub(super) fn write_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
@@ -20,7 +20,7 @@ pub(super) fn write_private(path: &Path, bytes: &[u8]) {
 pub fn configuration(directory: &Path, forge: &Forge<'_>) {
     assert!(Path::new("/usr/bin/git").is_file(), "/usr/bin/git is required");
     for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
-        fs::create_dir(directory.join(name)).expect("deployment directory");
+        fs::create_dir_all(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
         write_private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
