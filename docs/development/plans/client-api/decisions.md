@@ -1341,6 +1341,50 @@ choice would have been the user's (development.md, 10.4).
      2. jig 21.2 (w82) gets the point's Pass on text with the answer to its two other blocks of 06:15:38Z and 06:21:43Z, in the same message, not before: it is stopped until then. 21.3 and 21.4 read it in the README, and their prompts do not repeat it (ruling 167, point 4).
      3. Unchanged: the steer's Do, Stop, Applies to and Until; ruling 167; jig 21.2's two other blocks, which stay in blocked.md until their answer.
 
+224. **jig 14.4 and 14.5 as main's people types: the designer's answer** (design, jig 14's ready check question of 2026-10-17T06:07:15Z).
+     Ruling 224, design: the designer's answer, landed as jig b58a49c39 and temper bc7c1376; ruling 222's "14.4 waits for question.md's answer" ends. The answer's decision:
+
+
+     1. **14.4's record follows main; nothing is owed.** contract.md, 3.2
+        now: "authority, whose spend and deadline are the task's budget and
+        deadline ..., that budget as named there or `AsAllowed`"; "a report,
+        a change or a verdict: an approval is a procedure's"; "the grants
+        named after it". `NewTask` is field for field `people::Member`
+        (`batch.rs:28-42`): no `deadline`, `NewBudget { named | as_allowed }`,
+        `NewContract { report | verdict | change }`, and `named: bytes
+        16777216` (pieces of `OwnerGrant`) where `holdings` was.
+     2. **Holdings are no gap.** Main's party batch asks each connector
+        `Ask::TaskHoldings` per member before it commits
+        (`party_inputs.rs:142`, `parties.rs:263`, `:608`; filled at `:313`).
+        tasks.md, 4 now: "each connector says from its executor and spec
+        before the batch commits, whoever creates it". No `later.md` row.
+     3. **The answer** is `OwnerOutcomeCreated { first, last, given: option
+        CreatedGiven { task, amount } }`, as `people::Outcome::Created`
+        (`boundary.rs:403`; contract.md, 4: "the first and the last of the
+        tasks' numbers, consecutive in the batch's order"). Not asked:
+        `Malformed` gains `cycle` (`create.rs:60`; contract.md, 4).
+     4. **14.5:** `ProposeWidening` goes, as your reading said (people.md,
+        5.1). Not asked: `ProposeAmendment.revision` is required, as in
+        `people::Action::Amend { revision: u64 }`. `OwnerOutcomeProposed` is
+        `{ proposal }` (contract.md, 3.2: "its number answered"; 4 now:
+        "whom it waits for being in its document").
+     5. **`proposable` stays `option bool`, three states,** as
+        `translate/refusals.rs:26-30` maps them: none, no claim (`None`);
+        false, nobody (`Accepter::Nobody`); true, one could
+        (`Accepter::Role(_)`). A refusal of shape, reference or again carries
+        none. contract.md, 4 now: "A refusal that another check decided ...
+        makes no claim either way. Who would accept a proposal is the
+        offer's to say (5.3), and the proposal's document's once it is made,
+        not the refusal's".
+     6. **The plan:** 14.5's five `proposable` users leave its Files, its
+        `an_authority_refusal_names_the_role_that_could_accept` goes, and its
+        story becomes
+        `a_create_beyond_authority_is_refused_saying_a_proposal_could_be_accepted`.
+        jig 16's card takes to whom from the offer. temper 04.2 keeps its
+        `proposable` arm.
+     7. **Unchanged:** the people child's `to: u32` and `Accepter::Role(u32)`;
+        jig 15's helpers, which take `to` from the offer. Nothing is deferred.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
