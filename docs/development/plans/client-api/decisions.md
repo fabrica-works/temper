@@ -1612,6 +1612,28 @@ choice would have been the user's (development.md, 10.4).
      4. **Not option C:** no change in `jig-client` or `jig-client-domain` (ruling 235; 21.3's Files). The independent failures the report lists (read-capacity fixtures, ended watched documents, the intent clock, the owner-inbox projection, `max_out`) go on under 21.3's Shape.
      5. **Unchanged:** ruling 240's Size (aim 2,500, stop 3,000) and 243; the 10:5x steer's points.
 
+251. **jig 22.4: a cancel counts its tree's tasks, live runs and pending proposals, never effects** (design answer, the ready check of jig-22.1).
+     Ruling 251 (design answer, the ready check of jig-22.1): the designer's answer, landed as jig 360aabcc6 and temper 63803dd15; 22.4 no longer waits, and goes on under its amended Shape.
+
+     1. **What a cancel's effect counts.** contract.md, 5.4 now reads: "*cancelling:* what ends: the live tasks below the task, counted by phase; and, of the task and those below it, the live runs (each attempt claimed whose answer its task has not heard) and the pending proposals (each a task made that no holder has decided). Its effects are its connectors' (5.1): each withdraws the entries not yet sent and settles those in flight, and the document counts none of them". In the core, the counts walk `core.tasks.view_tasks()` with `task_tree::descendant`, as `task_tree::tree` (`task_tree.rs:813`) does:
+        - `tasks`: each live task below the task, never the task itself, through `PhaseCounts::add` (`task_tree.rs:256`).
+        - `live_runs`: the task and each live task below it whose `tasks::run_attempt(&row.phase)` is `Some`. That is `jig-domain-tasks/src/run.rs:129`, made `pub` and re-exported from `lib.rs`. It is `Some` when the run is claimed or running, closing at `Stage::Run`, or held from one of those. No `Writer::Run` slot is read.
+        - `proposals`: the task and each live task below it whose `proposal` is `ProposalState::Pending`, read as `task_tree::proposal` (`task_tree.rs:630`) reads it.
+     2. **No effect is counted.** `effects_pending` and `effects_settling` leave `Impact` in the wire, the contract and the core's sketch. The rest of the design already says this:
+        - contract.md, 5.1: "Their effects are the connectors' own, and jig's documents never count them".
+        - connectors.md, 4.2: "how many entries, and which, are the connector's to know and to show, never counted by the core".
+
+        objects.md, 11 now says the card states, "in jig's words, that effects not yet made are withdrawn and those in flight settle ... which, and how many, each connector's panel says". In the confirmation, `PendingEffects` (254) becomes `EffectsSettle`, with no hole: "Effects not yet begun will be withdrawn; begun effects will settle". `SettlingEffects` goes, and 255 is left unused.
+     3. **`takeover_budget` leaves `Impact`,** in the wire and in the contract. A move's reservation is that move's own effect. contract.md, 5.4: "*moving a task:* the reservation that moves to the party's pool", that is `Effect::Move { reservation }`, which `TakeoverFunds` now reads. The translation no longer writes 0.
+     4. **The wire:** `record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 }`, changed in place in v8. `TaskContext.impact` and `Escalation.impact` keep the smaller record. 22.4's Files list the sites. To check, run `git grep -l -E 'effects_pending|effects_settling|PendingEffects|SettlingEffects' -- crates tests testing examples ':!*/generated/*'` once after 22.4: it must print nothing (it prints 16 files at `b6a63f8c1`).
+     5. **Test:** `a_cancel_offer_counts_the_tree_it_would_end` stays one test, asserting three things:
+        - the task's own live run and pending proposal count in `live_runs` and `proposals`, never in `tasks`;
+        - a running delegate with no write hold counts in `live_runs`;
+        - a decided proposal is not counted.
+
+        Size stays at most 300 lines (removed lines count nothing).
+     6. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
