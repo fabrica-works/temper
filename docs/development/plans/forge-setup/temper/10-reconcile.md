@@ -63,7 +63,8 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
 8. **`application.webhooks` reaches reconcile when it exists:** `Settings.listener` is `None` while `Named` lacks the
    member; whichever of 05.3 (which adds it) and 10.1 lands second wires it, and 11.1 proves it. `Settings.hook_secret_bytes`
    comes from `forge_component.hook_secret_bytes` (`temper-engine-protocol-forge/src/limits.rs:50`, 128 shipped,
-   `temper-service/src/forge.rs:139`), which landed with a1a734f4d (ruling 134, in place of ruling 122's interim).
+   `temper-service/src/forge.rs:139`), which landed with a1a734f4d; 10.1 landed with `token_bytes` (`forge.rs:255`), and 05.3 sets it, beside `listener`
+   (ruling 135).
 
 ## Rules that bind it
 
@@ -98,8 +99,6 @@ Shape: sketches A-C.
   `setup.deadline_ms` 300 (`check.rs:125-155` refuses one without the other), and writes a private `admin_token`
   (the machine's first need, `reconcile.rs:147`).
 - `USAGE` (`lib.rs:24`) and its copies: `src/tests.rs:7, :14, :129`, and `forge.rs:146`'s `usage` string.
-- The shell's `Refused` gives `words()`, without prefix or newline; `forge::Refused::line()` (`forge.rs:24-29`) adds
-  `temper forge reconcile: forge N: ` once.
 - `tests/support/owned.rs` has `run(directory, program) -> Command` (:180, nine users) and `Running::start` (:192):
   the tier's runner is `owned::run_forge` (or another free name), `Running` logs to `server.log` (`instance.rs:121`
   reads it), holds `child: Option<Child>` so `into_child` can take it past its `Drop`, and `start` returns the port

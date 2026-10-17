@@ -644,6 +644,16 @@ run are appended after "For the user".
        `temper-box/src/limits.rs:40-48`; four paths and twelve line references.
      - Unchanged: Sizes, tests, proofs and Done when.
 
+135. **10.1's remainder: 05.3 wires the hook bound** (plan defect, temper 10's block of 2026-10-17T02:16:37Z).
+     Ruling 135, a plan defect: 10.1 landed before ruling 134 reached it. No supplement step:
+
+     - `Settings.hook_secret_bytes`: 05.3 sets it from `profile.forge_component.hook_secret_bytes` at
+       `crates/temper/src/forge.rs:255`, beside `listener`, as Choice 8 already gives 05.3 the wiring that lands second.
+       Until then reconcile reads `webhook_secret` within `token_bytes` (512), which holds its 64 digits.
+     - `Refused::words()` is dropped: 10.1's command removes the shell's prefix before its own `line()`, so the prefix
+       prints once, which was the point.
+     - Unchanged: 10.1 as landed; 10.2 goes on.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

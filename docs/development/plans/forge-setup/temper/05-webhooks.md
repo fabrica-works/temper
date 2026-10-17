@@ -223,6 +223,8 @@ Size: at most 280 lines.
 Removes: nothing.
 
 ### 05.3 `application.webhooks` and `forges[].webhook_secret`; `temper-service` hosts the listener
+Also (ruling 135): `crates/temper/src/forge.rs:255` sets reconcile's `hook_secret_bytes` from
+`profile.forge_component.hook_secret_bytes`, not `token_bytes`, beside `listener` (10-reconcile.md, Choice 8).
 
 Scope: configuration.md 3, 6, 7: the two members read and checked (`null` for none, never missing), the secrets read at
 start and handed to the component, the five limits' names and the listener's cross-checks, the listener's io tagged and
