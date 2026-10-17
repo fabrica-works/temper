@@ -679,6 +679,30 @@ per session are in each file.
     takes its numbers named, as jig-client's `tests/store.rs` :69, :91,
     :111 and :120 do. Seeds passed to `world(…)` and expected values stay
     literals.
+  - 00:40Z, point 1 (jig, tests in `tests/core`): Before a new test in
+    tests/core pages the inbox read or signs in a second party, search
+    the crate for it (README, "A test's helpers once"). The paging loop
+    over `reads::Read::Inbox` is written out in
+    `tests/core/tests/parties.rs:177` and `:458`, `reads.rs:112` and
+    `:184`, `restart.rs:518` and `src/stories/reads.rs:186` and `:308`. A
+    second party's sign-in and roles is written out in `parties.rs:160`
+    (`other_party`), `fields.rs:40` (`member_world`) and
+    `operations.rs:303` (`another_requester`). Add to
+    `tests/core/src/fixtures.rs`, `pub`: `inbox_objects(world, sign_in,
+    group) -> Vec<InboxObject>` (`parties.rs`'s `inbox`, moved, with
+    `proposal_object`) and `second_party(world, subject, role) -> u64`
+    (sign in, send `Roles`, return the new sign-in; `other_party` and
+    `owner` take it). The first of you whose new test needs one adds it
+    and uses it; the rest take it.
+  - 00:40Z, point 3 (jig, checks in `tests/conformance` and
+    `testing/jig-conformance`): Build a failure's message only when the
+    check fails. `check(holds, &format!(...))` formats on every pass, and
+    the conformance sweep passes through every cut:
+    `tests/conformance/src/scenarios/lifecycle.rs:100`, `:152` and
+    `:163`. Write `if !holds { return check(false, &format!(...)); }`,
+    and keep a literal message as it is. A trace stays typed and is
+    formatted in the failing branch; the first session to edit
+    `lifecycle.rs` fixes its three sites.
 
 ## Prerequisites the run checks at its start
 
