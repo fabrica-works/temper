@@ -563,25 +563,40 @@ of jig's family refusal translation (one production file) follows at
 its repin.
 Shape: wire, in this order before `Ask`: `FieldRule` and
 `VerdictChoice` move up (no byte change); `TaskRef { member: u32 |
-task: u64 }`; `NewContract { approval: ContractApproval { state, part:
-OwnerPart } | report: ContractReport { words } | verdict: ContractVerdict
-{ choices: list 32 VerdictChoice } | change: ContractChange { connector,
-kind, words } }`; `NewBudget { amount: BudgetAmount { value } |
+task: u64 }`; `NewContract { report: ContractReport { words } |
+verdict: ContractVerdict { choices: list 32 VerdictChoice } | change:
+ContractChange { connector, kind, words } }`; `NewBudget { named |
 as_allowed: BudgetAsAllowed { cap: option u64 } }`; `enum Retention {
 kept, forgotten_once_read }`; `TaskFlags { conversation: bool, listed:
-bool, retention: Retention }`; `NewHolding { connector, path, kind }`;
-`NewTask { executor: Executor, spec: Specification, contract:
-NewContract, authority: OwnerAuthority, budget: NewBudget, deadline:
-option u64, wake: OwnerWakePolicy, dependencies: list 32 TaskRef,
-holdings: list 32 NewHolding, tracked: option u32, label: u32, flags:
-TaskFlags }`, mirroring jig 03's batch task field for field (where they
-differ, jig 03's landed type wins and the record follows it); `Create {
-project: u32, tasks: bytes 1048576 }`; `Ask.create`;
-`OwnerOutcomeCreated { tasks: list 32 u64, given: option u64 }`;
-`Malformed` gains `two_as_allowed` and `conversation_not_agent`;
-`Refusal.no_escalation_holder`; `AdmissionLimit.goals`. Contract: the interface sketch's `NewTask`,
+bool, retention: Retention }`; `NewTask { executor: Executor, spec:
+Specification, contract: NewContract, authority: OwnerAuthority,
+budget: NewBudget, wake: OwnerWakePolicy, dependencies: list 32
+TaskRef, named: bytes 16777216, tracked: option u32, label: u32,
+flags: TaskFlags }`, field for field `people::Member`
+(`crates/jig-domain-people/src/batch.rs:28-42`; the designer's answer
+of 2026-10-17, jig b58a49c39, contract.md, 3.2: "authority, whose
+spend and deadline are the task's budget and deadline ..., that budget
+as named there or `AsAllowed`"): a `NewBudget::Named` budget is
+`authority.spend` (`routing/create.rs:188`), the deadline is
+`authority.deadline`;
+`named` is the grants named after the task, pieces of `OwnerGrant` as
+`OwnerAuthority.grants` are (`Member.named`, resolved at
+`routing/create.rs:179`); no approval contract ("an approval is a
+procedure's") and no holdings list (each connector names a party's
+task's holds from its executor and spec before the batch commits,
+`Ask::TaskHoldings` at `routing/parties.rs:608`; tasks.md, 4); `Create
+{ project: u32, tasks: bytes 1048576 }`; `Ask.create`; `CreatedGiven {
+task: u64, amount: u64 }` and `OwnerOutcomeCreated { first: u64, last:
+u64, given: option CreatedGiven }`, field for field
+`people::Outcome::Created` (`boundary.rs:403`; contract.md, 4: "the
+first and the last of the tasks' numbers, consecutive in the batch's
+order"); `Malformed` gains `two_as_allowed`, `conversation_not_agent`
+and `cycle` (`people::Malformed::{AsAllowedTwice, Conversation,
+Cycle}`, `refusals.rs:55-61`; contract.md, 4: "a cycle among a batch's
+dependencies"); `Refusal.no_escalation_holder`;
+`AdmissionLimit.goals`. Contract: the interface sketch's `NewTask`,
 `TaskRef`, `NewContract`, `NewBudget`, `TaskFlags`, `Retention`,
-`NewHolding`, `Malformed`, `Ask::Create`.
+`Malformed`, `Ask::Create`.
 Test shape: the component's tests:
 `a_create_reaches_the_people_child_with_each_task_s_fields`,
 `an_as_allowed_answer_names_what_was_given`; the link's:
@@ -602,22 +617,16 @@ Size: at most 300 lines.
 Removes: nothing.
 
 ### 14.5 `Propose` and `Withdraw`
-Scope: a party's `Propose` of a batch, an amendment or a widening, and
-`Withdraw` of their own pending proposal (contract.md, 3.2 and 3.5);
-refusals for authority naming who could accept a proposal (section 4).
-Needs: the session's start: jig 03's `people::Ask::{Propose, Withdraw}`,
-the party as a proposal's proposer, and "by whom" in its authority
-refusal.
+Scope: a party's `Propose` of a batch or an amendment (a widening of a
+task's authority among them), and `Withdraw` of their own pending
+proposal (contract.md, 3.2 and 3.5). The authority refusal's
+`proposable` stays as it is (section 4).
+Needs: the session's start: jig 03's `people::Ask::{Propose, Withdraw}`
+and the party as a proposal's proposer.
 Files: the v8 schema; the component's `translate/{operations.rs,
 answers.rs, refusals.rs}`; the contract's `operations.rs`,
 `refusals.rs`; the link's `translate/{operations.rs, answers.rs}`;
-users of `RefusalAuthority.proposable` (the reference UI's authority
-refusal words, the scripted engine's refusals, test records, and
-`testing/jig-client-test-view/src/{connector_values_refusal.rs (19),
-connector_values.rs (301)}`, `tests/client/src/joint/wire/refusals.rs`
-(17, 200), `tests/engine-clients/tests/requests.rs` (230),
-`testing/jig-client-test-domain/src/tests/root.rs` (739)); the link's
-`restore_ask` (arms for `Propose` and `Withdraw`:
+the link's `restore_ask` (arms for `Propose` and `Withdraw`:
 `crates/jig-client-protocol-link/src/translate/store.rs:78`) and the asks of
 `crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`
 (ruling 222); the
@@ -629,26 +638,33 @@ now sends `Propose` of the amendment, saying to whom; the scripted
 engine's model of a proposed amendment; downstream, the same family
 refusal translation as 14.4.
 Shape: wire: `ProposeBatch { tasks: bytes 1048576 }` (pieces of
-`NewTask`), `ProposeAmendment { task: u64, revision: option Revision,
-change: Amendment }`, `ProposeWidening { task: u64, authority:
-OwnerAuthority }`, `enum ProposeAction { batch, amendment: boxed
-ProposeAmendment, widening }`, `Propose { project: u32, action:
-ProposeAction, reason: text 65536 }`, `Withdraw { project: u32,
-proposal: u64 }`, `Ask.{propose, withdraw}`; `OwnerOutcomeProposed {
-proposal: u64, to: Recipient }` (people.md, 5.1: a `Propose` is
-answered with its number and to whom it went), `OwnerOutcomeWithdrawn {
-proposal: u64 }`;
-`RefusalAuthority { lacking: Lacking, proposable: option Recipient }`
-(was `option bool`: none says no proposal could be accepted);
-`Malformed` gains `proposed_as_allowed`. Contract:
+`NewTask`), `ProposeAmendment { task: u64, revision: Revision, change:
+Amendment }` (its revision required, as in `people::Action::Amend {
+task, revision: u64, amendment }`, `batch.rs:8-12`), `enum ProposeAction {
+batch, amendment: boxed ProposeAmendment }` (no widening: "A party
+proposes a batch, or an amendment, a widening of a task's authority
+among them", people.md, 5.1; `people::Action` is `Batch | Amend`),
+`Propose { project: u32, action: ProposeAction, reason: text 65536 }`,
+`Withdraw { project: u32, proposal: u64 }`, `Ask.{propose, withdraw}`;
+`OwnerOutcomeProposed { proposal: u64 }` (contract.md, 3.2: "its
+number answered"; whom it waits for is its document's `waiting`, and
+the offer's `to` before it is sent: the designer's answer of
+2026-10-17, contract.md, 4), `OwnerOutcomeWithdrawn { proposal: u64
+}`; `RefusalAuthority { lacking: Lacking, proposable: option bool }`
+unchanged, as main's three states map onto it
+(`crates/jig-protocol-engine-clients/src/translate/refusals.rs:26-30`):
+none, the refusal makes no claim (`None`, contract.md, 4: "A refusal
+that another check decided ... makes no claim either way"); false, no
+proposal could be accepted (`Accepter::Nobody`); true, one could
+(`Accepter::Role(_)`); `Malformed` gains `proposed_as_allowed`. Contract:
 the sketch's `ProposeAction`, `Ask::{Propose, Withdraw}`.
 `OwnerOutcomeGoalProposed` stays until jig 16.
 Test shape: the component's tests:
-`a_propose_of_an_amendment_reaches_the_people_child_with_its_reason`,
-`an_authority_refusal_names_the_role_that_could_accept`;
+`a_propose_of_an_amendment_reaches_the_people_child_with_its_reason`;
 `tests/client-protocol/tests/client.rs` (jig 12's story file):
 `a_party_proposes_a_batch_and_withdraws_it_before_it_is_decided`,
-`a_create_beyond_authority_is_refused_naming_who_could_accept`; the
+`a_create_beyond_authority_is_refused_saying_a_proposal_could_be_accepted`
+(its `proposable` is `Some(true)`); the
 reference UI's (`crates/jig-client-view/src/tests/domain/confirmation.rs`) (ruling 222):
 `a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_words`
 (`:295`, its proposable amendment at `:311`) keeps its name and its
@@ -663,8 +679,8 @@ and the withdraw leaves it withdrawn, the party its proposer. Bound: 1 s.
 Don't: send a `Propose` on the party's behalf when a `Create` is refused;
 offer `Withdraw` on a card (jig 22.4 does).
 Size: at most 270 lines.
-Removes: `RefusalAuthority.proposable`'s `option bool`; the reference
-UI's `Amend` of an amendment beyond the offer's first bound.
+Removes: the reference UI's `Amend` of an amendment beyond the offer's
+first bound.
 
 ## Interface sketches
 
@@ -723,32 +739,28 @@ record Compound { project: u32 operations: bytes 1048576 }
 record TaskRefMember { value: u32 }
 record TaskRefTask { value: u64 }
 enum TaskRef { member: TaskRefMember, task: TaskRefTask }
-record ContractApproval { state: bytes 65536 part: OwnerPart }
 record ContractReport { words: u32 }
 record ContractVerdict { choices: list 32 VerdictChoice }
 record ContractChange { connector: u16 kind: u16 words: u32 }
-enum NewContract { approval: ContractApproval, report: ContractReport, verdict: ContractVerdict, change: ContractChange }
-record BudgetAmount { value: u64 }
+enum NewContract { report: ContractReport, verdict: ContractVerdict, change: ContractChange }
 record BudgetAsAllowed { cap: option u64 }
-enum NewBudget { amount: BudgetAmount, as_allowed: BudgetAsAllowed }
+enum NewBudget { named, as_allowed: BudgetAsAllowed }
 enum Retention { kept, forgotten_once_read }
 record TaskFlags { conversation: bool listed: bool retention: Retention }
-record NewHolding { connector: u16 path: list 32 bytes 65536 kind: u16 }
-record NewTask { executor: Executor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget deadline: option u64 wake: OwnerWakePolicy dependencies: list 32 TaskRef holdings: list 32 NewHolding tracked: option u32 label: u32 flags: TaskFlags }
+record NewTask { executor: Executor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }
-record ProposeAmendment { task: u64 revision: option Revision change: Amendment }
-record ProposeWidening { task: u64 authority: OwnerAuthority }
-enum ProposeAction { batch: ProposeBatch, amendment: boxed ProposeAmendment, widening: ProposeWidening }
+record ProposeAmendment { task: u64 revision: Revision change: Amendment }
+enum ProposeAction { batch: ProposeBatch, amendment: boxed ProposeAmendment }
 record Propose { project: u32 action: ProposeAction reason: text 65536 }
 record Withdraw { project: u32 proposal: u64 }
 enum Ask { start_chat: StartChat, message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, move_task: Move, set_goal: SetGoal, prioritise: Prioritise, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create, propose: Propose, withdraw: Withdraw }
 record OwnerOutcomeCompound { project: u32 operations: u32 first_message: u64 }
-record OwnerOutcomeCreated { tasks: list 32 u64 given: option u64 }
+record CreatedGiven { task: u64 amount: u64 }
+record OwnerOutcomeCreated { first: u64 last: u64 given: option CreatedGiven }
 record OwnerOutcomeProposed { proposal: u64 }
 record OwnerOutcomeWithdrawn { proposal: u64 }
-record RefusalAuthority { lacking: Lacking proposable: option Recipient }
-enum Malformed { two_as_allowed, conversation_not_agent, proposed_as_allowed, project_mismatch }
+enum Malformed { two_as_allowed, conversation_not_agent, cycle, proposed_as_allowed, project_mismatch }
 record RefusalMalformed { at: u32 why: Malformed }
 record Refused { refusal: Refusal at: option u32 }
 record ScopeProject { value: u32 }
@@ -795,25 +807,23 @@ pub enum Operation {
 /// A new task's dependency: a member of its batch, by place, or a task.
 pub enum TaskRef { Member(u32), Task(u64) }
 /// The result contract a new task owes.
-pub enum NewContract { Approval { state: Box<[u8]>, part: OwnerPart }, Report { words: u32 }, Verdict { choices: List<VerdictChoice> }, Change { connector: u16, kind: u16, words: u32 } }
-/// A new task's budget; `AsAllowed`'s answer says what was given.
-pub enum NewBudget { Amount(u64), AsAllowed { cap: Option<u64> } }
+pub enum NewContract { Report { words: u32 }, Verdict { choices: List<VerdictChoice> }, Change { connector: u16, kind: u16, words: u32 } }
+/// A new task's budget: its authority's spend, or `AsAllowed`, whose answer says what was given.
+pub enum NewBudget { Named, AsAllowed { cap: Option<u64> } }
 /// What becomes of a task once ended.
 pub enum Retention { Kept, ForgottenOnceRead }
 /// A task's flags, each with engine semantics.
 pub struct TaskFlags { pub conversation: bool, pub listed: bool, pub retention: Retention }
-/// A resource a new task will write.
-pub struct NewHolding { pub connector: u16, pub path: List<Box<[u8]>>, pub kind: u16 }
-/// One task of a `Create` or a proposed batch.
+/// One task of a `Create` or a proposed batch, field for field `people::Member`; `named` holds the grants named after it.
 pub struct NewTask {
     pub executor: Executor, pub spec: Specification, pub contract: NewContract, pub authority: OwnerAuthority,
-    pub budget: NewBudget, pub deadline: Option<Wall>, pub wake: OwnerWakePolicy, pub dependencies: List<TaskRef>,
-    pub holdings: List<NewHolding>, pub tracked: Option<u32>, pub label: u32, pub flags: TaskFlags,
+    pub budget: NewBudget, pub wake: OwnerWakePolicy, pub dependencies: List<TaskRef>,
+    pub named: List<OwnerGrant>, pub tracked: Option<u32>, pub label: u32, pub flags: TaskFlags,
 }
 /// What a party proposes.
-pub enum ProposeAction { Batch { tasks: List<NewTask> }, Amendment { task: u64, revision: Option<Revision>, change: Box<Amendment> }, Widening { task: u64, authority: OwnerAuthority } }
+pub enum ProposeAction { Batch { tasks: List<NewTask> }, Amendment { task: u64, revision: Revision, change: Box<Amendment> } }
 /// Why a request is not well formed; `Refused`'s place names where.
-pub enum Malformed { TwoAsAllowed, ConversationNotAgent, ProposedAsAllowed, ProjectMismatch }
+pub enum Malformed { TwoAsAllowed, ConversationNotAgent, Cycle, ProposedAsAllowed, ProjectMismatch }
 /// jig's requests as this session leaves them (the project's own, and the four shape asks jig 16 removes, elided).
 pub enum Ask {
     Create { project: u32, tasks: List<NewTask> },

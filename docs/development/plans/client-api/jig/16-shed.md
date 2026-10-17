@@ -189,8 +189,8 @@ Needs: 16.1's query helpers in the reference UI.
 Files: the reference UI's project goals section (at the base
 `crates/jig-domain-client/src/pages/project/goals.rs`, 335 lines, and
 `owner_goals.rs`, 77), its move-up and move-down acts, the project's
-overview section, its refusal card (jig 14.5's `RefusalAuthority {
-proposable }`) and its confirmation; the scripted
+overview section, its refusal card (`RefusalAuthority { proposable }`,
+which jig 14.5 leaves as it is) and its confirmation; the scripted
 engine's compound of priority-only amendments (in place of its
 `Prioritise`); `tests/client`'s goal stories; `tests/client-protocol`.
 Shape: the section watches `queries::goals(project)` and reads
@@ -202,10 +202,13 @@ Amendment { priority: Some(p), .. } }`, one per goal whose priority
 changes, and the board says what priority does (pages.md, 6.2). The
 overview watches `queries::goals(project)` with a window of its first
 rows, under its own handle. A refusal for authority whose `proposable`
-names a holder offers "Propose instead", whose confirmation says to
-whom and sends `Ask::Propose` of the refused act (a batch for a refused
-`Create`, an amendment for a refused `Amend`); one that names none
-offers nothing.
+is `Some(true)` offers "Propose instead", whose confirmation says to
+whom from the offer (`me`'s creating bounds, or the task document's
+amending bounds: `Beyond::Proposed { to }`; jig's contract.md, 4: "Who
+would accept a proposal is the offer's to say") and sends
+`Ask::Propose` of the refused act (a batch for a refused `Create`, an
+amendment for a refused `Amend`); `Some(false)` says that nobody may
+accept it, and `None` offers nothing.
 Test shape: `tests/client/tests/stories.rs`:
 `moving_a_goal_up_sends_one_compound_request_of_priorities`,
 `the_project_overview_shows_the_board_s_first_goals`,

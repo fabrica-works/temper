@@ -269,15 +269,16 @@ build `ToApplication`, which jig 14.1 gives a `scope`, and a `window` for
 (derives the application's scope itself),
 `crates/temper-client-shell-terminal/src/route/family.rs:70,177` (builds
 `jig_client::Family` and uses the wire's `Answer::FinalAnswer`, `KeyedAnswer`
-after jig 14.1) and `crates/temper-service/src/family/refusals.rs:25` (the
-`proposable` arm) (ruling 222).
+after jig 14.1) and `crates/temper-service/src/family/refusals.rs` (its
+arms for jig 14.4's and 14.5's refusals; its `proposable` arm, :25,
+stays) (ruling 222).
 Shape:
 - `temper_service::family::answer(outcome:
   Option<forge::ApplicationOutcome>, limits: &w::Limits, jig:
   &jig_client_protocol_wire::<jig's current version>::Limits) ->
   Option<Box<[u8]>>`, unchanged in form; its `CoreRefused` bytes are the
   collapsed wire's `Refusal` record, the facts jig 14 adds among them
-  (no one to escalate to, not well formed, proposable by whom); a
+  (no one to escalate to, not well formed); a
   compound request's failing position is the answer's, not the
   refusal's, and an adoption is no compound request.
 - The forge side's version: `forge::Event::Served { versions }` also
