@@ -1561,6 +1561,24 @@ choice would have been the user's (development.md, 10.4).
      2. **The native startup ordering: not yet.** Whether temper's native shell holds the root's `Start` until it is signed in (option A) or jig's link should not open a stream without a credential (option B) is ruled after a check of how jig's own native host orders sign-in and the link's `open` on main. Until that ruling: go on with point 1, the gate's other failures under ruling 244, and the sweeps, but not this ordering; add no pending list to `client.rs`, change nothing in jig, and do not run `land`. When nothing else is left, report so and wait.
      3. **Unchanged:** rulings 236 to 244 (repairs aim 500, stop 550; Size aim 750, stop 850).
 
+246. **temper 03.5: the root starts before the sign-in; jig-12.s1 holds a watch until signed in** (design answer, temper 03.5's block of 2026-10-17T09:44:19Z).
+     Ruling 246 (design answer, temper 03.5's blocks of 2026-10-17T09:37:13Z and 09:44:19Z): the designer's answer, landed as jig 8c832e517 and temper c3d0c0b9; it ends ruling 245, point 2's interim. jig-12.s1 is `jig/12-s1-watch-waits-for-sign-in.md`.
+
+     1. **Before: the shell starts the root, then signs in.** 3.4 stands, now: "`Start { kept }` before any other event, then signs in (section 7): with the credential DIRECTORY holds, or by the printed link. The shell holds back neither the start nor the sign-in. The domain's children ask their watches from their start, and `jig-client` opens none on the engine until it is signed in". 1e8ed63a's order (`client.rs:395-403`) is the design's; temper's code does not change for it.
+     2. **The refused stream is jig's client's, and jig's client fixes it.** jig's `client.md`, 8.1 now: "**A watch waits for a sign-in.** A `Watch` while no sign-in is live (the link signed out, 8.2) is admitted, its handle opening, and nothing leaves for the transport ... Once signed in, the client opens each such watch under a fresh name; one on `me` is the client's own (8.2), not a second." 12: "Signed in, the client opens the stream, watches `me` (8.2), and opens the watches asked before (8.1); under `Transport` it is signed in from its `SignIn`."
+     3. **jig-12.s1, the supervisor's to add** (development.md, 10.4):
+        - Files: `crates/jig-client-domain/src/domain.rs`, `open` (:201): while `self.link == Link::SignedOut`, the watch is inserted with `name: None` and `until: None`, and no `Down::Open` is pushed. `link.rs`, `signed_in` (:55): after `set_link(Link::Starting)`, a held watch on `Frame` becomes `own` (no second `Frame` opened), and each held watch gets a fresh name and `w.opening(name)`. `crates/jig-client/src/tests/sign_in.rs`: the test.
+        - Test `a_watch_asked_before_signing_in_opens_once_signed_in`: `Client::new()`; `Watch { handle: ME, subject: Watchable::Jig(Subject::Frame) }`, then `Watch { handle: TASK, subject: task() }`: `requests()` is empty after each. Then `SignIn { with: With::Held(fixtures::credential(&CREDENTIAL)) }`: `[Told { Link::Starting }, OpenStream { credential: Some(fixtures::credential(&CREDENTIAL)) }]`. After `hello`, exactly two `Message::Watch` exchanges, each with that credential.
+        - Size: aim 60 added lines, stop at 100. Past 100, a question. Repairs to jig's worlds count in it. Proof: jig's gate, run by `land`; nothing else is wanted.
+        - Don't: change `jig-client-protocol-link` (`OpenStream { credential: None }` stays for `Transport`; `link/src/tests/stream.rs:68-73` and `jig-client/src/tests/sign_in.rs:79-96` unchanged); change how a read or a send is handled while signed out; change jig's native host.
+        - **Order:** it lands before jig 21.3's landing. 21.3 rebases onto it. Reason: temper 03.5's repin pins a step's landing, and must take jig-12.s1 without 21.3's.
+     4. **temper 03.5** (plan amended):
+        - Scope: the host starts the root at load and signs in after it.
+        - Needs: jig-12.s1, taken by a second repin commit, `Cargo.lock` alone. Any repair it brings counts in ruling 244's 550.
+        - Proof: the land gate's run of `temper-one-process-world` is the check of the five stories that fail at `referee/client.rs:97` under 1e8ed63a. Nothing else is wanted.
+        - Don't: hold back the root's `Start`; give `SignIn` before it; change the referee's 200 rule.
+     5. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

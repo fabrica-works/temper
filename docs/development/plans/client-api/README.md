@@ -67,6 +67,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/10-transport.md` | jig 10: `jig-client-protocol-http`, the native shell on it, the link's vocabulary | jig 01 | |
 | `jig/11-client-domain.md` | jig 11: `jig-client-domain`: the contract, handles and askers, the request table, kept work | jig 01 | |
 | `jig/12-client.md` | jig 12: `jig-client`: the link's states, `me`, `SignIn { with }`, families as bytes, the thin story against the real engine | jig 10, jig 11 | 12.2: skein-01.s3 |
+| `jig/12-s1-watch-waits-for-sign-in.md` | jig-12.s1 (ruling 246): a watch asked before signing in waits for it | nothing (lands before jig 21.3) | |
 | `jig/13-reference-ui.md` | jig 13: the reference UI on the public client; `ops`'s and the test application's roots by asker; `jig-domain-client` gone | jig 12 | |
 | `jig/13-s1-path-segments.md` | jig-13.s1 (ruling 143): a path's segments bounded apart from the rows; the view cuts a long path | jig 13.2 | |
 | `jig/13-s2-scripted-wire.md` | jig-13.s2 (ruling 205): the test client wire carries the scripted family's records | jig 13.3 | |
@@ -98,7 +99,7 @@ more says so in its row and its file. Dependencies are by capability:
 |---|---|---|---|
 | `temper/01-skein-ui-repin.md` | temper 01: temper on jig's base with skein-ui; its client crates renamed; the terminal on `skein-ui-text` | nothing | |
 | `temper/02-names.md` | temper 02: jig's renames followed, and the naming check | jig 01, temper 01 | |
-| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10, temper-03.s1; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2; 03.6: jig 21.4 |
+| `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10, temper-03.s1; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2, jig-12.s1; 03.6: jig 21.4 |
 | `temper/03-s1-engine-revisions.md` | temper-03.s1 (ruling 153): the repin onto jig 10.3, with jig 06's revisions and answers in temper's engine tools | jig 10.3 | |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.1: temper 03.4 (ruling 231); 04.2: jig 22; 04.3: jig 16; 04.4: jig-13.s1 |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
