@@ -1814,6 +1814,14 @@ choice would have been the user's (development.md, 10.4).
      - `git -C jig show origin/main:tests/client-protocol/src/fixtures.rs | grep -n 'pub fn journal'` prints `28:pub fn journal(mut limits: ...)`; `native/config.rs:3` is `"limits": {"profile": "small", "overrides": {...}}`.
      - 14.3's measure run, `logs/20261017T151241-664.log`: 4,110 tests; slowest 0.312 s (native terminal), 0.274 s (channel resumed window), 0.266 and 0.260 s (ops restarts), 0.248 s (one-process chat).
 
+270. **jig 14.s2: one measure run on the final tree** (process, jig 14.s2's block of 2026-10-17T16:48:17Z).
+     Ruling 270 (process, jig 14.s2's block of 2026-10-17T16:48:17Z): yes, one measure run on the final tree, once; then land.
+
+     1. **Run it once** when the repair is done, clippy clean and committed: `heavy --gate -- cargo nextest run --workspace --profile measure -j 1`, its log `logs/jig-14-s2/measure-end.log`. Move the present one to `logs/jig-14-s2/measure-end-first.log` first.
+     2. **The report** names each changed test's time in `measure-start.log` and in the final `measure-end.log`, and the two totals; `measure-end-first.log` is named, not compared again. Then land, as Proof says: land's gate, its `Gate-Result` times; no other measure run, whatever the final one shows.
+     3. **The step's stop stands:** Shape 3's 90 minutes count from your start (about 16:18Z): what is not done by about 17:48Z waits, and you land what is done. A missed 4 s is a guide missed: the landing stands, and the report names the gate's time and its three slowest tests.
+     4. **Unchanged:** the session file's Files, Size and Don't; no assertion, case, seed or story dropped; ruling 269.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
