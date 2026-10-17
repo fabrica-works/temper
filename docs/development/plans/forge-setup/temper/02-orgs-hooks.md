@@ -146,8 +146,8 @@ route-orgs-made: 201, `private`); `setup-org-made-for-a-user-takes-write-admin-a
 the four units `write`); `setup-team-listing-reads-back-what-was-made` (team-list: both again);
 `setup-team-made-again-is-422`; `setup-team-edit-without-a-name-keeps-the-name` (team-edit-nameless: 200, the
 answer's `name` the team's before the edit);
-`setup-team-edit-replaces-units-and-flags` (team-edit: `includes_all_repositories` false, pulls `read`, actions omitted
-so `none`); `setup-team-member-put-is-204` (member-added); `setup-team-members-list-the-added-user` (members);
+`setup-team-edit-replaces-units-and-flags` (team-edit: `includes_all_repositories` false, and `units_map` the four units
+as the encoder sends them, pulls `read` and actions `none`; ruling 127); `setup-team-member-put-is-204` (member-added); `setup-team-members-list-the-added-user` (members);
 `setup-team-member-put-of-a-missing-user-is-404`; `setup-team-member-writes-in-a-repository-made-later`
 (org-issue-by-member: 201); `setup-team-non-member-cannot-see-the-private-repository` (org-repo-for-a-stranger: 404);
 `setup-team-listing-pages-by-limit` (list-page-1: one team; list-page-3: none).

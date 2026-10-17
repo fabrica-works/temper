@@ -546,6 +546,17 @@ run are appended after "For the user".
      - Unchanged: the count by file in each report; the stop past the tolerance; never trim a doc comment, a test or the
        formatting to meet a Size.
 
+127. **02.1's team edit reads back four units** (plan defect, temper 02's block of 2026-10-17T00:52:53Z).
+     Ruling 127, a plan defect: 02.1's Choices say "Units go in `units_map` …, each of the four at its access" and "The
+     tool's literals are the encoder's output byte for byte", while the fact said "actions omitted so `none`". The encoder
+     sends `"repo.actions":"none"`, and Forgejo answers it so. The fact follows the encoder:
+
+     - `setup-team-edit-replaces-units-and-flags` holds when the `setup-team-edit` answer's `includes_all_repositories` is
+       false and its `units_map` is the four units as the edit sent them: code `write`, issues `write`, pulls `read`, actions
+       `none`. It checks the explicit `none`; an absent key no longer counts.
+     - Unchanged: the four-unit `TeamSpec` and the codec's replay; the fact's name; the other 17 facts; ruling 124's
+       check (two recordings in a row, `git status --short` empty) and Size of 1160.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
