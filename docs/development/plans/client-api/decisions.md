@@ -980,6 +980,49 @@ choice would have been the user's (development.md, 10.4).
 
      If the work that may go on is done before the answer, jig 03 commits it as WIP on its branch, reports it, and waits; it lands nothing of 03.5 before the answer's ruling.
 
+190. **jig 03.5: the accepter becomes the amended task's funder** (design answer, jig 03's block of 2026-10-17T00:08:23Z).
+     Ruling 190, the designer's answer, landed as jig 1ee6c02ac and temper cf9493c5; it ends ruling 189's interim, and 03.5 goes on whole under its amended Shape (Size 320):
+
+
+     1. **The accepter becomes the task's funder.** authority.md, 7, "Whoever
+        widens a task funds it": "From that commit, the giver is the task's
+        funder: *when it already was,* its reservation is resized to the
+        task's new budget; *otherwise,* the task is funded anew from it, as a
+        moved task is: its old funder is given back what the task had left and
+        keeps what it spent, and the giver reserves the task's new budget less
+        what the task spent. Its requester, its tree and its delegates'
+        funding stay as they were." authority.md, 9: "an amendment or a
+        widening makes the accepter the funder of the task it changes, whoever
+        proposed it". Nothing is split: "a task has one funder".
+     2. **The same rule binds every acceptance of an amendment or a widening**:
+        a party's `Amend`, a task's `Widen` and a task's `Amend`, whether a
+        party accepts it (`person_proposal_accept`, `party_decisions.rs:242`,
+        `:267`) or a task does (`named_proposal_accept`, `runs.rs:123`, `:143`).
+     3. **03.5** (temper cf9493c5): `tasks::Event::Amend` gains `funder:
+        Option<Funder>`. `None` is a direct amendment, which resizes its
+        present funder, as on main. `Some(f)` is the accepter's:
+        `Funder::Pool { project, person, period: core.period(project) }`,
+        opened first as the batch arms open it (`party_decisions.rs:50`,
+        `:220`); or `Funder::Task(key.task)`.
+        - `check_amend`: when `f` is the task's funder, `can_resize`
+          (`control.rs:340`). Otherwise, the move's preflight
+          (`moving.rs:198-229`) at the new budget, refused `Funding`.
+        - `apply_amend`: `resize` (:412), or the move's funding
+          (`moving.rs:347-368`, `:403-408`), shared through `funders.rs`.
+        - The authority check is unchanged (`check.rs:653`).
+        - New test: `tests/tasks/tests/funding.rs`,
+          `an_amendment_accepted_by_another_funder_funds_its_task_anew`.
+        - The Proof asserts the owner's pool as the task's funder, holding
+          the widened budget, and the old funder given its reservation back.
+        - Size goes from 260 to 320. `control.rs` and `boundary.rs` take at
+          most 40 more lines each.
+     4. **Deferred: a direct widening by an amender that does not fund the
+        task.** The design now says the amender funds it; main resizes the
+        present funder, and 03.5 passes `None` there. Its row is in `later.md`
+        ("a jig plan after this one") and in jig's `STATUS.md`.
+     5. **Unchanged:** 03.4's batch acceptance; who is recorded as `by`; jig
+        22's "the pool that funds it, after", which follows authority.md, 7.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
