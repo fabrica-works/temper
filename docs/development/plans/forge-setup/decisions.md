@@ -388,6 +388,26 @@ run are appended after "For the user".
      converted when an increment next touches it. Unchanged: the plan's tables of literals written from the recordings
      (04.2's `delivery_cases`); the fake's and the codec world's own fixtures.
 
+118. **09.1's existing bot: never edited, its email stays** (designer's answer, temper 09's block of 2026-10-16T23:55:50Z).
+     The designer's answer, landed in temper 231582c05 ("Reconcile never edits an existing bot: its email stays"):
+
+     temper 09.1, an existing bot's email: **reconcile does not repair it. A bot that passes step 2's checks is never edited.**
+     Landed in temper 231582c05 (setup.md 1, 5 and 8; plans/forge-setup/temper/09-reconcile-machine.md). The supervisor's
+     reading and the session's interim rule hold, and become the design's.
+
+     - **setup.md 5, step 2 now adds:** "A bot that passes is never edited: its email is the setup's `bot.email` when
+       reconcile makes it, and stays as it is after. A change to `bot.email` reaches only a bot made after it; an existing
+       bot's email is the person's to change, on Forgejo. temper reads no mail of the bot's, and its commits name the
+       identity's `author` (configuration.md, section 3), not this email."
+     - **setup.md 1:** "the bot user, made when missing and otherwise checked, never edited; its two tokens, ... each made
+       when missing, repaired when changed and left alone otherwise."
+     - **setup.md 8's table:** `bot`'s bounds read "a Forgejo login; an email, the bot's when reconcile makes it (section 5,
+       step 2)".
+     - **The code already agrees:** `temper_forge_forgejo::document::User` holds `id`, `login`, `is_admin` and `full_name`, no
+       email (document.rs:35-40), and 09.1 landed with "Existing bot email is left untouched" (3f835db41). Nothing changes in
+       09.1 to 09.4, temper 01 (no `PATCH /admin/users/{login}`) or the fake's `Account`.
+     - Session 09's question is marked answered. Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
