@@ -1799,6 +1799,21 @@ choice would have been the user's (development.md, 10.4).
      2. **Do:** cherry-pick `5e4afc0c8` (the 14 fixture lines, every assertion kept) back onto `client-api/jig-14-4`, and land it with `Create`, listed as small fixes outside your Files under ruling 264.
      3. **Unchanged:** ruling 267, points 2 to 4: no further timing repair in 14.4; a gate that times out again with no failing test blocks with the gate's time and its three slowest tests, and `land` runs no third time.
 
+269. **jig-14.s2: jig's focused suite cheaper, beside jig 14** (steer of 2026-10-17T16:16Z).
+     Ruling 269 (process, the handover of 2026-10-17T16:03:26Z and ruling 267's point 3, "The focused suite's time (13.945 s of 15 s at 14.3) is the supervisor's to plan next, apart from 14.4"): a supplement step, jig-14.s2 (`jig/14-s2-focused-suite.md`, needs nothing), makes jig's focused suite cheaper in a slot of its own, beside jig 14.4.
+
+     1. **Why a step of its own:** README "Test time" gives the repair to "the session's next increment", here jig 14.5, on the run's one chain (14.4, 14.5, 22, 15, 16, 17), while 7 of 8 slots stand idle. The focused gate ran 12.204, 13.653, 13.945 and 14.248 s at 14.1, 14.2, 14.3 and 14.s1 (aim 13.3 s, stop 15 s), and 14.4's two lands timed out at 15.016 and 15.004 s with no test failing.
+     2. **What the gate costs** (a read-only diagnosis of the gate logs, 16:15Z): it is bound by throughput, not a tail: 4,110 test processes on 8 threads summed 110.4 s over 13.945 s of wall at 14.3; the longest test is 1.12 s. 1 s of serial test time is about 0.37 s of wall. `heavy --gate` runs nothing beside a gate; `plan pulse` overlapped the first timeout but not the second, which ran as slow.
+     3. **While jig-14.s2 runs, it alone makes jig's tests cheaper under README "Test time":** jig 14.5 and the jig sessions after it do not start with a repair, and a gate of theirs over 13.3 s stands. Unchanged for them: the 15 s stop, a rule; a test their gate's log flags `SLOW` is made cheaper before its increment lands; ruling 267's point 2 for 14.4. Once jig-14.s2 lands, the README rule applies again from the next jig gate over the aim.
+     4. **Out of the step:** an `opt-level` for crates other than tools, a thread count, the per-process start (about 2 ms of each test's floor), and the phrasebook built in each test process (`english()`, about 1 ms in each of 546 view tests): production or gate changes, not this run's.
+     5. **Unchanged:** README "Test time" and its Never list; rulings 264, 267 and 268 for 14.4; temper's measure-run steer (15:00Z, point 3).
+
+     Checked:
+     - The measure command, README "Test time": `grep -n 'profile measure -j 1' README.md` prints 477: "`--profile measure -j 1`, the fuzzy suite's", after 476's "the focused suite's `heavy --gate -- cargo nextest run --workspace`".
+     - 14.4's repair files: `git -C jig show --stat 5e4afc0c8` lists `tests/channel/src/fixtures.rs`, `tests/channel/src/processes.rs`, `tests/client-protocol/src/native/config.rs`, `tests/ops/src/client/app.rs`, `tests/ops/tests/client_stories.rs`: 5 files, 14 insertions, 14 deletions.
+     - `git -C jig show origin/main:tests/client-protocol/src/fixtures.rs | grep -n 'pub fn journal'` prints `28:pub fn journal(mut limits: ...)`; `native/config.rs:3` is `"limits": {"profile": "small", "overrides": {...}}`.
+     - 14.3's measure run, `logs/20261017T151241-664.log`: 4,110 tests; slowest 0.312 s (native terminal), 0.274 s (channel resumed window), 0.266 and 0.260 s (ops restarts), 0.248 s (one-process chat).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
