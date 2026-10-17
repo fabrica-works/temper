@@ -1410,6 +1410,15 @@ choice would have been the user's (development.md, 10.4).
      4. **A further copy.** Where the focused test or the proof then meets another translation in `crates/jig-protocol-engine-clients/src/translate/` refused `Bound` because a wire list is sized by a domain list's capacity while its length fits, size it by `len()` the same way, add its case to step 2's test file, and name it in the commit body. At most 10 lines of engine production in all, counted in ruling 225's Size; past them, a block.
      5. **Unchanged:** ruling 226's other points (no core production change, no other engine change, its 45-minute aim); 21.2's Proof; ruling 225's Size (4,329 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1. A role offered more than four goal charters still has its frame refused `Bound`: `later.md`'s new row, for the designer.
 
+228. **jig 21.2: diagnose p-10's future write below the proof** (process, jig 21.2's block of 2026-10-17T07:08:09Z).
+     Ruling 228, process: the implementer's option A, within jig 21.2. p-10 passed the First words and delegate failures that rulings 226 and 227 aimed at; the referee's check it now fails is `tests/client/src/harness/referee.rs:85`, `judge.check(at <= judge.now(), "nothing shown done before durable: future write")`: an `Observed::Durable` stamped later than the judge's clock.
+
+     1. **Reproduce first,** in the focused common-world test of `logs/jig-21/21.2-r227-focused-12.log`, extended through a durable commit's observation. Log each `Observed::Durable`'s `at` and the judge's `now()` when it reaches the referee, and the clock each side reads.
+     2. **Fix where the log names the cause.** A fixture's clock or scheduling (in `tests/ops/src/joint/**`, or a world it reuses) is 21.2's to fix; name each file outside `tests/ops/src/joint/**` in the commit body. A cause in engine, core or client production code is a block with the logs, not a fixture change. The referee's check stays as it is.
+     3. **Then the proof:** at most two more runs of `p_accepts_the_restart_from_the_incidents_page` (p-11 and p-12), each after a different change aimed at a cause a focused log names; a new failure point is reproduced in the focused test before the next run. A failure after p-12 is a block with the logs.
+     4. **Bound:** aim to spend at most 45 minutes from your start on this diagnosis; past it, report what the focused logs show, and go on with it.
+     5. **Unchanged:** ruling 227's points 1, 2 and 4 (two engine production lines used of its 10: `translate/owner.rs`'s goals and projects lists by `len()`); ruling 226's other points (no core production change); 21.2's Proof; ruling 225's Size (4,331 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1. After the proof: the eight survival proofs, clippy and the gate, as 21.2's Proof says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
