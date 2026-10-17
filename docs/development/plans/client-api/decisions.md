@@ -1603,6 +1603,15 @@ choice would have been the user's (development.md, 10.4).
      3. **Open for the designer before 22.4:** what core state `live_runs`, `effects_pending`, `effects_settling` and pending proposals count, and `Impact.takeover_budget` in a cancel (question.md). 22.1 to 22.3 do not rest on it; 22.4 waits for its answer.
      4. Any further user a session finds of a name these corrections change is refreshed the same way and listed in its commit body.
 
+250. **jig 21.3: a rejected read result is its one terminal; the tests read again** (plan defect, jig 21.3's block of 2026-10-17T11:13:48Z).
+     Ruling 250 (plan defect, jig 21.3's block of 2026-10-17T11:13:48Z): a malformed read result is the read's one terminal; the moved tests read again (option B), and only what the native client never delivers is injected at the Ui's boundary.
+
+     1. **The design answers it.** jig's `client/domain/client.md`, 7: a read "has one terminal, `Page { handle, page }`" and "A read is one attempt (`../../protocol/client.md`, section 6): the application reads again if it wants." `jig-client-domain`'s `read_done` (`reads.rs:35-47`) removes the read and tells its one `Page`, as the design says. A Ui that keeps waiting on a read after its terminal would wait for nothing.
+     2. **The Ui retires its read on a terminal it rejects.** `page/routing.rs`'s `read_result` (and `application.rs`'s, if it holds the same pending read) drops its local reading when the page's identity does not match, and leaves the page as it was. The moved tests keep their names; the "wrong page, then the right page on the same read" sequence becomes: the wrong page (the page unchanged, the local reading gone), a fresh read through the real `Client`, then its right page, installed. The tests' assertions on the page stay; those on the old pending reading change to the retired one, each named in the commit body.
+     3. **A duplicate, late or reset page after the terminal**, which the native client never delivers, may be fed straight to the Ui's `Event::Client { told: Told::Page }` (option A's way), as a check of the Ui's own guard; valid documents and pages go through the real `Client`'s `Up`, as the Test shape says.
+     4. **Not option C:** no change in `jig-client` or `jig-client-domain` (ruling 235; 21.3's Files). The independent failures the report lists (read-capacity fixtures, ended watched documents, the intent clock, the owner-inbox projection, `max_out`) go on under 21.3's Shape.
+     5. **Unchanged:** ruling 240's Size (aim 2,500, stop 3,000) and 243; the 10:5x steer's points.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
