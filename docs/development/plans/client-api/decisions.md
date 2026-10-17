@@ -1545,6 +1545,15 @@ choice would have been the user's (development.md, 10.4).
 243. **jig 21.3: Ui::new takes its limits first** (plan defect, jig 21.3's block of 2026-10-17T09:10:57Z).
      Ruling 243 (plan defect, jig 21.3's block of 2026-10-17T09:10:57Z): option A. jig's `client/domain/view.md`, 18.1, says the Ui is "made with: its limits; the application's navigation and home; its arrangement"; the sketch left out the first. `Ui::new` is `pub fn new(limits: &Limits, navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>`: the limits each root already holds, passed first, as `Ui::new(&Limits)` takes them on main; no defaults. Unchanged: `Refused`'s two variants, `Navigation`'s fields, the rest of the sketch, rulings 234, 235 and 240.
 
+244. **temper 03.5: diagnose the reload below the story; repairs aim 500, stop 550** (process, temper 03.5's block of 2026-10-17T09:20:20Z).
+     Ruling 244 (process, temper 03.5's block of 2026-10-17T09:20:20Z): option A, as rulings 226 and 228 ruled for jig 21.2. The reload story fails at client step 8 before and after the authenticated-reload repair, so the next run is below it.
+
+     1. **Diagnose below the story, once:** one focused test of the root and its front on the reload path (`StartUnlinked`, signed in, hello, the frame's routing, and the restored Person frame the last run lacked), under 0.5 s. Fix only the cause it names, in the file it names. Then run the reload story once. The test stays if it checks what the story does not and runs under 0.5 s; otherwise it goes, and `logs/` keeps the cause.
+     2. **Then the gate's other failures** (11 default, 4 fuzzy, `logs/temper-03/03.5-gate1-diagnosis.txt`): each repaired at its named cause, all at once, then one default no-fail-fast sweep and one fuzzy sweep before the gate (ruling 219).
+     3. **The repairs outside the Files:** aim 500, stop at 550 (441 now), for these repairs; 03.5's Size stays aim 750, stop at 850 (789 now). At either stop, report the counts and the files left, and wait.
+     4. **The test over 40 lines:** `an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts` (`tests/engine/domain/tests/forge_routes.rs:2529`, 77 lines) is named in the landing report with its length at the base and now; split it only if 03.5 grew it.
+     5. **Unchanged:** ruling 229's rule (a run that fails at the same point as the one before is a block with its logs); every story assertion; rulings 236 to 241; the 09:08Z steer's point 1.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
