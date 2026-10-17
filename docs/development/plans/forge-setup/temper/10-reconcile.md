@@ -44,7 +44,7 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
 4. **Limits from the shipped profile** (development.md 5.6; a test naming another says why): documents and HTTP are
    `temper_engine_protocol_forge::limits::{documents, http}` (limits.rs:281, :299) of `temper_service::limits::
    profile(Small).forge_component` (limits.rs:247; forge.rs:110); io is jig's `profile(Small).io` (profile.rs:39), as
-   `sign_in.rs:96` takes Small. Each file is read within its bound: the three tokens' `token_bytes`, `webhook_secret`'s
+   `sign_in.rs:94` takes Small (its `.driver`). Each file is read within its bound: the three tokens' `token_bytes`, `webhook_secret`'s
    `hook_secret_bytes`, `user`'s 21 (20 digits and the final newline, configuration.md 6). The `setup.` limits are 07.1's,
    with the document's overrides. The binary hands the host `Host`'s value (`conventions::host`, conventions.rs:9) and
    `USER_AGENT`, so the shell crate does not depend on the engine's.
@@ -61,7 +61,9 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
    `write:repository` and `write:organization`, kept in the handle, never in a file. The org is private (answer 19), so
    is the repository, and the job clones with its own token (03.3's fact; decisions.md 25).
 8. **`application.webhooks` reaches reconcile when it exists:** `Settings.listener` is `None` while `Named` lacks the
-   member; whichever of 05.3 (which adds it) and 10.1 lands second wires it, and 11.1 proves it.
+   member; whichever of 05.3 (which adds it) and 10.1 lands second wires it, and 11.1 proves it. `Settings.hook_secret_bytes`
+   likewise: until 05.3 adds `forge_component.hook_secret_bytes`, `forge.rs` gives it `token_bytes` (512 shipped,
+   `temper-service/src/forge.rs:113`), and whichever lands second sets it from `hook_secret_bytes` (ruling 122).
 
 ## Rules that bind it
 
@@ -81,29 +83,30 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
 Scope: setup.md 5, 6.5, 9, 13.2 (the host's side); answers 6 and 14. The host runs 09's machine to its end on skein-http
 over skein-io within `setup.deadline_ms`: it does what the machine needs (a Forgejo request, a file of the forge's
 directory read or written whole, entropy) and hands back the outcome.
-Needs: 08.3 (`Instance::attach`; through 08.2, `temper forge run`, and 08.1's shell crate and `forge.rs`) and 09.3.
+Needs: 08.3 (`Instance::attach`; through 08.2, `temper forge run`, and 08.1's shell crate and `forge.rs`) and 09.3. Not
+05.3: Choice 8 says how `listener` and `hook_secret_bytes` reach `Settings` before it lands.
 Files: new `crates/temper-forge-setup-shell/src/{reconcile,exchange}.rs`, `src/lib.rs`, `Cargo.toml` (dependency
 `skein-http`; `temper-forge-forgejo` and `skein-json` are 08.1's, and 10.1 adds either if 08.1 did not; dev-dependencies
 `temper-service` and `temper-engine-protocol-forge`, for the profile's limits), `tests/{reconcile,exchange}.rs`,
 `tests/support/mod.rs` (08.1's), `Cargo.lock`; `crates/temper/src/forge.rs` (08.1's: the `reconcile` arm), `src/lib.rs`
-(client-api 05.2 hotspot: `USAGE` :22 alone), `src/tests.rs` (the two literals, :7, :14), `tests/forge.rs` (08.2's),
+(client-api 05.2 hotspot: `USAGE` :23 alone), `src/tests.rs` (the two literals, :7, :14), `tests/forge.rs` (08.2's),
 `tests/process.rs`, `tests/support/owned.rs` (hotspots).
 Shape: sketches A-C.
 - **The exchange** (`exchange.rs`): one `skein_http::client::Client` over one socket per request, as `connection.rs:158-259`
   does without TLS, with `close: true`: `io::Request::Connect`; the call with `Host`, `Authorization`, `User-Agent`,
-  `Content-Type`; `client::encode` (client.rs:34) gives the method (01.1's `Put` mapped too), target and body; the answer's
-  body goes into a `tokenizer::Tokenizer` whose events go to `client::step` (:155; the loop whole is
-  `temper-forge-forgejo/src/tests/fixtures.rs:61`) and `Gather`. A request with no decoder (`client::decoder` :94) is read
+  `Content-Type`; `temper_forge_forgejo::client::encode` (client.rs:36) gives the method (01.1's `Put` mapped too), target and body; the answer's
+  body goes into a `tokenizer::Tokenizer` whose events go to `client::step` (:160; the loop whole is
+  `drive`, `temper-forge-forgejo/src/tests/fixtures.rs:67`) and `Gather`. A request with no decoder (`client::decoder` :98) is read
   for its status alone.
-- **The loop** (`reconcile.rs`): a `skein_shell::Host` as sign_in.rs:166-219, with its own `Kernel::open` and `drive`
-  (sign_in.rs:104, :141) as 08.1's `command::run_one`; its `next_deadline` is the earlier of the exchange's end (Choice 1)
+- **The loop** (`reconcile.rs`): a `skein_shell::Host` as sign_in.rs:164-217, with its own `Kernel::open` and `drive`
+  (sign_in.rs:102, :139) as 08.1's `command::run_one`; its `next_deadline` is the earlier of the exchange's end (Choice 1)
   and the pause's. It refuses at start (`Refused::Limits`) unless `io.intake >= http::largest_read` and `io.output >=
   http::largest_room` (skein-http client.rs:101, :109). Files: read by `skein_shell::read_private_file(path, bound(..),
   effective_user())`, written by 08.1's whole-file writer; the machine's `File` maps to `<directory>/<name>`, but a managed
   `AdminToken` to the entry's `admin_token`. A draw is `skein_shell::crypto_seed()` (32 bytes). An absent file is
   `Event::Read(None)`; an unsafe, oversize or unreadable one ends the run as `Refused::File`.
 - **The command:** an arm beside `prepare` and `run`, the same arguments, in `forge.rs`; it checks the document as
-  `prepare` does and builds `Settings`: `address()` (lib.rs:196) gives `api`, `setup.*` come from 07.1's `Limits` with the
+  `prepare` does and builds `Settings`: `address()` (lib.rs:197) gives `api`, `setup.*` come from 07.1's `Limits` with the
   document's overrides. Order: the TLS refusal (Choice 3), the forge's entry (a managed one too; absent: Choice 5's words),
   its directory made 0o700 and checked as `prepare` does (reconcile is the first command to write in a managed forge's
   directory, configuration.md 6; a managed `admin_token` is the person's, wherever it is), the run. `USAGE` gains `temper
@@ -147,7 +150,7 @@ Proof: process, `reconcile_converges_an_owned_forgejo_and_a_second_run_writes_no
 it runs the commands from the scratch with the document's relative paths, so where the files land shows Choice 5's
 resolution): `temper forge reconcile config.json 1` exits 0 although Forgejo was started a moment before it; `forge-1/{api_token,
 git_token,user}` are 0o600. Then 08.3's `Instance::attach` over `start`'s child (`into_child`; `Names`'s port, the admin
-`Token::new` of `admin_token`) reads Forgejo by `instance.exchange(&Outgoing::get(..))` (lib.rs:87, instance.rs:196): the
+`Token::new` of `admin_token`) reads Forgejo by `instance.exchange(&Outgoing::get(..))` (`Outgoing` and its `get`, throwaway `lib.rs:84, :98`; instance.rs:195): the
 API token answers `GET /api/v1/user` as `temper-bot` with the id `user` holds; as the admin, the bot is no site admin and
 its full name holds `temper:bot`, org `acme` is private and has its team `temper-bot`. A second run exits 0 with the
 three files' inode and mtime unchanged. Command: `heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temper
@@ -187,8 +190,8 @@ Shape:
    is the creation's.
 3. `Forge::Throwaway` (mod.rs:11) loses `token` and `user`. `forgejo::configuration` (:114) leaves the members setup.md 8
    derives to `owned::document` (`forge-1/api_token`, `{"file": "forge-1/user"}`, identity token `forge-1/git_token`,
-   login `temper-bot`), changes the entry's `orgs` to `["acme"]` (08.3 names an org nobody makes), and writes the rule
-   `"ci":true,"gates":[],"approvals":[]` (:132). `Throwaway::get` (:36) reads as the person (the repository is
+   login `temper-bot`), changes the entry's `orgs` to `["acme"]` (08.3 names an org nobody makes), and flips the rule's
+   `"ci":false` to `true` (:132), the rest as it is (`up_to_date` is required, `landing.rs:74`). `Throwaway::get` (:36) reads as the person (the repository is
    private, so every read is); `job_state(pull)` (new) reads the pull's head, then `commits/{head}/status`.
 4. `person::adopt_and_change` (person.rs:233) drops its steps that press "It runs CI" (:244) and type the check
    (:245-248); the other process tests keep theirs.
@@ -198,8 +201,8 @@ Shape:
    side as `forgejo::configuration` writes it; `support::configuration` may run again over its directory
    (`create_dir_all`, as 08.3 has it). temper 13.1's proof calls it.
 Test shape: no new file or kind; the existing tests, on the new start (`temper_open_adopts_a_repository_by_commands`,
-process.rs:34, keeps its own unchecking of CI, :60). Reuse `Scratch` (mod.rs:43), `serve` (:82), `run_until_landed`
-(:462), `landing_scripts` (forgejo.rs:218; its review script stays until the story proves it uncued); `configuration()`
+process.rs:34, keeps its own unchecking of CI, :60). Reuse `Scratch` (mod.rs:43), `serve` (:83), `run_until_landed`
+(:463), `landing_scripts` (forgejo.rs:218; its review script stays until the story proves it uncued); `configuration()`
 keeps its profile overrides (:133-175). Ceiling: the story's referee, 180 s less its 5 s.
 Proof: process, `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart` (process.rs:71), which now also
 asserts `assert_eq!(forgejo.job_state(merged), "success")`: the merged pull request's head holds a `success` job, `main`

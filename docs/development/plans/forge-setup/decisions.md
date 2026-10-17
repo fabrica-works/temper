@@ -461,6 +461,21 @@ run are appended after "For the user".
      - Unchanged: the 25 setup and 40 component facts; the masks' first-appearance rule and their 40- and 64-digit runs;
        never trim a doc comment, a test or the formatting to meet a Size.
 
+122. **10's Shapes against main** (ready check of temper-10.1).
+     Ruling 122, the ready check of temper-10.1 (skein f981746a, temper 92bdbd429; 08.1, 08.2, 08.3, 09.2, 09.3 and
+     05.3 not landed, their names checked against their session files). Amends `temper/10-reconcile.md`:
+
+     - Line references moved on main: `sign_in.rs:94` (Small, its `.driver`), `:102`, `:139`, `:164-217`; `lib.rs` `USAGE` :23,
+       `address()` :197; `instance.rs:195`; throwaway `lib.rs:84, :98` (`Outgoing`, `get`); `client.rs:36, :98, :160`
+       (`temper_forge_forgejo::client`, not skein-http); the decode loop is `drive`, `tests/fixtures.rs:67`; `mod.rs:83, :463`.
+     - 10.2's rule (`support/forgejo.rs:132`) flips `"ci":false` to `true` and keeps the rest: `up_to_date` is required
+       (`landing.rs:74`), which the old text dropped.
+     - `Settings.hook_secret_bytes` needs 05.3's `forge_component.hook_secret_bytes`, not landed and not in Needs: as Choice 8
+       does for `listener`, `forge.rs` gives it `token_bytes` until 05.3 lands, and whichever of 05.3 and 10.1 lands second sets
+       it from `hook_secret_bytes`. 10.1 does not wait for 05.3.
+     - Unchanged: the `secrets/forge-1.*` paths of `support/configuration.rs:39` and temper-service's fixtures are other
+       tests' own documents, not the tier's; 10.2's Shape 3 changes only `forgejo::configuration`. Sizes, tests and proofs.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
