@@ -206,6 +206,74 @@ these take precedence over the Shapes below where they differ.
   designer's "`now` plus `span`" is
   `Wall::from_nanos(now.as_nanos().saturating_add(span.as_nanos()))`.
 
+## Corrections at jig `9f6f80839` (ruling 285, the ready check of 15.5 of 2026-10-17)
+
+After jig 15.1. These take precedence over the 15.5 bullet of the
+corrections above, and over 15.5's Shape and the `check.rs` sketch
+below, where they differ.
+
+- **The breach in a world:** the reference UI's world does not return
+  `Verdict::Failed` on a breach: its `observe` panics through the
+  referee's `assert_holding` (`tests/client/src/harness/world.rs:529,
+  :531`), with the check's reason. The reference test is in
+  `tests/client/tests/stories.rs`, beside `a_held_chat_is_released`
+  (`:57`), not in `referee.rs`, whose world is a toy `Wire` application
+  that cannot run `stories::held_chat`:
+
+  ```rust
+  #[test]
+  #[should_panic(expected = "jig's check: a decision names a revision never delivered")]
+  fn jig_s_check_fails_a_release_naming_a_revision_never_delivered() {
+      // `held_chat`, its client, then a raw release naming
+      // `Revision { value: 99 }`, run until done: no `Fault::Check`,
+      // no `.faults` (`Outcome.faults` is a count).
+  }
+  ```
+
+  Beside it, a control: `jig_s_check_passes_a_release_naming_the_delivered_revision`.
+- **`Object` and `Delivered`:** no `Proposal` in either: a proposal's
+  decision names no revision (`Ask::Decide { project, on: DecideOn }`,
+  `contract/asks.rs:157`), and `OwnerProposal` carries none. A note is
+  `Object::Note { scope: NoteScope, note: u64 }`, as `EditNote` and
+  `DeleteNote` key it (`translate/asks.rs:683, :701`;
+  `contract/common.rs:233`).
+- **`named` returns a list,** and a task has two revision spaces: an
+  `Amend` (`asks.rs:161`) names its spec's revision as `Task(task)` and
+  its `change.addressed.revision` as `PersonTask(task)`; a `Release`
+  (`asks.rs:159`) and an escalation's `Decide` name the hold's revision
+  as `Escalation(task)`; a priority-only `Amend` (revision `None`,
+  ruling 260) names nothing. A delivered `Task` records its spec's
+  revision, its hold's and its person task's, under those three.
+- **Every delivery feeds the check.** The world gains
+  `Receipt::Document` (fed to `Check::delivered`),
+  `Observation::Decision`, a default `App::decision`, and
+  `World::send_raw`; `Sent` keeps its fields, since three builders
+  outside Files construct it (`tests/ops/src/client/app.rs:482`,
+  `tests/client-protocol/src/front/observe.rs:51`, and temper's
+  `tests/client/src/app.rs:233`, whose `impl App` (`:42`) takes the
+  default `decision` unchanged). The legacy reads deliver too:
+  `ReadValue::Escalation` and `ReadValue::PersonTask`
+  (`tests/client/src/observe.rs:121, :132`) feed `Receipt::Document`
+  as their owner forms do. With the check fed so far alone,
+  `person_confirmation::a_choice_card_and_confirmation_keep_one_platform_reason_input`
+  and `a_words_card_and_confirmation_keep_one_platform_answer_input`
+  (`tests/client/tests/person_confirmation.rs:75, :83`) fail, seed
+  9312, "a decision names a revision never delivered": they are this
+  increment's controls. Every existing story holds under the check; a
+  story it trips is a delivery the referee does not feed: find it, feed
+  it, and list it in the commit body; if the reference UI really sends
+  a revision it never received, block.
+- **Limits:** the check's are constants in the referee, `objects: 256,
+  revisions: 16`; `tests/client/src/test.rs:21` has no such bounds.
+- **The kit's own tests** build their trees through `skein_ui::View`: a
+  bare `Builder` leaves every node `NodeId(0)`, and `acted` then finds
+  no node and returns `None` silently.
+- **Files gain** `tests/client/src/{observe.rs, test.rs,
+  harness/world.rs, harness/mod.rs}` and `tests/client/tests/stories.rs`;
+  `tests/boundary/src/tests/graph.rs:259`'s pin for
+  `jig-client-test-kit` becomes `jig-client, jig-client-test-domain,
+  jig-test-connector, skein-lib, skein-ui` (`:326` stays).
+
 ## The designer's answer of 2026-10-17T17:57Z (15.1's statuses, 15.3's fills)
 
 jig's `client/domain/pages.md`, 4 (the status table and its order),

@@ -1973,6 +1973,20 @@ choice would have been the user's (development.md, 10.4).
      - Done when's third grep at `9f6f80839`: `| wc -l` prints 221.
      - The check's sub-agent: the 16.1 sketch and its test (with `bytes`) clean under clippy; `jig-client-protocol-world` and `jig-client-view`: 625 of 626 focused (the new test, helpers stubbed), 2 of 2 fuzzy.
 
+285. **jig 15.5's Shapes against main** (ready check of jig-15.5).
+     Ruling 285 (plan defect, the ready check of jig 15.5 at jig `9f6f80839`, temper `783d3c84e`): 15.5's Shape and test do not fit the reference UI's world; corrected in `jig/15-helpers.md`, "Corrections at jig `9f6f80839` (ruling 285…)": a breach panics through the referee's `assert_holding` with the check's reason, so the reference test is a `should_panic` in `tests/client/tests/stories.rs` beside `a_held_chat_is_released`, with a control; `Object` and `Delivered` lose `Proposal`, and a note is keyed by `scope`; `named` returns a list over a task's revision spaces; every delivery feeds the check (the legacy `ReadValue::Escalation` and `ReadValue::PersonTask` included), `Sent` keeps its fields, and the two `person_confirmation` tests that the check alone trips are the increment's controls; the check's limits are the referee's constants; the kit's tree tests build through `skein_ui::View`; Files gain the world's `observe.rs`, `test.rs`, `harness/{world,mod}.rs`, `tests/stories.rs`, and the boundary pin. A story the check trips is a delivery the referee does not feed: feed it and list it in the commit body; a revision the reference UI never received, block. 15.5 ready; its re-check follows 15.2's landing, with the default and fuzzy profiles the check did not finish.
+
+     Checked:
+     - `tests/client/src/harness/world.rs:529: fn observe(&mut self, observation: Observation) {`, `:531: self.referee.assert_holding(self.settings.seed);`; `tests/client/tests/stories.rs:57: fn a_held_chat_is_released() {`.
+     - `contract/asks.rs:157: Decide { project: u32, on: DecideOn },`, `:159: Release { project: u32, task: u64, revision: Revision, again: Option<bool> },`, `:161: Amend { project: u32, task: u64, revision: Option<Revision>, change: Box<Amendment>, reason: Text },`.
+     - `translate/asks.rs:683: c::Ask::EditNote { project, note, scope, revision, … }`, `:701: c::Ask::DeleteNote { project, note, scope, revision }`; `contract/common.rs:233: pub enum NoteScope {`.
+     - `tests/client/src/observe.rs:121: ReadValue::Escalation(e) => vec![Receipt::Card {`, `:132: ReadValue::PersonTask(p) => {`.
+     - `Sent { … }` built at `tests/ops/src/client/app.rs:482`, `tests/client-protocol/src/front/observe.rs:51`; temper `tests/client/src/app.rs:42: impl App for Temper {`, `:233: Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None }`; temper uses nothing else of the world's `Receipt`, `Observation` or `App` beyond construction.
+     - `tests/client/tests/person_confirmation.rs:75: fn a_choice_card_and_confirmation_keep_one_platform_reason_input() {`, `:83: fn a_words_card_and_confirmation_keep_one_platform_answer_input() {`.
+     - `tests/client/src/test.rs:21`: the focused world's `jig_client_test_domain::Limits` (watches, notices), no check bounds.
+     - `tests/boundary/src/tests/graph.rs:259: ("jig-client-test-kit", vec!["jig-client-test-domain", "jig-test-connector", "skein-lib"]),`.
+     - The check's sub-agent, with the corrected sketch and wiring: fmt and clippy clean; `jig-client-test-kit` 14 of 14; the world's proof filter 3 of 3 and the control; the fuzzy `random_people_with_held_commits_and_double_press` passes (1.4 s); the workspace's default profile stopped at the two `person_confirmation` tests above (183 of 185 run passed); the rest of the default profile and the fuzzy profile not run.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
