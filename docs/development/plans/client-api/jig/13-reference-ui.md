@@ -334,7 +334,7 @@ carries the client's transport requests and events,
 `jig_client::{Request, Event}`, in place of the link's
 (protocol/client.md, 12: the shell is the application's "loop around
 `jig-client`"; the designer's answer of 2026-10-17).
-Needs: 13.3.
+Needs: 13.3, and jig-13.s2 before the family sides' values cross the client (ruling 205).
 Files: `testing/jig-client-test-domain/src/{domain.rs, boundary.rs,
 route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}` (its 25
 `jig_client_domain` uses in 12 files go to `jig_client::`, as 13.2's
@@ -465,7 +465,7 @@ and 18.6; client.md, 4, 8.3 and 11; line numbers at jig `5274ad08e`):
 
 The family sides' `Out::{Read, Open, Close}` and
 `Send` reach the client as `Read`, `Watch`, `Unwatch` and `Send` under
-their asker, encoded by 13.3's codec, and its tells come back decoded.
+their asker, encoded by 13.3's codec as jig-13.s2 extends it (ruling 205), and its tells come back decoded.
 The root's client limits declare the family owners its sides send, each
 at `jig_client_test_protocol_wire::VERSION` (`jig_client_domain::Limits.owners`,
 jig 12.4; client.md, 8.2); a family message of an owner not declared
