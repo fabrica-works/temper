@@ -1764,6 +1764,7 @@ dependencies = [
  "temper-client-shell-terminal",
  "temper-engine-domain",
  "temper-engine-protocol-forge",
+ "temper-forge-forgejo",
  "temper-forge-setup",
  "temper-forge-setup-shell",
  "temper-protocol-store",

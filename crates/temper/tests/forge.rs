@@ -115,3 +115,96 @@ fn a_termination_signal_kills_the_commands_group_and_ends_the_preparation_interr
     assert!(!state.prepared);
     scratch.remove();
 }
+#[test]
+fn a_second_run_is_refused_while_the_first_holds_the_lock() {
+    let scratch = support::Scratch::new("forge_run_held");
+    let programs = support::owned::scripted(scratch.path());
+    support::owned::finished(scratch.path());
+    let mut first = support::owned::run(scratch.path(), "forgejo").spawn().expect("first run");
+    programs.marker("forgejo", support::WITHIN);
+    let refused = support::owned::run(scratch.path(), "forgejo").output().expect("second run");
+    first.kill().and_then(|()| first.wait()).expect("first stopped");
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(refused.stderr, b"temper forge run: forge 1: forgejo is running or being prepared already\n");
+    scratch.remove();
+}
+#[test]
+fn the_run_replaces_itself_holding_the_lock_as_standard_input() {
+    let scratch = support::Scratch::new("forge_run_exec");
+    let programs = support::owned::scripted(scratch.path());
+    support::owned::finished(scratch.path());
+    let mut run = support::owned::run(scratch.path(), "forgejo").spawn().expect("run starts");
+    let marker = programs.marker("forgejo", support::WITHIN);
+    let stdin = fs::read_link(format!("/proc/{}/fd/0", run.id())).expect("stdin");
+    run.kill().and_then(|()| run.wait()).expect("stopped");
+    assert_eq!(marker.pid, run.id());
+    assert_eq!(stdin, programs.lock("forgejo"));
+    assert_eq!(
+        marker.arguments,
+        [
+            "--work-path",
+            scratch.path().join("forge-1/forgejo").to_str().expect("UTF-8 path"),
+            "--config",
+            scratch.path().join("forge-1/forgejo/app.ini").to_str().expect("UTF-8 path"),
+            "web"
+        ]
+    );
+    scratch.remove();
+}
+#[test]
+fn the_new_process_sees_the_specs_environment_alone() {
+    let scratch = support::Scratch::new("forge_run_environment");
+    let programs = support::owned::scripted(scratch.path());
+    support::owned::finished(scratch.path());
+    let mut run = support::owned::run(scratch.path(), "forgejo").env("LEAKED", "private").spawn().expect("run");
+    let mut marker = programs.marker("forgejo", support::WITHIN);
+    run.kill().and_then(|()| run.wait()).expect("stopped");
+    marker.environment.sort();
+    let directory = scratch.path().join("forge-1");
+    let mut expected = vec![
+        format!("HOME={}/home", directory.display()),
+        "PATH=/usr/bin:/bin".into(),
+        "TZ=UTC".into(),
+        "GIT_CONFIG_NOSYSTEM=1".into(),
+        format!("GIT_CONFIG_GLOBAL={}/home/gitconfig", directory.display()),
+        format!("PWD={}/forgejo", directory.display()),
+    ];
+    expected.sort();
+    assert_eq!(marker.environment, expected);
+    scratch.remove();
+}
+#[test]
+fn the_new_process_holds_no_descriptor_but_the_standard_three() {
+    let scratch = support::Scratch::new("forge_run_descriptors");
+    let programs = support::owned::scripted(scratch.path());
+    support::owned::finished(scratch.path());
+    let mut run = support::owned::run(scratch.path(), "runner").spawn().expect("run");
+    let marker = programs.marker("runner", support::WITHIN);
+    run.kill().and_then(|()| run.wait()).expect("stopped");
+    assert_eq!(marker.descriptors, [0, 1, 2]);
+    assert_eq!(
+        marker.arguments,
+        ["--config", scratch.path().join("forge-1/runner/config.yaml").to_str().expect("UTF-8 path"), "daemon"]
+    );
+    scratch.remove();
+}
+#[test]
+fn no_secret_of_the_state_reaches_a_refusal() {
+    let scratch = support::Scratch::new("forge_run_secret_refusal");
+    let _programs = support::owned::scripted(scratch.path());
+    support::owned::finished(scratch.path());
+    let path = scratch.path().join("forge-1/state");
+    let mut state = temper_forge_setup::state::decode(&fs::read(&path).expect("state")).expect("record");
+    state.prepared = false;
+    support::write_private(&path, temper_forge_setup::state::encode(&state).expose());
+    let refused = support::owned::run(scratch.path(), "forgejo").output().expect("refusal");
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(
+        refused.stderr,
+        b"temper forge run: forge 1: its preparation did not end: run temper forge prepare CONFIG.json 1\n"
+    );
+    for secret in [&state.secrets.secret_key, &state.secrets.internal_token, &state.secrets.jwt_secret] {
+        assert_eq!(skein_lib::bytes::find(&refused.stderr, secret.expose()), None);
+    }
+    scratch.remove();
+}

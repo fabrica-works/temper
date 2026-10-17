@@ -8,9 +8,11 @@ use std::{
 use temper_forge_setup::{
     place::{File, Place},
     prepare::{Exit, Failure, Prepare},
+    run::{self, Refusal},
     setup::Mode,
+    spec::Which,
 };
-use temper_forge_setup_shell::{command, prepare};
+use temper_forge_setup_shell::{command, prepare, run as host};
 /// A command's diagnostic, without any credential contents.
 #[derive(Debug)]
 pub struct Refused {
@@ -78,17 +80,55 @@ fn login(user: u32) -> Result<Box<[u8]>, String> {
     }
     Err(format!("user {user}: no login in /etc/passwd"))
 }
-pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
-    let usage =
-        || Refused { verb: "prepare", number: None, why: "usage: temper forge prepare CONFIG.json FORGE".into() };
-    let [verb, configuration, number] = arguments else {
-        return Err(usage());
-    };
-    if verb != "prepare" {
-        return Err(usage());
+fn run_refusal(why: Refusal, launch: &run::Launch, number: u16) -> String {
+    let prepare = |why: String| format!("{why}: run temper forge prepare CONFIG.json {number}");
+    match why {
+        Refusal::NoRunner => "the setup has no runner".into(),
+        Refusal::NotPrepared => prepare("not prepared".into()),
+        Refusal::Unfinished => prepare("its preparation did not end".into()),
+        Refusal::Versions { forgejo, runner } => {
+            use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+            let recorded =
+                runner.map_or_else(|| text(&forgejo), |runner| format!("{} / {}", text(&forgejo), text(&runner)));
+            let pinned = if launch.runner { format!("{VERSION} / {RUNNER_VERSION}") } else { VERSION.into() };
+            prepare(format!("prepared at {recorded}, this temper pins {pinned}"))
+        }
+        Refusal::Binary { printed } => format!("{} printed {printed:?}, not the pinned release", text(&launch.program)),
     }
+}
+fn run_failure(why: host::Failed, launch: &run::Launch, number: u16) -> String {
+    match why {
+        host::Failed::Refused(why) => run_refusal(why, launch, number),
+        host::Failed::Locked => format!(
+            "{} is running or being prepared already",
+            if launch.which == Which::Forgejo { "forgejo" } else { "runner" }
+        ),
+        host::Failed::Lock(why) => format!("{}: lock: {why}", text(&launch.lock)),
+        host::Failed::State(why) => format!("{}: state {why}", text(&launch.state)),
+        host::Failed::Version(why) => command_error(why),
+        host::Failed::Exec(why) => format!("{}: {why}", text(&launch.program)),
+    }
+}
+pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
+    let usage = || Refused {
+        verb: "prepare",
+        number: None,
+        why: "usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner".into(),
+    };
+    let (verb, configuration, number, which) = match arguments {
+        [verb, configuration, number] if verb == "prepare" => ("prepare", configuration, number, None),
+        [verb, configuration, number, which] if verb == "run" => {
+            let which = match which.to_str() {
+                Some("forgejo") => Which::Forgejo,
+                Some("runner") => Which::Runner,
+                _ => return Err(usage()),
+            };
+            ("run", configuration, number, Some(which))
+        }
+        _ => return Err(usage()),
+    };
     let number = number.to_str().and_then(|n| n.parse::<u16>().ok()).ok_or_else(usage)?;
-    let refused = |why| Refused { verb: "prepare", number: Some(number), why };
+    let refused = |why| Refused { verb, number: Some(number), why };
     let bytes = skein_shell::read_file(Path::new(configuration), super::CONFIG_BYTES).map_err(|why| {
         refused(format!("configuration {}: {}", Path::new(configuration).display(), super::unread(why)))
     })?;
@@ -98,7 +138,7 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
         return Err(refused("it is managed, not owned".into()));
     };
     let directory = std::path::absolute(super::path(&entry.directory)).map_err(|why| refused(why.to_string()))?;
-    if !directory.exists() {
+    if which.is_none() && !directory.exists() {
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
@@ -106,14 +146,17 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
             .map_err(|why| refused(format!("{}: {why}", directory.display())))?;
     }
     let user = skein_shell::effective_user();
-    super::private_root(&directory, user).map_err(|why| refused(format!("{}: {why}", directory.display())))?;
+    if directory.exists() {
+        super::private_root(&directory, user).map_err(|why| refused(format!("{}: {why}", directory.display())))?;
+    }
     let place = Place { directory: directory.as_os_str().as_bytes().into(), user: login(user).map_err(refused)? };
-    prepare::run(
-        &jig_protocol_config::profile(jig_protocol_config::Profile::Small).io,
-        &place,
-        Prepare::new(owned.clone(), place.clone(), None),
-    )
-    .map_err(|why| refused(failure(why, &place)))?;
+    let limits = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
+    if let Some(which) = which {
+        let launch = run::launch(owned, &place, which).map_err(|_| refused("the setup has no runner".into()))?;
+        return Err(refused(run_failure(host::run(&limits, &launch), &launch, number)));
+    }
+    prepare::run(&limits, &place, Prepare::new(owned.clone(), place.clone(), None))
+        .map_err(|why| refused(failure(why, &place)))?;
     Ok(0)
 }
 #[must_use]

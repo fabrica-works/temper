@@ -85,6 +85,10 @@ pub fn scripted(directory: &Path) -> Programs {
         let body = format!(
             r#"#!/bin/sh
 if [ "$1" = --version ]; then echo '{version}'; exit; fi
+if [ "$1" = web ] || [ "$3" = daemon ] || [ "$5" = web ]; then
+    {{ echo $$; printf '%s\n' "$@"; echo ENVIRONMENT; env; }} > '{directory}/{program}.marker'
+    exec sleep 60
+fi
 if [ "$1" = --work-path ]; then shift 4; fi
 base='{directory}'
 if [ -f "$base/{program}.fail" ] && [ "$1" = "$(cat "$base/{program}.fail")" ]; then echo broken >&2; exit 1; fi
@@ -132,4 +136,136 @@ pub fn finished(directory: &Path) {
         },
     };
     super::write_private(&root.join("state"), state::encode(&state).expose());
+}
+
+pub struct Marker {
+    pub pid: u32,
+    pub arguments: Vec<String>,
+    pub environment: Vec<String>,
+    pub descriptors: Vec<u32>,
+}
+impl Programs {
+    #[must_use]
+    pub fn lock(&self, program: &str) -> PathBuf {
+        self.directory.join(format!("forge-1/{program}.lock"))
+    }
+    pub fn marker(&self, program: &str, within: Duration) -> Marker {
+        let clock = skein_shell::Clock::new();
+        let deadline = clock.now().now.saturating_add(within);
+        loop {
+            if let Ok(text) = fs::read_to_string(self.directory.join(format!("{program}.marker"))) {
+                let mut lines = text.lines();
+                if let Some(pid) = lines.next().and_then(|line| line.parse::<u32>().ok())
+                    && fs::read_to_string(format!("/proc/{pid}/comm")).is_ok_and(|name| name.trim() == "sleep")
+                {
+                    let arguments =
+                        lines.by_ref().take_while(|line| *line != "ENVIRONMENT").map(String::from).collect();
+                    let environment = lines.map(String::from).collect();
+                    let mut descriptors: Vec<_> = fs::read_dir(format!("/proc/{pid}/fd"))
+                        .expect("descriptors")
+                        .map(|entry| {
+                            entry.expect("fd").file_name().to_str().expect("number").parse().expect("fd number")
+                        })
+                        .collect();
+                    descriptors.sort_unstable();
+                    return Marker { pid, arguments, environment, descriptors };
+                }
+            }
+            assert!(clock.now().now < deadline, "process execs sleep within bound");
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+}
+#[must_use]
+pub fn run(directory: &Path, program: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
+    command.args(["forge", "run", "config.json", "1", program]).current_dir(directory);
+    command
+}
+/// A process proof's child, reaped even when an assertion fails.
+pub struct Running {
+    child: std::process::Child,
+    log: PathBuf,
+}
+impl Running {
+    #[must_use]
+    pub fn start(directory: &Path, program: &str) -> Self {
+        let log = directory.join(format!("{program}.log"));
+        let output = fs::File::create(&log).expect("log");
+        let child =
+            run(directory, program).stdout(output.try_clone().expect("log clone")).stderr(output).spawn().expect("run");
+        Self { child, log }
+    }
+    pub fn declared(&mut self) {
+        let clock = skein_shell::Clock::new();
+        let deadline = clock.now().now.saturating_add(Duration::from_secs(30));
+        loop {
+            let text = fs::read_to_string(&self.log).expect("runner log");
+            if text.contains("declared successfully") {
+                return;
+            }
+            assert!(self.child.try_wait().expect("status").is_none(), "runner exited: {text}");
+            assert!(clock.now().now < deadline, "runner did not declare: {text}");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    pub fn stop(mut self) {
+        self.kill();
+    }
+    fn kill(&mut self) {
+        let _ = self.child.kill();
+        self.child.wait().expect("reaped");
+    }
+}
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+pub fn answer(port: u16, path: &str, token: Option<&str>) -> std::io::Result<serde_json::Value> {
+    use std::io::{Read, Write};
+    let mut socket =
+        std::net::TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), std::time::Duration::from_millis(100))?;
+    socket.set_read_timeout(Some(std::time::Duration::from_secs(1)))?;
+    let auth = token.map_or_else(String::new, |token| format!("Authorization: token {token}\r\n"));
+    write!(socket, "GET {path} HTTP/1.0\r\nHost: 127.0.0.1\r\n{auth}Connection: close\r\n\r\n")?;
+    let mut text = String::new();
+    socket.take(1 << 20).read_to_string(&mut text)?;
+    let (head, body) = text.split_once("\r\n\r\n").ok_or(std::io::ErrorKind::InvalidData)?;
+    if !head.starts_with("HTTP/1.0 200 ") && !head.starts_with("HTTP/1.1 200 ") {
+        return Err(std::io::ErrorKind::InvalidData.into());
+    }
+    serde_json::from_str(body).map_err(std::io::Error::other)
+}
+#[must_use]
+pub fn await_answer(port: u16, path: &str, token: Option<&str>) -> serde_json::Value {
+    let clock = skein_shell::Clock::new();
+    let deadline = clock.now().now.saturating_add(Duration::from_secs(30));
+    loop {
+        if let Ok(value) = answer(port, path, token) {
+            return value;
+        }
+        assert!(clock.now().now < deadline, "{path} did not answer");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+#[must_use]
+pub fn prepared_processes(directory: &Path) -> u16 {
+    let forgejo = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO");
+    let runner = std::env::var_os("TEMPER_FORGEJO_RUNNER").expect("TEMPER_FORGEJO_RUNNER");
+    let port = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
+    configuration(
+        directory,
+        &Names {
+            forgejo: Path::new(&forgejo),
+            runner: Some(Path::new(&runner)),
+            port,
+            bot: "temper-bot",
+            person: "ada",
+            orgs: &["workshop"],
+        },
+    );
+    let prepared = prepare(directory, 1);
+    assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
+    port
 }

@@ -147,3 +147,29 @@ fn forge_prepare_makes_an_owned_forge_then_remakes_nothing() {
 fn fs_read(path: &std::path::Path) -> Vec<u8> {
     std::fs::read(path).expect("prepared file")
 }
+
+#[test]
+fn a_prepared_forge_runs_forgejo_and_its_runner_once_each() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_run_real");
+    let port = owned::prepared_processes(scratch.path());
+    let forgejo = owned::Running::start(scratch.path(), "forgejo");
+    let version = owned::await_answer(port, "/api/v1/version", None);
+    assert_eq!(
+        version["version"].as_str().expect("version").split('+').next(),
+        Some(temper_throwaway_forgejo::VERSION)
+    );
+    let token = std::fs::read_to_string(scratch.path().join("forge-1/admin_token")).expect("admin token");
+    let admin = owned::await_answer(port, "/api/v1/user", Some(token.trim()));
+    assert_eq!(admin["login"], "temper-admin");
+    assert_eq!(admin["is_admin"], true);
+    let mut runner = owned::Running::start(scratch.path(), "runner");
+    runner.declared();
+    let refused = owned::run(scratch.path(), "forgejo").output().expect("second run");
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(refused.stderr, b"temper forge run: forge 1: forgejo is running or being prepared already\n");
+    runner.stop();
+    forgejo.stop();
+    assert!(owned::answer(port, "/api/v1/version", None).is_err());
+    scratch.remove();
+}

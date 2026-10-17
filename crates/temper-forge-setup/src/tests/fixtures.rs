@@ -236,3 +236,27 @@ impl Run {
         );
     }
 }
+pub fn prepared() -> crate::state::State {
+    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    crate::state::State {
+        forgejo: VERSION.as_bytes().into(),
+        runner: Some(RUNNER_VERSION.as_bytes().into()),
+        prepared: true,
+        secrets: secrets(),
+    }
+}
+pub fn launch(which: crate::spec::Which) -> crate::run::Launch {
+    crate::run::launch(&owned(), &place(), which).expect("configured process")
+}
+pub fn suffixed_line(which: crate::spec::Which, suffix: &str) -> Box<str> {
+    let line = line(which);
+    let mut writer = Writer::new(line.len().checked_add(suffix.len()).unwrap());
+    writer.put(line.as_bytes()).unwrap();
+    writer.put(suffix.as_bytes()).unwrap();
+    let bytes = writer.finish();
+    let mut chunks = bytes.utf8_chunks();
+    let chunk = chunks.next().unwrap();
+    assert!(chunk.invalid().is_empty());
+    assert!(chunks.next().is_none());
+    chunk.valid().into()
+}
