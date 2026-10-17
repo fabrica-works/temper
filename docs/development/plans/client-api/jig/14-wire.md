@@ -956,8 +956,8 @@ Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
   origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-14\.[0-9]'` prints 5 (ruling 222).
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-14\.[0-9]' | sort -u | wc -l` prints 5 (ruling 222).
 - The replaced records are gone: `git -C ~/src/rust/jig grep -n -E
   '^(record|enum) (Write|TakeOver|MarkSeen|SeenReplies|MadeWords)\b'
   origin/main -- crates/jig-client-protocol-wire/schema` prints nothing.

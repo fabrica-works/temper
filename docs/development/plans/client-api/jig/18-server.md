@@ -393,8 +393,8 @@ pub struct Bundle {
 Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig log origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-18\.'` prints 3.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-18\.' | sort -u | wc -l` prints 3.
 - `git -C ~/src/rust/jig grep -n -E 'clients\.listener|"clients"\]\["listener'
   origin/main -- crates testing tests` prints nothing.
 - In a worktree of jig at `origin/main`, `heavy cargo nextest run -p

@@ -690,8 +690,8 @@ Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
   origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-15\.'` prints 6.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-15\.' | sort -u | wc -l` prints 6.
 - `git -C ~/src/rust/jig ls-tree --name-only origin/main
   crates/jig-client/src/ | grep -c -E '^crates/jig-client/src/(facts|words|shapes|thread)\.rs$'`
   prints 4.

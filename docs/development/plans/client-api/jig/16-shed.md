@@ -479,8 +479,8 @@ Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
   origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-16\.'` prints 5.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-16\.' | sort -u | wc -l` prints 5.
 - The README's "Done when" 5 grep prints nothing.
 - `git -C ~/src/rust/jig grep -l -E
   '\b(StartChat|SetGoal|Prioritise|GoalExecutor|Disposal|DisposalIssue|TakeOver|ConversationLine|GoalLine|OfferedCharters|BoundsGoal|GoalProcedure|ReplyPosition|MadeChat|MadeGoal|RefusalDisposal|LimitConversationWords|ReadConversations|ReadGoals|SubjectGoals|NoteScopeGoal)\b'

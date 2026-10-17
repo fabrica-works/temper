@@ -800,8 +800,8 @@ read the body up to the route's bound (413 past it), then hand the component Exc
 Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig log origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-17\.'` prints 5.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-17\.' | sort -u | wc -l` prints 5.
 - `git -C ~/src/rust/jig grep -n -w -e Listen -e skein_http origin/main
   -- crates/jig-protocol-engine-clients/src` prints nothing.
 - `git -C ~/src/rust/jig grep -n -e 'sign-in/provider' -e

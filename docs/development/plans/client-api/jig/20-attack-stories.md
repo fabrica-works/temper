@@ -391,8 +391,8 @@ fetch("http://{address}<prefix>/v1/request", {method: "POST", credentials: "incl
 Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig log origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-20\.'` prints 5.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-20\.' | sort -u | wc -l` prints 5.
 - `git -C ~/src/rust/jig ls-tree -d --name-only origin/main
   testing/jig-client-fake-person-browser` prints one line.
 - `git -C ~/src/rust/jig log origin/main --all-match

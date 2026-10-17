@@ -1822,6 +1822,13 @@ choice would have been the user's (development.md, 10.4).
      3. **The step's stop stands:** Shape 3's 90 minutes count from your start (about 16:18Z): what is not done by about 17:48Z waits, and you land what is done. A missed 4 s is a guide missed: the landing stands, and the report names the gate's time and its three slowest tests.
      4. **Unchanged:** the session file's Files, Size and Don't; no assertion, case, seed or story dropped; ruling 269.
 
+271. **jig sessions' Step counts count names** (plan defect, jig 14.5's block of 2026-10-17T17:12:29Z).
+     Ruling 271 (plan defect, jig 14.5's block of 2026-10-17T17:12:29Z): accepted; jig 14 is done. The count counts commits, and an increment may land in two (14.4's fixture repair `130c0fd61` and its `Create` `542cd8cfd`, both `Step: jig-14.4`, rulings 264 and 268). It counts distinct names now, as the README's Done-when 10 does (`sort -u`).
+
+     1. **The sessions' Step counts** in `jig/14-wire.md` and `jig/15-helpers.md` to `jig/20-attack-stories.md` read `| grep '<pattern>' | sort -u | wc -l`, in place of `| grep -c '<pattern>'`; the counts they print are unchanged.
+     2. **jig 14's** prints 5 on `origin/main` (below): mark the session done.
+     3. **Unchanged:** the landed history; README Done-when 10; jig 14's other Done-when commands, which 14.5's log shows passed.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -574,8 +574,8 @@ pub fn take(route: &Route<'_>, path_and_query: &[u8]) -> Option<Taken>;
 Each command runs once, after the session's last increment lands.
 
 - `git -C ~/src/rust/jig log origin/main --grep='^Plan: client-api$'
-  --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-19\.'` prints 5.
+  --format='%(trailers:key=Step,valueonly,separator=)' | grep
+  '^jig-19\.' | sort -u | wc -l` prints 5.
 - `git -C ~/src/rust/jig show origin/main:Cargo.lock | grep -o
   'skein.git#[0-9a-f]*' | sort -u` prints one line, the commit of jig
   12.2's move, and with `<skein-01.s2>` the commit of "Choices"'
