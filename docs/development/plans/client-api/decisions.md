@@ -1439,6 +1439,13 @@ choice would have been the user's (development.md, 10.4).
      5. **Bound:** at most 10 lines of client production in all, counted in ruling 225's Size (4,331 now, aim 4,500, stop 5,000); past them, a block.
      6. **Unchanged:** ruling 227's engine lines (two of 10); no core production change (ruling 226); 21.2's Proof; the 06:20:26Z steer's point 1. The commit body names the fixture files outside `tests/ops/src/joint/**` (ruling 228, point 2), as the report lists them.
 
+231. **temper 04.1 needs temper 03.4, not whole temper 03** (steer of 2026-10-17T07:53Z).
+     Ruling 231, plan defect (the director's question of about 07:50Z: temper-04.1 `ready` since 2026-10-16T17:53Z, not started). temper 04.1 needs jig 09.4 and temper 03.4, not whole temper 03: the README's table now says "04.1: temper 03.4 (ruling 231)", and `temper/04-engine.md`'s 04.1 "Needs: jig 09.4 … and temper 03.4 (its repin past jig 09.4), not temper 03.5 or 03.6". Ruling 143, point 4, said it: "temper 04 starts after temper 03.4's repin past jig 13.2, so it waits on nothing more"; `context.md`, line 18, read "needs whole Temper 03".
+
+     - 04.1 names nothing of 03.5 or 03.6, and shares no file with them (03.5: `03-client.md:577-604`; 03.6: `:687-694`); temper's jig pin `c92d4a09d` (jig 13.2) holds jig 09.4's `3f2ae98ad` (`git merge-base --is-ancestor` succeeds), so 04.1 makes no repin and leaves `Cargo.lock` alone (04-engine.md, ruling 188). Whichever of 04.1 and 03.5 lands second rebases.
+     - Most of 04.1 is on `main` already (rulings 164, 169, 188): `Limits.templates` (`temper-engine-domain/src/limits.rs:54`, `:116`), `templates: jig.core.templates` (`temper-service/src/limits.rs:278`), `ENGINE`'s `"templates"` (`temper-service/src/tests/fixtures.rs:46`, `:68`, `:445`), `What::Operations` (`startup/problems.rs:98`, `:162`), `("people.operations", 5)` (`crates/temper/tests/support/forgejo.rs:170`), `STORE_VERSION` 2, the walking world's `templates`. What a read of `main` found left: the tests `the_example_engine_keeps_jigs_chat_and_goal_templates` and `a_chats_member_is_refused_as_unknown_naming_its_path`, and the `Grace` and `Operations` rows of `jig_refusals_print_words` (`crates/temper-service/src/tests/startup.rs:117-140`). Grep each of 04.1's names on `main` first, and do only what is missing; a Shape item already on `main` is no question.
+     - Unchanged: 04.2 to 04.4's own Needs (jig 22, jig 16, jig-13.s1); the fence (jig 14 after jig 21's last landing); 04.1's Size (40 lines).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

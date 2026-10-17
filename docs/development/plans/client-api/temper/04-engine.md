@@ -141,7 +141,8 @@ Scope: jig's two templates in the configurations temper writes, in
 place of the `chats` member, and jig's new core limit on templates
 taken by temper's engine root (`configuration.md`, 2 and 8; jig 09.1).
 Needs: jig 09.4 (jig 09's last increment: `templates` and the
-policies' overrides; temper 03 is the session's start).
+policies' overrides) and temper 03.4 (its repin past jig 09.4), not
+temper 03.5 or 03.6 (ruling 231).
 Files (temper-03.3 carried `Limits.templates`, `core_limits` and the
 service's `templates: jig.core.templates`, ruling 164, and `ENGINE`'s `templates`
 at `fixtures.rs:46`, :68 and :441, ruling 169: 04.1 does what remains.
