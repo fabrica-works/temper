@@ -530,6 +530,13 @@ run are appended after "For the user".
        stop on a question again, with the count by file.
      - Unchanged: the 18 facts; the mask's first-appearance rule; ruling 116's 600 for 02.2.
 
+125. **Size tolerance 3.5, codec 4.5** (steer of the check of 2026-10-17T00:28Z).
+     Ruling 125, process, from the check of 2026-10-17T00:28Z: the Size tolerance is 3.5 times a Size and 4.5 times a
+     "(codec)" Size (README "Sizes", which ruling 102 set at 2.6 and 3). Five Size stops (rulings 101, 102, 113, 116, 121)
+     were all granted, at 2.2 to 4.4 times; each ended a session's turn. A ruling's own number (116: 02.1 at 1100, 02.2 at
+     600; 121: 01.3 at 720; 124: 02.1 at 1160) stands where it is larger. Unchanged: the count by file in each report; the
+     stop past the tolerance; never trim a doc comment, a test or the formatting to meet a Size.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

@@ -145,12 +145,14 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   tools/forgejo-conformance/facts.txt` prints nothing. A difference
   these fixes do not cover is a question. This takes the place of the
   session files' "Byte-stability" question, until the run ends.
-- **Sizes (ruling 102).** An increment of this plan lands within 2.6
-  times its Size without asking, a Size marked "(codec)" within 3 times;
-  its report gives the count by code-organization.md 6's command, by
-  file. Past that, it stops on a question, as implementer.md 8.6 says.
-  This takes the place of 8.6's twice and 2.5 times, for every session
-  of this plan, until the run ends. Unchanged: never trim a doc comment,
+- **Sizes (rulings 102 and 125).** An increment of this plan lands
+  within 3.5 times its Size without asking, a Size marked "(codec)"
+  within 4.5 times; a ruling that gives an increment its own number
+  keeps it where it is larger. Its report gives the count by
+  code-organization.md 6's command, by file. Past that, it stops on a
+  question, as implementer.md 8.6 says. This takes the place of 8.6's
+  twice and 2.5 times, and of ruling 102's 2.6 and 3 times, for every
+  session of this plan, until the run ends. Unchanged: never trim a doc comment,
   a test or the formatting to meet a Size; a split increment's parts
   count together.
 - **The component fixture's HTTP 500 (ruling 114).** The conformance
