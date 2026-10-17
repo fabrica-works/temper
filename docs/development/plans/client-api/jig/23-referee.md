@@ -199,10 +199,12 @@ Files:
   `revisions` (`TaskRecord.revisions.spec`, `.hold`), `Named` from their
   inbound asks and named actions; the testing application's adapter also
   from the test connector's durable `ProcedureState` (Choices).
-- The users of `referee::Task`'s literal, edited to the new form:
-  `tests/core/tests/referee.rs:51` (`task`) and
-  `tests/core/src/observations.rs:138` (`task`), which the testing
-  application's, `ops`'s and the one-process adapters reuse.
+- The users of `referee::Task`'s literal, edited to the new form
+  (at jig `795ca6bc3`, ruling 209): `tests/core/tests/referee.rs:56`
+  (`task`), `tests/core/src/observations.rs:140` (`task`), which the
+  testing application's, `ops`'s and the one-process adapters reuse,
+  `testing/jig-conformance/src/referee/compound/tests.rs:6` (`task`)
+  and `tests/conformance/tests/referee.rs:219` (`position_snapshot`).
 - `tests/core/tests/referee/revisions.rs` (new), and
   `revisions_referee_cases()` in `tests/core/tests/referee.rs`.
 Shape:

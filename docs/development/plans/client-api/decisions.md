@@ -1200,6 +1200,14 @@ choice would have been the user's (development.md, 10.4).
      - jig 13.4: an entrance refusal reaches its root as the client's `jig_client_domain::contract::Answer::Refused(why)`, and the root gives the family's asker `family::Answer::Refused(EntranceRefusal::new(why)...)`, as `tests/ops/src/joint/front.rs:526-530` does for temper's. If 13.4's draft already sends `Refused` through 13.s2's codec, it builds it so instead; nothing else in 13.4 changes.
      - Unchanged: `EntranceRefusal`, jig's client wire (`v8::Refused`) and its link translation; the Don't list of 13.s2 (no change to `jig_test_connector` or its schema; no field dropped, defaulted or inferred). A further place that would put a jig refusal in the test client wire gets the same answer: no record; name it in the commit body.
 
+209. **jig 23.2: own-stop release waits for the designer; Task literal users** (interim, jig 23.2's block of 2026-10-17T02:15:23Z).
+     Ruling 209 (interim, jig 23.2; the question went to the designer at 2026-10-17T02:27Z): neither option A nor option B yet. Whether words that release a task the party stopped must name the hold's revision is a design question: jig's `domain/tasks.md`, 522-526, says "a release its hold's (5.5), whoever makes it", `domain/people.md`, 276-277, lists "words that release a task the party stopped" among what a compound request holds, and `Ask::Say { release }` (`crates/jig-domain-people/src/boundary.rs:272`) carries no revision. The designer's answer decides between an exemption in the referee and a revision carried by the words; it comes as a ruling.
+
+     - Until it comes, 23.2 goes on only with what does not rest on it: the rule for spec revisions, for holds released by a named `Release`, and for amendment proposals; the adapters' `Named` from inbound asks and named actions; the Task-literal users; its tests but the story `tests/core/tests/peers.rs:197` (`a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt`).
+     - Add no exemption, field or variant for a release by words (no `Task.stopper`, no `Observed::OwnStopRelease`, no flag on `Hold::StoppedBy`), and change nothing in `jig-domain-people` or `jig-domain-tasks`. 23.2 does not run `land` until the answer's ruling; when nothing else is left, it reports so and waits.
+     - The users of `referee::Task`'s literal, at jig `795ca6bc3`, are four, not two: `tests/core/tests/referee.rs:56`, `tests/core/src/observations.rs:140`, `testing/jig-conformance/src/referee/compound/tests.rs:6` and `tests/conformance/tests/referee.rs:219` (`position_snapshot`). Refresh any further literal the compiler names, and list it in the commit body.
+     - Unchanged: the rest of 23.2's session file; its second question (a procedure's named revision) stands as written.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
