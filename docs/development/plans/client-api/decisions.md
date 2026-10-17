@@ -2004,6 +2004,19 @@ choice would have been the user's (development.md, 10.4).
      - `testing/jig-client-test-view/src/family.rs:20: pub const PART_NODES: u32 = 39;`, `:32: pub fn page(`; `src/root.rs:63: family::page(&mut b, root.first(), view.first_words, view.words, &mut view.first);`; `Cargo.toml:17-19: [dev-dependencies] … jig-client.workspace = true`; `tests/boundary/src/tests/graph.rs:278: ["jig-client-domain", "jig-client-test-domain", "jig-client-view", "skein-lib", "skein-ui"]`; `tests/client/src/harness/observation.rs:52: Answer { attempt: Token, final_answer: bool, words: Option<(u64, u64)> },`.
      - The checks' sub-agents: 15.5 with ruling 285's and these corrections, default 4,179 of 4,179, fuzzy 111 of 111, the two controls pass, the boundary's vocabulary tests pass after the rename; 15.6 by grep alone (no sketch compiled); 16.1 and 16.2's sketch clean under clippy after the corrections, default 1,122 of 1,123 over four crates (the new joint test, its helpers stubbed), fuzzy 37 of 37.
 
+288. **jig 16.1: the transitional handlers take jig's default templates' labels** (plan defect, jig-16.1's block of 2026-10-17T22:31:24Z).
+     Ruling 288 (plan defect, jig 16.1's block of 2026-10-17T22:31:24Z): the engine's two transitional handlers make their tasks under jig's default templates' labels, within 16.1; the reference UI keeps sending `StartChat` and `SetGoal` until 16.3, as planned. The plan missed that 16.1's list, which queries the chat template's label as the design says ("the person's tasks of the chat template's label", pages.md, 4), cannot find a chat the transitional `StartChat` makes under label 0; 16.2's ended goals read would miss `SetGoal`'s goals the same way.
+
+     The design gives jig's default chat and goal templates labels 1 and 2 (`domain/core.md`, 7.3: "| label | 1 | 2 |"), which no project's policy overrides ("never the flags, the label or tracked, which are the shape's identity", core.md, 7.3). Both handlers already make their tasks with those templates' flags; their label is the one field that differs. The engine reads no template to do it (`domain/engine.md`, 11.1: "No decision reads one").
+
+     Not chosen: moving 16.3's chat start into 16.1 (the report's proposal): it moves the scripted engine's `Create`, the front's chat counter and their stories into 16.1 unchecked by a ready check, and leaves `SetGoal`'s label to 16.2. Not chosen either: a fixture whose chat template has label 0, which would leave the reference UI's list empty of its own chats on `main` with jig's defaults until 16.3.
+
+     1. **Change the two lines** in `crates/jig-domain-core/src/routing/parties.rs`, now in 16.1's Files: `label: 0` at `:229` (`StartChat`'s task) becomes `label: 1`, and `label: 0` at `:170` (`SetGoal`'s task) becomes `label: 2`, each with a one-line comment naming 16.5, which removes both handlers.
+     2. **Keep your focused test** `starting_a_chat_assigns_the_chat_templates_label` (`tests/client-protocol/src/front/effects.rs`), and add beside it `setting_a_goal_assigns_the_goal_templates_label`, which sets one goal through the people child's `SetGoal` and reads the expected label from `jig_core_world::fixtures::templates()` (template 2). Run both once.
+     3. **Then run the proof once.** Ruling 229's count for this proof stands at 2 of 6: a run failing at a later point is progress; the same point again, or another cause in production code outside 16.1's Files, is a block with the logs.
+     4. **A further test that pinned label 0** for a task `StartChat` or `SetGoal` made: refresh it to the template's label, and list it in the commit body.
+     5. **Unchanged:** 16.1's Proof, its 1 s bound and its other Files; the reference UI reads the chat label from `me` and never writes it as a number; no referee's or judge's check changes; 16.2 and 16.3 as planned.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

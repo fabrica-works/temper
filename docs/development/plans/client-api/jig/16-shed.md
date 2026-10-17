@@ -253,6 +253,28 @@ are under `crates/jig-client-view/src/`.
   refusal and the engine's compound; the users' edits listed above count
   apart, as one count in the report.
 
+## Corrections after jig 16.1's block of 2026-10-17T22:31:24Z (ruling 288)
+
+These take precedence over the corrections above and the Shapes below
+where they differ.
+
+- **16.1, Files** gain the engine's two transitional handlers in
+  `crates/jig-domain-core/src/routing/parties.rs`: the task `StartChat`
+  makes (`label: 0` at `:229`) takes label 1, and the task `SetGoal`
+  makes (`label: 0` at `:170`) takes label 2: jig's default chat and goal
+  templates' labels (jig's `domain/core.md`, 7.3: "| label | 1 | 2 |"),
+  as their flags already are those templates' flags. Each line gets a
+  comment naming 16.5, which removes both handlers. The engine reads no
+  template for it (`domain/engine.md`, 11.1: "No decision reads one").
+- **16.1, Test shape** gains two focused tests in
+  `tests/client-protocol/src/front/effects.rs`: the implementer's
+  `starting_a_chat_assigns_the_chat_templates_label`, and
+  `setting_a_goal_assigns_the_goal_templates_label`, each reading the
+  expected label from `jig_core_world::fixtures::templates()`.
+- **16.2 and 16.3:** no change. 16.2's ended goals find the goals the
+  goal form's `SetGoal` makes; 16.3 moves the forms to `shapes`, whose
+  tasks carry the template's own label.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
