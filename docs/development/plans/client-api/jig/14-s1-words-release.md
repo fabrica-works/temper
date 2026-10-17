@@ -52,3 +52,45 @@ Ruling 210's point 4 stands; these join its Files, Shape and Tests:
 - jig tests use `match`, not `matches!` (disallowed in jig's tests).
 Any further user of the removed fields is refreshed the same way and
 listed in the commit body.
+
+## Corrections at jig `a37b5fe12` (ruling 265, the re-check after 14.3)
+
+A compile of the change in a scratch worktree found these users of the
+removed fields; each joins the Files where ruling 210's point 4 does not
+already name it:
+- Production: `jig-domain-people` `boundary.rs:272` (`Ask::Say`), :443
+  (`Outcome::Said`), `compound.rs:13, 27`, `domain.rs:1290, 1332, 1385`
+  (`Expected::Say`); `jig-protocol-store/src/codec/people/` `asks.rs:490-492,
+  667-669`, `compound.rs:35-38, 78-79`, `outcomes.rs:85-86, 197-199,
+  315-321`; `jig-protocol-engine-clients/src/translate/` `asks.rs:18`
+  and `operations.rs:129` (14.3's `release: false`); `jig-domain-tasks`
+  `boundary.rs:1378, 1380, 1651`, `domain.rs:619-623`, `inbox.rs:214-251`,
+  `compound.rs:297-305`; `jig-domain-core` `sibling_routes.rs:59, 68, 99,
+  114`, `routing/tasks.rs:153-155`, `routing/people.rs:410`,
+  `routing/party_controls.rs:273-277, 306` (`say_request`),
+  `compound.rs:204-217`.
+- The fake parties' `Ask::Say { release: Option<u64> }`
+  (`testing/jig-fake-parties/src/lib.rs:82-83`, translator :408) goes
+  too, with its users `tests/core/src/peers.rs:216`,
+  `tests/core/tests/peers.rs:215`, `tests/channel/src/world.rs:284`,
+  `tests/channel/src/referee.rs`, `tests/channel/src/fixtures.rs:414`,
+  `tests/conformance/src/actions.rs:41`, `tests/core/src/faults.rs:56`.
+- Tests: `tests/core/src/observations.rs:734`, `tests/client/src/joint/truth.rs:197`,
+  `tests/client/src/joint/wire/{answers.rs, outcomes.rs}` (:116, :170),
+  the engine-clients component's `src/tests/fixtures.rs:271`,
+  `tests/fixtures/answers/outcomes.rs:95`, `tests/compound.rs:24`; the
+  `Event::Message { release }` tests of `jig-domain-core` and
+  `jig-domain-tasks` (`tests/revisions.rs:595, 611, 673` among them) and
+  `tests/tasks/tests/`. `simulation.rs:512` is
+  `tests/people/tests/simulation.rs`: its test
+  `words_to_a_stopped_chat_release_it_in_one_request` asserts the rule
+  this step removes, and becomes `words_to_a_stopped_chat_release_nothing`.
+- `inbox::message`'s `#[expect(clippy::too_many_arguments)]` stays (8
+  arguments after); its reason loses "atomic release choice".
+- Downstream: `tests/engine/domain/tests/forge_routes.rs`'s `Ask::Say`
+  is at :2070; temper's `tests/conformance/src/stories.rs:220, 237`,
+  `tests/system/src/world.rs:244`, `tests/system/src/composed.rs:391,
+  441-442`, `tests/system/tests/composed.rs:39` join point 5's sites.
+Checked: with these edits, `jig-protocol-config`, `jig-protocol-store`,
+`jig-store-codecs-world`, `jig-domain-people`: 473 of 473 (default),
+14 of 14 (fuzzy).

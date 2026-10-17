@@ -1773,6 +1773,9 @@ choice would have been the user's (development.md, 10.4).
      5. **14.4 may start now:** ruling 262 (jig `ad3b26d04`, temper `510db3bd4`) answered the role executor.
      6. **Unchanged:** README "Test time"'s Never list (no `global-timeout`, slow period or per-test ceiling raised; no focused test moved to the fuzzy suite); the steer of 15:00:35Z, points 1 and 3.
 
+265. **jig-14.s1's Files against main** (ready check of jig-14.s1).
+     Ruling 265 (plan defect, the re-check of jig-14.s1 at jig `a37b5fe12`, after 14.3; temper `c1111fcc2`): 14.s1's Files miss users of the removed release fields that a compile of the change found, in `jig-domain-people`, the store's people codec, the engine-clients translators (14.3's `release: false`), `jig-domain-tasks`, `jig-domain-core`, the fake parties' `Ask::Say { release }` and its users, and their tests; corrected in `jig/14-s1-words-release.md`, "Corrections at jig `a37b5fe12`". `tests/people/tests/simulation.rs`'s `words_to_a_stopped_chat_release_it_in_one_request` becomes `words_to_a_stopped_chat_release_nothing`. temper's further sites join ruling 210's point 5. Unchanged: ruling 210's point 4 and ruling 249's corrections; Size at most 150 production lines. Checked by a read-only sub-agent with the edits applied in a scratch worktree: 473 of 473 default and 14 of 14 fuzzy in the four crates it reached; the rest not compiled. Refresh any further user of the removed fields, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
