@@ -260,3 +260,22 @@ pub fn suffixed_line(which: crate::spec::Which, suffix: &str) -> Box<str> {
     assert!(chunks.next().is_none());
     chunk.valid().into()
 }
+impl Run {
+    pub fn kept_tokens(&mut self) {
+        use crate::{
+            place::File,
+            reconcile::{Event, Need, Reply},
+        };
+        use temper_forge_forgejo::{document::Document, request::Request};
+        for next in [File::GitToken, File::User] {
+            assert_eq!(
+                self.step(Event::Read(Some(secret(b"bot-token")))),
+                Need::Send { request: Request::User, token: secret(b"bot-token") }
+            );
+            assert_eq!(
+                self.step(Event::Reply(Reply::Document(Document::User(person(b"temper", b"temper:bot"))))),
+                Need::Read(next)
+            );
+        }
+    }
+}

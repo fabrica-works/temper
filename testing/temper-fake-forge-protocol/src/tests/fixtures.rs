@@ -263,13 +263,16 @@ impl Harness {
         panic!("direct reply")
     }
     pub fn ask(&mut self, method: &[u8], path: &[u8], body: &[u8]) {
+        self.ask_as(method, path, body, TOKEN);
+    }
+    pub fn ask_as(&mut self, method: &[u8], path: &[u8], body: &[u8], token: &[u8]) {
         let digits = skein_lib::Decimal::of(body.len().try_into().expect("length"));
         let parts = [
             method,
             b" ",
             path,
             b" HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAuthorization: token ",
-            TOKEN,
+            token,
             b"\r\nContent-Length: ",
             digits.as_bytes(),
             b"\r\n\r\n",
@@ -339,5 +342,26 @@ impl Harness {
             }
         }
         panic!("domain event delivered");
+    }
+}
+
+pub fn setup_harness() -> Harness {
+    let mut h = Harness::new(config());
+    let admin = h.service.setup_mut().account(b"temper-admin", true, b"");
+    h.service.setup_mut().token(admin, b"setup-admin", &[b"all"], Secret::new(boxed(TOKEN)));
+    h.service.setup_mut().account(b"temper", false, b"temper:bot");
+    h
+}
+pub fn make_setup_token(h: &mut Harness) -> temper_forge_forgejo::document::AccessToken {
+    h.ask(b"POST", b"/api/v1/admin/users/temper/tokens", br#"{"name":"temper-api","scopes":["read:user"]}"#);
+    assert_eq!(h.status(), 201);
+    // The fake and the world share the codec's vocabulary, without another JSON reader.
+    let token = h.service.setup().issued().last().expect("token made");
+    temper_forge_forgejo::document::AccessToken {
+        id: token.id,
+        name: token.name.clone(),
+        scopes: token.scopes.clone(),
+        last_eight: Box::new([]),
+        value: Some(token.secret.clone()),
     }
 }

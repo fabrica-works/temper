@@ -43,6 +43,7 @@ pub struct Server {
     json_down: Queue<Down>,
     decoder: Option<documents::BodyDecoder>,
     user: u64,
+    user_scope: bool,
     request: Option<Request>,
     select: response::Select,
     range: Result<Option<response::Range>, api::Error>,
@@ -75,6 +76,7 @@ impl Server {
             json_down: Queue::with_capacity(1),
             decoder: None,
             user: 0,
+            user_scope: false,
             request: None,
             select: response::Select::Document,
             range: Ok(None),
@@ -385,6 +387,7 @@ fn entrance(server: &mut Server, service: &mut Service, env: &Env<Limits>, call:
         return;
     };
     server.user = user;
+    server.user_scope = service.reads_user(call.header(b"authorization"));
     let method = match call.method {
         Method::Get => request::Method::Get,
         Method::Post => request::Method::Post,
@@ -436,6 +439,14 @@ fn decoded(server: &mut Server, service: &mut Service, env: &Env<Limits>, reques
         && *style != document::MergeStyle::Squash
     {
         respond(server, response::failure(&env.limits, errors::refusal(Refusal::MergeStyle)));
+        return;
+    }
+    if request == Request::User && !server.user_scope {
+        fail(server, &env.limits, 403);
+        return;
+    }
+    if let Some(reply) = service.setup.answer(&request, server.user, &service.config, &env.limits) {
+        respond(server, reply);
         return;
     }
     if let Some(answer) = table(service, &request, server.user) {
@@ -562,12 +573,12 @@ fn respond(server: &mut Server, reply: response::Reply) {
     server.requests.push(http::Request::Respond(http::Response {
         status: reply.status,
         headers: headers.into_boxed(),
-        body: http::Body::Length(length),
+        body: if reply.status == 204 { http::Body::None } else { http::Body::Length(length) },
         close: false,
     }));
-    if length == 0 {
+    if length == 0 && reply.status != 204 {
         server.requests.push(http::Request::Reply(Down::Finish));
-    } else {
+    } else if length > 0 {
         server.requests.push(http::Request::Reply(Down::Demand {
             read: Read::Nothing,
             room: u32::try_from(length).unwrap_or(u32::MAX).min(server.send),

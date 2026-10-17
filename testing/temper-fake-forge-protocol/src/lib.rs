@@ -11,6 +11,7 @@ pub mod response;
 pub mod routes;
 mod server;
 mod service;
+pub mod setup;
 pub mod tally;
 pub use server::{Event, MAX_DOWN, MAX_UP, Server, close, closed, down, resume, start, up};
 pub use service::{Error, Service, worst_case};

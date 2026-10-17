@@ -2162,6 +2162,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-forge-setup-reconcile-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "skein-http",
+ "skein-lib",
+ "temper-codecs-world",
+ "temper-engine-protocol-forge-world",
+ "temper-fake-forge-protocol",
+ "temper-forge-forgejo",
+ "temper-forge-setup",
+]
+
+[[package]]
 name = "temper-forge-setup-shell"
 version = "0.0.0"
 dependencies = [

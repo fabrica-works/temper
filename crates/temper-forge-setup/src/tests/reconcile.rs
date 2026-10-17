@@ -42,7 +42,8 @@ fn an_absent_bot_is_made_with_a_drawn_password_and_the_marker() {
             token: secret(fixtures::ADMIN),
         }
     );
-    assert_eq!(run.step(user(fixtures::person(b"temper", b"temper:bot"))), Need::Read(File::User));
+    assert_eq!(run.step(user(fixtures::person(b"temper", b"temper:bot"))), Need::Read(File::ApiToken));
+    run.kept_tokens();
     assert_eq!(run.step(Event::Read(None)), Need::Write { file: File::User, bytes: secret(b"42") });
     assert_eq!(run.step(Event::Written), Need::Done);
 }
@@ -50,7 +51,8 @@ fn an_absent_bot_is_made_with_a_drawn_password_and_the_marker() {
 fn a_bot_with_the_marker_is_kept_and_nothing_is_written() {
     let mut run = Run::managed();
     run.bot_lookup();
-    assert_eq!(run.step(user(fixtures::person(b"temper", b"note temper:bot account"))), Need::Read(File::User));
+    assert_eq!(run.step(user(fixtures::person(b"temper", b"note temper:bot account"))), Need::Read(File::ApiToken));
+    run.kept_tokens();
     assert_eq!(run.step(Event::Read(Some(secret(b"42")))), Need::Done);
 }
 #[test]
@@ -105,6 +107,7 @@ fn the_bots_id_is_written_in_decimal_only_when_the_file_differs() {
         let mut run = Run::owned();
         run.bot_lookup();
         run.step(user(fixtures::person(b"temper", b"temper:bot")));
+        run.kept_tokens();
         assert_eq!(
             run.step(Event::Read(old.clone())),
             Need::Write { file: File::User, bytes: secret(b"42") },

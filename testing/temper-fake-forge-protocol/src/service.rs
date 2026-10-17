@@ -18,6 +18,7 @@ pub struct Service {
     pub(crate) calls: Slab<Call>,
     pub(crate) rng: Rng,
     pub(crate) tally: Tally,
+    pub(crate) setup: crate::setup::Store,
 }
 impl Service {
     pub fn new(config: Config, limits: &Limits, seed: u64) -> Result<Self, Error> {
@@ -82,8 +83,9 @@ impl Service {
                 }
             }
         }
-        let tally = Tally::new(config.tokens.len());
-        Ok(Self { config, calls: Slab::with_capacity(limits.calls), rng: Rng::new(seed), tally })
+        let tally = Tally::new(config.tokens.len().saturating_add(limits.documents.inner));
+        let setup = crate::setup::Store::new(limits);
+        Ok(Self { config, calls: Slab::with_capacity(limits.calls), rng: Rng::new(seed), tally, setup })
     }
     #[expect(clippy::result_large_err, reason = "an unmatched owned reply returns unchanged with its reply right")]
     pub fn target(&mut self, request: domain::Request) -> Result<(Token, domain::Request), domain::Request> {
@@ -113,7 +115,29 @@ impl Service {
                 return Some(*user);
             }
         }
-        None
+        self.setup.token_user(token)
+    }
+    pub(crate) fn reads_user(&self, authorization: Option<&[u8]>) -> bool {
+        let Some(value) = authorization else {
+            return false;
+        };
+        let Some(token) = value.strip_prefix(b"token ") else {
+            return false;
+        };
+        for (known, _) in &self.config.tokens {
+            if known.expose() == token {
+                return true;
+            }
+        }
+        self.setup.reads_user(token)
+    }
+    /// Scenario state for setup, without changing the repository domain.
+    pub fn setup_mut(&mut self) -> &mut crate::setup::Store {
+        &mut self.setup
+    }
+    #[must_use]
+    pub fn setup(&self) -> &crate::setup::Store {
+        &self.setup
     }
 }
 /// Tables and each connection's HTTP, JSON, request and encoded response ownership.
@@ -164,8 +188,9 @@ pub fn worst_case(limits: &Limits, config: &Config) -> Option<u64> {
         .checked_add(skein_lib::Queue::<skein_json::tokenizer::Event>::worst_case(1)?)?
         .checked_add(skein_lib::Queue::<skein_lib::stream::Down>::worst_case(1)?)?;
     tables
+        .checked_add(crate::setup::worst_case(limits)?)?
         .checked_add(Slab::<Call>::worst_case(limits.calls)?)?
-        .checked_add(Map::<crate::Route, u64>::worst_case(40)?)?
-        .checked_add(Map::<u64, u64>::worst_case(config.tokens.capacity())?)?
+        .checked_add(Map::<crate::Route, u64>::worst_case(crate::tally::ROUTES)?)?
+        .checked_add(Map::<u64, u64>::worst_case(config.tokens.len().saturating_add(limits.documents.inner))?)?
         .checked_add(per_connection.checked_mul(u64::from(limits.connections))?)
 }

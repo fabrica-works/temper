@@ -1,4 +1,5 @@
 //! One forge reconciled from its answers, with one need outstanding (setup.md, 5).
+mod tokens;
 use crate::{
     place::File,
     setup::{Account, Entry},
@@ -79,6 +80,7 @@ enum State {
     Bot,
     Draw,
     Create,
+    Tokens,
     Id(u64),
     Written,
     Ended,
@@ -90,12 +92,13 @@ pub struct Reconcile {
     bot: Account,
     admin: Option<Secret>,
     state: State,
+    tokens: Option<tokens::Tokens>,
 }
 impl Reconcile {
     /// Starts one entry; hooks use the listener when their step is reached.
     #[must_use]
     pub fn new(entry: &Entry, _listener: Option<SocketAddr>) -> Self {
-        Self { forge: entry.forge, bot: entry.bot.clone(), admin: None, state: State::Begin }
+        Self { forge: entry.forge, bot: entry.bot.clone(), admin: None, state: State::Begin, tokens: None }
     }
     fn send(&self, request: Request) -> Need {
         Need::Send { request, token: self.admin.clone().expect("admin checked before bot") }
@@ -116,8 +119,9 @@ impl Reconcile {
         if bytes::find(&user.full_name, b"temper:bot").is_none() {
             return self.stop(Stage::Bot, Why::Unmarked);
         }
-        self.state = State::Id(user.id);
-        Need::Read(File::User)
+        self.tokens = Some(tokens::Tokens::new(user.id));
+        self.state = State::Tokens;
+        Need::Read(File::ApiToken)
     }
     fn advance(&mut self, state: State, event: Event) -> Need {
         match state {
@@ -148,6 +152,10 @@ impl Reconcile {
                 Ok(user) => self.id(user),
                 Err(why) => self.stop(Stage::Bot, why),
             },
+            State::Tokens => {
+                self.state = State::Tokens;
+                tokens::advance(self, event)
+            }
             State::Id(id) => match event {
                 Event::Read(value) => {
                     let digits = Decimal::of(id);
@@ -268,6 +276,7 @@ pub fn step(machine: &mut Reconcile, event: Event, out: &mut Queue<Need>) {
         | State::Bot
         | State::Draw
         | State::Create
+        | State::Tokens
         | State::Id(_)
         | State::Written => {
             let need = machine.advance(state, event);

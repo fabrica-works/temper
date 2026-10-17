@@ -130,7 +130,7 @@ impl Tally {
         }
         if let Some(user) = user {
             let count = self.users.get(&user).copied().unwrap_or(0).saturating_add(1);
-            self.users.insert(user, count).expect("users bounded by token table");
+            self.users.insert(user, count).expect("users bounded by configured and setup token tables");
         } else {
             self.unauthorized = self.unauthorized.saturating_add(1);
         }
