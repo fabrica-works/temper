@@ -1913,6 +1913,13 @@ choice would have been the user's (development.md, 10.4).
 
      Checked: `git -C jig grep -n -E 'fn [a-z0-9_]*frame' origin/main -- crates/jig-client-protocol-wire/src/tests.rs` prints `tests.rs:115:fn a_frame_at_its_ceilings_round_trips_unchanged() {`.
 
+278. **the 19:12Z steer goes to jig 22.3** (process, the coordinator's block of 2026-10-17T19:14:00Z).
+     Ruling 278 (process, the coordinator's block of 2026-10-17T19:14:00Z): yes. jig 22.2 landed (`8f8810f33`, 19:13:58Z) before the steer reached it, so both points go to jig 22.3's first commit.
+
+     1. **Point 1:** the split of `a_me_document_carries_each_project_s_templates_and_bounds` goes in 22.3's first commit; its codec-test rule applies to 22.3 and 22.4, as the point says. Until: jig 22 lands.
+     2. **Point 2:** the rename of `a_frame_at_its_ceilings_round_trips_unchanged` (`crates/jig-client-protocol-wire/src/tests.rs:115`, row `:342`) goes in 22.3's first commit. Until: jig 22.3 lands.
+     3. **Unchanged:** both points' Pass on texts, with "your first commit" read as 22.3's; ruling 277's README sentence.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
