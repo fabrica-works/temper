@@ -1901,6 +1901,13 @@ choice would have been the user's (development.md, 10.4).
      - `reports/jig-14-s2-20261017T171459Z.md`: "Gate: scripts/check.sh passed: 4124 tests / 14.964 s; 111 tests / 27.110 s"; `9bbbe0467`'s `Gate-Result: … 4124 tests / 14.405 s`.
      - The check of 18:11Z: s2's measure total 38.978 s at its start, 40.997 s at its end; the timeouts at 17:01Z and 17:04Z ended with 2,841 and 3,195 of about 4,120 tests run.
 
+276. **the 18:19Z steer's run-end points are jig 22.1's alone** (process, the coordinator's block of 2026-10-17T18:21:21Z).
+     Ruling 276 (process, the coordinator's block of 2026-10-17T18:21:21Z): the block is right; nothing more lands in the README. Ruling 167, point 4: later sessions read the README, and their prompts do not repeat it; point 6: a Pass on text that holds until the run's end lands there first. Both points' rules for later sessions are already README rules, so their Pass on texts are jig 22.1's alone.
+
+     1. **Point 1:** its Pass on text (the budget commit) is jig 22.1's alone; give it word for word, now, and log the point done. Applies to: jig 22.1; until it lands. The rule for later jig sessions is README "Test time" as ruling 275 amended it ("a jig session no longer starts with a repair of the focused suite").
+     2. **Point 3:** README "Named numbers in tests" (ruling 116) already says it. Give its Pass on text to jig 22.1 alone, now, and log the point done; "and each jig session you start" is withdrawn. Applies to: jig 22.1's new stories; until it lands.
+     3. **Unchanged:** point 2, done; ruling 275; ruling 167.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
