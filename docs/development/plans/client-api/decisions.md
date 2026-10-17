@@ -1700,6 +1700,13 @@ choice would have been the user's (development.md, 10.4).
      3. **Ops' two families share one `me` module** that takes the connector (`jig_ops_domain_connectors::Connector`), in place of `examples/ops/client-domain/src/infrastructure/me.rs` and `observability/me.rs`, which differ in the connector alone. Do it in the ops-only commit (`0b8a85a63`'s), which stays ops' one commit. The test root's `first/me.rs` stays its own.
      4. **Unchanged:** no test, comment or formatting trimmed to fit; ruling 257; the factor 3's derivation in each commit body; Scope, Shape, Test shape and Proof.
 
+259. **README: the 13:00Z steer's point 2** (process, the coordinator's block of 2026-10-17T13:01:13Z).
+     Ruling 259 (process, the coordinator's block of 2026-10-17T13:01:13Z): the block is right. Ruling 167, point 6: "a steer's Pass on text that holds until the run's end lands in 'The run's steers' before the steer is sent". The steer of 2026-10-17T13:00:29Z, point 2, holds until the run's end and was sent before its text landed. It lands now, word for word as the steer gave it, under "2026-10-17 13:00Z, point 2 (jig 21.4, then each session that adds a test to `crates/jig-client-view`)".
+
+     1. The coordinator carries out point 2 as the steer says: it gives jig 21.4 the point's Pass on text, and logs it done. context.md names only "Steer 13:00:29Z, point 2".
+     2. Later sessions read it in the README; their prompts do not repeat it (ruling 167, point 4).
+     3. Unchanged: points 1 and 3, already given to jig 21.4; ruling 258.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

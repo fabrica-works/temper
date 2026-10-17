@@ -825,6 +825,16 @@ per session are in each file.
     `incident_lead(engine)` and `remediation(engine, lead)` into
     `tests/ops/src/joint/fixture.rs`, `pub`, and uses them in the three
     files; report it as a small fix outside your Files.
+  - 2026-10-17 13:00Z, point 2 (jig 21.4, then each session that adds a
+    test to `crates/jig-client-view`): README 'A test's helpers once':
+    `crates/jig-client-view/src/tests/domain/native.rs:24-45` builds a
+    page or section tree with `Builder::new`, `JigBindings::new`,
+    `pages::main` and `finish`, which nine other test sites also write.
+    Move that `tree` to `crates/jig-client-view/src/tests/cards.rs`,
+    `pub(crate)`, beside `contains` (:157), use it in `native.rs`, and
+    use it in every new view test that builds a tree. Add a parameter to
+    it if a test needs one; write no new copy. Report the move as a small
+    fix outside your Files.
 
 ## Prerequisites the run checks at its start
 
