@@ -165,7 +165,7 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
     let bytes = skein_shell::read_file(Path::new(configuration), super::CONFIG_BYTES).map_err(|why| {
         refused(format!("configuration {}: {}", Path::new(configuration).display(), super::unread(why)))
     })?;
-    let (named, checked) = super::setup::check(&bytes).map_err(refused)?;
+    let (named, checked, _) = super::setup::check(&bytes).map_err(refused)?;
     if verb == "reconcile" {
         let settings = reconcile_settings(&named, &checked, number).map_err(refused)?;
         return temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())

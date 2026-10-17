@@ -253,3 +253,26 @@ fn reconcile_converges_an_owned_forgejo_and_a_second_run_writes_nothing() {
     instance.stop().expect("forge stops");
     scratch.remove();
 }
+
+#[test]
+fn temper_box_prints_the_link_and_a_stop_leaves_no_process() {
+    let scratch = support::Scratch::new("box_stop");
+    let forgejo = support::owned::tier_configuration(scratch.path());
+    let ended = support::boxed::run(scratch.path(), forgejo, support::boxed::Plan::Stop, Duration::from_secs(120));
+    assert_box_streams(&ended);
+    assert_eq!(ended.forgejo_at_link, Some(200), "Forgejo answered its version when the link came");
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "stopped as asked: {}", String::from_utf8_lossy(&ended.stderr));
+    assert_eq!(ended.left, Some(Vec::new()), "no process the box started outlived it");
+    assert_eq!(support::boxed::status(forgejo, "/api/v1/version"), None, "Forgejo is gone");
+    scratch.remove();
+}
+fn assert_box_streams(ended: &support::boxed::Outcome) {
+    let link = support::printed_link(&ended.stdout).expect("the box's stdout carries the link");
+    assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some(), "the sign-in link");
+    let alone = |line: &[u8]| line.is_empty() || line.starts_with(b"http://127.0.0.1:");
+    assert!(ended.stdout.split(|byte| *byte == b'\n').all(alone), "stdout holds links alone");
+    let steps: [&[u8]; 6] = [b"prepare 1: ", b"forgejo 1: ", b"runner 1: ", b"reconcile 1: ", b"serve: ", b"box: "];
+    let lines = || ended.stderr.split(|byte| *byte == b'\n').filter(|line| !line.is_empty());
+    assert!(lines().all(|line| steps.iter().any(|step| line.starts_with(step))), "each stderr line names its step");
+    assert!(lines().any(|line| line.starts_with(b"runner 1: ")), "the runner's lines arrive prefixed");
+}

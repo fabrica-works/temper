@@ -6,7 +6,7 @@ use temper_forge_setup::{
 };
 use temper_service::startup::{Named, Transport, User};
 
-pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked), String> {
+pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked, temper_box::limits::Limits), String> {
     let named = temper_service::named(bytes)
         .map_err(|why| String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned())?;
     let document = config::document(
@@ -42,7 +42,36 @@ pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked), String> {
     let members = Members { forges: forges.into_boxed_slice(), listeners: listeners.into_boxed_slice() };
     let application = super::member(&document, 0, b"application");
     let at = super::member(&document, application, b"setup");
-    let checked = check::checked(&document, at, &members, &named.overrides)
+    let setup_overrides: Vec<_> =
+        named.overrides.iter().filter(|(name, _)| !name.starts_with(b"box.")).cloned().collect();
+    let checked = check::checked(&document, at, &members, &setup_overrides)
         .map_err(|why| String::from_utf8_lossy(&problem::lines(&why)).into_owned())?;
-    Ok((named, checked))
+    let limits = box_limits(&named.overrides)?;
+    Ok((named, checked, limits))
+}
+
+fn box_limits(overrides: &[(Box<[u8]>, u64)]) -> Result<temper_box::limits::Limits, String> {
+    use temper_box::limits::{self, Refused};
+    let mut limits = limits::small();
+    let mut problems = Vec::new();
+    let prefix = "application.limits.overrides.";
+    for (name, value) in overrides.iter().filter(|(name, _)| name.starts_with(b"box.")) {
+        if let Err(why) = limits::apply(&mut limits, name, *value) {
+            let reason = match why {
+                Refused::Unknown => "no limit of temper's has this name",
+                Refused::Range => "outside its type",
+            };
+            problems.push(format!("{prefix}{}: {reason}", String::from_utf8_lossy(name)));
+        }
+    }
+    if let Err(why) = limits::check(&limits) {
+        let names = why.names();
+        let name = String::from_utf8_lossy(names[0]);
+        let reason = match names.get(1) {
+            Some(other) => format!("must agree with {}", String::from_utf8_lossy(other)),
+            None => "past its bound".into(),
+        };
+        problems.push(format!("{prefix}{name}: {reason}"));
+    }
+    if problems.is_empty() { Ok(limits) } else { Err(problems.join("\n")) }
 }

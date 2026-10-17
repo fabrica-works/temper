@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 jig-client-protocol-link.workspace = true
 temper-service.workspace = true
+temper-box.workspace = true
 temper-forge-setup.workspace = true
 temper-forge-forgejo.workspace = true
 temper-forge-setup-shell.workspace = true

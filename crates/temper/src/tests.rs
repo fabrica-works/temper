@@ -4,14 +4,14 @@ use super::configure;
 fn serve_without_a_configuration_path_is_a_usage_error() {
     assert_eq!(
         configure(["serve".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into())
     );
 }
 #[test]
 fn an_unknown_command_prints_the_usage_line() {
     assert_eq!(
         configure(["unknown".into(), "config.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into())
     );
 }
 
@@ -128,4 +128,22 @@ fn forge_without_its_arguments_prints_its_usage() {
         super::forge::start(&[]).expect_err("usage refused").line(),
         "temper forge prepare: usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE\n"
     );
+}
+
+#[test]
+fn box_with_one_path_is_the_box_command() {
+    assert_eq!(
+        configure(["box".into(), "config.json".into()].into_iter()),
+        Ok(super::Command::Box { configuration: "config.json".into() })
+    );
+}
+#[test]
+fn box_without_a_path_prints_the_usage() {
+    assert_eq!(configure(["box".into()].into_iter()),
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into()));
+}
+#[test]
+fn box_with_two_paths_prints_the_usage() {
+    assert_eq!(configure(["box".into(), "one.json".into(), "two.json".into()].into_iter()),
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into()));
 }

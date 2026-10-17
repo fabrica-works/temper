@@ -1,4 +1,5 @@
 //! Shared configuration fixtures for startup and the process tier.
+pub mod boxed;
 pub mod configuration;
 pub mod owned;
 pub mod sign_in;

@@ -1760,6 +1760,7 @@ dependencies = [
  "smith-local-domain",
  "smith-local-process-world",
  "smith-local-service",
+ "temper-box",
  "temper-client-domain",
  "temper-client-shell-terminal",
  "temper-engine-domain",

@@ -15,18 +15,20 @@ use temper_service::{
     settings::{Agent, Files, Seeds},
 };
 
+pub mod box_command;
 pub mod forge;
 mod host;
 pub mod open;
 mod setup;
 pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Serve { configuration: PathBuf },
+    Box { configuration: PathBuf },
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     SignIn { arguments: Vec<OsString> },
@@ -60,6 +62,8 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
     }
     if command == "serve" {
         Ok(Command::Serve { configuration })
+    } else if command == "box" {
+        Ok(Command::Box { configuration })
     } else if command == "agent" {
         Ok(Command::Agent { configuration })
     } else {
@@ -69,6 +73,9 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
 pub fn run(command: Command) -> Result<u8, String> {
     let exit = match command {
         Command::Serve { configuration } => serve(&configuration).map_err(|why| prefixed("temper serve", &why))?,
+        Command::Box { configuration } => {
+            box_command::run(&configuration).map_err(|why| prefixed("temper box", &why))?
+        }
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
         Command::Forge { arguments } => return Ok(forge::run(&arguments)),
@@ -315,7 +322,7 @@ fn private_root(path: &Path, user: u32) -> Result<(), String> {
     Ok(())
 }
 fn prepare(directory: &Path, bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
-    let (named, _) = setup::check(bytes)?;
+    let (named, _, _) = setup::check(bytes)?;
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .expect("named checked document");

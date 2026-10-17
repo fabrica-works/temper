@@ -166,3 +166,113 @@ fn a_setup_naming_another_api_token_file_refuses_temper_sign_in_naming_its_path(
     assert_eq!(refused, "temper sign-in: application.forges[0].api_token: invalid form\n");
     scratch.remove();
 }
+
+fn box_document(scratch: &support::Scratch) -> serde_json::Value {
+    support::configuration(scratch.path(), &support::Forge::Unreached);
+    serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration")).expect("JSON")
+}
+fn refused_box(scratch: &support::Scratch, value: &serde_json::Value) -> String {
+    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(value).expect("JSON"));
+    temper::run(temper::Command::Box { configuration: scratch.path().join("config.json") }).expect_err("box refused")
+}
+#[test]
+fn a_box_configuration_that_is_absent_is_refused_naming_it() {
+    assert_eq!(
+        temper::run(temper::Command::Box { configuration: "absent.json".into() }),
+        Err("temper box: configuration absent.json: absent\n".into())
+    );
+}
+#[test]
+fn a_box_configuration_missing_members_is_refused_one_line_each() {
+    let scratch = support::Scratch::startup("box-members");
+    assert_eq!(
+        refused_box(&scratch, &serde_json::json!({})),
+        "temper box: engine: missing\ntemper box: workers: missing\ntemper box: application: missing\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_setup_naming_no_forge_refuses_the_box_before_it_starts() {
+    let scratch = support::Scratch::startup("box-forge");
+    let mut value = managed(scratch.path(), false);
+    value["application"]["setup"][0]["forge"] = 7.into();
+    assert_eq!(refused_box(&scratch, &value), "temper box: application.setup[0].forge: unknown reference\n");
+    assert!(!scratch.path().join("forge-7").exists());
+    scratch.remove();
+}
+#[test]
+fn a_box_maximum_backoff_below_its_base_is_refused() {
+    let scratch = support::Scratch::startup("box-backoff");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.backoff_max_ms"] = 100.into();
+    assert_eq!(
+        refused_box(&scratch, &value),
+        "temper box: application.limits.overrides.box.backoff_ms: must agree with box.backoff_max_ms\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_box_maximum_backoff_reaching_its_window_is_refused() {
+    let scratch = support::Scratch::startup("box-window");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.backoff_max_ms"] = 300_000.into();
+    assert_eq!(
+        refused_box(&scratch, &value),
+        "temper box: application.limits.overrides.box.backoff_max_ms: must agree with box.window_ms\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_box_restart_count_past_its_bound_is_refused() {
+    let scratch = support::Scratch::startup("box-restarts");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.restarts"] = 65.into();
+    assert_eq!(
+        refused_box(&scratch, &value),
+        "temper box: application.limits.overrides.box.restarts: past its bound\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_box_restart_count_outside_its_type_is_refused() {
+    let scratch = support::Scratch::startup("box-restarts-type");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.restarts"] = 4_294_967_296_u64.into();
+    assert_eq!(
+        refused_box(&scratch, &value),
+        "temper box: application.limits.overrides.box.restarts: outside its type\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn an_unknown_box_limit_is_refused() {
+    let scratch = support::Scratch::startup("box-unknown");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.nope"] = 1.into();
+    assert_eq!(
+        refused_box(&scratch, &value),
+        "temper box: application.limits.overrides.box.nope: no limit of temper's has this name\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_box_limit_past_its_check_refuses_temper_serve_too() {
+    let scratch = support::Scratch::startup("box-serve-refused");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.backoff_max_ms"] = 100.into();
+    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("JSON"));
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("serve refused"),
+        "temper serve: application.limits.overrides.box.backoff_ms: must agree with box.backoff_max_ms\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn a_box_limit_within_its_check_is_accepted_by_temper_serve() {
+    let scratch = support::Scratch::startup("box-serve-accepted");
+    let mut value = box_document(&scratch);
+    value["application"]["limits"]["overrides"]["box.restarts"] = 3.into();
+    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("JSON"));
+    assert!(temper::prepare_in(scratch.path()).is_ok());
+    scratch.remove();
+}
