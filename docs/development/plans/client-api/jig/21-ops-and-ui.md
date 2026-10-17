@@ -222,9 +222,10 @@ read by `crates/jig-client-view/src/pages.rs:107-219` and
 derives `Debug`, `PartialEq` and `Eq` on `Request` and on
 `jig_client::Event` (`crates/jig-client/src/client.rs`, which joins the
 Files: it derives `Debug` alone), and `How` derives `Copy, PartialEq,
-Eq`; `Request` is not `Clone` (`With` is not). `step`'s `wall`, and
-`Request::{SignIn, Fact}`, are the designer's question of 2026-10-17
-(question.md).
+Eq`; `Request` is not `Clone` (`With` is not). `step` and `fire` take
+`wall`, as the sketch has them (view.md, 18.1, amended), and the Ui's
+`Request::{SignIn, Fact, Continue}` go (the designer's answer of
+2026-10-17, in the Shape).
 Shape: as the sketch: `Ui`, `Event::{Start, Went, Left, Act, Named,
 Client { told }}`, `Request::{Client { asked }, Show, Save, Erase,
 ShowPart, PartsLeft}`, `How`, `Refused`. `Named` replaces
@@ -241,7 +242,27 @@ in its own region when it is behind, has rows left out, was refused or
 is missing (pages.md, 12.5; view.md, 18.2). The sign-in page leaves a
 slot for the application's own ways of signing in (pages.md, 8 and 9;
 view.md, 4.1), owned by the application, `Owner::Application`, and
-filled by its view root.
+filled by its view root. The slot takes the place of the page's
+providers: `Request::SignIn { provider, back }`, `Act::SignIn`,
+`signin::Provider` and the providers' list go, and once `me` names the
+party the Ui comes back to the place it kept (view.md, 18.6), with no
+`back`. The test application's view puts its "Sign in with Test"
+button (`tests/client/tests/shell.rs:78`) in the slot; its act is the
+test root's own sign-in request, which its worlds carry as `Duty::SignIn`
+does at jig `5274ad08e` (`tests/client/src/harness/world.rs:556,
+:607-614`), less the `back` it goes to; `ops`'s the same, in its own
+commit. `Request::Fact` and the moved `facts.rs` go (view.md, 18.1): no
+root, world or shell reads a fact (each drops it:
+`tests/client/src/harness/world.rs:558`,
+`tests/client/src/joint/front.rs:221`,
+`tests/client-protocol/src/front.rs:225`), and the five lines that name
+a `Fact` in four of the moved crate's test files (`git grep -c` at jig
+`5274ad08e`) check the refusal the page or the act shows instead
+(view.md, 18.2 and 18.4). A handle the
+client ends `Limit`, or a read it answers `Limit`, is one the page left
+out (view.md, 18.2). `Continue` goes: the client continues a run's
+watch (client.md, 8.3). `Told::Dropped` reaches the Ui
+(`Event::Client`), which shows it from 21.4.
 Test shape: the moved tests keep their names on the new surface; their
 fixtures (`src/tests/fixtures.rs`) hold a `jig_client::Client::unlinked`
 and feed its `Up` (jig 12.5) for documents. Added:
@@ -253,7 +274,8 @@ and feed its `Up` (jig 12.5) for documents. Added:
 `a_page_past_the_ui_s_handles_opens_what_fits_and_says_what_it_left_out`,
 `naming_the_same_sections_again_keeps_their_watches_open`,
 `each_named_section_says_behind_in_its_own_region`,
-`the_sign_in_page_leaves_a_slot_for_the_application_s_ways`. The client
+`the_sign_in_page_leaves_a_slot_for_the_application_s_ways`,
+`a_handle_the_client_s_limit_ends_is_one_the_page_left_out`. The client
 world's referee (tests/client, `harness/referee.rs`) gains testing.md,
 6.3's "A sign-out told: a sign-out the engine did not receive is never
 shown done", with its referee test
@@ -269,9 +291,12 @@ nothing else.
 Don't: no document kept by the Ui across steps (view.md, 18); no
 decision the client makes (whether the link is live, when to retry).
 Size: at most 300 lines (most of the change is removal; the sign-in
-slot and the sections' words about 60 of them).
+slot, its "Sign in with Test" button and the sections' words about 60
+of them).
 Removes: the bridge; the moved `watches.rs`, `reads.rs`, `link.rs`,
-`versions.rs`; the page's generations.
+`versions.rs`; the page's generations; the Ui's `Request::{SignIn,
+Fact, Continue}`, `Act::SignIn`, `signin::Provider` and its list, and
+the moved `facts.rs`.
 
 ### 21.4 The reference UI's requests on `pending`; siblings watch `me` themselves
 Scope: the Ui's intents keyed `Key { asker: Asker::JIG, number }`, drawn
@@ -288,7 +313,9 @@ requests in flight", never queued (view.md, 18.4); one answered
 `Outcome::Unconfirmed` is refused in place and offered again once the
 link is live. The page "someone else's work" (pages.md, 8) leaves when
 its party signs in, or when each of its kept requests is answered
-unknown.
+unknown. Kept work the client dropped at start (`Told::Dropped {
+count }`, which the root gives the Ui: root.md, 8) shows as a notice
+saying how many (view.md, 18.4 and 18.7).
 Needs: 21.3's `Ui`.
 Files: `crates/jig-client-view/src/{intents.rs, notices/kept.rs,
 page/**, frame/me.rs, boundary.rs, ui.rs}`;
@@ -318,7 +345,8 @@ Test shape: the moved intent tests keep their names; added
 `an_act_past_the_client_s_limit_is_refused_in_place`,
 `an_act_answered_unconfirmed_is_offered_again_once_live`,
 `someone_else_s_work_leaves_when_its_party_signs_in`,
-`someone_else_s_work_leaves_when_its_requests_are_unknown`. Each under
+`someone_else_s_work_leaves_when_its_requests_are_unknown`,
+`kept_work_dropped_at_start_shows_a_notice`. Each under
 20 ms.
 Proof: joint layer: `heavy cargo nextest run -p jig-client-protocol-world
 -E 'test(signed_out_with_requests_pending_then_signed_in_again) |
@@ -328,7 +356,7 @@ and `heavy cargo nextest run -p jig-ops-world --profile fuzzy -E
 once; both pass; nothing else is wanted.
 Don't: no intent kept across a restart (view.md, 18.4: kept work has no
 card); no map in a root.
-Size: at most 290 lines.
+Size: at most 300 lines (the dropped notice about 10).
 Removes: the by-value hand-offs; `Kept { scope, requests }`.
 
 ## Interface sketches

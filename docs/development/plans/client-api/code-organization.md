@@ -222,7 +222,8 @@ them are rules, each with its check.
     the frame's link judgment): jig 13.2 to 21.3;
   - `jig_client_view::bridge`: jig 13.4 to 21.3; in it, the client's
     `NotKept`, `Limit`, `Unconfirmed` and `Unknown` shown as
-    `Progress::Unknown`: jig 13.4 to 21.4;
+    `Progress::Unknown`, its `Dropped` shown by nothing, and no
+    `KeptGone` for kept work answered: jig 13.4 to 21.4;
   - `Conversation::stream` beside 11.5's run text: jig 11.5 to 21.3;
   - the link outside the roots, the old roots' `RequestTable` and their
     `NotKept` mapped to `Fact::InvalidAnswer`: jig 12.2 to 13.4 (the

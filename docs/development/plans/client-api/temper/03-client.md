@@ -687,7 +687,7 @@ boundary.rs, forge.rs (`Event::Confirmed` gives way to its `me`
 handle), parts.rs, limits.rs}`; `crates/temper-client-view/src/{root.rs
 (:69-75, `jig_client_view::jig` and `after_page` with the `Ui`),
 limits.rs, forge/page.rs}`; `crates/temper-client-shell-terminal/src/{client.rs,
-limits.rs}`; `tests/client/src/{app.rs, front.rs, translate.rs,
+limits.rs, route.rs}`; `tests/client/src/{app.rs, front.rs, translate.rs,
 fixtures.rs}` (as jig 21.3 changes "the worlds' fronts"),
 `tests/one-process/src/world.rs`, `crates/temper/tests/support/person.rs`.
 Found by `git grep -n -e 'bridge::' -e 'Event::Confirmed' -e FrameIs
@@ -704,6 +704,14 @@ Shape:
 - The forge's side: a `me` handle of its own (`Watch { handle: Handle {
   asker: Owner::Forge.asker(), number: 0 }, subject: me }`), its party
   from that document, its link from `Told::Link`.
+- The `Ui` asks no sign-in, reports no fact and continues no watch (jig
+  21.3; jig's answer of 2026-10-17): the root's arms for the reference
+  UI's `Continue`, `SignIn` and `Fact` (`crates/temper-client-domain/src/route.rs:115,
+  :125-126, :150` at temper `ba298dd5`) go, and the terminal shell's
+  that carry them (`crates/temper-client-shell-terminal/src/route.rs:196,
+  :201, :203`); temper signs in by the printed link (`client.md`,
+  section 7). `Told::Dropped`, which names no asker, goes to the `Ui`
+  too (jig's `root.md`, 8).
 Test shape: `tests/client/tests/{stories.rs, adoption.rs}` and
 `fuzzy_client.rs` keep their names and expected values; the client
 domain's and the view's tests keep theirs on the `Ui`'s surface; one

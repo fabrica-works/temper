@@ -329,7 +329,11 @@ their order and routes each tell by its asker, exhaustively, and
 spine stops reopening and timing silence (the client's, jig 11.2), and
 its link follows `Told::Link`. The client's world runs this root on
 `Client::unlinked`; the protocol world and the native host on
-`Client::new`.
+`Client::new`. The native host's shell, `jig-client-shell-native`,
+carries the client's transport requests and events,
+`jig_client::{Request, Event}`, in place of the link's
+(protocol/client.md, 12: the shell is the application's "loop around
+`jig-client`"; the designer's answer of 2026-10-17).
 Needs: 13.3.
 Files: `testing/jig-client-test-domain/src/{domain.rs, boundary.rs,
 route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}` (its 25
@@ -349,7 +353,12 @@ native/world.rs, stories.rs:112-130}`, `tests/one-process` (its client),
 `testing/jig-test`'s
 `tests/support/mod.rs`; `tests/boundary/src/tests/graph.rs` (the test
 root links `jig-client`, `jig-client-view`,
-`jig-client-test-protocol-wire`, `jig-test-connector` and `skein-lib`).
+`jig-client-test-protocol-wire`, `jig-test-connector` and `skein-lib`);
+`crates/jig-client-shell-native/{Cargo.toml (`jig-client` in place of
+`jig-client-protocol-link`), src/shell.rs, src/connections.rs,
+src/files.rs, src/tests.rs}` (90 lines name `link::` in the four
+sources at jig `5274ad08e`); `crates/jig-client/src/client.rs` and its
+`src/tests/` (a sign-out that does not reach the engine, below).
 Re-check (ruling 191, jig `73734dd6f`): users the Files miss:
 `testing/jig-client-test-view/src/tests.rs:14, :338, :526, :537, :578,
 :639, :766, :779, :870`, `tests/native_effect.rs:47`,
@@ -366,8 +375,8 @@ Re-check (ruling 191, jig `73734dd6f`): users the Files miss:
 are `pub(crate)` fields). The sketches take `#[must_use]` on each `pub
 fn` that returns a value, and `Owner::asker` converts by `to_le_bytes`
 as `Owner::opaque` does, never `as u32` (`as_conversions` is denied).
-The bridge's tells without a reference UI counterpart are the
-designer's question of 2026-10-17 (question.md; ruling 191).
+The bridge's tells and values without a reference UI counterpart, and
+the native host: the designer's answer of 2026-10-17, in the Shape.
 Shape: the root's `Event` gains `Client { event: jig_client::Event }`
 for the transport's and the store's events, and loses `Answer`; its
 `Request` gains `Client { request: jig_client::Request }` for the
@@ -386,18 +395,70 @@ by `Owner::of_asker`, then `Connector::of(number)`, exhaustively
 ("so they are written before the step's exchanges leave", view.md,
 18.8). `jig_client_view::bridge`: `asked(request: &Request) ->
 Option<jig_client::Event>` (the reference UI's `Send`, `Read`, `Open`,
-`Close`, `SignOut` as the client's events under `Asker::JIG`, its
-tokens as numbers) and `told(domain, env, client: &Client, told: Told,
-out)` (a tell under `Asker::JIG` as the reference UI's present events:
-`Changed` as `Watch { Delivered(client.document(..)) }`,
-`Text { handle }` and `Dropped { count }` (`boundary.rs:116-117`) as
-the re-check after jig 12.5 settles them (view.md's names for them,
-by a supervisor's steer before 13.4 starts), `Page` as `Read`, `Ended` as `Ended`,
-`Pending` as `Progress` from `client.pending(..)`, `Answered` as
-`Answered` (`NotKept`, `Limit`, `Unconfirmed` and `Unknown` as
-`Progress::Unknown` until jig 21.4),
-`Kept` counted per party as `Kept { scope, requests }`, `Link` as the
-reference UI's link). The family sides' `Out::{Read, Open, Close}` and
+`Close`, `SignOut` as the client's events under `Asker::JIG`, a
+handle's number its token's, a key's below) and `told(domain, env,
+client: &Client, told: Told, out)` (a tell under `Asker::JIG` as the
+reference UI's present events: `Changed` as `Watch {
+Delivered(client.document(..)) }`, `Pending` as `Progress` from
+`client.pending(..)` (`Progress::NotServed` as `Parked`: only a
+family's request is held for its version, `jig-client-domain`'s
+`requests.rs:21, :161`), `Answered` as `Answered` (`NotKept`, `Limit`,
+`Unconfirmed` and `Unknown` as `Progress::Unknown` until jig 21.4),
+`Kept` counted per party as `Kept { scope, requests }`; `Text`,
+`Page`, `Ended`, `Link` and `Dropped` as below). The bridge's other
+rules (the designer's answer of 2026-10-17; view.md, 18.1, 18.2, 18.4
+and 18.6; client.md, 4, 8.3 and 11; line numbers at jig `5274ad08e`):
+- *A key's number* is its intent's token xored with a salt the root
+  draws once from its seed at `new`, and an answer's token is its
+  number xored with it again: a token's slot and generation start again
+  at a reload, and a key kept from before it comes back under its
+  number, so a token alone would repeat it (view.md, 18.1: "draws its
+  keys' numbers from its seed, fresh for each request it means"). `asked`
+  and `told` take the salt; each start of a world's client gives the
+  root a seed of its own (client.md, 11).
+- *A run's text.* For a run's handle the client tells `Changed`, then
+  `Text`, in one step (`crates/jig-client-domain/src/watches.rs:110,
+  :112`): `Changed` delivers the run's document, with the turn's text
+  the client holds, which the conversation's `stream` takes; `Text`
+  maps to nothing. `asked` gives `None` for `Continue`, and the root
+  nothing out: the client continues a run's watch from the text it
+  holds when it opens it again (`text.rs:93-104`), and the engine sends
+  the rest of a turn unasked (contract.md, 7.3).
+- *The link.* `Starting` and `Offline` as the UI's link; `Live` as
+  `Hello { served: true }`, which the UI waits for before it takes `me`
+  (`jig-domain-client`'s `domain.rs:939`), then its link `Live` (the
+  client tells `Link` before the `me` handle's `Changed`,
+  `watches.rs:102`); `SignedOut` as `SignedOut` (the sign-in page);
+  `OutOfDate` as `Hello { served: false }` (the out-of-date page,
+  `jig-domain-client`'s `versions.rs:12-21`). At a `Link` whose `client.link().sign_out_lost`
+  is set, the UI gets `SignOutLost` too.
+- *A sign-out that does not reach the engine.* `jig-client` tells
+  `Link` when it sets `sign_out_lost` (client.md, 4.2, amended; the
+  arm at `crates/jig-client/src/client.rs:276-277`). `Client::unlinked`
+  answers `SignOut` at once (`client.rs:236`); it leaves the sign-out to
+  its world instead, which answers it signed out or not reached, as the
+  link does from the wire, so that
+  `a_lost_sign_out_keeps_the_person_signed_in_and_says_so`
+  (`tests/client/tests/shell.rs:81`) runs on it.
+- *Ends.* `Ended { why }` as `Ended { end }`: `Unknown`, `NotAllowed`,
+  `Busy`, `SubjectEnded` and `SignedOut` by their names; `Limit` as
+  `Closed`, so the watch retires as one past the UI's own limit does
+  (view.md, 18.2); `NotServed` as `Unknown`: only a family's watch ends
+  so (`jig-client-domain`'s `domain.rs:140, :175`).
+- *Pages.* `Page { page }` as `Read { result }`: `Jig(result)` as it
+  is; `Limit` as `None(Busy)`; `NotServed`, which comes under jig's
+  asker only while the link is out of date (`reads.rs:18`), and
+  `Family { .. }`, which never does, as `None(Refused)`.
+- *Dropped.* The root gives `Dropped { count }` to the reference UI
+  (root.md, 3 and 8); the bridge maps it to nothing until jig 21.4
+  shows its notice.
+- *Kept work answered.* The bridge gives no `KeptGone`: no table owner
+  names a kept request's party once it is answered (root.md, 5). Until
+  jig 21.4, someone else's work leaves when its party signs in
+  (`refresh_kept_page`, `jig-domain-client`'s `domain.rs:804-819`), not
+  when its requests are answered unknown.
+
+The family sides' `Out::{Read, Open, Close}` and
 `Send` reach the client as `Read`, `Watch`, `Unwatch` and `Send` under
 their asker, encoded by 13.3's codec, and its tells come back decoded.
 The root's client limits declare the family owners its sides send, each
@@ -414,7 +475,16 @@ root's, kept and extended): `routes_a_tell_to_the_child_its_asker_names`,
 `jig_s_owner_is_the_asker_one_past_every_u16`,
 `an_asker_past_jig_s_is_no_owner`; `crates/jig-client-view/src/tests/bridge.rs`:
 `a_page_s_watch_is_the_client_s_under_jig_s_asker`,
-`a_changed_handle_is_the_page_s_delivery`. Reference test, on the
+`a_changed_handle_is_the_page_s_delivery`,
+`a_run_s_text_reaches_the_page_in_its_changed_document`,
+`out_of_date_shows_the_out_of_date_page`,
+`a_lost_sign_out_reaches_the_ui`,
+`a_watch_the_client_s_limit_ends_retires`,
+`a_key_is_never_a_kept_key_after_a_reload`; `crates/jig-client/src/tests/`:
+`a_sign_out_that_did_not_reach_the_engine_tells_the_link`,
+`an_unlinked_sign_out_its_world_loses_keeps_the_party_signed_in`; the
+native shell's tests keep their names on the client's vocabulary.
+Reference test, on the
 root's fixtures (`src/tests/root.rs:20-80`'s `limits()` and `env()`,
 which gain the client's limits from the world's profile):
 ```rust
@@ -438,11 +508,13 @@ gate runs `signing_in_and_starting_a_chat` (tests/client); nothing
 else.
 Don't: no map from handles or keys to children in the root; no `_` arm
 on an asker or an owner; no change to `ops` (jig 21.2).
-Size: at most 300 lines (the root about 120, the bridge about 140, the
-family sides about 40). The parts count together.
+Size: at most 370 lines (the root about 120, the bridge about 170, the
+family sides about 40, the native shell about 25, `jig-client`'s
+sign-out about 15). The parts count together.
 Removes: the test root's `RequestTable` and its table owner `Owner`
 (with `Kept { scope }`), `KeptAnswered`; the reference UI's silence and
-reopen timers.
+reopen timers; the native shell's dependency on
+`jig-client-protocol-link`.
 
 ## Interface sketches
 
