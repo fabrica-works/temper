@@ -2033,6 +2033,14 @@ choice would have been the user's (development.md, 10.4).
      3. **16.3, Files and Test shape** gain the story: once the goal form sends `shapes::set_goal`'s request, its answer is the `people::Outcome::Proposed { .. }` the referee asks, its durable refusal goes, both verdicts are `Passed`, and 15.6's expected failure goes.
      4. **Unchanged:** the referee's rule; 15.6's Shape, Test shape and Proof; no other check changes to pass.
 
+291. **jig 16.1: the gate story's wait read from the Conversations page's print, then one run** (process, jig-16.1's block of 2026-10-17T23:10:54Z).
+     Ruling 291 (process, jig-16.1's block of 2026-10-17T23:10:54Z): the report's proposal, with its repair and one run in the same authorization. Ruling 289's diagnosis (`logs/jig-16-1/gate-cause.md`) found the cause in the story's input, not in production: the worker answered (task 1 `Ended(Done(Report { words: b"World answer" }))`), the Go to task 1's Activity ran before the creation was acknowledged (`Read(None(Unknown))` before `Started { task: 1 }`), and the page kept "Page missing". The wait added before the Go, `Find::named(Role::Status, b"Chat started")`, failed at its own See on the Conversations page (`gate1-confirmed.log`), though the Activity page showed that notice at the timeout.
+
+     1. **Diagnose once:** with `gate1-diagnostics.patch`'s print moved to the new wait's See, run the focused reproduction once, and log in `gate-cause.md` what the Conversations page shows when that See gives up: the page's tree, and whether the chat's line or the `Chat started` notice is there, under which role and name.
+     2. **Repair the input from that print:** wait for what the print shows once the engine has made the chat (the notice by its printed role and name, or the chat's line in Conversations); then reach task 1's Activity (the Go, or a press of the chat's line where the print shows it as a link); then the unchanged answer See. The change stays in `tests/client-protocol/src/native.rs`'s `Script`; list it in the commit body. A cause the print shows in production code outside 16.1's Files is a block with the logs.
+     3. **Run the focused reproduction once more;** if it passes, run the gate and land. A failure at the answer See, or at the new wait again, is a block with the logs.
+     4. **Unchanged:** the expected answer and its 5 s wait; no referee's or judge's check; 16.1's Proof; rulings 288 and 289's other steps. Aim to spend at most 30 minutes on steps 1 to 3.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
