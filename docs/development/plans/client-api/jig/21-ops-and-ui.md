@@ -368,6 +368,9 @@ the client makes (whether the link is live, when to retry).
 Size: at most 320 lines (most of the change is removal; the sign-in
 slot, its "Sign in with Test" button and the sections' words about 60
 of them; the read's page test about 20).
+Ruling 240 re-estimates it, with the `Domain` to `Ui` rename (ruling
+234) in the count: aim 2,500, stop at 3,000 added lines by
+code-organization.md, 7's command; no split.
 Removes: the bridge; the moved `watches.rs`, `reads.rs`, `link.rs`,
 `versions.rs`; the page's generations; the Ui's `Request::{SignIn,
 Fact, Continue}`, `Act::SignIn`, `signin::Provider` and its list, and

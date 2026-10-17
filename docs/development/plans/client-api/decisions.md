@@ -1522,6 +1522,14 @@ choice would have been the user's (development.md, 10.4).
 239. **A repin's boundary repairs, as a README rule** (standing rule, temper 03.5's blocks of 2026-10-17T08:14:33Z and 08:25:44Z).
      A repin's boundary repairs, as a standing rule (the same block twice: temper 03.5's blocks of 2026-10-17T08:14:33Z and 08:25:44Z, answered by rulings 236 and 237). The README's Pins, "What a temper repin repairs", gains: "A boundary type of temper's (a field, a variant, a `CoreRange`) that carries what jig landed, as jig's reference roots and kit carry it (`ops`, `jig-test-service`, `jig_protocol_store`), is such a repair, not implementer.md 8.2's question: carry it losslessly, name each user in the commit body, and count it in the 200 (rulings 236 and 237 ...). A change jig did not make is still the question." It binds every temper repin to the run's end (temper 03.5, 03.6, the 04 and 06 repins, `temper-repin`); ruling 238's bounds stay 03.5's alone.
 
+240. **jig 21.3: Size re-estimated to 2,500, stop at 3,000; no split** (plan defect, jig 21.3's block of 2026-10-17T08:37:11Z).
+     Ruling 240 (plan defect, jig 21.3's block of 2026-10-17T08:37:11Z): option A. 21.3's Size, "at most 320 lines (most of the change is removal ...)", was set before ruling 234 put the view's `Domain` to `Ui` rename in its Files ("The view's `Domain` becomes `Ui` in each file that names it"), and before ruling 235 kept the read pages with the Ui. 668 lines now, 421 of them naming the rename, with the watched-document migration not yet done; jig 21.2's Size went the same way (rulings 221 and 225: 250, then 950, then 4,500; landed at 4,352).
+
+     1. **Size:** aim 2,500, stop at 3,000 added production lines by code-organization.md, 7's command, the rename's lines included and not counted apart; the report gives the number once, before landing.
+     2. **No split.** 21.3 stays one increment: what its Shape removes (the watch spine, the Ui's own watch documents and run text, `watches.rs`, `reads.rs`, `link.rs`, `versions.rs`, generations) and what it moves to the lent `&Client` land together.
+     3. **At the stop,** report the count by file and the work left, and wait.
+     4. **Unchanged:** 21.3's Shape, Files, Test shape, Proof and Don't (rulings 234 and 235); code-organization.md, 7's 40-line rule for files over 800 at the base; the 08:2xZ steer's points 1 and 3 (ruling 234).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
