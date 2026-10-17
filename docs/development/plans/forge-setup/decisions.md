@@ -620,6 +620,15 @@ run are appended after "For the user".
        logs and wait: do not change the test, the fixture or the process code, and do not retry a third time.
      - Unchanged: implementer.md 8.5 for every other failure; 09.3's Size (875) and proofs.
 
+133. **temper-08.s1: the process tests wait for what they read** (diagnosis of 09.3's gate failure).
+     Ruling 133, a plan defect in 08.1's and 08.2's process tests: step **temper-08.s1**,
+     `temper/08.s1-tests-wait-for-what-they-read.md`, fixes three races in the tests' observation that fail 1 to 5% of gate
+     runs (09.3's gate, ruling 132): `Programs::marker` reads `/proc/<pid>/fd` while `sleep`'s loader holds a transient fd
+     3; `Programs::hung` reads the pid file before it is written; `forge.rs:112` reads a killed sleep's stat once. No
+     production descriptor leaks (the lock is close-on-exec and dup2'd to 0). It needs nothing that has not landed; any
+     free slot starts it now, in a fresh session. Until it lands, a gate that fails on one of these three tests alone is
+     run once more, unchanged, without asking; a second failure is a question, with both logs.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
