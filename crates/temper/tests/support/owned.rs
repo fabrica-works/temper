@@ -189,24 +189,31 @@ impl Programs {
     }
 }
 #[must_use]
-pub fn run(directory: &Path, program: &str) -> Command {
+pub fn command(directory: &Path, program: &str) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_temper"));
     command.args(["forge", "run", "config.json", "1", program]).current_dir(directory);
     command
 }
 /// A process proof's child, reaped even when an assertion fails.
 pub struct Running {
-    child: std::process::Child,
+    child: Option<std::process::Child>,
     log: PathBuf,
 }
 impl Running {
     #[must_use]
     pub fn start(directory: &Path, program: &str) -> Self {
-        let log = directory.join(format!("{program}.log"));
+        let log = directory.join(if program == "forgejo" { "server.log" } else { "runner.log" });
         let output = fs::File::create(&log).expect("log");
-        let child =
-            run(directory, program).stdout(output.try_clone().expect("log clone")).stderr(output).spawn().expect("run");
-        Self { child, log }
+        let child = command(directory, program)
+            .stdout(output.try_clone().expect("log clone"))
+            .stderr(output)
+            .spawn()
+            .expect("run");
+        Self { child: Some(child), log }
+    }
+    #[must_use]
+    pub fn into_child(mut self) -> std::process::Child {
+        self.child.take().expect("owned child")
     }
     pub fn declared(&mut self) {
         let clock = skein_shell::Clock::new();
@@ -216,7 +223,10 @@ impl Running {
             if text.contains("declared successfully") {
                 return;
             }
-            assert!(self.child.try_wait().expect("status").is_none(), "runner exited: {text}");
+            assert!(
+                self.child.as_mut().expect("owned child").try_wait().expect("status").is_none(),
+                "runner exited: {text}"
+            );
             assert!(clock.now().now < deadline, "runner did not declare: {text}");
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
@@ -225,8 +235,10 @@ impl Running {
         self.kill();
     }
     fn kill(&mut self) {
-        let _ = self.child.kill();
-        self.child.wait().expect("reaped");
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            child.wait().expect("reaped");
+        }
     }
 }
 impl Drop for Running {
@@ -318,8 +330,10 @@ pub fn setup_without_runner(directory: &Path) {
 pub fn refused(directory: &Path, verb: &str, expected: &[u8]) {
     let result = if verb == "prepare" {
         prepare(directory, 1)
+    } else if verb == "reconcile" {
+        reconcile(directory, 1)
     } else {
-        run(directory, "forgejo").output().expect("run refuses")
+        command(directory, "forgejo").output().expect("run refuses")
     };
     assert_eq!(result.status.code(), Some(1));
     assert_eq!(result.stderr, expected);
@@ -342,4 +356,95 @@ pub fn dump(directory: &Path) -> (PathBuf, Vec<u8>, fs::Metadata) {
     assert!(skein_lib::bytes::find(&bytes, b"forgejo-db.sql").is_some());
     assert!(skein_lib::bytes::find(&bytes, b"app.ini").is_some());
     (backup, bytes, meta)
+}
+/// Starts one owned process with its output retained for a failing proof.
+#[must_use]
+pub fn run(directory: &Path, program: &str) -> Running {
+    Running::start(directory, program)
+}
+/// Prepares and starts, leaving readiness to reconcile's first exchange.
+#[must_use]
+pub fn start(directory: &Path) -> Running {
+    let prepared = prepare(directory, 1);
+    assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
+    run(directory, "forgejo")
+}
+#[must_use]
+pub fn reconcile(directory: &Path, forge: u16) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_temper"))
+        .args(["forge", "reconcile", "config.json", &forge.to_string()])
+        .current_dir(directory)
+        .output()
+        .expect("temper forge reconcile")
+}
+/// Attaches the read-only proof handle with preparation's private admin token.
+#[must_use]
+pub fn attach(directory: &Path, port: u16, running: Running) -> temper_throwaway_forgejo::Instance {
+    use temper_throwaway_forgejo::{Instance, Settings, Token};
+    let token = fs::read_to_string(directory.join("forge-1/admin_token")).expect("admin token");
+    Instance::attach(running.into_child(), port, directory, Token::new(token.trim().into()), &Settings::small())
+        .expect("owned forge answers")
+}
+/// Reads the converged bot, its id, and its private organization's team.
+pub fn assert_converged(directory: &Path, instance: &temper_throwaway_forgejo::Instance) {
+    use temper_throwaway_forgejo::{Outgoing, Token};
+    let api = fs::read_to_string(directory.join("forge-1/api_token")).expect("API token");
+    let token = Token::new(api.trim().into());
+    let response = instance.exchange(&Outgoing::get("/api/v1/user", Some(&token))).expect("bot answers");
+    assert_eq!(response.status, 200);
+    let bot: serde_json::Value = serde_json::from_slice(&response.body).expect("bot JSON");
+    assert_eq!(bot["login"], "temper-bot");
+    let id = fs::read_to_string(directory.join("forge-1/user")).expect("user").trim().parse::<u64>().expect("id");
+    assert_eq!(bot["id"], id);
+    let admin = &instance.admin().token;
+    let account = instance.exchange(&Outgoing::get("/api/v1/users/temper-bot", Some(admin))).expect("account answers");
+    let account: serde_json::Value = serde_json::from_slice(&account.body).expect("account JSON");
+    assert_eq!(account["is_admin"], false);
+    assert!(account["full_name"].as_str().expect("full name").contains("temper:bot"));
+    let org = instance.exchange(&Outgoing::get("/api/v1/orgs/acme", Some(admin))).expect("org answers");
+    let org: serde_json::Value = serde_json::from_slice(&org.body).expect("org JSON");
+    assert_eq!(org["visibility"], "private");
+    let teams = instance.exchange(&Outgoing::get("/api/v1/orgs/acme/teams", Some(admin))).expect("teams answer");
+    let teams: serde_json::Value = serde_json::from_slice(&teams.body).expect("teams JSON");
+    assert!(teams.as_array().expect("teams").iter().any(|team| team["name"] == "temper-bot"));
+}
+/// A managed forge whose directory reconcile must make itself.
+pub fn managed(directory: &Path) {
+    configuration(
+        directory,
+        &Names {
+            forgejo: Path::new("/usr/bin/false"),
+            runner: None,
+            port: 9,
+            bot: "temper-bot",
+            person: "ada",
+            orgs: &["acme"],
+        },
+    );
+    let path = directory.join("config.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    value["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
+    value["application"]["limits"]["overrides"]["setup.deadline_ms"] = 300.into();
+    value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 20.into();
+    value["application"]["limits"]["overrides"]["setup.backoff_max_ms"] = 50.into();
+    super::write_private(&path, &serde_json::to_vec(&value).expect("JSON"));
+    super::write_private(&directory.join("admin_token"), b"managed-admin-token");
+}
+pub fn configuration_value(directory: &Path, change: fn(&mut serde_json::Value)) {
+    let path = directory.join("config.json");
+    let mut value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    change(&mut value);
+    super::write_private(&path, &serde_json::to_vec(&value).expect("JSON"));
+}
+
+/// A minimal owned document for the reconcile proof, with no runner.
+#[must_use]
+pub fn reconcile_configuration(directory: &Path) -> u16 {
+    let binary = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO");
+    let port = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
+    configuration(
+        directory,
+        &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper-bot", person: "ada", orgs: &["acme"] },
+    );
+    port
 }

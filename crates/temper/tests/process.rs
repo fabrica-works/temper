@@ -162,7 +162,7 @@ fn a_prepared_forge_runs_forgejo_and_its_runner_once_each() {
     assert_eq!(admin["is_admin"], true);
     let mut runner = owned::Running::start(scratch.path(), "runner");
     runner.declared();
-    let refused = owned::run(scratch.path(), "forgejo").output().expect("second run");
+    let refused = owned::command(scratch.path(), "forgejo").output().expect("second run");
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(refused.stderr, b"temper forge run: forge 1: forgejo is running or being prepared already\n");
     runner.stop();
@@ -213,5 +213,39 @@ fn an_older_recorded_runner_has_its_files_prepared_again_without_a_dump() {
     assert!(upgraded.status.success(), "{}", String::from_utf8_lossy(&upgraded.stderr));
     assert_eq!(fs::read(configuration).expect("configuration remade"), before);
     assert_eq!(fs::read_dir(scratch.path().join("forge-1/backups")).expect("upgrade fixture").count(), 0);
+    scratch.remove();
+}
+
+#[test]
+fn reconcile_converges_an_owned_forgejo_and_a_second_run_writes_nothing() {
+    use std::{
+        fs,
+        os::unix::fs::{MetadataExt, PermissionsExt},
+    };
+    use support::owned;
+    let scratch = support::Scratch::new("owned_reconcile");
+    let port = owned::reconcile_configuration(scratch.path());
+    let running = owned::start(scratch.path());
+    let first = owned::reconcile(scratch.path(), 1);
+    assert_eq!(first.status.code(), Some(0), "{}", String::from_utf8_lossy(&first.stderr));
+    assert_eq!(first.stdout, b"");
+    let instance = owned::attach(scratch.path(), port, running);
+    owned::assert_converged(scratch.path(), &instance);
+    let files: Vec<_> =
+        ["api_token", "git_token", "user"].iter().map(|name| scratch.path().join("forge-1").join(name)).collect();
+    let before: Vec<_> = files.iter().map(|path| fs::metadata(path).expect("written file")).collect();
+    for meta in &before {
+        assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+    }
+    let second = owned::reconcile(scratch.path(), 1);
+    assert_eq!(second.status.code(), Some(0), "{}", String::from_utf8_lossy(&second.stderr));
+    for (path, before) in files.iter().zip(before) {
+        let after = fs::metadata(path).expect("kept file");
+        assert_eq!(
+            (after.ino(), after.mtime(), after.mtime_nsec()),
+            (before.ino(), before.mtime(), before.mtime_nsec())
+        );
+    }
+    instance.stop().expect("forge stops");
     scratch.remove();
 }

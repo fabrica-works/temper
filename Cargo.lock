@@ -2180,12 +2180,15 @@ name = "temper-forge-setup-shell"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
+ "skein-http",
  "skein-io",
  "skein-json",
  "skein-lib",
  "skein-shell",
+ "temper-engine-protocol-forge",
  "temper-forge-forgejo",
  "temper-forge-setup",
+ "temper-service",
 ]
 
 [[package]]

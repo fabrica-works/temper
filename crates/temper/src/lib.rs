@@ -21,7 +21,7 @@ pub mod open;
 mod setup;
 pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]

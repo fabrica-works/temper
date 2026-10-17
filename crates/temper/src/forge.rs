@@ -140,13 +140,16 @@ fn run_failure(why: host::Failed, launch: &run::Launch, number: u16) -> String {
     }
 }
 pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
-    let usage = || Refused {
+    let usage = || {
+        Refused {
         verb: "prepare",
         number: None,
-        why: "usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner".into(),
+        why: "usage: temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE".into(),
+    }
     };
     let (verb, configuration, number, which) = match arguments {
         [verb, configuration, number] if verb == "prepare" => ("prepare", configuration, number, None),
+        [verb, configuration, number] if verb == "reconcile" => ("reconcile", configuration, number, None),
         [verb, configuration, number, which] if verb == "run" => {
             let which = match which.to_str() {
                 Some("forgejo") => Which::Forgejo,
@@ -162,7 +165,17 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
     let bytes = skein_shell::read_file(Path::new(configuration), super::CONFIG_BYTES).map_err(|why| {
         refused(format!("configuration {}: {}", Path::new(configuration).display(), super::unread(why)))
     })?;
-    let (_, checked) = super::setup::check(&bytes).map_err(refused)?;
+    let (named, checked) = super::setup::check(&bytes).map_err(refused)?;
+    if verb == "reconcile" {
+        let settings = reconcile_settings(&named, &checked, number).map_err(refused)?;
+        return temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())
+            .map(|()| 0)
+            .map_err(|why| {
+                refused(
+                    why.line().split_once(": ").expect("prefix").1.split_once(": ").expect("forge").1.trim_end().into(),
+                )
+            });
+    }
     let entry = checked.setup.entry(number).ok_or_else(|| refused("the setup has no entry for it".into()))?;
     let Mode::Owned(owned) = &entry.mode else {
         return Err(refused("it is managed, not owned".into()));
@@ -198,4 +211,55 @@ pub fn run(arguments: &[OsString]) -> u8 {
             1
         }
     }
+}
+/// Checks the transport before reading files, then prepares the private directory.
+pub fn reconcile_settings(
+    named: &temper_service::startup::Named,
+    checked: &temper_forge_setup::check::Checked,
+    number: u16,
+) -> Result<temper_forge_setup_shell::reconcile::Settings, String> {
+    use temper_engine_protocol_forge::{conventions, limits};
+    let forge = named.forges.iter().find(|forge| forge.number == number).ok_or("the setup has no entry for it")?;
+    if !matches!(forge.transport, temper_service::startup::Transport::Plaintext) {
+        return Err("its transport is TLS, and reconcile speaks plaintext to loopback alone".into());
+    }
+    let entry = checked.setup.entry(number).ok_or("the setup has no entry for it")?;
+    let directory = std::path::absolute(super::path(&entry.directory)).map_err(|why| why.to_string())?;
+    if !directory.exists() {
+        fs::DirBuilder::new().recursive(true).mode(0o700).create(&directory).map_err(|why| why.to_string())?;
+    }
+    super::private_root(&directory, skein_shell::effective_user())
+        .map_err(|why| format!("{}: {why}", directory.display()))?;
+    let address = super::address(&forge.api)?;
+    let admin_token = match &entry.mode {
+        Mode::Managed { admin_token } => {
+            std::path::absolute(super::path(admin_token)).map_err(|why| why.to_string())?
+        }
+        Mode::Owned(_) => directory.join("admin_token"),
+    };
+    let mut profile = temper_service::limits::profile(temper_service::limits::Profile::Small);
+    for (name, value) in &named.overrides {
+        if !name.starts_with(b"setup.") && !name.starts_with(b"box.") {
+            temper_service::limits::apply(&mut profile, name, *value).map_err(|why| format!("limits: {why:?}"))?;
+        }
+    }
+    let io = jig_protocol_config::profile(jig_protocol_config::Profile::Small).io;
+    Ok(temper_forge_setup_shell::reconcile::Settings {
+        forge: number,
+        address,
+        host: conventions::host(address, None).expect("checked address"),
+        user_agent: conventions::USER_AGENT,
+        directory,
+        admin_token,
+        token_bytes: profile.forge_component.token_bytes,
+        hook_secret_bytes: profile.forge_component.token_bytes,
+        deadline: checked.limits.deadline,
+        backoff: checked.limits.backoff,
+        backoff_max: checked.limits.backoff_max,
+        http: limits::http(&profile.forge_component, false, &io),
+        documents: limits::documents(&profile.forge_component),
+        io,
+        entry: entry.clone(),
+        listener: None,
+    })
 }

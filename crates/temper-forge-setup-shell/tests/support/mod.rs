@@ -48,3 +48,132 @@ pub fn script(directory: &Path, body: &str) -> Spec {
 pub fn io() -> skein_io::Limits {
     jig_protocol_config::profile(jig_protocol_config::Profile::Small).io
 }
+
+pub const ADMIN: &[u8] = br#"{"id":1,"login":"temper-admin","is_admin":true,"full_name":""}"#;
+#[must_use]
+pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reconcile::Settings {
+    use temper_forge_setup::setup::{Account, Entry, Mode, Owned};
+    let scratch = Scratch::new(&format!("reconcile-{}", address.port()));
+    fs::set_permissions(scratch.path(), fs::Permissions::from_mode(0o700)).expect("private scratch");
+    temper_forge_setup_shell::files::write_private(&scratch.path().join("admin_token"), b"admin-token-value\n")
+        .expect("admin token");
+    let io = io();
+    let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component;
+    temper_forge_setup_shell::reconcile::Settings {
+        forge: 1,
+        address,
+        host: address.to_string().into_bytes().into_boxed_slice(),
+        user_agent: "test",
+        directory: scratch.path().into(),
+        admin_token: scratch.path().join("admin_token"),
+        token_bytes: profile.token_bytes,
+        hook_secret_bytes: profile.hook_secret_bytes,
+        deadline: skein_lib::Duration::from_secs(2),
+        backoff: skein_lib::Duration::from_millis(50),
+        backoff_max: skein_lib::Duration::from_millis(100),
+        http: temper_engine_protocol_forge::limits::http(&profile, false, &io),
+        documents: temper_engine_protocol_forge::limits::documents(&profile),
+        io,
+        entry: Entry {
+            forge: 1,
+            directory: Box::new([]),
+            bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },
+            orgs: Box::new([]),
+            mode: Mode::Owned(Owned {
+                forgejo: Box::new([]),
+                runner: None,
+                listen: address,
+                person: Account { login: b"ada".as_slice().into(), email: b"ada@example.invalid".as_slice().into() },
+            }),
+        },
+        listener: None,
+    }
+}
+pub struct Peer {
+    address: std::net::SocketAddr,
+}
+pub struct Heard {
+    pub requests: Vec<Received>,
+}
+pub struct Received {
+    pub line: String,
+    pub headers: Vec<(String, String)>,
+}
+impl Peer {
+    #[must_use]
+    pub fn reserve() -> Self {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("free port");
+        Self { address: listener.local_addr().expect("address") }
+    }
+    #[must_use]
+    pub fn address(&self) -> std::net::SocketAddr {
+        self.address
+    }
+    pub fn serve_after(self, ms: u64, replies: &[(u16, &[u8])]) -> Heard {
+        use std::io::{Read, Write};
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+        let listener = std::net::TcpListener::bind(self.address).expect("peer binds");
+        listener.set_nonblocking(true).expect("nonblocking accept");
+        let clock = skein_shell::Clock::new();
+        let mut requests = Vec::new();
+        for response in replies.iter().map(Some).chain(std::iter::once(None)) {
+            let end = clock.now().now.saturating_add(skein_lib::Duration::from_millis(if response.is_some() {
+                400
+            } else {
+                30
+            }));
+            let mut socket = loop {
+                if let Ok((socket, _)) = listener.accept() {
+                    break socket;
+                }
+                if clock.now().now >= end {
+                    return Heard { requests };
+                }
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            };
+            socket.set_read_timeout(Some(std::time::Duration::from_millis(350))).expect("read timeout");
+            let mut bytes = Vec::new();
+            let mut byte = [0];
+            while !bytes.ends_with(b"\r\n\r\n") {
+                if socket.read(&mut byte).unwrap_or(0) == 0 {
+                    break;
+                }
+                bytes.push(byte[0]);
+            }
+            let text = String::from_utf8(bytes).expect("request head");
+            let mut lines = text.lines();
+            requests.push(Received {
+                line: lines.next().expect("request line").into(),
+                headers: lines
+                    .filter_map(|line| line.split_once(':'))
+                    .map(|(name, value)| (name.to_ascii_lowercase(), value.trim().into()))
+                    .collect(),
+            });
+            if let Some((status, body)) = response {
+                write!(
+                    socket,
+                    "HTTP/1.1 {status} Answer\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .expect("response head");
+                socket.write_all(body).expect("response body");
+            } else {
+                let _ = socket.read(&mut byte);
+            }
+        }
+        Heard { requests }
+    }
+}
+/// One refused answer and the requests it allowed the host to make.
+#[must_use]
+pub fn refused(status: u16, body: &[u8], expected: &str) -> Heard {
+    let peer = Peer::reserve();
+    let settings = settings(peer.address());
+    std::thread::scope(|scope| {
+        let server = scope.spawn(|| peer.serve_after(0, &[(status, body)]));
+        let refused = temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())
+            .expect_err("request refused");
+        assert_eq!(refused.line(), expected);
+        server.join().expect("peer thread")
+    })
+}

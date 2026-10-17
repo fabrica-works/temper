@@ -131,9 +131,9 @@ fn a_second_run_is_refused_while_the_first_holds_the_lock() {
     let scratch = support::Scratch::new("forge_run_held");
     let programs = support::owned::scripted(scratch.path());
     support::owned::finished(scratch.path());
-    let mut first = support::owned::run(scratch.path(), "forgejo").spawn().expect("first run");
+    let mut first = support::owned::command(scratch.path(), "forgejo").spawn().expect("first run");
     programs.marker("forgejo", support::WITHIN);
-    let refused = support::owned::run(scratch.path(), "forgejo").output().expect("second run");
+    let refused = support::owned::command(scratch.path(), "forgejo").output().expect("second run");
     first.kill().and_then(|()| first.wait()).expect("first stopped");
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(refused.stderr, b"temper forge run: forge 1: forgejo is running or being prepared already\n");
@@ -144,7 +144,7 @@ fn the_run_replaces_itself_holding_the_lock_as_standard_input() {
     let scratch = support::Scratch::new("forge_run_exec");
     let programs = support::owned::scripted(scratch.path());
     support::owned::finished(scratch.path());
-    let mut run = support::owned::run(scratch.path(), "forgejo").spawn().expect("run starts");
+    let mut run = support::owned::command(scratch.path(), "forgejo").spawn().expect("run starts");
     let marker = programs.marker("forgejo", support::WITHIN);
     let stdin = fs::read_link(format!("/proc/{}/fd/0", run.id())).expect("stdin");
     run.kill().and_then(|()| run.wait()).expect("stopped");
@@ -167,7 +167,7 @@ fn the_new_process_sees_the_specs_environment_alone() {
     let scratch = support::Scratch::new("forge_run_environment");
     let programs = support::owned::scripted(scratch.path());
     support::owned::finished(scratch.path());
-    let mut run = support::owned::run(scratch.path(), "forgejo").env("LEAKED", "private").spawn().expect("run");
+    let mut run = support::owned::command(scratch.path(), "forgejo").env("LEAKED", "private").spawn().expect("run");
     let mut marker = programs.marker("forgejo", support::WITHIN);
     run.kill().and_then(|()| run.wait()).expect("stopped");
     marker.environment.sort();
@@ -189,7 +189,7 @@ fn the_new_process_holds_no_descriptor_but_the_standard_three() {
     let scratch = support::Scratch::new("forge_run_descriptors");
     let programs = support::owned::scripted(scratch.path());
     support::owned::finished(scratch.path());
-    let mut run = support::owned::run(scratch.path(), "runner").spawn().expect("run");
+    let mut run = support::owned::command(scratch.path(), "runner").spawn().expect("run");
     let marker = programs.marker("runner", support::WITHIN);
     run.kill().and_then(|()| run.wait()).expect("stopped");
     assert_eq!(marker.descriptors, [0, 1, 2]);
@@ -208,7 +208,7 @@ fn no_secret_of_the_state_reaches_a_refusal() {
     let mut state = temper_forge_setup::state::decode(&fs::read(&path).expect("state")).expect("record");
     state.prepared = false;
     support::write_private(&path, temper_forge_setup::state::encode(&state).expose());
-    let refused = support::owned::run(scratch.path(), "forgejo").output().expect("refusal");
+    let refused = support::owned::command(scratch.path(), "forgejo").output().expect("refusal");
     assert_eq!(refused.status.code(), Some(1));
     assert_eq!(
         refused.stderr,
@@ -311,5 +311,58 @@ fn an_interrupted_upgrade_leaves_the_state_for_the_next_preparation() {
     assert_eq!(ended.stderr, b"temper forge prepare: forge 1: interrupted\n");
     assert_eq!(fs::read(path).expect("old state kept"), before);
     assert_eq!(fs::read_dir(scratch.path().join("forge-1/backups")).expect("upgrade fixture").count(), 0);
+    scratch.remove();
+}
+#[test]
+fn reconcile_refuses_a_tls_forge_naming_it() {
+    let scratch = support::Scratch::new("reconcile_tls");
+    support::owned::managed(scratch.path());
+    support::owned::configuration_value(scratch.path(), |value| {
+        value["application"]["forges"][0]["transport"] =
+            serde_json::json!({"tls":{"server_name":"forge.example","trust":null}});
+    });
+    support::owned::refused(
+        scratch.path(),
+        "reconcile",
+        b"temper forge reconcile: forge 1: its transport is TLS, and reconcile speaks plaintext to loopback alone\n",
+    );
+    assert!(!scratch.path().join("forge-1").exists());
+    scratch.remove();
+}
+#[test]
+fn reconcile_makes_a_missing_forge_directory_private() {
+    let scratch = support::Scratch::new("reconcile_missing_directory");
+    support::owned::managed(scratch.path());
+    support::owned::refused(
+        scratch.path(),
+        "reconcile",
+        b"temper forge reconcile: forge 1: Forgejo did not answer within 300 ms\n",
+    );
+    assert_eq!(fs::metadata(scratch.path().join("forge-1")).expect("directory").permissions().mode() & 0o777, 0o700);
+    scratch.remove();
+}
+#[test]
+fn reconcile_refuses_a_forge_directory_open_to_others() {
+    let scratch = support::Scratch::new("reconcile_open_directory");
+    support::owned::managed(scratch.path());
+    fs::create_dir(scratch.path().join("forge-1")).expect("open directory");
+    fs::set_permissions(scratch.path().join("forge-1"), fs::Permissions::from_mode(0o755)).expect("open directory");
+    support::owned::refused(scratch.path(), "reconcile", format!("temper forge reconcile: forge 1: {}: must be a private directory of this user's, not reached through a link\n", scratch.path().join("forge-1").display()).as_bytes());
+    assert!(!scratch.path().join("forge-1/state").exists());
+    scratch.remove();
+}
+#[test]
+fn reconcile_refuses_a_forge_the_setup_has_no_entry_for() {
+    let scratch = support::Scratch::new("reconcile_no_entry");
+    support::owned::managed(scratch.path());
+    support::owned::configuration_value(scratch.path(), |value| {
+        value["application"]["setup"] = serde_json::json!([]);
+    });
+    support::owned::refused(
+        scratch.path(),
+        "reconcile",
+        b"temper forge reconcile: forge 1: the setup has no entry for it\n",
+    );
+    assert!(!scratch.path().join("forge-1").exists());
     scratch.remove();
 }

@@ -35,7 +35,7 @@ impl Throwaway {
         let prepared = owned::prepare(scratch.path(), 1);
         assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
         let log = fs::File::create(scratch.path().join("server.log")).expect("server log");
-        let child = owned::run(scratch.path(), "forgejo")
+        let child = owned::command(scratch.path(), "forgejo")
             .stdout(log.try_clone().expect("log clone"))
             .stderr(log)
             .spawn()

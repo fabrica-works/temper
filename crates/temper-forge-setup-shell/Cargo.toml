@@ -10,11 +10,14 @@ publish.workspace = true
 temper-forge-setup.workspace = true
 temper-forge-forgejo.workspace = true
 skein-io.workspace = true
+skein-http.workspace = true
 skein-lib.workspace = true
 skein-shell.workspace = true
 skein-json.workspace = true
 
 [dev-dependencies]
+temper-service.workspace = true
+temper-engine-protocol-forge.workspace = true
 jig-protocol-config.workspace = true
 
 [lints.rust]
