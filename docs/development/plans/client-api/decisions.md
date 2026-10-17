@@ -1393,6 +1393,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Files** gain `examples/ops/client-protocol-wire/schema/ops-client-v1.schema`, its generated code and goldens, written only by the drift test's write mode in the build lane: `heavy sh -c 'SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-client-wire-world --test drift -E "test(ops_client_wire_schema_matches_generated_code_and_goldens)"'`. Refresh any further user of the changed records that the build shows, and list it in the commit body.
      4. **Unchanged:** 21.2's Shape, Test shape, Proof (rulings 218 and 220's eight marks), Don't and Removes; rulings 192 and 221's "No split".
 
+226. **jig 21.2: diagnose the joint bootstrap below its layer** (process, jig 21.2's block of 2026-10-17T06:49:40Z).
+     Ruling 226, process: the implementer's option A. implementer.md, 8.8: "Diagnose a failure below its layer. Reproduce it where a run is cheap, in a world or a focused test through `heavy` in the build lane, and find its cause there. Run the proof again only after a change aimed at a cause its log names, once per change."
+
+     1. **Reproduce first.** Extend the passing unit `joint::bytes::tests::a_linked_ops_root_signs_in_through_the_byte_face` (27 ms, `logs/jig-21/21.2-bootstrap-5.log`), or a focused test beside it, with what the report names as the remaining difference: the common world's scheduling and startup, its clock and its deadlines, in place of the unit's 10 ms clock and direct callback drain. It reproduces when it shows the offline, signed-out tree without First words, as p-6 to p-8 do. Log the client's link state and each deadline it sets.
+     2. **Then the proof,** once, after a change aimed at the cause that focused test's log names. Default: at most two more runs of `p_accepts_the_restart_from_the_incidents_page`, each after a different change. A fourth run with the same symptom is a block with the logs, not a fifth run.
+     3. **Bound:** aim to spend at most 45 minutes on this diagnosis; past it, report what the focused logs show, and go on with it.
+     4. **Unchanged:** no engine or core production change (as the report proposes); 21.2's Proof, Files and ruling 225's Size (4,329 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
