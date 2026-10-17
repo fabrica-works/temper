@@ -207,6 +207,16 @@ Files:
   and `tests/conformance/tests/referee.rs:219` (`position_snapshot`).
 - `tests/core/tests/referee/revisions.rs` (new), and
   `revisions_referee_cases()` in `tests/core/tests/referee.rs`.
+- Words with a release (the designer's answer of 2026-10-17, jig
+  `5a9a97485`): `testing/jig-fake-parties/src/lib.rs` (`Ask::Say`'s
+  `release: bool` becomes `release: Option<u64>`, the hold's revision
+  the party saw); `tests/core/src/peers.rs:214-216` (its translation);
+  `tests/channel/src/world.rs:284`, which takes `release: None` alone,
+  its stories sending none; the literals `release: false`, now `None`:
+  `tests/channel/src/fixtures.rs:414`, `tests/channel/src/referee.rs:636,
+  650, 677`, `tests/conformance/src/actions.rs:41`,
+  `tests/core/src/faults.rs:56`, `tests/core/tests/peers.rs:115`; the
+  story `tests/core/tests/peers.rs:197`. Nothing under `crates/`.
 Shape:
 - `referee::Revision { Spec(u64), Hold(u64) }`; `Observed::Named { task:
   u64, revision: Revision }`; `Task` gains `spec_revision: u64` and
@@ -219,6 +229,31 @@ Shape:
   "task <n>'s spec moved past revision <r>, which nothing named" }` (or
   its hold). A named request that never commits leaves an unused entry,
   which nothing reads.
+- No exemption for a release by words: jig's `domain/people.md`, 5.1
+  (at `5a9a97485`): "Words release nothing: a `Message` adds words to
+  the inbox, and words to a task the party stopped come with a `Release`
+  in one compound request (below), naming the hold's revision as it
+  would alone." No `Task.stopper`, no `Observed::OwnStopRelease`, no
+  flag on a hold, and nothing of `Hold::StoppedBy` in the referee.
+- The adapters read a compound's operations as they read the lone asks:
+  in an inbound `people::Ask::Compound`, each `Operation::Release {
+  revision }` gives `Named { task, Hold(revision) }`, and each
+  `Operation::Amend` gives what a lone `people::Ask::Amend` gives (its
+  `Spec(revision)` but for a priority alone; its `release: Some(r)`,
+  `Hold(r)`).
+- The story `a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt`
+  (`tests/core/tests/peers.rs:197`) becomes the compound jig's
+  `domain/people.md`, 11 names ("a person stops a run, then writes to
+  its task and releases it in one compound request"): after the stop it
+  reads `jig_core_world::fixtures::live_row(&world, task).revisions.hold`
+  and sends `Ask::Say { task: Task::Last, words, release: Some(hold) }`,
+  which the peers kit sends as `people::Ask::Compound { project,
+  operations: [Message { task, words, release: false }, Release { task,
+  revision: hold, again: None }] }` (`release: None` stays a lone
+  `people::Ask::Say { .., release: false }`). The compound's answer
+  reaches the party as `Reply::Done` (`tests/core/src/peers.rs:454`), so
+  the story's two `Reply::Said` checks become `Reply::Done` checks:
+  absent before `release_commits`, present after. Its other checks stay.
 Test shape:
 - `tests/core/tests/referee/revisions.rs`, the same fixtures:
   `ownership_catches_an_amendment_made_past_the_revision_it_named`,
@@ -248,7 +283,9 @@ at the layer and for the reason 23.1 gives. Then 23.1's `jig-core-world` and
 `jig-one-process-world` runs, once each, under both profiles.
 Don't: count an accepted amendment proposal as unnamed (its proposer
 named the revision when it proposed, and that `Named` is consumed at the
-acceptance); read a task's revisions anywhere but the durable snapshot.
+acceptance); read a task's revisions anywhere but the durable snapshot;
+change a crate under `crates/` (`people::Ask::Say`'s `release` leaves
+the engine in a step after jig 14.3, the supervisor's).
 Size: at most 60 lines (`testing/jig-conformance` only).
 Removes: nothing.
 
@@ -295,6 +332,9 @@ pub enum Revision {
   `Phase::Held` for `Waiting` or `Active` with no party, run or procedure
   naming its hold (a hold whose reason the engine clears itself), the
   rule exempts that reason, and the increment names it in its report.
+  A party's stop is no such hold: a party lifts it, by a `Release` that
+  names its revision, alone or beside words (23.2's Shape; answered
+  2026-10-17).
 - **23.2: a procedure's named revision.** If the test connector's durable
   `ProcedureState` does not say which step amended, so that the adapter
   cannot report each amendment once, the increment raises it before it

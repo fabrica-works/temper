@@ -404,7 +404,14 @@ amend-and-release act, its conversation's sending (`Write` users),
 `testing/jig-client-scripted-engine/src/requests.rs` (it models a
 compound of `Message` and `Release`, and of `Amend` and `Release`, as it
 modelled `Write { release }` and `Amend { release }`), test records;
-`Made::Words`' users (the reference UI's outcome words).
+`Made::Words`' users (the reference UI's outcome words);
+`OwnerOutcomeSaid.released`'s users (at jig `5a9a97485`):
+`crates/jig-client-domain/src/contract/owner_outcome.rs:67`,
+`crates/jig-client-protocol-link/src/translate/answers.rs:73`,
+`crates/jig-client-view/src/owner_outcome.rs:143`,
+`testing/jig-client-scripted-engine/src/payload/owner_outcome.rs:49`,
+`tests/client/src/joint/wire/outcomes.rs:40-41`,
+`tests/client/src/observe.rs:553-554`, and their tests.
 Shape:
 - Wire: `Message { project: u32, task: u64, words: text 65536 }` (was
   `Write`, less `release`); `Amend` loses `release`; `enum Operation {
@@ -419,17 +426,28 @@ Shape:
   `OwnerOutcome.compound`; no per-operation list or `OperationOutcome`;
   `Refused { refusal: Refusal, at: option u32 }`; `AdmissionLimit`
   gains `operations`; `MadeWords` and `Made.words` go (`Message`'s
-  outcome is `OwnerOutcomeSaid`, as jig 04 left the people outcome).
+  outcome is `OwnerOutcomeSaid`, as jig 04 left the people outcome);
+  `OwnerOutcomeSaid` loses `released`, words releasing nothing (jig's
+  `domain/people.md`, 5.1, at `5a9a97485`: "Words release nothing: a
+  `Message` adds words to the inbox").
 - Engine: a compound's pieces decoded each as an `Operation` and
   translated as alone; one naming another project is answered
   `Refused { refusal: Refusal::Malformed { at: place, why:
   Malformed::ProjectMismatch }, at: Some(place) }` before the core, and
   nothing is kept. `enum Malformed { project_mismatch }` and
   `RefusalMalformed { at: u32, why: Malformed }`, `Refusal.malformed`,
-  start here; 14.4 and 14.5 add their variants.
+  start here; 14.4 and 14.5 add their variants. A `Message` translates
+  to `people::Ask::Say { .., release: false }` (`people::Operation::Message`
+  in a compound), and people's `Outcome::Said` to `OwnerOutcomeSaid`
+  without its `released`: those people fields stay until the step after
+  14.3 (the supervisor's) removes them from the engine.
 - Contract: `Ask::Message`, `Ask::Compound { project, operations:
   List<Operation> }` (the interface sketch); `Answer::Refused { refusal,
-  at: Option<u32> }`.
+  at: Option<u32> }`. The reference UI's words to a stopped chat are
+  `Compound { [Message, Release { revision, again: None }] }`, the
+  revision the hold's as the chat's document gave it (jig's
+  `client/domain/pages.md`, 4, at `5a9a97485`: "the release, which names
+  the hold's revision the page showed").
 Test shape: the wire crate: `a_compound_s_operations_round_trip_as_pieces`;
 the component's tests: `a_compound_reaches_the_people_child_in_order`,
 `a_compound_operation_naming_another_project_is_refused_at_its_place`,
@@ -453,10 +471,18 @@ stopped task resumes after one request made once (`requests_made()`
 counts 1), and words still reach a running run as `Message`. Bound:
 2 s.
 Don't: let the client chain a `Message` and a `Release` as two
-requests; give `Operation` records of its own without `project`.
-Size: at most 280 lines.
+requests; give `Operation` records of its own without `project`; change
+`people::Ask::Say`, `people::Operation::Message`, `people::Outcome::Said`
+or the tasks child's message (the step after 14.3).
+Size: at most 310 lines (280, and 30 for `OwnerOutcomeSaid.released`,
+whose 23 lines on the client's side and the engine's translation at jig
+`5a9a97485` are counted by `git grep -n -E 'Said|said' 5a9a97485 --
+crates/jig-client-domain crates/jig-client-protocol-link
+crates/jig-client-view crates/jig-protocol-engine-clients/src
+testing/jig-client-scripted-engine tests/client tests/client-protocol
+crates/jig-client-protocol-wire/schema | grep -c released`).
 Removes: `Write`, `Write.release`, `Amend.release`, `MadeWords`,
-`Made::Words`.
+`Made::Words`, `OwnerOutcomeSaid.released`.
 
 ### 14.4 `Create`
 Scope: a party's `Create` of a batch (contract.md, 3.2; tasks' fields
