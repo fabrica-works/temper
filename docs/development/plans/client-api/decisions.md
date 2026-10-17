@@ -1324,6 +1324,13 @@ choice would have been the user's (development.md, 10.4).
      3. **jig 21.2** removes the eight marks and runs them once: its Files and Proof say so now (`test(/_survives_/)` selects exactly these eight in `fuzzy_joint`).
      4. **Unchanged:** rulings 207, 215 (Size 784 of aim 850, stop 950), 218 and 219.
 
+221. **jig 21.2: Size re-estimated to 950, stop at 1,100; no split** (plan defect, jig 21.2's block of 2026-10-17T05:58:48Z).
+     Ruling 221, plan defect: jig 21.2's Size is re-estimated, and 21.2 goes on as one increment: the implementer's option A, with other numbers. Its Size, "at most 250 lines", was set before ruling 192 gave the root its own value mappings: "21.2's root maps its values to them, as jig 13.3 does for the test family". 13.3's one family took 466 lines (`testing/jig-client-test-domain/src/family/wire.rs`); `ops`'s four take 534 (`wire.rs` 229, `wire/infrastructure_documents.rs` 126, `wire/infrastructure_native.rs` 104, `wire/observability_documents.rs` 42, `wire/observability_native.rs` 33).
+
+     1. **No split.** The mappings do not land by themselves: the root is their one user, and without them it cannot reach 21.1's wire crate (ruling 192: a cyclic package dependency otherwise). 21.2's Shape keeps the root's change in one commit of its own.
+     2. **Size:** the 891 counted at `b94f89a89` (`logs/jig-21/21.2-size.txt`) stand. Aim to land at most 950 production lines, counted by code-organization.md's command (`tests/` worlds and `tests*.rs` are not counted); past 950, the report gives the count by file and why, and the session goes on. At 1,100, stop and block with the count by file. Count at each commit. This replaces "Size: at most 250 lines" and its twice-the-Size rule for 21.2, until it lands.
+     3. **Unchanged:** 21.2's Shape, Files, Test shape, Proof (with rulings 218 and 220's eight marks), Don't and Removes; ruling 192.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
