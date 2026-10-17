@@ -68,8 +68,11 @@ impl Programs {
         let clock = skein_shell::Clock::new();
         let deadline = clock.now().now.saturating_add(within);
         loop {
-            if let Ok(pid) = fs::read_to_string(self.directory.join("hung")) {
-                return pid.trim().parse().expect("sleep pid");
+            // The shell creates the file before it writes the pid: an empty file is not yet an answer.
+            if let Some(pid) =
+                fs::read_to_string(self.directory.join("hung")).ok().and_then(|text| text.trim().parse().ok())
+            {
+                return pid;
             }
             assert!(clock.now().now < deadline, "command hung within bound");
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -138,6 +141,14 @@ pub fn finished(directory: &Path) {
     super::write_private(&root.join("state"), state::encode(&state).expose());
 }
 
+/// Whether the process is blocked in its `sleep`. The kernel names the process `sleep` as the exec begins, and
+/// the dynamic loader holds a descriptor (3) until it has mapped the libraries, so only a process asleep has
+/// closed every descriptor the exec and its startup opened.
+fn asleep(pid: u32) -> bool {
+    fs::read_to_string(format!("/proc/{pid}/stat"))
+        .is_ok_and(|stat| stat.rsplit_once(") ").is_some_and(|(_, rest)| rest.starts_with("S ")))
+}
+
 pub struct Marker {
     pub pid: u32,
     pub arguments: Vec<String>,
@@ -157,6 +168,7 @@ impl Programs {
                 let mut lines = text.lines();
                 if let Some(pid) = lines.next().and_then(|line| line.parse::<u32>().ok())
                     && fs::read_to_string(format!("/proc/{pid}/comm")).is_ok_and(|name| name.trim() == "sleep")
+                    && asleep(pid)
                 {
                     let arguments =
                         lines.by_ref().take_while(|line| *line != "ENVIRONMENT").map(String::from).collect();

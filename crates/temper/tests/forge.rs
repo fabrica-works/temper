@@ -108,7 +108,18 @@ fn a_termination_signal_kills_the_commands_group_and_ends_the_preparation_interr
     let ended = run.wait_with_output().expect("preparation ends");
     assert_eq!(ended.status.code(), Some(1));
     assert_eq!(ended.stderr, b"temper forge prepare: forge 1: interrupted\n");
-    let stat = fs::read_to_string(format!("/proc/{sleep}/stat"));
+    let clock = skein_shell::Clock::new();
+    let deadline = clock.now().now.saturating_add(support::WITHIN);
+    let stat = loop {
+        let stat = fs::read_to_string(format!("/proc/{sleep}/stat"));
+        if stat.is_err()
+            || stat.as_ref().is_ok_and(|text| text.rsplit_once(") ").is_some_and(|(_, rest)| rest.starts_with("Z ")))
+        {
+            break stat;
+        }
+        assert!(clock.now().now < deadline, "the sleep exits within bound");
+        std::thread::yield_now();
+    };
     assert!(stat.is_err() || stat.expect("stat").contains(") Z "), "the sleep is dead");
     let state = temper_forge_setup::state::decode(&fs::read(scratch.path().join("forge-1/state")).expect("state"))
         .expect("record");
