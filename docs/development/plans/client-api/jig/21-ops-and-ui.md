@@ -186,6 +186,12 @@ Ruling 227: so do `crates/jig-protocol-engine-clients/src/translate/owner.rs`
 (`charters`, :163: the wire's goals list sized by `value.goals.len()`,
 as `translate/inbox.rs:93` sizes its rows' goals) and its test in
 `crates/jig-protocol-engine-clients/src/tests/documents.rs`.
+Ruling 230: so do the eight `acts` translations of
+`crates/jig-client-protocol-link/src/translate/` sized by
+`limits.client.rows` (`pages_part3.rs:155`, `pages_part5.rs:253`,
+`pages_part6.rs:41, 50, 71, 172, 255`, `pages_part7.rs:97`), each bounded
+by `c::MAX_OFFERED_ACTS` as `documents_part8.rs:35` is, and a
+translation test of `owner_escalation_fields`.
 Shape: as jig 13.4's: `ops`'s table owner, `owner::Owner` (with `Kept {
 scope }`), goes, and no owner enum takes its place; a tell routes by
 `jig_client_view::Owner::of_asker` (jig 13.4), `Jig` to the reference

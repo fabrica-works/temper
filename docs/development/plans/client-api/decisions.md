@@ -1429,6 +1429,16 @@ choice would have been the user's (development.md, 10.4).
      3. **Bound:** aim to spend at most 60 minutes from your start on the p proof; past it, report what the focused logs show, and go on with it.
      4. **Unchanged:** fixture changes stay in `tests/ops/src/joint/**` or a world it reuses, each file outside `tests/ops/src/joint/**` named in the commit body (ruling 228, point 2); ruling 227's points 1, 2 and 4 (two engine production lines used of its 10); no core production change (ruling 226); 21.2's Proof; ruling 225's Size (4,331 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1.
 
+230. **jig 21.2: offered acts bounded by MAX_OFFERED_ACTS in the link** (scope, jig 21.2's block of 2026-10-17T07:42:21Z).
+     Ruling 230, scope: the implementer's option A, within jig 21.2, with the same defect's copies.
+
+     1. **The repair.** In `crates/jig-client-protocol-link/src/translate/pages_part6.rs`, `owner_escalation_fields` (:50) bounds its acts by `c::MAX_OFFERED_ACTS`, as `documents_part8.rs:35` does: `acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?`. The view refuses an escalation whose acts have room past it (`jig-client-view/src/cards/owner_escalation.rs:45`, `if document.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS`); `limits.client.rows` gives room for 32, `MAX_OFFERED_ACTS` is 25 (`jig-client-domain/src/contract/documents.rs:226`).
+     2. **Its copies,** in the same commit: the other seven `acts: offered_piece(value.acts(), limits, limits.client.rows)?` of the link's `translate/` (`pages_part3.rs:155`, `pages_part5.rs:253`, `pages_part6.rs:41, 71, 172, 255`, `pages_part7.rs:97`) take `c::MAX_OFFERED_ACTS` the same way; the views of `owner_person_task.rs:123, 146`, `owner_proposal.rs:66` and `sections/project/owner.rs:150` refuse past it too. Name each in the commit body. Refresh any further copy you meet, and list it there.
+     3. **Its test,** at the unit layer, in the link crate's translation tests: an owner escalation with five acts translates to acts with room for at most `MAX_OFFERED_ACTS`. Under 20 ms. The view's checks and the referee stay as they are.
+     4. **Then** resume the seeded P survival at its run 3, under the README's rule of ruling 229 (at most six runs of it), then the gate and the landing.
+     5. **Bound:** at most 10 lines of client production in all, counted in ruling 225's Size (4,331 now, aim 4,500, stop 5,000); past them, a block.
+     6. **Unchanged:** ruling 227's engine lines (two of 10); no core production change (ruling 226); 21.2's Proof; the 06:20:26Z steer's point 1. The commit body names the fixture files outside `tests/ops/src/joint/**` (ruling 228, point 2), as the report lists them.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
