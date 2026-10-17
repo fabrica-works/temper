@@ -168,6 +168,10 @@ fn expected(answer: Answer) -> Document {
         | Answer::Protections(_)
         | Answer::Collaborators(_)
         | Answer::Permission(_)
+        | Answer::Org(_)
+        | Answer::Team(_)
+        | Answer::Teams(_)
+        | Answer::Members(_)
         | Answer::CombinedStatus { .. } => panic!("unexpected write answer"),
     }
 }

@@ -133,6 +133,13 @@ impl Store {
             Request::ApiSettings
             | Request::RepositoryById { .. }
             | Request::Repository { .. }
+            | Request::Org { .. }
+            | Request::CreateOrg { .. }
+            | Request::Teams { .. }
+            | Request::CreateTeam { .. }
+            | Request::EditTeam { .. }
+            | Request::TeamMembers { .. }
+            | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }
             | Request::Issue { .. }
@@ -181,6 +188,13 @@ impl Store {
             | Request::ApiSettings
             | Request::RepositoryById { .. }
             | Request::Repository { .. }
+            | Request::Org { .. }
+            | Request::CreateOrg { .. }
+            | Request::Teams { .. }
+            | Request::CreateTeam { .. }
+            | Request::EditTeam { .. }
+            | Request::TeamMembers { .. }
+            | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }
             | Request::Issue { .. }

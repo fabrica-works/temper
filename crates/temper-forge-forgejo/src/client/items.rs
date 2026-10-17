@@ -119,13 +119,7 @@ fn target(request: &Request, out: &mut Target) {
             out.put(b"/comments");
         }
         Request::Pull { at, number } => out.numbered(at, b"/pulls/", *number),
-        Request::PullFor { at, base, head } => {
-            out.repo(at);
-            out.put(b"/pulls/");
-            out.segment(base);
-            out.put(b"/");
-            out.segment(head);
-        }
+        Request::PullFor { at, base, head } => pull_for(out, at, base, head),
         Request::CombinedStatus { at, commit, page } => {
             out.repo(at);
             out.put(b"/commits/");
@@ -170,6 +164,13 @@ fn target(request: &Request, out: &mut Target) {
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("item encoder dispatch"),
     }
@@ -531,4 +532,12 @@ impl Items {
         }
         Ok(())
     }
+}
+
+fn pull_for(out: &mut Target, at: &Repo, base: &[u8], head: &[u8]) {
+    out.repo(at);
+    out.put(b"/pulls/");
+    out.segment(base);
+    out.put(b"/");
+    out.segment(head);
 }

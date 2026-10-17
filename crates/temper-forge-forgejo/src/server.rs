@@ -14,6 +14,7 @@ mod branches;
 pub mod delivery;
 mod files;
 mod items;
+mod orgs;
 mod reviews;
 mod setup;
 mod start;
@@ -41,7 +42,10 @@ pub enum Route {
 pub fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Unrouted> {
     match writes::route(method, target, limits) {
         Err(Unrouted::NotFound) => match read_route(method, target, limits) {
-            Err(Unrouted::NotFound) => setup::route(method, target, limits),
+            Err(Unrouted::NotFound) => match setup::route(method, target, limits) {
+                Err(Unrouted::NotFound) => orgs::route(method, target, limits),
+                other => other,
+            },
             other => other,
         },
         other => other,
@@ -69,6 +73,10 @@ fn read_route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, U
 pub enum Answer {
     Token(crate::document::AccessToken),
     Tokens(Box<[crate::document::AccessToken]>),
+    Org(crate::document::Org),
+    Team(crate::document::Team),
+    Teams(Box<[crate::document::Team]>),
+    Members(Box<[User]>),
     User(User),
     ApiSettings(ApiSettings),
     Repository(Repository),
@@ -135,6 +143,10 @@ fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refu
                 setup::token(json, token);
             }
             json.array_end();
+            Ok(())
+        }
+        Answer::Org(_) | Answer::Team(_) | Answer::Teams(_) | Answer::Members(_) => {
+            orgs::write(json, answer);
             Ok(())
         }
         Answer::Error(value) => {

@@ -37,6 +37,40 @@ pub enum Sort {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Reads an organization by name.
+    Org {
+        name: Box<[u8]>,
+    },
+    /// Makes a private organization for a person, on the admin route.
+    CreateOrg {
+        person: Box<[u8]>,
+        name: Box<[u8]>,
+    },
+    /// Lists one page of an organization's teams.
+    Teams {
+        org: Box<[u8]>,
+        page: Page,
+    },
+    /// Makes a team with the complete specification.
+    CreateTeam {
+        org: Box<[u8]>,
+        spec: crate::document::TeamSpec,
+    },
+    /// Replaces a team's specification.
+    EditTeam {
+        team: u64,
+        spec: crate::document::TeamSpec,
+    },
+    /// Lists one page of a team's members.
+    TeamMembers {
+        team: u64,
+        page: Page,
+    },
+    /// Adds a member, answering 204 without a document.
+    AddMember {
+        team: u64,
+        login: Box<[u8]>,
+    },
     User,
     ApiSettings,
     RepositoryById {

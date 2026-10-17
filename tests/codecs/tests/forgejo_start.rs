@@ -85,6 +85,10 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Issue(_)
         | Answer::Comments(_)
         | Answer::Pull(_)
+        | Answer::Org(_)
+        | Answer::Team(_)
+        | Answer::Teams(_)
+        | Answer::Members(_)
         | Answer::CombinedStatus { .. } => panic!("a start answer"),
     }
 }

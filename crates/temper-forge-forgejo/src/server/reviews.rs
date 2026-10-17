@@ -139,6 +139,10 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
         | Answer::Issue(_)
         | Answer::Comments(_)
         | Answer::Pull(_)
+        | Answer::Org(_)
+        | Answer::Team(_)
+        | Answer::Teams(_)
+        | Answer::Members(_)
         | Answer::CombinedStatus { .. }
         | Answer::Branch(_)
         | Answer::Branches(_)

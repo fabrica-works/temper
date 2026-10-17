@@ -205,6 +205,7 @@ impl Plan {
                     | d::Row::File(_)
                     | d::Row::Commit(_)
                     | d::Row::Run(_)
+                    | d::Row::Team(_)
                     | d::Row::Step(_)
                     | d::Row::Job(_) => {}
                 }
@@ -318,6 +319,8 @@ impl Plan {
             }
             d::Document::Token(_)
             | d::Document::User(_)
+            | d::Document::Org(_)
+            | d::Document::Team(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

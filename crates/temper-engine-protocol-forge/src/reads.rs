@@ -346,7 +346,6 @@ impl Plan {
                     | Rows::Branches(_) => Err(api::Error::InvalidAnswer),
                 }
             }
-            d::Row::Token(_) => Err(api::Error::InvalidAnswer),
             d::Row::Protection(_) => Ok(()),
             d::Row::Issue(issue) => self.append(
                 api::Answer::Items { items: Box::new([reading::summary(issue)]), more: false, now: self.now },
@@ -389,9 +388,13 @@ impl Plan {
                 self.append(api::Answer::Remarks { remarks: Box::new([reading::remark(remark)]), more: false }, shared)
             }
             d::Row::Branch(branch) => self.append(api::Answer::Branches(Box::new([branch.name])), shared),
-            d::Row::File(_) | d::Row::Commit(_) | d::Row::Run(_) | d::Row::Step(_) | d::Row::Job(_) => {
-                Err(api::Error::InvalidAnswer)
-            }
+            d::Row::Token(_)
+            | d::Row::Team(_)
+            | d::Row::File(_)
+            | d::Row::Commit(_)
+            | d::Row::Run(_)
+            | d::Row::Step(_)
+            | d::Row::Job(_) => Err(api::Error::InvalidAnswer),
         }
     }
     fn lookup_row(&mut self, pull: d::PullRequest) -> Result<(), api::Error> {
@@ -633,6 +636,7 @@ fn keep_row(row: &d::Row, forge: u16, tables: &mut Tables) {
         | d::Row::File(_)
         | d::Row::Commit(_)
         | d::Row::Run(_)
+        | d::Row::Team(_)
         | d::Row::Step(_)
         | d::Row::Job(_) => {}
     }
@@ -652,6 +656,8 @@ pub(crate) fn keep_document(document: &d::Document, forge: u16, tables: &mut Tab
         d::Document::Pull(pull) => keep_pull(pull, forge, tables),
         d::Document::Permission(permission) => keep_user(&permission.user, forge, tables),
         d::Document::Token(_)
+        | d::Document::Org(_)
+        | d::Document::Team(_)
         | d::Document::ApiSettings(_)
         | d::Document::Search { .. }
         | d::Document::Listed { .. }
@@ -710,6 +716,13 @@ fn page_bound(request: &Request) -> Option<u32> {
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,
     }
@@ -730,6 +743,7 @@ pub(crate) fn long(heard: &Heard) -> bool {
             | d::Row::File(_)
             | d::Row::Commit(_)
             | d::Row::Run(_)
+            | d::Row::Team(_)
             | d::Row::Step(_)
             | d::Row::Job(_) => false,
         },
@@ -739,6 +753,8 @@ pub(crate) fn long(heard: &Heard) -> bool {
             d::Document::Review(row) => long_body(&row.body),
             d::Document::Token(_)
             | d::Document::User(_)
+            | d::Document::Org(_)
+            | d::Document::Team(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

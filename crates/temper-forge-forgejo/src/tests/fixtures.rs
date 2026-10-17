@@ -141,3 +141,44 @@ impl Pump {
         panic!("decoder exhausted the input step bound")
     }
 }
+pub fn request(
+    method: crate::request::Method,
+    target: &[u8],
+    body: &[u8],
+    limits: &Limits,
+) -> Result<crate::request::Request, Malformed> {
+    use crate::server;
+    let server::Route::Body(mut decoder) = server::route(method, target, limits).unwrap() else { panic!("body route") };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.json };
+    let mut tokenizer = tokenizer::Tokenizer::new(&limits.json);
+    let mut above = Queue::with_capacity(1);
+    let mut below = Queue::with_capacity(1);
+    let mut intake =
+        Intake::with_capacity(u32::try_from(body.len()).unwrap().max(tokenizer::largest_demand(&limits.json)));
+    intake.append(body).unwrap();
+    let mut demand = server::body_first(&decoder);
+    let mut read = None;
+    for _ in 0..body.len().saturating_mul(4).saturating_add(32) {
+        match read.take() {
+            Some(read) => {
+                let event = match intake.meet(read) {
+                    Some(bytes) => Up::Bytes(bytes),
+                    None => Up::End,
+                };
+                tokenizer::up(&mut tokenizer, &env, event, &mut above, &mut below);
+            }
+            None => tokenizer::down(&mut tokenizer, &env, demand, &mut above, &mut below),
+        }
+        if let Some(Down::Demand { read: r, room: 0 }) = below.pop() {
+            read = Some(r);
+        }
+        if let Some(event) = above.pop() {
+            match server::body(&mut decoder, limits, &event) {
+                server::BodyStep::Demand(next) => demand = next,
+                server::BodyStep::Decoded(request) => return Ok(request),
+                server::BodyStep::Malformed(error) => return Err(error),
+            }
+        }
+    }
+    panic!("body decoder exhausted input step bound")
+}

@@ -36,3 +36,35 @@ pub fn git_token(value: bool) -> AccessToken {
     };
     token
 }
+
+use temper_forge_forgejo::document::{Access, Org, Team, TeamSpec, Units};
+pub const ORG: u64 = 6;
+pub const TEAM: u64 = 4;
+#[must_use]
+pub fn org() -> Org {
+    Org { id: ORG, name: Box::from(*b"ensemble") }
+}
+#[must_use]
+pub fn team() -> Team {
+    Team {
+        id: TEAM,
+        spec: TeamSpec {
+            name: Box::from(*b"writer"),
+            permission: Access::Write,
+            includes_all_repositories: true,
+            units: Units { code: Access::Write, issues: Access::Write, pulls: Access::Write, actions: Access::Write },
+        },
+    }
+}
+#[must_use]
+pub fn owners() -> Team {
+    Team {
+        id: 1,
+        spec: TeamSpec {
+            name: Box::from(*b"Owners"),
+            permission: Access::Owner,
+            includes_all_repositories: true,
+            units: Units { code: Access::Owner, issues: Access::Owner, pulls: Access::Owner, actions: Access::Owner },
+        },
+    }
+}

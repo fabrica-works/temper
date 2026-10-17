@@ -77,6 +77,7 @@ pub struct Repository {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Row {
     Token(AccessToken),
+    Team(Team),
     User(User),
     Issue(Issue),
     Comment(Comment),
@@ -95,6 +96,8 @@ pub enum Row {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
     Token(AccessToken),
+    Org(Org),
+    Team(Team),
     User(User),
     ApiSettings(ApiSettings),
     Repository(Repository),
@@ -397,5 +400,77 @@ pub(crate) fn step_status_text(status: StepStatus) -> &'static [u8] {
         StepStatus::Cancelled => b"cancelled",
         StepStatus::Skipped => b"skipped",
         StepStatus::Blocked => b"blocked",
+    }
+}
+
+/// A team's permission or a unit's access in Forgejo's words.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Access {
+    None,
+    Read,
+    Write,
+    Admin,
+    Owner,
+}
+/// The four repository units temper uses.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Units {
+    pub code: Access,
+    pub issues: Access,
+    pub pulls: Access,
+    pub actions: Access,
+}
+/// The same specification is sent when making and editing a team.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TeamSpec {
+    pub name: Box<[u8]>,
+    pub permission: Access,
+    pub includes_all_repositories: bool,
+    pub units: Units,
+}
+/// A team's id and retained specification.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Team {
+    pub id: u64,
+    pub spec: TeamSpec,
+}
+/// An organization's id and login, read from `name`.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Org {
+    pub id: u64,
+    pub name: Box<[u8]>,
+}
+/// Reads one of Forgejo's five access words.
+#[must_use]
+pub fn access(text: &[u8]) -> Option<Access> {
+    match text {
+        b"none" => Some(Access::None),
+        b"read" => Some(Access::Read),
+        b"write" => Some(Access::Write),
+        b"admin" => Some(Access::Admin),
+        b"owner" => Some(Access::Owner),
+        _ => None,
+    }
+}
+/// Spells an access in Forgejo's words.
+#[must_use]
+pub fn access_text(access: Access) -> &'static [u8] {
+    match access {
+        Access::None => b"none",
+        Access::Read => b"read",
+        Access::Write => b"write",
+        Access::Admin => b"admin",
+        Access::Owner => b"owner",
+    }
+}
+pub(crate) fn team() -> Team {
+    Team {
+        id: 0,
+        spec: TeamSpec {
+            name: Box::from([]),
+            permission: Access::None,
+            includes_all_repositories: false,
+            units: Units { code: Access::None, issues: Access::None, pulls: Access::None, actions: Access::None },
+        },
     }
 }

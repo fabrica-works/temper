@@ -19,6 +19,7 @@ use files::FileKind;
 pub(crate) mod reviews;
 use branches::BranchKind;
 use reviews::ReviewKind;
+pub(crate) mod orgs;
 pub(crate) mod setup;
 mod start;
 pub(crate) mod writes;
@@ -35,6 +36,13 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
+        Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. } => orgs::encode(request, limits),
         Request::Tokens { .. }
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
@@ -92,6 +100,7 @@ enum DecoderState {
     Error(writes::Error),
     Start(start::Start),
     Setup(setup::Setup),
+    Orgs(orgs::Orgs),
     Items(Box<items::Items>),
     Files(Box<files::Files>),
     Actions(actions::Actions),
@@ -101,7 +110,11 @@ enum DecoderState {
 #[must_use]
 pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
     let kind = match request {
+        Request::Org { .. } | Request::CreateOrg { .. } => Kind::Setup(setup::SetupKind::Org),
+        Request::CreateTeam { .. } | Request::EditTeam { .. } => Kind::Setup(setup::SetupKind::Team),
+        Request::Teams { .. } => Kind::Setup(setup::SetupKind::Teams),
         Request::DeleteToken { .. }
+        | Request::AddMember { .. }
         | Request::Raw { .. }
         | Request::JobLog { .. }
         | Request::Update { .. }
@@ -125,7 +138,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Protection { .. } => Kind::Branch(BranchKind::Protection),
         Request::Protections { .. } => Kind::Branch(BranchKind::Protections),
         Request::Permission { .. } => Kind::Branch(BranchKind::Permission),
-        Request::Collaborators { .. } => Kind::Users,
+        Request::TeamMembers { .. } | Request::Collaborators { .. } => Kind::Users,
         Request::Pulls { .. } => Kind::Item(Item::Pulls),
         Request::UserOf { .. } | Request::CreateUser { .. } | Request::User => Kind::Setup(setup::SetupKind::Account),
         Request::Tokens { .. } => Kind::Setup(setup::SetupKind::Tokens),
@@ -140,6 +153,9 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
+        Kind::Setup(
+            kind @ (setup::SetupKind::Org | setup::SetupKind::Team | setup::SetupKind::Teams | setup::SetupKind::Units),
+        ) => DecoderState::Orgs(orgs::Orgs::new(kind)),
         Kind::Setup(kind) => DecoderState::Setup(setup::Setup::new(kind, limits)),
         Kind::Error => DecoderState::Error(writes::Error::new()),
         Kind::Write(_) | Kind::Delivery(_) => unreachable!("answer kind selection"),
@@ -168,6 +184,7 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
+            DecoderState::Orgs(state) => state.step(movement),
             DecoderState::Setup(state) => state.step(movement, limits, &decoder.walk),
             DecoderState::Error(state) => state.step(movement),
             DecoderState::Files(state) => state.step(movement, &decoder.walk),
@@ -183,7 +200,8 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
 pub fn keep_after(decoder: &mut Decoder, after: u64) {
     match &mut decoder.state {
         DecoderState::Items(state) => state.keep_after(after),
-        DecoderState::Setup(_)
+        DecoderState::Orgs(_)
+        | DecoderState::Setup(_)
         | DecoderState::Error(_)
         | DecoderState::Files(_)
         | DecoderState::Actions(_)

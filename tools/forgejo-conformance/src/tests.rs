@@ -308,3 +308,17 @@ fn a_truncated_git_packet_keeps_its_length_attached_to_the_hex_run() {
         b"003fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb x\n"
     );
 }
+
+#[test]
+fn masking_sorts_the_deprecated_units_set_in_every_team() {
+    let exchange = Exchange {
+        sent: Vec::new(),
+        status: 200,
+        head: b"HTTP/1.1 200 OK\r\n".to_vec(),
+        body: br#"[{"units":["repo.pulls","repo.code"]},{"units":["repo.issues","repo.actions"]}]"#.to_vec(),
+    };
+    assert_eq!(
+        mask::response(&mut Mask::new(3000), &exchange),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 79\r\n\r\n[{\"units\":[\"repo.code\",\"repo.pulls\"]},{\"units\":[\"repo.actions\",\"repo.issues\"]}]"
+    );
+}

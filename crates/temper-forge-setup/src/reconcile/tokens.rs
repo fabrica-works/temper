@@ -153,7 +153,8 @@ impl Tokens {
                         );
                     }
                 }
-                Row::User(_)
+                Row::Team(_)
+                | Row::User(_)
                 | Row::Issue(_)
                 | Row::Comment(_)
                 | Row::Status(_)

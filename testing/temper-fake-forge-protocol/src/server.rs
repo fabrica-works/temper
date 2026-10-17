@@ -533,6 +533,13 @@ fn table(service: &Service, request: &Request, user: u64) -> Option<documents::A
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,
     }

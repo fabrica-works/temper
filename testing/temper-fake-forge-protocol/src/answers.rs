@@ -230,6 +230,13 @@ fn pull_answer(config: &Config, request: &Request, value: &a::Pull) -> Result<An
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => Err(a::Error::Refused),
     }
@@ -298,6 +305,13 @@ fn checks(config: &Config, request: &Request, values: &[a::CheckSummary]) -> Res
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),
     };
@@ -467,6 +481,13 @@ fn collaborators(config: &Config, request: &Request, values: &[a::Collaborator])
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),
     };

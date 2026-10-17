@@ -7,6 +7,7 @@ pub mod facts;
 mod fixture;
 mod job_clone;
 pub mod mask;
+mod orgs;
 mod registration;
 mod runner;
 mod setup;

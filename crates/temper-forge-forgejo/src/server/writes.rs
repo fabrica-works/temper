@@ -24,6 +24,8 @@ pub(crate) enum WriteKind {
     NewToken,
     Scopes,
     Scope,
+    NewOrg,
+    NewTeam,
     Pull,
     Comment,
     Review,
@@ -42,6 +44,17 @@ pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
     match kind {
         WriteKind::NewToken => {
             const { &[field(b"name", Read::Text, true), field(b"scopes", Read::Array(Kind::Write(WriteKind::Scopes)), true)] }
+        }
+        WriteKind::NewOrg => const { &[field(b"username", Read::Text, true), field(b"visibility", Read::Text, true)] },
+        WriteKind::NewTeam => {
+            const {
+                &[
+                    field(b"name", Read::Text, true),
+                    field(b"permission", Read::Text, true),
+                    field(b"includes_all_repositories", Read::Boolean, true),
+                    field(b"units_map", Read::Object(Kind::Setup(crate::client::setup::SetupKind::Units)), true),
+                ]
+            }
         }
         WriteKind::NewUser => {
             const {
@@ -93,6 +106,8 @@ pub(crate) fn element(kind: WriteKind) -> Option<Kind> {
         WriteKind::Logins => Some(Kind::Write(WriteKind::Login)),
         WriteKind::NewToken
         | WriteKind::Scope
+        | WriteKind::NewOrg
+        | WriteKind::NewTeam
         | WriteKind::NewUser
         | WriteKind::Issue
         | WriteKind::Pull
@@ -262,57 +277,7 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
         }
         Move::Scalar { kind, key, value } => decoder.scalar(kind, key, value),
         Move::End(kind) => {
-            if kind == Kind::Write(WriteKind::Logins) || kind == Kind::Write(WriteKind::Scopes) {
-                let logins = core::mem::replace(&mut decoder.texts, List::with_capacity(limits.inner)).into_boxed();
-                match &mut decoder.request {
-                    Request::CreateToken { scopes, .. } => *scopes = logins,
-                    Request::RequestReviewers { reviewers, .. } | Request::RemoveReviewers { reviewers, .. } => {
-                        *reviewers = logins;
-                    }
-                    Request::CreateIssue { .. }
-                    | Request::OpenPull { .. }
-                    | Request::PostComment { .. }
-                    | Request::PostReview { .. }
-                    | Request::EditIssue { .. }
-                    | Request::Merge { .. }
-                    | Request::Update { .. }
-                    | Request::PostStatus { .. }
-                    | Request::CreateBranch { .. }
-                    | Request::Tokens { .. }
-                    | Request::DeleteToken { .. }
-                    | Request::UserOf { .. }
-                    | Request::CreateUser { .. }
-                    | Request::DeleteBranch { .. }
-                    | Request::RepositoryById { .. }
-                    | Request::Repository { .. }
-                    | Request::UserSearch { .. }
-                    | Request::Issues { .. }
-                    | Request::Issue { .. }
-                    | Request::Comments { .. }
-                    | Request::Pull { .. }
-                    | Request::PullFor { .. }
-                    | Request::Pulls { .. }
-                    | Request::CombinedStatus { .. }
-                    | Request::Reviews { .. }
-                    | Request::ReviewComments { .. }
-                    | Request::Branch { .. }
-                    | Request::Branches { .. }
-                    | Request::Protection { .. }
-                    | Request::Protections { .. }
-                    | Request::Collaborators { .. }
-                    | Request::Permission { .. }
-                    | Request::PullFiles { .. }
-                    | Request::Compare { .. }
-                    | Request::Raw { .. }
-                    | Request::Runs { .. }
-                    | Request::Run { .. }
-                    | Request::Job { .. }
-                    | Request::Jobs { .. }
-                    | Request::JobLog { .. }
-                    | Request::User
-                    | Request::ApiSettings => unreachable!("reviewers body table"),
-                }
-            }
+            decoder.end(kind, limits);
             Ok(())
         }
         Move::Done => {
@@ -337,7 +302,72 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
     }
 }
 impl BodyDecoder {
+    fn end(&mut self, kind: Kind, limits: &Limits) {
+        if kind == Kind::Write(WriteKind::Logins) || kind == Kind::Write(WriteKind::Scopes) {
+            let logins = core::mem::replace(&mut self.texts, List::with_capacity(limits.inner)).into_boxed();
+            match &mut self.request {
+                Request::CreateToken { scopes, .. } => *scopes = logins,
+                Request::RequestReviewers { reviewers, .. } | Request::RemoveReviewers { reviewers, .. } => {
+                    *reviewers = logins;
+                }
+                Request::CreateIssue { .. }
+                | Request::OpenPull { .. }
+                | Request::PostComment { .. }
+                | Request::PostReview { .. }
+                | Request::EditIssue { .. }
+                | Request::Merge { .. }
+                | Request::Update { .. }
+                | Request::PostStatus { .. }
+                | Request::CreateBranch { .. }
+                | Request::Tokens { .. }
+                | Request::DeleteToken { .. }
+                | Request::UserOf { .. }
+                | Request::Org { .. }
+                | Request::CreateOrg { .. }
+                | Request::Teams { .. }
+                | Request::CreateTeam { .. }
+                | Request::EditTeam { .. }
+                | Request::TeamMembers { .. }
+                | Request::AddMember { .. }
+                | Request::CreateUser { .. }
+                | Request::DeleteBranch { .. }
+                | Request::RepositoryById { .. }
+                | Request::Repository { .. }
+                | Request::UserSearch { .. }
+                | Request::Issues { .. }
+                | Request::Issue { .. }
+                | Request::Comments { .. }
+                | Request::Pull { .. }
+                | Request::PullFor { .. }
+                | Request::Pulls { .. }
+                | Request::CombinedStatus { .. }
+                | Request::Reviews { .. }
+                | Request::ReviewComments { .. }
+                | Request::Branch { .. }
+                | Request::Branches { .. }
+                | Request::Protection { .. }
+                | Request::Protections { .. }
+                | Request::Collaborators { .. }
+                | Request::Permission { .. }
+                | Request::PullFiles { .. }
+                | Request::Compare { .. }
+                | Request::Raw { .. }
+                | Request::Runs { .. }
+                | Request::Run { .. }
+                | Request::Job { .. }
+                | Request::Jobs { .. }
+                | Request::JobLog { .. }
+                | Request::User
+                | Request::ApiSettings => unreachable!("reviewers body table"),
+            }
+        }
+    }
+
     fn flag(&mut self, key: &'static [u8], value: bool) -> Result<(), Malformed> {
+        if let Request::CreateTeam { spec, .. } | Request::EditTeam { spec, .. } = &mut self.request {
+            spec.includes_all_repositories = value;
+            return Ok(());
+        }
         if let Request::CreateUser { must_change_password, .. } = &mut self.request {
             *must_change_password = value;
             return Ok(());
@@ -365,6 +395,10 @@ impl BodyDecoder {
     fn text(&mut self, key: &'static [u8], text: Box<[u8]>) -> Result<(), Malformed> {
         match &mut self.request {
             Request::CreateToken { name, .. } => *name = text,
+            Request::CreateTeam { spec, .. } | Request::EditTeam { spec, .. } => {
+                crate::client::orgs::team_text(spec, key, text)?;
+            }
+            Request::CreateOrg { name, .. } => org_name(name, key, text)?,
             Request::CreateUser { login, email, full_name, password, .. } => match key {
                 b"username" => *login = text,
                 b"email" => *email = text,
@@ -448,6 +482,10 @@ impl BodyDecoder {
             | Request::Tokens { .. }
             | Request::DeleteToken { .. }
             | Request::UserOf { .. }
+            | Request::Org { .. }
+            | Request::Teams { .. }
+            | Request::TeamMembers { .. }
+            | Request::AddMember { .. }
             | Request::DeleteBranch { .. } => unreachable!("body text selection"),
         }
         Ok(())
@@ -497,6 +535,13 @@ impl BodyDecoder {
             | Request::CreateToken { .. }
             | Request::DeleteToken { .. }
             | Request::UserOf { .. }
+            | Request::Org { .. }
+            | Request::CreateOrg { .. }
+            | Request::Teams { .. }
+            | Request::CreateTeam { .. }
+            | Request::EditTeam { .. }
+            | Request::TeamMembers { .. }
+            | Request::AddMember { .. }
             | Request::CreateUser { .. }
             | Request::DeleteBranch { .. } => unreachable!("body id selection"),
         }
@@ -519,4 +564,13 @@ fn merge_style(text: &[u8]) -> Option<MergeStyle> {
         b"manually-merged" => Some(MergeStyle::ManuallyMerged),
         _ => None,
     }
+}
+
+fn org_name(name: &mut Box<[u8]>, key: &'static [u8], text: Box<[u8]>) -> Result<(), Malformed> {
+    if key == b"username" {
+        *name = text;
+    } else if text.as_ref() != b"private" {
+        return Err(Malformed::Value { field: key });
+    }
+    Ok(())
 }

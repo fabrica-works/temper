@@ -11,6 +11,10 @@ use skein_lib::{List, Secret};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum SetupKind {
     Account,
+    Org,
+    Team,
+    Teams,
+    Units,
     Token,
     Tokens,
     Scopes,
@@ -30,6 +34,7 @@ pub(crate) fn fields(kind: SetupKind) -> &'static [Field] {
             }
         }
         SetupKind::Tokens | SetupKind::Scopes | SetupKind::Scope => &[],
+        SetupKind::Org | SetupKind::Team | SetupKind::Teams | SetupKind::Units => super::orgs::fields(kind),
         SetupKind::Account => {
             const {
                 &[
@@ -118,7 +123,12 @@ impl Setup {
                     SetupKind::Account => Document::User(core::mem::replace(&mut self.user, document::user())),
                     SetupKind::Token => Document::Token(core::mem::replace(&mut self.token, token())),
                     SetupKind::Tokens => Document::Listed { skipped: 0 },
-                    SetupKind::Scopes | SetupKind::Scope => unreachable!("setup root"),
+                    SetupKind::Org
+                    | SetupKind::Team
+                    | SetupKind::Teams
+                    | SetupKind::Units
+                    | SetupKind::Scopes
+                    | SetupKind::Scope => unreachable!("setup root"),
                 });
             }
         }
@@ -135,9 +145,15 @@ fn token() -> AccessToken {
 }
 pub(crate) fn element(kind: SetupKind) -> Option<Kind> {
     match kind {
+        SetupKind::Teams => Some(Kind::Setup(SetupKind::Team)),
         SetupKind::Tokens => Some(Kind::Setup(SetupKind::Token)),
         SetupKind::Scopes => Some(Kind::Setup(SetupKind::Scope)),
-        SetupKind::Account | SetupKind::Token | SetupKind::Scope => None,
+        SetupKind::Org
+        | SetupKind::Team
+        | SetupKind::Units
+        | SetupKind::Account
+        | SetupKind::Token
+        | SetupKind::Scope => None,
     }
 }
 

@@ -69,6 +69,13 @@ pub fn repository(config: &Config, request: &Request) -> Option<Box<[u8]>> {
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -154,6 +161,13 @@ pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -193,16 +207,7 @@ pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
         Request::Branch { name, .. } => Read::Branch { branch: name.clone() },
         Request::Branches { .. } => return Ok(Op::Git(a::Git::Clone)),
         Request::Protection { name, .. } => Read::Protection { branch: name.clone() },
-        Request::Protections { .. } => {
-            let path = repository(config, request).ok_or(a::Error::Missing(a::What::Repository))?;
-            let mut branch = Box::from([]);
-            for repo in &config.repositories {
-                if repo.full == path {
-                    branch = repo.protected.clone().unwrap_or(Box::from([]));
-                }
-            }
-            Read::Protection { branch }
-        }
+        Request::Protections { .. } => protections(config, request)?,
         Request::Collaborators { .. } => Read::Collaborators,
         Request::Permission { login, .. } => {
             Read::Permission { user: uid(config, login).ok_or(a::Error::Missing(a::What::Repository))? }
@@ -309,6 +314,13 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -339,4 +351,15 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::Jobs { .. }
         | Request::JobLog { .. } => Err(a::Error::Refused),
     }
+}
+
+fn protections(config: &Config, request: &Request) -> Result<Read, a::Error> {
+    let path = repository(config, request).ok_or(a::Error::Missing(a::What::Repository))?;
+    let mut branch = Box::from([]);
+    for repo in &config.repositories {
+        if repo.full == path {
+            branch = repo.protected.clone().unwrap_or(Box::from([]));
+        }
+    }
+    Ok(Read::Protection { branch })
 }

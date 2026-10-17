@@ -388,7 +388,8 @@ pub fn json_cases() -> Vec<(String, Option<Request>)> {
         if serde_json::from_slice::<serde_json::Value>(&transcript.body).is_err() {
             continue;
         }
-        let request = if transcript.status < 300 {
+        let probe = ["setup-org-route-orgs-made", "setup-team-edit-nameless"].contains(&case.as_str());
+        let request = if transcript.status < 300 && !probe {
             let request = route(&transcript);
             if client::decoder(&request, &limits()).is_some() { Some(request) } else { None }
         } else {
@@ -486,6 +487,7 @@ pub fn setup_cases() -> Vec<(&'static str, Request)> {
         ("setup-scope-no-user", Request::User),
         ("setup-scope-read-user", Request::User),
     ]);
+    cases.extend(setup_org_cases());
     cases
 }
 
@@ -600,4 +602,56 @@ pub fn delivery_cases() -> Vec<(&'static str, temper_forge_forgejo::delivery::De
         cases.push((name, Delivery::Job { end, repository: 1, commit: sha(48) }));
     }
     cases
+}
+
+fn setup_team_spec() -> temper_forge_forgejo::document::TeamSpec {
+    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+    TeamSpec {
+        name: Box::from(*b"writer"),
+        permission: Access::Write,
+        includes_all_repositories: true,
+        units: Units { code: Access::Write, issues: Access::Write, pulls: Access::Write, actions: Access::Write },
+    }
+}
+const SETUP_TEAM: u64 = 4;
+fn setup_org_cases() -> Vec<(&'static str, Request)> {
+    use temper_forge_forgejo::document::Access;
+    let org = || Box::<[u8]>::from(*b"ensemble");
+    let make_org = || Request::CreateOrg { person: Box::from(*b"fixture"), name: org() };
+    let make_team = || Request::CreateTeam { org: org(), spec: setup_team_spec() };
+    let teams = |page| Request::Teams { org: org(), page };
+    let members = || Request::TeamMembers { team: SETUP_TEAM, page: Page { page: None, limit: None } };
+    let mut edited = setup_team_spec();
+    edited.includes_all_repositories = false;
+    edited.units.pulls = Access::Read;
+    edited.units.actions = Access::None;
+    vec![
+        ("setup-org-made", make_org()),
+        ("setup-org-made-again", make_org()),
+        ("setup-org-read", Request::Org { name: org() }),
+        ("setup-org-missing", Request::Org { name: Box::from(*b"missing") }),
+        ("setup-team-list-new-org", teams(Page { page: None, limit: None })),
+        ("setup-team-made", make_team()),
+        ("setup-team-made-again", make_team()),
+        ("setup-team-list", teams(Page { page: None, limit: None })),
+        ("setup-team-list-page-1", teams(Page { page: Some(1), limit: Some(1) })),
+        ("setup-team-list-page-3", teams(Page { page: Some(3), limit: Some(1) })),
+        ("setup-team-edit", Request::EditTeam { team: SETUP_TEAM, spec: edited }),
+        ("setup-team-members-none", members()),
+        ("setup-team-member-added", Request::AddMember { team: SETUP_TEAM, login: Box::from(*b"writer") }),
+        ("setup-team-members", members()),
+        ("setup-team-member-missing-user", Request::AddMember { team: SETUP_TEAM, login: Box::from(*b"missing") }),
+        (
+            "setup-org-issue-by-member",
+            Request::CreateIssue {
+                at: Repo { owner: org(), name: Box::from(*b"stage") },
+                title: Box::from(*b"member writes"),
+                body: Box::from(*b"fixture"),
+            },
+        ),
+        (
+            "setup-org-repo-for-a-stranger",
+            Request::Repository { at: Repo { owner: org(), name: Box::from(*b"stage") } },
+        ),
+    ]
 }

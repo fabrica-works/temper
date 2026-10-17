@@ -4,6 +4,13 @@ pub(crate) const ROUTES: u32 = 64;
 use temper_forge_forgejo::request::Request;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Route {
+    Org,
+    CreateOrg,
+    Teams,
+    CreateTeam,
+    EditTeam,
+    TeamMembers,
+    AddMember,
     User,
     Tokens,
     CreateToken,
@@ -56,6 +63,13 @@ pub fn route(request: &Request) -> Route {
         Request::Tokens { .. } => Route::Tokens,
         Request::CreateToken { .. } => Route::CreateToken,
         Request::DeleteToken { .. } => Route::DeleteToken,
+        Request::Org { .. } => Route::Org,
+        Request::CreateOrg { .. } => Route::CreateOrg,
+        Request::Teams { .. } => Route::Teams,
+        Request::CreateTeam { .. } => Route::CreateTeam,
+        Request::EditTeam { .. } => Route::EditTeam,
+        Request::TeamMembers { .. } => Route::TeamMembers,
+        Request::AddMember { .. } => Route::AddMember,
         Request::UserOf { .. } => Route::UserOf,
         Request::CreateUser { .. } => Route::CreateUser,
         Request::User => Route::User,

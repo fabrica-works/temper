@@ -67,6 +67,13 @@ pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Sel
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. } => return Err(a::Error::Refused),
         Request::CreateIssue { .. } => {
             (a::Read::Item { number: number(answer).ok_or(a::Error::Refused)?, after: 0 }, Select::Document)
@@ -130,6 +137,13 @@ pub fn select(config: &Config, request: &Request, range: Option<Range>) -> Resul
         | Request::CreateToken { .. }
         | Request::DeleteToken { .. }
         | Request::UserOf { .. }
+        | Request::Org { .. }
+        | Request::CreateOrg { .. }
+        | Request::Teams { .. }
+        | Request::CreateTeam { .. }
+        | Request::EditTeam { .. }
+        | Request::TeamMembers { .. }
+        | Request::AddMember { .. }
         | Request::CreateUser { .. } => Err(a::Error::Refused),
         Request::Branch { name, .. } => Ok(Select::Branch(name.clone())),
         Request::Branches { page, .. } => Ok(Select::Branches(*page)),
@@ -193,6 +207,13 @@ fn status(request: &Request) -> u16 {
         | crate::Route::Tokens
         | crate::Route::CreateToken
         | crate::Route::DeleteToken
+        | crate::Route::Org
+        | crate::Route::CreateOrg
+        | crate::Route::Teams
+        | crate::Route::CreateTeam
+        | crate::Route::EditTeam
+        | crate::Route::TeamMembers
+        | crate::Route::AddMember
         | crate::Route::CreateUser
         | crate::Route::User
         | crate::Route::ApiSettings

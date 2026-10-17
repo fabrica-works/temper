@@ -83,6 +83,8 @@ impl Plan {
             d::Document::Listed { skipped } => self.listed_done(skipped, l, shared, tables),
             d::Document::Token(_)
             | d::Document::User(_)
+            | d::Document::Org(_)
+            | d::Document::Team(_)
             | d::Document::ApiSettings(_)
             | d::Document::Comment(_)
             | d::Document::Status(_)

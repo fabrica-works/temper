@@ -728,6 +728,13 @@ fn raw_request(request: &request::Request) -> bool {
         | request::Request::CreateToken { .. }
         | request::Request::DeleteToken { .. }
         | request::Request::UserOf { .. }
+        | request::Request::Org { .. }
+        | request::Request::CreateOrg { .. }
+        | request::Request::Teams { .. }
+        | request::Request::CreateTeam { .. }
+        | request::Request::EditTeam { .. }
+        | request::Request::TeamMembers { .. }
+        | request::Request::AddMember { .. }
         | request::Request::CreateUser { .. }
         | request::Request::DeleteBranch { .. } => false,
     }

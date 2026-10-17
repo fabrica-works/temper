@@ -4,7 +4,7 @@ use temper_codecs_world::forgejo;
 use temper_forge_forgejo::{
     client,
     decode::Malformed,
-    document::{Document, Row},
+    document::{Access, Document, Row},
     request::{Method, Request},
     server::{self, Answer},
 };
@@ -72,6 +72,9 @@ fn setup_transcripts_decode_to_their_documents() {
         assert_eq!(result.document, Ok(document), "{case}");
         assert_eq!(result.rows, rows, "{case}");
     }
+    for reply in org_answers() {
+        check_document(&reply, &forgejo::transcript(reply.case).body);
+    }
 }
 #[test]
 fn setup_answers_the_server_encodes_decode_unchanged_with_the_transcripts_shape() {
@@ -84,6 +87,15 @@ fn setup_answers_the_server_encodes_decode_unchanged_with_the_transcripts_shape(
         assert_eq!(result.document, Ok(document), "{case}");
         assert_eq!(result.rows, rows, "{case}");
         assert!(forgejo::shape(&encoded).is_subset(&forgejo::shape(&forgejo::transcript(case).body)), "{case}");
+    }
+    for reply in org_answers() {
+        let encoded = server::encode(&reply.answer, &limits).expect("org encoding");
+        check_document(&reply, &encoded);
+        assert!(
+            forgejo::shape(&encoded).is_subset(&forgejo::shape(&forgejo::transcript(reply.case).body)),
+            "{}",
+            reply.case
+        );
     }
 }
 fn refused_answer(case: &str, status: u16, message: &[u8]) {
@@ -212,4 +224,52 @@ fn an_admin_token_without_a_user_scope_reads_the_refusal() {
 #[test]
 fn a_deleted_tokens_refusal_is_read_with_its_masked_value() {
     refused_answer("setup-token-deleted-use", 401, b"token is malformed: token contains an invalid number of segments\naccess token does not exist [sha: 0000000000000000000000000000000000000004]\ntoken is malformed: token contains an invalid number of segments\ntask with token \"0000000000000000000000000000000000000004\": resource does not exist\nauthorized integration: parse JWT error: token is malformed: token contains an invalid number of segments");
+}
+
+struct OrgAnswer {
+    case: &'static str,
+    request: temper_forge_forgejo::request::Request,
+    document: Document,
+    rows: Vec<Row>,
+    answer: Answer,
+}
+fn check_document(reply: &OrgAnswer, body: &[u8]) {
+    let limits = forgejo::profile_limits();
+    let decoder = client::decoder(&reply.request, &limits).expect("org answer");
+    let actual = forgejo::decode_answer(decoder, body, &limits);
+    assert_eq!(actual.document, Ok(reply.document.clone()), "{}", reply.case);
+    assert_eq!(actual.rows, reply.rows, "{}", reply.case);
+}
+fn org_answers() -> Vec<OrgAnswer> {
+    let mut cases = Vec::new();
+    for case in ["setup-org-made", "setup-org-read"] {
+        cases.push(org_answer(case, Document::Org(fixtures::org()), vec![], Answer::Org(fixtures::org())));
+    }
+    cases.push(org_answer("setup-team-made", Document::Team(fixtures::team()), vec![], Answer::Team(fixtures::team())));
+    let mut edited = fixtures::team();
+    edited.spec.permission = Access::Read;
+    edited.spec.includes_all_repositories = false;
+    edited.spec.units.pulls = Access::Read;
+    edited.spec.units.actions = Access::None;
+    cases.push(org_answer("setup-team-edit", Document::Team(edited.clone()), vec![], Answer::Team(edited)));
+    for (case, teams) in [
+        ("setup-team-list-new-org", vec![fixtures::owners()]),
+        ("setup-team-list", vec![fixtures::owners(), fixtures::team()]),
+        ("setup-team-list-page-1", vec![fixtures::owners()]),
+        ("setup-team-list-page-3", vec![]),
+    ] {
+        let rows = teams.iter().cloned().map(Row::Team).collect();
+        cases.push(org_answer(case, Document::Listed { skipped: 0 }, rows, Answer::Teams(teams.into_boxed_slice())));
+    }
+    for (case, users) in
+        [("setup-team-members-none", vec![]), ("setup-team-members", vec![fixtures::user(2, b"writer", false, b"")])]
+    {
+        let rows = users.iter().cloned().map(Row::User).collect();
+        cases.push(org_answer(case, Document::Listed { skipped: 0 }, rows, Answer::Members(users.into_boxed_slice())));
+    }
+    cases
+}
+fn org_answer(case: &'static str, document: Document, rows: Vec<Row>, answer: Answer) -> OrgAnswer {
+    let request = forgejo::setup_cases().into_iter().find(|(name, _)| *name == case).expect("org case").1;
+    OrgAnswer { case, request, document, rows, answer }
 }
