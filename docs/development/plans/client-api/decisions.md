@@ -1275,6 +1275,15 @@ choice would have been the user's (development.md, 10.4).
      4. If the 30 minutes end with no cause, or the cause is outside temper's fixtures: stop, put the fixture's `documents.lines` back to 4, and block again with the two runs' first lines and logs. The next ruling then weighs moving s2's pin to jig `40d1bec49`.
      5. Unchanged: rulings 199, 201 and 202, the fuzzy profile in s2's gate, and 03.4's turn after s2.
 
+214. **jig 06.5: a task's decided proposal from its proposer's history row** (plan defect, jig 06.5's block of 2026-10-17T03:20:41Z).
+     Ruling 214, plan defect, answered by the design in its own words. jig `docs/design/protocol/store.md` 383 (7.3, Parties' reads): "| a proposal | a party's: its record, by key, with its decision; a task's: the row of its proposer's history that keeps it |". 06.5's Needs put both under `tasks::Key::DecidedProposal(number)`; main keeps only a party's there (jig 11.2, `c231752c5`), and the design keeps a task's in its history.
+
+     1. A task proposer's `Event::DecidedProposal` row is the `proposal` of its `Key::History { task, revision }` record (`Stored::History { proposal: Option<Box<Proposal>> }`, `control.rs:104-113`), the revision found in the owner's `proposal_rows` by `kept.proposal == proposal`, as the store's `reads/point.rs:79-88` already finds it. Share that lookup with `point.rs`; do not copy it.
+     2. A proposal no longer in `proposal_rows` (it keeps the newest `inbox_messages`) is the row `None`, which the Shape answers `ProposalRefused(Unknown)`.
+     3. Not `CoreRecord::ProposalDecision`: it holds the outcome only (`jig-domain-core/src/stored.rs:650-661`), and `decision_record` writes none for a withdrawn proposal or one decided by a task or a deployment (`proposals.rs:383`).
+     4. No change to `Stored`, `Key`, the tasks-v3 schema, the codec, generated code or goldens. 06.5's Files gain `crates/jig-protocol-store/src/reads/point.rs:61-90`. Size stays at most 150 lines.
+     5. Unchanged: the party arm (`DecidedProposal(number)`), the Shape's answers, its Test shape and its Don't ("keep decided proposals in memory to answer this").
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

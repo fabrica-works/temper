@@ -612,8 +612,9 @@ tracks, untracks and sets a priority, and an amendment of the priority
 alone names no revision (engine.md, 7.3 and hosts.md, 8: "a change of
 priority alone names none"; tasks.md, 7: "the first commit decides").
 Needs: jig 03's proposals with a task or a party as proposer, the
-decided ones kept under `tasks::Key::DecidedProposal(number)` for both
-(store.md, 4.4: decided proposals keyed by "proposal"); jig 04.5 (its
+decided ones kept, a party's under `tasks::Key::DecidedProposal(number)`,
+a task's in its proposer's history row (store.md, 7.3: "a task's: the
+row of its proposer's history that keeps it"; ruling 214); jig 04.5 (its
 4.1's `Control::Cancel { reason, grace, message }` and the tasks child's
 grace bound; its 4.2's `Amendment.tracked: Option<Tracking>`; its 4.5's
 projections' room for a tracking amendment).
@@ -622,7 +623,8 @@ Files:
   render.rs, tests.rs, tests/fixtures.rs}`;
 - `crates/jig-domain-core/src/routing/{runs.rs:545-556, vocabulary.rs,
   historical.rs, mod.rs}`;
-- `crates/jig-protocol-store/src/historical.rs:7-48` (the get's key)
+- `crates/jig-protocol-store/src/historical.rs:7-48` (the get's key),
+  and `reads/point.rs:61-90` (the task arm's history lookup, ruling 214)
   and the roots that route `core::Now` to the store's get:
   `testing/jig-test-domain/src/routes.rs:520`,
   `examples/ops/domain/src/route.rs:1346`,
@@ -655,7 +657,13 @@ Shape:
   key, proposal, row: Option<tasks::Proposal>, busy: bool }`; a row
   whose proposer is the caller answers `CallPart::ProposalDecided {
   proposal, outcome }` from its state, other rows and none answer
-  `ProposalRefused(Unknown)`, busy answers `Unavailable`.
+  `ProposalRefused(Unknown)`, busy answers `Unavailable`. A task
+  proposer's row is the `proposal` of its `Key::History { task, revision }`
+  record, the revision found in the owner's `proposal_rows` by
+  `kept.proposal == proposal`, as `reads/point.rs:79-88` finds it (ruling
+  214); shared with that read, not copied. A proposal no longer in
+  `proposal_rows` is the row `None`. No `Stored`, schema, codec, generated
+  or golden change.
 - `render`: a withdraw's `ProposalDecided` reads `Already decided:
   proposal 9 was accepted` (`rejected`, `withdrawn`, `stale`).
 Test shape:
