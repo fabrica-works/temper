@@ -1717,6 +1717,19 @@ choice would have been the user's (development.md, 10.4).
      5. **Later sketches** follow: jig 16's goal move sends `Amendment { tracked: Some(Tracking::Tracked { priority: p }), .. }`; jig 22's task-query story amends with `Some(Tracking::Tracked { priority: 2 })`. Refresh any further copy of `tracked: option bool` or `priority: option u32` in an `Amendment`, and list it in the commit body.
      6. **Unchanged:** the rest of 14.2's Shape, Test shape and Size; the record merges, grace and template overrides you have going.
 
+261. **jig 14.2 to 14.4's Files against main** (ready check of jig-14.2).
+     Ruling 261 (plan defect, the re-check of jig 14.2 to 14.5 at jig `447ddfdf4`, after 14.1 landed; temper `9bd979292`): 14.2 to 14.4's Files miss users that 14.1, 21.3 and 21.4 moved or left; corrected in `jig/14-wire.md` (a "Re-check at jig `447ddfdf4`" paragraph before each of 14.2's, 14.3's and 14.4's Shape) and in `temper/04-engine.md`, 04.2's users.
+
+     1. **14.2's Files gain:** the link's `limits.rs:105` (`take_over_reason`, now `move_reason`); the full `Amendment` literals `tracked` reaches (the link's `amendment_fields`, the view's `confirmation/amendment.rs`, `tests/engine-clients/tests/requests.rs:109`, the component's `tests/fixtures.rs:88`, the scripted engine's `fields!` list); the link's `documents_part6.rs:168` (`SeenThrough`); for `AdmissionLimit.grace`, the view's `words/refusals.rs:92-128`, a `JigPhrase::EngineLimitGrace` in `phrases/{jig.rs, english.rs}`, and `contract/admission_limits.rs`; `tests/client-wire/tests/fuzzy_client_wire.rs`'s `check!` list.
+     2. **The contract boxes `Amendment`** in `Ask::Amend` and `Operation::Amend`, as the sketch does; the `#[expect(clippy::large_enum_variant)]` at `contract/asks.rs:116` goes, unfulfilled (the re-check saw `-D warnings` fail with it).
+     3. **`a_priority_only_amend_names_no_revision`** asserts revision 0 reaches the people child (`people::Ask::Amend`'s `revision: u64`, `jig-domain-people/src/boundary.rs:278`).
+     4. **14.3's Files gain:** the link's `limits.rs:100` (`write_words`, now `message_words`); `AdmissionLimit.operations`'s words as 14.2's; the `check!` list; `Made::Words`'s users (`tests/ops/src/client/app.rs:414`, `tests/client/tests/referee.rs`, `JigPhrase::MadeWords`).
+     5. **14.4's Files gain** `AdmissionLimit.goals`'s words as 14.2's. A role executor naming another project than the `Create`'s is a design question, in `question.md` now: 14.4 starts once its answer lands.
+     6. **temper 04.2's users gain** `temper-client-domain/src/forge/family.rs:115, :123`, the shell's `client.rs:472` and `src/tests/fixtures.rs:666`.
+     7. **Unchanged:** each increment's Scope, Shape, Test shape, Proof and Size; ruling 260.
+
+     Checked by a read-only sub-agent: the interface sketch and 14.2's reference test under clippy `-D warnings` against landed code (with stubs for unlanded `Story` methods); 14.2 to 14.5's schema records applied to `client-v8.schema`: codegen accepts them and `clippy -p jig-client-protocol-wire --lib -D warnings` is clean; the drift test 3 of 3; the wire fuzzy test 1 of 1 with the corrected `check!` list (5 compile errors without it). Refresh any further copy of a renamed record or limit field, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

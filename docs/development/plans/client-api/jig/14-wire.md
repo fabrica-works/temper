@@ -482,6 +482,43 @@ release) and the asks of
 `testing/jig-client-scripted-engine/src/payload/owner_outcome.rs:49`,
 `tests/client/src/joint/wire/outcomes.rs:40-41`,
 `tests/client/src/observe.rs:558-559` (at jig `1350b6564`) (ruling 222), and their tests.
+Re-check at jig `447ddfdf4` (after 14.1, ruling 261): the Files gain
+`crates/jig-client-protocol-link/src/limits.rs:105` (`wire.take_over_reason`,
+named after the record: `move_reason`); the full `Amendment` literals
+`tracked` reaches: the link's `translate/pages_part5.rs:169-203`
+(`amendment_fields`), `crates/jig-client-view/src/confirmation/amendment.rs`
+(:309, :314, :369, :417), `tests/engine-clients/tests/requests.rs:109`,
+`crates/jig-protocol-engine-clients/src/tests/fixtures.rs:88`
+(`w::AmendmentParts`), and the `fields!(Amendment { .. })` list of
+`crates/jig-client-scripted-engine/src/payload.rs:127`; the link's
+`translate/documents_part6.rs:168` (`answers::seen`, now `SeenThrough`);
+for `AdmissionLimit`'s `grace`, the exhaustive match of
+`crates/jig-client-view/src/words/refusals.rs:92-128`, a
+`JigPhrase::EngineLimitGrace` in `phrases/jig.rs` (beside the other
+`EngineLimit` phrases, :1042, :1674, :1842, :2986) and
+`phrases/english.rs:355`, and `crates/jig-client-domain/src/contract/admission_limits.rs`;
+`tests/client-wire/tests/fuzzy_client_wire.rs` (`check!` of
+`SeenReplies` :277, `TakeOver` :314, `MarkSeen` :317).
+`testing/jig-client-test-records/src/lib.rs` uses none of the changed
+records: no edit. The contract boxes `Amendment` in `Ask::Amend` (and
+14.3's `Operation::Amend`), as the sketch does; the
+`#[expect(clippy::large_enum_variant)]` of `contract/asks.rs:116-117`
+then goes, unfulfilled. `a_priority_only_amend_names_no_revision`
+asserts revision 0 reaches the people child (`people::Ask::Amend`'s
+`revision: u64`, `crates/jig-domain-people/src/boundary.rs:278`). The
+Story world's grace limit is `tests/core/src/world.rs:38` (600 s, as
+`small.rs:50`). Moved cites: `tests/client/src/observe.rs:563-564`,
+the engine's `translate/answers.rs:180`.
+Re-check at jig `447ddfdf4` (ruling 261): the schema's :303-304 are
+now :305-306. The Files gain `crates/jig-client-protocol-link/src/limits.rs:100`
+(`wire.write_words`, named after the record: `message_words`); for
+`AdmissionLimit`'s `operations`, the same view words, phrases and
+contract file as 14.2's `grace` (`JigPhrase::EngineLimitOperations`);
+`tests/client-wire/tests/fuzzy_client_wire.rs` (`check!` of `Write`
+:302, `MadeWords` :357); `Made::Words`'s users
+`tests/ops/src/client/app.rs:414`, `tests/client/tests/referee.rs`,
+and the view's `JigPhrase::MadeWords` (`phrases/jig.rs` :226, :1261,
+:2324, :2574; `words.rs:219`).
 Shape:
 - Wire: `Message { project: u32, task: u64, words: text 65536 }` (was
   `Write`, less `release`); `Amend` loses `release`; `enum Operation {
@@ -581,6 +618,13 @@ the asks of `crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`
 (ruling 222); downstream, the repository downstream
 of jig's family refusal translation (one production file) follows at
 its repin.
+Re-check at jig `447ddfdf4` (ruling 261): `Ask::TaskHoldings` is at
+`crates/jig-domain-core/src/routing/parties.rs:612`. For
+`AdmissionLimit`'s `goals`, the same view words, phrases and contract
+file as 14.2's `grace` (`JigPhrase::EngineLimitGoals`). A role executor
+whose `ExecutorRole.project` is not the `Create`'s project
+(`people::PersonAddress::Role(u32)` names none) is a question with the
+designer (question.md of 2026-10-17): 14.4 starts once it is answered.
 Shape: wire, in this order before `Ask`: `FieldRule` and
 `VerdictChoice` move up (no byte change); `TaskRef { member: u32 |
 task: u64 }`; `NewContract { report: ContractReport { words } |

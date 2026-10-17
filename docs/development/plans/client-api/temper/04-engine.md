@@ -272,7 +272,11 @@ build `ToApplication`, which jig 14.1 gives a `scope`, and a `window` for
 `jig_client::Family` and uses the wire's `Answer::FinalAnswer`, `KeyedAnswer`
 after jig 14.1) and `crates/temper-service/src/family/refusals.rs` (its
 arms for jig 14.4's and 14.5's refusals; its `proposable` arm, :25,
-stays) (ruling 222).
+stays) (ruling 222). Ruling 261 adds, at temper `9bd979292`:
+`crates/temper-client-domain/src/forge/family.rs:115` (`RefusedParts`
+gains `at`, jig 14.3) and :123, `crates/temper-client-shell-terminal/src/client.rs:472`
+and `src/tests/fixtures.rs:666` (`Answer::FinalAnswer`, `KeyedAnswer`
+since jig 14.1).
 Shape:
 - `temper_service::family::answer(outcome:
   Option<forge::ApplicationOutcome>, limits: &w::Limits, jig:
