@@ -1987,6 +1987,9 @@ choice would have been the user's (development.md, 10.4).
      - `tests/boundary/src/tests/graph.rs:259: ("jig-client-test-kit", vec!["jig-client-test-domain", "jig-test-connector", "skein-lib"]),`.
      - The check's sub-agent, with the corrected sketch and wiring: fmt and clippy clean; `jig-client-test-kit` 14 of 14; the world's proof filter 3 of 3 and the control; the fuzzy `random_people_with_held_commits_and_double_press` passes (1.4 s); the workspace's default profile stopped at the two `person_confirmation` tests above (183 of 185 run passed); the rest of the default profile and the fuzzy profile not run.
 
+286. **the 22:24Z steer's run-long texts in the README** (process, coordinator's block of 22:25:01Z).
+     Ruling 286 (process, the coordinator's block of 22:25:01Z): the 22:24Z steer's run-long texts land in the README's "The run's steers", as ruling 167 requires, and bind from there; the coordinator gives them in no prompt again. Point 3's Pass on lands as the steer gave it (every session that writes a core test). Point 2 splits: its rule on `tests/client-protocol/tests/client.rs` (new client-protocol stories go in `tests/client-protocol/tests/client/<topic>.rs`, nothing added to `client.rs`) holds for the run and lands in the README; its rule on `tests/core/src/peers.rs` holds until that file is at most 800 lines, and stays in the steer, which the coordinator keeps passing on to each session whose Files name `peers.rs` until then. Points 1 and 4 are temporary (until their greps and lengths say so) and stay in the steer. Mark the steer's points 2 (the `client.rs` half) and 3 as in the README from now.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -872,6 +872,21 @@ per session are in each file.
     target`: Codex's command review refuses it and drops the rest of its
     cell. Run Python as `python3`, the only name on this machine, never
     `python`.
+  - 2026-10-17 22:24Z, point 2 (every jig session; ruling 286): Put new
+    client-protocol stories in `tests/client-protocol/tests/client/<topic>.rs`,
+    as `client/words.rs` does; add nothing to
+    `tests/client-protocol/tests/client.rs` (797 lines at jig
+    `738c20adc`). Until `tests/core/src/peers.rs` is at most 800 lines
+    (804 at `738c20adc`), the steer's point 2 says how the next session
+    that edits it brings it there.
+  - 2026-10-17 22:24Z, point 3 (every session that writes a core test;
+    ruling 286): In `tests/core`, find a live row with
+    `fixtures::live_row(&world, task)`, never by scanning
+    `world.store.rows`. An assertion message is one line naming the task
+    and what was expected, not a dump of the workers' state. Name a seed
+    or a budget that matters (`831`, `10`) as a constant.
+    `a_scripted_chat_question_waits_for_its_requester` (49 lines) is the
+    example to bring to 40 or fewer.
 
 ## Prerequisites the run checks at its start
 
