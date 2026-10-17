@@ -1730,6 +1730,36 @@ choice would have been the user's (development.md, 10.4).
 
      Checked by a read-only sub-agent: the interface sketch and 14.2's reference test under clippy `-D warnings` against landed code (with stubs for unlanded `Story` methods); 14.2 to 14.5's schema records applied to `client-v8.schema`: codegen accepts them and `clippy -p jig-client-protocol-wire --lib -D warnings` is clean; the drift test 3 of 3; the wire fuzzy test 1 of 1 with the corrected `check!` list (5 compile errors without it). Refresh any further copy of a renamed record or limit field, and list it in the commit body.
 
+262. **14.4's role executor is the Create's project's** (design, the designer's answer of 2026-10-17T14:05Z).
+     Ruling 262 (design, the designer's answer of 2026-10-17T14:05Z, jig `ad3b26d04`, temper `ec988d053`): a role executor's project is the `Create`'s; `NewTask.executor` is `OwnerExecutor`; nothing is refused for it; jig 14.4 may start.
+
+
+     1. **A role executor's project is the `Create`'s, by definition.**
+        people.md, 1: "**Roles are per project,** the core's own".
+        contract.md, 3.2 now: "a person, or a role, which is the project's:
+        roles are per project"; tasks.md, 2 now: "a party or a role, the
+        task's project's role". Main reads it so: a role's inbox entry is
+        `Whom::Role { project: row.project, role }` (`inbox.rs:302-306`).
+     2. **The request names no project for it.** `NewTask.executor` is
+        `OwnerExecutor` (`client-v8.schema:91-94`), field for field
+        `people::TaskExecutor` (`batch.rs:44-49`), as `Amend`'s
+        `AddressChange.address` already names a role
+        (`client-v8.schema:213`). Contract: `NewTask.executor:
+        OwnerExecutor` (`contract/owner_part.rs:14-18`).
+     3. **Nothing is refused for it:** no `Malformed` variant, no other
+        refusal; contract.md, 4 is unchanged.
+     4. **The plan:** 14.4's Shape and the sketches take `OwnerExecutor`;
+        its component test's batch holds a role's task
+        (`PersonAddress::Role(2)` reaching the people child as
+        `TaskExecutor::Person(PersonAddress::Role(2))`); its Don't names the
+        project and the refusal; the re-check's "14.4 starts once it is
+        answered" ends. 14.5's `ProposeBatch` follows, its tasks being
+        pieces of `NewTask`. jig 15's `GoalDraft.executor` and `listed` take
+        `OwnerExecutor`, so `set_goal` copies it with no mapping.
+     5. **Unchanged:** the chips' `Executor` and its `ExecutorRole.project`;
+        `TaskFilter.executor`; `LackingTaskKind.executor`. Nothing is
+        deferred.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
