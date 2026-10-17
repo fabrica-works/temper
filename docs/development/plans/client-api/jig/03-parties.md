@@ -798,6 +798,12 @@ Files:
   address.rs, instructions.rs}`, `crates/jig-domain-core/src/tests.rs`
   (:937), `src/tests/{task_query.rs, acts/tracking.rs}`,
   `tests/tasks/tests/lifecycle/{grace.rs, goals.rs}`.
+- The referee's evidence for an accepted amendment or widening (ruling
+  195): `testing/jig-conformance/src/referee.rs` (`Snapshot::accepted_tasks`,
+  :232, and `durable`, :462-501; at most 40 lines), the two adapters that
+  fill it, `tests/core/src/observations.rs` (:781-795) and
+  `tests/ops/src/conformance/observations.rs` (:230-236; at most 25 lines
+  each), and a referee case in `tests/core/tests/referee.rs`.
 - `crates/jig-protocol-store`: the people codec of `Action::Amend`; the
   tasks codec of `PersonAction::Amend` (in place).
 - The transitional piece: `crates/jig-protocol-engine-clients/src/component.rs`

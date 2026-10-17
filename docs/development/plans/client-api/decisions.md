@@ -1062,6 +1062,16 @@ choice would have been the user's (development.md, 10.4).
      4. **temper 03.6** drops the arms its root and its terminal shell have for the UI's `Continue`, `SignIn` and `Fact`. temper signs in by the printed link (temper's `client.md`, 7).
      5. **Nothing is deferred:** no `later.md` row.
 
+195. **jig 03.5: the referee's evidence for an accepted amendment is its durable acceptance** (plan defect, jig 03's block of 2026-10-17T01:00:47Z).
+     Ruling 195, a plan defect: 03.5's Files missed the referee's evidence for an accepted amendment or widening. The design says what counts, in its own words. jig's `domain/testing.md`, 5, "Authority holds": "every effect a fake system saw is covered by the scenario's policy as it stood when the effect was decided, for the task that asked, or by a proposal whose acceptance the store made durable first". `domain/authority.md`, 9: "an amendment or a widening makes the accepter the funder of the task it changes, whoever proposed it, ..., its grants covered by the accepter's". So the referee judges an amended or widened task against its accepter, and its evidence is the durable acceptance, as for a batch's tasks: not the funder.
+
+     1. **One map, as on main.** `Snapshot::accepted_tasks` (`testing/jig-conformance/src/referee.rs:232`) holds, for each task, the last durable acceptance that set its authority: a batch member's, as on main, or an accepted amendment's or widening's, `Acceptance { proposal, by }` with `by` the accepter (`Source::Person(person)` for a party, `Source::Task(holder)` for a task). Its doc comment says both. `source()` (:449) and the authority chain (:520, :540) stay as they are. `Task::source` stays the requester, for result delivery and every other reader.
+     2. **Nothing else is added:** no funder in `Task` or `Snapshot`, no new map, and no rule for `Funder::{Period, Recurring}`: an acceptance's accepter is a party or a task (ruling 190, item 3).
+     3. **`durable()` (:462-501).** An entry still never disappears. It may change only to the acceptance of another proposal that passes the check a new entry passes: the proposal pending in the last snapshot from its proposer (`party_proposals` for a party's; the proposing task's `proposal` and holder for a task's), and the accepter covering it as on main. The three mutations of `tests/core/tests/referee.rs:609-615` stay violations.
+     4. **The adapters.** The two that fill `accepted_tasks` from accepted decisions, `tests/core/src/observations.rs:781-795` and `tests/ops/src/conformance/observations.rs:230-236`, add an entry for an accepted amendment or widening, keyed by the task it changes. A further adapter that fills it does the same, and the commit body lists it.
+     5. **Tests.** One referee case in `tests/core/tests/referee.rs`: a later amendment's acceptance by another party replaces the entry, and the task is judged against that party. The joint core proof stays as 03.5's Proof says.
+     6. **Size.** Within the ceiling 03.5 already has (ruling 190 and the 22:44Z steer): the referee takes at most 40 lines, and each adapter at most 25. Past them, say so in the report.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
