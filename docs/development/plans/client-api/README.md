@@ -466,6 +466,18 @@ per session are in each file.
   - jig: focused median 10.33 s, fuzzy 14.91 s. The run may add, as
     aims, at most 3.0 s to the focused suite (to about 13.3 s of its
     15) and 10 s to the fuzzy suite.
+  - jig's focused budget is 30 s for the rest of this run (ruling 275,
+    the user's rule of 2026-10-13: "a budget that bites (gate fails on
+    its global timeout, every test passing) is doubled temporarily for
+    the rest of that plan; the root-cause test-cost pass comes right
+    after the plan ends, then the budget is restored"): `.config/nextest.toml`'s
+    `[profile.default]` `global-timeout = "30s"`, in a commit of its own.
+    Its aim stays 13.3 s, a guide; a jig session no longer starts with a
+    repair of the focused suite. The pass after the run brings it to at
+    most 12 s (80% of 15 s, the median of three gate-lane runs) and puts
+    15 s back (`later.md`). Unchanged: jig's fuzzy budget and its repair
+    rule; temper's budgets; a test the gate flags `SLOW` is made cheaper
+    before its increment lands.
   - temper: focused median 4.00 s, fuzzy 14.36 s. The run may add at
     most 2.0 s to the focused suite and 5 s to the fuzzy suite.
   - Each landing's report names its suites' times from its
@@ -481,7 +493,7 @@ per session are in each file.
     supervisor decides. temper's
     `fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure`
     is no test to make cheaper in this run (ruling 122, `later.md`): the
-    slowest tests a repair finds are the others. Never: raising a `global-timeout`, a slow period
+    slowest tests a repair finds are the others. Never, apart from ruling 275's: raising a `global-timeout`, a slow period
     or a per-test ceiling, or moving a focused test to the fuzzy suite.
   - A test's own time in a session file ("under 20 ms", "under 0.5 s")
     is an aim, development.md 5.6's ceiling: nothing measures one test,
@@ -847,6 +859,11 @@ per session are in each file.
     replaces 06:20Z point 1's 'each test function over 40 lines that your
     commit leaves' and 21:01Z point 1's 'every file over 800 after your
     commit' where they differ.
+  - 2026-10-17 18:11Z, point 1 (every jig session): When your commit
+    removes or renames a record, an ask or an answer, rename in it the
+    tests whose names say the old word, in about eight words that state
+    the behaviour; a rename moves no assertion. List the renames outside
+    your Files as one count.
 
 ## Prerequisites the run checks at its start
 
@@ -980,7 +997,9 @@ Each command runs once, after `done.md`, reading `origin/main`.
     in decisions.md's rulings, for the user; the run is done either way.
 12. No budget was raised: `git -C ~/src/rust/jig diff a3b53546 origin/main
     -- .config/nextest.toml | grep -E '^[-+].*(global-timeout|period)'`
-    prints only the browser profile's added lines, and `git -C
+    prints only the browser profile's added lines and ruling 275's
+    focused `global-timeout` (`-` 15s, `+` 30s, until the pass after the
+    run puts 15 s back), and `git -C
     ~/src/rust/temper diff c7095516 origin/main -- .config/nextest.toml`
     prints nothing.
 13. Each store family moved once: `git -C ~/src/rust/jig show

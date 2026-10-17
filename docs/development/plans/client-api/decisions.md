@@ -1887,6 +1887,20 @@ choice would have been the user's (development.md, 10.4).
      9. **Nothing is deferred.** If 22.1 lands before the steer reaches it,
         a step before jig 15.3 adds the authority.
 
+275. **jig's focused budget doubled for the run** (steer of the check of 2026-10-17T18:11Z).
+     Ruling 275 (process, the check of 2026-10-17T18:11Z): jig's focused budget is doubled to 30 s for the rest of this run, as the user's rule of 2026-10-13 says: "During a running plan, a budget that bites (gate fails on its global timeout, every test passing) is doubled temporarily for the rest of that plan; the root-cause test-cost pass comes right after the plan ends, then the budget is restored."
+
+     1. **It has bitten:** jig's focused gate ran 14.405 s (14.5) and 14.964 s (14.s2) of its 15 s, 36 ms under the stop; five land gates timed out at 15 s with no test failing (14.4's two, 14.5's and 14.s2's of 17:01Z and 17:04Z). The repair step, jig-14.s2 (ruling 269), landed 0.56 s slower than 14.5, its measure total 38.978 s then 40.997 s.
+     2. **The change:** jig's `.config/nextest.toml`, `[profile.default]`, `global-timeout = "15s"` becomes `"30s"`, with the comment `# Doubled for temper's client-api run (ruling 275); 15s again after the test-cost pass that follows it.`, in a commit of its own (`Step:` the session's), made by jig 22.1 before its landing commit and landed with it.
+     3. **The README rule changes** for jig's focused suite alone ("Test time", amended): its aim stays 13.3 s, a guide that each report names; no jig session starts with a repair of it, in place of ruling 269's point 3 ("Once jig-14.s2 lands, the README rule applies again"). Done-when 12 allows the one changed line. A `later.md` row holds the test-cost pass: at most 12 s (80% of 15 s, the median of three gate-lane runs), then 15 s back.
+     4. **For the user** (decisions.md, F): the user may veto; restoring it is one revert of the commit of point 2.
+     5. **Unchanged:** jig's fuzzy budget (60 s) and its repair rule; temper's budgets; the slow period (500 ms) and a test the gate flags `SLOW` made cheaper before its increment lands; no focused test moved to the fuzzy suite.
+
+     Checked:
+     - `git -C jig show origin/main:.config/nextest.toml | grep -n 'global-timeout = "15s"'`: in `[profile.default]`, beside `slow-timeout = { period = "500ms" }`.
+     - `reports/jig-14-s2-20261017T171459Z.md`: "Gate: scripts/check.sh passed: 4124 tests / 14.964 s; 111 tests / 27.110 s"; `9bbbe0467`'s `Gate-Result: … 4124 tests / 14.405 s`.
+     - The check of 18:11Z: s2's measure total 38.978 s at its start, 40.997 s at its end; the timeouts at 17:01Z and 17:04Z ended with 2,841 and 3,195 of about 4,120 tests run.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -1915,3 +1929,12 @@ under the user's delegation, and the user may veto it before the run:
   pueued, and lasts until the next reboot:
   `sudo sh -c 'mkdir -p /sys/fs/cgroup/runner/pueued && echo "+cpu +memory" > /sys/fs/cgroup/runner/cgroup.subtree_control && chown -R runner:runner /sys/fs/cgroup/runner && pgrep -x pueued > /sys/fs/cgroup/runner/pueued/cgroup.procs'`.
   Default: one layer down until the user runs it.
+- **F. jig's focused budget doubled for the rest of the run** (ruling
+  275, 2026-10-17): the user's rule of 2026-10-13 for a budget that
+  bites. jig's focused gate ran 14.405 s and 14.964 s at jig 14.5 and
+  14.s2 of its 15 s, five land gates timed out at 15 s with no test
+  failing, and a repair step (jig-14.s2) left it 0.56 s slower. The
+  alternative is 15 s held: each jig session first repairs the suite on
+  the run's one chain, about 30 steps. Default: 30 s until the test-cost
+  pass right after the run; restore it at once with `git -C
+  ~/src/rust/jig revert <ruling 275's commit>`.
