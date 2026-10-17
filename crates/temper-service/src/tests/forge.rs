@@ -115,3 +115,31 @@ fn forge_component_overrides_take_dotted_names_and_ms() {
     }
     assert_eq!(limits::apply(&mut own, b"forge_component.deadline_ms", u64::MAX), Err(limits::Refused::Range));
 }
+#[test]
+fn a_hint_the_root_cannot_take_is_offered_again_next_pass() {
+    let mut service = fixtures::ready();
+    let hinted = fixtures::hook(&mut service);
+    for number in 2..16 {
+        if root::try_step(&mut service.engine.domain, &service.engine.env, fixtures::period(number)).is_err() {
+            break;
+        }
+    }
+    assert!(root::try_step(&mut service.engine.domain, &service.engine.env, forge::hinted(hinted.clone())).is_err());
+    service.engine.forge.above.push(kit::Event::Hint(hinted.clone()));
+    crate::engine::forge_pass(&mut service.engine);
+    assert_eq!(service.engine.forge.above.len(), 0);
+    service.engine.forge.down(kit::Request::Offer);
+    let Some(kit::Event::Hint(offered)) = service.engine.forge.above.pop() else { panic!("offered hint") };
+    assert_eq!(offered, hinted);
+}
+#[test]
+fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
+    let mut service = fixtures::started();
+    service.engine.forge.above.push(kit::Event::ListenerLost);
+    crate::engine::forge_pass(&mut service.engine);
+    let mut forge = fixtures::ForgeFace::new();
+    for _ in 0_u32..64 {
+        forge.turn(&mut service);
+    }
+    assert_eq!(service.end(), Some(&End::Stopped(Stop::Hooks)));
+}

@@ -2066,6 +2066,7 @@ dependencies = [
  "temper-fake-forge-domain",
  "temper-fake-forge-protocol",
  "temper-forge-forgejo",
+ "temper-service",
 ]
 
 [[package]]

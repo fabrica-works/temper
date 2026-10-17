@@ -8,6 +8,8 @@ use skein_lib::{List, Secret};
 pub struct Settings {
     /// At most `Limits::forges`, numbers unique.
     pub forges: List<Forge>,
+    /// The listener and secrets, present together (forge.md, 5).
+    pub webhooks: Option<crate::hooks::Webhooks>,
 }
 
 /// One forge, from `application.forges` (configuration.md, 3) and what the binary resolved.

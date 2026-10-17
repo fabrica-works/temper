@@ -10,6 +10,7 @@ mod contents;
 pub mod conventions;
 mod failure;
 pub mod grow;
+pub mod hooks;
 pub mod limits;
 pub mod marker;
 mod plan;

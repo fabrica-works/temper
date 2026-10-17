@@ -23,6 +23,11 @@ pub fn limits() -> Limits {
         idle: Duration::from_secs(5),
         start_backoff: Duration::from_secs(1),
         start_backoff_max: Duration::from_secs(8),
+        hooks: 4,
+        hook_head_bytes: 8192,
+        hook_body_bytes: 1_048_576,
+        hook_deadline: Duration::from_secs(10),
+        hook_secret_bytes: 128,
         tls: skein_tls::client::Limits { read: 16384, send: 16384, records: skein_tls::client::MAX_RECORD },
     }
 }
@@ -97,7 +102,7 @@ pub fn settings() -> Settings {
             user: WRITER,
         })
         .expect("one forge");
-    Settings { forges }
+    Settings { forges, webhooks: None }
 }
 /// Makes a literal HTTP answer for scenarios independent of recorded cases.
 #[must_use]
@@ -193,4 +198,55 @@ pub fn token_absent(value: &impl core::fmt::Debug) -> bool {
     let text = format!("{value:?}");
     let bytes = format!("{TOKEN:?}");
     !text.as_bytes().windows(TOKEN.len()).any(|part| part == TOKEN) && !text.contains(&bytes[1..bytes.len() - 1])
+}
+
+/// Hook bounds are the shipped profile's five hook limits.
+#[must_use]
+pub fn hook_limits() -> Limits {
+    let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).forge_component;
+    Limits {
+        hooks: profile.hooks,
+        hook_head_bytes: profile.hook_head_bytes,
+        hook_body_bytes: profile.hook_body_bytes,
+        hook_deadline: profile.hook_deadline,
+        hook_secret_bytes: profile.hook_secret_bytes,
+        ..limits()
+    }
+}
+pub const HOOK_SECRET: &[u8] = b"fixture-hook-secret";
+pub const PING: &[u8] = b"{\"zen\":\"a delivery of no row\"}";
+#[must_use]
+pub fn hook_settings() -> Settings {
+    let mut settings = settings();
+    let mut secrets = List::with_capacity(2);
+    secrets.push((FORGE, Secret::new(Box::from(HOOK_SECRET)))).expect("secret");
+    settings.webhooks = Some(temper_engine_protocol_forge::hooks::Webhooks {
+        listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
+        secrets,
+    });
+    settings
+}
+#[must_use]
+pub fn hooked_protocol_config() -> temper_fake_forge_protocol::Config {
+    let mut config = protocol_config();
+    config.hooks = Some(temper_fake_forge_protocol::delivery::Endpoint {
+        forge: FORGE,
+        host: Box::from(b"127.0.0.1:7200".as_slice()),
+        secret: Secret::new(Box::from(HOOK_SECRET)),
+    });
+    config
+}
+#[must_use]
+pub fn push_hook(branch: &[u8], commit: u64) -> temper_fake_forge_domain::Request {
+    use temper_fake_forge_domain::{Request, api::Change};
+    Request::Hook {
+        repository: Box::from(b"org/repo".as_slice()),
+        change: Change::Push,
+        number: None,
+        branch: Some(Box::from(branch)),
+        commit: Some(commit),
+        by: Some(2),
+        body: None,
+        ended: None,
+    }
 }

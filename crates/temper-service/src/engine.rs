@@ -403,6 +403,22 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 }
                 engine.drain_facts();
             }
+            kit::Event::Hint(hinted) => {
+                if engine.drain.is_some() || engine.end.is_some() {
+                    continue;
+                }
+                let connection = hinted.connection;
+                if let Err(root::Event::Forge(event)) =
+                    root::try_step(&mut engine.domain, &engine.env, crate::forge::hinted(hinted))
+                {
+                    let temper_engine_domain_forge::Event::Hint { hint } = *event else {
+                        unreachable!("hint retained by admission")
+                    };
+                    engine.forge.down(kit::Request::RefusedHint(kit::hooks::Hinted { connection, hint }));
+                }
+                engine.drain_facts();
+            }
+            kit::Event::ListenerLost => stop::hooks(engine),
             kit::Event::Stopped { forge, why } => stop::forge(engine, forge, why),
             kit::Event::Closed => engine.forge.closed = true,
         }

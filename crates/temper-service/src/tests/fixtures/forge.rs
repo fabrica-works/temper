@@ -124,3 +124,70 @@ impl ForgeFace {
         crate::route::request(&mut service.engine, temper_engine_domain::Request::Busy(event));
     }
 }
+/// Install a real listener connection and return its first verified hint.
+pub fn hook(service: &mut crate::Service) -> kit::hooks::Hinted {
+    use skein_lib::{List, Secret, Writer};
+    const SECRET: &[u8] = b"fixture-hook-secret";
+    const BODY: &[u8] = b"{\"repository\":{\"id\":2},\"number\":7}";
+    let config = super::engine();
+    let mut found = jig_protocol_config::Problems::empty();
+    let mut settings = crate::forge::settings(&config.forges, super::forge_runtime(), &mut found).expect("settings");
+    let mut secrets = List::with_capacity(1);
+    secrets.push((1, Secret::new(Box::from(SECRET)))).expect("secret");
+    settings.webhooks = Some(kit::hooks::Webhooks { listener: io::Addr::Ip(([127, 0, 0, 1], 7200).into()), secrets });
+    let layer = &mut service.engine.forge;
+    layer.component =
+        kit::Component::new(settings, &layer.env.limits, &crate::forge::shared(&config.limits, &config.jig.limits.io))
+            .expect("component");
+    while layer.io.pop().is_some() {}
+    layer.component.begin(&layer.env, &mut layer.above, &mut layer.io);
+    let listener = Token::new(1_u64 << 59_u32);
+    let mut owner = None;
+    let mut wire = skein_world::stream::Wire::new(7);
+    let mut mac = skein_lib::sha256::Hmac::new(SECRET);
+    mac.update(BODY);
+    let mut head = Writer::new(180);
+    head.put(b"POST /hooks/1 HTTP/1.1\r\nHost: loopback\r\nContent-Length: 34\r\nX-Forgejo-Event: pull_request\r\nX-Forgejo-Signature: ").expect("head");
+    for byte in mac.finish() {
+        for nibble in [byte / 16, byte % 16] {
+            head.put(&[b"0123456789abcdef"[usize::from(nibble)]]).expect("signature");
+        }
+    }
+    head.put(b"\r\n\r\n").expect("head");
+    wire.write(&head.finish());
+    wire.write(BODY);
+    layer.up(io::Event::Listening {
+        owner: listener,
+        listener: Token::new(88),
+        addr: io::Addr::Ip(([127, 0, 0, 1], 7200).into()),
+    });
+    layer.up(io::Event::Accepted {
+        owner: listener,
+        socket: Token::new(89),
+        peer: io::Addr::Ip(([127, 0, 0, 1], 9000).into()),
+    });
+    for _ in 0_u32..2048 {
+        while let Some(request) = layer.io.pop() {
+            match request {
+                io::Request::Bind { owner: bound, .. } => owner = Some(bound),
+                io::Request::Stream { stream, down } if stream == Token::new(89) => wire.take(down),
+                io::Request::Listen { .. } | io::Request::Connect { .. } | io::Request::Stream { .. } => {}
+                io::Request::Close { .. }
+                | io::Request::Abort { .. }
+                | io::Request::Reject { .. }
+                | io::Request::Output { .. }
+                | io::Request::Spawn { .. }
+                | io::Request::Signal { .. }
+                | io::Request::Usage { .. }
+                | io::Request::Window { .. } => panic!("hook delivery only"),
+            }
+        }
+        if let Some(up) = wire.answer() {
+            layer.up(io::Event::Stream { owner: owner.expect("bound hook"), up });
+        }
+        if let Some(kit::Event::Hint(hint)) = layer.above.pop() {
+            return hint;
+        }
+    }
+    panic!("verified hint");
+}

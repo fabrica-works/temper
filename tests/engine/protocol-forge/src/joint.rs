@@ -23,6 +23,12 @@ pub struct Joint {
     pub(crate) below: Queue<skein_io::Request>,
     peers: BTreeMap<Token, Peer>,
     service: Service,
+    hook_listener: Option<Token>,
+    hook_peers: BTreeMap<Token, crate::hooks::Peer>,
+    pub hints: Vec<temper_engine_protocol_forge::hooks::Hinted>,
+    next_hook: u64,
+    hook_waiting: bool,
+    hook_posts: std::collections::VecDeque<protocol::delivery::Post>,
     pub(crate) fake_env: Env<fake::Config>,
     protocol_env: Env<protocol::Limits>,
     pub domain: fake::Domain,
@@ -45,6 +51,20 @@ impl Joint {
         let mut config = fixtures::protocol_config();
         config.faults = faults;
         Self::with(seed, cut_chance, config, fixtures::limits(), settings, fixtures::shared(), checks(1000))
+    }
+    #[must_use]
+    pub fn hooked(seed: u64) -> Self {
+        let mut settings = fixtures::hook_settings();
+        settings.forges.get_mut(0).expect("forge").user = 1;
+        Self::with(
+            seed,
+            0,
+            fixtures::hooked_protocol_config(),
+            fixtures::hook_limits(),
+            settings,
+            fixtures::shared(),
+            checks(1000),
+        )
     }
     #[must_use]
     pub fn failing(seed: u64) -> Self {
@@ -76,7 +96,7 @@ impl Joint {
                 labels: Box::from([]),
                 checks,
                 protection: None,
-                hooked: false,
+                hooked: config.hooks.is_some(),
             },
         );
         fake::grant(&mut domain, b"org/repo", 1, raw::Permission::Admin);
@@ -88,6 +108,12 @@ impl Joint {
             above: Queue::with_capacity(128),
             below: Queue::with_capacity(128),
             peers: BTreeMap::new(),
+            hook_listener: None,
+            hook_peers: BTreeMap::new(),
+            hints: Vec::new(),
+            next_hook: 1_u64 << 58_u32,
+            hook_waiting: false,
+            hook_posts: std::collections::VecDeque::new(),
             service: Service::new(config, &fake_limits, seed).expect("service"),
             fake_env: Env { now, wall: Wall::EPOCH, limits: fake_config },
             protocol_env: Env { now, wall: Wall::from_nanos(now.as_nanos()), limits: fake_limits },
@@ -123,7 +149,11 @@ impl Joint {
             let busy = self.peers.values().any(|peer| {
                 peer.pipe.has_work() || peer.server.has_work() || !peer.below.is_empty() || !peer.above.is_empty()
             });
-            let next = if busy || !self.below.is_empty() {
+            let next = if busy
+                || !self.below.is_empty()
+                || !self.hook_posts.is_empty()
+                || self.hook_peers.values().any(|peer| peer.wire.received.is_empty())
+            {
                 self.env.now.saturating_add(Duration::from_nanos(100_000))
             } else {
                 let component = self.component.next_deadline().unwrap_or(end);
@@ -171,6 +201,15 @@ impl Joint {
             }
             self.server_events(owner);
         }
+        let sockets: Vec<_> = self.hook_peers.keys().copied().collect();
+        for socket in sockets {
+            let peer = self.hook_peers.get_mut(&socket).expect("hook peer");
+            if let Some(owner) = peer.owner
+                && let Some(up) = peer.wire.answer()
+            {
+                self.up(skein_io::Event::Stream { owner, up });
+            }
+        }
         fake::fire(&mut self.domain, &self.fake_env, &mut self.fake_out);
         while let Some(reply) = self.fake_out.pop() {
             match reply {
@@ -194,9 +233,14 @@ impl Joint {
                         );
                     }
                 }
-                fake::Request::Hook { .. } => {}
+                hook @ fake::Request::Hook { .. } => {
+                    if let Some(post) = self.service.delivery(&hook, &self.protocol_env.limits) {
+                        self.hook_posts.push_back(post);
+                    }
+                }
             }
         }
+        self.accept_hook();
         if self.component.next_deadline().is_some_and(|at| at <= self.env.now) {
             self.component.fire(&self.env, &mut self.above, &mut self.below);
         }
@@ -206,6 +250,8 @@ impl Joint {
                     assert!(self.answers.insert(answer.call.raw(), answer).is_none(), "one answer per call");
                 }
                 Event::Stopped { forge, why } => panic!("forge {forge} stopped: {why:?}"),
+                Event::Hint(hint) => self.hints.push(hint),
+                Event::ListenerLost => panic!("hook listener lost"),
                 Event::Closed => {}
             }
         }
@@ -215,6 +261,24 @@ impl Joint {
         self.service.reclaim();
         self.domain.reclaim();
         self.component.reclaim();
+    }
+    fn accept_hook(&mut self) {
+        if !self.hook_waiting
+            && let Some(post) = self.hook_posts.pop_front()
+        {
+            self.hook_waiting = true;
+            let socket = Token::new(self.next_hook);
+            self.next_hook += 1;
+            let mut wire = skein_world::stream::Wire::new(self.rng.next_u64());
+            wire.write(&post.head);
+            wire.write(&post.body);
+            self.hook_peers.insert(socket, crate::hooks::Peer { wire, owner: None, closed: false });
+            self.up(skein_io::Event::Accepted {
+                owner: self.hook_listener.expect("hook listener"),
+                socket,
+                peer: skein_io::Addr::Ip(([127, 0, 0, 1], 9000).into()),
+            });
+        }
     }
     fn server_events(&mut self, owner: Token) {
         while let Some(event) = self.peers.get_mut(&owner).expect("peer").above.pop() {
@@ -253,14 +317,22 @@ impl Joint {
                 self.up(skein_io::Event::Connected { owner });
             }
             skein_io::Request::Stream { stream, down } => {
-                if let Some(peer) = self.peers.get_mut(&stream) {
+                if let Some(peer) = self.hook_peers.get_mut(&stream) {
+                    peer.wire.take(down);
+                } else if let Some(peer) = self.peers.get_mut(&stream) {
                     peer.pipe.client_down(down);
                 }
             }
             skein_io::Request::Abort { entity } | skein_io::Request::Close { entity } => self.end(entity),
-            other @ (skein_io::Request::Listen { .. }
-            | skein_io::Request::Bind { .. }
-            | skein_io::Request::Reject { .. }
+            skein_io::Request::Listen { owner, addr } => {
+                self.hook_listener = Some(owner);
+                self.up(skein_io::Event::Listening { owner, listener: Token::new(1_u64 << 57_u32), addr });
+            }
+            skein_io::Request::Bind { owner, socket } => {
+                self.hook_waiting = false;
+                self.hook_peers.get_mut(&socket).expect("accepted hook").owner = Some(owner);
+            }
+            other @ (skein_io::Request::Reject { .. }
             | skein_io::Request::Output { .. }
             | skein_io::Request::Spawn { .. }
             | skein_io::Request::Signal { .. }
@@ -269,6 +341,9 @@ impl Joint {
         }
     }
     pub(crate) fn end(&mut self, owner: Token) {
+        if let Some(peer) = self.hook_peers.remove(&owner) {
+            self.up(skein_io::Event::Closed { owner: peer.owner.expect("bound hook") });
+        }
         if let Some(mut peer) = self.peers.remove(&owner) {
             protocol::closed(&mut peer.server, &mut self.service, &self.protocol_env, &mut peer.above, &mut peer.below);
             self.up(skein_io::Event::Closed { owner });

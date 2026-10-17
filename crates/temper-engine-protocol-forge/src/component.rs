@@ -44,6 +44,7 @@ pub(crate) struct Held {
 /// One component per deployment, owning every configured token and start.
 #[derive(Debug)]
 pub struct Component {
+    hooks: crate::hooks::Hooks,
     settings: Settings,
     starts: List<Start>,
     tables: Tables,
@@ -71,6 +72,7 @@ impl Component {
             start_tokens.push(None).expect("checked forge count");
         }
         Ok(Self {
+            hooks: crate::hooks::Hooks::new(limits),
             settings,
             starts,
             tables: Tables::new(limits.repositories, limits.users),
@@ -94,10 +96,14 @@ impl Component {
         if self.closed {
             return;
         }
+        let before = io.len();
+        if let Some(settings) = &self.settings.webhooks {
+            self.hooks.begin(settings, io);
+        }
         for at in 0..self.starts.len() {
             *self.starts.get_mut(at).expect("configured start") = Start::Checking { next: env.limits.start_backoff };
         }
-        self.drive(env, up, io, MAX_OUT.above);
+        self.drive_room(env, up, io, MAX_OUT.above, MAX_OUT.below.saturating_sub(io.len().saturating_sub(before)));
     }
     pub fn down(
         &mut self,
@@ -127,6 +133,7 @@ impl Component {
                 let _previous: Option<Id<Waiting>> = self.calls.insert(call, id).expect("call index matches its slab");
                 self.drive(env, up, io, MAX_OUT.above);
             }
+            Request::RefusedHint(hint) => self.hooks.refused(hint),
             Request::Refused(answer) => {
                 drop(
                     self.held
@@ -142,7 +149,12 @@ impl Component {
                 );
             }
             Request::Offer => {
-                for _ in 0..MAX_OUT.above {
+                self.hooks.offer();
+                let before = up.len();
+                if let Some(settings) = &self.settings.webhooks {
+                    self.hooks.drive(env, settings, up, io, MAX_OUT.above, MAX_OUT.below);
+                }
+                for _ in 0..MAX_OUT.above.saturating_sub(up.len().saturating_sub(before)) {
                     let mut next = None;
                     for (call, held) in &self.held {
                         if held.offer {
@@ -170,6 +182,7 @@ impl Component {
                 self.held = Map::with_capacity(self.held.capacity());
                 self.holders = Map::with_capacity(self.holders.capacity());
                 self.closed = true;
+                self.hooks.close();
                 self.drive(env, up, io, MAX_OUT.above);
             }
         }
@@ -183,6 +196,36 @@ impl Component {
         io: &mut Queue<skein_io::Request>,
     ) {
         let above = up.len();
+        let below = io.len();
+        let owner = match &event {
+            skein_io::Event::Listening { owner, .. }
+            | skein_io::Event::Accepted { owner, .. }
+            | skein_io::Event::Stream { owner, .. }
+            | skein_io::Event::Failed { owner, .. }
+            | skein_io::Event::Closed { owner } => Some(*owner),
+            skein_io::Event::Connecting { .. }
+            | skein_io::Event::Connected { .. }
+            | skein_io::Event::Output { .. }
+            | skein_io::Event::Spawned { .. }
+            | skein_io::Event::Exited { .. }
+            | skein_io::Event::Usage { .. }
+            | skein_io::Event::Resized
+            | skein_io::Event::Window { .. }
+            | skein_io::Event::Shutdown { .. } => None,
+        };
+        if let Some(owner) = owner
+            && self.hooks.owns(owner)
+        {
+            self.hooks.up(env, event, up);
+            self.drive_room(
+                env,
+                up,
+                io,
+                MAX_OUT.above.saturating_sub(up.len().saturating_sub(above)),
+                MAX_OUT.below.saturating_sub(io.len().saturating_sub(below)),
+            );
+            return;
+        }
         match event {
             skein_io::Event::Connecting { owner, socket } => {
                 if let Some(id) = self.connections.get(&owner)
@@ -281,6 +324,11 @@ impl Component {
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         let mut earliest = self.wake;
+        if let Some(time) = self.hooks.deadline()
+            && (earliest.is_none() || Some(time) < earliest)
+        {
+            earliest = Some(time);
+        }
         for (_, id) in &self.connections {
             let c = self.connection_slab.get(*id).expect("indexed connection");
             if let Some(time) = c.deadline
@@ -440,7 +488,16 @@ impl Component {
     ) {
         let above = up.len();
         let below = io.len();
-        self.drive_starts(env, up, io, above_room, below_room);
+        if let Some(settings) = &self.settings.webhooks {
+            self.hooks.drive(env, settings, up, io, above_room, below_room);
+        }
+        self.drive_starts(
+            env,
+            up,
+            io,
+            above_room.saturating_sub(up.len().saturating_sub(above)),
+            below_room.saturating_sub(io.len().saturating_sub(below)),
+        );
         self.drive_calls(
             env,
             up,
@@ -448,7 +505,12 @@ impl Component {
             above_room.saturating_sub(up.len().saturating_sub(above)),
             below_room.saturating_sub(io.len().saturating_sub(below)),
         );
-        if self.closed && self.connections.is_empty() && !self.ended {
+        if self.closed
+            && self.connections.is_empty()
+            && self.hooks.closed()
+            && !self.ended
+            && up.len().saturating_sub(above) < above_room
+        {
             self.ended = true;
             up.push(Event::Closed);
         }

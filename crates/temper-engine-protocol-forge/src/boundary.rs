@@ -22,6 +22,8 @@ pub enum Request {
     /// An answer the root's admission did not take (`try_step`'s `Err`): held, offered
     /// again at the next `Offer`; at most one per call.
     Refused(Answered),
+    /// A verified hint refused by root admission, held until the next offer.
+    RefusedHint(crate::hooks::Hinted),
     /// An answer the root returned undecided in its drain (`Request::Busy`): kept until
     /// `Close`, never offered again (forge.md, 2).
     Returned(Answered),
@@ -37,6 +39,10 @@ pub enum Request {
 pub enum Event {
     /// A call's one terminal.
     Answered(Answered),
+    /// A verified delivery, after its response is queued.
+    Hint(crate::hooks::Hinted),
+    /// The webhooks listener failed to bind or was lost.
+    ListenerLost,
     /// A forge's start check refused: the engine stops, naming the forge, and `temper
     /// serve` exits 1. At most once per forge.
     Stopped { forge: u16, why: Stopped },

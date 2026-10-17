@@ -85,3 +85,15 @@ pub(crate) fn forge(engine: &mut Engine, number: u16, why: temper_engine_protoco
         drain.stopped = Some(Stop::Forge { number, why });
     }
 }
+
+/// Losing the webhook listener drains the engine, like a failed forge start.
+pub(crate) fn hooks(engine: &mut Engine) {
+    if engine.drain.is_none() {
+        shutdown(engine);
+    }
+    if let Some(drain) = &mut engine.drain
+        && drain.stopped.is_none()
+    {
+        drain.stopped = Some(Stop::Hooks);
+    }
+}

@@ -104,6 +104,11 @@ impl Hosted {
             idle: Duration::from_secs(4),
             start_backoff: Duration::from_secs(1),
             start_backoff_max: Duration::from_secs(60),
+            hooks: 4,
+            hook_head_bytes: 8192,
+            hook_body_bytes: 1_048_576,
+            hook_deadline: Duration::from_secs(10),
+            hook_secret_bytes: 128,
             tls: skein_tls::client::Limits { read: 16384, send: 16384, records: skein_tls::client::MAX_RECORD },
         };
         (io_limits, client, limits)
@@ -132,7 +137,7 @@ impl Hosted {
                     + std::mem::size_of::<Complete>()
                     + std::mem::size_of::<Submit>()) as u64
             + 256 * (u64::from(client.answer_bytes) + 2 * u64::from(io_limits.output));
-        let component = Component::new(kit::Settings { forges }, &limits, &shared)
+        let component = Component::new(kit::Settings { forges, webhooks: None }, &limits, &shared)
             .map_err(|e| format!("component limits: {e:?}"))?;
         let clock = Clock::new();
         let now = clock.now();
@@ -258,6 +263,7 @@ impl Host for Hosted {
                 Event::Stopped { why, .. } => {
                     assert!(self.stopped.replace(why).is_none(), "one stop");
                 }
+                Event::Hint(_) | Event::ListenerLost => panic!("webhooks absent"),
                 Event::Closed => self.closed = true,
             }
         }

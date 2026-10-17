@@ -1,6 +1,7 @@
 mod connection;
 mod contents;
 mod fixtures;
+mod hooks;
 mod reads;
 mod writes;
 use crate::{

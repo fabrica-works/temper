@@ -54,6 +54,7 @@ impl skein_shell::Host for Host {
                     &jig_protocol_config::Path::root(),
                 )),
                 Stop::CommitFailed { number } => format!("temper serve: commit {number} failed\n"),
+                Stop::Hooks => "temper serve: webhooks listener failed\n".into(),
                 Stop::Listener => "temper serve: client listener failed\n".into(),
                 Stop::Forge { number, why } => {
                     use temper_engine_protocol_forge::{StartRead, Stopped};

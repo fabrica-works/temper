@@ -760,4 +760,4 @@ pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
     runtime
 }
 mod forge;
-pub use forge::ForgeFace;
+pub use forge::{ForgeFace, hook};

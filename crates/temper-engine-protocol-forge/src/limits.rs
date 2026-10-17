@@ -42,6 +42,12 @@ pub struct Limits {
     /// A forge's start asked again after this, doubling to `start_backoff_max`.
     pub start_backoff: Duration,
     pub start_backoff_max: Duration,
+    /// Webhook connections, head and body bytes, request deadline and secret bytes.
+    pub hooks: u32,
+    pub hook_head_bytes: u32,
+    pub hook_body_bytes: u32,
+    pub hook_deadline: Duration,
+    pub hook_secret_bytes: u32,
     /// TLS's own.
     pub tls: skein_tls::client::Limits,
 }
@@ -78,6 +84,8 @@ pub enum Stacked {
     HttpOverIo,
     TlsOverIo,
     JsonOverHttp,
+    ServerOverIo,
+    JsonOverServer,
 }
 
 /// Why the component cannot start (configuration.md, 7: "each failure naming both limits").
@@ -85,6 +93,12 @@ pub enum Stacked {
 pub enum Unusable {
     /// A limit is 0, or the worst case passes a `u64`.
     Zero,
+    /// The secret bound must admit at least 32 bytes.
+    SecretBytes { bytes: u32 },
+    /// A secret has no forge, is empty, or exceeds its byte bound.
+    Secret { forge: u16 },
+    /// A webhook listener must be a loopback IP socket.
+    Listener,
     /// `connections` is not the client's `calls`.
     Connections { connections: u32, calls: u32 },
     /// `deadline` passes the client's `lifetime`.
@@ -137,6 +151,10 @@ pub fn check(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unusable
         l.target_bytes,
         l.repositories,
         l.users,
+        l.hooks,
+        l.hook_head_bytes,
+        l.hook_body_bytes,
+        l.hook_secret_bytes,
         l.tls.read,
         l.tls.send,
         l.tls.records,
@@ -145,11 +163,19 @@ pub fn check(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unusable
             return Err(Unusable::Zero);
         }
     }
-    for value in [l.deadline, l.idle, l.start_backoff, l.start_backoff_max] {
+    for value in [l.deadline, l.idle, l.start_backoff, l.start_backoff_max, l.hook_deadline] {
         if value.as_nanos() == 0 {
             return Err(Unusable::Zero);
         }
     }
+    if l.hook_secret_bytes < 32 {
+        return Err(Unusable::SecretBytes { bytes: l.hook_secret_bytes });
+    }
+    let server = hook_http(l);
+    skein_http::server::worst_case(&server).ok_or(Unusable::Zero)?;
+    stack(Stacked::ServerOverIo, skein_http::server::largest_read(&server), s.io.intake)?;
+    stack(Stacked::ServerOverIo, skein_http::server::largest_room(&server), s.io.output)?;
+    stack(Stacked::JsonOverServer, tokenizer::largest_demand(&hook_documents(l).json), server.read)?;
     if l.connections != s.client.calls {
         return Err(Unusable::Connections { connections: l.connections, calls: s.client.calls });
     }
@@ -242,6 +268,24 @@ fn check_settings(l: &Limits, s: &Shared, settings: &Settings) -> Result<(), Unu
             return Err(Unusable::Request { forge: forge.number });
         }
     }
+    if let Some(hooks) = &settings.webhooks {
+        if hooks.secrets.len() > l.forges {
+            return Err(Unusable::Forges { forges: l.forges });
+        }
+        match hooks.listener {
+            skein_io::Addr::Ip(ip) if ip.ip().is_loopback() => {}
+            skein_io::Addr::Ip(_) | skein_io::Addr::InProcess(_) => return Err(Unusable::Listener),
+        }
+        for (forge, secret) in &hooks.secrets {
+            let mut known = false;
+            for configured in &settings.forges {
+                known |= configured.number == *forge;
+            }
+            if !known || secret.is_empty() || secret.len() > usize::try_from(l.hook_secret_bytes).expect("u32 fits") {
+                return Err(Unusable::Secret { forge: *forge });
+            }
+        }
+    }
     Ok(())
 }
 fn stack(stacked: Stacked, demand: u32, cap: u32) -> Result<(), Unusable> {
@@ -305,6 +349,25 @@ pub fn http(l: &Limits, tls: bool, io: &skein_io::Limits) -> skein_http::client:
         send: if tls { l.tls.send } else { io.output },
     }
 }
+/// The webhook server reads bounded pieces and answers with no response body.
+#[must_use]
+pub fn hook_http(l: &Limits) -> skein_http::server::Limits {
+    skein_http::server::Limits {
+        head: l.hook_head_bytes,
+        headers: l.headers,
+        body: u64::from(l.hook_body_bytes),
+        read: l.chunk.max(5),
+        response: 256,
+        send: 1,
+    }
+}
+/// Webhook documents have their own incoming body bound.
+#[must_use]
+pub fn hook_documents(l: &Limits) -> documents::Limits {
+    let mut docs = documents(l);
+    docs.json.length = l.hook_body_bytes;
+    docs
+}
 /// Conservative complete heap, pricing TLS on every connection because this interface
 /// knows the forge count, not their transports. Raw growth includes its doubling overlap.
 #[must_use]
@@ -346,6 +409,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(u64::from(l.tls.send.max(s.io.output)))?
         .checked_add(u64::from(l.body_bytes).checked_mul(6)?.checked_add(1024)?)?
         .checked_add(socket)?;
+    let hooks = hook_heap(l, decoder, socket, forges)?;
     let calls = Slab::<Waiting>::worst_case(s.client.calls)?
         .checked_add(Map::<Token, Token>::worst_case(l.connections)?)?
         .checked_add(List::<(Token, Id<Waiting>)>::worst_case(s.client.calls)?)?
@@ -396,10 +460,32 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
         .checked_add(Map::<Token, Id<crate::connection::Connection>>::worst_case(l.connections)?)?
         .checked_add(Slab::<crate::connection::Connection>::worst_case(l.connections)?)?
         .checked_add(List::<Option<Token>>::worst_case(l.forges)?)?
+        .checked_add(hooks)?
         .checked_add(calls)?
         .checked_add(held)?
         .checked_add(repositories)?
         .checked_add(users)?
         .checked_add(configured)?
         .checked_add(u64::try_from(size_of::<Answered>()).ok()?)
+}
+
+fn hook_heap(l: &Limits, decoder: u64, socket: u64, forges: u32) -> Option<u64> {
+    use skein_lib::{List, Queue};
+    skein_http::server::worst_case(&hook_http(l))?
+        .checked_add(tokenizer::worst_case(&hook_documents(l).json)?)?
+        .checked_add(decoder)?
+        .checked_add(socket)?
+        .checked_add(u64::try_from(size_of::<skein_lib::sha256::Hmac>()).ok()?)?
+        .checked_add(u64::try_from(size_of::<api::Hint>()).ok()?)?
+        .checked_add(u64::from(l.string_bytes).checked_add(u64::from(l.body_bytes))?)?
+        .checked_add(Queue::<skein_http::server::Event>::worst_case(4)?)?
+        .checked_add(Queue::<skein_lib::stream::Down>::worst_case(4)?)?
+        .checked_add(Queue::<tokenizer::Event>::worst_case(1)?)?
+        .checked_add(Queue::<skein_lib::stream::Down>::worst_case(1)?)?
+        .checked_add(u64::from(l.hook_head_bytes))?
+        .checked_add(u64::from(l.chunk).checked_mul(2)?)?
+        .checked_mul(u64::from(l.hooks))?
+        .checked_add(crate::hooks::storage(l.hooks)?)?
+        .checked_add(List::<(u16, skein_lib::Secret)>::worst_case(l.forges)?)?
+        .checked_add(u64::from(l.hook_secret_bytes).checked_mul(u64::from(forges))?)
 }

@@ -44,9 +44,16 @@ pub enum End {
 /// Why the service stopped; failed startup names its configuration paths.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Stop {
-    CommitFailed { number: u64 },
+    CommitFailed {
+        number: u64,
+    },
     Start(Problems),
     Listener,
-    Forge { number: u16, why: temper_engine_protocol_forge::Stopped },
+    /// The webhooks listener failed.
+    Hooks,
+    Forge {
+        number: u16,
+        why: temper_engine_protocol_forge::Stopped,
+    },
 }
 use jig_protocol_config::Problems;

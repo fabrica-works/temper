@@ -28,6 +28,8 @@ temper-engine-domain-forge-issues.workspace = true
 
 jig-domain-people.workspace = true
 
+temper-service.workspace = true
+
 [dev-dependencies]
 
 [lints.rust]

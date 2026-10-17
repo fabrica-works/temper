@@ -185,6 +185,7 @@ impl Machine {
                 Event::Stopped { forge, why } => {
                     assert!(self.stopped.replace((forge, why)).is_none(), "one stop");
                 }
+                Event::Hint(_) | Event::ListenerLost => panic!("webhooks absent"),
                 Event::Closed => {
                     assert!(!self.closed, "one close");
                     self.closed = true;

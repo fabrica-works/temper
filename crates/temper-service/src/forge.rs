@@ -73,7 +73,7 @@ pub fn settings(
             found.push(forge_path(u32::try_from(index).expect("runtime index")).member(b"api"), What::Refers);
         }
     }
-    if found.is_empty() { Some(kit::settings::Settings { forges: configured }) } else { None }
+    if found.is_empty() { Some(kit::settings::Settings { forges: configured, webhooks: None }) } else { None }
 }
 fn forge_path(index: u32) -> Path {
     Path::root().member(b"application").member(b"forges").child(Segment::Index(index))
@@ -96,6 +96,11 @@ pub fn event(answer: kit::Answered) -> root::Event {
         cost: answer.cost,
         result: answer.result,
     })))
+}
+/// Hand a verified delivery hint to root admission.
+#[must_use]
+pub fn hinted(hinted: kit::hooks::Hinted) -> root::Event {
+    root::Event::Forge(Box::new(forge::Event::Hint { hint: hinted.hint }))
 }
 /// Recover an answer refused by admission or returned during the drain.
 pub fn back(event: Box<forge::Event>) -> Result<kit::Answered, Box<forge::Event>> {
@@ -127,6 +132,11 @@ pub fn small(forge: &forge::Limits) -> kit::Limits {
         idle: Duration::from_secs(4),
         start_backoff: Duration::from_secs(1),
         start_backoff_max: Duration::from_secs(60),
+        hooks: 4,
+        hook_head_bytes: 8192,
+        hook_body_bytes: 1_048_576,
+        hook_deadline: Duration::from_secs(10),
+        hook_secret_bytes: 128,
         tls: skein_tls::client::Limits { read: 16_384, send: 16_384, records: skein_tls::client::MAX_RECORD },
     }
 }
@@ -217,8 +227,18 @@ pub fn problems(unusable: kit::Unusable, found: &mut Problems) {
             Stacked::TlsOverIo => {
                 &[b"forge_component.tls.read", b"forge_component.tls.send", b"io.intake", b"io.output"]
             }
-            Stacked::JsonOverHttp => &[b"forge_component.chunk"],
+            Stacked::JsonOverHttp | Stacked::JsonOverServer => &[b"forge_component.chunk"],
+            Stacked::ServerOverIo => &[b"forge_component.hook_head_bytes", b"io.intake", b"io.output"],
         },
+        Unusable::SecretBytes { .. } => &[b"forge_component.hook_secret_bytes"],
+        Unusable::Secret { forge } => {
+            found.push(forge_path(u32::from(forge)).member(b"webhook_secret"), What::Bound);
+            &[b"forge_component.hook_secret_bytes"]
+        }
+        Unusable::Listener => {
+            found.push(Path::root().member(b"application").member(b"webhooks").member(b"listener"), What::Plaintext);
+            return;
+        }
         Unusable::Forges { .. } => &[b"forge_component.forges"],
         Unusable::Request { .. } => {
             &[b"forge_component.target_bytes", b"forge_component.token_bytes", b"forge_component.tls.send"]
@@ -257,6 +277,7 @@ pub(crate) fn tag(mut request: skein_io::Request) -> skein_io::Request {
 pub(crate) fn indexed(unusable: kit::Unusable, forges: &[settings::Forge]) -> kit::Unusable {
     let mut unusable = unusable;
     if let kit::Unusable::Duplicate { forge }
+    | kit::Unusable::Secret { forge }
     | kit::Unusable::Token { forge }
     | kit::Unusable::User { forge }
     | kit::Unusable::Address { forge } = &mut unusable
