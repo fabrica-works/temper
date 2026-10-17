@@ -539,6 +539,10 @@ fn table(service: &Service, request: &Request, user: u64) -> Option<documents::A
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,

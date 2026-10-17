@@ -24,6 +24,8 @@ pub(crate) enum WriteKind {
     NewToken,
     Scopes,
     Scope,
+    NewHook,
+    HookConfig,
     NewOrg,
     NewTeam,
     Pull,
@@ -45,6 +47,8 @@ pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
         WriteKind::NewToken => {
             const { &[field(b"name", Read::Text, true), field(b"scopes", Read::Array(Kind::Write(WriteKind::Scopes)), true)] }
         }
+        WriteKind::NewHook => super::hooks::fields(),
+        WriteKind::HookConfig => super::hooks::config(),
         WriteKind::NewOrg => const { &[field(b"username", Read::Text, true), field(b"visibility", Read::Text, true)] },
         WriteKind::NewTeam => {
             const {
@@ -104,7 +108,9 @@ pub(crate) fn element(kind: WriteKind) -> Option<Kind> {
     match kind {
         WriteKind::Scopes => Some(Kind::Write(WriteKind::Scope)),
         WriteKind::Logins => Some(Kind::Write(WriteKind::Login)),
-        WriteKind::NewToken
+        WriteKind::HookConfig
+        | WriteKind::NewHook
+        | WriteKind::NewToken
         | WriteKind::Scope
         | WriteKind::NewOrg
         | WriteKind::NewTeam
@@ -268,6 +274,7 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
             return BodyStep::Demand(
                 if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins))
                     || decoder.walk.parent() == Some(Kind::Write(WriteKind::Scopes))
+                    || decoder.walk.parent() == Some(Kind::Setup(crate::client::setup::SetupKind::Events))
                 {
                     tokenizer::Request::Text(limits.string_bytes)
                 } else {
@@ -289,6 +296,7 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
         Ok(()) => BodyStep::Demand(
             if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins))
                 || decoder.walk.parent() == Some(Kind::Write(WriteKind::Scopes))
+                || decoder.walk.parent() == Some(Kind::Setup(crate::client::setup::SetupKind::Events))
             {
                 tokenizer::Request::Text(limits.string_bytes)
             } else {
@@ -303,9 +311,13 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
 }
 impl BodyDecoder {
     fn end(&mut self, kind: Kind, limits: &Limits) {
-        if kind == Kind::Write(WriteKind::Logins) || kind == Kind::Write(WriteKind::Scopes) {
+        if kind == Kind::Write(WriteKind::Logins)
+            || kind == Kind::Write(WriteKind::Scopes)
+            || kind == Kind::Setup(crate::client::setup::SetupKind::Events)
+        {
             let logins = core::mem::replace(&mut self.texts, List::with_capacity(limits.inner)).into_boxed();
             match &mut self.request {
+                Request::CreateOrgHook { hook, .. } | Request::EditOrgHook { hook, .. } => hook.events = logins,
                 Request::CreateToken { scopes, .. } => *scopes = logins,
                 Request::RequestReviewers { reviewers, .. } | Request::RemoveReviewers { reviewers, .. } => {
                     *reviewers = logins;
@@ -328,6 +340,8 @@ impl BodyDecoder {
                 | Request::CreateTeam { .. }
                 | Request::EditTeam { .. }
                 | Request::TeamMembers { .. }
+                | Request::OrgHooks { .. }
+                | Request::DeleteOrgHook { .. }
                 | Request::AddMember { .. }
                 | Request::CreateUser { .. }
                 | Request::DeleteBranch { .. }
@@ -364,6 +378,10 @@ impl BodyDecoder {
     }
 
     fn flag(&mut self, key: &'static [u8], value: bool) -> Result<(), Malformed> {
+        if let Request::CreateOrgHook { hook, .. } | Request::EditOrgHook { hook, .. } = &mut self.request {
+            hook.active = value;
+            return Ok(());
+        }
         if let Request::CreateTeam { spec, .. } | Request::EditTeam { spec, .. } = &mut self.request {
             spec.includes_all_repositories = value;
             return Ok(());
@@ -386,13 +404,19 @@ impl BodyDecoder {
             Value::Number(_) | Value::Time(_) => return Err(Malformed::Shape { field: key }),
         };
         let text = text.expect("text field");
-        if kind == Kind::Write(WriteKind::Login) || kind == Kind::Write(WriteKind::Scope) {
+        if kind == Kind::Write(WriteKind::Login)
+            || kind == Kind::Write(WriteKind::Scope)
+            || kind == Kind::Setup(crate::client::setup::SetupKind::Event)
+        {
             self.texts.push(text).ok().ok_or(Malformed::Bound { field: key })?;
             return Ok(());
         }
         self.text(key, text)
     }
     fn text(&mut self, key: &'static [u8], text: Box<[u8]>) -> Result<(), Malformed> {
+        if let Request::CreateOrgHook { hook, .. } | Request::EditOrgHook { hook, .. } = &mut self.request {
+            return super::hooks::text(hook, key, text);
+        }
         match &mut self.request {
             Request::CreateToken { name, .. } => *name = text,
             Request::CreateTeam { spec, .. } | Request::EditTeam { spec, .. } => {
@@ -421,18 +445,7 @@ impl BodyDecoder {
                 _ => unreachable!("pull fields"),
             },
             Request::PostComment { body, .. } => *body = text,
-            Request::PostReview { event, body, .. } => {
-                if key == b"body" {
-                    *body = text;
-                } else {
-                    *event = match &*text {
-                        b"APPROVED" => ReviewEvent::Approved,
-                        b"REQUEST_CHANGES" => ReviewEvent::RequestChanges,
-                        b"COMMENT" => ReviewEvent::Comment,
-                        _ => return Err(Malformed::Value { field: key }),
-                    };
-                }
-            }
+            Request::PostReview { event, body, .. } => review_text(event, body, key, text)?,
             Request::EditIssue { title, body, state, .. } => match key {
                 b"title" => *title = Some(text),
                 b"body" => *body = Some(text),
@@ -485,6 +498,10 @@ impl BodyDecoder {
             | Request::Org { .. }
             | Request::Teams { .. }
             | Request::TeamMembers { .. }
+            | Request::CreateOrgHook { .. }
+            | Request::EditOrgHook { .. }
+            | Request::OrgHooks { .. }
+            | Request::DeleteOrgHook { .. }
             | Request::AddMember { .. }
             | Request::DeleteBranch { .. } => unreachable!("body text selection"),
         }
@@ -541,6 +558,10 @@ impl BodyDecoder {
             | Request::CreateTeam { .. }
             | Request::EditTeam { .. }
             | Request::TeamMembers { .. }
+            | Request::OrgHooks { .. }
+            | Request::CreateOrgHook { .. }
+            | Request::EditOrgHook { .. }
+            | Request::DeleteOrgHook { .. }
             | Request::AddMember { .. }
             | Request::CreateUser { .. }
             | Request::DeleteBranch { .. } => unreachable!("body id selection"),
@@ -572,5 +593,25 @@ fn org_name(name: &mut Box<[u8]>, key: &'static [u8], text: Box<[u8]>) -> Result
     } else if text.as_ref() != b"private" {
         return Err(Malformed::Value { field: key });
     }
+    Ok(())
+}
+
+fn review_text(
+    event: &mut ReviewEvent,
+    body: &mut Box<[u8]>,
+    key: &'static [u8],
+    text: Box<[u8]>,
+) -> Result<(), Malformed> {
+    if key == b"body" {
+        *body = text;
+    } else {
+        *event = match &*text {
+            b"APPROVED" => ReviewEvent::Approved,
+            b"REQUEST_CHANGES" => ReviewEvent::RequestChanges,
+            b"COMMENT" => ReviewEvent::Comment,
+            _ => return Err(Malformed::Value { field: key }),
+        };
+    }
+
     Ok(())
 }

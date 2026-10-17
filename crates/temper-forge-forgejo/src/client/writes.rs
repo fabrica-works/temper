@@ -71,12 +71,7 @@ fn target(request: &Request, out: &mut Target) -> (Method, bool) {
             out.put(b"/merge");
         }
         Request::Update { at, number, style } => {
-            out.numbered(at, b"/pulls/", *number);
-            out.put(b"/update");
-            if let Some(style) = style {
-                out.put(b"?style=");
-                out.put(update(*style));
-            }
+            update_target(out, at, *number, *style);
             return (Method::Post, false);
         }
         Request::PostStatus { at, commit, .. } => {
@@ -104,6 +99,10 @@ fn target(request: &Request, out: &mut Target) -> (Method, bool) {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
@@ -239,6 +238,10 @@ fn write(json: &mut Encoder, request: &Request) {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
@@ -307,5 +310,14 @@ impl Error {
                 message: core::mem::replace(&mut self.message, Body::Kept(Box::from([]))),
             })),
         }
+    }
+}
+
+fn update_target(out: &mut Target, at: &crate::request::Repo, number: u64, style: Option<UpdateStyle>) {
+    out.numbered(at, b"/pulls/", number);
+    out.put(b"/update");
+    if let Some(style) = style {
+        out.put(b"?style=");
+        out.put(update(style));
     }
 }

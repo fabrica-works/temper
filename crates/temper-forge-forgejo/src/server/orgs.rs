@@ -86,7 +86,9 @@ pub(super) fn write(json: &mut Encoder, answer: &super::Answer) {
             }
             json.array_end();
         }
-        super::Answer::Token(_)
+        super::Answer::Hook(_)
+        | super::Answer::Hooks(_)
+        | super::Answer::Token(_)
         | super::Answer::Tokens(_)
         | super::Answer::User(_)
         | super::Answer::ApiSettings(_)

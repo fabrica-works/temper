@@ -1,6 +1,7 @@
 mod accounts;
 mod delivery;
 mod fixtures;
+mod hooks;
 mod orgs;
 mod pin;
 use crate::{

@@ -734,6 +734,10 @@ fn raw_request(request: &request::Request) -> bool {
         | request::Request::CreateTeam { .. }
         | request::Request::EditTeam { .. }
         | request::Request::TeamMembers { .. }
+        | request::Request::OrgHooks { .. }
+        | request::Request::CreateOrgHook { .. }
+        | request::Request::EditOrgHook { .. }
+        | request::Request::DeleteOrgHook { .. }
         | request::Request::AddMember { .. }
         | request::Request::CreateUser { .. }
         | request::Request::DeleteBranch { .. } => false,

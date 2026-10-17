@@ -250,6 +250,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
         | Answer::Org(_)
         | Answer::Team(_)
         | Answer::Teams(_)
+        | Answer::Hook(_)
+        | Answer::Hooks(_)
         | Answer::Members(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)

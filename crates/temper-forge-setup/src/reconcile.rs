@@ -240,6 +240,7 @@ fn account(event: Event) -> Result<temper_forge_forgejo::document::User, Why> {
                 Document::User(user) => Ok(user),
                 Document::Token(_)
                 | Document::Org(_)
+                | Document::Hook(_)
                 | Document::Team(_)
                 | Document::ApiSettings(_)
                 | Document::Repository(_)

@@ -73,6 +73,10 @@ pub fn follow(request: &Request, answer: &Answer) -> Result<Option<(a::Read, Sel
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. } => return Err(a::Error::Refused),
         Request::CreateIssue { .. } => {
@@ -143,6 +147,10 @@ pub fn select(config: &Config, request: &Request, range: Option<Range>) -> Resul
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. } => Err(a::Error::Refused),
         Request::Branch { name, .. } => Ok(Select::Branch(name.clone())),
@@ -213,6 +221,10 @@ fn status(request: &Request) -> u16 {
         | crate::Route::CreateTeam
         | crate::Route::EditTeam
         | crate::Route::TeamMembers
+        | crate::Route::OrgHooks
+        | crate::Route::CreateOrgHook
+        | crate::Route::EditOrgHook
+        | crate::Route::DeleteOrgHook
         | crate::Route::AddMember
         | crate::Route::CreateUser
         | crate::Route::User

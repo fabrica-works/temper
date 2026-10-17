@@ -240,6 +240,7 @@ impl Plan {
             | d::Row::Branch(_)
             | d::Row::Protection(_)
             | d::Row::File(_)
+            | d::Row::Hook(_)
             | d::Row::Team(_)
             | d::Row::Commit(_) => Err(api::Error::InvalidAnswer),
         }
@@ -318,6 +319,7 @@ impl Plan {
             d::Document::Token(_)
             | d::Document::User(_)
             | d::Document::Org(_)
+            | d::Document::Hook(_)
             | d::Document::Team(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)

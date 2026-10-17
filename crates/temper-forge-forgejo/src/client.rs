@@ -19,6 +19,7 @@ use files::FileKind;
 pub(crate) mod reviews;
 use branches::BranchKind;
 use reviews::ReviewKind;
+pub(crate) mod hooks;
 pub(crate) mod orgs;
 pub(crate) mod setup;
 mod start;
@@ -36,7 +37,11 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
-        Request::Org { .. }
+        Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
+        | Request::Org { .. }
         | Request::CreateOrg { .. }
         | Request::Teams { .. }
         | Request::CreateTeam { .. }
@@ -101,6 +106,7 @@ enum DecoderState {
     Start(start::Start),
     Setup(setup::Setup),
     Orgs(orgs::Orgs),
+    Hooks(hooks::Hooks),
     Items(Box<items::Items>),
     Files(Box<files::Files>),
     Actions(actions::Actions),
@@ -113,7 +119,10 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Org { .. } | Request::CreateOrg { .. } => Kind::Setup(setup::SetupKind::Org),
         Request::CreateTeam { .. } | Request::EditTeam { .. } => Kind::Setup(setup::SetupKind::Team),
         Request::Teams { .. } => Kind::Setup(setup::SetupKind::Teams),
-        Request::DeleteToken { .. }
+        Request::OrgHooks { .. } => Kind::Setup(setup::SetupKind::Hooks),
+        Request::CreateOrgHook { .. } | Request::EditOrgHook { .. } => Kind::Setup(setup::SetupKind::Hook),
+        Request::DeleteOrgHook { .. }
+        | Request::DeleteToken { .. }
         | Request::AddMember { .. }
         | Request::Raw { .. }
         | Request::JobLog { .. }
@@ -156,6 +165,9 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Kind::Setup(
             kind @ (setup::SetupKind::Org | setup::SetupKind::Team | setup::SetupKind::Teams | setup::SetupKind::Units),
         ) => DecoderState::Orgs(orgs::Orgs::new(kind)),
+        Kind::Setup(kind @ (setup::SetupKind::Hook | setup::SetupKind::Hooks)) => {
+            DecoderState::Hooks(hooks::Hooks::new(kind, limits))
+        }
         Kind::Setup(kind) => DecoderState::Setup(setup::Setup::new(kind, limits)),
         Kind::Error => DecoderState::Error(writes::Error::new()),
         Kind::Write(_) | Kind::Delivery(_) => unreachable!("answer kind selection"),
@@ -184,6 +196,7 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
+            DecoderState::Hooks(state) => state.step(movement, limits, &decoder.walk),
             DecoderState::Orgs(state) => state.step(movement),
             DecoderState::Setup(state) => state.step(movement, limits, &decoder.walk),
             DecoderState::Error(state) => state.step(movement),
@@ -200,7 +213,8 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
 pub fn keep_after(decoder: &mut Decoder, after: u64) {
     match &mut decoder.state {
         DecoderState::Items(state) => state.keep_after(after),
-        DecoderState::Orgs(_)
+        DecoderState::Hooks(_)
+        | DecoderState::Orgs(_)
         | DecoderState::Setup(_)
         | DecoderState::Error(_)
         | DecoderState::Files(_)

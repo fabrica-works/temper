@@ -37,6 +37,27 @@ pub enum Sort {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Lists one page of an organization's hooks.
+    OrgHooks {
+        org: Box<[u8]>,
+        page: Page,
+    },
+    /// Creates a Forgejo JSON hook.
+    CreateOrgHook {
+        org: Box<[u8]>,
+        hook: HookSpec,
+    },
+    /// Replaces the hook configuration, secret, events and active flag.
+    EditOrgHook {
+        org: Box<[u8]>,
+        id: u64,
+        hook: HookSpec,
+    },
+    /// Deletes an organization's hook; answers 204 without a document.
+    DeleteOrgHook {
+        org: Box<[u8]>,
+        id: u64,
+    },
     /// Reads an organization by name.
     Org {
         name: Box<[u8]>,
@@ -291,4 +312,14 @@ pub enum ReviewEvent {
 pub enum UpdateStyle {
     Merge,
     Rebase,
+}
+
+/// The configuration sent when creating or patching an organization hook.
+/// The encoder fixes its type to `forgejo` and its content type to JSON.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct HookSpec {
+    pub url: Box<[u8]>,
+    pub secret: Secret,
+    pub events: Box<[Box<[u8]>]>,
+    pub active: bool,
 }

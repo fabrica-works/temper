@@ -207,3 +207,15 @@ holds setup-team-member-put-of-a-missing-user-is-404
 holds setup-team-member-writes-in-a-repository-made-later
 holds setup-team-non-member-cannot-see-the-private-repository
 holds setup-team-listing-pages-by-limit
+holds setup-hook-for-a-loopback-address-is-made
+holds setup-hook-lists-the-events-it-was-made-with
+holds setup-hook-answers-its-target-in-config-url
+holds setup-hook-is-json-and-active
+holds setup-hook-never-shows-its-secret
+holds setup-hook-patch-narrows-events-but-keeps-the-workflow-job-ones
+holds setup-hook-patch-leaves-the-orgs-other-hook
+holds setup-hook-patch-of-a-missing-id-is-404
+holds setup-hook-listing-pages-by-limit
+holds setup-hook-of-one-url-can-be-made-twice
+holds setup-hook-delete-is-204-and-leaves-the-orgs-other-hooks
+holds setup-hook-delete-of-a-missing-id-is-404

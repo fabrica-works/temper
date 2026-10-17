@@ -236,6 +236,10 @@ fn pull_answer(config: &Config, request: &Request, value: &a::Pull) -> Result<An
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => Err(a::Error::Refused),
@@ -311,6 +315,10 @@ fn checks(config: &Config, request: &Request, values: &[a::CheckSummary]) -> Res
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),
@@ -487,6 +495,10 @@ fn collaborators(config: &Config, request: &Request, values: &[a::Collaborator])
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),

@@ -76,6 +76,7 @@ pub struct Repository {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Row {
+    Hook(Hook),
     Token(AccessToken),
     Team(Team),
     User(User),
@@ -95,6 +96,7 @@ pub enum Row {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
+    Hook(Hook),
     Token(AccessToken),
     Org(Org),
     Team(Team),
@@ -473,4 +475,13 @@ pub(crate) fn team() -> Team {
             units: Units { code: Access::None, issues: Access::None, pulls: Access::None, actions: Access::None },
         },
     }
+}
+
+/// An organization hook as listed. Its target is `config.url`; no secret is exposed.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Hook {
+    pub id: u64,
+    pub url: Box<[u8]>,
+    pub events: Box<[Box<[u8]>]>,
+    pub active: bool,
 }

@@ -13,6 +13,7 @@ mod actions;
 mod branches;
 pub mod delivery;
 mod files;
+mod hooks;
 mod items;
 mod orgs;
 mod reviews;
@@ -43,7 +44,10 @@ pub fn route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, Un
     match writes::route(method, target, limits) {
         Err(Unrouted::NotFound) => match read_route(method, target, limits) {
             Err(Unrouted::NotFound) => match setup::route(method, target, limits) {
-                Err(Unrouted::NotFound) => orgs::route(method, target, limits),
+                Err(Unrouted::NotFound) => match orgs::route(method, target, limits) {
+                    Err(Unrouted::NotFound) => hooks::route(method, target, limits),
+                    other => other,
+                },
                 other => other,
             },
             other => other,
@@ -71,6 +75,8 @@ fn read_route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, U
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Hook(crate::document::Hook),
+    Hooks(Box<[crate::document::Hook]>),
     Token(crate::document::AccessToken),
     Tokens(Box<[crate::document::AccessToken]>),
     Org(crate::document::Org),
@@ -143,6 +149,10 @@ fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refu
                 setup::token(json, token);
             }
             json.array_end();
+            Ok(())
+        }
+        Answer::Hook(_) | Answer::Hooks(_) => {
+            hooks::write(json, answer);
             Ok(())
         }
         Answer::Org(_) | Answer::Team(_) | Answer::Teams(_) | Answer::Members(_) => {

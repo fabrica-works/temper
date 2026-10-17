@@ -68,3 +68,55 @@ pub fn owners() -> Team {
         },
     }
 }
+#[must_use]
+pub fn hook(id: u64, other: bool, narrow: bool) -> temper_forge_forgejo::document::Hook {
+    temper_forge_forgejo::document::Hook {
+        id,
+        url: Box::from(if other {
+            b"http://127.0.0.1:3000/other".as_slice()
+        } else {
+            b"http://127.0.0.1:3000/hooks/1"
+        }),
+        events: if other {
+            Box::from([Box::<[u8]>::from(*b"push")])
+        } else if narrow {
+            ["push", "workflow_job_cancelled", "workflow_job_failure", "workflow_job_skipped", "workflow_job_success"]
+                .iter()
+                .map(|event| Box::from(event.as_bytes()))
+                .collect()
+        } else {
+            hook_events()
+        },
+        active: !narrow,
+    }
+}
+
+fn hook_events() -> Box<[Box<[u8]>]> {
+    [
+        "create",
+        "delete",
+        "push",
+        "issues",
+        "issue_assign",
+        "issue_label",
+        "issue_milestone",
+        "issue_comment",
+        "pull_request",
+        "pull_request_assign",
+        "pull_request_label",
+        "pull_request_milestone",
+        "pull_request_comment",
+        "pull_request_review_approved",
+        "pull_request_review_rejected",
+        "pull_request_review_comment",
+        "pull_request_sync",
+        "pull_request_review_request",
+        "workflow_job_cancelled",
+        "workflow_job_failure",
+        "workflow_job_skipped",
+        "workflow_job_success",
+    ]
+    .iter()
+    .map(|event| Box::from(event.as_bytes()))
+    .collect()
+}

@@ -389,6 +389,7 @@ impl Plan {
             }
             d::Row::Branch(branch) => self.append(api::Answer::Branches(Box::new([branch.name])), shared),
             d::Row::Token(_)
+            | d::Row::Hook(_)
             | d::Row::Team(_)
             | d::Row::File(_)
             | d::Row::Commit(_)
@@ -636,6 +637,7 @@ fn keep_row(row: &d::Row, forge: u16, tables: &mut Tables) {
         | d::Row::File(_)
         | d::Row::Commit(_)
         | d::Row::Run(_)
+        | d::Row::Hook(_)
         | d::Row::Team(_)
         | d::Row::Step(_)
         | d::Row::Job(_) => {}
@@ -657,6 +659,7 @@ pub(crate) fn keep_document(document: &d::Document, forge: u16, tables: &mut Tab
         d::Document::Permission(permission) => keep_user(&permission.user, forge, tables),
         d::Document::Token(_)
         | d::Document::Org(_)
+        | d::Document::Hook(_)
         | d::Document::Team(_)
         | d::Document::ApiSettings(_)
         | d::Document::Search { .. }
@@ -722,6 +725,10 @@ fn page_bound(request: &Request) -> Option<u32> {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,
@@ -743,6 +750,7 @@ pub(crate) fn long(heard: &Heard) -> bool {
             | d::Row::File(_)
             | d::Row::Commit(_)
             | d::Row::Run(_)
+            | d::Row::Hook(_)
             | d::Row::Team(_)
             | d::Row::Step(_)
             | d::Row::Job(_) => false,
@@ -754,6 +762,7 @@ pub(crate) fn long(heard: &Heard) -> bool {
             d::Document::Token(_)
             | d::Document::User(_)
             | d::Document::Org(_)
+            | d::Document::Hook(_)
             | d::Document::Team(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)

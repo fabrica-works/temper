@@ -182,3 +182,34 @@ pub fn request(
     }
     panic!("body decoder exhausted input step bound")
 }
+pub fn hook_spec() -> crate::request::HookSpec {
+    crate::request::HookSpec {
+        url: Box::from(*b"http://127.0.0.1:3000/hooks/1"),
+        secret: skein_lib::Secret::new(Box::from(*b"0123456789abcdef")),
+        events: Box::from([Box::<[u8]>::from(*b"push")]),
+        active: true,
+    }
+}
+pub fn hook_body() -> &'static str {
+    r#"{"type":"forgejo","config":{"url":"http://127.0.0.1:3000/hooks/1","content_type":"json","secret":"0123456789abcdef"},"events":["push"],"active":true}"#
+}
+pub fn debug(value: &impl core::fmt::Debug) -> Box<[u8]> {
+    struct Text {
+        bytes: [u8; 64],
+        len: usize,
+    }
+    impl core::fmt::Write for Text {
+        fn write_str(&mut self, text: &str) -> core::fmt::Result {
+            let end = self.len.checked_add(text.len()).ok_or(core::fmt::Error)?;
+            for (to, from) in self.bytes.get_mut(self.len..end).ok_or(core::fmt::Error)?.iter_mut().zip(text.as_bytes())
+            {
+                *to = *from;
+            }
+            self.len = end;
+            Ok(())
+        }
+    }
+    let mut text = Text { bytes: [0; 64], len: 0 };
+    core::fmt::write(&mut text, format_args!("{value:?}")).unwrap();
+    Box::from(&text.bytes[..text.len])
+}

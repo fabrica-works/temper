@@ -139,6 +139,10 @@ impl Store {
             | Request::CreateTeam { .. }
             | Request::EditTeam { .. }
             | Request::TeamMembers { .. }
+            | Request::OrgHooks { .. }
+            | Request::CreateOrgHook { .. }
+            | Request::EditOrgHook { .. }
+            | Request::DeleteOrgHook { .. }
             | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }
@@ -194,6 +198,10 @@ impl Store {
             | Request::CreateTeam { .. }
             | Request::EditTeam { .. }
             | Request::TeamMembers { .. }
+            | Request::OrgHooks { .. }
+            | Request::CreateOrgHook { .. }
+            | Request::EditOrgHook { .. }
+            | Request::DeleteOrgHook { .. }
             | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }

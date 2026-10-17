@@ -42,7 +42,16 @@ pub(crate) fn fields(kind: SetupKind) -> &'static [Field] {
             }
         }
         SetupKind::Teams => &[],
-        SetupKind::Account | SetupKind::Token | SetupKind::Tokens | SetupKind::Scopes | SetupKind::Scope => {
+        SetupKind::Hook
+        | SetupKind::Hooks
+        | SetupKind::Config
+        | SetupKind::Events
+        | SetupKind::Event
+        | SetupKind::Account
+        | SetupKind::Token
+        | SetupKind::Tokens
+        | SetupKind::Scopes
+        | SetupKind::Scope => {
             unreachable!("organization tables")
         }
     }
@@ -88,16 +97,12 @@ fn target(request: &Request, out: &mut Target) -> Method {
             Method::Post
         }
         Request::Teams { org, page } => {
-            out.put(b"orgs/");
-            out.segment(org);
-            out.put(b"/teams");
+            org_target(out, org, b"/teams");
             out.page(*page, false);
             Method::Get
         }
         Request::CreateTeam { org, .. } => {
-            out.put(b"orgs/");
-            out.segment(org);
-            out.put(b"/teams");
+            org_target(out, org, b"/teams");
             Method::Post
         }
         Request::EditTeam { team, .. } => {
@@ -106,18 +111,29 @@ fn target(request: &Request, out: &mut Target) -> Method {
             Method::Patch
         }
         Request::TeamMembers { team, page } => {
-            out.put(b"teams/");
-            out.number(*team);
-            out.put(b"/members");
+            member_target(out, *team, None);
             out.page(*page, false);
             Method::Get
         }
         Request::AddMember { team, login } => {
-            out.put(b"teams/");
-            out.number(*team);
-            out.put(b"/members/");
-            out.segment(login);
+            member_target(out, *team, Some(login));
             Method::Put
+        }
+        Request::OrgHooks { org, page } => {
+            super::hooks::target(out, org, Some(*page), None);
+            Method::Get
+        }
+        Request::CreateOrgHook { org, .. } => {
+            super::hooks::target(out, org, None, None);
+            Method::Post
+        }
+        Request::EditOrgHook { org, id, .. } => {
+            super::hooks::target(out, org, None, Some(*id));
+            Method::Patch
+        }
+        Request::DeleteOrgHook { org, id } => {
+            super::hooks::target(out, org, None, Some(*id));
+            Method::Delete
         }
         Request::User
         | Request::ApiSettings
@@ -168,6 +184,9 @@ fn target(request: &Request, out: &mut Target) -> Method {
 }
 fn body(json: &mut Encoder, request: &Request) {
     match request {
+        Request::CreateOrgHook { hook, .. } => super::hooks::specification(json, hook, true),
+        Request::EditOrgHook { hook, .. } => super::hooks::specification(json, hook, false),
+        Request::OrgHooks { .. } | Request::DeleteOrgHook { .. } => unreachable!("hook has no body"),
         Request::CreateOrg { name, .. } => {
             json.object_start();
             json.key(b"username");
@@ -333,7 +352,12 @@ impl Orgs {
                     }
                     SetupKind::Team => Document::Team(core::mem::replace(&mut self.team, document::team())),
                     SetupKind::Teams => Document::Listed { skipped: 0 },
-                    SetupKind::Units
+                    SetupKind::Hook
+                    | SetupKind::Hooks
+                    | SetupKind::Config
+                    | SetupKind::Events
+                    | SetupKind::Event
+                    | SetupKind::Units
                     | SetupKind::Account
                     | SetupKind::Token
                     | SetupKind::Tokens
@@ -344,4 +368,20 @@ impl Orgs {
         }
         Step::Demand(tokenizer::Request::Next)
     }
+}
+
+fn member_target(out: &mut Target, team: u64, login: Option<&[u8]>) {
+    out.put(b"teams/");
+    out.number(team);
+    out.put(b"/members");
+    if let Some(login) = login {
+        out.put(b"/");
+        out.segment(login);
+    }
+}
+
+fn org_target(out: &mut Target, org: &[u8], tail: &[u8]) {
+    out.put(b"orgs/");
+    out.segment(org);
+    out.put(tail);
 }

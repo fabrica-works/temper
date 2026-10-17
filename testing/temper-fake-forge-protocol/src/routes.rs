@@ -75,6 +75,10 @@ pub fn repository(config: &Config, request: &Request) -> Option<Box<[u8]>> {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
@@ -167,6 +171,10 @@ pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
@@ -267,15 +275,9 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
         Request::PostComment { number, body, .. } => {
             Ok(Op::Write(Write::Comment { number: *number, body: body.clone() }))
         }
-        Request::PostReview { number, event, body, .. } => Ok(Op::Write(Write::Review {
-            number: *number,
-            body: body.clone(),
-            verdict: Some(match event {
-                r::ReviewEvent::Approved => a::Verdict::Approve,
-                r::ReviewEvent::RequestChanges => a::Verdict::RequestChanges,
-                r::ReviewEvent::Comment => a::Verdict::Comment,
-            }),
-        })),
+        Request::PostReview { number, event, body, .. } => {
+            Ok(Op::Write(Write::Review { number: *number, body: body.clone(), verdict: Some(verdict(*event)) }))
+        }
         Request::EditIssue { number, title, body, state, .. } => {
             if state.is_some() && (title.is_some() || body.is_some()) {
                 return Err(a::Error::Refused);
@@ -320,6 +322,10 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::User
@@ -362,4 +368,12 @@ fn protections(config: &Config, request: &Request) -> Result<Read, a::Error> {
         }
     }
     Ok(Read::Protection { branch })
+}
+
+fn verdict(event: r::ReviewEvent) -> a::Verdict {
+    match event {
+        r::ReviewEvent::Approved => a::Verdict::Approve,
+        r::ReviewEvent::RequestChanges => a::Verdict::RequestChanges,
+        r::ReviewEvent::Comment => a::Verdict::Comment,
+    }
 }

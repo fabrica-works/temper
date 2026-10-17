@@ -80,38 +80,7 @@ fn target(request: &Request, out: &mut Target) {
         Request::Issues { at, state, kind, since, sort, page } => {
             out.repo(at);
             out.put(b"/issues");
-            let mut query = false;
-            if let Some(state) = state {
-                out.put(b"?state=");
-                out.put(match state {
-                    StateFilter::Open => b"open",
-                    StateFilter::Closed => b"closed",
-                    StateFilter::All => b"all",
-                });
-                query = true;
-            }
-            if let Some(kind) = kind {
-                out.put(if query { b"&type=" } else { b"?type=" });
-                out.put(match kind {
-                    IssueKind::Issues => b"issues",
-                    IssueKind::Pulls => b"pulls",
-                });
-                query = true;
-            }
-            if let Some(since) = since {
-                out.put(if query { b"&since=" } else { b"?since=" });
-                out.segment(&time::write(*since));
-                query = true;
-            }
-            if let Some(sort) = sort {
-                out.put(if query { b"&sort=" } else { b"?sort=" });
-                out.put(match sort {
-                    Sort::LeastUpdate => b"leastupdate",
-                    Sort::Other => b"latest",
-                });
-                query = true;
-            }
-            out.page(*page, query);
+            issue_query(out, *state, *kind, *since, *sort, *page);
         }
         Request::Issue { at, number } => out.numbered(at, b"/issues/", *number),
         Request::Comments { at, number } => {
@@ -170,6 +139,10 @@ fn target(request: &Request, out: &mut Target) {
         | Request::CreateTeam { .. }
         | Request::EditTeam { .. }
         | Request::TeamMembers { .. }
+        | Request::OrgHooks { .. }
+        | Request::CreateOrgHook { .. }
+        | Request::EditOrgHook { .. }
+        | Request::DeleteOrgHook { .. }
         | Request::AddMember { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("item encoder dispatch"),
@@ -540,4 +513,46 @@ fn pull_for(out: &mut Target, at: &Repo, base: &[u8], head: &[u8]) {
     out.segment(base);
     out.put(b"/");
     out.segment(head);
+}
+
+fn issue_query(
+    out: &mut Target,
+    state: Option<StateFilter>,
+    kind: Option<IssueKind>,
+    since: Option<Wall>,
+    sort: Option<Sort>,
+    page: Page,
+) {
+    let mut query = false;
+    if let Some(state) = state {
+        out.put(b"?state=");
+        out.put(match state {
+            StateFilter::Open => b"open",
+            StateFilter::Closed => b"closed",
+            StateFilter::All => b"all",
+        });
+        query = true;
+    }
+    if let Some(kind) = kind {
+        out.put(if query { b"&type=" } else { b"?type=" });
+        out.put(match kind {
+            IssueKind::Issues => b"issues",
+            IssueKind::Pulls => b"pulls",
+        });
+        query = true;
+    }
+    if let Some(since) = since {
+        out.put(if query { b"&since=" } else { b"?since=" });
+        out.segment(&time::write(since));
+        query = true;
+    }
+    if let Some(sort) = sort {
+        out.put(if query { b"&sort=" } else { b"?sort=" });
+        out.put(match sort {
+            Sort::LeastUpdate => b"leastupdate",
+            Sort::Other => b"latest",
+        });
+        query = true;
+    }
+    out.page(page, query);
 }

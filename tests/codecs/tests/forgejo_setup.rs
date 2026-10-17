@@ -72,7 +72,7 @@ fn setup_transcripts_decode_to_their_documents() {
         assert_eq!(result.document, Ok(document), "{case}");
         assert_eq!(result.rows, rows, "{case}");
     }
-    for reply in org_answers() {
+    for reply in org_answers().into_iter().chain(hook_answers()) {
         check_document(&reply, &forgejo::transcript(reply.case).body);
     }
 }
@@ -88,7 +88,7 @@ fn setup_answers_the_server_encodes_decode_unchanged_with_the_transcripts_shape(
         assert_eq!(result.rows, rows, "{case}");
         assert!(forgejo::shape(&encoded).is_subset(&forgejo::shape(&forgejo::transcript(case).body)), "{case}");
     }
-    for reply in org_answers() {
+    for reply in org_answers().into_iter().chain(hook_answers()) {
         let encoded = server::encode(&reply.answer, &limits).expect("org encoding");
         check_document(&reply, &encoded);
         assert!(
@@ -235,10 +235,10 @@ struct OrgAnswer {
 }
 fn check_document(reply: &OrgAnswer, body: &[u8]) {
     let limits = forgejo::profile_limits();
-    let decoder = client::decoder(&reply.request, &limits).expect("org answer");
-    let actual = forgejo::decode_answer(decoder, body, &limits);
-    assert_eq!(actual.document, Ok(reply.document.clone()), "{}", reply.case);
-    assert_eq!(actual.rows, reply.rows, "{}", reply.case);
+    let reader = client::decoder(&reply.request, &limits).expect("org answer");
+    let decoded = forgejo::decode_answer(reader, body, &limits);
+    assert_eq!(decoded.document, Ok(reply.document.clone()), "{}", reply.case);
+    assert_eq!(decoded.rows, reply.rows, "{}", reply.case);
 }
 fn org_answers() -> Vec<OrgAnswer> {
     let mut cases = Vec::new();
@@ -272,4 +272,38 @@ fn org_answers() -> Vec<OrgAnswer> {
 fn org_answer(case: &'static str, document: Document, rows: Vec<Row>, answer: Answer) -> OrgAnswer {
     let request = forgejo::setup_cases().into_iter().find(|(name, _)| *name == case).expect("org case").1;
     OrgAnswer { case, request, document, rows, answer }
+}
+fn hook_answers() -> Vec<OrgAnswer> {
+    let mut cases = Vec::new();
+    for (case, id, other, narrow) in [
+        ("setup-hook-made", 1, false, false),
+        ("setup-hook-made-twin", 2, false, false),
+        ("setup-hook-made-other", 3, true, false),
+        ("setup-hook-patched", 1, false, false),
+        ("setup-hook-patched-narrow", 1, false, true),
+    ] {
+        let hook = fixtures::hook(id, other, narrow);
+        cases.push(org_answer(case, Document::Hook(hook.clone()), vec![], Answer::Hook(hook)));
+    }
+    for (case, hooks) in [
+        ("setup-hook-list-none", vec![]),
+        (
+            "setup-hook-list",
+            vec![fixtures::hook(1, false, false), fixtures::hook(2, false, false), fixtures::hook(3, true, false)],
+        ),
+        ("setup-hook-list-page-1", vec![fixtures::hook(1, false, false)]),
+        ("setup-hook-list-page-4", vec![]),
+    ] {
+        let rows = hooks.iter().cloned().map(Row::Hook).collect();
+        cases.push(org_answer(case, Document::Listed { skipped: 0 }, rows, Answer::Hooks(hooks.into_boxed_slice())));
+    }
+    cases
+}
+#[test]
+fn patching_a_missing_hook_reads_its_refusal() {
+    refused_answer("setup-hook-patch-missing", 404, b"The target couldn't be found.");
+}
+#[test]
+fn deleting_a_missing_hook_reads_its_refusal() {
+    refused_answer("setup-hook-delete-missing", 404, b"The target couldn't be found.");
 }

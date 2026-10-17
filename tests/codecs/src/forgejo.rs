@@ -488,6 +488,7 @@ pub fn setup_cases() -> Vec<(&'static str, Request)> {
         ("setup-scope-read-user", Request::User),
     ]);
     cases.extend(setup_org_cases());
+    cases.extend(setup_hook_cases());
     cases
 }
 
@@ -653,5 +654,72 @@ fn setup_org_cases() -> Vec<(&'static str, Request)> {
             "setup-org-repo-for-a-stranger",
             Request::Repository { at: Repo { owner: org(), name: Box::from(*b"stage") } },
         ),
+    ]
+}
+/// The hook events sent by the setup recorder, in the request's order.
+#[must_use]
+pub fn setup_hook_events() -> Box<[Box<[u8]>]> {
+    [
+        "issues",
+        "issue_assign",
+        "issue_label",
+        "issue_milestone",
+        "pull_request",
+        "pull_request_assign",
+        "pull_request_label",
+        "pull_request_milestone",
+        "pull_request_sync",
+        "pull_request_review_request",
+        "issue_comment",
+        "pull_request_comment",
+        "pull_request_review_approved",
+        "pull_request_review_rejected",
+        "pull_request_review_comment",
+        "push",
+        "create",
+        "delete",
+        "workflow_job_success",
+        "workflow_job_failure",
+        "workflow_job_cancelled",
+        "workflow_job_skipped",
+    ]
+    .iter()
+    .map(|event| Box::from(event.as_bytes()))
+    .collect()
+}
+fn setup_hook_spec(patched: bool, other: bool, narrow: bool) -> temper_forge_forgejo::request::HookSpec {
+    temper_forge_forgejo::request::HookSpec {
+        url: Box::from(if other {
+            b"http://127.0.0.1:3000/other".as_slice()
+        } else {
+            b"http://127.0.0.1:3000/hooks/1"
+        }),
+        secret: skein_lib::Secret::new(Box::from(if patched {
+            b"0000000000000000000000000000000000000000000000000000000000000013".as_slice()
+        } else {
+            b"0000000000000000000000000000000000000000000000000000000000000012"
+        })),
+        events: if other || narrow { Box::from([Box::<[u8]>::from(*b"push")]) } else { setup_hook_events() },
+        active: !narrow,
+    }
+}
+fn setup_hook_cases() -> Vec<(&'static str, Request)> {
+    let org = || Box::from(*b"ensemble");
+    let list = |page| Request::OrgHooks { org: org(), page };
+    let make = |other| Request::CreateOrgHook { org: org(), hook: setup_hook_spec(false, other, false) };
+    let patch = |id, narrow| Request::EditOrgHook { org: org(), id, hook: setup_hook_spec(true, false, narrow) };
+    vec![
+        ("setup-hook-list-none", list(Page { page: None, limit: None })),
+        ("setup-hook-made", make(false)),
+        ("setup-hook-made-twin", make(false)),
+        ("setup-hook-made-other", make(true)),
+        ("setup-hook-list", list(Page { page: None, limit: None })),
+        ("setup-hook-list-page-1", list(Page { page: Some(1), limit: Some(1) })),
+        ("setup-hook-list-page-4", list(Page { page: Some(4), limit: Some(1) })),
+        ("setup-hook-patched", patch(1, false)),
+        ("setup-hook-patched-narrow", patch(1, true)),
+        ("setup-hook-patch-missing", patch(999_999, false)),
+        ("setup-hook-deleted", Request::DeleteOrgHook { org: org(), id: 2 }),
+        ("setup-hook-delete-missing", Request::DeleteOrgHook { org: org(), id: 999_999 }),
     ]
 }

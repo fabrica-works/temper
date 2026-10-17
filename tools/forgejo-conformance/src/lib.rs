@@ -5,6 +5,7 @@ pub mod component;
 mod deliveries;
 pub mod facts;
 mod fixture;
+mod hooks;
 mod job_clone;
 pub mod mask;
 mod orgs;

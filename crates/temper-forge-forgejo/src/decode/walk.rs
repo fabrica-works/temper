@@ -293,7 +293,8 @@ impl Walk {
                     self.end()
                 } else {
                     let kind = element(self.parent().expect("array element")).expect("array kind");
-                    if kind == Kind::Setup(crate::client::setup::SetupKind::Scope)
+                    if kind == Kind::Setup(crate::client::setup::SetupKind::Event)
+                        || kind == Kind::Setup(crate::client::setup::SetupKind::Scope)
                         || kind == Kind::Write(crate::server::writes::WriteKind::Scope)
                         || kind == Kind::Branch(crate::client::branches::BranchKind::Context)
                         || kind == Kind::Write(crate::server::writes::WriteKind::Login)
@@ -302,6 +303,8 @@ impl Walk {
                             || kind == Kind::Write(crate::server::writes::WriteKind::Scope)
                         {
                             b"scopes".as_slice()
+                        } else if kind == Kind::Setup(crate::client::setup::SetupKind::Event) {
+                            b"events".as_slice()
                         } else if kind == Kind::Write(crate::server::writes::WriteKind::Login) {
                             b"reviewers".as_slice()
                         } else {

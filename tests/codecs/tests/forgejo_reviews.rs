@@ -130,6 +130,8 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         Answer::Org(_)
         | Answer::Team(_)
         | Answer::Teams(_)
+        | Answer::Hook(_)
+        | Answer::Hooks(_)
         | Answer::Members(_)
         | Answer::Error(_)
         | Answer::Comment(_)
