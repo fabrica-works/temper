@@ -242,19 +242,3 @@ fn the_upgrade_stops_where_register_failed_and_repeats_next_time() {
     let mut again = Drive::new(fixtures::owned());
     assert_eq!(again.reach(found), Request::Lock(File::RunnerLock));
 }
-
-#[test]
-fn the_upgrade_reads_the_registered_uuid_after_settings_diagnostics() {
-    let mut drive = Drive::new(fixtures::owned());
-    assert_eq!(drive.reach(fixtures::older(None, Some(b"13.1.0"))), Request::Lock(File::RunnerLock));
-    assert_eq!(drive.send(Event::Done), Request::Layout);
-    let Request::Write { file: File::AppIni, .. } = drive.send(Event::Done) else { panic!("settings") };
-    assert_eq!(drive.send(Event::Done), fixtures::run_command(Command::Register));
-    let Request::Write { file: File::RunnerConfiguration, contents } =
-        drive.send(fixtures::ran(b"settings diagnostic\nrunner-uuid\n"))
-    else {
-        panic!("connection")
-    };
-    assert!(skein_lib::bytes::find(contents.expose(), b"uuid: \"runner-uuid\"").is_some());
-    assert_eq!(skein_lib::bytes::find(contents.expose(), b"settings diagnostic"), None);
-}

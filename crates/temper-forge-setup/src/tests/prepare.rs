@@ -125,7 +125,7 @@ fn a_first_preparation_records_its_start_first_and_its_end_last() {
         state.secrets.internal_token.expose(),
         b"0101010101010101010101010101010101010101010101010101010101010101"
     );
-    assert_eq!(state.secrets.jwt_secret.expose(), b"0202020202020202020202020202020202020202020202020202020202020202");
+    assert_eq!(state.secrets.jwt_secret.expose(), b"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI");
     let mut drive = person(false);
     let Request::Write { file: File::PersonPassword, .. } = drive.send(fixtures::ran(b"person-password\n")) else {
         panic!("password")
@@ -198,7 +198,7 @@ fn a_failed_command_names_its_status_and_none_of_the_secrets() {
     drive.send(fixtures::ran(b"person-password\n"));
     drive.send(Event::Done);
     drive.send(Event::Done);
-    let output = b"0000000000000000000000000000000000000000000000000000000000000000 0101010101010101010101010101010101010101010101010101010101010101 0202020202020202020202020202020202020202020202020202020202020202 0404040404040404040404040404040404040404 admin-token person-password";
+    let output = b"0000000000000000000000000000000000000000000000000000000000000000 0101010101010101010101010101010101010101010101010101010101010101 AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI 0404040404040404040404040404040404040404 admin-token person-password";
     assert_eq!(
         drive.send(Event::Ran(Ran {
             exit: Exit::Signal(9),

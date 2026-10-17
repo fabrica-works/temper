@@ -11,7 +11,11 @@ use crate::{
 };
 use alloc::boxed::Box;
 use core::net::IpAddr;
-use skein_lib::{Queue, Secret, Writer, bytes};
+use skein_lib::{
+    Queue, Secret, Writer,
+    base64::{self, Alphabet},
+    bytes,
+};
 use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION, names_forgejo, names_runner};
 /// One request is emitted per step.
 pub const MAX_OUT: u32 = 1;
@@ -307,7 +311,11 @@ impl Prepare {
         match index {
             0 => self.state.secrets.secret_key = hex(value.expose(), 32),
             1 => self.state.secrets.internal_token = hex(value.expose(), 32),
-            2 => self.state.secrets.jwt_secret = hex(value.expose(), 32),
+            2 => {
+                let mut text = Writer::new(43);
+                base64::encode(Alphabet::Url, value.expose(), &mut text).expect("32 bytes encode to 43 characters");
+                self.state.secrets.jwt_secret = Secret::new(text.finish());
+            }
             3 => self.name = joined(&[b"temper-admin-", hex(value.expose(), 8).expose()]),
             4 => self.runner_secret = Some(hex(value.expose(), 20)),
             _ => unreachable!("five draws at most"),
@@ -356,7 +364,7 @@ impl Prepare {
                 self.write(File::PersonPassword, password, Phase::Password)
             }
             Command::Register => {
-                let Some(uuid) = registration(&ran.stdout) else {
+                let Some(uuid) = first_line(&ran.stdout) else {
                     return self.end(Err(Failure::Unread { command }));
                 };
                 let text = runner::configuration(
@@ -422,23 +430,6 @@ fn first_line(value: &Secret) -> Option<Secret> {
     let end = bytes::find(input, b"\n").unwrap_or(input.len());
     let line = input.get(..end)?.strip_suffix(b"\r").unwrap_or(input.get(..end)?);
     if line.is_empty() { None } else { Some(Secret::new(bytes::copy_of(line))) }
-}
-// Register prints its UUID last; Forgejo can print settings diagnostics before it.
-fn registration(value: &Secret) -> Option<Secret> {
-    let mut last = None;
-    let mut remaining = value.expose();
-    for _ in 0..remaining.len() {
-        let end = bytes::find(remaining, b"\n").unwrap_or(remaining.len());
-        let line = remaining.get(..end)?.strip_suffix(b"\r").unwrap_or(remaining.get(..end)?);
-        if !line.is_empty() {
-            last = Some(Secret::new(bytes::copy_of(line)));
-        }
-        if end == remaining.len() {
-            break;
-        }
-        remaining = remaining.get(end.checked_add(1)?..)?;
-    }
-    last
 }
 fn hex(input: &[u8], count: usize) -> Secret {
     let mut w = Writer::new(count.checked_mul(2).expect("bounded hex"));

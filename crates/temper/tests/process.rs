@@ -113,21 +113,7 @@ fn a_running_engine_lends_the_record_temper_sign_in_kept() {
 #[test]
 fn forge_prepare_makes_an_owned_forge_then_remakes_nothing() {
     let scratch = support::Scratch::new("forge_prepare_real");
-    let forgejo = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO is required");
-    let runner = std::env::var_os("TEMPER_FORGEJO_RUNNER").expect("TEMPER_FORGEJO_RUNNER is required");
-    support::owned::configuration(
-        scratch.path(),
-        &support::owned::Names {
-            forgejo: std::path::Path::new(&forgejo),
-            runner: Some(std::path::Path::new(&runner)),
-            port: 3000,
-            bot: "temper-bot",
-            person: "ada",
-            orgs: &["workshop"],
-        },
-    );
-    let first = support::owned::prepare(scratch.path(), 1);
-    assert_eq!(first.status.code(), Some(0), "{}", String::from_utf8_lossy(&first.stderr));
+    let _port = support::owned::prepared_processes(scratch.path());
     let before: Vec<_> = support::owned::files(scratch.path())
         .iter()
         .map(|path| {
@@ -142,6 +128,17 @@ fn forge_prepare_makes_an_owned_forge_then_remakes_nothing() {
     assert_eq!(second.status.code(), Some(0), "{}", String::from_utf8_lossy(&second.stderr));
     let after: Vec<_> = support::owned::files(scratch.path()).iter().map(|path| fs_read(path)).collect();
     assert_eq!(after, before);
+    let ini = scratch.path().join("forge-1/forgejo/app.ini");
+    let settings = fs_read(&ini);
+    let admin_token = scratch.path().join("forge-1/admin_token");
+    std::fs::remove_file(&admin_token).expect("removed token");
+    let third = support::owned::prepare(scratch.path(), 1);
+    assert_eq!(third.status.code(), Some(0), "{}", String::from_utf8_lossy(&third.stderr));
+    let token = fs_read(&admin_token);
+    let line = token.split(|byte| *byte == b'\n').next().expect("token line");
+    assert_eq!(line.len(), 40);
+    assert!(line.iter().all(u8::is_ascii_hexdigit));
+    assert_eq!(fs_read(&ini), settings);
     scratch.remove();
 }
 fn fs_read(path: &std::path::Path) -> Vec<u8> {
