@@ -3,66 +3,55 @@ use super::{Forge, Scratch, owned, write_private};
 use serde_json::{Value, json};
 use std::{
     fs,
-    net::{SocketAddr, TcpListener},
+    net::SocketAddr,
     path::{Path, PathBuf},
 };
-use temper_throwaway_forgejo::{Account, Forgejo, Init, Instance, Made, Outgoing, Settings, Token};
+use temper_throwaway_forgejo::{Instance, Outgoing, Token};
 pub type BranchHead = (Box<[u8]>, Box<[u8]>);
 
 pub struct Throwaway {
     instance: Instance,
     forgejo: PathBuf,
-    acme: Account,
-    bot: Account,
-    widget: Made,
+    runner: owned::Running,
+    person: Token,
+    repository: u64,
 }
 impl Throwaway {
     #[must_use]
     pub fn start(scratch: &Scratch) -> Self {
-        let binary = Forgejo::from_env().expect("TEMPER_FORGEJO must name the pinned Forgejo");
-        let port = TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
-        owned::configuration(
-            scratch.path(),
-            &owned::Names {
-                forgejo: binary.binary(),
-                runner: None,
-                port,
-                bot: "temper-bot",
-                person: "ada",
-                orgs: &["workshop"],
-            },
+        let address = owned::tier_configuration(scratch.path());
+        let running = owned::start(scratch.path());
+        let began = skein_shell::Clock::new().now().now;
+        let instance = owned::attach(scratch.path(), address.port(), running);
+        stage("attach", began);
+        let began = skein_shell::Clock::new().now().now;
+        let mut runner = owned::run(scratch.path(), "runner");
+        runner.declared();
+        stage("runner", began);
+        let began = skein_shell::Clock::new().now().now;
+        let reconciled = owned::reconcile(scratch.path(), 1);
+        assert_eq!(reconciled.status.code(), Some(0), "{}", String::from_utf8_lossy(&reconciled.stderr));
+        assert!(
+            skein_shell::Clock::new().now().now.saturating_since(began) < super::WITHIN,
+            "reconcile within its bound"
         );
-        let prepared = owned::prepare(scratch.path(), 1);
-        assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
-        let log = fs::File::create(scratch.path().join("server.log")).expect("server log");
-        let child = owned::command(scratch.path(), "forgejo")
-            .stdout(log.try_clone().expect("log clone"))
-            .stderr(log)
-            .spawn()
-            .expect("owned Forgejo starts");
-        let token = fs::read_to_string(scratch.path().join("forge-1/admin_token")).expect("admin token");
-        let mut instance =
-            Instance::attach(child, port, scratch.path(), Token::new(token.trim().into()), &Settings::small())
-                .expect("owned Forgejo answers");
-        let acme = instance.create_user("acme").expect("repository owner");
-        let bot = instance.create_user("temper-bot").expect("forge user");
-        let widget = instance.create_repository(&acme, "widget", Init::Readme).expect("initialized repository");
-        instance.add_collaborator(&acme, "widget", &bot, "write").expect("bot may write");
-        Self { instance, forgejo: binary.binary().into(), acme, bot, widget }
+        stage("reconcile", began);
+        let person = person_token(&instance);
+        let repository = repository(&instance, &person);
+        Self { instance, forgejo: owned::binaries().0, runner, person, repository }
     }
+
     #[must_use]
     pub fn forge(&self) -> Forge<'_> {
         Forge::Throwaway {
             forgejo: &self.forgejo,
             api: SocketAddr::from(([127, 0, 0, 1], self.instance.port())),
             git: self.instance.base(),
-            token: self.bot.token.value(),
-            user: self.bot.id,
         }
     }
     fn get(&self, suffix: &str) -> temper_throwaway_forgejo::Exchange {
         self.instance
-            .exchange(&Outgoing::get(&format!("/api/v1/repos/acme/widget/{suffix}"), Some(&self.acme.token)))
+            .exchange(&Outgoing::get(&format!("/api/v1/repos/acme/widget/{suffix}"), Some(&self.person)))
             .expect("throwaway forge answer")
     }
     #[must_use]
@@ -73,6 +62,17 @@ impl Throwaway {
         value.as_array().expect("pull list").iter().find_map(|pull| {
             (pull["merged"].as_bool() == Some(true)).then(|| pull["number"].as_u64().expect("pull number"))
         })
+    }
+    #[must_use]
+    pub fn job_state(&self, pull: u64) -> String {
+        let response = self.get(&format!("pulls/{pull}"));
+        assert_eq!(response.status, 200, "pull head");
+        let pull: Value = serde_json::from_slice(&response.body).expect("pull JSON");
+        let head = pull["head"]["sha"].as_str().expect("pull head");
+        let response = self.get(&format!("commits/{head}/status"));
+        assert_eq!(response.status, 200, "job status");
+        let status: Value = serde_json::from_slice(&response.body).expect("status JSON");
+        status["state"].as_str().expect("job state").into()
     }
     #[must_use]
     pub fn main_readme(&self) -> Vec<u8> {
@@ -130,30 +130,29 @@ impl Throwaway {
         )
     }
     pub fn stop(self) {
+        self.runner.stop();
         self.instance.stop().expect("owned Forgejo stopped");
     }
     #[must_use]
     pub fn repository(&self) -> u64 {
-        self.widget.id
+        self.repository
     }
 }
 
 pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
-    let Forge::Throwaway { api, git: _, token, user, forgejo } = forge else { return };
+    let Forge::Throwaway { api, forgejo, .. } = forge else { return };
+    let (_, runner) = owned::binaries();
     owned::document(
         value,
         &owned::Names {
             forgejo,
-            runner: None,
+            runner: Some(&runner),
             port: api.port(),
             bot: "temper-bot",
             person: "ada",
-            orgs: &["workshop"],
+            orgs: &["acme"],
         },
     );
-    write_private(&directory.join("forge-1/api_token"), token.as_bytes());
-    write_private(&directory.join("forge-1/git_token"), token.as_bytes());
-    write_private(&directory.join("forge-1/user"), format!("{user}\n").as_bytes());
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",api.to_string()],"last":"open","value":"acme"}});
     let grants =
         json!([grant(1), grant(2), grant(3), grant(4), grant(7), grant(8), grant(10), grant(11), grant(12), grant(13)]);
@@ -164,7 +163,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     value["engine"]["projects"][0]["policy"]["roles"][0]["authority"] = authority;
     value["engine"]["projects"][0]["policy"]["roles"][0]["authority"]["budget"]["spend"] = 40.into();
     value["engine"]["projects"][0]["policy"]["projections"] = grants;
-    value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{"connector":1,"kind":4,"enforce":true,"pattern":{"segments":["forge",api.to_string(),"acme","widget","branch"],"last":"exact","value":"main"},"ci":false,"up_to_date":false,"gates":[],"approvals":[]}]}]);
+    value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{"connector":1,"kind":4,"enforce":true,"pattern":{"segments":["forge",api.to_string(),"acme","widget","branch"],"last":"exact","value":"main"},"ci":true,"up_to_date":true,"gates":[],"approvals":[]}]}]);
     value["application"]["limits"]["overrides"]["root.brief.gather_ms"] = 5000.into();
     let limits = value["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides");
     for (name, size) in [
@@ -190,7 +189,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
         ("authority.grants", 12),
         ("authority.segments", 9),
         ("authority.roles", 1),
-        ("authority.requirements", 1),
+        ("authority.requirements", 2),
         ("notes.scopes", 15),
         ("brief.briefs", 2),
         ("brief.sections", 4),
@@ -304,3 +303,82 @@ pub fn landing_scripts(answer: &[u8], forgejo: &Throwaway) -> Box<[skein_fake_ll
         initial,
     ])
 }
+
+fn stage(name: &str, began: skein_lib::Time) {
+    eprintln!(
+        "stage {name}: {} ms",
+        skein_shell::Clock::new().now().now.saturating_since(began).as_nanos() / 1_000_000
+    );
+}
+fn request(instance: &Instance, token: &Token, method: &str, path: &str, body: &Value, status: u16) -> Value {
+    let body = serde_json::to_vec(body).expect("request JSON");
+    let response = instance.exchange(&Outgoing::json(method, path, Some(token), &body)).expect("Forgejo answer");
+    assert_eq!(response.status, status, "{method} {path}");
+    serde_json::from_slice(&response.body).expect("answer JSON")
+}
+fn person_token(instance: &Instance) -> Token {
+    let began = skein_shell::Clock::new().now().now;
+    let admin = &instance.admin().token;
+    request(
+        instance,
+        admin,
+        "PATCH",
+        "/api/v1/admin/users/ada",
+        &json!({"login_name":"ada","source_id":0,"must_change_password":false}),
+        200,
+    );
+    let value = request(
+        instance,
+        admin,
+        "POST",
+        "/api/v1/admin/users/ada/tokens",
+        &json!({"name":"person","scopes":["write:repository","write:organization"]}),
+        201,
+    );
+    stage("person", began);
+    Token::new(value["sha1"].as_str().expect("person token").into())
+}
+fn repository(instance: &Instance, person: &Token) -> u64 {
+    let began = skein_shell::Clock::new().now().now;
+    let value = request(
+        instance,
+        person,
+        "POST",
+        "/api/v1/orgs/acme/repos",
+        &json!({"name":"widget","auto_init":true,"default_branch":"main","private":true}),
+        201,
+    );
+    request(instance, person, "PATCH", "/api/v1/repos/acme/widget", &json!({"has_actions":true}), 200);
+    for (path, content) in [("check.sh", "test -s README.md\n"), (".forgejo/workflows/check.yaml", WORKFLOW)] {
+        let length = skein_lib::base64::encoded_len(
+            skein_lib::base64::Alphabet::Standard,
+            u32::try_from(content.len()).expect("workflow length"),
+        )
+        .expect("base64 length");
+        let mut encoded = skein_lib::Writer::new(usize::try_from(length).expect("bounded length"));
+        skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, content.as_bytes(), &mut encoded)
+            .expect("bounded workflow");
+        let encoded = encoded.finish();
+        let content = std::str::from_utf8(&encoded).expect("base64 text");
+        request(
+            instance,
+            person,
+            "POST",
+            &format!("/api/v1/repos/acme/widget/contents/{path}"),
+            &json!({"branch":"main","message":"Add check","content":content}),
+            201,
+        );
+    }
+    stage("repository", began);
+    value["id"].as_u64().expect("repository id")
+}
+const WORKFLOW: &str = r#"on: { push: { branches: ['temper/**'] } }
+jobs:
+  check:
+    runs-on: temper-host
+    steps:
+      - run: |
+          auth=$(printf 'x-access-token:%s' "${{ github.token }}" | base64 -w0)
+          git -c "http.extraHeader=Authorization: basic $auth" clone "${{ github.server_url }}/${{ github.repository }}.git" .
+          git checkout "${{ github.sha }}" && sh check.sh
+"#;

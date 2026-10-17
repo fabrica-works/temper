@@ -365,9 +365,15 @@ pub fn run(directory: &Path, program: &str) -> Running {
 /// Prepares and starts, leaving readiness to reconcile's first exchange.
 #[must_use]
 pub fn start(directory: &Path) -> Running {
+    let clock = skein_shell::Clock::new();
+    let began = clock.now().now;
     let prepared = prepare(directory, 1);
     assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
-    run(directory, "forgejo")
+    eprintln!("stage prepare: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
+    let began = clock.now().now;
+    let running = run(directory, "forgejo");
+    eprintln!("stage start: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
+    running
 }
 #[must_use]
 pub fn reconcile(directory: &Path, forge: u16) -> Output {
@@ -447,4 +453,20 @@ pub fn reconcile_configuration(directory: &Path) -> u16 {
         &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper-bot", person: "ada", orgs: &["acme"] },
     );
     port
+}
+
+/// Both pinned executables are required before the process tier starts anything.
+#[must_use]
+pub fn binaries() -> (PathBuf, PathBuf) {
+    let forgejo = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO must name the pinned Forgejo");
+    let runner = std::env::var_os("TEMPER_FORGEJO_RUNNER").expect("TEMPER_FORGEJO_RUNNER must name the pinned runner");
+    (forgejo.into(), runner.into())
+}
+/// Writes the process tier's owned setup and engine configuration without starting a process.
+#[must_use]
+pub fn tier_configuration(directory: &Path) -> std::net::SocketAddr {
+    let (forgejo, _) = binaries();
+    let api = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address");
+    super::configuration(directory, &super::Forge::Throwaway { forgejo: &forgejo, api, git: format!("http://{api}") });
+    api
 }

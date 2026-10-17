@@ -241,11 +241,6 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         Step::Type { find: Find::named(Role::TextField, b"Owner"), words: b"acme".as_slice().into() },
         Step::Type { find: Find::named(Role::TextField, b"Name"), words: b"widget".as_slice().into() },
         Step::Type { find: Find::named(Role::TextField, b"Landing branch"), words: b"main".as_slice().into() },
-        Step::Press { find: Find::named(Role::Check, b"It runs CI") },
-        Step::Type {
-            find: Find::named(Role::TextField, b"Checks: gate numbers, separated by spaces or commas"),
-            words: b"1".as_slice().into(),
-        },
         Step::Press { find: Find::named(Role::Button, b"Adopt") },
         Step::See { find: Find::text(b"Adopted acme/widget on forge 1 as owned."), within: super::WITHIN },
     ]);

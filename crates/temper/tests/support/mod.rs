@@ -11,7 +11,7 @@ use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub enum Forge<'a> {
     Unreached,
-    Throwaway { forgejo: &'a Path, api: std::net::SocketAddr, git: String, token: &'a str, user: u64 },
+    Throwaway { forgejo: &'a Path, api: std::net::SocketAddr, git: String },
 }
 pub(super) fn write_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");

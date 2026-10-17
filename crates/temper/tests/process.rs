@@ -73,9 +73,13 @@ fn a_persons_change_lands_on_the_forge_and_is_found_after_a_restart() {
     let forgejo = support::forgejo::Throwaway::start(&scratch);
     support::configuration(scratch.path(), &forgejo.forge());
     let peer = support::fake_llm(support::landing_scripts(support::ANSWER, &forgejo));
+    let clock = skein_shell::Clock::new();
+    let began = clock.now().now;
     let first = support::run_until_landed(scratch.path(), support::person::adopt_and_change(&forgejo), peer, &forgejo);
     assert_eq!((first.signed_in, first.finished), (1, true), "{}", String::from_utf8_lossy(&first.stderr));
+    eprintln!("stage job: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
     let merged = forgejo.merged_pull().expect("the change's pull request is merged");
+    assert_eq!(forgejo.job_state(merged), "success");
     assert!(forgejo.main_readme().ends_with(support::EDIT), "main holds the agent's edit");
     let second = support::run(scratch.path(), support::person::found(), None, Duration::from_secs(60));
     assert!(second.finished, "the work is found after the restart");
