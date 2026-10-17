@@ -1446,6 +1446,14 @@ choice would have been the user's (development.md, 10.4).
      - Most of 04.1 is on `main` already (rulings 164, 169, 188): `Limits.templates` (`temper-engine-domain/src/limits.rs:54`, `:116`), `templates: jig.core.templates` (`temper-service/src/limits.rs:278`), `ENGINE`'s `"templates"` (`temper-service/src/tests/fixtures.rs:46`, `:68`, `:445`), `What::Operations` (`startup/problems.rs:98`, `:162`), `("people.operations", 5)` (`crates/temper/tests/support/forgejo.rs:170`), `STORE_VERSION` 2, the walking world's `templates`. What a read of `main` found left: the tests `the_example_engine_keeps_jigs_chat_and_goal_templates` and `a_chats_member_is_refused_as_unknown_naming_its_path`, and the `Grace` and `Operations` rows of `jig_refusals_print_words` (`crates/temper-service/src/tests/startup.rs:117-140`). Grep each of 04.1's names on `main` first, and do only what is missing; a Shape item already on `main` is no question.
      - Unchanged: 04.2 to 04.4's own Needs (jig 22, jig 16, jig-13.s1); the fence (jig 14 after jig 21's last landing); 04.1's Size (40 lines).
 
+232. **jig 21.3: completed reads wait for the designer; the rest goes on** (interim, jig 21.3's block of 2026-10-17T08:11:37Z).
+     Ruling 232 (interim, jig 21.3; the question went to the designer at 2026-10-17T08:14Z): neither option A nor option B yet. Who keeps a completed read's page after `Told::Page` is a design question: jig's `client/domain/view.md`, 18, says the Ui "keeps no document of its own: it reads each from the client, by its handles, when the client reports it changed", and `client/domain/client.md`, 7, says "A read is one attempt ...: the application reads again if it wants" and "Keeping rows across pages, as a list slides while a person scrolls, is the presentation's"; neither says in its own words where a read's page lives. The designer's answer decides; it comes as a ruling.
+
+     - Until it comes, 21.3 goes on only with what does not rest on it: the Ui's state on the client for watched documents, as its Shape says (each read from `client.document(handle)` when the client reports it changed), its surface, its tests and stories but those of a completed read's page.
+     - Each holder of a completed read's result (`page/project.rs:543-549`'s `ProjectPage.owner`, from `Read::Project`, and any other the compiler or a grep of `Told::Page`'s users names) stays as `main` has it: add no client storage, accessor or limit for completed reads, and change nothing in `crates/jig-client` or `crates/jig-domain-client` for them. List each such holder in the report that ends the wait.
+     - 21.3 does not run `land` until the answer's ruling; when nothing else is left, it reports so and waits.
+     - Unchanged: the rest of 21.3's session file, its Don't included, and rulings 192 and 194.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
