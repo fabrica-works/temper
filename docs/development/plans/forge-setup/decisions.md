@@ -476,6 +476,41 @@ run are appended after "For the user".
      - Unchanged: the `secrets/forge-1.*` paths of `support/configuration.rs:39` and temper-service's fixtures are other
        tests' own documents, not the tier's; 10.2's Shape 3 changes only `forgejo::configuration`. Sizes, tests and proofs.
 
+123. **15.1's runner added or removed; the runner's lock** (designer's answer, ready check of temper-15.1).
+     Ruling 123, the designer's answer to the ready check of temper-15.1's question of 2026-10-17T00:15:04Z, landed in temper 13e35d82e (setup.md 6.3, 6.4, 13.1; temper/15-upgrade.md, 07-prepare.md). It replaces ruling 120's rename of 07.4's test, and ruling 120's interim rule on 08.2's words. The answer's decision:
+
+
+     temper 15.1, the runner's presence and the runner's lock: **a later preparation converges a runner added or removed,
+     and `run` names `prepare` for it; the runner's lock is taken whenever the preparation writes the runner's files.**
+     Landed in temper 13e35d82e (setup.md 6.3, 6.4, 13.1; plans/forge-setup/temper/15-upgrade.md, 07-prepare.md).
+
+     - **1, setup.md 6.3 item 4 (new):** "A runner added or removed: the setup and `state` disagree on whether there is one,
+       and `app.ini`'s `[actions]` follows the setup (6.2). A runner added is prepared under the runner's lock too, as a
+       first preparation prepares it: its secret drawn into `runner/secret` when that file is missing, and kept otherwise;
+       registered; its connection written. A runner removed is recorded as none, and its files and its registration are
+       left, unused, so that a runner added again registers as the same one. A runner's recorded version is compared with
+       its pin only while the setup has one. Either may come with an upgrade, in one preparation."
+     - **1, setup.md 6.4:** `run` checks "that `state` records a preparation at the pinned versions, with a runner exactly
+       when the setup has one; refuses otherwise, naming what to run: `temper forge prepare` for a forge not prepared, a
+       preparation that did not end, an older version, or a runner added or removed (6.3); no command of this temper for a
+       newer version, or one it cannot read."
+     - **2, setup.md 6.3's preamble:** "the runner's too when it writes the runner's files: at a first preparation, and for
+       a runner older than its pin (item 3) or added (item 4)". 6.4: "the runner's too when it writes the runner's files
+       (6.3)". A runner removed writes none, so takes Forgejo's lock alone; a Forgejo-only upgrade too (ruling 120 stands).
+     - **temper 15.1 builds it** (15-upgrade.md, amended): `Found` gains `runner_secret: bool`; the runner's field is an enum
+       of the machine's own (a `Course`, added, removed or none); added: `Lock(RunnerLock)` first, then after `app.ini`
+       `Draw` and `Write RunnerSecret` (when missing), `Register`, `RunnerConfiguration`, `State`; removed: no request of its
+       own. `admit_state` checks presence both ways before the versions: `Refusal::Runner { recorded: bool }`, worded
+       `prepared with a runner, and the setup has none` / `prepared without a runner, and the setup has one`, each then
+       `: run temper forge prepare CONFIG.json N`. `Failure::Recorded` and its words go, and 07.4's
+       `a_recorded_version_other_than_the_pin_is_refused` with it (ruling 120's rename is replaced).
+     - **Tests:** `a_runner_added_to_a_prepared_forge_is_registered_under_its_lock` (rows: secret missing, present),
+       `a_runner_removed_writes_no_runner_file_and_records_none`, `the_run_names_prepare_for_a_runner_added_or_removed`
+       (binary), and two rows in 08.2's `the_run_refuses_a_forge_not_prepared_at_the_pins`. Done when 2 counts 14, from 11.
+       Size 180 to 230. No process test of its own: 08.1's runs `Register` on the real binaries.
+     - 08.2 is unchanged: it lands its words as planned, and 15.1 splits them. 07's question 1 is marked answered. Nothing is
+       deferred: no `later.md` row.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
