@@ -17,7 +17,7 @@ none (setup.md 6.3 item 4). The plan's last temper work: a box at the pinned ver
   `place::{Place, File}`, `state::{State, encode, decode}`, `Drive` (07.4); `run::{Refusal, admit_state}` (08.2);
   `crates/temper/src/forge.rs`, `tests/support/owned.rs`, the shell's `prepare.rs` and `files.rs` (08.1).
 - Code at the base: `.config/nextest.toml:30-33` (the process profile), `crates/temper/tests/process.rs:1-5, 100-111`,
-  `tests/support/mod.rs:5,43-70,517` (`WITHIN`, `Scratch`, `private`).
+  `tests/support/mod.rs:6,44-71,518` (`WITHIN`, `Scratch`, `private`).
 
 ## What the design asks
 
@@ -83,12 +83,14 @@ Files: `crates/temper-forge-setup/src/upgrade.rs` (new), `lib.rs` (a `mod`), `sr
 `a_recorded_version_other_than_the_pin_is_refused`, `tests/prepare.rs:196-203`, goes: its one row, Forgejo
 `another-version`, is the garbage row of `the_upgrade_refuses_…`, and a runner's presence is no longer refused), `src/tests/run.rs`
 (08.2's), `src/tests/files.rs` (a row
-`(File::DumpPartial, b"/srv/forge-2/backups/dump.partial.zip")` in the table at `:43-56`), `src/tests/spec.rs`, `src/tests/fixtures.rs` (07.1's, extended: `Drive::reach`, `older`,
+`(File::DumpPartial, b"/srv/forge-2/backups/dump.partial.zip")` in the table at `:43-56`), `src/tests/spec.rs` (`Command::Dump` in `no_argument_of_any_command_holds_a_secret`'s list, `:99-111`),
+`src/tests/fixtures.rs` (`runner_secret` in the `Found` of `first()`, false, and `later()`, true, `:152`, `:156-165`; 07.1's, extended: `Drive::reach`, `older`,
 `backup`, `ran_ok`); `crates/temper-forge-setup-shell/src/{prepare,files}.rs`, `tests/files.rs` (08.1's);
 `crates/temper/src/forge.rs` (words), `tests/forge.rs` (three tests), `tests/process.rs` (**hotspot**: two tests),
-`tests/support/owned.rs` (**hotspot**: `record_versions`, `file`). The docs that say only a first preparation takes
-the runner's lock follow setup.md 6.3's preamble: `Request::Lock` (`prepare.rs:58`), `File::RunnerLock` (`place.rs:34`).
-`Failure::Recorded` (`prepare.rs:89-91`) goes, with its words in `forge.rs`: each case it held now has its own course.
+`tests/support/owned.rs` (**hotspot**: `record_versions`, `file`; a `state` without a runner is made inline, as `tests/forge.rs:65-68` makes
+`prepared`, each row on a `Scratch` of its own, since `owned::configuration` creates its directory). The docs that say only a first preparation takes
+the runner's lock follow setup.md 6.3's preamble: `Request::Lock` (`prepare.rs:58`), `File::RunnerLock` (`place.rs:35-36`).
+`Failure::Recorded` (`prepare.rs:90-91`) goes, with its words in `forge.rs`: each case it held now has its own course.
 Shape: sketch 1, and these changes in place. `Command` gains `Dump`, built by `spec::command`; `File` gains `DumpPartial`,
 and `Place::backup(name)` is `<directory>/backups/<name>`. `Request` gains `Exists { path: Box<[u8]> }` (answered
 `Event::Exists(bool)`) and `Rename { from: Box<[u8]>, to: Box<[u8]> }` (answered `Done`); `Failure` gains `Newer { which:
@@ -98,7 +100,8 @@ checks the machine takes `course(state.forgejo, VERSION)` and, when the setup an
 `course(state.runner, RUNNER_VERSION)`; a runner in the setup and not in `state` is added, one in `state` and not in the
 setup removed, whatever version it records (setup.md 6.3 item 4). It keeps Forgejo's `Course` and the runner's (a
 `Course`, added, removed or none: an enum of the machine's own) as fields of `Prepare` (`prepare.rs:114`), never as a
-`bool`: it has three, and a fourth trips clippy's `struct_excessive_bools`. A
+`bool`: it has three, and a fourth trips clippy's `struct_excessive_bools`; `Found.runner_secret` rides in the
+runner's enum (`Added { secret: bool }`). A
 `Newer` or `Unreadable` ends the preparation before `Layout`, nothing written; Forgejo's `Same` with the runner's `Same`,
 or no runner in either, is 07.4's later preparation;
 else, with an older or added runner `Request::Lock(File::RunnerLock)` first (08.1's host takes it without waiting; a held one ends
@@ -138,8 +141,11 @@ inputs (`16.0.5`, `13.1.0`; `older(forgejo, runner)` takes `None` for the pin), 
   without `Draw` and `RunnerSecret`)
 - `a_runner_removed_writes_no_runner_file_and_records_none` (no `Lock`; `app.ini` with `ENABLED = false` (`ini.rs:64`); no
   `Register`, `RunnerSecret` or `RunnerConfiguration`; `State` with no runner)
-- in `src/tests/run.rs`, 08.2's `the_run_refuses_a_forge_not_prepared_at_the_pins` gains two rows, a runner added and one
-  removed, each `Refusal::Runner`
+- in `src/tests/run.rs` (08.2 split its refusals into one test each, ruling 128): `course` in the expectations of
+  `the_run_refuses_an_older_preparation` (:17) and `…_a_newer_preparation` (:29); `…_a_different_runner_preparation`
+  (:41-48) expects `Refusal::Runner { recorded: false }`; a new test, a setup without a runner on a `state` with one,
+  expects `Refusal::Runner { recorded: true }` (`the_run_refuses_a_runner_the_setup_lacks`, :50, is `NoRunner`'s: name
+  the new one otherwise)
 
 Beside them (< 0.5 s each): the shell's `tests/files.rs` `a_renamed_file_exists_under_its_new_name_only`; in
 `crates/temper/tests/forge.rs`, on 08.1's and 08.2's scripts, `a_newer_recorded_forgejo_refuses_the_preparation_untouched`
@@ -190,6 +196,15 @@ test(=an_older_recorded_runner_has_its_files_prepared_again_without_a_dump)"'` e
 most 90 s. Nothing runs higher: the migration finds nothing to do on a v17 database (its order after the dump is the unit
 test's), and no older binary is used. A runner added runs the first preparation's `Register` and configuration, which
 08.1's process test runs on the real binaries: no process test of its own.
+**`JWT_SECRET` is Forgejo's (ruling 128):** Forgejo reads it as base64 in the URL alphabet without padding, 32 bytes;
+the 64 hexadecimal digits of `prepare.rs:230` decode to 48, so the first Forgejo command after each `app.ini` logs
+`JWT_SECRET … invalid base64 decoded length: 48 … creating new key` on stdout and rewrites `app.ini`, and `ran`'s
+`first_line` (`prepare.rs:265` for `Register`, `:380` for `Token`) reads that line as the uuid or the token. The draw
+of index 2 becomes `skein_lib::base64::encode(Alphabet::Url, ..)` of the 32 bytes (43 characters); refresh
+`tests/prepare.rs:128`'s expectation. No `Migrate` is added before `Register`. The check: in 08.1's
+`forge_prepare_makes_an_owned_forge_then_remakes_nothing` (`process.rs:114`), a third preparation after removing
+`admin_token` exits 0, writes `admin_token` again, its first line 40 hexadecimal digits, and leaves `app.ini` byte-equal
+to the second preparation's.
 Don't: touch the first-preparation or same-version paths; prune, restore or overwrite a backup; dump on a first
 preparation or after a preparation that did not end; name a version in production code.
 Size: 230 (150 in the drafts: the runner's arm and the partial's rename are the difference; a runner added or removed,

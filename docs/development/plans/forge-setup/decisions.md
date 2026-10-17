@@ -557,6 +557,26 @@ run are appended after "For the user".
      - Unchanged: the four-unit `TeamSpec` and the codec's replay; the fact's name; the other 17 facts; ruling 124's
        check (two recordings in a row, `git status --short` empty) and Size of 1160.
 
+128. **15.1 against 08's landings; JWT_SECRET's encoding** (re-check of temper-15.1).
+     Ruling 128, the re-check of temper-15.1 after 08.1 and 08.2 landed (temper 7f3908ae8; a scratch worktree ran the
+     corrections: clippy clean, 128/128 default, Done when 2's 14/14, and both process tests 2/2). Amends
+     `temper/15-upgrade.md`:
+
+     - **`JWT_SECRET`** (a defect of 07.4's draw, `prepare.rs:230`): 64 hexadecimal digits, which Forgejo decodes as base64
+       in the URL alphabet to 48 bytes, not its 32; the first Forgejo command after each `app.ini` then logs
+       `JWT_SECRET … invalid base64 decoded length: 48 … creating new key` on stdout and rewrites `app.ini`, and `ran`'s
+       `first_line` takes that line as `Register`'s uuid (the runner test failed so) or, on a later preparation with
+       `admin_token` missing, as the token. The draw becomes `skein_lib::base64::encode(Alphabet::Url, ..)` of its 32 bytes;
+       a third preparation in 08.1's `forge_prepare_makes_an_owned_forge_then_remakes_nothing`, `admin_token` removed, checks
+       the token and `app.ini` byte-equal. No `Migrate` before `Register` (the check's workaround is not taken).
+     - 08.2 split `the_run_refuses_a_forge_not_prepared_at_the_pins` into one test per refusal (`tests/run.rs:7-48`): the
+       runner rows go into those; a new test for `Refusal::Runner { recorded: true }`.
+     - Files: `Command::Dump` in `tests/spec.rs:99-111`'s list; `runner_secret` in `fixtures.rs:152, :156-165`'s `Found`.
+     - A `state` without a runner is made inline (`record_versions` keeps `None`), each row on its own `Scratch`;
+       `Found.runner_secret` rides in the runner's enum, not a fourth `bool`.
+     - Line references: `prepare.rs:90-91`, `place.rs:35-36`, `tests/support/mod.rs:6,44-71,518`.
+     - Unchanged: Size 230, Done when's counts, the process tests' names.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
