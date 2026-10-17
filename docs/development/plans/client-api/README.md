@@ -361,7 +361,7 @@ per session are in each file.
     jig's pin of it, and skein to jig's pin of it only where that is
     forward ("temper's skein ahead", below) (each read as above), in
     place of 5.7's "each to its `origin/main`".
-  - **skein's cap** (ruling {ruling}, the director's request of
+  - **skein's cap** (ruling 296, the director's request of
     2026-10-17T23:46Z): no skein move of this plan, the closing repin's
     included, takes jig's or temper's skein past skein `2733882` ("Mark
     hearth's render active on debian-8gb-hel1-1"). hearth's `skein_io`
