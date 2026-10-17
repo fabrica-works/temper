@@ -104,7 +104,7 @@ they read from.
 - **A root keeps no map and no `_` arm** (root.md, 10): the root's match
   on an asker is exhaustive over its owners, checked by clippy's
   `wildcard_enum_match_arm` and `match_wildcard_for_single_variants`,
-  denied in the workspace; and `git grep -n -E 'Map<|BTreeMap'
+  denied in the workspace; and `git grep -n -E '\bMap\b|BTreeMap|HashMap'
   -- testing/jig-client-test-domain/src/route.rs
   testing/jig-client-test-domain/src/domain.rs` prints nothing at 13.4's
   end.
@@ -137,9 +137,12 @@ pattern at drift.rs:6); `crates/jig-client-protocol-wire/schema/client-v8-part1.
 `crates/jig-client-protocol-link/src/{boundary.rs, store.rs,
 translate/store.rs}` (`Saved::{Jig, Family}`, `Erased::{Jig, Family}`,
 `Keeper`, `StoreVersion` go; `Event::Start.versions:
-List<StoreVersion>` (`boundary.rs:43`) and `Request::Dropped { keeper }`
-(`boundary.rs:101`) go with them; a storage key is the table's 16-byte
-key), and its tests `src/tests/fixtures/link_store.rs` and
+List<StoreVersion>` (`boundary.rs:43`) goes with them, and
+`Request::Dropped` stays, losing its `keeper` (`boundary.rs:99-100`;
+ruling 191): `crates/jig-client/src/client.rs:400` tells `Told::Dropped
+{ count: 1 }` from it, and `a_kept_record_of_another_version_is_dropped_and_told`
+(`crates/jig-client/src/tests/store.rs:162-175`) keeps passing; a
+storage key is the table's 16-byte key), and its tests `src/tests/fixtures/link_store.rs` and
 `src/tests/store.rs`;
 users (log `search-jig13-records.txt`): `tests/client-protocol/src/
 {front.rs, front/persistence.rs, native.rs, family.rs}`, the native
@@ -147,8 +150,13 @@ shell's `connections.rs` and `shell.rs`,
 `tests/client-wire/tests/fuzzy_client_wire.rs:25, :27-35` (ten `check!`
 on the removed types: the fuzzy test fails to compile otherwise) and
 `crates/jig-client-protocol-wire/src/tests.rs:229, :244-255`;
+`crates/jig-client/src/client.rs:118-120, :395-412` (`StoreVersion`,
+`Keeper::Table`, `Saved::{Table, Jig, Family}`, `Erased::Table`) and its
+`src/tests/{store.rs, fixtures.rs:211}`; the link's `src/component.rs:66`
+(`Event::Start { versions, kept }`); `tests/client-protocol/src/client.rs:35-36`
+(`w::Keeper::Table`, `kept.keeper()`) (ruling 191);
 downstream, its terminal's `route.rs` (21 lines naming `Saved`,
-`Erased`, `Keeper` or `StoreVersion`) and `tests/family.rs:147-157` (3
+`Erased`, `Keeper` or `StoreVersion`) and `src/tests/family.rs:153-163` (3
 more), which its own sessions follow.
 `tests/boundary/src/tests/graph.rs`:
 `client_view_links_only_its_domain_and_foundation` gains `skein-codec`.
@@ -158,7 +166,11 @@ encode, decode}` as the sketch, `Record` mirroring the page's
 party, task, words, touched }`) field by field; the link's `Saved` is
 the table's record alone, `Saved { version: u16, record:
 RequestRecord<Held> }`, and the client wire's `Kept` is `versioned record
-Kept { store_version: u16 record: bytes 65536 }`.
+Kept { store_version: u16 record: bytes 65536 }`. The application gives
+the link only the client's records at `Start`, and the reference UI its
+own (root.md, 8: "each child's to the child"; ruling 191). Each `pub fn`
+of `records.rs` that returns a value takes `#[must_use]` (clippy's
+`must_use_candidate`).
 Test shape: unit tests in `crates/jig-client-view/src/tests/records.rs`;
 new fixtures `src/tests/fixtures.rs`: `place()` and `draft()` records
 with the literals of the link's `src/tests/fixtures/link_store.rs:122-130`,
@@ -217,6 +229,12 @@ view 37, `tests/client` 186, `tests/ops` 16, `tests/client-protocol`
 manifests with `Cargo.lock`; inside the moved files, 235 counted
 `crate::` lines name a renamed module. Downstream, 191 lines in 38
 files, which its own sessions follow.
+Re-check (ruling 191, jig `73734dd6f`): the world's dependency list is
+at `graph.rs:309`; `client_engine_breaches` (`graph.rs:471`) names the
+crate too; `jig_domain_client::` is 1,050 lines in 204 files, 188 in
+`tests/client`, 152 in 27 files of temper; the comment-only copies
+`tests/client/README.md:52`, `client-v8.schema:2` and
+`client-v8-part1.schema:63` are renamed too.
 Shape: no type changes. `jig_client_view`'s root gains what
 `jig_domain_client`'s exported, by these lines: `pub use
 boundary::{Event, Request};`, `pub use ui::{Domain, fire, max_out,
@@ -275,6 +293,10 @@ front/persistence.rs:63}` (uses them);
 `tests/boundary/src/tests/graph.rs`
 (`test_client_domain_links_only_its_child_owner_vocabulary_and_foundation`
 gains `jig-client-test-protocol-wire`).
+Re-check (ruling 191, jig `73734dd6f`): `engine.rs:89, :157, :164, :168`
+are now `:93, :164, :171, :175`, and `translation.rs:93-99` is `:95,
+:98, :101`; the codec is `family.rs` (235 lines) and
+`family/{documents, facts, parts}.rs` (1,398), all under `src/codec/**`.
 Shape: `jig_client_test_protocol_wire::codec::{request_record, request,
 outcome, outcome_value, subject, subject_value, read, read_value,
 document, document_value, read_answer, read_answer_value, limits,
@@ -328,6 +350,24 @@ native/world.rs, stories.rs:112-130}`, `tests/one-process` (its client),
 `tests/support/mod.rs`; `tests/boundary/src/tests/graph.rs` (the test
 root links `jig-client`, `jig-client-view`,
 `jig-client-test-protocol-wire`, `jig-test-connector` and `skein-lib`).
+Re-check (ruling 191, jig `73734dd6f`): users the Files miss:
+`testing/jig-client-test-view/src/tests.rs:14, :338, :526, :537, :578,
+:639, :766, :779, :870`, `tests/native_effect.rs:47`,
+`tests/world_limits.rs:16-17` (`domain.table`);
+`tests/client-protocol/src/fixtures.rs:136` (`profile.table`),
+`tests/protocol.rs:204` (`store::Record::Table`);
+`tests/client/src/joint/people_stories.rs:385`,
+`stories/referee_stories.rs:40` (`Event::Answer`),
+`tests/client/tests/{faults.rs:85, :153, shell.rs:48}` (`Record::Table`),
+`unlinked.rs:17-22` (`world.table`, jig 12.5's);
+`tests/ops/src/joint/front.rs:129-144`, which matches the root's
+`Event` exhaustively and takes its new arm. The reference test's
+`root.first()` and `root.jig()` are accessors 13.4 adds (`domain.rs:12-13`
+are `pub(crate)` fields). The sketches take `#[must_use]` on each `pub
+fn` that returns a value, and `Owner::asker` converts by `to_le_bytes`
+as `Owner::opaque` does, never `as u32` (`as_conversions` is denied).
+The bridge's tells without a reference UI counterpart are the
+designer's question of 2026-10-17 (question.md; ruling 191).
 Shape: the root's `Event` gains `Client { event: jig_client::Event }`
 for the transport's and the store's events, and loses `Answer`; its
 `Request` gains `Client { request: jig_client::Request }` for the
