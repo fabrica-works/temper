@@ -1908,6 +1908,11 @@ choice would have been the user's (development.md, 10.4).
      2. **Point 3:** README "Named numbers in tests" (ruling 116) already says it. Give its Pass on text to jig 22.1 alone, now, and log the point done; "and each jig session you start" is withdrawn. Applies to: jig 22.1's new stories; until it lands.
      3. **Unchanged:** point 2, done; ruling 275; ruling 167.
 
+277. **README: a rename's sweep finds its tests** (steer of the check of 2026-10-17T19:10:00Z).
+     Ruling 277 (process, the check of 2026-10-17T19:10:00Z): README "The run's steers", 2026-10-17 18:11Z, point 1, gains the way to find the tests a rename leaves: "Before your landing commit, for each word your commit removes or renames, run `git grep -n -E 'fn [a-z0-9_]*<word>' -- <the crates you change>` and rename each test it prints whose name names the old thing." jig 22.1 renamed 23 tests and left `a_frame_at_its_ceilings_round_trips_unchanged`, whose body encodes and decodes `Me`. Unchanged: the rule's eight-word names and its one count for renames outside Files.
+
+     Checked: `git -C jig grep -n -E 'fn [a-z0-9_]*frame' origin/main -- crates/jig-client-protocol-wire/src/tests.rs` prints `tests.rs:115:fn a_frame_at_its_ceilings_round_trips_unchanged() {`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

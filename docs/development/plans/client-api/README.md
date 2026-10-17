@@ -863,7 +863,10 @@ per session are in each file.
     removes or renames a record, an ask or an answer, rename in it the
     tests whose names say the old word, in about eight words that state
     the behaviour; a rename moves no assertion. List the renames outside
-    your Files as one count.
+    your Files as one count. Before your landing commit, for each word
+    your commit removes or renames, run `git grep -n -E
+    'fn [a-z0-9_]*<word>' -- <the crates you change>` and rename each
+    test it prints whose name names the old thing (ruling 277).
 
 ## Prerequisites the run checks at its start
 
