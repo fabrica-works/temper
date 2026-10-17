@@ -243,3 +243,20 @@ fn a_restored_record_of_version_one_is_dropped_as_invalid() {
     assert_eq!(invalid, 3);
     assert_eq!(root.table.len(), 0, "version one restores no requests");
 }
+#[test]
+fn the_reference_uis_records_never_reach_the_small_store() {
+    let limits = fixtures::limits();
+    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let record = jig_client_view::store::Record::Place {
+        version: jig_client_view::store::STORE_VERSION,
+        party: 9,
+        address: jig_client_view::address::Address::Inbox { project: None },
+    };
+    for request in [jig_client_view::Request::Erase { key: record.key() }, jig_client_view::Request::Save { record }] {
+        let mut child = Queue::with_capacity(1);
+        child.push(request);
+        let mut out = Queue::with_capacity(crate::max_out(&limits));
+        crate::route::route_jig(&mut root, &fixtures::env(&limits), &mut child, &mut out);
+        assert!(out.is_empty(), "reference UI records produce neither store requests nor facts");
+    }
+}
