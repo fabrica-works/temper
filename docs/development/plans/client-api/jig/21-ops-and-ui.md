@@ -182,6 +182,10 @@ removes the same mark from
 `p_story_survives_seeded_commit_crashes_and_random_presses` and
 `q_story_survives_seeded_commit_crashes_reload_and_random_presses`
 (Offline, and a dropped watch kept behind, are the client's).
+Ruling 227: so do `crates/jig-protocol-engine-clients/src/translate/owner.rs`
+(`charters`, :163: the wire's goals list sized by `value.goals.len()`,
+as `translate/inbox.rs:93` sizes its rows' goals) and its test in
+`crates/jig-protocol-engine-clients/src/tests/documents.rs`.
 Shape: as jig 13.4's: `ops`'s table owner, `owner::Owner` (with `Kept {
 scope }`), goes, and no owner enum takes its place; a tell routes by
 `jig_client_view::Owner::of_asker` (jig 13.4), `Jig` to the reference

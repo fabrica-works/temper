@@ -1401,6 +1401,15 @@ choice would have been the user's (development.md, 10.4).
      3. **Bound:** aim to spend at most 45 minutes on this diagnosis; past it, report what the focused logs show, and go on with it.
      4. **Unchanged:** no engine or core production change (as the report proposes); 21.2's Proof, Files and ruling 225's Size (4,329 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1.
 
+227. **jig 21.2: the frame's offered goals sized by their count** (scope, jig 21.2's block of 2026-10-17T06:57:15Z).
+     Ruling 227, scope: the implementer's option A, within jig 21.2.
+
+     1. **The repair.** In `crates/jig-protocol-engine-clients/src/translate/owner.rs`, `charters` (:163) sizes the wire's goals list by the goals it holds, `List::with_capacity(value.goals.len())`, as `translate/inbox.rs:93` sizes its rows' goals. The wire refuses a list by its room (`generated/v8.rs:29636`, `self.goals.capacity() > limits.offered_charters_goals.min(CEILINGS.offered_charters_goals)`; ceiling 4, `client-v8.schema:576`, `goals: list 4 Charter`), and the domain's list has room for `limits.documents.lines` (`jig-domain-core/src/documents/small.rs:133`).
+     2. **Its test,** at the unit layer, in `crates/jig-protocol-engine-clients/src/tests/documents.rs`, beside `a_frame_with_two_projects_becomes_its_record`: a frame whose charter's goals list has room for 32 and holds one goal becomes the same record, `jig_client_test_records::frame_two_projects_record()`. Under 20 ms. No record or golden changes.
+     3. **Then** give the joint fixture back the document limit that `documents.lines=4` replaced, and go on under ruling 226, points 1 to 3: the focused test first; then the p proof once, after the change the focused test's log names. That run is p-10, the last p run ruling 226 allows; a failure after it is a block with the logs.
+     4. **A further copy.** Where the focused test or the proof then meets another translation in `crates/jig-protocol-engine-clients/src/translate/` refused `Bound` because a wire list is sized by a domain list's capacity while its length fits, size it by `len()` the same way, add its case to step 2's test file, and name it in the commit body. At most 10 lines of engine production in all, counted in ruling 225's Size; past them, a block.
+     5. **Unchanged:** ruling 226's other points (no core production change, no other engine change, its 45-minute aim); 21.2's Proof; ruling 225's Size (4,329 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1. A role offered more than four goal charters still has its frame refused `Bound`: `later.md`'s new row, for the designer.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
