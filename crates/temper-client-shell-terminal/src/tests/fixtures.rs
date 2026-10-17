@@ -1,4 +1,4 @@
-use jig_client_domain::contract;
+use jig_client::contract;
 use jig_client_protocol_link as link;
 use skein_lib::{RequestRecord, Token};
 use temper_client_domain as client;
@@ -11,13 +11,6 @@ pub fn credential() -> skein_lib::Secret {
     skein_lib::Secret::new(Box::from(CREDENTIAL))
 }
 pub const CREDENTIAL: &[u8] = b"one-time-service-credential";
-pub fn jig_record() -> jig_domain_client::store::Record {
-    jig_domain_client::store::Record::Place {
-        version: jig_domain_client::store::STORE_VERSION,
-        party: SERVICE,
-        address: jig_domain_client::address::Address::Inbox { project: None },
-    }
-}
 pub fn table_record() -> client::store::Record {
     client::store::Record::Table {
         version: client::store::VERSION,
@@ -26,7 +19,7 @@ pub fn table_record() -> client::store::Record {
             scope: SERVICE,
             first_sent: None,
             request: client::store::Held {
-                key: jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: ATTEMPT.raw() },
+                key: jig_client::Key { asker: jig_client::Asker::JIG, number: ATTEMPT.raw() },
                 request: client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
             },
         },
@@ -80,8 +73,8 @@ pub fn adopted(protection: client::forge::Protection) -> client::forge::Adopted 
 pub fn send_adoption(attempt: Token) -> client::Request {
     client::Request::Send { attempt, key: [9; 16], ask: client::Ask::Forge(client::forge::Ask::Adopt(adoption())) }
 }
-pub fn final_answer(attempt: Token, answer: jig_client_domain::Answered) -> link::Request {
-    link::Request::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(answer) }
+pub fn final_answer(attempt: Token, answer: jig_client::Answered) -> link::Request {
+    link::Request::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(answer), why: None }
 }
 pub fn role_refusal() -> contract::Refusal {
     contract::Refusal::Role { held: None }
@@ -203,9 +196,9 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
     }
     visible(builder.finish())
 }
-pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> skein_ui::Tree {
-    use jig_client_domain::contract::{Delivery, ReadResult, Subject, WatchEvent};
-    use jig_domain_client::Event as JigEvent;
+pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> skein_ui::Tree {
+    use jig_client::contract::{Delivery, ReadResult, Subject, WatchEvent};
+    use jig_client_view::Event as JigEvent;
     use skein_lib::{Env, Queue, Wall};
     use temper_client_domain::{Event, JigOut, Request};
     let mut limits = crate::limits::native().client;
@@ -226,7 +219,7 @@ pub fn page(address: jig_domain_client::address::Address, signed_out: bool) -> s
         Event::Start {
             address: client::Address::Jig(address),
             kept: skein_lib::List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
         &mut out,
     );
@@ -347,31 +340,28 @@ pub fn inbox_document(group: contract::InboxReadGroup) -> contract::InboxPage {
     contract::InboxPage { cut: false, rows, before: None, after: None }
 }
 pub fn inbox_page() -> skein_ui::Tree {
-    page(jig_domain_client::address::Address::Inbox { project: None }, false)
+    page(jig_client_view::address::Address::Inbox { project: None }, false)
 }
 pub fn task_page() -> skein_ui::Tree {
     page(
-        jig_domain_client::address::Address::Task {
-            task: 9,
-            section: jig_domain_client::address::TaskSection::Activity,
-        },
+        jig_client_view::address::Address::Task { task: 9, section: jig_client_view::address::TaskSection::Activity },
         false,
     )
 }
 pub fn project_page() -> skein_ui::Tree {
     page(
-        jig_domain_client::address::Address::Project {
+        jig_client_view::address::Address::Project {
             project: 1,
-            section: jig_domain_client::address::ProjectSection::Overview,
+            section: jig_client_view::address::ProjectSection::Overview,
         },
         false,
     )
 }
 pub fn deployment_page() -> skein_ui::Tree {
-    page(jig_domain_client::address::Address::Deployment, false)
+    page(jig_client_view::address::Address::Deployment, false)
 }
 pub fn signed_out_page() -> skein_ui::Tree {
-    page(jig_domain_client::address::Address::Inbox { project: None }, true)
+    page(jig_client_view::address::Address::Inbox { project: None }, true)
 }
 
 pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {

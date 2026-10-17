@@ -1,9 +1,9 @@
 mod fixtures;
 mod form;
 use crate::{Address, Ask, Event, Fact, Request, forge, store::Record};
-use jig_client_domain::contract::{self, Part, PartScope};
-use jig_domain_client::boundary::Offset;
-use jig_domain_client::pages::navigation::Destination;
+use jig_client::contract::{self, Part, PartScope};
+use jig_client_view::boundary::Offset;
+use jig_client_view::page::navigation::Destination;
 use skein_lib::{List, Queue, RequestRecord};
 
 #[test]
@@ -33,7 +33,12 @@ fn a_family_hello_outside_the_version_makes_the_side_out_of_date() {
         ("newer", contract::VersionRange { first: 2, last: 2 }, forge::Served::OutOfDate),
         ("inverted", contract::VersionRange { first: 2, last: 1 }, forge::Served::OutOfDate),
     ] {
-        crate::step(&mut root, &fixtures::env(&limits), Event::Forge(forge::Event::Served { versions }), &mut out);
+        crate::step(
+            &mut root,
+            &fixtures::env(&limits),
+            Event::Forge(forge::Event::Served { versions: Some(versions) }),
+            &mut out,
+        );
         assert_eq!(root.forge().served(), expected, "{name}");
     }
 }
@@ -49,7 +54,7 @@ fn kept(version: u16) -> List<Record> {
                     scope,
                     first_sent: None,
                     request: crate::store::Held {
-                        key: jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: u64::from(key) },
+                        key: jig_client::Key { asker: jig_client::Asker::JIG, number: u64::from(key) },
                         request: Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
                     },
                 },
@@ -93,7 +98,7 @@ fn parts_left_forget_the_parts_of_that_generation() {
         crate::parts::show(&mut root, &env, fixtures::resource(), generation, PartScope::Deployment, &mut out);
     }
     let mut child = Queue::with_capacity(1);
-    child.push(jig_domain_client::Request::PartsLeft { generation: 2 });
+    child.push(jig_client_view::Request::PartsLeft { generation: 2 });
     crate::route::route_jig(&mut root, &env, &mut child, &mut out);
     for generation in [1, 2, 3] {
         assert_eq!(
@@ -129,7 +134,7 @@ fn kept_requests_are_restored_parked_and_counted_per_scope() {
     crate::take(&mut root, &env, &mut out);
     assert!(out.is_empty(), "kept work starts parked");
     fixtures::confirm(&mut root, watch, 9, &mut out);
-    assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
+    assert_eq!(root.jig().page(), &jig_client_view::page::Page::SomeoneElse);
     out = Queue::with_capacity(crate::max_out(&limits));
     for (scope, expected) in [(7, 2), (8, 1)] {
         root.table.confirmed(Some(scope));
@@ -161,7 +166,7 @@ fn a_table_record_of_another_version_is_dropped_as_invalid() {
         &mut root,
         &env,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: kept(3),
             offset: Offset { minutes: 0 },
         },
@@ -197,7 +202,7 @@ fn a_table_record_of_another_version_is_dropped_as_invalid() {
 }
 #[test]
 fn temper_navigation_is_the_inbox_conversations_and_deployment() {
-    use jig_domain_client::address::Address as JigAddress;
+    use jig_client_view::address::Address as JigAddress;
     let limits = fixtures::limits();
     let navigation = crate::navigation(&limits);
     assert_eq!(navigation.home, Destination::Jig(JigAddress::Inbox { project: None }));
@@ -223,7 +228,7 @@ fn a_restored_record_of_version_one_is_dropped_as_invalid() {
         &mut root,
         &env,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: kept(1),
             offset: Offset { minutes: 0 },
         },

@@ -412,6 +412,7 @@ fn start_with_worker(
     worker_bytes: u64,
 ) -> crate::Service {
     let mut settings = engine();
+    settings.jig.limits.core.people.operations = 2;
     settings.jig.limits.core.tasks.tasks = 2;
     settings.jig.limits.core.tasks.project_tasks = 2;
     settings.jig.limits.core.tasks.tree_tasks = 2;
@@ -429,7 +430,7 @@ fn start_with_worker(
     settings.jig.limits.core.fleet.slots = 1;
     settings.limits.root.journal.deliveries = 128;
     settings.limits.root.journal.held = 384;
-    settings.limits.root.journal.writes = 2048;
+    settings.limits.root.journal.writes = 8192;
     settings.jig.limits.clients.connections = 2;
     settings.jig.limits.clients.streams = 2;
     settings.jig.limits.clients.watches_per_stream = 4;

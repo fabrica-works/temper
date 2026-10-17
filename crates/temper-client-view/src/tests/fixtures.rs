@@ -1,4 +1,4 @@
-use jig_client_domain::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
+use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall, Writer};
 use temper_client_domain::{Limits, forge};
 pub const FORGE: u16 = 1;
@@ -7,7 +7,7 @@ pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
     Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -34,7 +34,7 @@ pub fn limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_millis(10),
                 most: Duration::from_millis(80),
             },
@@ -161,7 +161,7 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
     None
 }
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
-    use jig_client_domain::contract::{
+    use jig_client::contract::{
         self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, ProjectRole, Subject, WatchEvent,
     };
     use temper_client_domain::{Address, Event, JigOut, Request};
@@ -173,9 +173,9 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
         &mut root,
         &env,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project }),
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
         &mut out,
     );
@@ -195,11 +195,11 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             chat_budget: 0,
         })
         .expect("one project");
-    temper_client_domain::step(&mut root, &env, Event::Jig(jig_domain_client::Event::Hello { served: true }), &mut out);
+    temper_client_domain::step(&mut root, &env, Event::Jig(jig_client_view::Event::Hello { served: true }), &mut out);
     temper_client_domain::step(
         &mut root,
         &env,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch: watch.expect("frame opened"),
             event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
                 party: FrameParty {

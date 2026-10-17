@@ -5,8 +5,8 @@ use crate::{
     route,
 };
 pub(crate) fn event(event: &temper_client_domain::Event) -> Option<Notice> {
-    use jig_client_domain::contract::{ReadNone, ReadResult, WatchEnd};
-    use jig_domain_client::Event as Jig;
+    use jig_client::contract::{ReadNone, ReadResult, WatchEnd};
+    use jig_client_view::Event as Jig;
     use temper_client_domain::Event;
     if matches!(
         event,
@@ -53,8 +53,8 @@ impl Client for NativeClient {
                     return Some(Notice::Credential { party, token: credential });
                 }
                 Shown::Notice(
-                    route::Notice::Dropped { .. }
-                    | route::Notice::Unread { .. }
+                    route::Notice::Dropped
+                    | route::Notice::Unread
                     | route::Notice::Served { .. }
                     | route::Notice::Unasked
                     | route::Notice::Fact(_)

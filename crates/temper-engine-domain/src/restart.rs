@@ -49,6 +49,7 @@ pub(crate) fn request_load(
         Range::Core(
             crate::CoreRange::Deployment
             | crate::CoreRange::TaskResult { .. }
+            | crate::CoreRange::EndedRead { .. }
             | crate::CoreRange::EscalationDecision { .. }
             | crate::CoreRange::ProposalDecision { .. }
             | crate::CoreRange::Notes(jig_domain_notes::Range::Entry { .. }),
@@ -82,6 +83,7 @@ pub(crate) fn request_load(
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::People
                 | crate::CoreRange::TaskResult { .. }
+                | crate::CoreRange::EndedRead { .. }
                 | crate::CoreRange::Turns { .. },
             )
             | Range::Census(_)
@@ -108,7 +110,8 @@ pub(crate) fn request_load(
                 | crate::CoreRange::RunProofs
                 | crate::CoreRange::Turns { .. }
                 | crate::CoreRange::TaskTranscript { .. }
-                | crate::CoreRange::TaskResult { .. },
+                | crate::CoreRange::TaskResult { .. }
+                | crate::CoreRange::EndedRead { .. },
             )
             | Range::Census(_)
             | Range::Forge => {
@@ -236,7 +239,8 @@ pub(crate) fn startup_page(
             | crate::CoreRange::ProposalDecision { .. }
             | crate::CoreRange::Turns { .. }
             | crate::CoreRange::TaskTranscript { .. }
-            | crate::CoreRange::TaskResult { .. },
+            | crate::CoreRange::TaskResult { .. }
+            | crate::CoreRange::EndedRead { .. },
         ) => {
             unreachable!("startup range")
         }
@@ -480,15 +484,8 @@ fn census_page(
 ) {
     for row in rows {
         let restored = match row {
-            Record::Core(jig_domain_core::Record::Tasks(row)) => {
-                domain.core.restore_inbox_row(&core_limits(&env.limits), &row)
-            }
-            Record::Core(
-                jig_domain_core::Record::Core(_)
-                | jig_domain_core::Record::People(_)
-                | jig_domain_core::Record::Notes(_),
-            )
-            | Record::Forge { .. } => false,
+            Record::Core(row) => domain.core.restore_inbox_row(&core_limits(&env.limits), &row),
+            Record::Forge { .. } => false,
         };
         if !restored {
             let _refused = domain.core.restart_refuse();

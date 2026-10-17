@@ -11,6 +11,7 @@ use jig_domain_host as host;
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher releases every held core output")]
 pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, held: core::Held) {
     match held {
+        core::Held::Load(load) => super::now::now(domain, env, decision, *load),
         core::Held::SettledCall { to, call, .. } => {
             host_route::settled(domain, &env.limits, decision, to, call);
         }

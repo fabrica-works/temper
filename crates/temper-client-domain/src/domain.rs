@@ -10,7 +10,7 @@ use skein_lib::{Env, Queue, RequestAnswered, RequestOut, RequestProgress, Reques
 /// The two children and their shared durable request table.
 #[derive(Debug)]
 pub struct Domain {
-    pub(crate) jig: jig_domain_client::Domain,
+    pub(crate) jig: jig_client_view::Domain,
     pub(crate) forge: forge::Side,
     forge_number: u16,
     pub(crate) table: RequestTable<Owner, Held>,
@@ -20,7 +20,7 @@ pub fn new(limits: &Limits, seed: u64, forge: forge::Config) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
     let mut rng = Rng::new(seed);
     Domain {
-        jig: jig_domain_client::Domain::new(&limits.jig, rng.next_u64()),
+        jig: jig_client_view::Domain::new(&limits.jig, rng.next_u64()),
         forge: forge::Side::new(&limits.forge, forge),
         forge_number: forge.connector,
         table: RequestTable::new(&limits.table, rng.next_u64()),
@@ -28,7 +28,7 @@ pub fn new(limits: &Limits, seed: u64, forge: forge::Config) -> Domain {
 }
 impl Domain {
     #[must_use]
-    pub const fn jig(&self) -> &jig_domain_client::Domain {
+    pub const fn jig(&self) -> &jig_client_view::Domain {
         &self.jig
     }
     #[must_use]
@@ -44,14 +44,14 @@ pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<
     route::event(root, env, event, out);
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(jig_domain_client::max_out(&env.limits.jig));
-    jig_domain_client::fire(&mut root.jig, &route::jig_env(env), &mut child);
+    let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
+    jig_client_view::fire(&mut root.jig, &route::jig_env(env), &mut child);
     route::route_jig(root, env, &mut child, out);
     root.table.fire(env.now, env.wall);
 }
 #[must_use]
 pub fn next_deadline(root: &Domain) -> Option<Time> {
-    let mut next = jig_domain_client::next_deadline(&root.jig);
+    let mut next = jig_client_view::next_deadline(&root.jig);
     for deadline in [forge::next_deadline(&root.forge), root.table.next_deadline()].into_iter().flatten() {
         next = match next {
             Some(old) => Some(old.min(deadline)),
@@ -93,7 +93,7 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         route::progress(root, env, owner, progress, out);
     }
     root.table.reclaim();
-    jig_domain_client::reclaim(&mut root.jig);
+    jig_client_view::reclaim(&mut root.jig);
     forge::reclaim(&mut root.forge);
 }
 #[must_use]
@@ -112,7 +112,7 @@ pub(crate) fn answered(
         RequestAnswered::Final(owner) => match owner {
             Owner::Jig(request) => match answer {
                 Some(crate::Answered::Jig(answer)) => {
-                    route::jig(root, env, jig_domain_client::Event::Answered { request, answer }, out);
+                    route::jig(root, env, jig_client_view::Event::Answered { request, answer }, out);
                 }
                 Some(crate::Answered::Forge(_)) | None => {
                     out.push(Request::Fact { fact: Fact::InvalidAnswer });
@@ -126,11 +126,11 @@ pub(crate) fn answered(
             },
             Owner::Kept { scope } => {
                 out.push(Request::Fact { fact: Fact::KeptAnswered });
-                route::jig(root, env, jig_domain_client::Event::KeptGone { scope }, out);
+                route::jig(root, env, jig_client_view::Event::KeptGone { scope }, out);
             }
         },
         RequestAnswered::Pending => match envelope {
-            skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_domain_client::Event::SignedOut, out),
+            skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_client_view::Event::SignedOut, out),
             skein_lib::RequestEnvelope::Final
             | skein_lib::RequestEnvelope::Again
             | skein_lib::RequestEnvelope::Lost => {}
@@ -141,11 +141,10 @@ pub(crate) fn answered(
 pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64, ask: Ask, out: &mut Queue<Request>) {
     let size = ask_size(&env.limits, &ask);
     let key = match owner {
-        Owner::Jig(token) => jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: token.raw() },
-        Owner::Forge(token) => jig_client_domain::Key {
-            asker: jig_client_domain::Asker(u32::from(root.forge_number)),
-            number: token.raw(),
-        },
+        Owner::Jig(token) => jig_client::Key { asker: jig_client::Asker::JIG, number: token.raw() },
+        Owner::Forge(token) => {
+            jig_client::Key { asker: jig_client::Asker(u32::from(root.forge_number)), number: token.raw() }
+        }
         Owner::Kept { .. } => unreachable!("restored requests do not ask"),
     };
     if root.table.ask(owner, scope, size, Held { key, request: ask }).is_err() {
@@ -162,25 +161,25 @@ pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
 /// Installs application-configured provider words before Start (client.md, 12).
 pub fn provider(
     root: &mut Domain,
-    provider: jig_domain_client::signin::Provider,
-) -> Result<(), jig_domain_client::signin::Provider> {
+    provider: jig_client_view::signin::Provider,
+) -> Result<(), jig_client_view::signin::Provider> {
     root.jig.provider(provider)
 }
 
 /// Installs the application's navigation before Start; the jig child validates its bound.
 pub fn configure_navigation(
     root: &mut Domain,
-    navigation: jig_domain_client::pages::navigation::Navigation,
-) -> Result<(), jig_domain_client::pages::navigation::Navigation> {
+    navigation: jig_client_view::page::navigation::Navigation,
+) -> Result<(), jig_client_view::page::navigation::Navigation> {
     root.jig.configure_navigation(navigation)
 }
 
 /// temper starts at the inbox and offers jig's three destinations.
 #[must_use]
-pub fn navigation(limits: &Limits) -> jig_domain_client::pages::navigation::Navigation {
-    use jig_domain_client::{
+pub fn navigation(limits: &Limits) -> jig_client_view::page::navigation::Navigation {
+    use jig_client_view::{
         address::Address,
-        pages::navigation::{Destination, Navigation},
+        page::navigation::{Destination, Navigation},
     };
     let mut navigation = Navigation::new(limits.jig.navigation_entries);
     for address in [Address::Inbox { project: None }, Address::Conversations { project: None }, Address::Deployment] {

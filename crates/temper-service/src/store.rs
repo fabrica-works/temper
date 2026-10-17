@@ -69,7 +69,7 @@ pub fn limits(
         store: kv,
         secrets: kv,
         journal: root::journal_limits(&root.journal),
-        joins: core.load_slots,
+        joins: profile.joins,
         queue: kv.queued,
         files: profile.files,
         reads: core.load_slots.checked_add(core.tasks.tasks)?,

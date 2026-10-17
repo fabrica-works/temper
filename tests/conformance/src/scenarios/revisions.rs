@@ -57,6 +57,7 @@ pub(super) fn party_amend(world: &mut World) -> Result<(), Violation> {
             task: target(world),
             revision: 0,
             amendment: people::Amendment {
+                tracked: None,
                 addressed: None,
                 instructions: None,
                 spec: Some(people::Spec {

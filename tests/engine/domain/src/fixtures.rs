@@ -81,7 +81,7 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
     use crate::walking::{config, limits};
     let mut bounds = limits();
     bounds.call_records = 8;
-    bounds.journal.writes = 3000;
+    bounds.journal.writes = 6000;
     bounds.journal.held = 300;
     bounds.journal.deliveries = 100;
     bounds.tasks.depth = 2;

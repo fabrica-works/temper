@@ -167,6 +167,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     value["application"]["limits"]["overrides"]["root.brief.gather_ms"] = 5000.into();
     let limits = value["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides");
     for (name, size) in [
+        ("people.operations", 5),
         ("tasks.tasks", 8),
         ("documents.lines", 2),
         ("documents.chips", 2),

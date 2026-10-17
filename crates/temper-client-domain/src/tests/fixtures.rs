@@ -1,8 +1,6 @@
 use crate::{Address, Event, JigOut, Limits, Request, forge, store::Record};
-use jig_client_domain::contract::{
-    self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent,
-};
-use jig_domain_client::boundary::Offset;
+use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
+use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 pub const FORGE: u16 = 1;
 pub const OTHER: u16 = 2;
@@ -10,7 +8,7 @@ pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
     Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -37,7 +35,7 @@ pub fn limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_millis(10),
                 most: Duration::from_millis(80),
             },
@@ -200,7 +198,7 @@ pub fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
         root,
         &env(&limits),
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept,
             offset: Offset { minutes: 0 },
         },
@@ -242,6 +240,6 @@ pub fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
 pub fn confirm(root: &mut crate::Domain, watch: Token, party: u64, out: &mut Queue<Request>) {
     let limits = limits();
     let env = env(&limits);
-    crate::step(root, &env, Event::Jig(jig_domain_client::Event::Hello { served: true }), out);
-    crate::step(root, &env, Event::Jig(jig_domain_client::Event::Watch { watch, event: frame(party) }), out);
+    crate::step(root, &env, Event::Jig(jig_client_view::Event::Hello { served: true }), out);
+    crate::step(root, &env, Event::Jig(jig_client_view::Event::Watch { watch, event: frame(party) }), out);
 }

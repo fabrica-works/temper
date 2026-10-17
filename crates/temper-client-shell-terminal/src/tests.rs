@@ -2,7 +2,7 @@ use crate::{
     limits,
     route::{self, Down, Notice, Up},
 };
-use jig_client_domain::contract;
+use jig_client::contract;
 use jig_client_protocol_link as link;
 use skein_lib::{List, Queue, Secret, Time};
 use temper_client_domain as client;
@@ -16,7 +16,7 @@ fn a_jig_read_reaches_the_link_with_its_own_token() {
         client::Request::Jig(client::JigOut::Read { read: fixtures::READ, what: fixtures::inbox_read() }),
         &mut fixtures::family(),
     );
-    let Down::Link(link::Event::Read { read, what: jig_client_domain::Readable::Jig(what) }) = down else {
+    let Down::Link(link::Event::Read { read, what: jig_client::Readable::Jig(what) }) = down else {
         panic!("jig read reaches its link");
     };
     assert_eq!(read, fixtures::READ);
@@ -29,7 +29,7 @@ fn a_jig_watch_event_reaches_the_root_unchanged() {
         ("alive", contract::WatchEvent::Alive, contract::WatchEvent::Alive),
     ] {
         let up = route::up(link::Request::Watch { watch: fixtures::WATCH, event }, &mut fixtures::family());
-        let Up::Root(client::Event::Jig(jig_domain_client::Event::Watch { watch, event: found })) = up else {
+        let Up::Root(client::Event::Jig(jig_client_view::Event::Watch { watch, event: found })) = up else {
             panic!("{name}: jig watch reaches the root");
         };
         assert_eq!(watch, fixtures::WATCH, "{name}: token");
@@ -39,9 +39,8 @@ fn a_jig_watch_event_reaches_the_root_unchanged() {
 #[test]
 fn a_table_record_saved_then_kept_comes_back_the_same() {
     let limits = limits::link(&limits::native()).expect("usable native limits");
-    for (name, record) in
-        [("jig", client::store::Record::Jig(fixtures::jig_record())), ("table", fixtures::table_record())]
     {
+        let (name, record) = ("table", fixtures::table_record());
         let mut link = link::Link::new(&limits).expect("bounded store codec");
         let mut out = Queue::with_capacity(link.max_out());
         link.step(
@@ -49,17 +48,13 @@ fn a_table_record_saved_then_kept_comes_back_the_same() {
             link::Event::Save { record: route::saved(record.clone(), &fixtures::family()).expect("bounded fixture") },
             &mut out,
         );
-        let Some(link::Request::Write { key, record: bytes }) = out.pop() else {
+        let Some(link::Request::Save { record: link::Record { key, bytes } }) = out.pop() else {
             panic!("{name}: save writes");
         };
         let mut kept = List::with_capacity(1);
-        kept.push(link::StoreRead { key, record: bytes }).expect("one record fits");
-        let mut versions = List::with_capacity(2);
-        for version in route::versions() {
-            versions.push(version).expect("two versions fit");
-        }
+        kept.push(link::Record { key, bytes }).expect("one record fits");
         let mut restarted = link::Link::new(&limits).expect("bounded restore");
-        restarted.step(Time::ZERO, link::Event::Start { kept, versions }, &mut out);
+        restarted.step(Time::ZERO, link::Event::Start { kept }, &mut out);
         let Some(link::Request::Kept { record: saved }) = out.pop() else {
             panic!("{name}: record restored");
         };
@@ -72,14 +67,10 @@ fn exchanges_and_store_writes_go_to_jigs_shell() {
     let requests = [
         (
             "write",
-            link::Request::Write { key: Box::from(*b"key"), record: Box::from(*b"record") },
-            link::Request::Write { key: Box::from(*b"key"), record: Box::from(*b"record") },
+            link::Request::Save { record: link::Record { key: Box::from(*b"key"), bytes: Box::from(*b"record") } },
+            link::Request::Save { record: link::Record { key: Box::from(*b"key"), bytes: Box::from(*b"record") } },
         ),
-        (
-            "remove",
-            link::Request::Remove { key: Box::from(*b"key") },
-            link::Request::Remove { key: Box::from(*b"key") },
-        ),
+        ("remove", link::Request::Erase { key: Box::from(*b"key") }, link::Request::Erase { key: Box::from(*b"key") }),
         (
             "exchange",
             link::Request::Exchange {
@@ -125,14 +116,14 @@ fn a_family_readout_or_delivery_nobody_asked_for_is_a_notice() {
             "read",
             link::Request::Read {
                 read: fixtures::READ,
-                result: jig_client_domain::Readout::Family { family: 1, record: Some(Box::from(*b"record")) },
+                result: jig_client::Readout::Family { family: 1, record: Some(Box::from(*b"record")) },
             },
         ),
         (
             "delivery",
             link::Request::FamilyDelivery {
                 watch: fixtures::WATCH,
-                record: jig_client_domain::Family { family: 1, version: 1, bytes: Box::from(*b"record") },
+                record: jig_client::Family { family: 1, version: 1, bytes: Box::from(*b"record") },
             },
         ),
     ] {

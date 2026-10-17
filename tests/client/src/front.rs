@@ -78,7 +78,7 @@ impl Joint {
             keyed_fault: None,
             reads: 0,
             read_loads: BTreeSet::new(),
-            transport: Transport::new(jig_client_domain::contract::VersionRange {
+            transport: Transport::new(jig_client::contract::VersionRange {
                 first: jig_client_protocol_wire::VERSION,
                 last: jig_client_protocol_wire::VERSION,
             }),
@@ -335,9 +335,9 @@ impl Front<Temper> for Joint {
         }
     }
     fn received(&mut self, who: ClientId, event: &Event) {
-        if let Event::Jig(jig_domain_client::Event::Watch {
+        if let Event::Jig(jig_client_view::Event::Watch {
             watch,
-            event: jig_client_domain::contract::WatchEvent::Delivered(_),
+            event: jig_client::contract::WatchEvent::Delivered(_),
         }) = event
             && let Some(event) = self.transport.taken(who, *watch)
         {
@@ -366,7 +366,7 @@ impl Front<Temper> for Joint {
     fn sign_out(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
         if self.offline_until.is_some() {
-            self.callbacks.push((who, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            self.callbacks.push((who, Event::Jig(jig_client_view::Event::SignOutLost)));
             return;
         }
         let Some(sign_in) = self.transport.sign_in(who) else { return };

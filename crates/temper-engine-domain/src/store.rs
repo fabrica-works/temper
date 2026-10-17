@@ -271,6 +271,7 @@ pub enum CoreRange {
     /// Root startup reads every people child row before accepting people.
     People,
     /// Root reads one historical ended task for an authenticated result page.
+    EndedRead { task: u64, party: u64 },
     TaskResult {
         /// Positive root-issued ended task key; terminal page has at most one row.
         task: u64,
@@ -300,27 +301,6 @@ pub enum Range {
     Forge,
 }
 
-/// Place an admitted census index key in jig's walk order (store/README.md, 5).
-#[must_use]
-pub fn census_interval(census: &jig_domain_core::Census, key: &jig_domain_core::Key) -> Option<u32> {
-    use jig_domain_core::Key as Core;
-    match key {
-        Core::Tasks(jig_domain_tasks::Key::ConversationOldest { .. }) => Some(0),
-        Core::Tasks(jig_domain_tasks::Key::Result { party, .. }) => {
-            if !census.admits(key) {
-                return None;
-            }
-            for (index, read) in census.results.iter().enumerate() {
-                if read.party == *party {
-                    return u32::try_from(index).ok()?.checked_add(1);
-                }
-            }
-            None
-        }
-        Core::Tasks(_) | Core::Core(_) | Core::People(_) | Core::Notes(_) => None,
-    }
-}
-
 impl Range {
     /// Check membership before accepting a store row. Pure value predicate, with no allocation,
     /// effect or terminal. Turn zero is invalid; continuation ordering is checked by the load
@@ -335,10 +315,14 @@ impl Range {
             Range::Forge => false,
             // The store joins the census's admitted index rows to the ended
             // owners they name, and pages those owners in key order.
-            Range::Census(_) => {
-                let jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(task)) = core else { return false };
-                *task != 0
-            }
+            Range::Census(census) => match core {
+                jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(task)) => *task != 0,
+                jig_domain_core::Key::People(jig_domain_people::Key::EndedRead { .. }) => census.admits(core),
+                jig_domain_core::Key::Core(_)
+                | jig_domain_core::Key::Tasks(_)
+                | jig_domain_core::Key::People(_)
+                | jig_domain_core::Key::Notes(_) => false,
+            },
             Range::Core(range) => range.contains(core),
         }
     }
@@ -382,6 +366,9 @@ impl CoreRange {
             CoreRange::RunProofs => {
                 let Core::Core(CoreKey::RunProof(task)) = key else { return false };
                 *task != 0
+            }
+            CoreRange::EndedRead { task, party } => {
+                *key == jig_domain_core::Key::People(jig_domain_people::Key::EndedRead { task: *task, party: *party })
             }
             CoreRange::TaskResult { task } => {
                 let Core::Tasks(jig_domain_tasks::Key::Ended(number)) = key else { return false };
@@ -518,6 +505,11 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 .ok()?
                 .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
             jig_domain_people::Stored::Answer { ask, .. } => match ask.as_ref() {
+                jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
+                jig_domain_people::Ask::Create { batch, .. } => people_bytes::batch(batch),
+                jig_domain_people::Ask::Propose { action: jig_domain_people::Action::Batch(batch), reason, .. } => {
+                    people_bytes::batch(batch)?.checked_add(u64::try_from(reason.len()).ok()?)
+                }
                 jig_domain_people::Ask::EditNote { scope, change, .. } => {
                     let scope_bytes = match scope.as_ref() {
                         jig_domain_people::NoteScope::Deployment
@@ -579,7 +571,8 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 }
                 jig_domain_people::Ask::Close { disposals, .. } => u64::from(disposals.len())
                     .checked_mul(u64::try_from(size_of::<jig_domain_people::Disposal>()).ok()?),
-                jig_domain_people::Ask::MarkSeen { .. }
+                jig_domain_people::Ask::Withdraw { .. }
+                | jig_domain_people::Ask::MarkSeen { .. }
                 | jig_domain_people::Ask::Application { .. }
                 | jig_domain_people::Ask::TakePerson { .. }
                 | jig_domain_people::Ask::SetPool { .. }
@@ -605,6 +598,7 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             },
             jig_domain_people::Stored::SignIn { .. }
             | jig_domain_people::Stored::ReadResults { .. }
+            | jig_domain_people::Stored::EndedRead { .. }
             | jig_domain_people::Stored::ReadChat { .. } => Some(0),
             jig_domain_people::Stored::Policy { value, .. } => jig_domain_people::policy_bytes(value),
         },
@@ -723,3 +717,5 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
             .checked_mul(u64::try_from(size_of::<jig_domain_authority::Finding>()).ok()?),
     }
 }
+
+mod people_bytes;

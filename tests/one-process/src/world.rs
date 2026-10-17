@@ -210,7 +210,7 @@ impl Person {
         let steps = match scenario {
             Story::Chat { words } | Story::ChatReadThenWait { words } => vec![
                 Step::Go {
-                    address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations {
+                    address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Conversations {
                         project: None,
                     }),
                 },
@@ -355,8 +355,8 @@ impl Host for Person {
                         let frame = self.wire.received.iter().any(|event| {
                             matches!(
                                 event,
-                                referee::client::Received::Delivery(jig_client_domain::contract::Delivery::Frame(_))
-                                    | referee::client::Received::Read(jig_client_domain::contract::ReadValue::Frame(_))
+                                referee::client::Received::Delivery(jig_client::contract::Delivery::Frame(_))
+                                    | referee::client::Received::Read(jig_client::contract::ReadValue::Frame(_))
                             )
                         });
                         PROGRESS.with(|progress| progress.borrow_mut().press_had_frame.push((self.life, frame)));

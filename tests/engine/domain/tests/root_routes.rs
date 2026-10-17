@@ -101,6 +101,7 @@ fn live(driver: &Driver, task: u64) -> &tasks::TaskRecord {
 /// A person's amendment of a task's words or authority, with its reason.
 fn person_amendment(words: Option<&[u8]>, authority: Option<people::Authority>, reason: &[u8]) -> people::Amendment {
     people::Amendment {
+        tracked: None,
         addressed: None,
         instructions: None,
         spec: words.map(|words| people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
@@ -154,7 +155,7 @@ fn proposed(driver: &Driver) -> u64 {
             if let Delivery::WebReply {
                 reply:
                     people::Reply::Outcome(
-                        people::Outcome::GoalProposed { proposal } | people::Outcome::AmendProposed { proposal, .. },
+                        people::Outcome::Proposed { proposal, .. } | people::Outcome::AmendProposed { proposal, .. },
                     ),
                 ..
             } = delivery
@@ -243,7 +244,7 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     limits.people.requests = 8;
     limits.people.pending = 4;
     // jig's children name more outputs per route now; the journal takes them.
-    limits.journal.writes = 3000;
+    limits.journal.writes = 6000;
     limits.journal.deliveries = 40;
     limits.journal.held = 120;
     let mut config = config(seed);
@@ -509,7 +510,7 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
         reply_to: ReplyTo::new(Token::new(2047)),
         sign_in: driver.session(),
         key: [48; 16],
-        ask: people::Ask::Cancel { project: 1, task, reason: b"requester closes".as_slice().into() },
+        ask: people::Ask::Cancel { project: 1, task, reason: b"requester closes".as_slice().into(), grace: None },
     }));
     driver.settle();
     assert!(replied(&driver, &people::Outcome::Cancelled { task }));
@@ -575,7 +576,7 @@ fn a_members_goal_past_their_allotment_becomes_a_proposal_a_maintainer_accepts()
         reply_to: ReplyTo::new(Token::new(2010)),
         sign_in: member_session,
         key: [201; 16],
-        ask: goal(b"ship a goal", 150, 7),
+        ask: jig_core_world::fixtures::propose_goal(goal(b"ship a goal", 150, 7)),
     }));
     driver.settle();
     let proposal = proposed(&driver);
@@ -641,7 +642,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_by_whom_and_how() 
         reply_to: ReplyTo::new(Token::new(2022)),
         sign_in: member_session,
         key: [204; 16],
-        ask: goal(b"race for goal", 150, 3),
+        ask: jig_core_world::fixtures::propose_goal(goal(b"race for goal", 150, 3)),
     }));
     driver.settle();
     let proposal = proposed(&driver);
@@ -1181,7 +1182,7 @@ fn batch_fixture_custom(
     bounds.fleet.slots = slots;
     bounds.call_records = 4;
     bounds.brief.sections = 5;
-    bounds.journal.writes = 3000;
+    bounds.journal.writes = 6000;
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;
     let mut configuration = config(92);
@@ -3771,7 +3772,17 @@ fn a_move_the_new_funder_cannot_cover_is_refused_whole() {
     // Authority refusals carry what is lacking (jig b7bdd9e8): the child's
     // budget against the person's spent pool.
     let lacking = people::Lack::Budget { needs: 10, left: 0 };
-    assert!(replied(&driver, &people::Outcome::Refused(people::Refusal::Authority { lacking, proposable: None })));
+    assert!(
+        replied(
+            &driver,
+            &people::Outcome::Refused(people::Refusal::Authority {
+                lacking,
+                proposable: Some(people::Accepter::Role(0))
+            })
+        ),
+        "{:?}",
+        driver.delivered
+    );
     assert_eq!(
         driver.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(root.task)))),
         before_parent.as_ref()
@@ -4121,6 +4132,7 @@ fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_the
     );
     let before = driver.store.rows.clone();
     let mut task_bounds = limits();
+    task_bounds.people.operations = 1;
     task_bounds.tasks.tasks = 1;
     task_bounds.tasks.project_tasks = 1;
     task_bounds.tasks.tree_tasks = 1;
@@ -4166,3 +4178,6 @@ fn signing_out_routes_to_people_and_expires_the_session() {
         Delivery::Read { answer: jig_domain_core::reads::Answer::None(jig_domain_core::reads::Why::SignedOut), .. }
     )));
 }
+
+#[path = "root_routes/ended_read.rs"]
+mod ended_read;

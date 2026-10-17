@@ -1,6 +1,6 @@
 //! The forge family in domain words, independent of its wire (client.md, 4.6).
 use alloc::boxed::Box;
-use jig_client_domain::contract::{EntranceRefusal, Refusal};
+use jig_client::contract::{EntranceRefusal, Refusal};
 /// The forge's one address: the adoption page for a project (client.md,
 /// 4.5); reached from the navigation slot's link.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

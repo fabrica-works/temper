@@ -1,7 +1,7 @@
 //! Keep: bounded parts held until their page generation leaves.
 //! Replace: Ops connector subjects with the forge's parts, which need no reads.
 //! `Show` retains a part; `PartsLeft` frees that generation and every older one.
-use jig_client_domain::contract::Part;
+use jig_client::contract::Part;
 use skein_lib::{Env, List, Queue, Time};
 mod form;
 mod vocabulary;
@@ -22,7 +22,7 @@ pub enum Event {
     Answered { request: skein_lib::Token, answer: Answer },
     Went { address: Address },
     Left,
-    Served { versions: jig_client_domain::contract::VersionRange },
+    Served { versions: Option<jig_client::contract::VersionRange> },
     Show { part: Part, generation: u32 },
     PartsLeft { generation: u32 },
 }
@@ -115,18 +115,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 side.changed();
             }
         }
-        Event::Served { versions } => {
-            side.served = if versions.contains(side.config.version) { Served::Yes } else { Served::OutOfDate };
-            if let Some(draft) = &mut side.form {
-                draft.served = side.served;
-                if side.served == Served::OutOfDate
-                    && let Some((request, _)) = draft.pending
-                {
-                    draft.pending = Some((request, skein_lib::RequestProgress::Parked));
-                }
-            }
-            side.changed();
-        }
+        Event::Served { versions } => served(side, versions),
         Event::Act { act } => act_on(side, &env.limits, act, out),
         Event::Progress { request, progress } => {
             if let Some(draft) = &mut side.form
@@ -271,4 +260,20 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_add(u64::from(limits.field_bytes).checked_mul(6)?)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)
+}
+
+fn served(side: &mut Side, versions: Option<jig_client::contract::VersionRange>) {
+    side.served = match versions {
+        Some(range) if range.contains(side.config.version) => Served::Yes,
+        Some(_) | None => Served::OutOfDate,
+    };
+    if let Some(draft) = &mut side.form {
+        draft.served = side.served;
+        if side.served == Served::OutOfDate
+            && let Some((request, _)) = draft.pending
+        {
+            draft.pending = Some((request, skein_lib::RequestProgress::Parked));
+        }
+    }
+    side.changed();
 }

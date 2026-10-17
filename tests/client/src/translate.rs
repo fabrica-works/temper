@@ -70,7 +70,9 @@ pub fn party(event: core::Event) -> engine::Event {
         core::Event::RefusedPayload { .. } => panic!("the client kit does not make RefusedPayload"),
         core::Event::Activate { .. } => panic!("the client kit does not make Activate"),
         core::Event::PreparedAgent { .. } => panic!("the client kit does not make PreparedAgent"),
-        core::Event::ForgetChat { .. } => panic!("the client kit does not make ForgetChat"),
+        core::Event::Forget { .. } => panic!("the client kit does not make ForgetChat"),
+        core::Event::EndedReadLoaded { .. } => panic!("the client kit does not make EndedReadLoaded"),
+        core::Event::PartyInputsLoaded { .. } => panic!("the client kit does not make PartyInputsLoaded"),
         core::Event::SeenChatLoaded { .. } => panic!("the client kit does not make SeenChatLoaded"),
         core::Event::HistoricalProposal { .. } => panic!("the client kit does not make HistoricalProposal"),
         core::Event::HistoricalPersonTask { .. } => panic!("the client kit does not make HistoricalPersonTask"),
@@ -91,9 +93,10 @@ pub fn party(event: core::Event) -> engine::Event {
 }
 fn unsupported_people(event: &people::Event) -> PartyInput {
     match event {
+        people::Event::MoveChat { .. } => panic!("the client kit does not make People::MoveChat"),
         people::Event::ChatState { .. } => panic!("the client kit does not make People::ChatState"),
         people::Event::ChatSeen { .. } => panic!("the client kit does not make People::ChatSeen"),
-        people::Event::ForgetChat { .. } => panic!("the client kit does not make People::ForgetChat"),
+        people::Event::Forget { .. } => panic!("the client kit does not make People::ForgetChat"),
         people::Event::MakeService { .. } => panic!("the client kit does not make People::MakeService"),
         people::Event::Seed { .. } => panic!("the client kit does not make People::Seed"),
         people::Event::Waiting { .. } => panic!("the client kit does not make People::Waiting"),
@@ -113,7 +116,7 @@ pub fn request(
     transport: &mut Transport,
     who: ClientId,
     request: &Request,
-    limits: &jig_domain_client::Limits,
+    limits: &jig_client_view::Limits,
 ) -> Vec<engine::Event> {
     let mut events = Vec::new();
     match request {
@@ -175,7 +178,7 @@ pub fn request(
 pub fn incoming(
     transport: &mut Transport,
     request: engine::Request,
-    limits: &jig_domain_client::Limits,
+    limits: &jig_client_view::Limits,
 ) -> Option<packets::Incoming> {
     match request {
         engine::Request::Party(request) => match request {
@@ -207,7 +210,7 @@ pub fn incoming(
 fn delivery_packet(
     transport: &mut Transport,
     delivery: Delivery,
-    limits: &jig_domain_client::Limits,
+    limits: &jig_client_view::Limits,
 ) -> Option<packets::Incoming> {
     match delivery {
         Delivery::WebReply { to, reply } => {

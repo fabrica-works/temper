@@ -1,14 +1,14 @@
 //! Keep: the child/table routing shape and exhaustive owner variants.
 //! Replace: Ops connector sides with the forge's side and temper's navigation.
 use crate::{Domain, Fact, Limits, Request, forge, route};
-use jig_client_domain::contract::Part;
+use jig_client::contract::Part;
 use skein_lib::{Env, Queue};
 pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
     generation: u32,
-    _scope: jig_client_domain::contract::PartScope,
+    _scope: jig_client::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
     if connector(&part) == root.forge_number() {

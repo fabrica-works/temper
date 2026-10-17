@@ -191,6 +191,9 @@ fn snapshot(store: &Store) -> rules::Snapshot {
             )) => {
                 snapshot.tasks.insert(task.number, jig_core_world::observations::task(task));
                 snapshot.receipts.insert(rules::Receipt::Task(task.number));
+                if matches!(task.phase, jig_domain_tasks::Phase::Ended(_)) {
+                    snapshot.receipts.insert(rules::Receipt::Ended(task.number));
+                }
                 for word in &task.inbox {
                     snapshot.receipts.insert(rules::Receipt::Word(task.number, word.number));
                 }
@@ -382,7 +385,9 @@ impl skein_world::Referee<Proc> for Referee {
                         self.signed_in = true;
                     }
                     let requires = client_receipts(event, &self.store.borrow(), self.party);
-                    self.released |= requires.iter().any(|receipt| matches!(receipt, rules::Receipt::Turn(..)));
+                    self.released |= requires
+                        .iter()
+                        .any(|receipt| matches!(receipt, rules::Receipt::Turn(..) | rules::Receipt::Terminal(..)));
                     if !requires.is_empty() {
                         self.say(now, rules::Observed::Released { requires });
                     }
@@ -482,7 +487,7 @@ fn settled(store: &Store) -> u32 {
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "the conformance receipts select committed client documents")]
 fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) -> Vec<rules::Receipt> {
-    use jig_client_domain::contract as c;
+    use jig_client::contract as c;
     match event {
         client::Received::SignedIn(party) => {
             let receipts: Vec<_> = store
@@ -509,6 +514,17 @@ fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) 
         }
         client::Received::Delivery(c::Delivery::RunState(run)) if run.committed_turn > 0 => {
             vec![rules::Receipt::Turn(run.task, run.attempt.expect("committed attempt"), run.committed_turn)]
+        }
+        client::Received::Read(c::ReadValue::Historical(value)) => {
+            let c::OwnerHistoricalValue::Task { document, result } = &value.value else { return Vec::new() };
+            let c::ChipPhase::Owner { details, .. } = document.chip.details.as_ref() else {
+                panic!("owner task facts")
+            };
+            assert_eq!(result.task.task, document.chip.task, "result belongs to its task");
+            vec![
+                rules::Receipt::Ended(document.chip.task),
+                rules::Receipt::Terminal(document.chip.task, details.attempt.expect("finished attempt")),
+            ]
         }
         client::Received::Read(c::ReadValue::Activity(page)) => page
             .rows

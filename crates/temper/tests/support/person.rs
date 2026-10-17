@@ -17,7 +17,7 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     Script {
         resume: false,
         steps: Box::new([
-            Step::Go { address: Address::Jig(jig_domain_client::address::Address::Conversations { project: None }) },
+            Step::Go { address: Address::Jig(jig_client_view::address::Address::Conversations { project: None }) },
             Step::See { find: Find::named(skein_ui::Role::TextArea, b"First words"), within: Duration::from_secs(20) },
             Step::Type { find: Find::named(skein_ui::Role::TextArea, b"First words"), words: words.into() },
             Step::Press { find: Find::named(skein_ui::Role::Button, b"Start a conversation") },
@@ -234,7 +234,7 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
     use skein_ui::Role;
     let mut steps = answered_chat(b"Hello", super::ANSWER).steps.into_vec();
     steps.extend([
-        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: Some(1) }) },
+        Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: Some(1) }) },
         Step::See { find: Find::named(Role::Link, b"Adopt a repository"), within: super::WITHIN },
         Step::Press { find: Find::named(Role::Link, b"Adopt a repository") },
         Step::See { find: Find::named(Role::TextField, b"Owner"), within: super::WITHIN },
@@ -245,14 +245,14 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         Step::See { find: Find::text(b"Adopted acme/widget on forge 1 as owned."), within: super::WITHIN },
     ]);
     steps.extend([
-        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Conversations { project: None }) },
+        Step::Go { address: Address::Jig(jig_client_view::address::Address::Conversations { project: None }) },
         Step::See { find: Find::named(Role::TextArea, b"First words"), within: super::WITHIN },
         Step::Type {
             find: Find::named(Role::TextArea, b"First words"),
             words: b"@forge_chat Land a small change".as_slice().into(),
         },
         Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
-        Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }) },
+        Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }) },
         inbox_reply(b"Task 2:"),
     ]);
     Script { steps: steps.into_boxed_slice(), resume: false }
@@ -262,7 +262,7 @@ pub fn found() -> Script {
     Script {
         resume: true,
         steps: Box::new([
-            Step::Go { address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }) },
+            Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }) },
             inbox_reply(b"Task 2:"),
         ]),
     }

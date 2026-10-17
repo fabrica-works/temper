@@ -141,11 +141,11 @@ fn tables(bytes: &[u8], limits: &wire::Limits) -> Option<Vec<Table>> {
         let key = reader.bytes(length)?;
         let length = reader.u32()?;
         let record = reader.bytes(length)?;
-        if key.first() != Some(&1) {
-            continue;
-        }
         let kept = wire::Kept::decode(limits, &mut Reader::new(record)).ok()?;
         let entry = wire::TableEntry::decode(limits, &mut Reader::new(kept.record())).ok()?;
+        if key != entry.key().as_slice() {
+            return None;
+        }
         table.push(Table {
             key: *entry.key(),
             scope: entry.scope(),

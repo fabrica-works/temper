@@ -161,7 +161,15 @@ pub(super) fn encode_lack(value: &p::Lack, l: &w::Limits) -> Result<w::Lack, w::
         }
         p::Lack::Grant { kind } => w::Lack::Grant(w::LackGrant::new(l, w::LackGrantParts { kind: *kind })?),
         p::Lack::Funding => w::Lack::Funding,
-        p::Lack::TaskKind => w::Lack::TaskKind,
+        p::Lack::TaskKind { executor } => w::Lack::TaskKind(w::LackTaskKind::new(
+            l,
+            w::LackTaskKindParts {
+                executor: match executor {
+                    Some(executor) => Some(encode_executor(*executor, l)?),
+                    None => None,
+                },
+            },
+        )?),
         p::Lack::Depth { most } => w::Lack::Depth(w::LackDepth::new(l, w::LackDepthParts { most: *most })?),
         p::Lack::Deadline => w::Lack::Deadline,
         p::Lack::Tasks { left } => w::Lack::Tasks(w::LackTasks::new(l, w::LackTasksParts { left: *left })?),
@@ -191,7 +199,10 @@ pub(super) fn decode_lack(value: w::Lack) -> p::Lack {
         w::Lack::Budget(value) => p::Lack::Budget { needs: value.needs(), left: value.left() },
         w::Lack::Grant(value) => p::Lack::Grant { kind: value.kind() },
         w::Lack::Funding => p::Lack::Funding,
-        w::Lack::TaskKind => p::Lack::TaskKind,
+        w::Lack::TaskKind(value) => match value.into_parts().executor {
+            Some(executor) => p::Lack::TaskKind { executor: Some(decode_executor(executor)) },
+            None => p::Lack::TaskKind { executor: None },
+        },
         w::Lack::Depth(value) => p::Lack::Depth { most: value.most() },
         w::Lack::Deadline => p::Lack::Deadline,
         w::Lack::Tasks(value) => p::Lack::Tasks { left: value.left() },
@@ -246,6 +257,9 @@ pub(super) fn encode_limit_kind(value: p::LimitKind, _l: &w::Limits) -> w::Limit
         p::LimitKind::Policy => w::LimitKind::Policy,
         p::LimitKind::Resource => w::LimitKind::Resource,
         p::LimitKind::Service => w::LimitKind::Service,
+        p::LimitKind::Operations => w::LimitKind::Operations,
+        p::LimitKind::Grace => w::LimitKind::Grace,
+        p::LimitKind::Goals => w::LimitKind::Goals,
     }
 }
 pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
@@ -285,10 +299,25 @@ pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
         w::LimitKind::Policy => p::LimitKind::Policy,
         w::LimitKind::Resource => p::LimitKind::Resource,
         w::LimitKind::Service => p::LimitKind::Service,
+        w::LimitKind::Operations => p::LimitKind::Operations,
+        w::LimitKind::Grace => p::LimitKind::Grace,
+        w::LimitKind::Goals => p::LimitKind::Goals,
     }
 }
 pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::NotWellFormed { at, why } => w::Refusal::NotWellFormed(w::RefusalNotWellFormed::new(
+            l,
+            w::RefusalNotWellFormedParts {
+                at: *at,
+                why: match why {
+                    p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
+                    p::Malformed::Cycle => w::Malformed::Cycle,
+                    p::Malformed::AsAllowedTwice => w::Malformed::AsAllowedTwice,
+                    p::Malformed::Conversation => w::Malformed::Conversation,
+                },
+            },
+        )?),
         p::Refusal::Disposal { task, issue } => w::Refusal::Disposal(w::RefusalDisposal::new(
             l,
             w::RefusalDisposalParts { task: *task, issue: encode_disposal_issue(*issue, l) },
@@ -304,7 +333,16 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
         )?),
         p::Refusal::Authority { lacking, proposable } => w::Refusal::Authority(w::RefusalAuthority::new(
             l,
-            w::RefusalAuthorityParts { lacking: encode_lack(lacking, l)?, proposable: *proposable },
+            w::RefusalAuthorityParts {
+                lacking: encode_lack(lacking, l)?,
+                proposable: match proposable {
+                    None => None,
+                    Some(p::Accepter::Nobody) => Some(w::Accepter::Nobody),
+                    Some(p::Accepter::Role(role)) => {
+                        Some(w::Accepter::Role(w::AccepterRole::new(l, w::AccepterRoleParts { role: *role })?))
+                    }
+                },
+            },
         )?),
         p::Refusal::Limit { which } => {
             w::Refusal::Limit(w::RefusalLimit::new(l, w::RefusalLimitParts { which: encode_limit_kind(*which, l) })?)
@@ -326,6 +364,15 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
 }
 pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
     match value {
+        w::Refusal::NotWellFormed(value) => p::Refusal::NotWellFormed {
+            at: value.at(),
+            why: match value.why() {
+                w::Malformed::ProposedAsAllowed => p::Malformed::ProposedAsAllowed,
+                w::Malformed::Cycle => p::Malformed::Cycle,
+                w::Malformed::AsAllowedTwice => p::Malformed::AsAllowedTwice,
+                w::Malformed::Conversation => p::Malformed::Conversation,
+            },
+        },
         w::Refusal::Disposal(value) => {
             p::Refusal::Disposal { task: value.task(), issue: decode_disposal_issue(value.issue().clone()) }
         }
@@ -338,9 +385,14 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
                 None => None,
             },
         },
-        w::Refusal::Authority(value) => {
-            p::Refusal::Authority { lacking: decode_lack(value.lacking().clone()), proposable: *value.proposable() }
-        }
+        w::Refusal::Authority(value) => p::Refusal::Authority {
+            lacking: decode_lack(value.lacking().clone()),
+            proposable: match value.proposable() {
+                None => None,
+                Some(w::Accepter::Nobody) => Some(p::Accepter::Nobody),
+                Some(w::Accepter::Role(role)) => Some(p::Accepter::Role(role.role())),
+            },
+        },
         w::Refusal::Limit(value) => p::Refusal::Limit { which: decode_limit_kind(value.which().clone()) },
         w::Refusal::Moved(value) => p::Refusal::Moved { now: decode_moved(value.now().clone()) },
         w::Refusal::Ended(value) => p::Refusal::Ended { how: decode_ending(value.how().clone()) },
@@ -370,5 +422,55 @@ fn decode_role(v: w::Role) -> p::Role {
         w::Role::Member => p::Role::Member,
         w::Role::Observer => p::Role::Observer,
         w::Role::Policy(v) => p::Role::Policy { role: v.role() },
+    }
+}
+
+fn encode_executor(value: p::TaskExecutor, limits: &w::Limits) -> Result<w::TaskExecutor, w::Problem> {
+    Ok(match value {
+        p::TaskExecutor::Agent { charter } => {
+            w::TaskExecutor::Agent(w::TaskExecutorAgent::new(limits, w::TaskExecutorAgentParts { charter })?)
+        }
+        p::TaskExecutor::Procedure { connector, code } => w::TaskExecutor::Procedure(w::TaskExecutorProcedure::new(
+            limits,
+            w::TaskExecutorProcedureParts { connector, code },
+        )?),
+        p::TaskExecutor::Person(address) => w::TaskExecutor::Person(w::TaskExecutorPerson::new(
+            limits,
+            w::TaskExecutorPersonParts { address: encode_person_address(&address, limits)? },
+        )?),
+    })
+}
+fn decode_executor(value: w::TaskExecutor) -> p::TaskExecutor {
+    match value {
+        w::TaskExecutor::Agent(value) => p::TaskExecutor::Agent { charter: value.into_parts().charter },
+        w::TaskExecutor::Procedure(value) => {
+            let w::TaskExecutorProcedureParts { connector, code } = value.into_parts();
+            p::TaskExecutor::Procedure { connector, code }
+        }
+        w::TaskExecutor::Person(value) => p::TaskExecutor::Person(decode_person_address(value.into_parts().address)),
+    }
+}
+
+fn encode_person_address(value: &p::PersonAddress, limits: &w::Limits) -> Result<w::PersonAddress, w::Problem> {
+    Ok(match value {
+        p::PersonAddress::Person(value) => w::PersonAddress::Person(w::PersonAddressPerson::new(
+            limits,
+            w::PersonAddressPersonParts { value: *value },
+        )?),
+        p::PersonAddress::Role(value) => {
+            w::PersonAddress::Role(w::PersonAddressRole::new(limits, w::PersonAddressRoleParts { value: *value })?)
+        }
+    })
+}
+fn decode_person_address(value: w::PersonAddress) -> p::PersonAddress {
+    match value {
+        w::PersonAddress::Person(value) => {
+            let w::PersonAddressPersonParts { value } = value.into_parts();
+            p::PersonAddress::Person(value)
+        }
+        w::PersonAddress::Role(value) => {
+            let w::PersonAddressRoleParts { value } = value.into_parts();
+            p::PersonAddress::Role(value)
+        }
     }
 }

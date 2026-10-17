@@ -177,7 +177,7 @@ fn a_core_refusal_uses_jigs_refusal_record() {
         ),
         (
             "authority",
-            people::Refusal::Authority { lacking: people::Lack::Writer, proposable: Some(true) },
+            people::Refusal::Authority { lacking: people::Lack::Writer, proposable: Some(people::Accepter::Role(1)) },
             j::Refusal::Authority(
                 j::RefusalAuthority::new(
                     &limits,

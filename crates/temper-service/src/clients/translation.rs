@@ -64,7 +64,9 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         | core::Event::RefusedPayload { .. }
         | core::Event::Activate { .. }
         | core::Event::PreparedAgent { .. }
-        | core::Event::ForgetChat { .. }
+        | core::Event::Forget { .. }
+        | core::Event::EndedReadLoaded { .. }
+        | core::Event::PartyInputsLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::HistoricalPersonTask { .. }

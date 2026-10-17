@@ -47,6 +47,7 @@ impl Problems {
                 | config::What::Budget { .. }
                 | config::What::Accounts { .. }
                 | config::What::Grace { .. }
+                | config::What::Operations { .. }
                 | config::What::Message
                 | config::What::Silence
                 | config::What::StopBound

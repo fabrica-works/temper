@@ -75,6 +75,8 @@ pub fn limits() -> engine::Limits {
         room_refusals: 2,
     };
     let people = people::Limits {
+        batch: 4,
+        operations: 2,
         people: 2,
         inbox_entries: 2,
         inbox_tasks: 4,
@@ -137,7 +139,7 @@ pub fn limits() -> engine::Limits {
             result_bytes: 384,
             run_bytes: 4096,
         },
-        loads: loads::Limits { loads: 2, rows: 1, bytes: 16384, reply_bytes: 16384, transcript_bytes: 8192 },
+        loads: loads::Limits { loads: 2, rows: 2, bytes: 16384, reply_bytes: 16384, transcript_bytes: 8192 },
         tasks,
         people,
         fleet,

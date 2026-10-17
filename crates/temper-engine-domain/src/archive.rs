@@ -190,6 +190,24 @@ pub(crate) fn note_loaded(
 pub(crate) fn ended_loaded(domain: &mut Domain, waiter: Token, rows: Box<[Record]>) {
     let Some(Read::Ended(read)) = take_read(domain, waiter) else { return };
     domain.archive_reads.retire(Id::from_token(waiter));
+    if let EndedRead::Position { request, task, party } = read {
+        let through = match rows.into_iter().next() {
+            Some(Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::EndedRead {
+                task: number,
+                party: owner,
+                through,
+            }))) if number == task && owner == party => through,
+            _ => 0,
+        };
+        domain.work.push(Work::Core(jig_domain_core::Event::EndedReadLoaded {
+            request,
+            task,
+            party,
+            through,
+            busy: false,
+        }));
+        return;
+    }
     let mut row = None;
     if rows.len() == 1
         && let Some(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(ended)))) = rows.into_iter().next()
@@ -209,10 +227,10 @@ pub(crate) fn ended_failed(domain: &mut Domain, waiter: Token) {
 pub(crate) fn ended_answer(domain: &mut Domain, read: EndedRead, row: Option<Box<tasks::TaskRecord>>, busy: bool) {
     let event = match read {
         EndedRead::SeenChat { request, .. } => jig_domain_core::Event::SeenChatLoaded { request, row, busy },
-        EndedRead::Chat { .. } => match row {
-            Some(row) => jig_domain_core::Event::ForgetChat { row },
-            None => return,
-        },
+        EndedRead::Position { request, task, party } => {
+            jig_domain_core::Event::EndedReadLoaded { request, task, party, through: 0, busy }
+        }
+        EndedRead::PartyInput { request, .. } => jig_domain_core::Event::PartyInputsLoaded { request, row, busy },
         EndedRead::PersonTask { request, person, project, task } => {
             jig_domain_core::Event::HistoricalPersonTask { request, person, project, task, row, busy }
         }

@@ -43,7 +43,7 @@ pub struct Family {
     pub link: link::Limits,
 }
 #[must_use]
-pub fn request(ask: &forge::Ask, limits: &w::Limits) -> Option<jig_client_domain::Family> {
+pub fn request(ask: &forge::Ask, limits: &w::Limits) -> Option<jig_client::Family> {
     let forge::Ask::Adopt(a) = ask;
     let mut checks = List::with_capacity(limits.adopt_checks);
     for check in &a.checks {
@@ -67,10 +67,10 @@ pub fn request(ask: &forge::Ask, limits: &w::Limits) -> Option<jig_client_domain
         },
     )
     .ok()?;
-    Some(jig_client_domain::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::adopt(&record) })
+    Some(jig_client::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::adopt(&record) })
 }
 #[must_use]
-pub fn restored(record: &jig_client_domain::Family, limits: &w::Limits) -> Option<forge::Ask> {
+pub fn restored(record: &jig_client::Family, limits: &w::Limits) -> Option<forge::Ask> {
     if record.family != wire::FORGE {
         return None;
     }
@@ -96,7 +96,7 @@ pub fn restored(record: &jig_client_domain::Family, limits: &w::Limits) -> Optio
     }))
 }
 #[must_use]
-pub fn answer(record: &jig_client_domain::Family, limits: &w::Limits, link: &link::Limits) -> Option<forge::Answer> {
+pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limits) -> Option<forge::Answer> {
     if record.family != wire::FORGE {
         return None;
     }
@@ -159,7 +159,7 @@ pub fn answer(record: &jig_client_domain::Family, limits: &w::Limits, link: &lin
     })
 }
 #[must_use]
-pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client_domain::contract::Refusal> {
+pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client::contract::Refusal> {
     use jig_client_protocol_wire as j;
     let mut reader = Reader::new(bytes);
     let refusal = j::Refusal::decode(&limits.wire, &mut reader).ok()?;
@@ -175,12 +175,12 @@ pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client_do
     )
     .ok()?;
     match link::translate::answers::answer(j::Answer::FinalAnswer(owned), limits).ok()? {
-        jig_client_domain::contract::Answer::Refused(refusal) => Some(refusal),
-        jig_client_domain::contract::Answer::Done(_) => None,
+        jig_client::contract::Answer::Refused(refusal) => Some(refusal),
+        jig_client::contract::Answer::Done(_) => None,
     }
 }
 #[must_use]
-pub const fn served(versions: jig_client_domain::contract::VersionRange) -> forge::Served {
+pub const fn served(versions: jig_client::contract::VersionRange) -> forge::Served {
     if versions.contains(wire::CLIENT_VERSION) { forge::Served::Yes } else { forge::Served::OutOfDate }
 }
 const fn role_to(role: forge::Role) -> w::Role {

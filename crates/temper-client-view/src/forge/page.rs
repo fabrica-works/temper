@@ -22,7 +22,7 @@ fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bind
     builder.close();
 }
 #[must_use]
-pub fn project_name(jig: &jig_domain_client::Domain, project: u32, words: &jig_client_view::words::Words) -> Box<[u8]> {
+pub fn project_name(jig: &jig_client_view::Domain, project: u32, words: &jig_client_view::words::Words) -> Box<[u8]> {
     if let Some(frame) = &jig.frame().document {
         for row in &frame.projects {
             if row.project == project
@@ -85,10 +85,10 @@ pub fn page(
         jig.progress(
             builder,
             match progress {
-                RequestProgress::InFlight => jig_domain_client::intents::Progress::InFlight,
-                RequestProgress::Retrying => jig_domain_client::intents::Progress::Retrying,
-                RequestProgress::Parked => jig_domain_client::intents::Progress::Parked,
-                RequestProgress::Unknown => jig_domain_client::intents::Progress::Unknown,
+                RequestProgress::InFlight => jig_client_view::intents::Progress::InFlight,
+                RequestProgress::Retrying => jig_client_view::intents::Progress::Retrying,
+                RequestProgress::Parked => jig_client_view::intents::Progress::Parked,
+                RequestProgress::Unknown => jig_client_view::intents::Progress::Unknown,
             },
         );
     }

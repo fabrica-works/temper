@@ -14,7 +14,18 @@ use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client::api;
 type World = Harness<Temper>;
+mod conversations;
+pub(crate) mod lifecycle;
+pub(crate) mod queries;
 mod revisions;
+fn parent(world: &World) -> (u64, u64) {
+    let a = &world.peers.assignments[0];
+    (a.task, a.attempt)
+}
+fn message(world: &mut World, task: u64) {
+    let attempt = world.peers.assignments.iter().rev().find(|a| a.task == task).expect("assigned host").attempt;
+    world.peers.worker.message(task, attempt, 100, b"complete scripted work".as_slice().into());
+}
 fn check(holds: bool, why: &str) -> Result<(), Violation> {
     if holds { Ok(()) } else { Err(Violation { promise: Promise::Lost, why: why.into() }) }
 }
@@ -125,6 +136,27 @@ impl ScenarioApplication for Temper {
     )]
     fn action(world: &mut World, action: Action) -> Result<(), Violation> {
         match action {
+            Action::Compound | Action::CompoundAgain | Action::CancelWithGrace | Action::Finish => {
+                let mut phase = 0;
+                while lifecycle::advance(world, action, &mut phase)? {
+                    world.drain()?;
+                }
+            }
+            Action::WatchQuery | Action::EndTask | Action::ReadEnded => {
+                let mut phase = 0;
+                while queries::advance(world, action, &mut phase)? {
+                    world.drain()?;
+                }
+            }
+            Action::Conversation { .. } | Action::Turn | Action::MarkTurns | Action::MarkResults => {
+                conversations::action(world, action);
+            }
+            Action::EndConversations => {
+                for index in 0..2 {
+                    conversations::finish(world, index);
+                    world.drain()?;
+                }
+            }
             Action::Ready => {
                 for _ in 0..4 {
                     if !world.peers.assignments.is_empty() {
@@ -150,6 +182,13 @@ impl ScenarioApplication for Temper {
                         world.trace.iter().filter(|event| event.contains("WebReply")).collect::<Vec<_>>()
                     )
                 })?;
+                if world.peers.scenario == Some(Scenario::Compound) {
+                    let mut phase = 2;
+                    while lifecycle::prepare(world, &mut phase)? {
+                        world.drain()?;
+                    }
+                }
+                world.peers.lifecycle.ready = world.outcome().commits;
                 world.peers.initial_assignments = world.peers.assignments.len();
                 if world.peers.scenario == Some(Scenario::NarrowingPolicy) {
                     ask(
@@ -515,6 +554,9 @@ impl ScenarioApplication for Temper {
     }
     fn check(world: &World, scenario: Scenario) -> Result<(), Violation> {
         match scenario {
+            Scenario::Compound | Scenario::Grace => lifecycle::check_ending(world, scenario),
+            Scenario::ConversationEndsWhileRead => conversations::check_ending(world),
+            Scenario::QueryWatchedWhileTasksEnd => queries::check_ending(world),
             Scenario::RacingDecisions => revisions::check(world),
             Scenario::LateCopy => {
                 check_lazy(world.systems.effects.len() == 2 && world.systems.effects.iter().all(|x| x.applied), || {

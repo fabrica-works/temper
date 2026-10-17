@@ -5,7 +5,7 @@ use crate::{
     store::{Key, Record},
 };
 use alloc::boxed::Box;
-use jig_client_domain::contract::{Ask as JigAsk, Read, Subject};
+use jig_client::contract::{Ask as JigAsk, Read, Subject};
 use skein_lib::{List, RequestEnvelope, RequestKey, Token};
 /// One keyed request, tagged with the child that owns its meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,23 +17,23 @@ pub enum Ask {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
     Forge(crate::forge::Answer),
-    Jig(jig_client_domain::contract::Answer),
+    Jig(jig_client::contract::Answer),
 }
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
     Forge(crate::forge::Act),
-    Jig(jig_domain_client::action::Act),
+    Jig(jig_client_view::action::Act),
 }
 /// One external fact or act for the root to route.
 #[derive(Debug)]
 pub enum Event {
     Forge(crate::forge::Event),
-    Start { address: Address, kept: List<Record>, offset: jig_domain_client::boundary::Offset },
+    Start { address: Address, kept: List<Record>, offset: jig_client_view::boundary::Offset },
     Went { place: Place },
     Act { action: Action },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered> },
-    Jig(jig_domain_client::Event),
+    Jig(jig_client_view::Event),
     SignedOut,
 }
 /// An unkeyed jig shell obligation passed through the root.
@@ -43,13 +43,13 @@ pub enum JigOut {
     Open { watch: Token, subject: Subject },
     Continue { watch: Token, subject: Subject },
     Close { watch: Token },
-    Answered { asked: Token, answer: jig_client_domain::contract::Answer },
+    Answered { asked: Token, answer: jig_client::contract::Answer },
     Unknown { asked: Token },
 }
 /// Bounded routing and child facts for the shell to observe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_domain_client::facts::Fact),
+    Jig(jig_client_view::facts::Fact),
     TableFull,
     PartsFull,
     InvalidRecord,

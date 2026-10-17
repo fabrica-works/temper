@@ -44,7 +44,7 @@ fn the_navigation_slot_links_the_frames_project_or_holds_nothing() {
         &mut root,
         temper_client_domain::Event::Went {
             place: temper_client_domain::Place::Address(temper_client_domain::Address::Jig(
-                jig_domain_client::address::Address::Inbox { project: None },
+                jig_client_view::address::Address::Inbox { project: None },
             )),
         },
     );
@@ -134,11 +134,11 @@ fn each_outcome_reads_as_the_designs_sentence() {
 }
 #[test]
 fn each_kind_of_jig_refusal_uses_jigs_words() {
-    let refusal = jig_client_domain::contract::Refusal::Role { held: None };
+    let refusal = jig_client::contract::Refusal::Role { held: None };
     for answer in [
         forge::Answer::CoreRefused(refusal.clone()),
         forge::Answer::EntranceRefused(
-            jig_client_domain::contract::EntranceRefusal::new(refusal.clone()).expect("entrance refusal"),
+            jig_client::contract::EntranceRefusal::new(refusal.clone()).expect("entrance refusal"),
         ),
     ] {
         let mut form = form();
@@ -245,10 +245,10 @@ fn the_outcomes_link_opens_the_projects_resources() {
     let link = node_of_role(&tree, Role::Link);
     assert_eq!(
         bindings::decode(&bindings, link.link.expect("link bound").token, Act::Press),
-        Some(Action::Jig(jig_domain_client::action::Act::Go {
-            address: jig_domain_client::address::Address::Project {
+        Some(Action::Jig(jig_client_view::action::Act::Go {
+            address: jig_client_view::address::Address::Project {
                 project: 1,
-                section: jig_domain_client::address::ProjectSection::Resources
+                section: jig_client_view::address::ProjectSection::Resources
             }
         }))
     );

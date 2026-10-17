@@ -319,6 +319,7 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
             Range::Core(
                 crate::CoreRange::Deployment
                 | crate::CoreRange::TaskResult { .. }
+                | crate::CoreRange::EndedRead { .. }
                 | crate::CoreRange::EscalationDecision { .. }
                 | crate::CoreRange::ProposalDecision { .. },
             ) => {
@@ -363,7 +364,7 @@ fn census_position(census: &jig_domain_core::Census, key: &Key) -> Option<(u32, 
     let Key::Core(key) = key else {
         return None;
     };
-    Some((crate::census_interval(census, key)?, key.clone()))
+    Some((census.interval(key)?, key.clone()))
 }
 
 fn valid_range(range: &Range) -> bool {
@@ -378,6 +379,7 @@ fn valid_range(range: &Range) -> bool {
         )
         | Range::Census(_)
         | Range::Forge => true,
+        Range::Core(crate::CoreRange::EndedRead { task, party }) => *task != 0 && *party != 0,
         Range::Core(crate::CoreRange::TaskResult { task } | crate::CoreRange::TaskTranscript { task, .. }) => {
             *task != 0
         }

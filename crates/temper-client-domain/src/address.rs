@@ -4,7 +4,7 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
     Forge(crate::forge::Address),
-    Jig(jig_domain_client::address::Address),
+    Jig(jig_client_view::address::Address),
 }
 /// A decoded location or a missing address.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -58,9 +58,13 @@ fn many_completions_use_one_run_allowance() {
 #[test]
 fn remaining_shared_scenarios_use_real_forge_and_people_operations() {
     for scenario in [
+        jig_conformance::scenarios::Scenario::Compound,
+        jig_conformance::scenarios::Scenario::ConversationEndsWhileRead,
+        jig_conformance::scenarios::Scenario::QueryWatchedWhileTasksEnd,
         jig_conformance::scenarios::Scenario::OtherHand,
         jig_conformance::scenarios::Scenario::ChangedJudge,
         jig_conformance::scenarios::Scenario::NarrowingPolicy,
+        jig_conformance::scenarios::Scenario::Grace,
     ] {
         jig_conformance::scenarios::run::<Temper>(scenario, jig_conformance::Cut::None, 71)
             .unwrap_or_else(|error| panic!("{scenario:?}: {error:?}"))

@@ -145,7 +145,7 @@ impl NativeClient {
             linked,
             patches: Queue::with_capacity(view_limits.tree.patches),
             kept: List::with_capacity(records),
-            address: domain::Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             phase: if token_start { Phase::WaitingToken } else { Phase::WaitingLink },
             dirty: false,
             signing_out: false,
@@ -234,7 +234,7 @@ impl NativeClient {
             self.event(domain::Event::Start {
                 address: self.address.clone(),
                 kept,
-                offset: jig_domain_client::boundary::Offset { minutes: 0 },
+                offset: jig_client_view::boundary::Offset { minutes: 0 },
             });
         }
     }
@@ -254,7 +254,7 @@ impl NativeClient {
             Signing::Again | Signing::Lost | Signing::Refused => {
                 if self.signing_out {
                     self.signing_out = false;
-                    self.event(domain::Event::Jig(jig_domain_client::Event::SignOutLost));
+                    self.event(domain::Event::Jig(jig_client_view::Event::SignOutLost));
                 }
             }
         }
@@ -337,15 +337,11 @@ impl Host for NativeClient {
                 self.link.step(now, link::Event::SignIn { with: link::With::Held(credential) }, &mut self.linked);
             }
             self.loaded = true;
-            let mut versions = List::with_capacity(2);
-            for version in route::versions() {
-                versions.push(version).expect("two store owners fit");
-            }
             let mut kept = List::with_capacity(u32::try_from(records.len()).expect("shell's bounded store"));
             for record in records {
                 kept.push(record).expect("exact record capacity");
             }
-            self.link.step(now, link::Event::Start { versions, kept }, &mut self.linked);
+            self.link.step(now, link::Event::Start { kept }, &mut self.linked);
             self.outputs();
             if self.phase == Phase::WaitingToken {
                 self.start();
@@ -356,7 +352,7 @@ impl Host for NativeClient {
             self.signed(if ok { signing } else { Signing::Lost });
         }
         while let Some(event) = self.shell.events().pop() {
-            if matches!(event, link::Event::WriteFailed) {
+            if matches!(event, link::Event::NotStored) {
                 self.notices.push(Shown::Terminal(crate::terminal::Notice::StoreFailed));
             }
             self.link.step(now, event, &mut self.linked);

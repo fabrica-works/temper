@@ -4,6 +4,9 @@ use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::NotWellFormed { .. } => {
+            return Err(w::Problem { reason: skein_codec::Reason::Tag, path: w::Path::RefusalTag });
+        }
         p::Refusal::Disposal { task, issue } => {
             let issue = match issue {
                 p::DisposalIssue::Missing => w::DisposalIssue::Missing,
@@ -21,7 +24,14 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         }
         p::Refusal::Authority { lacking, proposable } => w::Refusal::Authority(w::RefusalAuthority::new(
             limits,
-            w::RefusalAuthorityParts { lacking: lack(lacking, limits)?, proposable },
+            w::RefusalAuthorityParts {
+                lacking: lack(lacking, limits)?,
+                proposable: match proposable {
+                    Some(p::Accepter::Role(_)) => Some(true),
+                    Some(p::Accepter::Nobody) => Some(false),
+                    None => None,
+                },
+            },
         )?),
         p::Refusal::Limit { which } => {
             let which =
@@ -69,7 +79,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         p::Lack::Grant { kind } => {
             w::Lacking::GrantKind(w::LackingGrantKind::new(limits, w::LackingGrantKindParts { kind })?)
         }
-        p::Lack::TaskKind => {
+        p::Lack::TaskKind { .. } => {
             w::Lacking::TaskKind(w::LackingTaskKind::new(limits, w::LackingTaskKindParts { executor: None })?)
         }
         p::Lack::Depth { most } => {
@@ -105,7 +115,7 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Duplicate => w::AdmissionLimit::Duplicate,
         p::LimitKind::Empty => w::AdmissionLimit::Empty,
         p::LimitKind::Batch => w::AdmissionLimit::Batch,
-        p::LimitKind::ProjectLiveTasks => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::ProjectLiveTasks | p::LimitKind::Goals => w::AdmissionLimit::ProjectLiveTasks,
         p::LimitKind::LiveTasks => w::AdmissionLimit::LiveTasks,
         p::LimitKind::Tree => w::AdmissionLimit::Tree,
         p::LimitKind::Depth => w::AdmissionLimit::Depth,
@@ -113,7 +123,7 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Subscription => w::AdmissionLimit::Subscription,
         p::LimitKind::Dependencies => w::AdmissionLimit::Dependencies,
         p::LimitKind::Cycle => w::AdmissionLimit::Cycle,
-        p::LimitKind::Spec => w::AdmissionLimit::Spec,
+        p::LimitKind::Operations | p::LimitKind::Grace | p::LimitKind::Spec => w::AdmissionLimit::Spec,
         p::LimitKind::Contract => w::AdmissionLimit::Contract,
         p::LimitKind::Authority => w::AdmissionLimit::Authority,
         p::LimitKind::Inputs => w::AdmissionLimit::Inputs,

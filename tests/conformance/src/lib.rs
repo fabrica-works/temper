@@ -7,6 +7,8 @@ pub mod observations;
 mod scenarios;
 pub mod stories;
 pub mod systems;
+#[cfg(test)]
+mod tests;
 
 use jig_conformance::referee as r;
 use jig_conformance::{Application, Clock, Input, Output};
@@ -123,6 +125,10 @@ pub struct Peers {
     pub saved_deadline: Option<Wall>,
     pub initial_assignments: usize,
     pub changes: Vec<u64>,
+    children: Vec<u64>,
+    forgetting: std::collections::BTreeMap<u64, Vec<u64>>,
+    lifecycle: scenarios::lifecycle::State,
+    query: scenarios::queries::State,
     pub branches: Vec<Box<[u8]>>,
     pub produced: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
     pub reported: std::collections::BTreeMap<u64, temper_engine_domain_forge_client::api::Commit>,
@@ -206,7 +212,24 @@ impl Application for Temper {
         } else if config.story.is_some() {
             Box::new([workers::Script::Wait, workers::Script::Finish { report: b"story done".as_slice().into() }])
         } else {
+            use jig_conformance::scenarios::Scenario;
             match config.scenario {
+                Some(Scenario::QueryWatchedWhileTasksEnd) => Box::new([
+                    workers::Script::Wait,
+                    workers::Script::Finish { report: b"query task done".as_slice().into() },
+                ]),
+                Some(Scenario::ConversationEndsWhileRead) => Box::new([
+                    workers::Script::Wait,
+                    workers::Script::Turn { body: b"conversation turn".as_slice().into(), cost: 1, read: None },
+                    workers::Script::Wait,
+                    workers::Script::Finish { report: b"conversation done".as_slice().into() },
+                ]),
+                Some(Scenario::Compound) => Box::new([workers::Script::Wait, workers::Script::Wait]),
+                Some(Scenario::Grace) => Box::new([
+                    workers::Script::Wait,
+                    workers::Script::Wait,
+                    workers::Script::Finish { report: b"grace finished".as_slice().into() },
+                ]),
                 Some(jig_conformance::scenarios::Scenario::RunBudget) => {
                     let mut values = vec![workers::Script::Wait];
                     for index in 0..12 {
@@ -236,7 +259,11 @@ impl Application for Temper {
             story: config.story,
             policy: observations::policy(config.seed, config.scenario, config.story),
             policy_generation: 0,
-            worker: workers::Worker::new(link::CHANNEL, 2, (0..16).map(|_| script.clone()).collect()),
+            worker: workers::Worker::new(
+                link::CHANNEL,
+                config.limits.fleet.slots,
+                (0..16).map(|_| script.clone()).collect(),
+            ),
             assignments: Vec::new(),
             answers: Vec::new(),
             sign_in: None,
@@ -255,6 +282,10 @@ impl Application for Temper {
             saved_deadline: None,
             initial_assignments: 0,
             changes: Vec::new(),
+            children: Vec::new(),
+            forgetting: std::collections::BTreeMap::new(),
+            lifecycle: scenarios::lifecycle::State::new(config.seed),
+            query: scenarios::queries::State::default(),
             branches: Vec::new(),
             produced: std::collections::BTreeMap::new(),
             reported: std::collections::BTreeMap::new(),
@@ -418,6 +449,16 @@ impl Application for Temper {
             Delivery::Returned(event) => return vec![Input::Event(Event::Root(event))],
             Delivery::Resume => return vec![Input::Event(Event::Fire)],
         };
+        let request = match request {
+            engine::Request::Store(engine::StoreRequest::Read { load, range }) => {
+                let result = store.read(range);
+                return vec![Input::Event(Event::Root(engine::Event::Store(engine::StoreInput::ReadLoaded {
+                    load,
+                    result,
+                })))];
+            }
+            request => request,
+        };
         // The protocol layer answers at once (testing-strategy.md, 4).
         let request = match peers.protocol.play(request) {
             Ok(events) => return events.into_iter().map(|event| Input::Event(Event::Root(event))).collect(),
@@ -435,6 +476,26 @@ impl Application for Temper {
             }
             engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
             | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => {
+                if let engine::Delivery::Assigned { assignment, .. } = &delivery
+                    && matches!(
+                        peers.scenario,
+                        Some(
+                            jig_conformance::scenarios::Scenario::Compound
+                                | jig_conformance::scenarios::Scenario::Grace
+                                | jig_conformance::scenarios::Scenario::ConversationEndsWhileRead
+                                | jig_conformance::scenarios::Scenario::QueryWatchedWhileTasksEnd
+                        )
+                    )
+                {
+                    // These scripts leave their push workspace at its initial head;
+                    // a real worker reports that head even when no file changed.
+                    peers.reported.insert(assignment.task, systems.head);
+                }
+                if let engine::Delivery::Document { watcher, .. } = &delivery {
+                    events.push(engine::Event::Party(engine::PartyInput::Delivered { watcher: *watcher }));
+                }
+                scenarios::queries::delivered(peers, store, &delivery);
+                scenarios::lifecycle::delivered(peers, &delivery);
                 delivered(peers, clock, delivery);
             }
             // A refused sign-in is asked again at the next poll.
@@ -541,6 +602,21 @@ impl Application for Temper {
         }
         events.into_iter().map(|event| Input::Event(Event::Root(event))).collect()
     }
+    fn submitted(peers: &mut Peers, store: &Store, _: Clock) {
+        if let Some((number, writes)) = store.pending.back() {
+            let mut forgotten = Vec::new();
+            for write in writes {
+                if let engine::Write::Erase(engine::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)))) =
+                    write
+                {
+                    forgotten.push(*task);
+                }
+            }
+            if !forgotten.is_empty() {
+                peers.forgetting.insert(*number, forgotten);
+            }
+        }
+    }
     fn observed(peers: &mut Peers, systems: &systems::FakeForge, store: &Store, _: Clock) -> Vec<r::Observed> {
         let mut observations = Vec::new();
         if peers.applied != store.applied {
@@ -562,6 +638,14 @@ impl Application for Temper {
                 }
             }
             observations.push(r::Observed::Durable { number: store.applied, snapshot });
+            while let Some((&number, _)) = peers.forgetting.first_key_value() {
+                if number > store.applied {
+                    break;
+                }
+                for task in peers.forgetting.remove(&number).expect("submitted retention") {
+                    observations.push(r::Observed::Forgotten { task });
+                }
+            }
         }
         observations.append(&mut peers.observed);
         observations.extend(systems.take_observed());

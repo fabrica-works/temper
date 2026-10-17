@@ -291,6 +291,7 @@ fn a_census_cursor_behind_its_start_is_out_of_order() {
     let mut out = Queue::with_capacity(1);
     for (after, next, expected) in [
         (result_key(4, 2), result_key(8, 3), Some(Failure::Order)),
+        (result_key(8, 1), ended_read_key(5, 8), Some(Failure::Order)),
         (result_key(8, 2), result_key(8, 2), Some(Failure::Order)),
         (result_key(8, 2), result_key(8, 3), None),
         (result_key(8, 2), key(3), Some(Failure::Cursor)),
@@ -319,4 +320,85 @@ fn a_forge_row_survives_the_real_store_byte_for_byte() {
     store.seed(Box::new([row.clone()]), Box::new([]));
     let (rows, next) = store.page(&Range::Forge, None, 8);
     assert_eq!((rows.as_ref(), next), ([row].as_slice(), None));
+}
+
+fn ended_read_key(task: u64, party: u64) -> Key {
+    Key::Core(jig_domain_core::Key::People(jig_domain_people::Key::EndedRead { task, party }))
+}
+
+#[test]
+fn a_census_page_takes_an_ended_read_position_then_its_task() {
+    let mut store = Store::new();
+    let position = Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::EndedRead {
+        task: 5,
+        party: 8,
+        through: 1,
+    }));
+    store.seed(
+        Box::new([
+            position.clone(),
+            ended_record(5),
+            Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Result(
+                jig_domain_tasks::ResultRow { party: 8, position: 1, task: 5 },
+            ))),
+        ]),
+        Box::new([]),
+    );
+    let limits = Limits { bytes: 16_384, reply_bytes: 16_384, transcript_bytes: 16_384, ..LIMITS };
+    let mut loads = Loads::new(&limits);
+    let mut out = Queue::with_capacity(1);
+    let owner = loads::begin(&mut loads, Token::new(51), census_range(), None, 2, &mut out).expect("census admitted");
+    out.pop();
+    let (rows, next) = store.page(&census_range(), None, 2);
+    assert_eq!(rows, Box::new([position, ended_record(5)]) as Box<[Record]>);
+    assert_eq!(next, Some(ended_read_key(5, 8)));
+    loads::loaded(&mut loads, owner, rows.clone(), next.clone(), &mut out);
+    assert_eq!(out.pop(), Some(Request::Loaded { waiter: Token::new(51), rows, next: next.clone(), cut: None }));
+    let (rows, next) = store.page(&census_range(), next.as_ref(), 2);
+    assert_eq!(rows, Box::new([ended_record(5)]) as Box<[Record]>);
+    assert_eq!(next, None);
+}
+
+#[test]
+fn an_ended_conversation_query_joins_its_owner_and_read_position_after_restart() {
+    use jig_domain_core::{self as core, reads};
+    use jig_domain_tasks as tasks;
+    const PARTY: u64 = 1;
+    const TASK: u64 = 1;
+    let mut store = Store::new();
+    let owner = ended_record(TASK);
+    let Record::Core(core::Record::Tasks(tasks::Stored::Ended(task))) = &owner else { panic!("ended fixture") };
+    let index = core::Record::Tasks(tasks::Stored::EndedByParty(tasks::EndedByParty {
+        party: PARTY,
+        task: TASK,
+        label: task.label,
+        ended_at: task.ended_at.expect("ended time"),
+    }));
+    store.seed(Box::new([owner, Record::Core(index.clone())]), Box::new([]));
+    store.crash(71);
+    let loaded = store.read(Box::new(reads::Range {
+        party: PARTY,
+        scope: reads::Scope::Tasks {
+            query: core::documents::TaskQuery {
+                project: None,
+                requester: Some(tasks::Party::Person(PARTY)),
+                root: None,
+                parent: None,
+                label: None,
+                phase: None,
+                executor: None,
+                tracked: None,
+                order: core::documents::QueryOrder::Number,
+            },
+        },
+        after: None,
+        backwards: false,
+        rows: 4,
+        bytes: 65_536,
+    }));
+    let reads::Loaded::Page { rows, next } = loaded else { panic!("ended query page") };
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].value, index);
+    assert_eq!(rows[0].owner.as_ref().map(|owner| owner.number), Some(TASK));
+    assert_eq!(next, None);
 }

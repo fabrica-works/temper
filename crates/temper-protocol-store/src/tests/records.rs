@@ -440,7 +440,7 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
         p::Lack::Budget { needs: u64::MAX, left: 42 },
         p::Lack::Grant { kind: u16::MAX },
         p::Lack::Funding,
-        p::Lack::TaskKind,
+        p::Lack::TaskKind { executor: None },
         p::Lack::Depth { most: u32::MAX },
         p::Lack::Deadline,
         p::Lack::Tasks { left: u32::MAX },
@@ -457,7 +457,7 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
         p::Lack::Failed { connector: 8, kind: 7 },
         p::Lack::Unguarded { connector: 6, kind: 5 },
     ] {
-        for proposable in [None, Some(false), Some(true)] {
+        for proposable in [None, Some(p::Accepter::Nobody), Some(p::Accepter::Role(u32::MAX))] {
             rows.push(p::Refusal::Authority { lacking, proposable }).expect("bounded application cases");
         }
     }
@@ -611,7 +611,7 @@ fn every_application_outcome_preserves_its_complete_record() {
     assert!(
         jig_protocol_store::people_v3::Refusal::worst_case_bytes(&jig_protocol_store::people_v3::CEILINGS)
             .expect("bounded facts")
-            <= 23
+            <= 24
     );
 }
 #[test]

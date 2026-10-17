@@ -25,7 +25,7 @@ pub struct Limits {
 pub fn native() -> Limits {
     Limits {
         client: client::Limits {
-            jig: jig_domain_client::Limits {
+            jig: jig_client_view::Limits {
                 watches: 16,                            // Ops's 8 raised to the target 16 live watches.
                 notices: 8,                             // Notices retained for display.
                 notice_life: Duration::from_secs(5),    // Notice display lifetime.
@@ -52,7 +52,7 @@ pub fn native() -> Limits {
                 conversation_words: 8, // Pending conversation snapshots.
                 navigation_entries: 8, // Navigation destinations.
                 updates_count: 99,     // Unread counter before its lower-bound mark.
-                backoff: jig_domain_client::limits::Backoff {
+                backoff: jig_client_view::limits::ui::Backoff {
                     first: Duration::from_secs(1), // First watch reconnect span.
                     most: Duration::from_secs(30), // Longest watch reconnect span.
                 },
@@ -98,7 +98,34 @@ pub fn native() -> Limits {
 /// # Errors
 /// Returns the link's refusal if these client bounds cannot be encoded.
 pub fn link(limits: &Limits) -> Result<link::Limits, link::Unusable> {
-    link::Limits::new(limits.client.jig, EXCHANGES)
+    let jig = limits.client.jig;
+    link::Limits::new(
+        jig_client::DomainLimits {
+            owners: &[jig_client::Spoken {
+                family: temper_client_protocol_wire::FORGE,
+                version: temper_client_protocol_wire::CLIENT_VERSION,
+            }],
+            requests: limits.client.table,
+            ask_bytes: limits.client.table.bytes,
+            handles: jig.watches,
+            watches: jig.watches,
+            reads: jig.reads,
+            turn_bytes: u32::try_from(jig.document_bytes).map_err(|_| link::Unusable::Limits)?,
+            document_bytes: jig.document_bytes,
+            backoff: jig_client::Backoff { first: jig.backoff.first, most: jig.backoff.most },
+            rows: jig.rows,
+            text: jig.text,
+            projects: jig.projects,
+            charters: jig.charters,
+            fields: jig.fields,
+            delegates: jig.delegates,
+            records: jig.records,
+            kept: jig.kept,
+            parts: jig.parts,
+            heartbeat: jig.heartbeat,
+        },
+        EXCHANGES,
+    )
 }
 /// Family bounds mirror the small forge's names, gates and protection contexts.
 #[must_use]

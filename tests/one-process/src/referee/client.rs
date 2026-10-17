@@ -1,6 +1,6 @@
 //! Client receipts decoded from the kernel's HTTP and SSE bytes.
 pub(crate) mod cache;
-use jig_client_domain::contract as client;
+use jig_client::contract as client;
 use jig_client_protocol_link::translate;
 use jig_client_protocol_wire::v8 as wire;
 use skein_io::kernel::{Complete, Done, Op};
@@ -145,7 +145,7 @@ impl Connection {
                     received.push(Received::Answer { key: *keyed.key(), answer });
                 } else if let wire::Answer::FinalAnswer(document) = value {
                     let wire::Owner::Family(family) = document.owner() else { panic!("application family owner") };
-                    let record = jig_client_domain::Family {
+                    let record = jig_client::Family {
                         family: family.number(),
                         version: document.version(),
                         bytes: document.record().into(),

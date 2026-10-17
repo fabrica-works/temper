@@ -59,7 +59,7 @@ fn a_chat_started_on_jigs_page_is_answered_by_the_run() {
 fn a_held_chats_escalation_released_from_its_task_page() {
     let mut world = fixtures::world(fixtures::SEED);
     let task = fixtures::held_chat(world.front());
-    let address = temper_client_domain::Address::Jig(jig_domain_client::address::Address::task(task));
+    let address = temper_client_domain::Address::Jig(jig_client_view::address::Address::task(task));
     let person = world.client(fixtures::PARTY, address);
     world.person(
         person,

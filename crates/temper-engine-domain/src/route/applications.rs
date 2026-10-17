@@ -22,7 +22,7 @@ pub(super) fn start(
         reply_to,
         sign_in,
         key,
-        project,
+        scope: people::ApplicationScope::Project(project),
         connector: domain.config.forge_connector,
         digest,
         owner,

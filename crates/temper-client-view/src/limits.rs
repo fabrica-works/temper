@@ -16,7 +16,7 @@ impl Limits {
         let mut tree = jig_client_view::limits::compose(
             &domain.jig,
             jig,
-            &jig_domain_client::pages::Arrangement::none(),
+            &jig_client_view::page::Arrangement::none(),
             64,
             fragments,
             2,

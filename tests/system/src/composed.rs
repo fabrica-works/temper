@@ -443,6 +443,7 @@ impl World {
                     }
                     parties::Ask::Stop { task: parties::Task::Number(task) } => people::Ask::Stop { project, task },
                     other @ (parties::Ask::Close { .. }
+                    | parties::Ask::Cancel { .. }
                     | parties::Ask::SeeResults { .. }
                     | parties::Ask::SeeChat { .. }
                     | parties::Ask::Goal { .. }

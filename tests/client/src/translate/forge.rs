@@ -169,12 +169,10 @@ pub fn incoming(
             let (envelope, answer) =
                 wire::answers::keyed(wire::answers::reply(reply)).expect("application admission disposition");
             let answer = answer.map(|value| match value {
-                jig_client_domain::contract::Answer::Refused(why) => {
-                    client::Answered::Forge(forge::Answer::EntranceRefused(
-                        jig_client_domain::contract::EntranceRefusal::new(why).expect("fixed entrance facts"),
-                    ))
-                }
-                jig_client_domain::contract::Answer::Done(_) => panic!("adoption's body comes from its connector"),
+                jig_client::contract::Answer::Refused(why) => client::Answered::Forge(forge::Answer::EntranceRefused(
+                    jig_client::contract::EntranceRefusal::new(why).expect("fixed entrance facts"),
+                )),
+                jig_client::contract::Answer::Done(_) => panic!("adoption's body comes from its connector"),
             });
             let Reply::Keyed { client, attempt, .. } = transport.take_reply(to.into_token()).expect("original route")
             else {

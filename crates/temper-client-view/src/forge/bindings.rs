@@ -66,10 +66,10 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Navigate { project } => {
                     Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project } })
                 }
-                Meaning::Resources { project } => Action::Jig(jig_domain_client::action::Act::Go {
-                    address: jig_domain_client::address::Address::Project {
+                Meaning::Resources { project } => Action::Jig(jig_client_view::action::Act::Go {
+                    address: jig_client_view::address::Address::Project {
                         project,
-                        section: jig_domain_client::address::ProjectSection::Resources,
+                        section: jig_client_view::address::ProjectSection::Resources,
                     },
                 }),
                 Meaning::Field(_) => return None,

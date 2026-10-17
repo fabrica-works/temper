@@ -141,6 +141,24 @@ fn goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
     }
 }
 
+fn proposed_goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
+    let mut ask = jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
+        project: 1,
+        spec: spec.into(),
+        executor: people::GoalExecutor::Charter(1),
+        budget,
+        priority,
+        deadline: None,
+    });
+    let people::Ask::Propose { action: people::Action::Batch(batch), .. } = &mut ask else { panic!("goal proposal") };
+    batch[0].authority.tools = 3;
+    batch[0].authority.delegation =
+        people::Delegation { kinds: Box::new([people::Executor::Charter(1)]), tasks: 3, depth: 1 };
+    batch[0].contract = people::Contract::Report { words: 128 };
+    batch[0].wake.results = people::ResultsWake::LastOrFailure;
+    ask
+}
+
 #[test]
 #[expect(clippy::too_many_lines, reason = "the story follows proposal, approval, planning, and completion")]
 #[expect(clippy::wildcard_enum_match_arm, reason = "the story selects its committed deliveries")]
@@ -169,7 +187,7 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         reply_to: ReplyTo::new(Token::new(305)),
         sign_in: member_session,
         key: [35; 16],
-        ask: goal(b"@goalplan Ship the goal", 150, 7),
+        ask: proposed_goal(b"@goalplan Ship the goal", 150, 7),
     }));
     driver.settle();
     let proposal = driver
@@ -177,11 +195,11 @@ fn a_smith_goal_is_proposed_accepted_planned_and_done() {
         .iter()
         .find_map(|delivery| match delivery {
             Delivery::WebReply {
-                reply: people::Reply::Outcome(people::Outcome::GoalProposed { proposal }), ..
+                reply: people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }), ..
             } => Some(*proposal),
             _ => None,
         })
-        .expect("goal proposal committed");
+        .unwrap_or_else(|| panic!("goal proposal committed: {:?}", driver.delivered));
     assert!(
         !driver
             .store
@@ -388,6 +406,7 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
             revision: driver.task(coordinator).expect("live coordinator").revisions.spec,
             release: None,
             amendment: people::Amendment {
+                tracked: None,
                 addressed: None,
                 instructions: None,
                 spec: None,

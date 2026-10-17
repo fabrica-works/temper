@@ -1,10 +1,10 @@
 //! The shell adapter observes requests and trees, never a domain's decisions.
-use jig_client_domain::contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd};
+use jig_client::contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd};
+use jig_client_view::boundary::Offset;
 use jig_client_world::{
     harness::{App, CardKey, Duty, Receipt, Seen, Sent, StoreWrite},
     observe,
 };
-use jig_domain_client::boundary::Offset;
 use skein_lib::{Env, List, Queue, RequestEnvelope, Time};
 use skein_ui::{Act, NodeId, Patch, Tree};
 use temper_client_domain::{self as domain, Action, Address, Event, JigOut, Request};
@@ -89,7 +89,6 @@ impl App for Temper {
     }
     fn record_key(record: &Self::Record) -> Self::Key {
         match record {
-            domain::store::Record::Jig(record) => domain::store::Key::Jig(record.key()),
             domain::store::Record::Table { record, .. } => domain::store::Key::Table(record.key),
         }
     }
@@ -99,10 +98,10 @@ impl App for Temper {
                 Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
             }
             Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
             }
             Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }))
+                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
             }
             Request::Save { .. }
             | Request::Erase { .. }
@@ -127,7 +126,7 @@ impl App for Temper {
     }
     fn window_changed(event: &Event) -> bool {
         match event {
-            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => {
+            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => {
                 observe::jig_window_changed(act)
             }
             Event::Start { .. }

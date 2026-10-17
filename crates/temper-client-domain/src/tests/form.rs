@@ -103,7 +103,7 @@ fn out_of_date_disables_adopt_and_keeps_the_pending_request() {
     let limits = fixtures::limits();
     let mut out = fixtures::forge_event(
         &mut root,
-        forge::Event::Served { versions: jig_client_domain::contract::VersionRange { first: 2, last: 2 } },
+        forge::Event::Served { versions: Some(jig_client::contract::VersionRange { first: 2, last: 2 }) },
     );
     assert_eq!(root.forge().form().expect("page stays").served, forge::Served::OutOfDate);
     assert_eq!(root.forge().form().expect("page stays").pending, Some((request, skein_lib::RequestProgress::Parked)));

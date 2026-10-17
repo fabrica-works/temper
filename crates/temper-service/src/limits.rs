@@ -189,7 +189,7 @@ const ROOT: Root = Root {
         // At least deliveries * 3: the root's worst case.
         held: 1536,
         // At least `route_bound` plus `call_records`: the root's worst case.
-        writes: 8192,
+        writes: 12288,
         // At least jig small fleet.workers * fleet.max_out + 1: the root's worst case.
         deliveries: 512,
         // At least row_bound, including forge.client.answer_bytes: the root's worst case.
@@ -203,7 +203,7 @@ const ROOT: Root = Root {
         // Concurrent loads, from the root world.
         loads: 2,
         // Rows in one page, from the root world.
-        rows: 1,
+        rows: 2,
         // Kept page bytes in loads' worst case; jig small core.load_bytes.
         bytes: 65_536,
         // At least loads.bytes: loads' worst case; jig small core.load_bytes.

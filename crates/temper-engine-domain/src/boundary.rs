@@ -580,7 +580,8 @@ pub(crate) enum Payload {
 #[derive(Debug)]
 pub(crate) enum EndedRead {
     SeenChat { request: Token, task: u64 },
-    Chat { task: u64 },
+    Position { request: Token, task: u64, party: u64 },
+    PartyInput { request: Token, task: u64 },
     PersonTask { request: Token, person: u64, project: u32, task: u64 },
 }
 

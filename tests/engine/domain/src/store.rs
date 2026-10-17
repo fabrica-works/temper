@@ -292,6 +292,26 @@ impl Store {
             self.tick_pages();
         }
     }
+    /// Read a historical page through the real store and the service's routing.
+    #[must_use]
+    pub fn read(&mut self, range: Box<jig_domain_core::reads::Range>) -> jig_domain_core::reads::Loaded {
+        self.request(engine::StoreRequest::Read { load: Token::new(1), range });
+        loop {
+            if let Some(reply) = self.replies.pop() {
+                match reply {
+                    engine::StoreInput::ReadLoaded { result, .. } => return result,
+                    engine::StoreInput::Committed { .. } => continue,
+                    engine::StoreInput::Uncommitted { .. }
+                    | engine::StoreInput::Unloaded { .. }
+                    | engine::StoreInput::Loaded { .. } => {
+                        panic!("historical read returned another terminal: {reply:?}")
+                    }
+                }
+            }
+            assert!(!self.failed && !self.delayed.is_empty(), "historical read has a terminal");
+            self.tick_pages();
+        }
+    }
     fn request(&mut self, request: engine::StoreRequest) {
         let request = route::down(&mut self.routes, request).expect("root store request admitted");
         self.drive(VecDeque::from([request]), Queue::with_capacity(protocol::MAX_OUT_DOWN));

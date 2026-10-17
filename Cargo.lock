@@ -1972,6 +1972,7 @@ name = "temper-engine-domain-world"
 version = "0.0.0"
 dependencies = [
  "jig-conformance",
+ "jig-core-world",
  "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-brief",
@@ -2326,6 +2327,7 @@ dependencies = [
 name = "temper-system-world"
 version = "0.0.0"
 dependencies = [
+ "jig-core-world",
  "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-brief",

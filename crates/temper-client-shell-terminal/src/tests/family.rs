@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::route::{self, Down, Notice, Up, family};
-use jig_client_domain::contract;
+use jig_client::contract;
 use jig_client_protocol_link as link;
 use temper_client_domain::{self as client, forge};
 use temper_client_protocol_wire::{self as wire, CLIENT_VERSION, FORGE, v1 as w};
@@ -52,9 +52,9 @@ fn protection_rule() -> w::Protection {
         .expect("rule fits"),
     )
 }
-fn answer(outcome: w::Outcome) -> jig_client_domain::Family {
+fn answer(outcome: w::Outcome) -> jig_client::Family {
     let record = w::AdoptAnswer::new(&fixtures::wire_limits(), w::AdoptAnswerParts { outcome }).expect("outcome fits");
-    jig_client_domain::Family { family: FORGE, version: CLIENT_VERSION, bytes: wire::answer(&record) }
+    jig_client::Family { family: FORGE, version: CLIENT_VERSION, bytes: wire::answer(&record) }
 }
 fn refused(reason: w::ForgeReason) -> w::Outcome {
     w::Outcome::ForgeRefused(
@@ -118,11 +118,11 @@ fn each_outcome_decodes_to_the_forge_sides_answer() {
 fn jigs_refusal_at_admission_of_a_forge_attempt_is_entrance_refused() {
     let mut family = fixtures::family();
     let sent = family::down(fixtures::send_adoption(fixtures::ATTEMPT), &mut family);
-    let Down::Link(link::Event::Send { ask: jig_client_domain::Ask::Family(record), .. }) = sent else {
+    let Down::Link(link::Event::Send { ask: jig_client::Ask::Family(record), .. }) = sent else {
         panic!("the adoption leaves as the family's record");
     };
     assert_eq!((record.family, record.version), (FORGE, CLIENT_VERSION));
-    let refused = jig_client_domain::Answered::Jig(contract::Answer::Refused(fixtures::role_refusal()));
+    let refused = jig_client::Answered::Jig(contract::Answer::Refused(fixtures::role_refusal()));
     let up = family::up(fixtures::final_answer(fixtures::ATTEMPT, refused), &mut family);
     let Up::Root(client::Event::Answer { answer: Some(client::Answered::Forge(answer)), .. }) = up else {
         panic!("jig's refusal reaches the forge's side");
@@ -140,29 +140,21 @@ fn a_restored_adoption_of_another_version_is_dropped() {
             scope: 1,
             first_sent: None,
             request: client::store::Held {
-                key: jig_client_domain::Key {
-                    asker: jig_client_domain::Asker(u32::from(FORGE)),
-                    number: fixtures::ATTEMPT.raw(),
-                },
+                key: jig_client::Key { asker: jig_client::Asker(u32::from(FORGE)), number: fixtures::ATTEMPT.raw() },
                 request: client::Ask::Forge(forge::Ask::Adopt(fixtures::adoption())),
             },
         },
     };
     let saved = route::saved(record.clone(), &family).expect("bounded record");
     assert_eq!(route::kept(saved.clone(), &family), Some(record), "current version is restored");
-    let link::Saved::Table { version, mut record } = saved else {
-        panic!("table saved");
-    };
-    let jig_client_domain::Ask::Family(mut ask) = record.request.request else {
+    let link::Saved { version, mut record } = saved;
+    let jig_client::Ask::Family(mut ask) = record.request.request else {
         panic!("forge saved");
     };
     ask.version = 2;
-    record.request.request = jig_client_domain::Ask::Family(ask);
-    let up = route::up(link::Request::Kept { record: link::Saved::Table { version, record } }, &mut family);
-    assert!(
-        matches!(up, Up::Notice(Notice::Dropped { keeper: link::Keeper::Family(FORGE) })),
-        "another version dropped"
-    );
+    record.request.request = jig_client::Ask::Family(ask);
+    let up = route::up(link::Request::Kept { record: link::Saved { version, record } }, &mut family);
+    assert!(matches!(up, Up::Notice(Notice::Dropped)), "another version dropped");
 }
 #[test]
 fn each_attempt_terminal_frees_room_for_its_retry() {
@@ -177,7 +169,10 @@ fn each_attempt_terminal_frees_room_for_its_retry() {
             "{name}: retry admitted"
         );
         assert!(family.attempts.sent(skein_lib::Token::new(999)).is_err(), "{name}: bounded");
-        let up = route::up(link::Request::Answer { attempt: fixtures::ATTEMPT, envelope, answer: None }, &mut family);
+        let up = route::up(
+            link::Request::Answer { attempt: fixtures::ATTEMPT, envelope, answer: None, why: None },
+            &mut family,
+        );
         assert!(matches!(up, Up::Root(client::Event::Answer { .. })), "{name}: terminal routed");
         assert!(!family.attempts.answered(fixtures::ATTEMPT, false), "{name}: attempt retired");
     }
@@ -185,9 +180,8 @@ fn each_attempt_terminal_frees_room_for_its_retry() {
 #[test]
 fn an_undecodable_family_answer_is_lost_and_keeps_the_keyed_request() {
     let mut family = fixtures::family();
-    let record = jig_client_domain::Family { family: FORGE, version: CLIENT_VERSION, bytes: Box::from(*b"invalid") };
-    let up =
-        route::up(fixtures::final_answer(fixtures::ATTEMPT, jig_client_domain::Answered::Family(record)), &mut family);
+    let record = jig_client::Family { family: FORGE, version: CLIENT_VERSION, bytes: Box::from(*b"invalid") };
+    let up = route::up(fixtures::final_answer(fixtures::ATTEMPT, jig_client::Answered::Family(record)), &mut family);
     assert!(
         matches!(up, Up::Root(client::Event::Answer { envelope: skein_lib::RequestEnvelope::Lost, answer: None, .. })),
         "an undecodable outcome cannot retire the table's request"
@@ -197,10 +191,10 @@ fn an_undecodable_family_answer_is_lost_and_keeps_the_keyed_request() {
 fn the_forge_familys_hello_reaches_its_side() {
     let mut family = fixtures::family();
     let versions = contract::VersionRange { first: 2, last: 2 };
-    let up = route::up(link::Request::Hello { family: Some(FORGE), versions }, &mut family);
+    let up = route::up(link::Request::Hello { family: Some(FORGE), versions: Some(versions) }, &mut family);
     let Up::Root(client::Event::Forge(forge::Event::Served { versions: found })) = up else {
         panic!("hello reaches the side");
     };
-    assert_eq!(found, versions);
-    assert_eq!(family::served(found), forge::Served::OutOfDate);
+    assert_eq!(found, Some(versions));
+    assert_eq!(family::served(found.expect("served family")), forge::Served::OutOfDate);
 }

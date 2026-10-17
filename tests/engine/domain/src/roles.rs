@@ -203,7 +203,6 @@ impl World {
         let mut store = snapshot(settings);
         story_policy(&mut store, settings);
         let mut people = [0; 2];
-        let mut sessions = [0; 2];
         let mut task = 0;
         for row in store.rows.values() {
             match row {
@@ -220,6 +219,7 @@ impl World {
                         people::Stored::SignIn { .. }
                         | people::Stored::ReadResults { .. }
                         | people::Stored::ReadChat { .. }
+                        | people::Stored::EndedRead { .. }
                         | people::Stored::Roles { .. }
                         | people::Stored::Policy { .. }
                         | people::Stored::Answer { .. },
@@ -261,15 +261,7 @@ impl World {
                 | Record::Forge { .. } => {}
             }
         }
-        for row in store.rows.values() {
-            if let Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, person, .. })) = row {
-                for index in 0..2 {
-                    if *person == people[index] {
-                        sessions[index] = *number;
-                    }
-                }
-            }
-        }
+        let sessions = signed_in(&store, people);
         assert!(task != 0 && people.iter().all(|person| *person != 0) && sessions.iter().all(|session| *session != 0));
         let initial_rows = store.rows.clone();
         let limits = limits();
@@ -575,4 +567,18 @@ pub fn reroute_replayed(settings: Settings, winner: usize) -> World {
         assert_eq!(format!("{first:?}"), format!("{replay:?}"), "complete frozen role world: {settings:?}");
     }
     panic!("role replay did not settle: {:?}", first.trace);
+}
+
+fn signed_in(store: &Store, people: [u64; 2]) -> [u64; 2] {
+    let mut sessions = [0; 2];
+    for row in store.rows.values() {
+        if let Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, person, .. })) = row {
+            for index in 0..2 {
+                if *person == people[index] {
+                    sessions[index] = *number;
+                }
+            }
+        }
+    }
+    sessions
 }

@@ -15,9 +15,9 @@ pub(crate) fn set(story: Story) {
 pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     let mut steps = vec![
         Step::Go {
-            address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
+            address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
                 project: fixtures::PROJECT,
-                section: jig_domain_client::address::ProjectSection::Overview,
+                section: jig_client_view::address::ProjectSection::Overview,
             }),
         },
         see(Find::named(Role::Link, b"Adopt a repository")),
@@ -30,9 +30,9 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
         press(Role::Button, b"Adopt"),
         see(Find::text(b"Adopted acme/app on forge 1 as owned.")),
         Step::Go {
-            address: temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
+            address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
                 project: fixtures::PROJECT,
-                section: jig_domain_client::address::ProjectSection::Goals,
+                section: jig_client_view::address::ProjectSection::Goals,
             }),
         },
         see(Find::named(Role::TextArea, b"Goal specification")),

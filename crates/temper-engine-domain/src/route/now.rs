@@ -139,7 +139,15 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             start_preparation(domain, env, decision, task, transcript_waiter, from);
         }
         core::Now::SeenChat { request, task } => ended(domain, env, decision, EndedRead::SeenChat { request, task }),
-        core::Now::LoadEndedChat { task } => ended(domain, env, decision, EndedRead::Chat { task }),
+        core::Now::LoadEndedRead { request, task, party } => {
+            ended(domain, env, decision, EndedRead::Position { request, task, party });
+        }
+        core::Now::PartyInputs { request, tasks, .. } => ended(
+            domain,
+            env,
+            decision,
+            EndedRead::PartyInput { request, task: *tasks.first().expect("historical input") },
+        ),
         core::Now::HistoricalPersonTask { request, person, project, task } => {
             ended(domain, env, decision, EndedRead::PersonTask { request, person, project, task });
         }
@@ -225,18 +233,17 @@ fn start_preparation(
 
 /// Load one ended owner row the core asked for; a full read table answers busy.
 fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: EndedRead) {
-    let task = match &read {
-        EndedRead::SeenChat { task, .. } | EndedRead::Chat { task } | EndedRead::PersonTask { task, .. } => *task,
+    let range = match &read {
+        EndedRead::Position { task, party, .. } => crate::CoreRange::EndedRead { task: *task, party: *party },
+        EndedRead::SeenChat { task, .. } | EndedRead::PartyInput { task, .. } | EndedRead::PersonTask { task, .. } => {
+            crate::CoreRange::TaskResult { task: *task }
+        }
     };
     match domain.archive_reads.insert(Some(Read::Ended(read))) {
         Ok(waiter) => emit(
             decision,
             &env.limits,
-            Delivery::Load {
-                waiter: waiter.token(),
-                range: Range::Core(crate::CoreRange::TaskResult { task }),
-                after: None,
-            },
+            Delivery::Load { waiter: waiter.token(), range: Range::Core(range), after: None },
         ),
         Err(Some(Read::Ended(read))) => crate::archive::ended_answer(domain, read, None, true),
         Err(

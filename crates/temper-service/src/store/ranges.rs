@@ -11,7 +11,7 @@ pub(super) fn cursor(range: &Range, key: &Key) -> Option<store::Cursor> {
         Key::Forge(key) => store::keys::application(&temper_protocol_store::keys::encode(key, u32::MAX)?, u32::MAX)?,
     };
     let interval = match (range, key) {
-        (Range::Census(census), Key::Core(key)) => temper_engine_domain::census_interval(census, key)?,
+        (Range::Census(census), Key::Core(key)) => census.interval(key)?,
         (Range::Core(CoreRange::Tasks), Key::Core(core::Key::Tasks(_))) => 1,
         (Range::Core(_) | Range::Census(_) | Range::Forge, Key::Core(_) | Key::Forge(_)) => 0,
     };
@@ -37,6 +37,15 @@ pub(super) fn request(owner: skein_lib::Token, flight: &Flight) -> Option<store:
             CoreRange::People => store::Restore::Jig(Box::new([core::RestoreRange::People])),
             CoreRange::Tasks => store::Restore::Jig(Box::new([core::RestoreRange::Core, core::RestoreRange::Tasks])),
             CoreRange::Calls | CoreRange::RunProofs => store::Restore::Jig(Box::new([core::RestoreRange::Core])),
+            CoreRange::EndedRead { task, party } => {
+                return Some(store::Request::Get {
+                    owner,
+                    key: store::Get::Jig(core::Key::People(jig_domain_people::Key::EndedRead {
+                        task: *task,
+                        party: *party,
+                    })),
+                });
+            }
             CoreRange::TaskResult { task } => {
                 return Some(store::Request::Get {
                     owner,

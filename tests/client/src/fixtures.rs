@@ -21,7 +21,7 @@ pub const WITHIN: Duration = Duration::from_secs(1);
 #[must_use]
 pub fn domain_limits() -> Limits {
     Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -48,7 +48,7 @@ pub fn domain_limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_millis(10),
                 most: Duration::from_millis(80),
             },
@@ -116,7 +116,7 @@ pub fn view_bounds(limits: &Limits, jig: &jig_client_view::words::Words, forge: 
 }
 #[must_use]
 pub fn inbox() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_domain_client::address::Address::Inbox { project: None })
+    temper_client_domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None })
 }
 #[must_use]
 pub fn world(seed: u64) -> World<Temper, Joint> {
@@ -132,13 +132,13 @@ pub fn codec() -> jig_protocol_transcript::Limits {
     jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 32768,
-        turn: jig_client_domain::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
+        turn: jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     }
 }
 
 #[must_use]
 pub fn conversations() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_domain_client::address::Address::Conversations { project: None })
+    temper_client_domain::Address::Jig(jig_client_view::address::Address::Conversations { project: None })
 }
 #[must_use]
 pub fn chats(driver: &Driver) -> u32 {
@@ -237,6 +237,7 @@ pub fn read(
     };
     let value = reads::Row {
         value: Record::Tasks(tasks::Stored::Ended(row.clone())),
+        ended_read: None,
         owner: Some(row.clone()),
         ancestors: Box::new([]),
         related: None,
@@ -254,9 +255,9 @@ pub fn read(
 }
 #[must_use]
 pub fn project() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_domain_client::address::Address::Project {
+    temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
         project: 1,
-        section: jig_domain_client::address::ProjectSection::Overview,
+        section: jig_client_view::address::ProjectSection::Overview,
     })
 }
 #[must_use]

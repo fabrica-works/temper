@@ -13,6 +13,9 @@ pub fn root(
 ) -> (engine::Config, engine::Limits) {
     let mut limits = walking::limits();
     limits.people.people = 4;
+    if scenario == Some(Scenario::Compound) {
+        limits.people.operations = 3;
+    }
     limits.people.amendment_bytes = 2048;
     limits.people.holdings = 4;
     limits.authority.requirements = 8;
@@ -49,8 +52,16 @@ pub fn root(
 
     limits.journal.result_bytes = 4096;
     limits.journal.transcript_bytes = 32_768;
-    limits.fleet.slots = 2;
-    limits.fleet.workstreams = 2;
+    let slots = if matches!(
+        scenario,
+        Some(Scenario::Compound | Scenario::ConversationEndsWhileRead | Scenario::QueryWatchedWhileTasksEnd)
+    ) {
+        3
+    } else {
+        2
+    };
+    limits.fleet.slots = slots;
+    limits.fleet.workstreams = slots;
     limits.notes.scopes = 3 + limits.authority.grants;
     limits.tasks.funders = 16;
     limits.tasks.batch = 4;
@@ -132,7 +143,15 @@ pub fn root(
         match scenario {
             Some(Scenario::LateCopy | Scenario::UncertainRestarts | Scenario::NarrowingPolicy) => &[1, 2, 6, 15],
             Some(Scenario::OtherHand | Scenario::ChangedJudge) => &[1, 2, 3, 4, 15],
-            Some(Scenario::StandingTask | Scenario::RunBudget | Scenario::RacingDecisions) => &[1, 2, 15],
+            Some(
+                Scenario::StandingTask
+                | Scenario::RunBudget
+                | Scenario::RacingDecisions
+                | Scenario::Compound
+                | Scenario::Grace
+                | Scenario::ConversationEndsWhileRead
+                | Scenario::QueryWatchedWhileTasksEnd,
+            ) => &[1, 2, 15],
             Some(Scenario::ShrinkingPool) => panic!("forge has no pooled holds"),
             None => &[1, 8, 13, 2, 3, 4, 6, 15],
         }

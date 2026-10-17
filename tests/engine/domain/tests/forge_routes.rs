@@ -1407,6 +1407,7 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
             revision: spec_revision(&world, repair),
             release: None,
             amendment: people::Amendment {
+                tracked: None,
                 addressed: None,
                 instructions: None,
                 spec: Some(people::Spec {
