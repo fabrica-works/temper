@@ -382,6 +382,15 @@ per session are in each file.
   `jig-client-scripted-engine`. jig 12's thin story (the printed link,
   `me` live, `Stop` answered once durable, kept across a reload) grows
   with each client increment after it.
+- **A joint or process proof that fails** (ruling 229, after rulings 226
+  to 228 each counted a proof's runs): reproduce each new failure point
+  in a focused test first (implementer.md, 8.8), log its cause there, and
+  change only what that log names; then run the proof once. A run that
+  fails at a later story point than the run before it is progress: go on
+  the same way. A run that fails at the same point as the run before it,
+  a cause in production code outside the increment's Files, or a sixth
+  run of one proof after this rule reaches it, is a block with the logs.
+  A referee's or a judge's check is never changed to pass.
 - **Logs cited as `logs/wN/…`** in the session files are the planner's
   evidence, under `~/src/rust/tmp/plan/client-api/logs/`, outside the
   plan; nothing asks to read them.

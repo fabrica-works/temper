@@ -1419,6 +1419,16 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** aim to spend at most 45 minutes from your start on this diagnosis; past it, report what the focused logs show, and go on with it.
      5. **Unchanged:** ruling 227's points 1, 2 and 4 (two engine production lines used of its 10: `translate/owner.rs`'s goals and projects lists by `len()`); ruling 226's other points (no core production change); 21.2's Proof; ruling 225's Size (4,331 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1. After the proof: the eight survival proofs, clippy and the gate, as 21.2's Proof says.
 
+229. **jig 21.2: a failing proof goes on while it progresses** (process, jig 21.2's block of 2026-10-17T07:17:25Z).
+     Ruling 229, process: the implementer's option A, within jig 21.2, as a rule of the plan. p-10, p-11 and p-12 each failed at a later story point than the run before (future write; `read_series` on Task 5; Task 6's panels after acceptance), and each cause the focused test logged was the joint fixture's (`fixture::alert`'s due; `exchanges_per_client` against the native fixture's 8). The README now says, for every session from now until the run's end:
+
+     > **A joint or process proof that fails** (ruling 229, after rulings 226 to 228 each counted a proof's runs): reproduce each new failure point in a focused test first (implementer.md, 8.8), log its cause there, and change only what that log names; then run the proof once. A run that fails at a later story point than the run before it is progress: go on the same way. A run that fails at the same point as the run before it, a cause in production code outside the increment's Files, or a sixth run of one proof after this rule reaches it, is a block with the logs. A referee's or a judge's check is never changed to pass.
+
+     1. **Now:** reproduce p-12's failure (person step 13, no text containing "Restart service", Task 6's object panels Loading; `logs/jig-21/21.2-proof-p-12.log`) in the focused test, then go on under the rule: p-13 to p-18 at most, for `p_accepts_the_restart_from_the_incidents_page`.
+     2. **The eight survival proofs,** once p passes, under the same rule, each with its own count.
+     3. **Bound:** aim to spend at most 60 minutes from your start on the p proof; past it, report what the focused logs show, and go on with it.
+     4. **Unchanged:** fixture changes stay in `tests/ops/src/joint/**` or a world it reuses, each file outside `tests/ops/src/joint/**` named in the commit body (ruling 228, point 2); ruling 227's points 1, 2 and 4 (two engine production lines used of its 10); no core production change (ruling 226); 21.2's Proof; ruling 225's Size (4,331 now, aim 4,500, stop 5,000); the 06:20:26Z steer's point 1.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
