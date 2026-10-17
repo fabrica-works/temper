@@ -1542,6 +1542,9 @@ choice would have been the user's (development.md, 10.4).
 242. **The 08:16Z steer's two moved tests go to fuzzy_bytes.rs** (steer of 2026-10-17T09:08Z).
      The 09:08Z steer's point 2 amends the README's 08:16Z point 1 text (ruling 234): jig 21.3 moves `an_environment_answer_can_be_lost_at_its_native_byte_face` and `an_environment_chat_stays_live_while_its_provision_finishes`, with their helpers `ready_environment` and `environment_chat`, to a new `tests/ops/tests/fuzzy_bytes.rs`, not to `tests/ops/tests/fuzzy_joint.rs`, which is over 800 lines at jig `154e10942` and ends at 800 or fewer (code-organization.md, 7: a file over 800 lines at the base grows by at most 40); where p and the eight survival tests already check what one of the two checks, 21.3 deletes that test instead, and the log keeps the cause. Its report gives the gate's focused and fuzzy times (README, Test time: fuzzy 22.291 s of 24.9 s at 21.2's landing). The rest of the 08:16Z point 1 stands.
 
+243. **jig 21.3: Ui::new takes its limits first** (plan defect, jig 21.3's block of 2026-10-17T09:10:57Z).
+     Ruling 243 (plan defect, jig 21.3's block of 2026-10-17T09:10:57Z): option A. jig's `client/domain/view.md`, 18.1, says the Ui is "made with: its limits; the application's navigation and home; its arrangement"; the sketch left out the first. `Ui::new` is `pub fn new(limits: &Limits, navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>`: the limits each root already holds, passed first, as `Ui::new(&Limits)` takes them on main; no defaults. Unchanged: `Refused`'s two variants, `Navigation`'s fields, the rest of the sketch, rulings 234, 235 and 240.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

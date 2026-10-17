@@ -490,7 +490,7 @@ pub enum Refused { Navigation, Arrangement }
 #[derive(Debug)]
 pub struct Ui { /* place, page, objects, intents, drafts, notices, seed */ }
 impl Ui {
-    pub fn new(navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>;
+    pub fn new(limits: &Limits, navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>;
     pub fn step(&mut self, now: Time, wall: Wall, client: &Client, event: Event, out: &mut Queue<Request>);
     pub fn fire(&mut self, now: Time, wall: Wall, client: &Client, out: &mut Queue<Request>);
     #[must_use]
