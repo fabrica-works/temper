@@ -1554,6 +1554,13 @@ choice would have been the user's (development.md, 10.4).
      4. **The test over 40 lines:** `an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts` (`tests/engine/domain/tests/forge_routes.rs:2529`, 77 lines) is named in the landing report with its length at the base and now; split it only if 03.5 grew it.
      5. **Unchanged:** ruling 229's rule (a run that fails at the same point as the one before is a block with its logs); every story assertion; rulings 236 to 241; the 09:08Z steer's point 1.
 
+245. **temper 03.5: the amendment story's proposer as jig's; native ordering interim** (scope, temper 03.5's block of 2026-10-17T09:37:13Z).
+     Ruling 245 (scope, temper 03.5's block of 2026-10-17T09:37:13Z): the first question answered, the second interim.
+
+     1. **The member-amendment story: option A.** development.md, 5.7: a repin may change "the downstream tests that an upstream change of behaviour breaks, adapted the way the upstream commit adapted its own (its body names the rule)". jig removed the implicit `Ask::Amend`; an explicit `Ask::Propose` names `Proposer::Party(member)`, as jig's reference does. The story's proposer input and its expected identity become `Proposer::Party(member)`; every other assertion and the accepted-budget equality stay. The commit body names jig's commit and the reference sites the log names. This keeps ruling 244's "every story assertion": an assertion adapted to jig's change is kept, not dropped.
+     2. **The native startup ordering: not yet.** Whether temper's native shell holds the root's `Start` until it is signed in (option A) or jig's link should not open a stream without a credential (option B) is ruled after a check of how jig's own native host orders sign-in and the link's `open` on main. Until that ruling: go on with point 1, the gate's other failures under ruling 244, and the sweeps, but not this ordering; add no pending list to `client.rs`, change nothing in jig, and do not run `land`. When nothing else is left, report so and wait.
+     3. **Unchanged:** rulings 236 to 244 (repairs aim 500, stop 550; Size aim 750, stop 850).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
