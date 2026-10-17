@@ -571,9 +571,16 @@ declare the forge, `FORGE` at `CLIENT_VERSION`, in
 `jig_client_domain::Limits.owners` (jig 12.4; jig's `client.md`, 8.2),
 so `not_served` names it from the hello on, before any adoption is
 sent, and a kept adoption of another version is dropped by `jig-client`
-at start.
+at start. The terminal's host starts the root at load and signs in
+after it, as 1e8ed63a does (`client.md`, 3.4: `Start { kept }` "before
+any other event, then signs in"; "The shell holds back neither the
+start nor the sign-in"): jig's reference UI asks its frame's watch at
+its start, and `jig-client` opens it once signed in (jig's `client.md`,
+8.1: "A watch waits for a sign-in"), from jig-12.s1.
 Needs: jig 21.2 (`ops`'s root on `jig_client::Client`, jig 13.4's
-native host and worlds among it).
+native host and worlds among it); jig-12.s1 (a watch asked while signed
+out opened once signed in), whose landing a second repin commit takes
+by the rule above, with `jig-12.s1` for `jig-NN.k`.
 Files:
 - `crates/temper-client-protocol-wire/src/lib.rs` (`Owner`, `number`,
   `owner`, beside `FORGE` and `CLIENT_VERSION`; the sketch below,
@@ -661,16 +668,23 @@ table as the forge's bytes, temper's engine routing decodes it by
 once: `heavy cargo nextest run -p temper-one-process-world -E
 'test(an_adopted_repository_gets_its_change_pushed_through_git)'` (about
 3 s; 2.2 s at the base): the same through HTTP bytes and the native
-host holding the client.
+host holding the client. After the repin onto jig-12.s1, the land
+gate's run of `temper-one-process-world` is the check that the five
+stories failing at `tests/one-process/src/referee/client.rs:97` under
+1e8ed63a pass: no other run is wanted.
 Don't: decode a family's bytes in `jig-client`; keep a map from keys to
 children or a `_` arm on an asker (jig's `root.md`, 5 and 10); give
-jig's reference UI an asker of temper's.
+jig's reference UI an asker of temper's; hold back the root's `Start`,
+or give `SignIn` before it, in the terminal's host; change the
+referee's rule that every client response is 200
+(`tests/one-process/src/referee/client.rs:97`).
 Size: at most 300 lines; ruling 238 re-estimates it with the repin
 onto jig 21.2 and rulings 236 and 237: aim 750, stop at 850 added lines
 by code-organization.md's command, the repin's repairs included; the
 repairs outside the Files aim 300, stop at 350 (README, Pins); ruling
 241 moves them to aim 400, stop at 450; ruling 244 to aim 500, stop
-at 550, for the gate's repairs.
+at 550, for the gate's repairs. The repin onto jig-12.s1 changes
+`Cargo.lock` alone; any repair it brings counts in ruling 244's 550.
 Removes: the root's `RequestTable`, `store.rs`, `Owner::Kept`, the
 terminal's `route/family.rs`, the forge's `Config { connector, version
 }` (the wire crate's `Owner` and `CLIENT_VERSION` in its place).

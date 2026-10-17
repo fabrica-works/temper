@@ -203,11 +203,17 @@ temper-client-domain/src/
 ### 3.4 At start
 
 The shell starts the domain with the small store's records, which the
-domain gives `jig-client` (`Start { kept }`), then signs in (section 7).
-Once signed in, the domain watches `me` and opens home, the inbox. Kept
-requests are parked until `me` confirms their party (jig's
-`client/domain/client.md`, section 11); another party's stay parked and
-are not shown, and the terminal says so in a line of its own (6.6).
+domain gives `jig-client` (`Start { kept }`) before any other event,
+then signs in (section 7): with the credential DIRECTORY holds, or by
+the printed link. The shell holds back neither the start nor the
+sign-in. The domain's children ask their watches from their start, and
+`jig-client` opens none on the engine until it is signed in (jig's
+`client/domain/client.md`, 8.1 and 12), so no stream leaves without
+the credential. Once signed in, the domain watches `me` and opens
+home, the inbox. Kept requests are parked until `me` confirms their
+party (jig's `client/domain/client.md`, section 11); another party's
+stay parked and are not shown, and the terminal says so in a line of
+its own (6.6).
 temper's pages keep no record of their own: a client closed on any page
 opens at the inbox, and a composer's words not sent, or a form's values,
 are not kept across a restart (section 11).
