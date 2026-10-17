@@ -11,16 +11,24 @@ Shape: the repin 03.4's Needs name (jig 13.2's landing), made on
 engine, store and conformance adapters and their tests, the four new
 conformance scenarios (`Compound`, `Grace`, `ConversationEndsWhileRead`,
 `QueryWatchedWhileTasksEnd`) and their 12 actions included: each runs
-against temper's adapter and passes. A scenario that needs behaviour
+against temper's adapter and passes. By ruling 201, it also carries
+03.4's Scope and Files as the saved WIP holds them: the client crates'
+and tests' path rewrites (`jig_domain_client::` and `jig_client_domain::`,
+`pages::` to `page::`, `limits::Backoff` to `limits::ui::Backoff`), the
+link surface (`link::Saved` is a struct at jig 13.2), and 03.4's Shape
+and Removes (`store::Record::Jig`, `Key::Jig`, the root's `Save` and
+`Erase` of the reference UI's records). A scenario that needs behaviour
 temper's engine lacks is reported as a question, never skipped.
 Test shape: no new test; the conformance suite and temper's gate.
 Proof: temper's gate, by `land`, at the jig 13.2 pin.
-Size: aim for at most 550 added lines (415 counted with path rewrites
-at 01:32Z, `logs/temper-03/03.4-repin-counts.txt`, before the four
-scenarios' adapters); past it, report why. The README's 200 lines do
+Size: aim for at most 550 added production lines (415 counted with
+path rewrites at 01:32Z, `logs/temper-03/03.4-repin-counts.txt`, the
+client's about 179 included, before the four scenarios' adapters); test
+lines reported apart; past it, report why. The README's 200 lines do
 not bind this step; they bind 03.4 again from its next commit.
-Don't: 03.4's Shape work (it follows on this landing); a lint
-exception; a skipped or ignored scenario.
+Don't: 03.4's new unit test and its Proof (they follow on this
+landing); keep `jig-domain-client` in a manifest or alias its paths; a
+lint exception; a skipped or ignored scenario.
 Done when: `git -C ~/src/rust/temper log origin/main --all-match
 --grep='^Plan: client-api$' --grep='^Step: temper-03.s2$' --format=%H -1`
 prints its landing.

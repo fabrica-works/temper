@@ -1113,6 +1113,21 @@ choice would have been the user's (development.md, 10.4).
      4. **Size:** the threading counts apart from the 160 production lines: aim for at most 80 lines of it; past it, report the count and go on. No temper code calls the five writers; a `pub` signature that jig's ops or test application calls is changed there too, and listed in the commit body.
      5. **Unchanged:** the Don't (no cut in the client's data or the engine's documents; `compose` not raised); what the view acts on takes the whole path (`view.md`, 7: "what the view acts on (a filter by a resource, a draft's pattern) takes the whole path").
 
+201. **temper 03.s2 carries the client sweep jig 13.2's pin forces** (plan defect, temper 03.s2's block of 2026-10-17T01:37:57Z).
+     temper-03.s2 carries the client sweep the jig 13.2 pin forces, as the saved WIP `1f60a44a9` holds it. Ruling 199 kept s2 to "every repair it needs in temper's engine, store and conformance adapters" with "Don't: 03.4's Shape work". At jig 13.2, `jig-domain-client` is gone and `link::Saved` is a struct with no `Jig` variant. temper's client crates do not compile without 03.4's Scope, and keeping `Record::Jig` would need a mapping 03.4 deletes.
+
+     1. s2 also carries 03.4's Scope and Files as the WIP holds them:
+        - the client crates' and tests' path rewrites: `jig_domain_client::` and `jig_client_domain::`, `pages::` to `page::`, and `limits::Backoff` to `limits::ui::Backoff`;
+        - the link surface, in the shell-terminal's `client.rs`, `route.rs`, `limits.rs` and tests, and the domain's `forge.rs`, `tests.rs` and `tests/form.rs`;
+        - 03.4's Shape and Removes: `store::Record::Jig`, `Key::Jig`, and the root's `Save` and `Erase` of the reference UI's records.
+
+        03.4's "Don't: keep `jig-domain-client` in a manifest; alias its paths" now binds s2.
+     2. s2's Size aim stays 550, counted as added production lines. That is 415 at 01:32Z, which includes the client's about 179. s2 reports its test lines apart, and past 550 it reports why.
+     3. s2's Don't becomes: "03.4's new unit test and its Proof (they follow on this landing); keep `jig-domain-client` in a manifest or alias its paths; a lint exception; a skipped or ignored scenario."
+     4. 03.4 keeps its Test shape (`the_reference_uis_records_never_reach_the_small_store`), its Proof and its review, on s2's landing, in at most 30 lines.
+
+     If s2 finds a further client file the pin forces, it carries that file too and lists it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

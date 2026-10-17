@@ -547,7 +547,9 @@ temper-client-world -E 'test(signing_in_shows_the_inbox_from_the_engine_root)
 each): the person signs in on jig's pages from their new crate, and a
 kept adoption is made once after a reload.
 Don't: keep `jig-domain-client` in a manifest; alias its paths.
-Size: at most 80 lines (the path rewrite counted apart).
+Size: at most 80 lines (the path rewrite counted apart). By ruling
+201, temper-03.s2 carries this Scope, Files, Shape and Removes; 03.4
+keeps its Test shape and Proof on s2's landing: at most 30 lines.
 Removes: `jig-domain-client` from temper's manifests;
 `store::Record::Jig`.
 
