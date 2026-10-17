@@ -1316,6 +1316,14 @@ choice would have been the user's (development.md, 10.4).
 219. **a failed gate is followed by the touched crates' tests, every failure at once** (steer of 2026-10-17T05:20Z).
      Steer of 2026-10-17T05:20Z, from the check of 2026-10-17T05:20Z, point 1: after a failed `land` gate, a session whose commit changes more than 20 files (and jig 13.4) runs its touched crates' tests with `--no-fail-fast`, default and fuzzy profiles, and fixes every failure before `land` again. Recorded in the README as "05:20Z, point 1".
 
+220. **jig 13.4: five more ops recovery tests marked until jig 21.2** (plan defect, jig 13.4's block of 2026-10-17T05:25:44Z).
+     Ruling 220, plan defect in the order of steps, as ruling 218. The five fail for ruling 218's cause: `ops`'s root has no client until jig 21.2, and 13.4 leaves backoff, `Offline` and reopening to the client (ruling 207; `view.md` 1099-1100: "Backoffs and heartbeats are the client's"). Three wait for an `Offline` that only the client now gives (`bridge.rs:99`). In the two whose waiting card disappears, `ops`'s joint front sends the view a raw `Ended { end: Dropped }` (`tests/ops/src/joint/front.rs:400`, `drop_watches`), which 13.4's view retires (`ui.rs:988` at `7061ef016`), and which a client never forwards: `jig-client-domain/src/watches.rs:148`, `WatchEnd::Dropped | WatchEnd::Stopping => None`, its handle kept behind (`client.md` 417-419: "**Dropped is not ended.** … its handle stays, behind").
+
+     1. **13.4 marks the five** at main's `tests/ops/tests/fuzzy_joint.rs:764, :772, :780, :788, :798` (`q_provision_survives_its_acceptance_commit_and_move_end_survives_reload`, `q_provision_survives_its_made_commit_and_move_end_survives_reload`, `q_move_end_survives_its_durable_answer_commit_and_reload`, `p_story_survives_seeded_commit_crashes_and_random_presses`, `q_story_survives_seeded_commit_crashes_reload_and_random_presses`) with ruling 218's `#[ignore]` text as it is, each assertion unchanged, and names them in the commit body beside the three. A further `tests/ops` test that fails only because `ops`'s root has no client takes the same mark and is named in the commit body and the report; past two more, stop and report.
+     2. **No other change:** the view's `Ended` handling stays as 13.4 has it, with no fallback for a raw `Dropped`; ruling 218's point 2 stands. 13.4 lands as one increment by its gate.
+     3. **jig 21.2** removes the eight marks and runs them once: its Files and Proof say so now (`test(/_survives_/)` selects exactly these eight in `fuzzy_joint`).
+     4. **Unchanged:** rulings 207, 215 (Size 784 of aim 850, stop 950), 218 and 219.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
