@@ -82,6 +82,52 @@ reference UI onto these task queries.
   code-organization.md, 6's grep for that name prints nothing at each
   increment's end.
 
+## Re-check at jig `24f3bcc55` (ruling 273, after jig 14 and 21 landed)
+
+These take precedence over the Shapes, Test shapes and sketches below
+where they differ.
+
+- **22.1:** `crates/jig-client-view/src/limits/ui.rs:103-109` is gone
+  (21.4 removed the Ui's frame, roles and charters worst case): drop that
+  item; the `document_bytes` cite is `ui.rs:26`; `frame/me.rs:35-38` is
+  now `:30-31` and `:35-40`. Files gain the users 21.4 added:
+  `crates/jig-client-view/src/ui/{borrowed,client}.rs`,
+  `examples/ops/client-domain/src/{me,tests,tests_support}.rs`,
+  `testing/jig-client-test-domain/src/{first/me,second}.rs`, and the view
+  tests `bridge.rs`, `domain/native.rs`, `domain/pending.rs`,
+  `fixtures/client.rs`. The core world has one project (`projects: 1`,
+  `tests/core/src/world.rs:82`): the test and Proof read "project 1's
+  template 2 holds the override's budget, template 1 the configuration's"
+  in place of "project 2 the default". The sketch's `contract/me.rs`
+  defines `MeParty`, `FrameParty`'s four fields.
+- **22.2:** the `Amend` story's "(at `b6a63f8c1` it has neither)" is
+  stale: both landed. Its ask is `Ask::Amend { project, task, revision:
+  None, change: Box::new(Amendment { .. }), reason }` (boxed, ruling
+  261), with all seven `Amendment` fields named (no `Default`); its task
+  is created tracked (`create_tasks()` creates both members with
+  `tracked: None`: give the story a member with `tracked: Some(..)`).
+- **22.4:** `Offered` gains `effect: Option<Effect>` in place, in
+  `contract/documents.rs:343`; `contract/effects.rs` holds `ReleaseEffect`
+  and `Effect` alone (a second `Offered` there is ambiguous under the glob
+  re-exports, E0659). Files gain
+  `testing/jig-client-scripted-engine/src/tests/compound.rs:16`
+  (`ActKind::AmendRelease`, which 22.4 removes) and the scripted engine's
+  `payload.rs:573` (`fields!(Offered { act, admission })` gains `effect`,
+  with `Payload` for `Effect` and `ReleaseEffect`). Each contract
+  `Offered { .. }` literal (in 53 files at `24f3bcc55`) gains
+  `effect: None` unless its test reads an effect. Moved cites:
+  `phrases/jig.rs` 636-638, 1473-1474, 2326-2327, 2802-2803;
+  `english.rs` 1398-1405; `client-v8.schema:625` (`PhaseCounts`);
+  `waits.rs:12`.
+- **Unchanged:** ruling 262's `OwnerExecutor` needs nothing here
+  (`ExecutorKind::Person` covers a role executor).
+
+The re-check compiled the corrected sketches under `clippy --workspace
+--all-targets -D warnings` with `effect: None` in each literal, and ran
+the packages depending on `jig-client-domain`: 2,335 of 2,335 focused (in
+groups), 95 of 95 fuzzy. Refresh any further user of a moved or renamed
+item, and list it in the commit body.
+
 ## Increments
 
 Each increment regenerates the codec once from the edited schema:

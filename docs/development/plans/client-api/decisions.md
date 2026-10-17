@@ -1838,6 +1838,15 @@ choice would have been the user's (development.md, 10.4).
      - `crates/jig-client-view/src/conversation.rs` 602 lines, `conversation/words.rs` 238 (`wc -l`); `conversation.rs:554: pub fn worst_case`; `phrases/jig.rs` 3,093 lines; `testing/jig-fake-workers/src/lib.rs:46-53`: `Call { Opaque, ProposeGoal, Choose }`, no question.
      - The check's sub-agent compiled the corrected sketches under `clippy -D warnings` with jig 22's types stubbed, and with the graph pins (`graph.rs:259`, `:713`) applied ran 1,164 focused tests (two runs) and 111 fuzzy, all passing; clippy clean.
 
+273. **jig 22's Shapes against main, after jig 14** (re-check of jig-22.1).
+     Ruling 273 (plan defect, the re-check of jig 22 at jig `24f3bcc55`, after jig 14 and 21 landed; temper `475f8d3b1`): jig 22's session file misses what 21.4 and 14 moved; corrected in `jig/22-documents.md`, "Re-check at jig `24f3bcc55`": 22.1's gone `limits/ui.rs` item, moved cites and 21.4's users, its test on project 1's two templates (the core world has one project), `MeParty` in the sketch; 22.2's `Amend` story boxed with all seven fields and a tracked member; 22.4's `Offered` gaining `effect` in place in `documents.rs:343`, the scripted engine's `compound.rs:16` and `payload.rs:573`, and `effect: None` in each `Offered` literal. Sent to jig 22.1 as a steer.
+
+     Checked:
+     - `git -C jig show origin/main:crates/jig-client-view/src/limits/ui.rs | wc -l`: 110; `git grep 'size_of::<Frame>\|OfferedCharters' … limits/ui.rs`: nothing.
+     - `tests/core/src/world.rs:82: projects: 1,`; `contract/documents.rs:343: pub struct Offered {`; `scripted-engine/src/tests/compound.rs:16: act: ActKind::AmendRelease,`; `payload.rs:573: fields!(Offered { act, admission });`; `client-v8.schema:625: record PhaseCounts`.
+     - `git -C jig grep -l 'Offered {' origin/main | wc -l`: 53.
+     - The re-check's sub-agent: corrected sketches clean under `clippy --workspace --all-targets -D warnings`; 2,335 of 2,335 focused and 95 of 95 fuzzy in the packages depending on `jig-client-domain`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
