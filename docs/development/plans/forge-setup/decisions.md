@@ -511,6 +511,25 @@ run are appended after "For the user".
      - 08.2 is unchanged: it lands its words as planned, and 15.1 splits them. 07's question 1 is marked answered. Nothing is
        deferred: no `later.md` row.
 
+124. **Byte-stable recordings, a standing rule; 02.1 at 1160** (plan defect, temper 02's block of 2026-10-17T00:24:09Z).
+     Ruling 124, a plan defect, the same block as ruling 121's (01.3), so a standing rule now: the README's
+     "Byte-stable recordings (rulings 121 and 124)". 02.1's recording after ruling 119 changed 11 setup responses
+     (`setup-org-{issue-by-member,made-by-write-admin-alone,made,read,route-orgs-made}`,
+     `setup-team-{edit,list-new-org,list-page-1,list,made,members}`): masked `created` timestamps alias by second, and
+     Forgejo orders the deprecated `units` array at random.
+
+     - Fixed, as the session proposes: each org and team creation whose answer carries a timestamp is made in a second of
+       its own, and the mask sorts the `units` array's strings. Both fixes are in the README's rule; the second is in the
+       shared `tools/forgejo-conformance/src/mask.rs`, outside 02.1's Files, which this ruling adds. No transcript on main
+       holds a `units` array (grep below), so only 02.1's captures change.
+     - 01.3 changes `mask.rs` too (ruling 121: pkt-line ids). 02.1 lands after 01.3, as it already waits for 01.3's
+       `decode_refusal`: rebase on it, keep both fixes, and record again.
+     - What counts: the README rule's check, once: after a second recording in a row, `git status --short
+       tools/forgejo-conformance/transcripts tools/forgejo-conformance/facts.txt` prints nothing; quote it in the report.
+     - Size: 02.1 lands within 1160 production lines by code-organization.md 6's command (ruling 116 gave 1100); past 1160,
+       stop on a question again, with the count by file.
+     - Unchanged: the 18 facts; the mask's first-appearance rule; ruling 116's 600 for 02.2.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

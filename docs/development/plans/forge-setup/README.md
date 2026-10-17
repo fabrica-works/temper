@@ -130,6 +130,21 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   Transcripts and `facts.txt` are written by the tools only; a new
   capture is appended after the existing ones. `heavy --gate` refuses a
   tree with changes: commit first.
+- **Byte-stable recordings (rulings 121 and 124).** A recording of a
+  group that changes a capture of an earlier recording is fixed in the
+  tool, not accepted, without asking: a creation whose answer carries a
+  timestamp is made in a second of its own, so that the mask's
+  first-appearance rule aliases no earlier timestamp; a set-valued array
+  that Forgejo orders at random (the deprecated `units`) is sorted by
+  the mask; an id the mask misses (a pkt-line's) is masked. A fix to
+  the shared mask (`tools/forgejo-conformance/src/mask.rs`) lands in the
+  increment that needs it, named in its commit body; a session whose
+  captures a landed fix changes refreshes them in its next landing. The
+  check, once per increment that adds captures: after a second recording
+  in a row, `git status --short tools/forgejo-conformance/transcripts
+  tools/forgejo-conformance/facts.txt` prints nothing. A difference
+  these fixes do not cover is a question. This takes the place of the
+  session files' "Byte-stability" question, until the run ends.
 - **Sizes (ruling 102).** An increment of this plan lands within 2.6
   times its Size without asking, a Size marked "(codec)" within 3 times;
   its report gives the count by code-organization.md 6's command, by
