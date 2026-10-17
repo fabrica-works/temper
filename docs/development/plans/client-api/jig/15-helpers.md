@@ -411,6 +411,30 @@ jig's `client/domain/pages.md`, 4 (the status table and its order),
 - **Unchanged:** `close_chat`, `fall`'s comparison, `NotOffered`'s
   variants, jig 15.4 to 15.6.
 
+## Corrections after jig 15.6's block of 2026-10-17T23:03:01Z (ruling 290)
+
+These take precedence over the corrections above and 15.6's increment
+where they differ.
+
+- **15.6, Files** gain the joint story
+  `tests/client/src/joint/role_stories/proposed_story.rs`. Its goal
+  beyond the pool is offered as proposable ("This will be proposed to
+  its holder") and answered with a refusal: the transitional state
+  03-parties.md's Choices name ("its goal form beyond the pool shows a
+  refusal that names who could accept, until it proposes through
+  `Propose` (jig 14 to 16)"), which "offers kept" now fails, as it
+  should. Until jig 16.3, the story's second verdict, after Confirm,
+  expects the referee's offers-kept failure for that draft, exactly
+  (`Verdict::Failed(skein_world::domain::Failure { .. })`, as
+  `tests/client/tests/referee.rs:476` asserts one), with a comment that
+  names 16.3 as its end; its first verdict (`Passed`, before send) and
+  its durable refusal stay. A further story the referee fails for the
+  same cause (an offer the reference UI's legacy goal act does not keep)
+  takes the same expectation: list each in the commit body. A failure of
+  any other cause is a block.
+- **Unchanged:** the referee's rule, and 15.6's Shape, Test shape and
+  Proof.
+
 ## Increments
 
 ### 15.1 `facts`

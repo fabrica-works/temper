@@ -275,6 +275,18 @@ where they differ.
   goal form's `SetGoal` makes; 16.3 moves the forms to `shapes`, whose
   tasks carry the template's own label.
 
+## Corrections after jig 15.6's block of 2026-10-17T23:03:01Z (ruling 290)
+
+- **16.3, Files and Test shape** gain the joint story
+  `tests/client/src/joint/role_stories/proposed_story.rs`, under its
+  name. Once the goal form sends what `shapes::set_goal` gives, its goal
+  beyond the pool is proposed as its confirmation said: its answer is
+  the `people::Outcome::Proposed { .. }` the referee's rule asks, in
+  place of its durable refusal; both its verdicts are `Passed`; and the
+  expected offers-kept failure 15.6 gave it goes (15-helpers.md, ruling
+  290). If 16.3 lands before 15.6, 16.3 changes the story so, and 15.6
+  gives it nothing.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query

@@ -2025,6 +2025,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Then run the gate story once** in the focused test, and land once. Its count stands at 2: the same failure point a third time is a block with the logs.
      4. **Unchanged:** the story's expected answer and its 5 s wait; no referee's or judge's check changes; 16.1's Proof, which passed (run 3, 0.205 s); ruling 288.
 
+290. **jig 15.6: the joint proposed-goal story expects offers kept's failure until 16.3** (plan defect, jig-15.6's block of 2026-10-17T23:03:01Z).
+     Ruling 290 (plan defect, jig-15.6's block of 2026-10-17T23:03:01Z): the report's proposal. The joint story `an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_answer` (`tests/client/src/joint/role_stories/proposed_story.rs`) holds the transitional state the plan chose at 03.4 (`jig/03-parties.md`, Choices: "its goal form beyond the pool shows a refusal that names who could accept, until it proposes through `Propose` (jig 14 to 16)"), while its confirmation offers the goal as proposable. 15.6's "offers kept" fails it as the design asks; 15.6's Files missed it. The fix stays in 16.3, whose goal form sends what `shapes::set_goal` gives: moving it before 15.6 would hold 15.6 behind 16.1 and 16.2.
+
+     1. **15.6, Files** gain the story. Until jig 16.3, its second verdict, after Confirm, expects the referee's offers-kept failure for that draft, exactly, as `tests/client/tests/referee.rs:476` asserts a `Verdict::Failed(skein_world::domain::Failure { .. })`, with a comment that names 16.3 as its end. Its first verdict (`Passed`, before send) and its durable refusal stay.
+     2. **A further story** the referee fails for the same cause (an offer the reference UI's legacy goal act does not keep) takes the same expectation: list each in the commit body. A failure of any other cause is a block.
+     3. **16.3, Files and Test shape** gain the story: once the goal form sends `shapes::set_goal`'s request, its answer is the `people::Outcome::Proposed { .. }` the referee asks, its durable refusal goes, both verdicts are `Passed`, and 15.6's expected failure goes.
+     4. **Unchanged:** the referee's rule; 15.6's Shape, Test shape and Proof; no other check changes to pass.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
