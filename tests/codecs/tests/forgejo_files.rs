@@ -170,6 +170,8 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

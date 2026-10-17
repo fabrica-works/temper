@@ -226,6 +226,9 @@ fn pull_answer(config: &Config, request: &Request, value: &a::Pull) -> Result<An
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => Err(a::Error::Refused),
@@ -291,6 +294,9 @@ fn checks(config: &Config, request: &Request, values: &[a::CheckSummary]) -> Res
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),
@@ -457,6 +463,9 @@ fn collaborators(config: &Config, request: &Request, values: &[a::Collaborator])
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => return Err(a::Error::Refused),

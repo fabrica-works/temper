@@ -27,7 +27,8 @@ pub fn run(forgejo: &Forgejo, scratch: &Path) -> Result<Vec<Fact>> {
     let f = Fixture::new(forgejo, scratch)?;
     let mut secrets = write::Secrets::from_instance(&f.instance);
     crate::runner::component(&f, &mut secrets)?;
-    let mut host = Hosted::new(&f, &f.writer.token)?;
+    let writer = crate::setup::scoped(&f, &mut secrets, "writer", "temper-api", crate::tokens::API)?;
+    let mut host = Hosted::new(&f, &writer)?;
     let mut facts = vec![host.started("component-start-ready", None)?];
     for (name, token, expected) in [
         (

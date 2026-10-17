@@ -12,6 +12,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     let body = format!(
         "{{\"username\":\"bot\",\"email\":\"bot@example.invalid\",\"password\":\"{password}\",\"full_name\":\"temper:bot\",\"must_change_password\":false}}"
     );
+    std::thread::sleep(std::time::Duration::from_secs(1));
     r.send_new(
         "setup-user-create",
         "POST",
@@ -40,6 +41,7 @@ pub(crate) fn record(r: &mut Recorder<'_>, admin: &Token) -> Result<()> {
     let body = format!(
         "{{\"username\":\"person\",\"email\":\"person@example.invalid\",\"password\":\"{password}\",\"full_name\":\"Person\",\"must_change_password\":true}}"
     );
+    std::thread::sleep(std::time::Duration::from_secs(1));
     r.send_new(
         "setup-user-create-person",
         "POST",

@@ -137,6 +137,8 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Run(_)
         | Answer::Job { .. }
         | Answer::Jobs(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

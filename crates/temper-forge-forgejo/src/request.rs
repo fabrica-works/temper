@@ -222,6 +222,19 @@ pub enum Request {
         at: Repo,
         branch: Box<[u8]>,
     },
+    Tokens {
+        login: Box<[u8]>,
+        page: Page,
+    },
+    CreateToken {
+        login: Box<[u8]>,
+        name: Box<[u8]>,
+        scopes: Box<[Box<[u8]>]>,
+    },
+    DeleteToken {
+        login: Box<[u8]>,
+        id: u64,
+    },
     UserOf {
         login: Box<[u8]>,
     },

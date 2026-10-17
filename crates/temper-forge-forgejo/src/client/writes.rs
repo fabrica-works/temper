@@ -94,7 +94,10 @@ fn target(request: &Request, out: &mut Target) -> (Method, bool) {
             out.segment(branch);
             return (Method::Delete, false);
         }
-        Request::UserOf { .. }
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -219,7 +222,10 @@ fn write(json: &mut Encoder, request: &Request) {
             text(json, b"new_branch_name", branch);
             text(json, b"old_ref_name", &id::write(from));
         }
-        Request::UserOf { .. }
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings

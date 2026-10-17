@@ -1,9 +1,11 @@
+mod fixtures;
 use std::boxed::Box;
 use temper_codecs_world::forgejo;
 use temper_forge_forgejo::{
     client,
-    document::{Document, User},
-    request::Method,
+    decode::Malformed,
+    document::{Document, Row},
+    request::{Method, Request},
     server::{self, Answer},
 };
 #[test]
@@ -29,46 +31,58 @@ fn setup_requests_route_on_the_servers_side_to_the_same_request() {
         );
     }
 }
-fn answers() -> Vec<(&'static str, User)> {
+fn answers() -> Vec<(&'static str, Answer)> {
+    let bot = || Answer::User(fixtures::user(fixtures::BOT, b"bot", false, b"temper:bot"));
+    let person = || Answer::User(fixtures::user(fixtures::PERSON, b"person", false, b"Person"));
     vec![
-        (
-            "setup-user-create",
-            User { id: 4, login: Box::from(*b"bot"), is_admin: false, full_name: Box::from(*b"temper:bot") },
-        ),
-        (
-            "setup-user-of",
-            User { id: 4, login: Box::from(*b"bot"), is_admin: false, full_name: Box::from(*b"temper:bot") },
-        ),
-        ("setup-user-admin", User { id: 1, login: Box::from(*b"fixture"), is_admin: true, full_name: Box::from([]) }),
-        (
-            "setup-user-create-person",
-            User { id: 5, login: Box::from(*b"person"), is_admin: false, full_name: Box::from(*b"Person") },
-        ),
-        (
-            "setup-user-person-cleared",
-            User { id: 5, login: Box::from(*b"person"), is_admin: false, full_name: Box::from(*b"Person") },
-        ),
+        ("setup-user-create", bot()),
+        ("setup-user-of", bot()),
+        ("setup-user-admin", Answer::User(fixtures::user(1, b"fixture", true, b""))),
+        ("setup-user-create-person", person()),
+        ("setup-user-person-cleared", person()),
+        ("setup-token-make", Answer::Token(fixtures::api_token(true))),
+        ("setup-token-make-git", Answer::Token(fixtures::git_token(true))),
+        ("setup-token-list", Answer::Tokens(Box::new([fixtures::git_token(false)]))),
+        ("setup-token-list-page-2", Answer::Tokens(Box::new([fixtures::api_token(false)]))),
+        ("setup-token-as-the-bot", bot()),
+        ("setup-token-git-as-the-bot", bot()),
+        ("setup-scope-read-user", Answer::User(fixtures::user(1, b"fixture", true, b""))),
     ]
+}
+fn expected(answer: Answer) -> (Document, Vec<Row>) {
+    if let Answer::User(user) = answer {
+        return (Document::User(user), vec![]);
+    }
+    if let Answer::Token(token) = answer {
+        return (Document::Token(token), vec![]);
+    }
+    let Answer::Tokens(tokens) = answer else { panic!("a setup answer") };
+    (Document::Listed { skipped: 0 }, tokens.into_vec().into_iter().map(Row::Token).collect())
+}
+fn request(case: &str) -> Request {
+    forgejo::setup_cases().into_iter().find(|(name, _)| *name == case).expect("setup case").1
 }
 #[test]
 fn setup_transcripts_decode_to_their_documents() {
     let limits = forgejo::profile_limits();
-    for (case, user) in answers() {
-        let decoder = client::decoder(&temper_forge_forgejo::request::Request::User, &limits).expect("user");
-        assert_eq!(
-            forgejo::decode_answer(decoder, &forgejo::transcript(case).body, &limits).document,
-            Ok(Document::User(user)),
-            "{case}"
-        );
+    for (case, answer) in answers() {
+        let decoder = client::decoder(&request(case), &limits).expect("setup decoder");
+        let result = forgejo::decode_answer(decoder, &forgejo::transcript(case).body, &limits);
+        let (document, rows) = expected(answer);
+        assert_eq!(result.document, Ok(document), "{case}");
+        assert_eq!(result.rows, rows, "{case}");
     }
 }
 #[test]
 fn setup_answers_the_server_encodes_decode_unchanged_with_the_transcripts_shape() {
     let limits = forgejo::profile_limits();
-    for (case, user) in answers() {
-        let encoded = server::encode(&Answer::User(user.clone()), &limits).expect("user encoding");
-        let decoder = client::decoder(&temper_forge_forgejo::request::Request::User, &limits).expect("user");
-        assert_eq!(forgejo::decode_answer(decoder, &encoded, &limits).document, Ok(Document::User(user)), "{case}");
+    for (case, answer) in answers() {
+        let encoded = server::encode(&answer, &limits).expect("setup encoding");
+        let decoder = client::decoder(&request(case), &limits).expect("setup decoder");
+        let result = forgejo::decode_answer(decoder, &encoded, &limits);
+        let (document, rows) = expected(answer);
+        assert_eq!(result.document, Ok(document), "{case}");
+        assert_eq!(result.rows, rows, "{case}");
         assert!(forgejo::shape(&encoded).is_subset(&forgejo::shape(&forgejo::transcript(case).body)), "{case}");
     }
 }
@@ -110,15 +124,14 @@ fn a_token_for_a_person_who_must_change_password_reads_the_refusal() {
 fn user_body() -> serde_json::Value {
     serde_json::json!({"username":"bot", "email":"bot@example.invalid", "password":"secret", "full_name":"temper:bot", "must_change_password":false})
 }
-fn refused(body: &serde_json::Value, expected: &str) {
+fn refused(body: &serde_json::Value, expected: Malformed) {
     assert_eq!(
-        forgejo::decode_route(
+        forgejo::decode_refusal(
             Method::Post,
             b"/api/v1/admin/users",
             body.to_string().as_bytes(),
             &forgejo::profile_limits()
-        )
-        .expect_err("bad body"),
+        ),
         expected
     );
 }
@@ -126,20 +139,77 @@ fn refused(body: &serde_json::Value, expected: &str) {
 fn a_text_must_change_password_is_refused_naming_its_field() {
     let mut body = user_body();
     body["must_change_password"] = serde_json::json!("false");
-    refused(
-        &body,
-        "body: Shape { field: [109, 117, 115, 116, 95, 99, 104, 97, 110, 103, 101, 95, 112, 97, 115, 115, 119, 111, 114, 100] }",
-    );
+    refused(&body, Malformed::Shape { field: b"must_change_password" });
 }
 #[test]
 fn a_password_past_string_bytes_is_refused_naming_its_field() {
     let mut body = user_body();
     body["password"] = serde_json::json!("x".repeat(513));
-    refused(&body, "body: TooLong { field: [112, 97, 115, 115, 119, 111, 114, 100] }");
+    refused(&body, Malformed::TooLong { field: b"password" });
 }
 #[test]
 fn a_missing_full_name_is_refused_naming_its_field() {
     let mut body = user_body();
     body.as_object_mut().expect("object").remove("full_name");
-    refused(&body, "body: Missing { field: [102, 117, 108, 108, 95, 110, 97, 109, 101] }");
+    refused(&body, Malformed::Missing { field: b"full_name" });
+}
+
+fn token_body() -> serde_json::Value {
+    serde_json::json!({"name":"temper-api", "scopes":["read:user"]})
+}
+fn refused_token(body: &serde_json::Value, expected: Malformed) {
+    assert_eq!(
+        forgejo::decode_refusal(
+            Method::Post,
+            b"/api/v1/admin/users/bot/tokens",
+            body.to_string().as_bytes(),
+            &forgejo::profile_limits()
+        ),
+        expected
+    );
+}
+#[test]
+fn a_scope_list_that_is_text_is_refused_naming_scopes() {
+    let mut body = token_body();
+    body["scopes"] = serde_json::json!("read:user");
+    refused_token(&body, Malformed::Shape { field: b"scopes" });
+}
+#[test]
+fn a_scope_list_past_the_profiles_inner_is_refused_naming_scopes() {
+    let mut body = token_body();
+    body["scopes"] = serde_json::json!(vec!["read:user"; 33]);
+    refused_token(&body, Malformed::Bound { field: b"scopes" });
+}
+
+#[test]
+fn making_a_token_of_an_existing_name_reads_the_refusal() {
+    refused_answer("setup-token-make-again", 400, b"access token name has been used already");
+}
+#[test]
+fn a_git_token_without_read_user_reads_the_scope_refusal() {
+    refused_answer("setup-token-git-alone", 403, b"token does not have at least one of required scope(s): [read:user]");
+}
+#[test]
+fn deleting_a_missing_token_reads_the_refusal() {
+    refused_answer("setup-token-delete-missing", 404, b"The target couldn't be found.");
+}
+#[test]
+fn an_api_token_without_write_issue_reads_the_scope_refusal() {
+    refused_answer(
+        "setup-token-narrow-write",
+        403,
+        b"token does not have at least one of required scope(s): [write:issue]",
+    );
+}
+#[test]
+fn an_admin_token_without_write_admin_reads_the_scope_refusal() {
+    refused_answer("setup-scope-no-admin", 403, b"token does not have at least one of required scope(s): [read:admin]");
+}
+#[test]
+fn an_admin_token_without_a_user_scope_reads_the_refusal() {
+    refused_answer("setup-scope-no-user", 403, b"token does not have at least one of required scope(s): [read:user]");
+}
+#[test]
+fn a_deleted_tokens_refusal_is_read_with_its_masked_value() {
+    refused_answer("setup-token-deleted-use", 401, b"token is malformed: token contains an invalid number of segments\naccess token does not exist [sha: 0000000000000000000000000000000000000004]\ntoken is malformed: token contains an invalid number of segments\ntask with token \"0000000000000000000000000000000000000004\": resource does not exist\nauthorized integration: parse JWT error: token is malformed: token contains an invalid number of segments");
 }

@@ -230,7 +230,8 @@ fn account(event: Event) -> Result<temper_forge_forgejo::document::User, Why> {
         Event::Reply(reply) => match reply {
             Reply::Document(document) => match document {
                 Document::User(user) => Ok(user),
-                Document::ApiSettings(_)
+                Document::Token(_)
+                | Document::ApiSettings(_)
                 | Document::Repository(_)
                 | Document::Search { .. }
                 | Document::Listed { .. }

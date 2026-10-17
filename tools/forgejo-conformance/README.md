@@ -16,9 +16,14 @@ Scratch must be empty or absent, outside `/tmp`. The binary's first version
 line and SHA-256 are kept in `transcripts/binary.txt`.
 
 Each case is `transcripts/<case>/{request,response}`: raw HTTP/1.1 bytes.
-Authorization is `token MASKED`. Responses are unframed, with chunking
+Authorization is `token MASKED` or `Basic MASKED`. Responses are unframed, with chunking
 removed and Content-Length recomputed. JSON key order, whitespace and types
 remain as received. Cases replace their own directory only.
+
+The setup group records admin user and token routes under the minimum
+admin scope set. It registers newly made token values and their eight-digit
+tails before masking, and checks every kept capture for those secrets.
+The component facts run under `read:user`, `write:issue`, and `write:repository`.
 
 One map masks object ids and RFC3339 times by first appearance across the
 run, preserving id width and time offset. Ports become 3000; Date and

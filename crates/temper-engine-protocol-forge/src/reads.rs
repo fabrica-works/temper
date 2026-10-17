@@ -346,6 +346,7 @@ impl Plan {
                     | Rows::Branches(_) => Err(api::Error::InvalidAnswer),
                 }
             }
+            d::Row::Token(_) => Err(api::Error::InvalidAnswer),
             d::Row::Protection(_) => Ok(()),
             d::Row::Issue(issue) => self.append(
                 api::Answer::Items { items: Box::new([reading::summary(issue)]), more: false, now: self.now },
@@ -626,7 +627,8 @@ fn keep_row(row: &d::Row, forge: u16, tables: &mut Tables) {
             }
         }
         d::Row::Pull(pull) => keep_pull(pull, forge, tables),
-        d::Row::Branch(_)
+        d::Row::Token(_)
+        | d::Row::Branch(_)
         | d::Row::Protection(_)
         | d::Row::File(_)
         | d::Row::Commit(_)
@@ -649,7 +651,8 @@ pub(crate) fn keep_document(document: &d::Document, forge: u16, tables: &mut Tab
         d::Document::Review(review) => keep_user(&review.user, forge, tables),
         d::Document::Pull(pull) => keep_pull(pull, forge, tables),
         d::Document::Permission(permission) => keep_user(&permission.user, forge, tables),
-        d::Document::ApiSettings(_)
+        d::Document::Token(_)
+        | d::Document::ApiSettings(_)
         | d::Document::Search { .. }
         | d::Document::Listed { .. }
         | d::Document::CombinedStatus(_)
@@ -703,6 +706,9 @@ fn page_bound(request: &Request) -> Option<u32> {
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,
@@ -715,7 +721,8 @@ pub(crate) fn long(heard: &Heard) -> bool {
             d::Row::Comment(row) => long_body(&row.body),
             d::Row::Review(row) => long_body(&row.body),
             d::Row::ReviewComment(row) => long_body(&row.body),
-            d::Row::User(_)
+            d::Row::Token(_)
+            | d::Row::User(_)
             | d::Row::Status(_)
             | d::Row::Branch(_)
             | d::Row::Protection(_)
@@ -730,7 +737,8 @@ pub(crate) fn long(heard: &Heard) -> bool {
             d::Document::Issue(row) => long_body(&row.body),
             d::Document::Comment(row) => long_body(&row.body),
             d::Document::Review(row) => long_body(&row.body),
-            d::Document::User(_)
+            d::Document::Token(_)
+            | d::Document::User(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

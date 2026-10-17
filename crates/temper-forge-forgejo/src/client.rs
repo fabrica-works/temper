@@ -35,7 +35,11 @@ pub enum Refusal {
 }
 pub fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
     match request {
-        Request::UserOf { .. } | Request::CreateUser { .. } => setup::encode(request, limits),
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
+        | Request::CreateUser { .. } => setup::encode(request, limits),
         Request::CreateIssue { .. }
         | Request::OpenPull { .. }
         | Request::PostComment { .. }
@@ -97,7 +101,8 @@ enum DecoderState {
 #[must_use]
 pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
     let kind = match request {
-        Request::Raw { .. }
+        Request::DeleteToken { .. }
+        | Request::Raw { .. }
         | Request::JobLog { .. }
         | Request::Update { .. }
         | Request::DeleteBranch { .. }
@@ -123,6 +128,8 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::Collaborators { .. } => Kind::Users,
         Request::Pulls { .. } => Kind::Item(Item::Pulls),
         Request::UserOf { .. } | Request::CreateUser { .. } | Request::User => Kind::Setup(setup::SetupKind::Account),
+        Request::Tokens { .. } => Kind::Setup(setup::SetupKind::Tokens),
+        Request::CreateToken { .. } => Kind::Setup(setup::SetupKind::Token),
         Request::ApiSettings => Kind::Settings,
         Request::RepositoryById { .. } | Request::Repository { .. } => Kind::Repository,
         Request::UserSearch { .. } => Kind::Search,
@@ -133,7 +140,7 @@ pub fn decoder(request: &Request, limits: &Limits) -> Option<Decoder> {
         Request::CombinedStatus { .. } => Kind::Item(Item::Combined),
     };
     let state = match kind {
-        Kind::Setup(_) => DecoderState::Setup(setup::Setup::new()),
+        Kind::Setup(kind) => DecoderState::Setup(setup::Setup::new(kind, limits)),
         Kind::Error => DecoderState::Error(writes::Error::new()),
         Kind::Write(_) | Kind::Delivery(_) => unreachable!("answer kind selection"),
         Kind::File(kind) => DecoderState::Files(Box::new(files::Files::new(kind))),
@@ -161,7 +168,7 @@ pub fn step(decoder: &mut Decoder, limits: &Limits, event: &tokenizer::Event) ->
     match decoder.walk.step(event, limits) {
         Err(error) => Step::Malformed(error),
         Ok(movement) => match &mut decoder.state {
-            DecoderState::Setup(state) => state.step(movement),
+            DecoderState::Setup(state) => state.step(movement, limits, &decoder.walk),
             DecoderState::Error(state) => state.step(movement),
             DecoderState::Files(state) => state.step(movement, &decoder.walk),
             DecoderState::Actions(state) => state.step(movement, &decoder.walk),

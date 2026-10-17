@@ -179,8 +179,8 @@ fn element(kind: Kind) -> Option<Kind> {
         Kind::Item(Item::Comments) => Some(Kind::Item(Item::Comment)),
         Kind::Item(Item::Statuses) => Some(Kind::Item(Item::Status)),
         Kind::Item(Item::Labels) => Some(Kind::Item(Item::Label)),
-        Kind::Setup(_)
-        | Kind::Delivery(_)
+        Kind::Setup(kind) => crate::client::setup::element(kind),
+        Kind::Delivery(_)
         | Kind::Error
         | Kind::User
         | Kind::Settings
@@ -293,10 +293,16 @@ impl Walk {
                     self.end()
                 } else {
                     let kind = element(self.parent().expect("array element")).expect("array kind");
-                    if kind == Kind::Branch(crate::client::branches::BranchKind::Context)
+                    if kind == Kind::Setup(crate::client::setup::SetupKind::Scope)
+                        || kind == Kind::Write(crate::server::writes::WriteKind::Scope)
+                        || kind == Kind::Branch(crate::client::branches::BranchKind::Context)
                         || kind == Kind::Write(crate::server::writes::WriteKind::Login)
                     {
-                        let key = if kind == Kind::Write(crate::server::writes::WriteKind::Login) {
+                        let key = if kind == Kind::Setup(crate::client::setup::SetupKind::Scope)
+                            || kind == Kind::Write(crate::server::writes::WriteKind::Scope)
+                        {
+                            b"scopes".as_slice()
+                        } else if kind == Kind::Write(crate::server::writes::WriteKind::Login) {
                             b"reviewers".as_slice()
                         } else {
                             b"status_check_contexts".as_slice()

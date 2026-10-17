@@ -21,6 +21,9 @@ use skein_lib::List;
 pub(crate) enum WriteKind {
     Issue,
     NewUser,
+    NewToken,
+    Scopes,
+    Scope,
     Pull,
     Comment,
     Review,
@@ -37,6 +40,9 @@ const fn field(key: &'static [u8], read: Read, required: bool) -> Field {
 }
 pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
     match kind {
+        WriteKind::NewToken => {
+            const { &[field(b"name", Read::Text, true), field(b"scopes", Read::Array(Kind::Write(WriteKind::Scopes)), true)] }
+        }
         WriteKind::NewUser => {
             const {
                 &[
@@ -78,13 +84,16 @@ pub(crate) fn fields(kind: WriteKind) -> &'static [Field] {
         WriteKind::Branch => {
             const { &[field(b"new_branch_name", Read::Text, true), field(b"old_ref_name", Read::Id { empty: false }, true)] }
         }
-        WriteKind::Logins | WriteKind::Login => &[],
+        WriteKind::Scopes | WriteKind::Scope | WriteKind::Logins | WriteKind::Login => &[],
     }
 }
 pub(crate) fn element(kind: WriteKind) -> Option<Kind> {
     match kind {
+        WriteKind::Scopes => Some(Kind::Write(WriteKind::Scope)),
         WriteKind::Logins => Some(Kind::Write(WriteKind::Login)),
-        WriteKind::NewUser
+        WriteKind::NewToken
+        | WriteKind::Scope
+        | WriteKind::NewUser
         | WriteKind::Issue
         | WriteKind::Pull
         | WriteKind::Comment
@@ -213,7 +222,7 @@ fn route_tail(
     Ok(Route::Body(BodyDecoder {
         walk: Walk::new(Kind::Write(kind), limits),
         request,
-        logins: List::with_capacity(limits.inner),
+        texts: List::with_capacity(limits.inner),
         terminal: false,
     }))
 }
@@ -221,7 +230,7 @@ fn route_tail(
 pub struct BodyDecoder {
     pub(super) walk: Walk,
     pub(super) request: Request,
-    pub(super) logins: List<Box<[u8]>>,
+    pub(super) texts: List<Box<[u8]>>,
     pub(super) terminal: bool,
 }
 #[must_use]
@@ -241,17 +250,22 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
     };
     let result = match movement {
         Move::Demand(demand) => {
-            return BodyStep::Demand(if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins)) {
-                tokenizer::Request::Text(limits.string_bytes)
-            } else {
-                demand
-            });
+            return BodyStep::Demand(
+                if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins))
+                    || decoder.walk.parent() == Some(Kind::Write(WriteKind::Scopes))
+                {
+                    tokenizer::Request::Text(limits.string_bytes)
+                } else {
+                    demand
+                },
+            );
         }
         Move::Scalar { kind, key, value } => decoder.scalar(kind, key, value),
         Move::End(kind) => {
-            if kind == Kind::Write(WriteKind::Logins) {
-                let logins = core::mem::replace(&mut decoder.logins, List::with_capacity(limits.inner)).into_boxed();
+            if kind == Kind::Write(WriteKind::Logins) || kind == Kind::Write(WriteKind::Scopes) {
+                let logins = core::mem::replace(&mut decoder.texts, List::with_capacity(limits.inner)).into_boxed();
                 match &mut decoder.request {
+                    Request::CreateToken { scopes, .. } => *scopes = logins,
                     Request::RequestReviewers { reviewers, .. } | Request::RemoveReviewers { reviewers, .. } => {
                         *reviewers = logins;
                     }
@@ -264,6 +278,8 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
                     | Request::Update { .. }
                     | Request::PostStatus { .. }
                     | Request::CreateBranch { .. }
+                    | Request::Tokens { .. }
+                    | Request::DeleteToken { .. }
                     | Request::UserOf { .. }
                     | Request::CreateUser { .. }
                     | Request::DeleteBranch { .. }
@@ -305,11 +321,15 @@ pub fn body(decoder: &mut BodyDecoder, limits: &Limits, event: &tokenizer::Event
         }
     };
     match result {
-        Ok(()) => BodyStep::Demand(if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins)) {
-            tokenizer::Request::Text(limits.string_bytes)
-        } else {
-            tokenizer::Request::Next
-        }),
+        Ok(()) => BodyStep::Demand(
+            if decoder.walk.parent() == Some(Kind::Write(WriteKind::Logins))
+                || decoder.walk.parent() == Some(Kind::Write(WriteKind::Scopes))
+            {
+                tokenizer::Request::Text(limits.string_bytes)
+            } else {
+                tokenizer::Request::Next
+            },
+        ),
         Err(error) => {
             decoder.terminal = true;
             BodyStep::Malformed(error)
@@ -336,11 +356,15 @@ impl BodyDecoder {
             Value::Number(_) | Value::Time(_) => return Err(Malformed::Shape { field: key }),
         };
         let text = text.expect("text field");
-        if kind == Kind::Write(WriteKind::Login) {
-            self.logins.push(text).ok().ok_or(Malformed::Bound { field: b"reviewers" })?;
+        if kind == Kind::Write(WriteKind::Login) || kind == Kind::Write(WriteKind::Scope) {
+            self.texts.push(text).ok().ok_or(Malformed::Bound { field: key })?;
             return Ok(());
         }
+        self.text(key, text)
+    }
+    fn text(&mut self, key: &'static [u8], text: Box<[u8]>) -> Result<(), Malformed> {
         match &mut self.request {
+            Request::CreateToken { name, .. } => *name = text,
             Request::CreateUser { login, email, full_name, password, .. } => match key {
                 b"username" => *login = text,
                 b"email" => *email = text,
@@ -421,6 +445,8 @@ impl BodyDecoder {
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }
+            | Request::Tokens { .. }
+            | Request::DeleteToken { .. }
             | Request::UserOf { .. }
             | Request::DeleteBranch { .. } => unreachable!("body text selection"),
         }
@@ -467,6 +493,9 @@ impl BodyDecoder {
             | Request::Jobs { .. }
             | Request::JobLog { .. }
             | Request::Update { .. }
+            | Request::Tokens { .. }
+            | Request::CreateToken { .. }
+            | Request::DeleteToken { .. }
             | Request::UserOf { .. }
             | Request::CreateUser { .. }
             | Request::DeleteBranch { .. } => unreachable!("body id selection"),

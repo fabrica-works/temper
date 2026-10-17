@@ -193,7 +193,8 @@ impl Plan {
                     d::Row::User(user) => {
                         tables.keep_user(self.repository.forge, user.id, user.login);
                     }
-                    d::Row::Issue(_)
+                    d::Row::Token(_)
+                    | d::Row::Issue(_)
                     | d::Row::Comment(_)
                     | d::Row::Status(_)
                     | d::Row::Review(_)
@@ -315,7 +316,8 @@ impl Plan {
                     }
                 }
             }
-            d::Document::User(_)
+            d::Document::Token(_)
+            | d::Document::User(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

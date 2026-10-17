@@ -38,6 +38,7 @@ impl Recorder<'_> {
                 self.f.exchange_basic(method, target, body.map(str::as_bytes), login, secret)?
             }
         };
+        made_token(&exchange, self.mask, self.secrets);
         let request = mask::request(self.mask, &exchange);
         let response = mask::response(self.mask, &exchange);
         write::case(self.out, name, &request, &response, self.secrets)?;
@@ -332,4 +333,17 @@ pub fn flags(f: &Fixture, out: &Path, mask: &mut Mask, secrets: &mut Secrets) ->
         r.w(name, "GET", &format!("{R}/compare/{before}...{after}?{flags}"), None)?;
     }
     Ok(())
+}
+
+pub(crate) fn made_token(exchange: &Exchange, mask: &mut Mask, secrets: &mut Secrets) {
+    if (200..300).contains(&exchange.status)
+        && let Ok(body) = serde_json::from_slice::<serde_json::Value>(&exchange.body)
+        && let Some(value) = body["sha1"].as_str().filter(|s| !s.is_empty())
+    {
+        secrets.add(SecretKind::ApiToken, value);
+        if let Some(tail) = body["token_last_eight"].as_str().filter(|s| !s.is_empty()) {
+            secrets.add(SecretKind::ApiToken, tail);
+            mask.literal(tail);
+        }
+    }
 }

@@ -1,18 +1,35 @@
 use crate::{
     decode::{
         Malformed, Step,
-        walk::{Field, Kind, Move, Read, Value},
+        walk::{Field, Kind, Move, Read, Value, Walk},
     },
-    document::{self, Document, User},
+    document::{self, AccessToken, Document, Row, User},
 };
 use skein_json::tokenizer;
+use skein_lib::{List, Secret};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum SetupKind {
     Account,
+    Token,
+    Tokens,
+    Scopes,
+    Scope,
 }
 pub(crate) fn fields(kind: SetupKind) -> &'static [Field] {
     match kind {
+        SetupKind::Token => {
+            const {
+                &[
+                    Field { key: b"id", read: Read::Number, required: true },
+                    Field { key: b"name", read: Read::Text, required: true },
+                    Field { key: b"scopes", read: Read::Array(Kind::Setup(SetupKind::Scopes)), required: true },
+                    Field { key: b"sha1", read: Read::Text, required: false },
+                    Field { key: b"token_last_eight", read: Read::Text, required: false },
+                ]
+            }
+        }
+        SetupKind::Tokens | SetupKind::Scopes | SetupKind::Scope => &[],
         SetupKind::Account => {
             const {
                 &[
@@ -28,14 +45,37 @@ pub(crate) fn fields(kind: SetupKind) -> &'static [Field] {
 #[derive(Debug)]
 pub(super) struct Setup {
     user: User,
+    token: AccessToken,
+    scopes: List<Box<[u8]>>,
+    kind: SetupKind,
 }
 impl Setup {
-    pub(super) fn new() -> Self {
-        Self { user: document::user() }
+    pub(super) fn new(kind: SetupKind, limits: &Limits) -> Self {
+        Self { user: document::user(), token: token(), scopes: List::with_capacity(limits.inner), kind }
     }
-    pub(super) fn step(&mut self, movement: Move) -> Step {
+    pub(super) fn step(&mut self, movement: Move, limits: &Limits, walk: &Walk) -> Step {
         match movement {
-            Move::Demand(demand) => return Step::Demand(demand),
+            Move::Demand(demand) => {
+                return Step::Demand(if walk.parent() == Some(Kind::Setup(SetupKind::Scopes)) {
+                    tokenizer::Request::Text(limits.string_bytes)
+                } else {
+                    demand
+                });
+            }
+            Move::Scalar { kind, key, value } if kind != Kind::Setup(SetupKind::Account) => match (key, value) {
+                (b"id", Value::Number(id)) => self.token.id = id,
+                (b"name", Value::Text(text)) => self.token.name = text,
+                (b"sha1", Value::Text(text)) => {
+                    self.token.value = if text.is_empty() { None } else { Some(Secret::new(text)) }
+                }
+                (b"token_last_eight", Value::Text(text)) => self.token.last_eight = text,
+                (b"scopes", Value::Text(text)) => {
+                    if self.scopes.push(text).is_err() {
+                        return Step::Malformed(Malformed::Bound { field: key });
+                    }
+                }
+                _ => return Step::Malformed(Malformed::Shape { field: key }),
+            },
             Move::Scalar { key, value, .. } => match value {
                 Value::Number(value) => self.user.id = value,
                 Value::Boolean(value) => self.user.is_admin = value,
@@ -50,6 +90,13 @@ impl Setup {
                     return Step::Malformed(Malformed::Shape { field: key });
                 }
             },
+            Move::End(Kind::Setup(SetupKind::Scopes)) => {
+                self.token.scopes =
+                    core::mem::replace(&mut self.scopes, List::with_capacity(limits.inner)).into_boxed();
+            }
+            Move::End(Kind::Setup(SetupKind::Token)) if self.kind == SetupKind::Tokens => {
+                return Step::Row(Row::Token(core::mem::replace(&mut self.token, token())), tokenizer::Request::Next);
+            }
             Move::End(Kind::Setup(_)) => {}
             Move::End(
                 Kind::User
@@ -66,9 +113,31 @@ impl Setup {
                 | Kind::Delivery(_)
                 | Kind::Branch(_),
             ) => unreachable!("setup tables"),
-            Move::Done => return Step::Done(Document::User(core::mem::replace(&mut self.user, document::user()))),
+            Move::Done => {
+                return Step::Done(match self.kind {
+                    SetupKind::Account => Document::User(core::mem::replace(&mut self.user, document::user())),
+                    SetupKind::Token => Document::Token(core::mem::replace(&mut self.token, token())),
+                    SetupKind::Tokens => Document::Listed { skipped: 0 },
+                    SetupKind::Scopes | SetupKind::Scope => unreachable!("setup root"),
+                });
+            }
         }
-        Step::Demand(tokenizer::Request::Next)
+        Step::Demand(if walk.parent() == Some(Kind::Setup(SetupKind::Scopes)) {
+            tokenizer::Request::Text(limits.string_bytes)
+        } else {
+            tokenizer::Request::Next
+        })
+    }
+}
+
+fn token() -> AccessToken {
+    AccessToken { id: 0, name: Box::from([]), scopes: Box::from([]), last_eight: Box::from([]), value: None }
+}
+pub(crate) fn element(kind: SetupKind) -> Option<Kind> {
+    match kind {
+        SetupKind::Tokens => Some(Kind::Setup(SetupKind::Token)),
+        SetupKind::Scopes => Some(Kind::Setup(SetupKind::Scope)),
+        SetupKind::Account | SetupKind::Token | SetupKind::Scope => None,
     }
 }
 
@@ -81,21 +150,16 @@ use alloc::boxed::Box;
 use skein_json::writer::{self, Encoder};
 use skein_lib::Writer;
 pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refusal> {
-    if let Request::UserOf { login } = request {
-        let mut measure = Target { length: 0, writer: None };
-        measure.put(b"/api/v1/users/");
-        measure.segment(login);
-        if measure.length > usize::try_from(limits.target_bytes).expect("u32 fits") {
-            return Err(Refusal::TooLong);
-        }
-        let mut out = Target { length: 0, writer: Some(Writer::new(measure.length)) };
-        out.put(b"/api/v1/users/");
-        out.segment(login);
-        return Ok(Encoded { method: Method::Get, target: out.writer.expect("writing pass").finish(), body: None });
-    }
-    let target = b"/api/v1/admin/users".as_slice();
-    if target.len() > usize::try_from(limits.target_bytes).expect("u32 fits") {
+    let mut measure = Target { length: 0, writer: None };
+    let method = target(&mut measure, request);
+    if measure.length > usize::try_from(limits.target_bytes).expect("u32 fits") {
         return Err(Refusal::TooLong);
+    }
+    let mut out = Target { length: 0, writer: Some(Writer::new(measure.length)) };
+    target(&mut out, request);
+    let target = out.writer.expect("writing pass").finish();
+    if method != Method::Post {
+        return Ok(Encoded { method, target, body: None });
     }
     let body = {
         let mut measure = Encoder::measure(&limits.writer);
@@ -111,9 +175,22 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
         write(&mut out, request);
         Some(out.finish())
     };
-    Ok(Encoded { method: Method::Post, target: Box::from(target), body })
+    Ok(Encoded { method, target, body })
 }
 fn write(json: &mut Encoder, request: &Request) {
+    if let Request::CreateToken { name, scopes, .. } = request {
+        json.object_start();
+        json.key(b"name");
+        json.string(name);
+        json.key(b"scopes");
+        json.array_start();
+        for scope in scopes {
+            json.string(scope);
+        }
+        json.array_end();
+        json.object_end();
+        return;
+    }
     let Request::CreateUser { login, email, password, full_name, must_change_password } = request else {
         unreachable!("user body selection")
     };
@@ -130,4 +207,36 @@ fn write(json: &mut Encoder, request: &Request) {
     json.key(b"must_change_password");
     json.boolean(*must_change_password);
     json.object_end();
+}
+
+fn target(out: &mut Target, request: &Request) -> Method {
+    if let Request::UserOf { login } = request {
+        out.put(b"/api/v1/users/");
+        out.segment(login);
+        return Method::Get;
+    }
+    out.put(b"/api/v1/admin/users");
+    if let Request::CreateUser { .. } = request {
+        return Method::Post;
+    }
+    let (login, method) = if let Request::Tokens { login, .. } = request {
+        (login, Method::Get)
+    } else if let Request::CreateToken { login, .. } = request {
+        (login, Method::Post)
+    } else if let Request::DeleteToken { login, .. } = request {
+        (login, Method::Delete)
+    } else {
+        unreachable!("setup request selection")
+    };
+    out.put(b"/");
+    out.segment(login);
+    out.put(b"/tokens");
+    if let Request::Tokens { page, .. } = request {
+        out.page(*page, false);
+    }
+    if let Request::DeleteToken { id, .. } = request {
+        out.put(b"/");
+        out.number(*id);
+    }
+    method
 }

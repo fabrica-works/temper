@@ -65,7 +65,10 @@ fn full(at: &r::Repo) -> Box<[u8]> {
 #[must_use]
 pub fn repository(config: &Config, request: &Request) -> Option<Box<[u8]>> {
     match request {
-        Request::UserOf { .. }
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -147,7 +150,10 @@ pub fn check(state: d::StatusState) -> a::Check {
 pub fn op(config: &Config, request: &Request) -> Result<Op, a::Error> {
     let missing = a::Error::Missing(a::What::Commit);
     let read = match request {
-        Request::UserOf { .. }
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings
@@ -299,7 +305,10 @@ fn write(config: &Config, request: &Request) -> Result<Op, a::Error> {
             Ok(Op::Write(Write::CreateBranch { branch: branch.clone(), commit: commit(from).ok_or(missing)? }))
         }
         Request::DeleteBranch { branch, .. } => Ok(Op::Write(Write::DeleteBranch { branch: branch.clone() })),
-        Request::UserOf { .. }
+        Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
+        | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::User
         | Request::ApiSettings

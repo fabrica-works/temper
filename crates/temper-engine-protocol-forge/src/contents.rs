@@ -206,7 +206,8 @@ impl Plan {
                     Err(_) => Err(api::Error::TooLarge),
                 }
             }
-            d::Row::User(_)
+            d::Row::Token(_)
+            | d::Row::User(_)
             | d::Row::Issue(_)
             | d::Row::Comment(_)
             | d::Row::Review(_)
@@ -269,7 +270,8 @@ impl Plan {
                     Err(api::Error::InvalidAnswer)
                 }
             }
-            d::Document::User(_)
+            d::Document::Token(_)
+            | d::Document::User(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

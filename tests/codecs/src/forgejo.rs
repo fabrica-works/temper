@@ -104,24 +104,44 @@ pub fn decode_route(method: Method, target: &[u8], body: &[u8], limits: &Limits)
     match server::route(method, target, limits) {
         Err(error) => Err(format!("route: {error:?}")),
         Ok(server::Route::Ready(request)) => Ok((request, 0)),
-        Ok(server::Route::Body(mut decoder)) => {
-            let mut result = None;
-            let first = server::body_first(&decoder);
-            let steps = drive(body, limits, first, |event| match server::body(&mut decoder, limits, event) {
-                server::BodyStep::Demand(next) => Some(next),
-                server::BodyStep::Decoded(request) => {
-                    result = Some(Ok(request));
-                    None
-                }
-                server::BodyStep::Malformed(error) => {
-                    result = Some(Err(format!("body: {error:?}")));
-                    None
-                }
-            });
-            result.expect("terminal body decoder").map(|request| (request, steps))
+        Ok(server::Route::Body(decoder)) => {
+            decode_body(decoder, body, limits).map_err(|error| format!("body: {error:?}"))
         }
     }
 }
+#[must_use]
+pub fn decode_refusal(
+    method: Method,
+    target: &[u8],
+    body: &[u8],
+    limits: &Limits,
+) -> temper_forge_forgejo::decode::Malformed {
+    let server::Route::Body(decoder) = server::route(method, target, limits).expect("body route") else {
+        panic!("a body decoder")
+    };
+    decode_body(decoder, body, limits).expect_err("a malformed request body")
+}
+fn decode_body(
+    mut decoder: server::BodyDecoder,
+    body: &[u8],
+    limits: &Limits,
+) -> Result<(Request, usize), temper_forge_forgejo::decode::Malformed> {
+    let mut result = None;
+    let first = server::body_first(&decoder);
+    let steps = drive(body, limits, first, |event| match server::body(&mut decoder, limits, event) {
+        server::BodyStep::Demand(next) => Some(next),
+        server::BodyStep::Decoded(request) => {
+            result = Some(Ok(request));
+            None
+        }
+        server::BodyStep::Malformed(error) => {
+            result = Some(Err(error));
+            None
+        }
+    });
+    result.expect("terminal body decoder").map(|request| (request, steps))
+}
+
 fn drive(
     body: &[u8],
     limits: &Limits,
@@ -407,7 +427,7 @@ pub fn setup_cases() -> Vec<(&'static str, Request)> {
         )),
         must_change_password: false,
     };
-    vec![
+    let mut cases = vec![
         ("setup-user-create", bot()),
         ("setup-user-create-again", bot()),
         ("setup-user-create-by-writer", bot()),
@@ -429,7 +449,44 @@ pub fn setup_cases() -> Vec<(&'static str, Request)> {
         ("setup-user-person-basic", Request::User),
         ("setup-user-person-token", Request::User),
         ("setup-user-person-cleared", Request::User),
-    ]
+    ];
+    let make = |name: &[u8], scopes: &[&[u8]]| Request::CreateToken {
+        login: Box::from(*b"bot"),
+        name: Box::from(name),
+        scopes: scopes.iter().map(|s| Box::from(*s)).collect(),
+    };
+    let api = || make(b"temper-api", &[b"read:user", b"write:issue", b"write:repository"]);
+    cases.extend([
+        ("setup-token-make", api()),
+        ("setup-token-make-git", make(b"temper-git", &[b"write:repository", b"read:user"])),
+        ("setup-token-make-again", api()),
+        (
+            "setup-token-list",
+            Request::Tokens { login: Box::from(*b"bot"), page: Page { page: Some(1), limit: Some(1) } },
+        ),
+        (
+            "setup-token-list-page-2",
+            Request::Tokens { login: Box::from(*b"bot"), page: Page { page: Some(2), limit: Some(1) } },
+        ),
+        ("setup-token-as-the-bot", Request::User),
+        ("setup-token-git-as-the-bot", Request::User),
+        ("setup-token-git-alone", Request::User),
+        ("setup-token-delete", Request::DeleteToken { login: Box::from(*b"bot"), id: 6 }),
+        ("setup-token-deleted-use", Request::User),
+        ("setup-token-delete-missing", Request::DeleteToken { login: Box::from(*b"bot"), id: 999_999 }),
+        (
+            "setup-token-narrow-write",
+            Request::CreateIssue {
+                at: specimen(),
+                title: Box::from(*b"scope probe"),
+                body: Box::from(*b"scope probe"),
+            },
+        ),
+        ("setup-scope-no-admin", Request::Tokens { login: Box::from(*b"bot"), page: Page { page: None, limit: None } }),
+        ("setup-scope-no-user", Request::User),
+        ("setup-scope-read-user", Request::User),
+    ]);
+    cases
 }
 
 /// A recorded webhook request's event header and JSON body.

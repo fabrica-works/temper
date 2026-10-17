@@ -518,6 +518,9 @@ fn table(service: &Service, request: &Request, user: u64) -> Option<documents::A
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => None,

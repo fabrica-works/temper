@@ -146,6 +146,8 @@ fn expected(answer: Answer) -> Document {
         Answer::Status(value) => Document::Status(value),
         Answer::Branch(value) => Document::Branch(value),
         Answer::Error(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

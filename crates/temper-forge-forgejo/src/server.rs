@@ -67,6 +67,8 @@ fn read_route(method: Method, target: &[u8], limits: &Limits) -> Result<Route, U
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Token(crate::document::AccessToken),
+    Tokens(Box<[crate::document::AccessToken]>),
     User(User),
     ApiSettings(ApiSettings),
     Repository(Repository),
@@ -123,6 +125,18 @@ pub fn encode(answer: &Answer, limits: &Limits) -> Result<Box<[u8]>, writer::Ref
 }
 fn write(json: &mut writer::Encoder, answer: &Answer) -> Result<(), writer::Refusal> {
     match answer {
+        Answer::Token(value) => {
+            setup::token(json, value);
+            Ok(())
+        }
+        Answer::Tokens(tokens) => {
+            json.array_start();
+            for token in tokens {
+                setup::token(json, token);
+            }
+            json.array_end();
+            Ok(())
+        }
         Answer::Error(value) => {
             json.object_start();
             json.key(b"message");

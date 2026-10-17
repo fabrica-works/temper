@@ -81,7 +81,8 @@ impl Plan {
             }
             d::Document::Search { ok } => self.search_done(ok, tables),
             d::Document::Listed { skipped } => self.listed_done(skipped, l, shared, tables),
-            d::Document::User(_)
+            d::Document::Token(_)
+            | d::Document::User(_)
             | d::Document::ApiSettings(_)
             | d::Document::Comment(_)
             | d::Document::Status(_)

@@ -166,6 +166,9 @@ fn target(request: &Request, out: &mut Target) {
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("item encoder dispatch"),

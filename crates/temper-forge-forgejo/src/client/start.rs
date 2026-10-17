@@ -61,6 +61,9 @@ pub(super) fn encode(request: &Request, limits: &Limits) -> Result<Encoded, Refu
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. } => unreachable!("start encoder dispatch"),
@@ -133,6 +136,9 @@ fn target(request: &Request, out: &mut Writer) -> Result<(), skein_lib::Overflow
         | Request::Update { .. }
         | Request::PostStatus { .. }
         | Request::CreateBranch { .. }
+        | Request::Tokens { .. }
+        | Request::CreateToken { .. }
+        | Request::DeleteToken { .. }
         | Request::UserOf { .. }
         | Request::CreateUser { .. }
         | Request::DeleteBranch { .. }

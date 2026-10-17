@@ -10,6 +10,7 @@ pub mod mask;
 mod registration;
 mod runner;
 mod setup;
+mod tokens;
 mod users;
 pub mod write;
 use std::{error::Error, path::Path};

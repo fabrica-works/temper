@@ -128,7 +128,9 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
             json.boolean(*ok);
             json.object_end();
         }
-        Answer::Error(_)
+        Answer::Token(_)
+        | Answer::Tokens(_)
+        | Answer::Error(_)
         | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)

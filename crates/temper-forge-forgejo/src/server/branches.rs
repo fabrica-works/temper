@@ -124,6 +124,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
         | Answer::Run(_)
         | Answer::Job { .. }
         | Answer::Jobs(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

@@ -245,6 +245,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) -> Result<(), writer::R
         | Answer::Collaborators(_)
         | Answer::Permission(_)
         | Answer::Pulls(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

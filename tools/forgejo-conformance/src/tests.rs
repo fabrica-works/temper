@@ -273,3 +273,38 @@ fn a_provisioning_failure_keeps_at_most_two_hundred_body_bytes() {
         )
     );
 }
+
+#[test]
+fn a_made_tokens_value_and_tail_leave_its_transcript_masked() {
+    let exchange = Exchange {
+        sent: Vec::new(),
+        status: 201,
+        head: b"HTTP/1.1 201 Created\r\n".to_vec(),
+        body: br#"{"sha1":"0123456789abcdef0123456789abcdef01234567","token_last_eight":"01234567"}"#.to_vec(),
+    };
+    let mut secrets = Secrets::of(&[]);
+    let mut mask = Mask::new(3000);
+    crate::cases::made_token(&exchange, &mut mask, &mut secrets);
+    let masked = mask::response(&mut mask, &exchange);
+    assert_eq!(masked, b"HTTP/1.1 201 Created\r\nContent-Length: 81\r\n\r\n{\"sha1\":\"0000000000000000000000000000000000000002\",\"token_last_eight\":\"00000001\"}");
+    assert_eq!(write::check("made token", b"", &masked, &secrets), Ok(()));
+}
+
+#[test]
+fn git_packet_ids_share_the_plain_ids_first_appearance_order() {
+    let mut mask = Mask::new(3000);
+    assert_eq!(mask.bytes(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), b"0000000000000000000000000000000000000001");
+    assert_eq!(
+        mask.bytes(b"0000002fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb x\n002faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa y\n002fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb z\n0000"),
+        b"0000002f0000000000000000000000000000000000000002 x\n002f0000000000000000000000000000000000000001 y\n002f0000000000000000000000000000000000000002 z\n0000"
+    );
+}
+
+#[test]
+fn a_truncated_git_packet_keeps_its_length_attached_to_the_hex_run() {
+    let mut mask = Mask::new(3000);
+    assert_eq!(
+        mask.bytes(b"003fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb x\n"),
+        b"003fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb x\n"
+    );
+}

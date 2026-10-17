@@ -38,6 +38,15 @@ pub struct User {
     pub is_admin: bool,
     pub full_name: Box<[u8]>,
 }
+/// An access token's value is present only in its creation answer.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AccessToken {
+    pub id: u64,
+    pub name: Box<[u8]>,
+    pub scopes: Box<[Box<[u8]>]>,
+    pub last_eight: Box<[u8]>,
+    pub value: Option<skein_lib::Secret>,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ApiSettings {
     pub max_response_items: u32,
@@ -67,6 +76,7 @@ pub struct Repository {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Row {
+    Token(AccessToken),
     User(User),
     Issue(Issue),
     Comment(Comment),
@@ -84,6 +94,7 @@ pub enum Row {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Document {
+    Token(AccessToken),
     User(User),
     ApiSettings(ApiSettings),
     Repository(Repository),

@@ -230,7 +230,8 @@ impl Plan {
                 }
                 Ok(())
             }
-            d::Row::User(_)
+            d::Row::Token(_)
+            | d::Row::User(_)
             | d::Row::Issue(_)
             | d::Row::Comment(_)
             | d::Row::Review(_)
@@ -313,7 +314,8 @@ impl Plan {
                     range: Some(crate::plan::Range::Tail(max)),
                 })))
             }
-            d::Document::User(_)
+            d::Document::Token(_)
+            | d::Document::User(_)
             | d::Document::ApiSettings(_)
             | d::Document::Repository(_)
             | d::Document::Search { .. }

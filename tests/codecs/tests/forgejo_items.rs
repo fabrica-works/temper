@@ -174,6 +174,8 @@ fn expected(answer: Answer) -> (Document, Vec<Row>) {
         | Answer::Collaborators(_)
         | Answer::Permission(_)
         | Answer::Pulls(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

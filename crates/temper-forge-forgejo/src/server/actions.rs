@@ -93,6 +93,8 @@ pub(super) fn write(json: &mut Encoder, answer: &Answer) {
         | Answer::Comment(_)
         | Answer::Status(_)
         | Answer::Review(_)
+        | Answer::Token(_)
+        | Answer::Tokens(_)
         | Answer::User(_)
         | Answer::ApiSettings(_)
         | Answer::Repository(_)

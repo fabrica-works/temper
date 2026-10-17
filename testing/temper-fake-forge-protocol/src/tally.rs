@@ -5,6 +5,9 @@ use temper_forge_forgejo::request::Request;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Route {
     User,
+    Tokens,
+    CreateToken,
+    DeleteToken,
     UserOf,
     CreateUser,
     ApiSettings,
@@ -50,6 +53,9 @@ pub enum Route {
 #[must_use]
 pub fn route(request: &Request) -> Route {
     match request {
+        Request::Tokens { .. } => Route::Tokens,
+        Request::CreateToken { .. } => Route::CreateToken,
+        Request::DeleteToken { .. } => Route::DeleteToken,
         Request::UserOf { .. } => Route::UserOf,
         Request::CreateUser { .. } => Route::CreateUser,
         Request::User => Route::User,
