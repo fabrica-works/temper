@@ -1104,6 +1104,15 @@ choice would have been the user's (development.md, 10.4).
 
      Unchanged: 03.4's Shape and Size; ruling 188's census for 03.4's own work; no lint exception.
 
+200. **jig 13.s1: the cut's bound is the view's own node text; no skein change** (plan defect, jig 13.s1's block of 2026-10-17T01:37:08Z).
+     **jig 13.s1: the cut's bound is the view's own node text; no skein change** (plan defect, jig 13.s1's block of 2026-10-17T01:37:08Z). The session file names where paths are written and says "`limits.rs:74-78`'s node text holds a phrase, the mark and `literal_segment::max_bytes(text)`", but not how a writer learns that node text.
+
+     1. **No skein increment and no repin.** skein-ui's `Builder` keeps its limits `pub(crate)` (`crates/skein-ui/src/builder.rs:42`), and ruling 170 made jig 12.2's move "the plan's one jig move of skein".
+     2. **The cut's bound is jig-client-view's own node text:** the `text_per_node` that `limits::envelope` derives from the client's `Limits.text` and the phrase (`crates/jig-client-view/src/limits.rs:74-77`). Each root keeps it or widens it with `.max(..)` (`testing/jig-client-test-view/src/limits.rs:57`, `:101`; `examples/ops/client-view/src/limits.rs:61`; temper's `crates/temper-client-view/src/limits.rs:24`), so a path cut by it fits the tree's node in every root. Write the derivation once, in a function that `envelope` and the cut both call (default: `limits::node_text(text: u32, phrase: u32) -> Option<u32>`).
+     3. **How it reaches the five writers** (`words/held.rs`'s `part_fact`, `owner_authority::pattern`, `policy_edit::pattern`, `proposed_task::part`, `owner_historical.rs`'s `goal`), the default: a parameter, which each caller takes from what it already holds: the client's `Limits`, or `JigBindings`, which holds the client's text as `text_limit` (`binding.rs:52`) and may gain an accessor for it; a caller that holds neither takes it from its own caller. Another route inside jig-client-view is fine if it is smaller: name it in the report.
+     4. **Size:** the threading counts apart from the 160 production lines: aim for at most 80 lines of it; past it, report the count and go on. No temper code calls the five writers; a `pub` signature that jig's ops or test application calls is changed there too, and listed in the commit body.
+     5. **Unchanged:** the Don't (no cut in the client's data or the engine's documents; `compose` not raised); what the view acts on takes the whole path (`view.md`, 7: "what the view acts on (a filter by a resource, a draft's pattern) takes the whole path").
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

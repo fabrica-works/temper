@@ -51,7 +51,12 @@ ruling 198 (follow each by its name):
   `policy_edit.rs:107-108`, `proposed_task.rs:91-95`,
   `owner_historical.rs:92-94`);
   `limits.rs:74-78`'s node text holds a phrase, the mark and
-  `literal_segment::max_bytes(text)`; the node counts derived from
+  `literal_segment::max_bytes(text)`; the cut's bound is that node
+  text, `limits::envelope`'s `text_per_node`, derived once in a function
+  that `envelope` and the cut both call, and passed to the five writers
+  above from the client's `Limits` or `JigBindings`' `text_limit`
+  (`binding.rs:52`) that their callers hold, never from skein's
+  `Builder` (ruling 200); the node counts derived from
   `rows` take `segments` for a path's part, `rows` for the rest:
   `owner_authority::document_nodes` (`owner_authority.rs:180`, its 9
   callers) and `proposed_task::part_nodes` (`proposed_task.rs:146`, its
@@ -106,7 +111,9 @@ step sets `segments` in `temper-client-shell-terminal/src/limits.rs:52-59`,
 `temper-client-domain/src/tests/fixtures.rs:37-44`,
 `temper-client-view/src/tests/fixtures.rs:34-41` and `forge_route.rs:611`
 (ruling 198), and lists them in its commit body.
-Size: aim for at most 160 production lines; past it, report why.
+Size: aim for at most 160 production lines; past it, report why. The
+bound's threading to the writers counts apart: aim for at most 80 lines
+of it; past it, report the count and go on (ruling 200).
 Don't: cut a path in the client's data or the engine's documents; change
 what `rows` bounds besides paths; raise `compose`; give the engine a
 configured limit for a path; name temper (`git -C <worktree> grep -n -i
