@@ -1941,6 +1941,16 @@ choice would have been the user's (development.md, 10.4).
 
      Checked: `ls logs/jig-22/*.py | wc -l` in the run's directory: 29 scripts (the check of 20:13Z); `which python` prints nothing on carbon-forge, `which python3` prints `/usr/bin/python3`.
 
+282. **jig 15's Shapes against main, after jig 22** (re-check of jig-15.1).
+     Ruling 282 (plan defect, the re-check of jig 15 at jig `533dee685`, after jig 22.1 to 22.4 landed; temper `d753bdc3a`): jig 15's session file misses what 22.1 to 22.4 moved; corrected in `jig/15-helpers.md`: the cites of ruling 272's corrections refreshed in place (`client-v8.schema:316`, the link's `translate/operations.rs:230, :328`, the link's `tests/fixtures/create.rs:18`, the engine's `tests/fixtures/create.rs:87`, 15.4's `action.rs:49`); 15.1's `dangerous` and its test name cover delete-note (`dangerous_marks_cancel_reject_and_delete_note_alone`), as ruling 272 said; 15.1's Removes is the reference UI's `effect` (`confirmation.rs:572`, which 22.4 moved onto `Offered.effect`), the close's `impact()` read staying, and its users gain `acts::offer` and the cards' `admitted`; 15.1's `Story::line` reads 22.3's query fixtures; "Corrections at jig `533dee685`": a `fixtures::me` with project 1's templates 1 and 2 for 15.1 and 15.3, and `Wall`'s "now plus span". Ruling 274's Needs (`Me`, `CreateBounds.authority`, wire `BoundsCreate.authority`, `TaskLine`, `waits_on`, `Offered.effect`) have all landed. Sent to jig 15.1 as a steer; 15.2 to 15.4 ready.
+
+     Checked:
+     - `git -C jig grep -n NewTask origin/main -- '*client-v8.schema'`: `:316: record NewTask { … wake: OwnerWakePolicy …`; link `translate/operations.rs:230: wake: asks::wire_owner_wake_policy(&v.wake, limits)?,`, `:328: wake: super::facts::owner_wake_policy(v.wake(), limits),`; link `tests/fixtures/create.rs:18: c::NewTask {`; engine `tests/fixtures/create.rs:87: let task = w::NewTask::new(`.
+     - `jig-client-view/src/confirm.rs:202: let dangerous = act == ActKind::Cancel || act == ActKind::Reject || act == ActKind::DeleteNote;`; `action.rs:49: FoldCall { name: crate::conversation::CallName, open: bool },`.
+     - `confirmation.rs:572: fn effect(object: &Object, act: ActKind) -> Option<&Effect> {` over `crate::acts::offer` (`acts.rs:27`); `confirmation.rs:216: if let Some(impact) = impact(object) {` under `ActKind::Close`; `contract/effects.rs:12: pub enum Effect { Release(ReleaseEffect), Cancel(Impact), Move { reservation: u64 } }`; `cards/common.rs:269: fn admitted(rows: &List<Offered>, act: ActKind) -> bool {`.
+     - `tests/client-protocol/src/client/operations.rs:8: pub fn running_task`; `fixtures/queries.rs:7: pub fn task_query`, `:27: pub fn task_lines`; no `fn me` or `fn line` on `Story`; `skein-lib/src/time.rs:21: pub struct Wall(u64);`, with `from_nanos` and `as_nanos` and no add.
+     - The re-check's sub-agent: the `facts`, `shapes` and `words` sketches clean under clippy `-D warnings`; 1,092 of 1,092 focused and 37 of 37 fuzzy in `jig-client`, `jig-boundary`, `jig-client-view`, `jig-client-world`, `jig-client-protocol-world` and `jig-client-test-kit`, with 15.2's `skein-ui` dependency and graph pin and the corrected `dangerous` test. Not compiled: the `thread` and `check` sketches (their types exist on main).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

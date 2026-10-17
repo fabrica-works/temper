@@ -169,7 +169,7 @@ turn.
   `KeptWords::bind(scope)`; `Fold`, `CallName` and `worst_case`
   (`conversation.rs:554`) move with the module into `thread`. Users
   joining Files: `ui.rs`, `ui/client.rs`, `ui/borrowed*.rs`,
-  `intents.rs:191, :200, :270`, `drafts.rs:244`, `action.rs:47`,
+  `intents.rs:191, :200, :270`, `drafts.rs:244`, `action.rs:49`,
   `pages.rs:11`, `pages/work.rs:92`, `page/task.rs:479, :618`,
   `turns.rs:196`, `limits/ui.rs:74, :92`. No temper user.
 - **15.5:** `Revision { value: 99 }`, not `Revision(99)`. A breach reads
@@ -190,6 +190,21 @@ and, with 15.2's and 15.5's graph pins applied, ran the workspace: 1,164
 of 1,164 focused (in two runs), 111 of 111 fuzzy, clippy clean. Refresh
 any further user of a moved or renamed item, and list it in the commit
 body.
+
+## Corrections at jig `533dee685` (ruling 282, the re-check of 2026-10-17)
+
+After jig 22.1 to 22.4. The line numbers above are refreshed in place;
+these take precedence over the Shapes below where they differ.
+
+- **15.1, 15.3:** no fixture builds a `contract::Me` on main
+  (`tests/client/src/stories.rs::frame` has none;
+  `crates/jig-client/src/tests/fixtures.rs` holds wire bytes). The first
+  of 15.1 and 15.3 to start adds `fixtures::me` there, with project 1's
+  templates 1 and 2; the other reuses it if it has landed, and otherwise
+  adds the same and keeps one at its rebase. It joins both Files.
+- **15.3:** `Wall` has no addition (`skein-lib/src/time.rs:21`): the
+  designer's "`now` plus `span`" is
+  `Wall::from_nanos(now.as_nanos().saturating_add(span.as_nanos()))`.
 
 ## The designer's answer of 2026-10-17T17:57Z (15.1's statuses, 15.3's fills)
 
@@ -230,12 +245,12 @@ jig's `client/domain/pages.md`, 4 (the status table and its order),
   gives none the values of `tasks::WakePolicy::DEFAULT`, as an agent's
   `delegate` without `wake` gets them
   (`crates/jig-protocol-tools/src/nested.rs:44`); `people::Member`, the
-  store and the core are unchanged. Files: `client-v8.schema:314` and
+  store and the core are unchanged. Files: `client-v8.schema:316` and
   its generated code, `contract/operations.rs:65`, the link's
-  `translate/operations.rs:227, :325`, the engine's
+  `translate/operations.rs:230, :328`, the engine's
   `translate/operations.rs:251`, and the `NewTask` fixtures:
-  `crates/jig-client-protocol-link/src/tests/fixtures/create.rs:15`,
-  `crates/jig-protocol-engine-clients/src/tests/fixtures/create.rs:81`,
+  `crates/jig-client-protocol-link/src/tests/fixtures/create.rs:18`,
+  `crates/jig-protocol-engine-clients/src/tests/fixtures/create.rs:87`,
   `testing/jig-client-scripted-engine/src/payload/operations.rs:41`,
   `tests/client-protocol/src/fixtures/create.rs:13`. Test: the engine's
   create fixture sends no wake, and
@@ -300,8 +315,10 @@ Files: `crates/jig-client/src/{lib.rs, facts.rs}` (new module), its
 tests `crates/jig-client/src/tests/facts.rs` and fixtures
 `crates/jig-client/src/tests/fixtures.rs` (jig 12's); users: the
 reference UI's conversation page (`crates/jig-client-view/src/`, the
-conversation's header) and its confirmation (where it reads an effect
-or marks a cancel or a rejection dangerous).
+conversation's header), its confirmation (where it reads an effect
+or marks a cancel, a rejection or a note's deletion dangerous), its
+`acts::offer` (`acts.rs:27`) and its cards' `admitted`
+(`cards/common.rs:269`).
 Shape: `pub enum ChatStatus { Starting, Writing, Tool { tool:
 Option<Text>, since: Wall }, WaitingForYou { kind: WaitedFor, entries: u32 },
 WaitingFor(Whom), Parked, Retrying { at: Wall, try_number: u32, tries: u32, class:
@@ -314,8 +331,8 @@ tool and since when), its retry notice, its hold and its end; waiting
 for you when `waits_on` names the reader, or a role they hold in the
 task's project, as `me` says; `pub fn effect(offers: &[Offered], act: ActKind) ->
 Option<&Effect>`; `pub fn offer(offers: &[Offered], act: ActKind) ->
-Option<&Admission>`; `pub fn dangerous(act: ActKind) -> bool` (cancel
-and reject). The status follows pages.md, 4's table row by row: "due,
+Option<&Admission>`; `pub fn dangerous(act: ActKind) -> bool` (cancel,
+reject and delete-note). The status follows pages.md, 4's table row by row: "due,
 preparing or claimed | starting; running, writing | writing; running a
 tool | which tool, when its host names it, and for how long; waiting on
 the person ... | waiting for you, and for what; waiting on another party
@@ -328,14 +345,17 @@ it, one per row of pages.md, 4's table: a chip and a `WaitsOn` built by
 the fixtures, the reader's `me`, the expected `ChatStatus` as a
 literal), `a_task_line_and_its_task_document_give_one_status`,
 `effect_is_none_for_an_act_not_offered`,
-`dangerous_marks_cancel_and_reject_alone`; `tests/client-protocol/tests/client.rs` (jig 12's story file):
+`dangerous_marks_cancel_reject_and_delete_note_alone`; `tests/client-protocol/tests/client.rs` (jig 12's story file):
 `a_running_chat_reads_as_writing_from_the_engine_s_documents` (jig 12's
 `Story` with jig 14.2's `Story::running_task`: while the fake worker's
 turn is in progress, the status over the task document and over the
 task's line is `Writing`; once the fake worker's question commits, both
 are `WaitingForYou { kind: WaitedFor::Question, entries: 1 }`). This
 increment adds `Story::me` and `Story::line` to jig 12's `Story`
-(`tests/client-protocol/src/client.rs`): the client's `me` handle, and
+(`tests/client-protocol/src/client.rs`; `Story::running_task` is at
+`client/operations.rs:8`; `Story::line` watches 22.3's
+`fixtures::task_query` and reads `fixtures::task_lines`,
+`tests/client-protocol/src/fixtures/queries.rs:7, :27`): the client's `me` handle, and
 a task query's line for one task, watched under a handle of the
 story's. Ceilings: unit under 20 ms, joint under 0.5 s.
 Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world -E
@@ -349,8 +369,10 @@ Don't: say a status in words here (15.2); read anything but the values
 the caller passes; take the run's document (the chip carries what the
 status needs).
 Size: at most 200 lines.
-Removes: the reference UI's own reading of a cancel's effect where it
-read the legacy `Impact` (jig 22.4 left the data in `Offered.effect`).
+Removes: the reference UI's `effect` (`confirmation.rs:572`, over
+`acts::offer` at `acts.rs:27`: jig 22.4 moved it onto `Offered.effect`),
+now `facts::effect`. The close's `impact()` read (`confirmation.rs:216`)
+stays: `Effect` has no close (`contract/effects.rs:12`).
 
 ### 15.2 `words`
 Scope: `jig_client::words` (client.md, 19; view.md, 7): a phrase for
