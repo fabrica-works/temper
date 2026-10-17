@@ -1654,6 +1654,15 @@ choice would have been the user's (development.md, 10.4).
         - No other referee rule or judge changes. 21.3's Size stands: aim 2,500, stop 3,000.
      5. **Nothing is deferred:** no `later.md` row.
 
+254. **jig 21.3: one bounded diagnosis of each repeated story** (process, jig 21.3's block of 2026-10-17T11:57:42Z).
+     Ruling 254 (process, jig 21.3's block of 2026-10-17T11:57:42Z): one bounded diagnosis of each repeated story, by its cause before any fix.
+
+     1. **The sign-out race is answered:** ruling 253 (jig bbb6303aa), with the coordinator.
+     2. **For each of the two stories** (the joint crash/reload seed 4503, Offline at 0.600359346 s; ops' withdrawn restart seed 512, the waiting card lost at 7.375941956 s): run its focused reproduction once with the trace the story already prints, and name the first event where the Ui's or the root's state departs from what the client told it, by file:line, in the report, before changing code. At most 30 minutes for each story.
+     3. **Then:** a cause inside 21.3's Files is fixed, with a unit test that fails before the fix, and the story run once. A cause in `jig-client` or `jig-client-domain` (outside 21.3's Files, ruling 235), or no cause found in 30 minutes, is reported with the trace's lines, and that story stops: block again, naming it.
+     4. **Meanwhile** 21.3 goes on with ruling 253 and the other failing changed-crate tests; it runs `land` only after both suites pass with `--no-fail-fast` (README 05:20Z, point 1).
+     5. **Unchanged:** ruling 229 for every other story; rulings 240, 243, 250, 252, 253; Size stop 3,000 (2,806 now).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
