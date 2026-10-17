@@ -167,6 +167,14 @@ manifests `examples/ops/client-domain/Cargo.toml`,
 gains `jig-client`), `lib.rs:11` (`pub mod owner`), and
 `tests/ops/tests/fuzzy_joint.rs:561` (`joint::infrastructure::ask(Ask)`
 for the digest). The ops rules are at `graph.rs:360` and `:373`.
+Ruling 218: `tests/ops/tests/fuzzy_joint.rs:737, :746, :755` join the
+Files: 21.2 removes the `#[ignore]` jig 13.4 put on
+`p_acceptance_survives_the_commit_before_its_durable_decision`,
+`p_acceptance_survives_its_durable_decision_commit` and
+`p_acceptance_survives_the_commit_after_its_durable_decision` (the old
+root had no client to judge its link `Offline` and reopen its watches),
+and calls `bridge::closed` after a bridge-routed `Close`, as 13.4's
+commit body says.
 Shape: as jig 13.4's: `ops`'s table owner, `owner::Owner` (with `Kept {
 scope }`), goes, and no owner enum takes its place; a tell routes by
 `jig_client_view::Owner::of_asker` (jig 13.4), `Jig` to the reference
@@ -186,7 +194,10 @@ extended): `routes_an_infrastructure_tell_to_its_side`,
 Proof: joint layer, `ops`'s real engine: `heavy cargo nextest run -p
 jig-ops-world --profile fuzzy -E 'binary(fuzzy_joint) &
 test(=p_accepts_the_restart_from_the_incidents_page)'`, once (0.83 s at
-the base); it passes; nothing else is wanted. In the default suite, the
+the base); it passes; nothing else is wanted. And, once, the three tests
+ruling 218 marked: `heavy cargo nextest run -p jig-ops-world --profile
+fuzzy -E 'binary(fuzzy_joint) & test(/^p_acceptance_survives_/)'`; each
+passes. In the default suite, the
 gate runs `p_accepts_a_restart_from_the_incidents_page` (tests/ops);
 nothing else.
 Don't: no change to `ops`'s families' meaning or pages; no file of

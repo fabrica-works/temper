@@ -1305,6 +1305,14 @@ choice would have been the user's (development.md, 10.4).
 217. **temper's tests name their numbers (README 23:45Z, point 2)** (steer of 2026-10-17T04:24Z).
      Steer of 2026-10-17T04:24Z, from the check of 2026-10-17T04:24Z, point 1: README 23:45Z, point 2 (named request ids, durations and times in tests) binds temper's sessions; temper 03.s2's scenarios left bare numbers in `tests/conformance/src/scenarios/queries.rs` and `lifecycle.rs`, which the first temper session to edit either file names. Recorded in the README as "04:24Z, point 1 (temper)".
 
+218. **jig 13.4: ops' three recovery tests marked until jig 21.2** (plan defect, jig 13.4's block of 2026-10-17T05:19:32Z).
+     Ruling 218, plan defect in the order of steps, as ruling 163 marked a story until the step that gives its cause: the implementer's third option. Ruling 207 rests on the design's "Backoffs and heartbeats are the client's" (`view.md`, 1099-1100); `ops`'s root gets its client only at jig 21.2 ("`ops`'s root on `jig_client::Client`"), and until then it steps the view directly (`examples/ops/client-domain/src/route.rs:16-19`), so no client judges its link `Offline` or reopens its watches.
+
+     1. **13.4 marks the three tests** at `tests/ops/tests/fuzzy_joint.rs:737, :746, :755` (`p_acceptance_survives_the_commit_before_its_durable_decision`, `p_acceptance_survives_its_durable_decision_commit`, `p_acceptance_survives_the_commit_after_its_durable_decision`) `#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]`, each assertion unchanged, and names them in the commit body. Another test that fails only because `ops`'s root has no client takes the same mark and is named there too; past three more, stop and report.
+     2. **No other change:** ruling 207's removal stays in 13.4; no fallback in the view; 21.2 is not advanced. 13.4 lands as one increment by its gate, as ruling 215 says.
+     3. **jig 21.2** removes the marks and runs the three once (its Files and Proof say so now), and calls `bridge::closed` after a bridge-routed `Close`, as 13.4's commit body records.
+     4. **Unchanged:** ruling 215's Size (784 of aim 850, stop 950); 13.4's Shape, Removes and Proof; ruling 207.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
