@@ -1,10 +1,11 @@
-//! Keep: bounded parts held until their page generation leaves.
+//! Keep: bounded parts held until their page leaves.
 //! Replace: Ops connector subjects with the forge's parts, which need no reads.
-//! `Show` retains a part; `PartsLeft` frees that generation and every older one.
+//! `Show` retains a part; `PartsLeft` frees the old page's parts.
 use jig_client::contract::Part;
 use skein_lib::{Env, List, Queue, Time};
 pub mod family;
 mod form;
+pub(crate) mod me;
 mod vocabulary;
 pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form};
 pub use vocabulary::*;
@@ -17,15 +18,14 @@ pub struct Limits {
 }
 #[derive(Debug)]
 pub enum Event {
-    Confirmed { party: Option<u64> },
     Act { act: Act },
     Progress { request: skein_lib::Token, progress: skein_lib::RequestProgress },
     Answered { request: skein_lib::Token, answer: Answer },
     Went { address: Address },
     Left,
     Served { served: Served },
-    Show { part: Part, generation: u32 },
-    PartsLeft { generation: u32 },
+    Show { part: Part },
+    PartsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
@@ -34,13 +34,9 @@ pub enum Fact {
 #[derive(Debug)]
 pub enum Request {
     Show { address: Address },
+    Client { asked: jig_client::Event },
     Send { request: skein_lib::Token, ask: jig_client::Ask },
     Fact { fact: Fact },
-}
-#[derive(Debug)]
-struct Held {
-    part: Part,
-    generation: u32,
 }
 #[derive(Debug)]
 pub struct Side {
@@ -49,7 +45,9 @@ pub struct Side {
     form: Option<Form>,
     serial: u64,
     party: Option<u64>,
-    held: List<Held>,
+    me: bool,
+    link: jig_client::Link,
+    held: List<Part>,
     shown: u64,
 }
 impl Side {
@@ -61,6 +59,8 @@ impl Side {
             form: None,
             serial: skein_lib::Rng::new(seed).next_u64(),
             party: None,
+            me: false,
+            link: jig_client::Link::Starting,
             held: List::with_capacity(limits.parts),
             shown: 0,
         }
@@ -78,9 +78,9 @@ impl Side {
         self.form.as_ref()
     }
     #[must_use]
-    pub fn contains(&self, part: &Part, generation: u32) -> bool {
+    pub fn contains(&self, part: &Part) -> bool {
         for held in &self.held {
-            if held.generation == generation && held.part == *part {
+            if held == part {
                 return true;
             }
         }
@@ -92,13 +92,6 @@ impl Side {
 }
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Confirmed { party } => {
-            side.party = party;
-            if let Some(draft) = &mut side.form {
-                draft.confirmed = party.is_some();
-                side.changed();
-            }
-        }
         Event::Went { address } => {
             side.address = Some(address);
             let Address::Adopt { project } = address;
@@ -154,29 +147,21 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 side.changed();
             }
         }
-        Event::Show { part, generation } => {
-            if side.contains(&part, generation) {
+        Event::Show { part } => {
+            if side.contains(&part) {
                 return;
             }
-            if side.held.push(Held { part, generation }).is_err() {
+            if side.held.push(part).is_err() {
                 out.push(Request::Fact { fact: Fact::Full });
             } else {
                 side.changed();
             }
         }
-        Event::PartsLeft { generation } => {
-            let mut kept = List::with_capacity(side.held.capacity());
-            let old = core::mem::replace(&mut side.held, List::with_capacity(0));
-            let count = old.len();
-            for held in old.into_boxed() {
-                if held.generation > generation {
-                    kept.push(held).expect("surviving parts fit their old bound");
-                }
-            }
-            if count != kept.len() {
+        Event::PartsLeft => {
+            if !side.held.is_empty() {
+                side.held.clear();
                 side.changed();
             }
-            side.held = kept;
         }
     }
 }
@@ -257,8 +242,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.field_bytes < 7 {
         return None;
     }
-    List::<Held>::worst_case(limits.parts)?
-        .checked_mul(2)?
+    List::<Part>::worst_case(limits.parts)?
         .checked_add(u64::from(limits.field_bytes).checked_mul(6)?)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)
 }

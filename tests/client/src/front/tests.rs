@@ -113,3 +113,23 @@ fn pending_adoption(
     assert_eq!(kept.len(), 1);
     kept
 }
+
+#[test]
+fn a_real_sign_out_records_the_engine_receipt_before_the_callback() {
+    let mut front = Joint::new(fixtures::SEED, fixtures::domain_limits());
+    front.bind(CLIENT, fixtures::PARTY);
+    front.poll(Time::ZERO, WALL);
+    front.sign_out(CLIENT, Time::ZERO, WALL);
+    let callbacks = front.poll(Time::ZERO, WALL);
+    assert!(callbacks.iter().any(|(who, event)| *who == CLIENT
+        && matches!(
+            event.root(),
+            Some(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } })
+        )));
+    assert!(
+        front.observed().into_iter().any(|observation| matches!(
+            observation, Observed::SignInEnded { client } if client == CLIENT
+        )),
+        "the real engine's sign-out answer must precede the callback"
+    );
+}

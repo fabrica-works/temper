@@ -325,11 +325,7 @@ fn populate_page(
                     client::step(root, env, Event::Went { place: client::Place::Address(next) }, out);
                 }
             }
-            Request::Client { .. }
-            | Request::Jig(_)
-            | Request::SignIn { .. }
-            | Request::SignOut
-            | Request::Fact { .. } => {}
+            Request::Client { .. } | Request::SignOut | Request::Fact { .. } => {}
         }
     }
 }

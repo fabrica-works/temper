@@ -20,13 +20,11 @@ pub enum Notice {
 pub enum Down {
     Shell(jig_client::Request),
     Duty(Duty),
-    Nothing,
 }
 /// Navigation, authentication and facts stay in the host.
 #[derive(Debug)]
 pub enum Duty {
     Show { address: client::Address, replace: bool },
-    SignIn { provider: u16, back: client::Address },
     SignOut,
     Fact(client::Fact),
 }
@@ -34,9 +32,7 @@ pub enum Duty {
 pub fn down(request: client::Request) -> Down {
     match request {
         client::Request::Client { request } => Down::Shell(request),
-        client::Request::Jig(client::JigOut::Answered { .. } | client::JigOut::Unknown { .. }) => Down::Nothing,
         client::Request::Show { address, replace } => Down::Duty(Duty::Show { address, replace }),
-        client::Request::SignIn { provider, back } => Down::Duty(Duty::SignIn { provider, back }),
         client::Request::SignOut => Down::Duty(Duty::SignOut),
         client::Request::Fact { fact } => Down::Duty(Duty::Fact(fact)),
     }

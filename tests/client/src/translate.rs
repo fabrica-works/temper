@@ -256,32 +256,7 @@ fn delivery_packet(
 pub fn callback(event: jig_client_test_domain::Event) -> Event {
     match event {
         jig_client_test_domain::Event::Client { event } => Event::Client { event },
-        jig_client_test_domain::Event::Jig(event) => {
-            use jig_client_view::Event as Ui;
-            let up = match event {
-                Ui::Hello { served } => jig_client::Up::Served { served, versions: None },
-                Ui::Watch { watch, event } => jig_client::Up::Watched { watch, event },
-                Ui::Ended { watch, end } => jig_client::Up::WatchEnded { watch, end },
-                Ui::Read { read, result } => {
-                    jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
-                }
-                Ui::SignedOut => jig_client::Up::SignedOut,
-                event @ (Ui::Start { .. }
-                | Ui::Kept { .. }
-                | Ui::KeptGone { .. }
-                | Ui::Went { .. }
-                | Ui::Act { .. }
-                | Ui::Ask { .. }
-                | Ui::Progress { .. }
-                | Ui::Answered { .. }
-                | Ui::ShowObjects { .. }
-                | Ui::ShowSections { .. }
-                | Ui::ObjectsLeft
-                | Ui::SignOutLost
-                | Ui::Frame { .. }) => return Event::Jig(event),
-            };
-            Event::Client { event: jig_client::Event::Up { up } }
-        }
+        jig_client_test_domain::Event::Jig(event) => Event::Jig(event),
         jig_client_test_domain::Event::SignedOut => {
             Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }
         }

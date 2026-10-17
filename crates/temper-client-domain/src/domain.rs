@@ -3,7 +3,7 @@ use crate::{Event, Limits, Request, forge, route};
 use skein_lib::{Env, Queue, Rng, Time};
 #[derive(Debug)]
 pub struct Domain {
-    pub(crate) jig: jig_client_view::Domain,
+    pub(crate) jig: jig_client_view::Ui,
     pub(crate) forge: forge::Side,
     pub(crate) client: jig_client::Client,
     pub(crate) salt: u64,
@@ -27,7 +27,13 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     }
     .expect("checked client limits");
     Domain {
-        jig: jig_client_view::Domain::new(&limits.jig),
+        jig: jig_client_view::Ui::new(
+            &limits.jig,
+            navigation(limits),
+            jig_client_view::address::Address::Inbox { project: None },
+            jig_client_view::page::Arrangement::none(),
+        )
+        .expect("temper UI configuration fits"),
         forge: forge::Side::new(&limits.forge, rng.next_u64()),
         client,
         salt: rng.next_u64(),
@@ -40,7 +46,7 @@ impl Domain {
         &self.client
     }
     #[must_use]
-    pub const fn jig(&self) -> &jig_client_view::Domain {
+    pub const fn jig(&self) -> &jig_client_view::Ui {
         &self.jig
     }
     #[must_use]
@@ -57,7 +63,7 @@ pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-    jig_client_view::fire(&mut root.jig, &route::jig_env(env), &mut child);
+    root.jig.fire(env.now, env.wall, &root.client, &mut child);
     route::route_jig(root, env, &mut child, out);
     let mut client = Queue::with_capacity(jig_client::max_out(&env.limits.client));
     root.client.fire(env.now, env.wall, &mut client);
@@ -80,14 +86,6 @@ pub fn take(root: &mut Domain, _env: &Env<Limits>, _out: &mut Queue<Request>) {
 pub fn shown(root: &Domain) -> u64 {
     root.jig.shown().checked_add(forge::shown(&root.forge)).expect("forge shown count fits")
 }
-/// Installs application-configured provider words before Start (client.md, 12).
-pub fn provider(
-    root: &mut Domain,
-    provider: jig_client_view::signin::Provider,
-) -> Result<(), jig_client_view::signin::Provider> {
-    root.jig.provider(provider)
-}
-
 /// Installs the application's navigation before Start; the jig child validates its bound.
 pub fn configure_navigation(
     root: &mut Domain,

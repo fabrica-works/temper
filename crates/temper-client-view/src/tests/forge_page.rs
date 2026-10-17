@@ -195,17 +195,12 @@ fn a_field_input_is_typed_and_older_binding_tokens_decode_nothing() {
 }
 #[test]
 fn adopt_is_disabled_until_a_party_is_confirmed() {
-    let mut view = fixtures::view();
-    let mut root = fixtures::adoption_root();
-    for (party, disabled) in [(None, true), (Some(73), false), (None, true)] {
-        fixtures::root_event(&mut root, temper_client_domain::Event::Forge(forge::Event::Confirmed { party }));
-        let rendered = fixtures::build(&mut view, &root);
-        let node = fixtures::find(rendered, Role::Button, b"Adopt").expect("Adopt button");
-        for button in rendered.nodes() {
-            if button.id == node {
-                assert_eq!(button.states.as_slice().contains(&State::Disabled), disabled, "party {party:?}");
-            }
-        }
+    let mut form = form();
+    for (party, disabled) in [(None, true), (Some(73_u64), false), (None, true)] {
+        form.confirmed = party.is_some();
+        let rendered = tree(&form);
+        let button = node_of_role(&rendered, Role::Button);
+        assert_eq!(button.states.as_slice().contains(&State::Disabled), disabled, "party {party:?}");
     }
 }
 #[test]

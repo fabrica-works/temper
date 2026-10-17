@@ -19,19 +19,11 @@ pub enum Event {
     Jig(jig_client_view::Event),
     SignedOut,
 }
-/// An unkeyed jig shell obligation passed through the root.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum JigOut {
-    Answered { asked: skein_lib::Token, answer: jig_client::contract::Answer },
-    Unknown { asked: skein_lib::Token },
-}
 /// Bounded routing and child facts for the shell to observe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_client_view::facts::Fact),
     PartsFull,
     InvalidRecord,
-    InvalidAnswer,
     UnknownConnector,
     UnknownAsker,
 }
@@ -39,9 +31,7 @@ pub enum Fact {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     Client { request: jig_client::Request },
-    Jig(JigOut),
     Show { address: Address, replace: bool },
-    SignIn { provider: u16, back: Address },
     SignOut,
     Fact { fact: Fact },
 }

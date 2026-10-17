@@ -98,8 +98,13 @@ impl Joint {
         }
     }
     fn hello(&mut self, who: ClientId) {
-        self.callbacks
-            .push((who, translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())).into()));
+        self.callbacks.push((
+            who,
+            translate::callback(jig_client_test_domain::Event::Client {
+                event: jig_client::Event::Up { up: self.transport.hello() },
+            })
+            .into(),
+        ));
         self.callbacks.push((
             who,
             RootEvent::Client {
@@ -179,6 +184,7 @@ impl Joint {
                 }
             }
             packets::Incoming::SignedOut { client, sign_in } => {
+                self.observed.push(Observed::SignInEnded { client });
                 self.sign_outs.entry(client).or_default().push_back(Some(sign_in));
                 self.callbacks.push((
                     client,
@@ -294,8 +300,12 @@ impl Front<Temper> for Joint {
                 name: b"Person".as_slice().into(),
             },
         );
-        self.callbacks
-            .push((who, Event::Root(translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())))));
+        self.callbacks.push((
+            who,
+            Event::Root(translate::callback(jig_client_test_domain::Event::Client {
+                event: jig_client::Event::Up { up: self.transport.hello() },
+            })),
+        ));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
     }
@@ -412,8 +422,12 @@ impl Front<Temper> for Joint {
                 )
         });
         self.sign_outs.remove(&who);
-        self.callbacks
-            .push((who, Event::Root(translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())))));
+        self.callbacks.push((
+            who,
+            Event::Root(translate::callback(jig_client_test_domain::Event::Client {
+                event: jig_client::Event::Up { up: self.transport.hello() },
+            })),
+        ));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
     }
@@ -434,7 +448,7 @@ impl Front<Temper> for Joint {
     fn sign_out(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
         if self.offline_until.is_some() {
-            self.callbacks.push((who, Event::Root(RootEvent::Jig(jig_client_view::Event::SignOutLost))));
+            self.callbacks.push((who, Event::Root(RootEvent::Client { event: jig_client::Event::SignOutLost })));
             return;
         }
         let Some(sign_in) = self.transport.sign_in(who) else { return };

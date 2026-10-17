@@ -31,7 +31,6 @@ pub fn domain_limits() -> Limits {
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
-            providers: 1,
             objects: 3,
             sources: 8,
             reads: 8,

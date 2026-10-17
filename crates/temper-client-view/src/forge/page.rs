@@ -22,8 +22,12 @@ fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bind
     builder.close();
 }
 #[must_use]
-pub fn project_name(jig: &jig_client_view::Domain, project: u32, words: &jig_client_view::words::Words) -> Box<[u8]> {
-    if let Some(frame) = &jig.frame().document {
+pub fn project_name(
+    jig: &jig_client_view::ui::Borrowed<'_>,
+    project: u32,
+    words: &jig_client_view::words::Words,
+) -> Box<[u8]> {
+    if let Some(frame) = jig.frame().document {
         for row in &frame.projects {
             if row.project == project
                 && let Some(name) = &row.name

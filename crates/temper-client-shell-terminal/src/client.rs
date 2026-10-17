@@ -37,7 +37,6 @@ pub struct Seen {
 #[derive(Debug)]
 pub enum Shown {
     Notice(route::Notice),
-    SignInAsked,
     Terminal(crate::terminal::Notice),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,7 +57,6 @@ pub struct NativeClient {
     with: Option<jig_client::With>,
     authentication: skein_lib::Map<skein_lib::Token, bool>,
     kept_keys: skein_lib::Set<jig_client::Key>,
-    credential_notice: Option<(u64, skein_lib::Secret)>,
     address: domain::Address,
     phase: Phase,
     dirty: bool,
@@ -127,7 +125,6 @@ impl NativeClient {
             with,
             authentication: skein_lib::Map::with_capacity(limits::EXCHANGES),
             kept_keys: skein_lib::Set::with_capacity(bounds.client.client.domain.requests.requests),
-            credential_notice: None,
             address: domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             phase: Phase::WaitingToken,
             dirty: false,
@@ -229,7 +226,7 @@ impl NativeClient {
         self.dirty = true;
     }
     fn transport(&mut self, event: jig_client::Event) {
-        self.credential_notice = match &event {
+        let credential_notice = match &event {
             jig_client::Event::Reply { message, .. } => service_credential(message, &self.env.limits.client),
             jig_client::Event::Start { .. }
             | jig_client::Event::StartUnlinked { .. }
@@ -288,6 +285,9 @@ impl NativeClient {
             self.notices.push(Shown::Terminal(crate::terminal::Notice::StoreFailed));
         }
         self.event(domain::Event::Client { event });
+        if let Some((party, credential)) = credential_notice {
+            self.notices.push(Shown::Notice(route::Notice::Credential { party, credential }));
+        }
         let credential = self.root.client().link().credential.cloned();
         if credential != self.credential {
             self.shell.keep(credential.clone());
@@ -313,7 +313,7 @@ impl NativeClient {
             Signing::Again | Signing::Lost | Signing::Refused => {
                 if self.signing_out {
                     self.signing_out = false;
-                    self.event(domain::Event::Jig(jig_client_view::Event::SignOutLost));
+                    self.event(domain::Event::Client { event: jig_client::Event::SignOutLost });
                 }
             }
         }
@@ -322,18 +322,6 @@ impl NativeClient {
     }
     fn outputs(&mut self) {
         while let Some(request) = self.out.pop() {
-            if let domain::Request::Jig(domain::JigOut::Answered {
-                answer:
-                    jig_client::contract::Answer::Done(jig_client::contract::Outcome::Made {
-                        what: jig_client::contract::Made::Service { party },
-                    }),
-                ..
-            }) = &request
-                && self.credential_notice.as_ref().is_some_and(|(made, _)| made == party)
-                && let Some((party, credential)) = self.credential_notice.take()
-            {
-                self.notices.push(Shown::Notice(route::Notice::Credential { party, credential }));
-            }
             match route::down(request) {
                 Down::Shell(request) => {
                     if let jig_client::Request::Exchange { exchange, message, .. } = &request {
@@ -358,14 +346,12 @@ impl NativeClient {
                             self.go(address);
                         }
                     }
-                    Duty::SignIn { .. } => self.notices.push(Shown::SignInAsked),
                     Duty::SignOut => {
                         self.signing_out = true;
                         self.event(domain::Event::Client { event: jig_client::Event::SignOut });
                     }
                     Duty::Fact(_) => self.seen.facts = self.seen.facts.saturating_add(1),
                 },
-                Down::Nothing => {}
             }
         }
     }

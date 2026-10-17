@@ -7,12 +7,11 @@ pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
-    generation: u32,
     _scope: jig_client::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
     if connector(&part) == root.forge_number() {
-        route::forge(root, env, forge::Event::Show { part, generation }, out);
+        route::forge(root, env, forge::Event::Show { part }, out);
     } else {
         out.push(Request::Fact { fact: Fact::UnknownConnector });
     }

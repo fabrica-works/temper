@@ -6,7 +6,7 @@ use jig_client_world::{
 };
 use skein_lib::{Env, List, Queue, RequestEnvelope, Time};
 use skein_ui::{Act, NodeId, Patch, Tree};
-use temper_client_domain::{self as domain, Action, Address, JigOut, Request};
+use temper_client_domain::{self as domain, Action, Address, Request};
 use temper_client_view as view;
 
 use crate::fixtures;
@@ -121,8 +121,7 @@ impl App for Temper {
             Request::Client { request: jig_client::Request::SignOut } | Request::SignOut => Duty::SignOut,
             Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
-            Request::SignIn { provider, back } => Duty::SignIn { provider, back },
-            Request::Fact { .. } | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. }) => Duty::Fact,
+            Request::Fact { .. } => Duty::Fact,
         }
     }
     fn record_key(record: &Self::Record) -> Self::Key {
@@ -163,10 +162,8 @@ impl App for Temper {
                     | jig_client::Request::Down { down: jig_client::Down::Save { .. } | jig_client::Down::Erase { .. } },
             }
             | Request::Show { .. }
-            | Request::SignIn { .. }
             | Request::SignOut
-            | Request::Fact { .. }
-            | Request::Jig(_) => return None,
+            | Request::Fact { .. } => return None,
         };
         Some(domain::Event::Client { event }.into())
     }
@@ -186,7 +183,7 @@ impl App for Temper {
         match event.root() {
             Some(
                 domain::Event::Act { action: Action::Jig(act) }
-                | domain::Event::Jig(jig_client_view::Event::Act { act }),
+                | domain::Event::Jig(jig_client_view::Event::Act { action: act }),
             ) => observe::jig_window_changed(act),
             Some(domain::Event::Act { action: Action::Forge(_) }) => true,
             Some(
@@ -242,33 +239,7 @@ impl App for Temper {
         let Some(event) = event.root() else { return vec![Receipt::Started] };
         match event {
             domain::Event::Jig(event) => observe::jig_received(event),
-            domain::Event::Client { event: jig_client::Event::Up { up } } => {
-                let jig = match up {
-                    jig_client::Up::Served { served, .. } => Some(jig_client_view::Event::Hello { served: *served }),
-                    jig_client::Up::Watched { watch, event } => {
-                        Some(jig_client_view::Event::Watch { watch: *watch, event: event.clone() })
-                    }
-                    jig_client::Up::WatchEnded { watch, end } => {
-                        Some(jig_client_view::Event::Ended { watch: *watch, end: *end })
-                    }
-                    jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) } => {
-                        Some(jig_client_view::Event::Read { read: *read, result: result.clone() })
-                    }
-                    jig_client::Up::SignedOut => return vec![Receipt::Parked],
-                    jig_client::Up::SignedIn
-                    | jig_client::Up::NotKept { .. }
-                    | jig_client::Up::FamilyServed { .. }
-                    | jig_client::Up::Answer { .. }
-                    | jig_client::Up::FamilyDelivered { .. }
-                    | jig_client::Up::ReadDone { .. } => None,
-                };
-                if let Some(event) = jig {
-                    return observe::jig_received(&event);
-                }
-                observe::received(&jig_client_test_domain::Event::Client {
-                    event: jig_client::Event::Up { up: up.clone() },
-                })
-            }
+            domain::Event::Client { event: jig_client::Event::Up { up } } => observe::up_received(up),
             domain::Event::SignedOut => vec![Receipt::Parked],
             domain::Event::Start { .. }
             | domain::Event::Went { .. }

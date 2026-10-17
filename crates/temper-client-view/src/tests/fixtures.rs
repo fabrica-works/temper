@@ -16,7 +16,6 @@ pub fn limits() -> Limits {
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
-            providers: 1,
             objects: 3,
             sources: 8,
             reads: 8,
@@ -124,12 +123,12 @@ pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> skein_u
         forge::step(
             &mut side,
             &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            forge::Event::Show { part: part.clone(), generation: 1 },
+            forge::Event::Show { part: part.clone() },
             &mut Queue::with_capacity(1),
         );
     }
     let mut builder = skein_ui::Builder::new(&tree_limits());
-    crate::forge::part(&mut builder, &side, &part, 1, words);
+    crate::forge::part(&mut builder, &side, &part, words);
     builder.finish()
 }
 pub fn part_text(words: &crate::words::Words, part: Part, held: bool) -> Box<[u8]> {
@@ -214,7 +213,6 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             chat_budget: 0,
         })
         .expect("one project");
-    temper_client_domain::step(&mut root, &env, Event::Jig(jig_client_view::Event::Hello { served: true }), &mut out);
     temper_client_domain::step(
         &mut root,
         &env,

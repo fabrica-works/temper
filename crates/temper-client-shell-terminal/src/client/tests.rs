@@ -42,14 +42,7 @@ fn another_partys_kept_work_prints_its_line_once() {
 #[test]
 fn a_service_credential_is_a_notice_never_a_root_event() {
     let mut host = common::native();
-    host.credential_notice = service_credential(&common::service_answer(), &host.env.limits.client);
-    host.out.push(domain::Request::Jig(domain::JigOut::Answered {
-        asked: common::ATTEMPT,
-        answer: jig_client::contract::Answer::Done(jig_client::contract::Outcome::Made {
-            what: jig_client::contract::Made::Service { party: common::SERVICE },
-        }),
-    }));
-    host.outputs();
+    host.transport(jig_client::Event::Reply { exchange: common::ATTEMPT, message: common::service_answer() });
     let Some(Shown::Notice(route::Notice::Credential { party, credential })) = host.notices() else {
         panic!("credential notice")
     };

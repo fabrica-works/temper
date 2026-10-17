@@ -56,11 +56,12 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.jig.begin();
     view.forge.begin();
+    let jig = root.jig().borrow(root.client());
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if !jig_client_view::jig(&mut builder, root.jig(), view.nav, &view.jig_words, &mut view.jig) {
+    if !jig_client_view::jig(&mut builder, &jig, view.nav, &view.jig_words, &mut view.jig) {
         if let Some(form) = root.forge().form() {
-            let project = forge::page::project_name(root.jig(), form.project, &view.jig_words);
+            let project = forge::page::project_name(&jig, form.project, &view.jig_words);
             builder.open(Role::Main);
             forge::page::page(
                 &mut builder,
@@ -73,12 +74,16 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             );
             builder.close();
         }
-        jig_client_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);
+        jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
     }
     builder.close();
     for pass in 0..2 {
         for slot in builder.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
+            if slot.reference == jig_client_view::signin::SLOT {
+                builder.splice(slot.id, fragment);
+                continue;
+            }
             let filled = match Owner::from_opaque(slot.reference.owner) {
                 Some(Owner::Jig) | None => false,
                 Some(Owner::Application { number: connector }) => {
@@ -87,7 +92,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     } else if slot.reference == view.nav {
                         forge::page::navigation(
                             &mut fragment,
-                            root.jig().frame_summary().project,
+                            jig.frame_summary().project,
                             &view.forge_words,
                             &mut view.forge,
                         );
@@ -95,13 +100,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     } else {
                         match view.jig.part(slot.reference.token) {
                             Some(part) => {
-                                forge::part(
-                                    &mut fragment,
-                                    root.forge(),
-                                    part,
-                                    root.jig().generation(),
-                                    &view.forge_words,
-                                );
+                                forge::part(&mut fragment, root.forge(), part, &view.forge_words);
                                 true
                             }
                             None => match view.jig.owner_part(slot.reference.token) {

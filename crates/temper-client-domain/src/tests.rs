@@ -54,8 +54,8 @@ fn a_part_of_the_forges_number_is_held_by_its_side() {
     let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     let part = Part::Connector { connector: forge };
-    crate::parts::show(&mut root, &env, part.clone(), 1, PartScope::Project(fixtures::PROJECT), &mut out);
-    assert!(root.forge().contains(&part, 1), "forge {forge}");
+    crate::parts::show(&mut root, &env, part.clone(), PartScope::Project(fixtures::PROJECT), &mut out);
+    assert!(root.forge().contains(&part), "forge {forge}");
     assert!(out.is_empty(), "forge {forge} reads no document");
 }
 #[test]
@@ -65,10 +65,10 @@ fn a_part_of_another_connector_is_reported_unknown() {
     let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     let part = Part::Connector { connector: fixtures::OTHER };
-    crate::parts::show(&mut root, &env, part.clone(), 1, PartScope::Project(fixtures::PROJECT), &mut out);
+    crate::parts::show(&mut root, &env, part.clone(), PartScope::Project(fixtures::PROJECT), &mut out);
     assert_eq!(out.pop(), Some(Request::Fact { fact: Fact::UnknownConnector }));
     assert!(out.is_empty(), "an unknown connector's part asks for nothing more");
-    assert!(!root.forge().contains(&part, 1), "the forge's side holds no other connector's part");
+    assert!(!root.forge().contains(&part), "the forge's side holds no other connector's part");
 }
 #[test]
 fn parts_left_forget_the_parts_of_that_generation() {
@@ -76,19 +76,11 @@ fn parts_left_forget_the_parts_of_that_generation() {
     let env = fixtures::env(&limits);
     let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
-    for generation in [1, 2, 3] {
-        crate::parts::show(&mut root, &env, fixtures::resource(), generation, PartScope::Deployment, &mut out);
-    }
+    crate::parts::show(&mut root, &env, fixtures::resource(), PartScope::Deployment, &mut out);
     let mut child = Queue::with_capacity(1);
-    child.push(jig_client_view::Request::PartsLeft { generation: 2 });
+    child.push(jig_client_view::Request::PartsLeft);
     crate::route::route_jig(&mut root, &env, &mut child, &mut out);
-    for generation in [1, 2, 3] {
-        assert_eq!(
-            root.forge().contains(&fixtures::resource(), generation),
-            generation == 3,
-            "generation {generation}"
-        );
-    }
+    assert!(!root.forge().contains(&fixtures::resource()));
     assert!(out.is_empty());
 }
 #[test]
@@ -98,12 +90,12 @@ fn a_part_past_the_sides_bound_is_reported_parts_full() {
     let env = fixtures::env(&limits);
     let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::parts::show(&mut root, &env, fixtures::connector(), 1, PartScope::Deployment, &mut out);
-    crate::parts::show(&mut root, &env, fixtures::connector(), 1, PartScope::Deployment, &mut out);
-    crate::parts::show(&mut root, &env, fixtures::resource(), 1, PartScope::Deployment, &mut out);
+    crate::parts::show(&mut root, &env, fixtures::connector(), PartScope::Deployment, &mut out);
+    crate::parts::show(&mut root, &env, fixtures::connector(), PartScope::Deployment, &mut out);
+    crate::parts::show(&mut root, &env, fixtures::resource(), PartScope::Deployment, &mut out);
     assert_eq!(out.pop(), Some(Request::Fact { fact: Fact::PartsFull }));
     assert!(out.is_empty());
-    assert!(!root.forge().contains(&fixtures::resource(), 1));
+    assert!(!root.forge().contains(&fixtures::resource()));
     assert_eq!(forge::shown(root.forge()), 1);
 }
 #[test]
@@ -133,7 +125,11 @@ fn the_reference_uis_records_never_reach_the_small_store() {
         party: 9,
         address: jig_client_view::address::Address::Inbox { project: None },
     };
-    for request in [jig_client_view::Request::Erase { key: record.key() }, jig_client_view::Request::Save { record }] {
+    let mut keys = List::with_capacity(1);
+    keys.push(record.key()).expect("one key");
+    let mut records = List::with_capacity(1);
+    records.push(record).expect("one record");
+    for request in [jig_client_view::Request::Erase { records: keys }, jig_client_view::Request::Save { records }] {
         let mut child = Queue::with_capacity(1);
         child.push(request);
         let mut out = Queue::with_capacity(crate::max_out(&limits));
@@ -161,4 +157,29 @@ fn an_asker_naming_no_child_is_a_fact_and_reaches_none() {
     assert_eq!(out.pop(), Some(Request::Fact { fact: Fact::UnknownAsker }));
     assert_eq!(root.forge().form().expect("form").outcome, None);
     assert!(out.is_empty());
+}
+
+#[test]
+fn the_forges_side_learns_its_party_from_its_own_me_handle() {
+    let limits = fixtures::limits();
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
+    let watch = fixtures::start(&mut root, List::with_capacity(0));
+    crate::route::forge(
+        &mut root,
+        &fixtures::env(&limits),
+        forge::Event::Went { address: forge::Address::Adopt { project: fixtures::PROJECT } },
+        &mut Queue::with_capacity(crate::max_out(&limits)),
+    );
+    assert!(!root.forge().form().expect("adoption page").confirmed);
+    fixtures::confirm(&mut root, watch, fixtures::PARTY, &mut Queue::with_capacity(crate::max_out(&limits)));
+    assert!(root.client().document(forge::me::handle()).is_some());
+    assert!(root.forge().form().expect("adoption page").confirmed);
+    crate::route::told(
+        &mut root,
+        &fixtures::env(&limits),
+        jig_client::Told::Ended { handle: forge::me::handle(), why: jig_client::Why::SignedOut },
+        &mut Queue::with_capacity(crate::max_out(&limits)),
+    );
+    assert!(!root.forge().form().expect("adoption page").confirmed);
+    assert_eq!(root.jig().frame_summary(root.client()).party, Some(fixtures::PARTY));
 }

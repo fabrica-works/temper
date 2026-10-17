@@ -28,8 +28,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(forge::worst_case(&limits.forge)?)?;
     // A shown outcome may carry a protection rule or a whole core refusal.
     total = total.checked_add(limits.jig.document_bytes)?;
-    // Held parts and the PartsLeft survivor list each own their part payloads.
-    total = total.checked_add(u64::from(limits.forge.parts).checked_mul(limits.jig.document_bytes)?.checked_mul(2)?)?;
+    // The forge holds the parts of its current page.
+    total = total.checked_add(u64::from(limits.forge.parts).checked_mul(limits.jig.document_bytes)?)?;
     total = total.checked_add(jig_client::worst_case(&limits.client)?)?;
     let jig_out = jig_client_view::max_out(&limits.jig);
     let root_out = checked_max_out(limits)?;

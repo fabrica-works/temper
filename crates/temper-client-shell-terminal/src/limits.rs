@@ -33,7 +33,6 @@ pub fn native() -> Limits {
                 save_delay: Duration::from_millis(250), // Draft write debounce.
                 intents: 8,                             // In-flight user actions.
                 fields: 16,                             // Editable fields held on pages.
-                providers: 1,                           // Space for jig's provider words.
                 objects: 16,                            // Open object cards.
                 sources: 16,                            // Sources sharing watched objects.
                 reads: 16,                              // Concurrent page readouts.

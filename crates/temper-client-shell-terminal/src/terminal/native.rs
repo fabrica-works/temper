@@ -5,16 +5,18 @@ use crate::{
     route,
 };
 pub(crate) fn event(event: &temper_client_domain::Event) -> Option<Notice> {
+    use jig_client::Up;
     use jig_client::contract::{ReadNone, ReadResult, WatchEnd};
-    use jig_client_view::Event as Jig;
     use temper_client_domain::Event;
     if matches!(
         event,
         Event::SignedOut
-            | Event::Jig(
-                Jig::Ended { end: WatchEnd::SignedOut, .. }
-                    | Jig::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
-            )
+            | Event::Client {
+                event: jig_client::Event::Up {
+                    up: Up::WatchEnded { end: WatchEnd::SignedOut, .. }
+                        | Up::ReadDone { result: jig_client::Readout::Jig(ReadResult::None(ReadNone::SignedOut)), .. }
+                }
+            }
     ) {
         Some(Notice::SignedOut)
     } else {
@@ -47,7 +49,6 @@ impl Client for NativeClient {
         while let Some(shown) = self.notices() {
             match shown {
                 Shown::Terminal(notice) => return Some(notice),
-                Shown::SignInAsked => return Some(Notice::SignedOut),
                 Shown::Notice(route::Notice::Credential { party, credential }) => {
                     return Some(Notice::Credential { party, token: credential });
                 }

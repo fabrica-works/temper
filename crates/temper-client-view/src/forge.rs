@@ -1,4 +1,4 @@
-//! Keep: owner parts and parts held for the page generation (root.md, 6–9).
+//! Keep: owner parts and parts held for the page (root.md, 6–9).
 //! Replace: Ops subjects with the forge's resource words and fixed paragraph.
 use crate::words::{Word, Words};
 use alloc::boxed::Box;
@@ -97,14 +97,8 @@ fn shown(builder: &mut Builder, words: &Words) {
     words.text(builder, Word::Shown, &[]);
     builder.close();
 }
-pub fn part(
-    builder: &mut Builder,
-    side: &temper_client_domain::forge::Side,
-    part: &Part,
-    generation: u32,
-    words: &Words,
-) {
-    if !side.contains(part, generation) {
+pub fn part(builder: &mut Builder, side: &temper_client_domain::forge::Side, part: &Part, words: &Words) {
+    if !side.contains(part) {
         builder.open(Role::Status);
         words.text(builder, Word::Unshowable, &[]);
         builder.close();
