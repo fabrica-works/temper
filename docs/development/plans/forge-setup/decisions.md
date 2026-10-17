@@ -610,6 +610,16 @@ run are appended after "For the user".
      - Unchanged: the fake forge, which replaces a hook's events whole (no request of temper's narrows a hook, so no test
        reaches the difference); the other eleven hook facts; the probe's request; ruling 130's 900.
 
+132. **09.3 retries once past the descriptor test** (process, temper 09's block of 2026-10-17T01:50:52Z).
+     Ruling 132, process, interim: `temper::forge::the_new_process_holds_no_descriptor_but_the_standard_three` (08.2's
+     test, `crates/temper/tests/forge.rs:184`) saw `[0, 1, 2, 3]` in 09.3's gate; candidate 49d225783 touches no process or
+     descriptor code, and the gates of the landings since 08.2 passed it. The supervisor has the failure diagnosed by a
+     sub-agent; its fix, in the test or in production, becomes a step of its own, not 09.3's.
+
+     - 09.3 runs `land` once more on candidate 49d225783, unchanged. If the same test fails again, report it with both gate
+       logs and wait: do not change the test, the fixture or the process code, and do not retry a third time.
+     - Unchanged: implementer.md 8.5 for every other failure; 09.3's Size (875) and proofs.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
