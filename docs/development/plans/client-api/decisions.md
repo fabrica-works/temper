@@ -1137,6 +1137,28 @@ choice would have been the user's (development.md, 10.4).
 
      This changes nothing else in ruling 201's split.
 
+203. **jig 06.4: a party's amendment keeps its revision; one given amount; stale ends withdrawn** (plan defect, jig 06.4's blocks of 2026-10-17T01:37:39Z, 01:39:18Z and 01:43:34Z).
+     These are plan defects. 06.4's Files name `routing/party_controls.rs:80`, which 03.5 removed, and its Shape's "ends the proposal `ProposalOutcome::Stale`" names a state the design does not have.
+
+     1. **A party's amendment keeps its revision (option A).** The design says, in tasks.md: "An amendment names its task's spec's revision ... whoever makes it: a party ... One whose revision has moved is refused as moved". hosts.md says: "`propose`: ... an amendment, naming the revision as `amend` does".
+        - `ProposedAmendment` gains `revision: u64`, so `tasks::PersonAction::Amend` carries it as well as `ProposalAction::Amend`. Both are one record (`tasks-v3.schema:134`).
+        - The proposal is built at `routing/propose.rs:217` with the revision that `party_amend_revision` (`:193`) checked, priority-only exemption kept.
+        - It is checked again at acceptance, in `goal_decide`'s Amend arm (`routing/party_decisions.rs:68`).
+        - One test: a party twin of `an_amendment_proposal_accepted_after_its_spec_moved_is_stale`. List the about 11 sites that name both fields in the commit body.
+     2. **The delegate reply's given amount: carry one `Option<people::Given>`, not `Box<[Made]>`.** The design gives at most one: "At most one task of a batch gives `AsAllowed` ... The answer says what was given" (authority.md).
+        - `BatchKind::Delegation { stubs, given }`, and the `delegating` tuple (`lib.rs:260`) gains `Option<people::Given>`.
+        - `MadeRoute::Delegated` gains `given`, and `tasks: Box<[u64]>` is unchanged.
+        - The one consuming site (`routing/tasks.rs:428`) builds `CallPart::Delegated`'s `Made { task, revision, given }`: revision 0 for a new task, as 06.4's Shape says.
+        - No new `memory.rs` term: the map's slot is priced at `memory.rs:191`.
+        - If the run path does not yet refuse a batch with two `AsAllowed` as not well formed, as the party path does (`routing/create.rs:274`, `AsAllowedTwice`), add that refusal and one test.
+     3. **A stale proposal ends withdrawn, with no new tasks input.** tasks.md's proposal states are "pending, accepted, rejected or withdrawn", and "Withdrawn ... when the state it was made against has changed so that it no longer applies".
+        - When the acceptance's revision check fails, the core sends the existing `WithdrawProposal` or `WithdrawPersonProposal`, naming the proposal's proposer, and keeps a route flag.
+        - Once the child's `Withdrawn` reply returns, it answers `CallPart::Moved` or `Refusal::Moved`. Item 1's party twin uses the same path.
+        - `StaleProposal` is refused: it would add a pub `tasks::Event` and arms in three matches to buy only a reply tag that the core turns into Moved.
+     4. **Size.** 06.4 aims for at most 480 lines. That covers the WIP's +358 and these three answers, about 75 production and 60 test lines. Past 480, report why.
+
+     A further user of a type these items change, which the Files miss, is edited and listed in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

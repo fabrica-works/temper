@@ -504,8 +504,12 @@ Files:
   proposals.rs:51, tests.rs:881, 960}`,
   `crates/jig-protocol-store/src/{codec/tasks/proposals.rs:186, 232,
   tests/codec/phase.rs:178}`, jig 03.5's party amendment proposal
-  (`routing/party_controls.rs:80` at the base), and the matches that
-  bind it with `..` unchanged;
+  (`tasks::PersonAction::Amend`, built at `routing/propose.rs:217` and
+  accepted in `routing/party_decisions.rs:68`'s `goal_decide`, ruling
+  203; `routing/party_controls.rs:80` is gone), and the matches that
+  bind it with `..` unchanged; for the delegate reply's given amount,
+  `lib.rs:260` (`delegating`), `routing/mod.rs:146` and
+  `sibling_routes.rs:48` (ruling 203);
 - `crates/jig-protocol-store/schema/{core-v3.schema, tasks-v3.schema}`
   (edited in place), `src/codec/core/calls.rs:93, 134, 190, 229`;
 - the users of `core::Delegate { .. }` literals: `nested.rs:46`, and in
@@ -542,9 +546,14 @@ Shape:
   moved answers `CallPart::Moved`. `tasks::ProposalAction::Amend { task,
   revision, amendment }` keeps it; an acceptance (a run's,
   `runs.rs:123`, or a party's, `party_decisions.rs:238`) compares it
-  first, and a moved one ends the proposal `ProposalOutcome::Stale` and
-  answers the accepter moved (`CallPart::Moved`, or the party's
-  `Refusal::Moved`). tasks v3: `ProposedAmendment` gains `revision: u64`.
+  first, and a moved one ends the proposal withdrawn, with the existing
+  `WithdrawProposal` or `WithdrawPersonProposal` (tasks.md: "Withdrawn
+  ... when the state it was made against has changed so that it no
+  longer applies"; no new tasks input, ruling 203), and answers the
+  accepter moved (`CallPart::Moved`, or the party's `Refusal::Moved`)
+  once the child's reply returns. tasks v3: `ProposedAmendment` gains
+  `revision: u64`, so a party's `PersonAction::Amend` carries it too,
+  checked by `party_amend_revision` at `goal_decide` (ruling 203).
 - `CallPart::Proposed { proposal: u64, holder: tasks::ProposalHolder }`,
   the holder it waits for when admitted; core v3: `record
   CallPartProposed { proposal: u64 holder: ProposalHolder }` with
@@ -590,7 +599,8 @@ Don't: let a call become a proposal on its own (authority.md, 9); add an
 connector's tool, with its `proposal` reason, as today); resolve a
 task's `AsAllowed` in `jig-domain-authority` (jig 02.4's `as_allowed` is
 a party's).
-Size: at most 300 lines.
+Size: at most 300 lines; by ruling 203, aim for at most 480 (the three
+answers of 01:37Z to 01:43Z included); past it, report why.
 Removes: nothing.
 
 ### 06.5 `withdraw` answers already decided; `cancel` takes a grace
