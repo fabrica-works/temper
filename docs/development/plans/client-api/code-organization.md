@@ -276,7 +276,12 @@ them are rules, each with its check.
   paths, joined by |>'`; its Size is checked against the difference.
   Lines that rustfmt re-wraps because a path grew (a `use` list's
   continuation lines, a signature or a call re-wrapped) are rewrite
-  lines too, though they name no new path (ruling 118). When the
+  lines too, though they name no new path (ruling 118). A file the Shape
+  moves onto a path main already holds (jig 13.2's `domain.rs` onto the
+  orphan `ui.rs`), which `-M` reads as an edit, counts as a move: its added
+  lines are those of `git diff --numstat origin/main:<old path>
+  HEAD:<new path>`, in place of `-M`'s for that file, and the old file's
+  removal adds none (ruling 196). When the
   difference passes twice the Size, the report lists, by file, the
   difference's lines that are no such re-wrap; within twice the Size,
   the increment lands without asking. Nothing else is counted.

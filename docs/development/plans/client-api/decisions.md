@@ -1072,6 +1072,14 @@ choice would have been the user's (development.md, 10.4).
      5. **Tests.** One referee case in `tests/core/tests/referee.rs`: a later amendment's acceptance by another party replaces the entry, and the task is judged against that party. The joint core proof stays as 03.5's Proof says.
      6. **Size.** Within the ceiling 03.5 already has (ruling 190 and the 22:44Z steer): the referee takes at most 40 lines, and each adapter at most 25. Past them, say so in the report.
 
+196. **jig 13.2: a move onto the orphan's path counts blob to blob** (plan defect, jig 13's block of 2026-10-17T01:02:50Z).
+     Ruling 196, a plan defect: the count's command misses a move onto a path main already holds. `code-organization.md`, 7 names jig 13.2 among the moves, which "counts only what it adds beyond the move". So `domain.rs` onto the orphan `ui.rs` counts as a move, as you propose.
+
+     1. **The moved file's added lines** are those of `git diff --numstat origin/main:crates/jig-domain-client/src/domain.rs HEAD:crates/jig-client-view/src/ui.rs` (84 at your draft `1f1922722`), in place of `-M`'s 1,280 for `ui.rs`. The removal of `domain.rs` and of the orphan add nothing.
+     2. **The rest is counted as section 7 says:** the remaining files' added lines, less those that name a moved path or a new name, and less rustfmt's re-wraps (ruling 118). Within twice the Size (120), 13.2 lands without asking; past it, the report lists the lines by file, as section 7 says.
+     3. **The report gives both numbers:** the command's 2,437, and the count with item 1 in place of `ui.rs`'s line.
+     4. The plan's `code-organization.md`, 7 now says this for any such move (temper, this ruling's commit).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
