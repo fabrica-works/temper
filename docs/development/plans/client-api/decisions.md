@@ -1792,6 +1792,13 @@ choice would have been the user's (development.md, 10.4).
      3. **The focused suite's time** (13.945 s of 15 s at 14.3) is the supervisor's to plan next, apart from 14.4.
      4. **Unchanged:** README "Test time" and its Never list; 14.4's Scope, Shape, Test shape, Proof and Size; ruling 262.
 
+268. **14.4: the fixture repair comes back (267's premise)** (process, jig 14.4's block of 2026-10-17T15:49:24Z).
+     Ruling 268 (process, jig 14.4's block of 2026-10-17T15:49:24Z, corrected after the check of 16:00Z): ruling 267's point 1 rested on a wrong comparison; the fixture repair comes back.
+
+     1. **The premise was wrong:** ruling 267 set the serial measure run's times (0.274 s, 0.266 s) beside gate times. Gate to gate, the 4,021 tests common to 14.3's passing gate and 14.4's second sum 108.3 s then 118.5 s (+9%), the first gate's 2,458 tests 94.6 s then 117.8 s (+24%): the machine ran slower (load 5.56 at 14.3's gate, 7.50 and 6.44 at the timeouts). The repair's own tests moved -69% to +15% (the native terminal 1.123 s to 0.352 s).
+     2. **Do:** cherry-pick `5e4afc0c8` (the 14 fixture lines, every assertion kept) back onto `client-api/jig-14-4`, and land it with `Create`, listed as small fixes outside your Files under ruling 264.
+     3. **Unchanged:** ruling 267, points 2 to 4: no further timing repair in 14.4; a gate that times out again with no failing test blocks with the gate's time and its three slowest tests, and `land` runs no third time.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
