@@ -80,7 +80,7 @@ reference pages inside temper's frame until temper 07.
   the client only through the `&Client` the root lends it within the
   step. It keeps no copy of a document across steps.
 - **Transitional, until temper 07.4** (decisions.md, 7): temper's
-  `Address` keeps `Jig(place)` for the reference pages not yet temper's;
+  `Address` keeps `Jig(address)` for the reference pages not yet temper's;
   at such an address the main is `jig-client-view`'s `main` (view.md,
   4.1's `pages::main`, in the module jig 13.2 names `page`) and
   `after_page`, inside temper's frame, and the reference UI child (asker
@@ -99,7 +99,10 @@ reference pages inside temper's frame until temper 07.
 - **A deciding act's revision comes from the tree.** The binding of a
   deciding node carries the revision of the document the card was built
   from; the domain sends that one, never the document's newest (jig's
-  check, `client.md`, 10).
+  check, `client.md`, 10). Deciding a proposal names no revision: "A
+  proposal never changes once made, so deciding it names its number"
+  (jig's `client/domain/contract.md`, 5.2; `Ask::DecideProposal`, jig
+  `crates/jig-client-domain/src/contract/asks.rs:135`).
 - **Chats:** the live chats are a watch, `tasks{query}` (requester the
   person, label the chat template's from `me`, by last activity); the
   closed ones a read of the query's ended group, a page at a time
@@ -134,7 +137,7 @@ reference pages inside temper's frame until temper 07.
 
 Scope: `Owner::Pages`'s child of the root, its `me` handle, the project
 the person is in, temper's `Address` (`Inbox`, `Chats`, `Chat { task }`,
-`Adopt { project }`, and the transitional `Jig(place)`), routing by
+`Adopt { project }`, and the transitional `Jig(address)`), routing by
 asker 2 to it; temper's banner and navigation around each page, after
 the mockups' top bar: the link's state ("Connecting" until `me`,
 "Live", "Offline" when the link drops) and "Behind" after it while a
@@ -150,14 +153,20 @@ Files: `crates/temper-client-domain/src/{pages.rs (new), address.rs,
 route.rs, domain.rs, boundary.rs, limits.rs}`;
 `crates/temper-client-view/src/{frame.rs (new), root.rs, words.rs,
 limits.rs}`; `crates/temper-client-shell-terminal/src/limits.rs` (the
-pages' limits in the sum) and `src/terminal.rs` with
-`crates/temper/src/open.rs` (the status region given to
-`skein_ui_text::Settings` moves to temper's banner's link region, which
-holds "Behind" after the link's state, `client.md`, 6.4); the goldens whose banner and navigation
-change (`crates/temper-client-shell-terminal/src/tests/golden/*.txt`,
-14 at the base, by hand); `tests/client/src/fixtures.rs` (`inbox()` at
-:118, `conversations()` at :140 and `project()` at :256 name temper's
-`Address`), `tests/client/tests/stories.rs:8-24` (the banner's names:
+pages' limits in the sum) and `src/terminal.rs:58-62` (the status
+region given to `skein_ui_text::Settings` moves to temper's banner's
+link region, which holds "Behind" after the link's state, `client.md`,
+6.4), with the other users of `JigRegion::Link`: `src/tests.rs:186`,
+`src/tests/fixtures.rs:112, 372` and `tests/support/mod.rs:30, 127`
+(`terminal.rs` alone fails `fuzzy_terminal`: "seed 1: last change
+printed"); `crates/temper/src/open.rs` builds no `Settings` and does not
+change; the goldens whose banner and navigation change
+(`crates/temper-client-shell-terminal/src/tests/golden/*.txt`, 14 at
+the base, by hand), the trees they print, built by hand in
+`src/tests/fixtures.rs` (`inbox_page()` at :342), and the list of pages
+`src/tests/render.rs:40-52` compares; `tests/client/src/fixtures.rs` (`inbox()` at
+:118, `conversations()` at :140 and `project()` at :257 name temper's
+`Address`), `tests/client/tests/stories.rs:8-21` (the banner's names:
 "Signed in as Person" at :15 becomes the person's name, an expected
 literal the Shape renames); the process tier's terminal script,
 `crates/temper/tests/process.rs:34-63` (`[4] Project 1` at :44 and the
@@ -167,6 +176,15 @@ temper's navigation) and `crates/temper/tests/support/terminal.rs`;
 (`Address::Jig(..)` becomes temper's `Address::Jig(..)`, unchanged in
 meaning). Users of temper's `Address` found by `git grep -n -w -e
 'Address::Jig' -e 'Address::Forge' -- '*.rs'` in temper.
+The navigation's configuration, which 06.1 removes, and its users,
+unless 03.6 has moved them: the domain's `src/lib.rs:20` and
+`src/tests.rs:204-218`, the shell's `src/client.rs:130` and
+`src/tests/fixtures.rs:291-292`. The root `Cargo.toml`
+(`jig-client-test-kit` in `[workspace.dependencies]`, which
+`tests/client/Cargo.toml` takes); the new modules' declarations in
+`crates/temper-client-domain/src/{lib.rs, tests.rs}` and
+`crates/temper-client-view/src/{lib.rs, tests.rs}`; the fixtures the
+tests below name, in each crate's `src/tests/fixtures.rs`.
 Shape:
 - `temper_client_protocol_wire::Owner::Pages` (number 2, since 03.5)
   given its child: the root's `owner::Owner` gains `Pages` (`asker`
@@ -177,8 +195,9 @@ Shape:
   { told }` (what the client tells under asker 2), `Event::Link { link
   }`; `Request::Client(..)` for the client, `Request::Show { address }`.
 - `temper_client_domain::Address` (the sketch below): `Inbox { filter
-  }`, `Chats`, `Chat { task }`, `Adopt { project }`, `Jig(place)`
-  (transitional, removed by 07.4). The forge's `Adopt` keeps its child
+  }`, `Chats`, `Chat { task }`, `Adopt { project }`, `Jig(address)`,
+  jig's `jig_client_view::address::Address` (transitional, removed by
+  07.4). The forge's `Adopt` keeps its child
   and its form; only its address moves into temper's enum.
 - `tests/client`'s referee runs jig 15.5's check (`jig-client-test-kit`,
   as jig 15.5's Shape names its entry point) on each story's sent
@@ -190,7 +209,8 @@ Shape:
   the order of 5.3, with "Inbox" and its count from `me`'s needs, the
   project's entries only when a project is chosen, "Adopt a repository"
   whatever the person's role (5.3).
-- `Act::Project { project }` (one of `me`'s projects) changes the
+- `pages::Act` (in `pages.rs`, deriving `Debug`): `Act::Project {
+  project }` (one of `me`'s projects) changes the
   project the person is in; `Act::SignOut` gives the client `SignOut`;
   while `client.link().sign_out_lost`, the banner says the sign-out did
   not reach the engine and offers "Sign out" again (jig's `client.md`,
@@ -202,14 +222,15 @@ Test shape: step tests in `crates/temper-client-domain/src/tests/pages.rs`
 (new), on `crates/temper-client-domain/src/tests/fixtures.rs` (its
 limits from the shipped profile as the fixtures module takes them
 today); view tests in `crates/temper-client-view/src/tests/frame.rs`
-(new), reading the tree with skein's fake person's queries; and the
+(new), reading the tree with the view's fixtures (`find`, and `link_names`
+below); and the
 joint world. The reference step test:
 ```rust
 #[test]
 fn the_pages_watch_me_from_start_under_their_own_asker() {
     let mut pages = fixtures::pages();
     let mut out = Queue::with_capacity(16);
-    pages::step(&mut pages, &fixtures::env(), &fixtures::client(), pages::Event::Started, &mut out);
+    pages::step(&mut pages, &fixtures::env(&fixtures::limits()), &fixtures::client(), pages::Event::Started, &mut out);
     let watches = fixtures::watches(&mut out);
     assert_eq!(watches, [(fixtures::asker(2), fixtures::ME)], "one watch of me, asked by Pages");
 }
@@ -218,11 +239,16 @@ The reference view test:
 ```rust
 #[test]
 fn the_navigation_offers_inbox_chats_and_adoption_in_order() {
-    let view = fixtures::built(&fixtures::signed_in_with_project());
-    let face = skein_fake_person::TreeFace::new(view.tree());
-    assert_eq!(face.names(Role::Link), ["Inbox 0", "Chats", "Adopt a repository"]);
+    let view = fixtures::signed_in_with_project();
+    assert_eq!(fixtures::link_names(&view), ["Inbox 0", "Chats", "Adopt a repository"]);
 }
 ```
+`fixtures::link_names` (new) collects the names of the tree's
+`Role::Link` nodes, beside `fixtures::find`
+(`crates/temper-client-view/src/tests/fixtures.rs:155`): skein's
+`TreeFace` has no `names`, and temper-client-view takes no
+`skein-fake-person`. `signed_in_with_project` (new) builds the view as
+the landed `built(root_forge: u16)` (:132) does.
 Tests, each under 20 ms: the two above,
 `an_asker_naming_pages_reaches_the_pages_child`,
 `the_project_chosen_is_the_first_of_me_at_start`,
@@ -261,10 +287,12 @@ card reading the object it needs; links by number; seen
 06.3 adds them.
 Needs: 06.1.
 Files: `crates/temper-client-domain/src/pages/inbox.rs` (new),
-`pages.rs`; `crates/temper-client-view/src/pages/inbox.rs` (new),
-`root.rs`, `words.rs`; `crates/temper-client-shell-terminal/src/tests/golden/inbox.txt`
+`pages.rs`; `crates/temper-client-view/src/{pages.rs (new),
+pages/inbox.rs (new)}`, `root.rs`, `words.rs`; `crates/temper-client-shell-terminal/src/tests/golden/inbox.txt`
 (re-recorded by hand, with an entry of each kind and an update, as
-`client.md`, 10's golden text lists it); `tests/client/tests/stories.rs` and the
+`client.md`, 10's golden text lists it), and its tree, `inbox_page()`
+(`src/tests/fixtures.rs:342`), by hand; the fixtures its tests name
+(`question` among them), in each crate's `src/tests/fixtures.rs`; `tests/client/tests/stories.rs` and the
 process tier's `crates/temper/tests/process.rs:34-63` (the inbox's
 printed lines: `All goals` at :43 becomes temper's goal filter's name).
 Shape:
@@ -343,7 +371,7 @@ Shape:
   it says comes from `facts::effect(offers, act)` and
   `facts::dangerous(act)` (jig 15.1) over the card's document.
 - Each deciding binding carries `(object, revision)` as the card was
-  built (Choices); `acts::send(.., operation, revision)` keys the
+  built (Choices; a proposal's, its number alone); `acts::send(.., operation, revision)` keys the
   request with the pages' seed and asks the client (`Send { key, request
   }`), keeping the key with the card that sent it.
 - A card's state: open, deciding (pending, shown as asked from
@@ -361,12 +389,12 @@ reference step test:
 ```rust
 #[test]
 fn accepting_sends_nothing_until_the_confirmation_is_confirmed() {
-    let mut pages = fixtures::inbox_with_proposal(fixtures::PROPOSAL, fixtures::REVISION);
+    let mut pages = fixtures::inbox_with_proposal(fixtures::PROPOSAL);
     let mut out = Queue::with_capacity(16);
-    fixtures::act(&mut pages, &mut out, Act::Accept { proposal: fixtures::PROPOSAL, revision: fixtures::REVISION });
+    fixtures::act(&mut pages, &mut out, Act::Accept { proposal: fixtures::PROPOSAL });
     assert_eq!(fixtures::sent(&mut out).len(), 0, "said before it is sent");
     fixtures::act(&mut pages, &mut out, Act::Confirm);
-    assert_eq!(fixtures::sent(&mut out), [fixtures::decide_accept(fixtures::PROPOSAL, fixtures::REVISION)]);
+    assert_eq!(fixtures::sent(&mut out), [fixtures::decide_accept(fixtures::PROPOSAL)]);
 }
 ```
 Tests, each under 20 ms (unit) or 0.5 s (world):
@@ -407,15 +435,19 @@ Needs: 06.1.
 Files: `crates/temper-client-domain/src/pages/chats.rs` (new),
 `pages.rs`; `crates/temper-client-view/src/pages/chats.rs` (new),
 `words.rs`; `crates/temper-client-shell-terminal/src/tests/golden/chats.txt`
-(new); the stories that start a chat on jig's page, each moved to
+(new), with its tree in `src/tests/fixtures.rs` and its entry in
+`src/tests/render.rs`'s list; the stories that start a chat on jig's page, each moved to
 temper's names (an expected literal the Shape renames):
 `tests/client/tests/stories.rs` (`a_double_press_of_start_makes_one_chat`,
 `a_chat_started_on_jigs_page_is_answered_by_the_run`, renamed
 `a_chat_started_on_the_chats_page_is_answered_by_the_run`,
 `signed_out_mid_request_is_made_once_after_signing_in`),
 `tests/client/src/fixtures.rs:140` (`conversations()` becomes
-`chats()`), `tests/one-process/src/world.rs:209-222`,
-`crates/temper/tests/support/person.rs:16-27, 251-257` ("First words"
+`chats_page()`: `chats(&Driver)` at :144 keeps its name), with its users
+`tests/client/tests/stories.rs:26, 45, 80` and
+`tests/client/tests/fuzzy_client.rs:10`;
+`tests/one-process/src/world.rs:209-222`,
+`crates/temper/tests/support/person.rs:16-27, 248-255` ("First words"
 and "Start a conversation" become "Start a chat" and "Start").
 Shape:
 - `pages::chats::Chats { live: Handle, closed: Handle, words:
@@ -482,15 +514,20 @@ Needs: 06.4.
 Files: `crates/temper-client-domain/src/pages/chat.rs` (new),
 `pages.rs`, `acts.rs`; `crates/temper-client-view/src/pages/chat.rs`
 (new), `words.rs`; `crates/temper-client-shell-terminal/src/tests/golden/chat.txt`
-(new); `tests/client/tests/chat.rs` (new).
+(new), with its tree in `src/tests/fixtures.rs` and its entry in
+`src/tests/render.rs`'s list; `tests/client/tests/chat.rs` (new); the
+fixtures its tests name (`chat`, `chat_page`), in each crate's
+`src/tests/fixtures.rs`.
 Shape:
 - `pages::chat::Chat { task: u64, document: Handle, run: Option<Handle>,
   activity: Handle, thread: jig_client::thread::Thread, words:
   Box<[u8]>, pending: List<Key> }`: the `Thread` of jig 15.4, fed
   `document(&task)`, `page(activity_page)`, `older()`, `run(&run_state,
-  text)`, `sending(key, by, words)` and `answered(key, &answer)` from
+  text)`, `sending(key, by, words, place)` and `answered(key, &answer)` from
   the client's documents and tells; its header's status
-  `facts::chat_status(&task, run, party)` (jig 15.1) in `words`.
+  `facts::chat_status(chip, waits_on, project, me)` (jig 15.1, over the
+  task document's `chip`, `waits_on` and `project`; it takes no run
+  document) in `words`.
 - `Act::MessageWords { words }`, `Act::Send` (`Message`, one keyed
   request), `Act::Stop` (`Stop`, one keyed request, not confirmed: it
   can be undone by releasing), `Act::Older` (the next page of
@@ -595,9 +632,11 @@ Removes: nothing.
 
 `temper_client_domain::Address`, `Filter`, `Kind`, `Proposal` and
 `Confirm` compile at the base as `temper_client_domain::sketch_pages`
-(`logs/w9/clippy-sketches-3.txt`; `jig_client_view::Place` stubbed as a
-unit struct). The pages child's surface names jig 12's and 15's types,
-and is checked at the ready check.
+(`logs/w9/clippy-sketches-3.txt`), and, as below, with
+`Jig(jig_client_view::address::Address)`, `jig_client::contract::Proposer`,
+and `Debug` and `#[must_use]` where shown, under clippy at jig
+`b58a49c39` and temper `70f376c5` (06's ready check, 2026-10-17). The
+pages child's surface names jig 15's types where it uses them.
 
 ```rust
 // crates/temper-client-domain/src/address.rs
@@ -614,7 +653,7 @@ pub enum Address {
     /// The adoption form, the forge side's page (4.4).
     Adopt { project: u32 },
     /// A page of jig's reference UI: transitional, removed by temper 07.4.
-    Jig(jig_client_view::Place),
+    Jig(jig_client_view::address::Address),
 }
 /// The inbox's filter (`inbox.html`): a field that is none shows every value.
 pub struct Filter { pub project: Option<u32>, pub kind: Option<Kind>, pub goal: Option<u64> }
@@ -634,13 +673,13 @@ pub enum Kind {
 ```rust
 // crates/temper-client-domain/src/acts.rs
 /// A proposal, as `Decide` names it: its proposer and its number (jig's contract.md, 3.2).
-pub struct Proposal { pub proposer: u64, pub number: u64 }
+pub struct Proposal { pub proposer: jig_client::contract::Proposer, pub number: u64 }
 /// The page's one open confirmation (client.md, 3.6): an act said before it is sent.
 pub enum Confirm {
-    /// Accept, naming the revision the card showed.
-    Accept { proposal: Proposal, revision: u64 },
+    /// Accept: a proposal never changes once made, so it names no revision (contract.md, 5.2).
+    Accept { proposal: Proposal },
     /// Reject with the reason the card's field holds.
-    Reject { proposal: Proposal, revision: u64 },
+    Reject { proposal: Proposal },
     /// Release a held task at its hold's revision.
     Release { task: u64, revision: u64 },
     /// Close a chat, with what becomes of each live delegate (`shapes::close_chat`).
@@ -651,8 +690,10 @@ pub enum Confirm {
 ```rust
 // crates/temper-client-domain/src/pages.rs, after jig_client_view::Ui (jig's view.md, 18.1)
 /// temper's pages: owner `Pages` (2), the asker of every handle and key they give the client.
+#[derive(Debug)]
 pub struct Pages { /* me's handle, the project chosen, the page, the confirmation, acts by key, seed */ }
 /// To the pages, from the root.
+#[derive(Debug)]
 pub enum Event {
     /// The client started: watch `me`.
     Started,
@@ -666,6 +707,7 @@ pub enum Event {
     Link { link: jig_client::Link },
 }
 /// From the pages, for the root.
+#[derive(Debug)]
 pub enum Request {
     /// One of the client's events (`Watch`, `Unwatch`, `Read`, `Send`), under the pages' asker.
     Client(jig_client::Event),
@@ -674,7 +716,9 @@ pub enum Request {
 }
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &jig_client::Client, event: Event, out: &mut Queue<Request>);
 pub fn fire(pages: &mut Pages, env: &Env<Limits>, client: &jig_client::Client, out: &mut Queue<Request>);
+#[must_use]
 pub fn next_deadline(pages: &Pages) -> Option<Time>;
+#[must_use]
 pub fn shown(pages: &Pages) -> u64;
 ```
 
