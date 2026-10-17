@@ -1460,6 +1460,39 @@ choice would have been the user's (development.md, 10.4).
 234. **jig 21.3 and 21.4 against main after 21.2; 08:16Z steer texts** (re-check of jig 21.3 and 21.4, and steer of 2026-10-17T08:16Z).
      jig 21.3 and 21.4 against main after jig 21.2, and the 08:16Z steer's run-end texts. The re-check of what moved since ruling 192's check (jig `73734dd6f`) to jig `154e10942` (21.2), temper `d120b2f1`, skein `f981746a7` unchanged, by a read-only sub-agent, is corrected in `jig/21-ops-and-ui.md`: the watch spine's functions are in `crates/jig-client-view/src/ui.rs` (`open` :465 to `read_final_task` :1109), not `jig-domain-client`, which is gone; `jig_client::Event` and `jig_client::Request` derive `Debug, PartialEq, Eq` since `5c06a7e98`, so `crates/jig-client/src/client.rs` leaves 21.3's Files; the sketch derives `Debug, PartialEq, Eq` on the Ui's `Event` and `Request`, `Copy` on `How`, `Debug` on `Ui` and `Refused`, `#[must_use]` on `next_deadline` and `shown`, and `Erase` takes the view's `store::StoreKey` (no `records` module); 21.3's Files take the users of `Request::{SignIn, Fact}`, `Act::SignIn` and `signin::Provider` in the view crate, both roots and the worlds' setups of `providers`, `tests/client/src/observe.rs:203-241` (`jig_received`), and each file naming the view's `Domain` that the rename to `Ui` reaches; moved lines (`world.rs:565, :567`, `joint/front.rs:224`, `tests/client-protocol/src/native.rs:190`, `pages.rs:108-220`); 21.4's Files take `tests/client/tests/shell.rs:30` and `tests/client/src/observe.rs:230-242`, its test lines move (ops client-domain `tests.rs:1135-1186`, client-view `tests.rs:1619-1620`, `family_terminals.rs:55-56, :266`, ops `limits.rs` about :38-80), and the Done-when grep gains `-e 'Request::Frame' -e 'FrameShown'`. temper's users of what 21.3 and 21.4 remove, for temper 03.6's ready check, temper pinned at jig `c92d4a09d` until then: `crates/temper-client-domain/src/route.rs:56, :103-137, :175-178`, `domain.rs:129, :164-166`, `boundary.rs:52`, `forge.rs:96, :120`; `crates/temper-client-shell-terminal/src/route.rs:119, :185, :187`; the `Hello` fixtures in `crates/temper-client-view/src/tests/`. Suites at `154e10942`: the corrected sketch under `heavy cargo clippy -p jig-w6-sketch --all-targets -- -D warnings`, passing; `jig-client-protocol-world`, 21.3's two proof tests and two neighbours, 4/4; `jig-ops-world --profile fuzzy` p, passing; `jig-client-world` `a_dropped_watch_shows_the_page_behind_until_it_reopens`, passing. The 08:16Z steer's points 1 (cause-finding tests out of the default suite) and 2 (`tests/ops`'s story helpers once) hold until the run's end: their Pass on texts are in the README's "The run's steers". Refresh any further copy, and list it in the commit body.
 
+235. **jig 21.3: a read's page stays with the page that read it** (design answer, jig 21.3's block of 2026-10-17T08:11:37Z).
+     Ruling 235 (design answer, jig 21.3's block of 2026-10-17T08:11:37Z): the designer's answer, landed as jig de4f80564 and temper 892f4e88; 21.3 goes on under it and lands when its Shape is done.
+
+     1. **A: the Ui keeps a read's page.** view.md, 18 now says: "It keeps no
+        copy of a watch's document: it reads each from the client, by its
+        handles, when the client reports it changed. A read's page, which the
+        client hands over once, in the read's terminal, and keeps no copy of
+        (client.md, 7), the reference UI keeps until the page that read it is
+        left or the handle's next page replaces it (18.3)."
+     2. **18.3, a new bullet:** "The page keeps what the read is handed, under
+        the read's handle: a project's settings, a page of a task's history
+        or activity, an object's document read to say how it ended. A read's
+        handle keeps one page; a window's keeps the rows its pages put in the
+        window ... What it keeps goes when the page is left (18.2), or when a
+        read on the same handle is answered with a page, which replaces it; a
+        read answered with none leaves it, and the page shows why, as 18.2
+        says." 18.2's going to a page "forgets its reads and the pages they
+        were handed".
+     3. **18.9:** the pages kept are a limit and part of the Ui's worst case,
+        "one per read handle, each priced at the client's bytes of a page
+        handed over (client.md, 14)".
+     4. **For 21.3:** each holder of a read's page stays as `main` has it
+        (`ProjectPage.owner`, `owner_spend`, read windows, bodies read to say
+        how an object ended), with its pricing (`page::project::worst_case`,
+        `windows::worst_case`). Nothing in `crates/jig-client` or
+        `crates/jig-client-domain` changes for completed reads. The Don't now
+        reads: "no copy of a watch's document kept by the Ui across steps: it
+        reads each from `client.document(handle)` (view.md, 18); a read's page
+        is the page's to keep, never the client's (view.md, 18.3)". Added
+        test: `a_read_s_page_stays_until_the_page_is_left_or_its_next_page_replaces_it`.
+        Size 300 to 320.
+     5. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
