@@ -1266,6 +1266,15 @@ choice would have been the user's (development.md, 10.4).
 
      No session changes anything for this ruling.
 
+213. **temper-03.s2: 30 minutes for the merge story's derived bound** (plan defect, temper 03.s2's block of 2026-10-17T03:23:15Z).
+     Ruling 213, plan defect: temper-03.s2 gets 30 minutes more for the merge story, aimed by a cause already known. The first refusal is the pinned core's: at jig `c92d4a09d` (s2's pin, jig 13.2), `task_tree.rs:328-329` bounds an adopted resource path by `limits.documents.lines`. jig main bounds it by `limits.documents.segments` since 13.s1 (`40d1bec49`), as `client/domain/client.md` 727-729 says: "a path's segments: the most segments of a resource's path or a pattern a document may carry, a bound of its own, never a window's rows". Raising the fixture's `documents.lines` stands in for the missing `segments`, and the stream that then drops at Time(0) right after Hello is a second effect of that raise, not of the merge.
+
+     1. s2 keeps its pin at jig `c92d4a09d` (ruling 199): no repin in this ruling.
+     2. First look, at most 30 minutes from receiving this: run the merge story with the fixture's `documents.lines` at 4 and at 8, and compare the first refusal or close that each run logs before `Notice(Fact(StreamDropped))` (server side and client side). The question to answer: which bound derived from `documents.lines` (an envelope, a window, a frame or a body size) passes a bound of the transport or of the HTTP server at 8.
+     3. If it is a derived bound of a fixture: raise the fixture's paired bound as well, in the fixture only, with one line of comment naming this ruling and jig 13.s1's `segments`; then land s2.
+     4. If the 30 minutes end with no cause, or the cause is outside temper's fixtures: stop, put the fixture's `documents.lines` back to 4, and block again with the two runs' first lines and logs. The next ruling then weighs moving s2's pin to jig `40d1bec49`.
+     5. Unchanged: rulings 199, 201 and 202, the fuzzy profile in s2's gate, and 03.4's turn after s2.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
