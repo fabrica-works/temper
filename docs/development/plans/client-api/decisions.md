@@ -1032,6 +1032,36 @@ choice would have been the user's (development.md, 10.4).
 193. **The 00:40Z steer's two rules in the README** (steer of 2026-10-17T00:41:21Z).
      The 00:40Z steer, from the check of 00:40Z: its points 1 (a test's helpers once: `inbox_objects` and `second_party` in `tests/core/src/fixtures.rs`) and 3 (a failure's message built only when the check fails) hold until the run's end, so their Pass on texts are in the README's "The run's steers" (ruling 167). Points 2 (04.7's `[false, true]` loop split, by jig 04.s1) and 4 (`actual` in 12.5's `unlinked.rs`, by jig 13.1) end with their sessions' landings and rest on the README's 18:42Z and 14:09Z rules.
 
+194. **jig 13.4's bridge, and jig 21.3's wall, SignIn and Fact** (design answer, the questions of 2026-10-17T00:33:54Z (re-check of ruling 191) and 00:34:56Z (ready check of jig-21.1)).
+     Ruling 194, the designer's answers, landed as jig 64e1ab93b and temper 8a14b8ed: jig 13.4 (Size 370), jig 21.3, jig 21.4 (Size 300) and temper 03.6 go under their amended Shapes, and jig 21.3 waits for no answer now; nothing is deferred.
+
+
+     ### jig 13.4: what the reference UI's bridge does with the client's tells and values it has no counterpart for, 2026-10-17T00:52Z
+
+
+
+     1. **`Dropped { count }` was a gap in the design, and now has a rule.** client.md, 11 now says: "The client tells only how many, `Dropped { count }`, once at start, under no asker: nothing of a record it does not read is read, its key's asker included." root.md, 8 now says: "The root gives the count to one child, which says so: the reference UI, where the application has it". view.md, 18.4 now says: "a notice says that many requests kept from before were not sent". The bridge maps it to nothing until jig 21.4, which shows the notice.
+     2. **`Text`** maps to nothing. For a run's handle, the client tells `Changed` and then `Text` in one step (`jig-client-domain/src/watches.rs:110, :112`). `Changed` already delivers the run's document, which holds the client's text.
+     3. **`Continue`** reaches no client event: `asked` gives `None`. client.md, 8.3 says: "Opened again, the watch starts from the beginning of the turn being written: the client keeps what it holds". contract.md, 7.3 says the client "is sent the rest when there is more". view.md, 18.1 now says: "It never continues a run's watch".
+     4. **The link.** `Starting` and `Offline` map to the UI's link. `Live` maps to `Hello { served: true }`, then `Live`. `SignedOut` maps to `SignedOut`, and `OutOfDate` to `Hello { served: false }`. view.md, 18.2: "signed out and out of date are pages not about the work".
+     5. **A sign-out that did not reach the engine.** client.md, 4.2 now says `Link` is told "whenever it changes, and when a sign-out does not reach the engine". The bridge then gives the UI `SignOutLost`. `Client::unlinked` answers `SignOut` at once (`client.rs:236`). In 13.4 it leaves the sign-out to its world instead, so that `a_lost_sign_out_keeps_the_person_signed_in_and_says_so` (`tests/client/tests/shell.rs:81`) runs.
+     6. **The client's limit.** `Why::Limit` maps to `Closed`, and `Readout::Limit` to `None(Busy)`. view.md, 18.2 now says: "A handle the client ends, or a read it answers, refused by the client's own limit ..., is one the page left out."
+     7. **`NotServed`.** Under jig's asker, only a read while the link is out of date is answered so (`reads.rs:18`). The bridge maps it, and `Family { .. }`, to `None(Refused)`. `Why::NotServed` (mapped to `Unknown`) and `Progress::NotServed` (mapped to `Parked`) come only for a family's handle or request (`domain.rs:140, :175`; `requests.rs:21, :161`).
+     8. **Keys (found by the check; not asked).** 13.4's "its tokens as numbers" would repeat a kept key after a reload, because a token is a slot and a generation, both fresh at a restart (skein `id.rs:41-45`). That breaks view.md, 18.1: "draws its keys' numbers from its seed, fresh for each request it means". A key's number is now its token xored with a salt that the root draws from its seed.
+     9. **`KeptGone`.** The bridge gives none until 21.4: no owner names a kept request's party once it is answered (root.md, 5).
+     10. **The native host.** In 13.4, `jig-client-shell-native` moves onto `jig_client::{Request, Event}`. protocol/client.md, 12 says the shell is the application's "loop around `jig-client`". 13.4's Size goes from 300 to 370, and 21.4's from 290 to 300.
+     11. **Nothing is deferred:** no `later.md` row.
+
+     ### jig 21.3: `step`'s `wall`, and the reference UI's `Request::{SignIn, Fact}`, 2026-10-17T00:52Z
+
+
+
+     1. **`Ui::step` and `fire` take `wall`.** view.md, 18.1 is the text that was wrong, and the plan's sketch stands. view.md, 18.1 now reads `step(now, wall, &Client, Event, ..)` and says: "the wall time it shows the engine's wall times against ('waiting 4 min')". client.md, 4 now reads `step(now, wall, ..)` and says: "`now` and `wall` are the monotonic instant and the wall time ... (programming-model.md, section 9: `env.now` and `env.wall`)".
+     2. **`SignIn` goes, in 21.3.** view.md, 18.6: "Signing in is the application's". pages.md, 8: the sign-in page leaves a slot "which the application's view fills with its own nodes". view.md, 18.1 now says: "It never asks to sign in". `Act::SignIn`, `signin::Provider` and the page's provider list go too. The UI comes back to the place it kept with no `back` ("Once `me` names the party, the reference UI returns to the place it kept", 18.6). The test application's "Sign in with Test" button moves into its slot.
+     3. **`Fact` goes, in 21.3.** view.md, 18.1 now says: "A limit that refuses is said where it refuses, on the page or in place (18.2, 18.4), never as a report beside it." No root, world or shell reads a fact.
+     4. **temper 03.6** drops the arms its root and its terminal shell have for the UI's `Continue`, `SignIn` and `Fact`. temper signs in by the printed link (temper's `client.md`, 7).
+     5. **Nothing is deferred:** no `later.md` row.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
