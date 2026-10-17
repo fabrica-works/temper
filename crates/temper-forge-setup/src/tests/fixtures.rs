@@ -78,12 +78,14 @@ pub fn secrets() -> crate::state::Secrets {
 }
 
 pub struct Drive {
+    runner: bool,
     machine: crate::prepare::Prepare,
     out: skein_lib::Queue<crate::prepare::Request>,
 }
 impl Drive {
     pub fn new(owned: crate::setup::Owned) -> Self {
         Self {
+            runner: owned.runner.is_some(),
             machine: crate::prepare::Prepare::new(owned, place(), None),
             out: skein_lib::Queue::with_capacity(crate::prepare::MAX_OUT),
         }
@@ -115,6 +117,9 @@ impl Drive {
             request = self.send(Event::Printed(line(Which::Runner)));
         }
         request
+    }
+    pub fn reach(&mut self, found: crate::prepare::Found) -> crate::prepare::Request {
+        self.versions(found, self.runner)
     }
     pub fn drawn(&mut self, runner: bool) -> crate::prepare::Request {
         use crate::prepare::{Event, Request};
@@ -149,7 +154,7 @@ pub fn line(which: crate::spec::Which) -> Box<str> {
     chunk.valid().into()
 }
 pub fn first() -> crate::prepare::Found {
-    crate::prepare::Found { state: None, admin_token: false, files: false }
+    crate::prepare::Found { state: None, admin_token: false, runner_secret: false, files: false }
 }
 pub fn later() -> crate::prepare::Found {
     use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
@@ -161,6 +166,7 @@ pub fn later() -> crate::prepare::Found {
             secrets: secrets(),
         })),
         admin_token: true,
+        runner_secret: true,
         files: true,
     }
 }
@@ -278,4 +284,41 @@ impl Run {
             );
         }
     }
+}
+
+pub fn older(forgejo: Option<&[u8]>, runner: Option<&[u8]>) -> crate::prepare::Found {
+    let mut state = prepared();
+    if let Some(version) = forgejo {
+        state.forgejo = version.into();
+    }
+    if let Some(version) = runner {
+        state.runner = Some(version.into());
+    }
+    crate::prepare::Found { state: Some(crate::state::encode(&state)), ..later() }
+}
+pub fn backup(recorded: &[u8]) -> Box<[u8]> {
+    let pin = temper_forge_forgejo::pin::VERSION.as_bytes();
+    let mut name = Writer::new(recorded.len().checked_add(pin.len()).unwrap().checked_add(16).unwrap());
+    for piece in [b"forgejo-".as_slice(), recorded, b"-to-", pin, b".zip"] {
+        name.put(piece).unwrap();
+    }
+    name.finish()
+}
+pub fn ran_ok() -> crate::prepare::Event {
+    ran(b"runner-uuid\n")
+}
+pub fn run_command(command: crate::spec::Command) -> crate::prepare::Request {
+    crate::prepare::Request::Run { command, spec: crate::spec::command(command, &owned(), &place()) }
+}
+pub fn runner_added() -> crate::prepare::Found {
+    let mut state = prepared();
+    state.runner = None;
+    crate::prepare::Found { state: Some(crate::state::encode(&state)), runner_secret: false, ..later() }
+}
+pub fn failed() -> crate::prepare::Event {
+    crate::prepare::Event::Ran(crate::prepare::Ran {
+        exit: crate::prepare::Exit::Code(1),
+        stdout: secret(b""),
+        stderr: secret(b"broken"),
+    })
 }

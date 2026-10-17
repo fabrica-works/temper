@@ -11,6 +11,7 @@ use temper_forge_setup::{
     run::{self, Refusal},
     setup::Mode,
     spec::Which,
+    upgrade::Course,
 };
 use temper_forge_setup_shell::{command, prepare, run as host};
 /// A command's diagnostic, without any credential contents.
@@ -64,8 +65,24 @@ fn failure(why: prepare::Failed, place: &Place) -> String {
             Failure::Unread { command } => format!("{command:?} printed no required value"),
             Failure::State(why) => format!("{}: state cannot be decoded: {why:?}", text(&place.directory)),
             Failure::Unrecorded => format!("{}: Forgejo files have no preparation state", text(&place.directory)),
-            Failure::Recorded => format!("{}: state records other prepared versions", text(&place.directory)),
+            Failure::Newer { which, recorded } => {
+                let (name, pin) = pinned(which);
+                format!(
+                    "{name} is prepared at {}, newer than this temper's pin {pin}: its migrations only go forward",
+                    text(&recorded)
+                )
+            }
+            Failure::Unreadable { which } => {
+                format!("{} is prepared at a version this temper cannot read", pinned(which).0)
+            }
         },
+    }
+}
+fn pinned(which: Which) -> (&'static str, &'static str) {
+    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    match which {
+        Which::Forgejo => ("forgejo", VERSION),
+        Which::Runner => ("runner", RUNNER_VERSION),
     }
 }
 fn login(user: u32) -> Result<Box<[u8]>, String> {
@@ -86,12 +103,25 @@ fn run_refusal(why: Refusal, launch: &run::Launch, number: u16) -> String {
         Refusal::NoRunner => "the setup has no runner".into(),
         Refusal::NotPrepared => prepare("not prepared".into()),
         Refusal::Unfinished => prepare("its preparation did not end".into()),
-        Refusal::Versions { forgejo, runner } => {
+        Refusal::Runner { recorded } => prepare(if recorded {
+            "prepared with a runner, and the setup has none".into()
+        } else {
+            "prepared without a runner, and the setup has one".into()
+        }),
+        Refusal::Versions { course: Course::Unreadable, .. } => {
+            "prepared at a version this temper cannot read: no command of this temper runs it".into()
+        }
+        Refusal::Versions { forgejo, runner, course } => {
             use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
             let recorded =
                 runner.map_or_else(|| text(&forgejo), |runner| format!("{} / {}", text(&forgejo), text(&runner)));
             let pinned = if launch.runner { format!("{VERSION} / {RUNNER_VERSION}") } else { VERSION.into() };
-            prepare(format!("prepared at {recorded}, this temper pins {pinned}"))
+            let reason = format!("prepared at {recorded}, this temper pins {pinned}");
+            if course == Course::Newer {
+                format!("{reason}: no command of this temper runs it")
+            } else {
+                prepare(reason)
+            }
         }
         Refusal::Binary { printed } => format!("{} printed {printed:?}, not the pinned release", text(&launch.program)),
     }

@@ -21,7 +21,8 @@ fn the_run_refuses_an_older_preparation() {
         run::admit_state(&fixtures::launch(Which::Forgejo), Some(&state)),
         Err(Refusal::Versions {
             forgejo: b"0.0.0".as_slice().into(),
-            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into())
+            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into()),
+            course: crate::upgrade::Course::Older,
         })
     );
 }
@@ -33,7 +34,8 @@ fn the_run_refuses_a_newer_preparation() {
         run::admit_state(&fixtures::launch(Which::Forgejo), Some(&state)),
         Err(Refusal::Versions {
             forgejo: b"999.0.0".as_slice().into(),
-            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into())
+            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into()),
+            course: crate::upgrade::Course::Newer,
         })
     );
 }
@@ -43,7 +45,7 @@ fn the_run_refuses_a_different_runner_preparation() {
     state.runner = None;
     assert_eq!(
         run::admit_state(&fixtures::launch(Which::Forgejo), Some(&state)),
-        Err(Refusal::Versions { forgejo: temper_forge_forgejo::pin::VERSION.as_bytes().into(), runner: None })
+        Err(Refusal::Runner { recorded: false })
     );
 }
 #[test]
@@ -90,4 +92,11 @@ fn the_launch_names_the_selected_lock_and_state() {
     assert_eq!(forgejo.lock.as_ref(), b"/srv/forge-2/forgejo.lock");
     assert_eq!(runner.lock.as_ref(), b"/srv/forge-2/runner.lock");
     assert_eq!(forgejo.state.as_ref(), b"/srv/forge-2/state");
+}
+
+#[test]
+fn the_run_names_prepare_for_a_runner_removed() {
+    let mut launch = fixtures::launch(Which::Forgejo);
+    launch.runner = false;
+    assert_eq!(run::admit_state(&launch, Some(&fixtures::prepared())), Err(Refusal::Runner { recorded: true }));
 }

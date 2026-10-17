@@ -208,3 +208,97 @@ fn no_secret_of_the_state_reaches_a_refusal() {
     }
     scratch.remove();
 }
+
+#[test]
+fn a_newer_recorded_forgejo_refuses_the_preparation_untouched() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_newer_prepare");
+    let _programs = owned::scripted(scratch.path());
+    assert!(owned::prepare(scratch.path(), 1).status.success());
+    owned::record_versions(scratch.path(), Some(b"999.0.0"), None);
+    let files = ["state", "forgejo/app.ini"];
+    let before: Vec<_> = files
+        .iter()
+        .map(|name| fs::read(scratch.path().join("forge-1").join(name)).expect("upgrade fixture"))
+        .collect();
+    owned::refused(scratch.path(), "prepare", b"temper forge prepare: forge 1: forgejo is prepared at 999.0.0, newer than this temper's pin 17.0.0: its migrations only go forward\n");
+    let after: Vec<_> = files
+        .iter()
+        .map(|name| fs::read(scratch.path().join("forge-1").join(name)).expect("upgrade fixture"))
+        .collect();
+    assert_eq!(before, after);
+    assert_eq!(fs::read_dir(scratch.path().join("forge-1/backups")).expect("upgrade fixture").count(), 0);
+    scratch.remove();
+}
+#[test]
+fn the_run_refuses_a_newer_recorded_version_in_its_own_words() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_newer_run");
+    let _programs = owned::scripted(scratch.path());
+    owned::finished(scratch.path());
+    owned::record_versions(scratch.path(), Some(b"999.0.0"), None);
+    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared at 999.0.0 / 13.2.0, this temper pins 17.0.0 / 13.2.0: no command of this temper runs it\n");
+    scratch.remove();
+}
+#[test]
+fn the_run_refuses_an_unreadable_recorded_version_in_its_own_words() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_unreadable_run");
+    let _programs = owned::scripted(scratch.path());
+    owned::finished(scratch.path());
+    owned::record_versions(scratch.path(), Some(b"private-looking-garbage"), None);
+    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared at a version this temper cannot read: no command of this temper runs it\n");
+    scratch.remove();
+}
+#[test]
+fn the_run_names_prepare_for_a_runner_added() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_runner_added_run");
+    let _programs = owned::scripted(scratch.path());
+    owned::finished(scratch.path());
+    owned::recorded_without_runner(scratch.path());
+    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared without a runner, and the setup has one: run temper forge prepare CONFIG.json 1\n");
+    scratch.remove();
+}
+#[test]
+fn the_run_names_prepare_for_a_runner_removed() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_runner_removed_run");
+    let _programs = owned::scripted(scratch.path());
+    owned::finished(scratch.path());
+    owned::setup_without_runner(scratch.path());
+    owned::refused(scratch.path(), "run", b"temper forge run: forge 1: prepared with a runner, and the setup has none: run temper forge prepare CONFIG.json 1\n");
+    scratch.remove();
+}
+#[test]
+fn an_interrupted_upgrade_leaves_the_state_for_the_next_preparation() {
+    use support::owned;
+    let scratch = support::Scratch::new("forge_upgrade_interrupted");
+    let programs = owned::scripted(scratch.path());
+    assert!(owned::prepare(scratch.path(), 1).status.success());
+    owned::record_versions(scratch.path(), Some(b"16.0.5"), None);
+    let path = owned::file(scratch.path(), 1, temper_forge_setup::place::File::State);
+    let before = fs::read(&path).expect("old state");
+    programs.hang("forgejo", "dump");
+    let run = Command::new(env!("CARGO_BIN_EXE_temper"))
+        .args(["forge", "prepare", "config.json", "1"])
+        .current_dir(scratch.path())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("prepare");
+    let _sleep = programs.hung(support::WITHIN);
+    assert!(
+        Command::new("/bin/sh")
+            .args(["-c", &format!("kill -TERM {}", run.id())])
+            .status()
+            .expect("upgrade fixture")
+            .success()
+    );
+    let ended = run.wait_with_output().expect("interrupted");
+    assert_eq!(ended.status.code(), Some(1));
+    assert_eq!(ended.stderr, b"temper forge prepare: forge 1: interrupted\n");
+    assert_eq!(fs::read(path).expect("old state kept"), before);
+    assert_eq!(fs::read_dir(scratch.path().join("forge-1/backups")).expect("upgrade fixture").count(), 0);
+    scratch.remove();
+}

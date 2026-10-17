@@ -15,6 +15,7 @@ pub mod setup;
 pub mod spec;
 pub mod state;
 pub mod step;
+pub mod upgrade;
 pub use setup::Setup;
 pub use step::{Step, steps};
 #[cfg(test)]

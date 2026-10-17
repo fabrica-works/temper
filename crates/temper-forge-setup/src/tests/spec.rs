@@ -99,6 +99,7 @@ fn runner_registration_joins_all_labels_in_one_argument() {
 fn no_argument_of_any_command_holds_a_secret() {
     let secrets = fixtures::secrets();
     for command in [
+        Command::Dump,
         Command::Migrate,
         Command::CreateAdmin,
         Command::CreatePerson,
@@ -182,4 +183,12 @@ fn each_version_check_has_just_the_version_argument() {
         assert_eq!(spec.program.as_ref(), program);
         assert_eq!(&*spec.arguments, &[Box::from(b"--version".as_slice())]);
     }
+}
+
+#[test]
+fn the_upgrade_names_the_partial_and_its_private_temp_directory() {
+    forgejo_suffix(
+        Command::Dump,
+        &[b"dump", b"--file", b"/srv/forge-2/backups/dump.partial.zip", b"--tempdir", b"/srv/forge-2/backups/"],
+    );
 }

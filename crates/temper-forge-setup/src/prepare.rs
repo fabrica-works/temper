@@ -7,6 +7,7 @@ use crate::{
     setup::Owned,
     spec::{self, Command, Spec, Which},
     state::{self, Secrets, State},
+    upgrade::{self, Course},
 };
 use alloc::boxed::Box;
 use core::net::IpAddr;
@@ -27,6 +28,7 @@ pub enum Exit {
 pub struct Found {
     pub state: Option<Secret>, // Whole record, absent on a fresh preparation.
     pub admin_token: bool,     // Whether the token file exists.
+    pub runner_secret: bool,   // Whether an added runner can keep its secret.
     pub files: bool,           // Whether Forgejo's files exist.
 }
 /// A command's bounded output, kept private until masked for a failure.
@@ -47,6 +49,8 @@ pub enum Event {
     Ran(Ran),
     /// The host drew exactly 32 random bytes.
     Drew(Secret),
+    /// Whether the requested backup exists.
+    Exists(bool),
     /// A lock or file effect completed.
     Done,
 }
@@ -55,7 +59,7 @@ pub enum Event {
 pub enum Request {
     /// Check the binary before deciding from its state.
     Version { which: Which, spec: Spec }, // Read the first stdout line.
-    /// Take and retain the runner lock for a first preparation.
+    /// Take and retain the runner lock before writing its files.
     Lock(File), // Take the runner's lock without waiting.
     /// Remove the interrupted first preparation’s files.
     Clear, // Remove only an interrupted preparation's files.
@@ -69,6 +73,10 @@ pub enum Request {
     Token { spec: Spec }, // Execute the admin token command.
     /// Write a complete private file.
     Write { file: File, contents: Secret }, // Write the whole private file.
+    /// Check for an upgrade backup without changing it.
+    Exists { path: Box<[u8]> },
+    /// Commit the completed partial dump.
+    Rename { from: Box<[u8]>, to: Box<[u8]> },
     /// Finish successfully or with a refusal.
     End(Result<(), Failure>), // Terminal answer.
 }
@@ -87,8 +95,10 @@ pub enum Failure {
     State(state::Refused),
     /// Forgejo’s files exist without a preparation record.
     Unrecorded,
-    /// The prepared pins or runner presence differ from this setup.
-    Recorded,
+    /// A recorded version is newer than its pin.
+    Newer { which: Which, recorded: Box<[u8]> },
+    /// A recorded version cannot be compared.
+    Unreadable { which: Which },
 }
 #[derive(Clone, Copy, Debug)]
 enum Phase {
@@ -100,6 +110,8 @@ enum Phase {
     Start,
     Layout,
     Ini,
+    Backup,
+    Rename,
     Run(Command),
     Token,
     AdminToken,
@@ -108,6 +120,13 @@ enum Phase {
     RunnerConfiguration,
     Finish,
     End,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum RunnerCourse {
+    Version(Course),
+    Added,
+    Removed,
+    None,
 }
 /// The opaque state of one preparation, with private credentials and no host.
 #[derive(Debug)]
@@ -121,6 +140,9 @@ pub struct Prepare {
     first: bool,
     clear: bool,
     admin_token: bool,
+    forgejo: Course,
+    runner: RunnerCourse,
+    backup: Box<[u8]>,
     name: Box<[u8]>,
     runner_secret: Option<Secret>,
     token: Option<Secret>,
@@ -150,6 +172,9 @@ impl Prepare {
             first: true,
             clear: false,
             admin_token: false,
+            forgejo: Course::Same,
+            runner: RunnerCourse::None,
+            backup: Box::new([]),
             name: Box::new([]),
             runner_secret: None,
             token: None,
@@ -196,12 +221,35 @@ impl Prepare {
                 Err(why) => return self.end(Err(Failure::State(why))),
             };
             if self.state.prepared {
-                let runner = self.owned.runner.is_some().then_some(Box::from(RUNNER_VERSION.as_bytes()));
-                if self.state.forgejo.as_ref() != VERSION.as_bytes() || self.state.runner != runner {
-                    return self.end(Err(Failure::Recorded));
-                }
                 self.first = false;
-                return self.request(Phase::Layout, Request::Layout);
+                self.forgejo = upgrade::course(&self.state.forgejo, VERSION.as_bytes());
+                if let Some(why) = Self::refusal(Which::Forgejo, self.forgejo, &self.state.forgejo) {
+                    return self.end(Err(why));
+                }
+                self.runner = match (&self.owned.runner, &self.state.runner) {
+                    (Some(_), Some(version)) => {
+                        let course = upgrade::course(version, RUNNER_VERSION.as_bytes());
+                        if let Some(why) = Self::refusal(Which::Runner, course, version) {
+                            return self.end(Err(why));
+                        }
+                        RunnerCourse::Version(course)
+                    }
+                    (Some(_), None) => RunnerCourse::Added,
+                    (None, Some(_)) => RunnerCourse::Removed,
+                    (None, None) => RunnerCourse::None,
+                };
+                self.backup = self.place.backup(&upgrade::backup_name(&self.state.forgejo, VERSION.as_bytes()));
+                if self.runner == RunnerCourse::Added && found.runner_secret {
+                    // The existing file remains the registration's token; no entropy is drawn.
+                    self.runner_secret = None;
+                } else if self.runner == RunnerCourse::Added {
+                    self.runner_secret = Some(Secret::new(Box::new([])));
+                }
+                return if self.runner_changes() {
+                    self.request(Phase::Lock, Request::Lock(File::RunnerLock))
+                } else {
+                    self.request(Phase::Layout, Request::Layout)
+                };
             }
             self.clear = true;
         } else if found.files {
@@ -214,6 +262,38 @@ impl Prepare {
         } else {
             self.begin()
         }
+    }
+    fn refusal(which: Which, course: Course, recorded: &[u8]) -> Option<Failure> {
+        match course {
+            Course::Newer => Some(Failure::Newer { which, recorded: bytes::copy_of(recorded) }),
+            Course::Unreadable => Some(Failure::Unreadable { which }),
+            Course::Same | Course::Older => None,
+        }
+    }
+    fn runner_changes(&self) -> bool {
+        self.runner == RunnerCourse::Added || self.runner == RunnerCourse::Version(Course::Older)
+    }
+    fn upgrading(&self) -> bool {
+        self.forgejo == Course::Older || self.runner_changes() || self.runner == RunnerCourse::Removed
+    }
+    fn after_ini(&mut self) -> Request {
+        if self.first || self.forgejo == Course::Older { self.run(Command::Migrate) } else { self.after_migrate() }
+    }
+    fn after_migrate(&mut self) -> Request {
+        if self.runner_changes() {
+            if self.runner == RunnerCourse::Added && self.runner_secret.is_some() {
+                self.request(Phase::Draw(4), Request::Draw)
+            } else {
+                self.run(Command::Register)
+            }
+        } else if self.upgrading() {
+            self.finish()
+        } else {
+            self.later_token()
+        }
+    }
+    fn later_token(&mut self) -> Request {
+        if self.admin_token { self.end(Ok(())) } else { self.request(Phase::Draw(3), Request::Draw) }
     }
     fn ini(&mut self) -> Request {
         self.write(
@@ -233,6 +313,13 @@ impl Prepare {
             _ => unreachable!("five draws at most"),
         }
         if !self.first {
+            if index == 4 {
+                return self.write(
+                    File::RunnerSecret,
+                    self.runner_secret.clone().expect("drawn secret"),
+                    Phase::RunnerSecret,
+                );
+            }
             return self.token();
         }
         let count = if self.owned.runner.is_some() { 5 } else { 4 };
@@ -244,6 +331,8 @@ impl Prepare {
         self.write(File::State, state::encode(&self.state), Phase::Start)
     }
     fn finish(&mut self) -> Request {
+        self.state.forgejo = VERSION.as_bytes().into();
+        self.state.runner = self.owned.runner.is_some().then_some(RUNNER_VERSION.as_bytes().into());
         self.state.prepared = true;
         self.write(File::State, state::encode(&self.state), Phase::Finish)
     }
@@ -252,7 +341,12 @@ impl Prepare {
             return self.end(Err(Failure::Command { command, exit: ran.exit, tail: self.tail(ran) }));
         }
         match command {
-            Command::Migrate => self.run(Command::CreateAdmin),
+            Command::Dump => self.request(
+                Phase::Rename,
+                Request::Rename { from: self.place.path(File::DumpPartial), to: self.backup.clone() },
+            ),
+            Command::Migrate if self.first => self.run(Command::CreateAdmin),
+            Command::Migrate => self.after_migrate(),
             Command::CreateAdmin => self.token(),
             Command::CreatePerson => {
                 let Some(password) = first_line(&ran.stdout) else {
@@ -262,7 +356,7 @@ impl Prepare {
                 self.write(File::PersonPassword, password, Phase::Password)
             }
             Command::Register => {
-                let Some(uuid) = first_line(&ran.stdout) else {
+                let Some(uuid) = registration(&ran.stdout) else {
                     return self.end(Err(Failure::Unread { command }));
                 };
                 let text = runner::configuration(
@@ -329,6 +423,23 @@ fn first_line(value: &Secret) -> Option<Secret> {
     let line = input.get(..end)?.strip_suffix(b"\r").unwrap_or(input.get(..end)?);
     if line.is_empty() { None } else { Some(Secret::new(bytes::copy_of(line))) }
 }
+// Register prints its UUID last; Forgejo can print settings diagnostics before it.
+fn registration(value: &Secret) -> Option<Secret> {
+    let mut last = None;
+    let mut remaining = value.expose();
+    for _ in 0..remaining.len() {
+        let end = bytes::find(remaining, b"\n").unwrap_or(remaining.len());
+        let line = remaining.get(..end)?.strip_suffix(b"\r").unwrap_or(remaining.get(..end)?);
+        if !line.is_empty() {
+            last = Some(Secret::new(bytes::copy_of(line)));
+        }
+        if end == remaining.len() {
+            break;
+        }
+        remaining = remaining.get(end.checked_add(1)?..)?;
+    }
+    last
+}
 fn hex(input: &[u8], count: usize) -> Secret {
     let mut w = Writer::new(count.checked_mul(2).expect("bounded hex"));
     for byte in input.iter().take(count) {
@@ -373,6 +484,10 @@ pub fn step(machine: &mut Prepare, event: Event, out: &mut Queue<Request>) {
             let Event::Ran(ran) = event else { unreachable!("command result expected") };
             machine.ran(command, &ran)
         }
+        Phase::Backup => {
+            let Event::Exists(exists) = event else { unreachable!("existence expected") };
+            if exists { machine.ini() } else { machine.run(Command::Dump) }
+        }
         Phase::Token => {
             let Event::Ran(ran) = event else { unreachable!("token result expected") };
             if ran.exit != Exit::Code(0) {
@@ -389,6 +504,7 @@ pub fn step(machine: &mut Prepare, event: Event, out: &mut Queue<Request>) {
         | Phase::Start
         | Phase::Layout
         | Phase::Ini
+        | Phase::Rename
         | Phase::AdminToken
         | Phase::Password
         | Phase::RunnerSecret
@@ -397,21 +513,30 @@ pub fn step(machine: &mut Prepare, event: Event, out: &mut Queue<Request>) {
         | Phase::End) => {
             let Event::Done = event else { unreachable!("effect completion expected") };
             match phase {
-                Phase::Lock => machine.begin(),
+                Phase::Lock if machine.first => machine.begin(),
                 Phase::Clear => machine.request(Phase::Draw(0), Request::Draw),
-                Phase::Start => machine.request(Phase::Layout, Request::Layout),
-                Phase::Layout => machine.ini(),
-                Phase::Ini if machine.first => machine.run(Command::Migrate),
-                Phase::Ini if !machine.admin_token => machine.request(Phase::Draw(3), Request::Draw),
+                Phase::Lock | Phase::Start => machine.request(Phase::Layout, Request::Layout),
+                Phase::Layout if !machine.first && machine.forgejo == Course::Older => {
+                    machine.request(Phase::Backup, Request::Exists { path: machine.backup.clone() })
+                }
+                Phase::Layout | Phase::Rename => machine.ini(),
+                Phase::Ini => machine.after_ini(),
+                Phase::Finish if !machine.first => machine.later_token(),
                 Phase::AdminToken if machine.first => machine.run(Command::CreatePerson),
-                Phase::Ini | Phase::Finish | Phase::AdminToken => machine.end(Ok(())),
+                Phase::Finish | Phase::AdminToken => machine.end(Ok(())),
                 Phase::Password => match &machine.runner_secret {
                     Some(secret) => machine.write(File::RunnerSecret, secret.clone(), Phase::RunnerSecret),
                     None => machine.finish(),
                 },
                 Phase::RunnerSecret => machine.run(Command::Register),
                 Phase::RunnerConfiguration => machine.finish(),
-                Phase::Found | Phase::Version(_) | Phase::Draw(_) | Phase::Run(_) | Phase::Token | Phase::End => {
+                Phase::Found
+                | Phase::Version(_)
+                | Phase::Draw(_)
+                | Phase::Run(_)
+                | Phase::Token
+                | Phase::Backup
+                | Phase::End => {
                     unreachable!("phase handled or terminal")
                 }
             }

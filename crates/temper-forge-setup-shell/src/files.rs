@@ -56,3 +56,18 @@ pub fn layout(place: &Place) -> io::Result<()> {
     }
     write_private(&crate::path(&place.directory).join("home/gitconfig"), b"")
 }
+
+/// Whether a backup is already present; inspection failures refuse the preparation.
+pub fn exists(path: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(why) if why.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(why) => Err(why),
+    }
+}
+/// Syncs a completed partial, renames it and syncs its directory.
+pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
+    fs::File::open(from)?.sync_all()?;
+    fs::rename(from, to)?;
+    fs::File::open(to.parent().expect("a backup has a parent"))?.sync_all()
+}

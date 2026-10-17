@@ -269,3 +269,65 @@ pub fn prepared_processes(directory: &Path) -> u16 {
     assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
     port
 }
+
+/// The setup's typed file under a numbered forge directory.
+#[must_use]
+pub fn file(directory: &Path, forge: u16, file: temper_forge_setup::place::File) -> PathBuf {
+    use std::os::unix::ffi::OsStrExt;
+    let place = temper_forge_setup::place::Place {
+        directory: directory.join(format!("forge-{forge}")).as_os_str().as_bytes().into(),
+        user: Box::new([]),
+    };
+    PathBuf::from(std::ffi::OsStr::from_bytes(&place.path(file)))
+}
+pub fn record_versions(directory: &Path, forgejo: Option<&[u8]>, runner: Option<&[u8]>) {
+    let path = file(directory, 1, temper_forge_setup::place::File::State);
+    let mut state = temper_forge_setup::state::decode(&fs::read(&path).expect("state")).expect("record");
+    if let Some(version) = forgejo {
+        state.forgejo = version.into();
+    }
+    if let Some(version) = runner {
+        state.runner = Some(version.into());
+    }
+    super::write_private(&path, temper_forge_setup::state::encode(&state).expose());
+}
+pub fn recorded_without_runner(directory: &Path) {
+    let path = file(directory, 1, temper_forge_setup::place::File::State);
+    let mut state = temper_forge_setup::state::decode(&fs::read(&path).expect("state")).expect("record");
+    state.runner = None;
+    super::write_private(&path, temper_forge_setup::state::encode(&state).expose());
+}
+pub fn setup_without_runner(directory: &Path) {
+    let path = directory.join("config.json");
+    let mut config: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("config")).expect("JSON");
+    config["application"]["setup"][0]["mode"]["owned"]["runner"] = serde_json::Value::Null;
+    super::write_private(&path, &serde_json::to_vec(&config).expect("JSON"));
+}
+pub fn refused(directory: &Path, verb: &str, expected: &[u8]) {
+    let result = if verb == "prepare" {
+        prepare(directory, 1)
+    } else {
+        run(directory, "forgejo").output().expect("run refuses")
+    };
+    assert_eq!(result.status.code(), Some(1));
+    assert_eq!(result.stderr, expected);
+}
+
+/// Checks the dump archive's recorded evidence and keeps its bytes and timestamp for a repeated upgrade.
+#[must_use]
+pub fn dump(directory: &Path) -> (PathBuf, Vec<u8>, fs::Metadata) {
+    let backups: Vec<_> = fs::read_dir(directory.join("forge-1/backups"))
+        .expect("backups")
+        .map(|entry| entry.expect("backup entry").path())
+        .collect();
+    assert_eq!(backups.len(), 1);
+    let backup = backups[0].clone();
+    assert_eq!(backup.file_name().expect("backup name"), format!("forgejo-16.0.5-to-{VERSION}.zip").as_str());
+    let bytes = fs::read(&backup).expect("backup");
+    let meta = fs::metadata(&backup).expect("metadata");
+    assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+    assert!(bytes.starts_with(b"PK"));
+    assert!(skein_lib::bytes::find(&bytes, b"forgejo-db.sql").is_some());
+    assert!(skein_lib::bytes::find(&bytes, b"app.ini").is_some());
+    (backup, bytes, meta)
+}

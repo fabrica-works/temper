@@ -173,3 +173,48 @@ fn a_prepared_forge_runs_forgejo_and_its_runner_once_each() {
     assert!(owned::answer(port, "/api/v1/version", None).is_err());
     scratch.remove();
 }
+
+#[test]
+fn an_older_recorded_forgejo_is_dumped_then_upgraded() {
+    use std::fs;
+    use support::owned;
+    use temper_forge_setup::{place::File, state};
+    let scratch = support::Scratch::new("forge_upgrade_real");
+    let _port = owned::prepared_processes(scratch.path());
+    owned::record_versions(scratch.path(), Some(b"16.0.5"), None);
+    let partial = owned::file(scratch.path(), 1, File::DumpPartial);
+    fs::write(&partial, b"interrupted dump").expect("partial");
+    let upgraded = owned::prepare(scratch.path(), 1);
+    assert!(upgraded.status.success(), "{}", String::from_utf8_lossy(&upgraded.stderr));
+    let (backup, before, meta) = owned::dump(scratch.path());
+    assert!(!partial.exists());
+    let record = state::decode(&fs::read(owned::file(scratch.path(), 1, File::State)).expect("upgrade fixture"))
+        .expect("upgrade fixture");
+    assert_eq!(&*record.forgejo, temper_throwaway_forgejo::VERSION.as_bytes());
+    owned::record_versions(scratch.path(), Some(b"16.0.5"), None);
+    let repeated = owned::prepare(scratch.path(), 1);
+    assert!(repeated.status.success(), "{}", String::from_utf8_lossy(&repeated.stderr));
+    assert_eq!(fs::read(&backup).expect("backup kept"), before);
+    assert_eq!(
+        fs::metadata(&backup).expect("upgrade fixture").modified().expect("upgrade fixture"),
+        meta.modified().expect("upgrade fixture")
+    );
+    scratch.remove();
+}
+#[test]
+fn an_older_recorded_runner_has_its_files_prepared_again_without_a_dump() {
+    use std::fs;
+    use support::owned;
+    use temper_forge_setup::place::File;
+    let scratch = support::Scratch::new("runner_upgrade_real");
+    let _port = owned::prepared_processes(scratch.path());
+    owned::record_versions(scratch.path(), None, Some(b"13.1.0"));
+    let configuration = owned::file(scratch.path(), 1, File::RunnerConfiguration);
+    let before = fs::read(&configuration).expect("connection");
+    fs::remove_file(&configuration).expect("remove configuration");
+    let upgraded = owned::prepare(scratch.path(), 1);
+    assert!(upgraded.status.success(), "{}", String::from_utf8_lossy(&upgraded.stderr));
+    assert_eq!(fs::read(configuration).expect("configuration remade"), before);
+    assert_eq!(fs::read_dir(scratch.path().join("forge-1/backups")).expect("upgrade fixture").count(), 0);
+    scratch.remove();
+}

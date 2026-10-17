@@ -193,15 +193,6 @@ fn forgejos_files_with_no_state_are_refused() {
     );
 }
 #[test]
-fn a_recorded_version_other_than_the_pin_is_refused() {
-    let mut found = fixtures::later();
-    let mut state = state::decode(found.state.as_ref().unwrap().expose()).unwrap();
-    state.forgejo = b"another-version".as_slice().into();
-    found.state = Some(state::encode(&state));
-    let mut drive = Drive::new(fixtures::owned());
-    assert_eq!(drive.versions(found, true), Request::End(Err(Failure::Recorded)));
-}
-#[test]
 fn a_failed_command_names_its_status_and_none_of_the_secrets() {
     let mut drive = person(true);
     drive.send(fixtures::ran(b"person-password\n"));

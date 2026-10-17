@@ -42,6 +42,7 @@ impl Tokens {
             | File::RunnerSecret
             | File::RunnerConfiguration
             | File::ForgejoLock
+            | File::DumpPartial
             | File::RunnerLock => unreachable!("two token files"),
         }
     }

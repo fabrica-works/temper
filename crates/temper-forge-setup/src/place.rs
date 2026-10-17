@@ -30,9 +30,11 @@ pub enum File {
     RunnerSecret,
     /// The runner's connection and jobs' settings.
     RunnerConfiguration,
+    /// An upgrade dump before its final rename.
+    DumpPartial,
     /// Held by Forgejo and the preparation.
     ForgejoLock,
-    /// Held by the runner and a first preparation.
+    /// Held by the runner and preparations that write its files.
     RunnerLock,
 }
 impl Place {
@@ -40,6 +42,7 @@ impl Place {
     #[must_use]
     pub fn path(&self, file: File) -> Box<[u8]> {
         let name = match file {
+            File::DumpPartial => b"backups/dump.partial.zip".as_slice(),
             File::AppIni => b"forgejo/app.ini".as_slice(),
             File::State => b"state",
             File::AdminToken => b"admin_token",
@@ -54,6 +57,11 @@ impl Place {
             File::RunnerLock => b"runner.lock",
         };
         joined(&[&self.directory, b"/", name])
+    }
+    /// A named backup under the private backup directory.
+    #[must_use]
+    pub fn backup(&self, name: &[u8]) -> Box<[u8]> {
+        joined(&[&self.directory, b"/backups/", name])
     }
     /// Forgejo's work path.
     #[must_use]

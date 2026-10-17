@@ -4,6 +4,7 @@ use crate::{
     setup::Owned,
     spec::{self, Command, Spec, Which},
     state::State,
+    upgrade::{self, Course},
 };
 use alloc::boxed::Box;
 use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION, names_forgejo, names_runner};
@@ -13,7 +14,8 @@ pub enum Refusal {
     NoRunner,
     NotPrepared,
     Unfinished,
-    Versions { forgejo: Box<[u8]>, runner: Option<Box<[u8]>> },
+    Runner { recorded: bool },
+    Versions { forgejo: Box<[u8]>, runner: Option<Box<[u8]>>, course: Course },
     Binary { printed: Box<str> },
 }
 /// Specifications and file names checked under the process's lock.
@@ -53,10 +55,17 @@ pub fn admit_state(launch: &Launch, state: Option<&State>) -> Result<(), Refusal
     if !state.prepared {
         return Err(Refusal::Unfinished);
     }
-    if state.forgejo.as_ref() != VERSION.as_bytes()
-        || (launch.runner && state.runner.as_deref() != Some(RUNNER_VERSION.as_bytes()))
+    if launch.runner != state.runner.is_some() {
+        return Err(Refusal::Runner { recorded: state.runner.is_some() });
+    }
+    let mut course = upgrade::course(&state.forgejo, VERSION.as_bytes());
+    if launch.runner
+        && let Some(runner) = &state.runner
     {
-        return Err(Refusal::Versions { forgejo: state.forgejo.clone(), runner: state.runner.clone() });
+        course = course.max(upgrade::course(runner, RUNNER_VERSION.as_bytes()));
+    }
+    if course != Course::Same {
+        return Err(Refusal::Versions { forgejo: state.forgejo.clone(), runner: state.runner.clone(), course });
     }
     Ok(())
 }

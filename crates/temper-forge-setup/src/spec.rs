@@ -18,6 +18,8 @@ pub enum Which {
 /// One preparation command or supervised process.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Command {
+    /// Dump the prepared Forgejo before migrating it.
+    Dump,
     /// Prepare the database schema.
     Migrate,
     /// Make temper-admin with a discarded random password.
@@ -97,6 +99,7 @@ fn words(input: &[&[u8]]) -> Box<[Box<[u8]>]> {
 #[must_use]
 pub fn command(command: Command, owned: &Owned, place: &Place) -> Spec {
     let args = match command {
+        Command::Dump => words(&[b"dump", b"--file", &place.path(File::DumpPartial), b"--tempdir", &place.backup(b"")]),
         Command::Migrate => words(&[b"migrate"]),
         Command::CreateAdmin => words(&[
             b"admin",

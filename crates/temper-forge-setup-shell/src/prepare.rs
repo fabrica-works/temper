@@ -32,6 +32,7 @@ fn found(place: &Place) -> Result<Found, Failed> {
     };
     Ok(Found {
         state,
+        runner_secret: crate::path(&place.path(File::RunnerSecret)).exists(),
         admin_token: crate::path(&place.path(File::AdminToken)).exists(),
         files: files::present(place).map_err(|why| Failed::Io("directory", why.kind()))?,
     })
@@ -72,6 +73,13 @@ pub fn run(limits: &skein_io::Limits, place: &Place, mut machine: Prepare) -> Re
             Request::Write { file, contents } => {
                 files::write_private(crate::path(&place.path(file)), contents.expose())
                     .map_err(|why| Failed::Io("file", why.kind()))?;
+                Event::Done
+            }
+            Request::Exists { path } => {
+                Event::Exists(files::exists(crate::path(&path)).map_err(|why| Failed::Io("backup", why.kind()))?)
+            }
+            Request::Rename { from, to } => {
+                files::rename(crate::path(&from), crate::path(&to)).map_err(|why| Failed::Io("backup", why.kind()))?;
                 Event::Done
             }
             Request::End(result) => return result.map_err(Failed::Refused),

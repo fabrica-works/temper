@@ -33,3 +33,17 @@ fn clear_removes_a_first_preparations_files_and_never_backups() {
     }
     scratch.remove();
 }
+
+#[test]
+fn a_renamed_file_exists_under_its_new_name_only() {
+    let scratch = support::Scratch::new("file_rename");
+    let from = scratch.path().join("dump.partial.zip");
+    let to = scratch.path().join("backup.zip");
+    files::write_private(&from, b"PKcontents").expect("partial");
+    assert!(!files::exists(&to).expect("absent"));
+    files::rename(&from, &to).expect("rename");
+    assert!(!files::exists(&from).expect("old name"));
+    assert!(files::exists(&to).expect("backup"));
+    assert_eq!(fs::read(to).expect("whole backup"), b"PKcontents");
+    scratch.remove();
+}

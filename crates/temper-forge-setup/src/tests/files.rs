@@ -42,6 +42,7 @@ fn a_state_debug_shows_no_secret() {
 fn each_layout_file_is_below_the_forge_directory() {
     for (file, expected) in [
         (File::AppIni, b"/srv/forge-2/forgejo/app.ini".as_slice()),
+        (File::DumpPartial, b"/srv/forge-2/backups/dump.partial.zip"),
         (File::State, b"/srv/forge-2/state"),
         (File::AdminToken, b"/srv/forge-2/admin_token"),
         (File::PersonPassword, b"/srv/forge-2/person_password"),
