@@ -292,6 +292,34 @@ where they differ.
   the fault and its words, and lists it in the commit body (the steer of
   2026-10-17T23:27Z). Any other difference is a block.
 
+## Corrections after jig 16.1's block of 2026-10-17T23:27:43Z (ruling 294)
+
+- **16.1, Files** gain the channel world's store observer,
+  `tests/channel/src/world/store.rs`. It reads `skein-kv` commit frames
+  from every file under `store/`: at a recovery read (`:72`), at a write
+  (`Capture::pending`, `:89-92`) and at a sync (`:163`). After a power loss
+  inside a commit's write, the restart writes a repair snapshot
+  (`store/snapshot.tmp`, renamed `store/snapshot`: `skein-kv`'s
+  `src/store.rs:909`, `:982`), whose 18-byte `SKVS` header and chunks are
+  no commit frames; 16.1's changes move the fuzzy draw `calm(6)`, power
+  loss before submission 118, onto that path, and the frame check at
+  `:257` fails on the snapshot's first chunk
+  (`logs/jig-16-1/gate-cause.md`). The observer reads frames only from
+  commit logs (`store/log-<20 digits>`, `src/store.rs:433`), at each of
+  those sites and any further one; a snapshot's writes, reads and syncs
+  give it no frames, and the commits the snapshot holds stay as the
+  observer recovered them from the log it replaces, through the next
+  restart. The check at `:257` and every other conformance check stay.
+- **16.1, Test shape** gains a focused test in `tests/channel`: a power
+  loss inside a commit's write, then the restart's repair snapshot; the
+  observer takes no frames from the snapshot, and the commits before the
+  cut stay durable. The preserved reproduction
+  (`logs/jig-16-1/gate2-power-loss-reproduction.rs`) may be that test,
+  if it asserts that the snapshot's write was reached.
+- **temper:** its one-process durable referee is a copy of this observer
+  (`tests/one-process/src/referee/durable.rs:76, :94, :149`, the check at
+  `:256`); temper 04.3 takes the same repair (`temper/04-engine.md`).
+
 ## Increments
 
 ### 16.1 The conversations section on a task query

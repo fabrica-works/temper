@@ -133,6 +133,17 @@ path's segments apart from its rows (`configuration.md`, 7).
   case names its `documents.lines` value, 2, beside the profile's, with
   its source (`crates/temper/tests/support/configuration.rs:32`).
 
+## Corrections after jig 16.1's block of 2026-10-17T23:27:43Z (ruling 294)
+
+- **04.3, Files** gain `tests/one-process/src/referee/durable.rs`, a copy
+  of jig's channel store observer that reads `skein-kv` commit frames
+  from every file under `store/` (`:76`, `:94`, `:149`; the check at
+  `:256`). It takes jig 16.1's repair (`jig/16-shed.md`, ruling 294): it
+  reads frames only from commit logs (`store/log-<20 digits>`), a repair
+  snapshot gives it none, and the commits the snapshot holds stay
+  durable. Follow jig 16.1's diff of `tests/channel/src/world/store.rs`;
+  refresh any further copy, and list it in the commit body.
+
 ## Increments
 
 ### 04.1 `templates` in temper's configurations, in place of `chats`

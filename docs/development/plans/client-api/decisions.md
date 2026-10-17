@@ -2054,6 +2054,15 @@ choice would have been the user's (development.md, 10.4).
 293. **jig 16: ruling 290's expected failure may take a moved time** (steer of 2026-10-17T23:27Z).
      Ruling 293 (steer of 2026-10-17T23:27Z, from the check of 2026-10-17T23:25:34Z): ruling 290's expected failure in `tests/client/src/joint/role_stories/proposed_story.rs` names the time of the referee's failure (`at: Time::from_nanos(8_416_106)`, `:54` on jig `25fd50d50`), which 16.1's or 16.2's changes to the core and the reference UI may move. Until 16.3 lands, a landing that moves only that time takes the time the story's failure prints, keeps the fault and its words, and lists it in the commit body; any other difference is a block. `jig/16-shed.md`'s ruling 290 section gains this.
 
+294. **jig 16.1: the store observer reads frames only from commit logs** (plan defect, jig-16.1's block of 2026-10-17T23:27:43Z).
+     Ruling 294 (plan defect, jig-16.1's block of 2026-10-17T23:27:43Z): the report's proposal, repaired by session 16 in 16.1. Ruling 292's diagnosis (`logs/jig-16-1/gate-cause.md`) found the cause in the channel world's store observer, not in production: the reproduction passes on main `25fd50d50`; at the prepared commit, the power loss cuts commit 7's write, the restart writes a repair snapshot, and `Capture::pending` (`tests/channel/src/world/store.rs:89-92`) hands the snapshot's first chunk (`00 00 00 12`, 18 rows) to the commit-frame decoder, whose check at `:257` fails. The observer is test code of jig's, and 16.1's changes are what reach it.
+
+     1. **16.1, Files** gain `tests/channel/src/world/store.rs`. The observer reads `skein-kv` commit frames only from commit logs (`store/log-<20 digits>`), at each site that now takes every `store/` file (the recovery read at `:72`, `pending` at `:89-92`, the sync at `:163`) and any further one. A repair snapshot (`store/snapshot.tmp`, renamed `store/snapshot`) gives it no frames, and the commits the snapshot holds stay as the observer recovered them from the log it replaces, through the next restart.
+     2. **16.1, Test shape** gains a focused test in `tests/channel`: a power loss inside a commit's write, then the restart's repair snapshot; the observer takes no frames from the snapshot, and the commits before the cut stay durable. The preserved reproduction may be that test, if it asserts that the snapshot's write was reached.
+     3. **temper's copy** (`tests/one-process/src/referee/durable.rs:76, :94, :149`, its check at `:256`) takes the same repair in temper 04.3, which takes jig 16. Refresh any further copy you find, and list it in the commit body.
+     4. **Then** run the focused test and the reproduction once, then the gate, and land. A failure elsewhere in the observer, or at `:257` on a commit log, is a block with the logs.
+     5. **Unchanged:** the frame check at `:257` and every other conformance, referee and judge check; the fuzzy draws; rulings 288, 291 and 293.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
