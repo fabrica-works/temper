@@ -2063,6 +2063,9 @@ choice would have been the user's (development.md, 10.4).
      4. **Then** run the focused test and the reproduction once, then the gate, and land. A failure elsewhere in the observer, or at `:257` on a commit log, is a block with the logs.
      5. **Unchanged:** the frame check at `:257` and every other conformance, referee and judge check; the fuzzy draws; rulings 288, 291 and 293.
 
+295. **the run's kit pinned at skein 841f487** (infrastructure, the director's request of 2026-10-17T23:40Z).
+     Ruling 295 (infrastructure, the director's request of 2026-10-17T23:40Z): the run's kit is pinned at skein `841f487`, the commit of this machine's skein checkout, which this run's tools ran from until now: `git -C ~/src/rust/skein worktree add --detach ~/src/rust/tmp/temper/client-api/kit 841f487`. The run was claimed before runs took their kit from their claim (skein `e6fd9fb`, "Take a run's kit from its claim"), so a kit change landing in skein's checkout would have reached it mid-run; from now on `plan`, `land` and `heavy`, run from the copy on PATH, hand over to `kit/scripts/dev`'s (`kit.sh`, `run_kit`), as for a run claimed after `e6fd9fb`, and skein's kit batch may land without reaching this run. Nothing the run runs changes: the checkout was clean at `841f487`, with no untracked or ignored file under `scripts/` or `docs/`. Checked: `bash -x "$(command -v plan)" status` gives `+ exec /srv/data/git/runner/src/tmp/temper/client-api/kit/scripts/dev/plan status`; `bash -x "$(command -v land)" --help` gives `+ exec …/client-api/kit/scripts/dev/land --help`; `heavy --tail 3 bash -c 'echo "kit_home=${DEV_KIT_HOME:-unset}"'` gives `kit_home=/srv/data/git/runner/src/skein/scripts/dev` (the handover's mark) and `task 679 (build) exit 0`. The run's process stays skein `15ddb75` (supervision.md's Process line). `plan`'s end of the run removes `kit/`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
