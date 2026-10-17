@@ -70,21 +70,30 @@ Needs: temper 08.2 (`run.rs`, `forge.rs`), and through it 08.1 (`temper forge pr
 `files.rs`, `owned.rs`) and 07.4 (the machine, `Drive`); 03.2 and 03.3 (the dump and runner facts).
 Files: `crates/temper-forge-setup/src/upgrade.rs` (new), `lib.rs` (a `mod`), `src/prepare.rs` (07.4's: the arm),
 `src/spec.rs` (`Command::Dump`), `src/place.rs` (`File::DumpPartial`, `Place::backup`), `src/run.rs` (08.2's:
-`Refusal::Versions`), `src/tests/upgrade.rs` (new), `src/tests/prepare.rs` (07.4's
-`a_recorded_version_other_than_the_pin_is_refused` is renamed `a_runner_that_state_and_the_setup_disagree_on_is_refused`,
-its version rows moving here), `src/tests/spec.rs`, `src/tests/fixtures.rs` (07.1's, extended: `Drive::reach`, `older`,
+`Refusal::Versions`), `src/tests/upgrade.rs` (new), `src/tests.rs` (`mod upgrade;`), `src/tests/prepare.rs` (07.4's
+`a_recorded_version_other_than_the_pin_is_refused`, `tests/prepare.rs:196-203`, is renamed
+`a_runner_that_state_and_the_setup_disagree_on_is_refused`: its one row, Forgejo `another-version`, goes, since the
+garbage row of `the_upgrade_refuses_…` covers it, and two rows take its place, a setup without a runner against a
+`state` with one and the reverse, both `Failure::Recorded`; ruling 120), `src/tests/files.rs` (a row
+`(File::DumpPartial, b"/srv/forge-2/backups/dump.partial.zip")` in the table at `:43-56`), `src/tests/spec.rs`, `src/tests/fixtures.rs` (07.1's, extended: `Drive::reach`, `older`,
 `backup`, `ran_ok`); `crates/temper-forge-setup-shell/src/{prepare,files}.rs`, `tests/files.rs` (08.1's);
 `crates/temper/src/forge.rs` (words), `tests/forge.rs` (three tests), `tests/process.rs` (**hotspot**: two tests),
-`tests/support/owned.rs` (**hotspot**: `record_versions`, `file`).
+`tests/support/owned.rs` (**hotspot**: `record_versions`, `file`). The docs that say only a first preparation takes
+the runner's lock, or that any version mismatch is `Recorded`, follow the upgrade: `Request::Lock` (`prepare.rs:58`),
+`Failure::Recorded` (`prepare.rs:89-91`), `File::RunnerLock` (`place.rs:34`).
 Shape: sketch 1, and these changes in place. `Command` gains `Dump`, built by `spec::command`; `File` gains `DumpPartial`,
 and `Place::backup(name)` is `<directory>/backups/<name>`. `Request` gains `Exists { path: Box<[u8]> }` (answered
 `Event::Exists(bool)`) and `Rename { from: Box<[u8]>, to: Box<[u8]> }` (answered `Done`); `Failure` gains `Newer { which:
 Which, recorded: Box<[u8]> }` and `Unreadable { which: Which }`, and `Recorded` keeps the runner-presence mismatch (07.4's
 question on a runner added or removed). On a finished `state` of matching runner presence and passed binary checks the
-machine takes `course(state.forgejo, VERSION)` and, when the setup has a runner, `course(state.runner, RUNNER_VERSION)`. A
+machine takes `course(state.forgejo, VERSION)` and, when the setup has a runner, `course(state.runner, RUNNER_VERSION)`,
+and keeps the two `Course` values as fields of `Prepare` (`prepare.rs:114`), never as a `bool`: it has three, and a
+fourth trips clippy's `struct_excessive_bools`. A
 `Newer` or `Unreadable` ends the preparation before `Layout`, nothing written; two `Same` are 07.4's later preparation;
 else, with an older runner `Request::Lock(File::RunnerLock)` first (08.1's host takes it without waiting; a held one ends
-the run naming the runner, so nothing is dumped or migrated beside a running runner), and after `Layout`: `Exists(backup)`
+the run naming the runner, so an older runner's files are never prepared beside a running runner; a Forgejo-only upgrade
+takes Forgejo's lock alone, as setup.md 6.3 item 3 reads, and goes on beside a running runner), its `Done` going on to
+`Layout` (`Phase::Lock`'s arm, `prepare.rs:400`, goes to `begin()` only for a first preparation), and after `Layout`: `Exists(backup)`
 and, when absent, `Run Dump` then `Rename` partial to backup (Forgejo older); `Write app.ini`; `Run Migrate` (Forgejo
 older); `Run Register` and `Write RunnerConfiguration` (runner older); `Write State` with the pins; then the later
 preparation's `admin_token` when missing. The backup is `backup_name(state.forgejo, VERSION)`. The host answers `Exists` and
@@ -118,7 +127,12 @@ Beside them (< 0.5 s each): the shell's `tests/files.rs` `a_renamed_file_exists_
 ```rust
 // crates/temper-forge-setup/src/tests/upgrade.rs
 use super::fixtures;
-use crate::{place::File, prepare::{Event, Request}, spec::Command, state};
+use crate::{
+    place::File,
+    prepare::{Event, Request},
+    spec::Command,
+    state,
+};
 use temper_forge_forgejo::pin::VERSION;
 
 #[test]
@@ -131,8 +145,8 @@ fn the_upgrade_dumps_an_older_forgejo_before_it_migrates() {
     let Request::Run { command: Command::Dump, .. } = drive.send(Event::Exists(false)) else { panic!("dumped") };
     let rename = Request::Rename { from: place.path(File::DumpPartial), to: backup };
     assert_eq!(drive.send(fixtures::ran_ok()), rename, "the partial becomes the backup");
-    assert!(matches!(drive.send(Event::Done), Request::Write { file: File::AppIni, .. }), "app.ini after the dump");
-    assert!(matches!(drive.send(Event::Done), Request::Run { command: Command::Migrate, .. }), "then migrated");
+    let Request::Write { file: File::AppIni, .. } = drive.send(Event::Done) else { panic!("app.ini after the dump") };
+    let Request::Run { command: Command::Migrate, .. } = drive.send(Event::Done) else { panic!("then migrated") };
     let Request::Write { file: File::State, contents } = drive.send(fixtures::ran_ok()) else { panic!("recorded") };
     assert_eq!(&*state::decode(contents.expose()).expect("a state").forgejo, VERSION.as_bytes(), "the pin, last");
 }
@@ -184,7 +198,10 @@ pub fn backup_name(recorded: &[u8], pinned: &[u8]) -> Box<[u8]> { todo!() }
 
 ## Questions to raise when reached
 
-None open. A recorded version this temper cannot read is refused (Choices).
+A recorded version this temper cannot read is refused (Choices). Asked of the designer with ruling 120: what `run`
+names when the setup and `state` disagree on the runner's presence (08.2's `admit_state` makes it `Versions`, with no
+recorded version for `course`), and setup.md 6.3's preamble against its item 3 on the runner's lock. Until answered:
+15.1 leaves 08.2's words for a presence mismatch as they land, and words only the cases that have a `course`.
 
 ## Done when
 

@@ -421,6 +421,24 @@ run are appended after "For the user".
      - Unchanged: `TeamSpec` is one value, and every make and edit sends its `name`; the encoder, the cases and the other
        17 facts.
 
+120. **15's Shapes against main** (ready check of temper-15.1).
+     Ruling 120, the ready check of temper-15.1 (skein f981746a, temper 92bdbd429; 08.1 and 08.2 not landed, their
+     names checked against `08-run.md`). Amends `temper/15-upgrade.md`:
+
+     - Files gains `src/tests.rs` (`mod upgrade;`) and a `File::DumpPartial` row in `src/tests/files.rs:43-56`, and the docs
+       of `Request::Lock` (`prepare.rs:58`), `Failure::Recorded` (`:89-91`) and `File::RunnerLock` (`place.rs:34`).
+     - 07.4's `a_recorded_version_other_than_the_pin_is_refused` has one row, Forgejo `another-version`, and no runner row to
+       move: renamed, it gets two rows, a runner in the setup and not in `state` and the reverse, both `Failure::Recorded`.
+     - Shape: the two `Course` values are fields of `Prepare`, which has three `bool`s (a fourth trips
+       `struct_excessive_bools`); the runner's lock's `Done` goes on to `Layout` in an upgrade, not `begin()`; a Forgejo-only
+       upgrade takes Forgejo's lock alone and goes on beside a running runner (the old text said nothing is dumped beside one).
+     - The reference test's sketch: `let … else` in place of `assert!(matches!(…))` (`clippy.toml` disallows `matches!`), and
+       its nested `use` wrapped as rustfmt prints it.
+     - Questions: two go to the designer (run's words for a runner-presence mismatch; setup.md 6.3's preamble against its
+       item 3); until answered, 15.1 leaves 08.2's words for a presence mismatch as they land.
+     - Unchanged: Size 180, the tests' names and Done when's count of 11; sketch 1's `todo!()` bodies are the
+       implementer's to write.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
