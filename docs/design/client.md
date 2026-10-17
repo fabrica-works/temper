@@ -88,6 +88,10 @@ temper-client-shell-terminal    the terminal: temper's host, its settings and li
 └── jig-client-shell-native     jig's native transport: skein's HTTP client with jig-client-protocol-http; the small store's file and the credential's
 temper                          the binary; `temper open` runs the terminal (protocol.md, section 4)
 
+for agents
+temper-client-tools             the agents' tools on jig-client, beside the view (tools.md, section 4)
+temper-client-shell-cli         `temper ctl`, over jig-client-shell-native (tools.md, section 8)
+
 for tests
 skein-fake-person               the person, on skein-ui's tree (testing.md, 4.4)
 jig-client-test-kit             jig's check, and the faults of jig's client worlds (jig's `client/domain/testing.md`, 6.2 and section 7)
@@ -1007,14 +1011,15 @@ The client's tiers, as testing.md places them (section 2):
   which the terminal keeps beside `jig-client`'s small store, never in
   it (jig's `protocol/client.md`, section 10). Default: none; the client
   opens at the inbox.
-- **Clients that are not a person's:** a command run once, a service
-  acting as a party, a bot (`draft/factory.md`): `jig-client`'s other
-  modes (jig's `client/domain/client.md`, section 20). Default: none,
-  until the factory's lab or run side needs one.
+- **Clients that are not a person's:** a command run once and a
+  service acting as a party are the agents' tools, `temper ctl`
+  (tools.md). A bot (`draft/factory.md`): none, until the factory's lab
+  or run side needs one.
 - **Several terminals:** each `temper open` with its own DIRECTORY is a
   client of its own. Two on one DIRECTORY share its token and write its
   small store whole over each other. Default: not supported and not
-  detected; a lock on DIRECTORY is the candidate.
+  detected; a lock on DIRECTORY is the candidate, which `temper ctl`
+  takes for its own calls (tools.md, 8.3).
 - **A fresh link from the client:** default: the person runs `temper
   open` with the last link, whose refusal makes `temper serve` print a
   fresh one.

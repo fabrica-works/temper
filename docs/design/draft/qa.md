@@ -121,6 +121,11 @@ connector, close kin of `ops`'s infrastructure connector.
 
 ### 4.2 A driver
 
+For temper's core, replaced by `tools.md`: agents drive jig's
+plumbing through `temper ctl`, not the text view; the pages are the
+fake person's, and the browser's QA drives the browser. The rest of
+this section stands for other products.
+
 How an agent uses the product as a person does. For temper, and for any
 application on jig, the design has it already: jig's client domain, on
 the native shell over skein's HTTP client, read as a text view by role,

@@ -117,6 +117,7 @@ service (`jig-test-service`), the reference binary (`jig-test`).
 | the API token | a forge's token for its API, the engine's protocol layer's only (credentials.md, section 5) |
 | the forge's client family | temper's client side of the forge connector: its words, and the adoption form (client.md, section 4) |
 | the terminal shell | `temper-client-shell-terminal` (client.md, section 6) |
+| the tools | the agents' interface to temper, `temper ctl`: `temper-client-tools` and `temper-client-shell-cli` (tools.md) |
 | the clients' listener | `temper-service`'s listener for clients, on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig` (client.md, section 8) |
 | the fake git program | `testing/temper-fake-git` (testing.md, 4.3) |
 | the throwaway Forgejo | a Forgejo v17.0 started by a test script on loopback, with SQLite in a scratch directory, removed after (testing.md, 2.6) |
@@ -139,6 +140,9 @@ from jig's reference binary. Its commands, exactly:
 temper serve CONFIG.json
 temper agent AGENT.json
 temper open DIRECTORY LINK_OR_ADDRESS
+temper ctl DIRECTORY TOOL [ARGUMENT...] [--json]
+temper ctl DIRECTORY --call FILE [--json]
+temper ctl help [TOOL]
 temper sign-in CONFIG.json ACCOUNT
 temper forge prepare CONFIG.json FORGE
 temper forge run CONFIG.json FORGE forgejo|runner
@@ -164,6 +168,9 @@ temper box CONFIG.json
 - **`temper open DIRECTORY LINK_OR_ADDRESS`:** a person's terminal client
   (client.md; configuration.md, section 9). It reads no configuration
   file.
+- **`temper ctl DIRECTORY ...`:** the agents' tools, one call per
+  process, over the same native transport as `temper open` (tools.md,
+  section 8). It reads no configuration file.
 - **`temper sign-in CONFIG.json ACCOUNT`:** an LLM account's sign-in at a
   terminal (credentials.md, section 3). The engine need not run.
 - **The forge's setup** (setup.md), each command reading and checking
@@ -186,7 +193,7 @@ temper box CONFIG.json
   any failure (a refused start, a usage error, a failed commit, an
   abort, a failed sign-in, a failed step of the setup, the box giving
   up), the reason on stderr. smith's agent shell exits 0 or 1 the same
-  way; `temper forge run`'s is Forgejo's or the runner's own.
+  way; `temper ctl`'s statuses are tools.md, 6.3; `temper forge run`'s is Forgejo's or the runner's own.
 
 Standalone, one person's machine:
 
@@ -200,6 +207,7 @@ temper serve CONFIG.json               one process, one loop: temper-service's s
 ├── temper agent AGENT.json            a child process per run, in a process group of its own
 └── git ...                              a child process per git invocation, in a process group of its own (git.md, section 7)
 temper open DIRECTORY LINK_OR_ADDRESS  a process of its own, reaching the engine on loopback
+temper ctl DIRECTORY TOOL ...          a process per call, reaching the engine on loopback
 temper sign-in CONFIG.json ACCOUNT     a process of its own, run by hand
 ```
 
@@ -287,6 +295,8 @@ terminal's host, `temper-forge-setup-shell` and the box's host:
 | `crates/temper-client-domain` | client root | `jig-client` held, temper's pages, the forge's client side (client.md, section 3) | client.md, section 2 |
 | `crates/temper-client-view` | view | temper's pages as skein-ui's tree, with the forge's view (client.md, section 5) | client.md, section 2 |
 | `crates/temper-client-shell-terminal` | shell | the terminal: its host ordinary Rust, over skein's text shell and jig's native transport (client.md, section 6) | client.md, section 2 |
+| `crates/temper-client-tools` | client root, rendering | the agents' tools: the table, the runner, marks and conditions, the rendering, the tools' root (tools.md, section 4) | tools.md, section 4 |
+| `crates/temper-client-shell-cli` | shell | `temper ctl`: its host ordinary Rust, one call per process over jig's native transport (tools.md, section 8) | tools.md, section 4 |
 
 **temper's test crates and tiers** (testing.md, sections 2 and 7):
 `testing/temper-fake-forge-protocol`, the fake forge's server side over

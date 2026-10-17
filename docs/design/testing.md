@@ -245,6 +245,8 @@ and 10).
   Adopt pressed with `n`), and exits 0 on `q` after a drained close. Its
   referee reads the printed pages (the inbox and the adoption's
   outcome) and the exit status.
+- **The agents' tools,** `temper ctl` against `temper serve`, on a
+  scratch directory of their own: tools.md, 11.3.
 - **The server's guards,** a third test, against `temper serve`'s
   clients' listener: jig's one attack story that needs no browser, a
   rebound Host (jig's `protocol/browser.md`, section 15): a request
@@ -784,6 +786,8 @@ scripted engine before it or beside it (client.md, section 10).
   engine root alone.
 - **The joint world is the client's acceptance.** A client increment is
   done when its stories pass there.
+- **The agents' tools** run there too: their root, as a scripted agent
+  beside the fake person (tools.md, 11.2).
 
 ## 7. Layout
 
