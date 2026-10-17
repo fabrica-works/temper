@@ -1587,6 +1587,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Overlap at the rebase** (the re-check, against 21.3's worktree and 21.4's Files): `tests/client/src/{test.rs, scripted.rs, observe.rs}` and `tests/client-protocol/src/client.rs`, at items other than 21.3's; `crates/jig-client-view/src/bridge.rs`, which 21.3 deletes, holds only 14.1's wildcard arms (they move to 21.3's `ui/client.rs`). Conflicts there are 14.1's to resolve at its rebase, counted in its Size.
      4. **Unchanged:** 14.1's Size (300) and the 2.5 times codec rule; jig 22 after jig 14; temper 03.6's repin onto 21.4's landing; rulings 222 and 224.
 
+248. **jig 15 and 16: each increment on its own needs** (steer of 2026-10-17T10:33:58Z).
+     Ruling 248 (order, the user's "speed up the plan, without compromising its outcome", 2026-10-17T10:13Z): jig 15's and 16's increments start as their own needs land, not their session's.
+
+     1. **jig 15** (once jig 22 has, as before): 15.1 first; then 15.2, 15.3 and 15.4 each once 15.1 has landed, each in a slot of its own; 15.5 once 15.2 has (its Needs: "15.1's `facts::effect` and `facts::dangerous`, 15.2's `words`"); 15.6 once 15.3 and 15.5 have. Their files are apart (15.2 `words` and the view's phrasebook, 15.3 `shapes` and `tests/client-protocol`, 15.4 `thread` and the view's `conversation/**` and `windows.rs`, 15.5 the test kit and `tests/client`'s harness), sharing `jig-client`'s `lib.rs` module lines, `Cargo.toml`, `Cargo.lock` and `graph.rs`.
+     2. **jig 16** (once jig 21 has too, as before): 16.1 once 15.1 to 15.3 have landed, beside 15.4 to 15.6 (it reads `facts::chat_status`, `words`, `shapes::CHAT` and `template`); 16.2 once 16.1 has; 16.3 once 16.2 and 15.6 have (15.6's Proof stands on the scripted model 16.3 rewrites); 16.4 once 16.2 has, beside 16.3; 16.5 last, once 16.3, 16.4 and every jig 15 step have landed: temper 04.3 repins onto 16.5's landing, and temper 06.1 relies on it holding 15.5's check.
+     3. **Conflicts** at a landing in the shared files are the later step's to resolve at its rebase (generated code by regenerating it, as each increment's codec rule says), counted in its Size; a conflict in an item another running step changes is a block, naming both steps.
+     4. **Unchanged:** jig 14 → 22 → 15 at the session level; jig 17 once all of jig 16 has; 18, 19, 20 in order; each step's Size, Proof and gate; each session's first step held for its ready check, and each step started early here gets one too (supervisor.md, section 5).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

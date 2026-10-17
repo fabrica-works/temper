@@ -105,7 +105,9 @@ conversation's task line (pages.md, 3).
 Needs: the session's start: jig 21's reference UI with its state on the
 client alone (after jig 13's reference UI on `jig_client`);
 jig 22's task line, `tasks{query}` watched and read (22.2, 22.3) and
-`me`'s templates (22.1); jig 15's `facts::chat_status` and `words`.
+`me`'s templates (22.1); jig 15's `facts::chat_status` (15.1), `words`
+(15.2) and `shapes::CHAT` and `template` (15.3): it starts once 15.1 to 15.3
+have landed, beside 15.4 to 15.6 (ruling 248).
 Files: the reference UI (`crates/jig-client-view/src/`): its
 `Section::Conversations { project }` (at the base
 `crates/jig-domain-client/src/pages/conversations.rs`, 515 lines, and

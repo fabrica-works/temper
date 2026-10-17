@@ -74,9 +74,9 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/14-wire.md` | jig 14: the wire collapsed, its requests: the version refusal, scopes and windows, the operations, the compound request | jig 03 to 09, jig 21.2; lands nothing before jig 21's last landing (the fence below; ruling 247) | |
 | `jig/14-s1-words-release.md` | jig-14.s1 (ruling 210): words release nothing; the words' release leaves the engine | jig 14.3 | |
 | `jig/22-documents.md` | jig 22: the wire's documents: `me`, the task line and queries, offers and a decision's effect | jig 14 | |
-| `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | |
+| `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | 15.2, 15.3, 15.4: 15.1; 15.5: 15.2; 15.6: 15.3, 15.5 (ruling 248) |
 | `jig/21-ops-and-ui.md` | jig 21: `ops` and the reference UI's state on the client alone; `ops`'s wire crate | jig 13 | |
-| `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15, jig 21 | |
+| `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15.1 to 15.3, jig 21 | 16.3: 15.6; 16.5: every jig 15 step (ruling 248) |
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
 | `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s2 |
@@ -132,8 +132,14 @@ per session are in each file.
   jig 04 and jig 08 once jig 02.1 has; jig 03 once jig 02 has; jig 09
   once jig 02.1 and 04.1 have; jig 12 once jig 10 and 11 have; jig 13
   once jig 12 has; jig 21 once jig 13 has; jig 14 once jig 03 to 09 and
-  jig 21.2 have (it lands after jig 21, the fence below); jig 22 once jig 14 has; jig 15, 16, 17, 18, 19, 20 in
-  that order, jig 16 once jig 21 has too; jig 23 once jig 03 has; the
+  jig 21.2 have (it lands after jig 21, the fence below); jig 22 once jig 14 has; jig 15 once jig 22 has: 15.1 first, then 15.2, 15.3 and 15.4 each once 15.1 has,
+  in slots of their own, 15.5 once 15.2 has, 15.6 once 15.3 and 15.5 have;
+  jig 16 once jig 21 has too: 16.1 once 15.1 to 15.3 have, beside 15.4 to
+  15.6; 16.2 once 16.1 has; 16.3 once 16.2 and 15.6 have (15.6's Proof stands
+  on the scripted model 16.3 rewrites); 16.4 once 16.2 has, beside 16.3; 16.5
+  last, once 16.3, 16.4 and every jig 15 step have (temper 04.3 repins onto
+  16.5's landing, and temper 06.1 relies on it holding 15.5's check) (ruling
+  248); jig 17, 18, 19, 20 in that order, jig 17 once jig 16 has; jig 23 once jig 03 has; the
   temper sessions as their rows say.
 - **The fence:** jig 14 lands nothing before jig 21's last landing (14.1
   is built beside jig 21.3 and 21.4, ruling 247), so that
