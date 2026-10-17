@@ -52,6 +52,12 @@ pub(super) fn request(owner: skein_lib::Token, flight: &Flight) -> Option<store:
                     key: store::Get::Jig(core::Key::Tasks(jig_domain_tasks::Key::Ended(*task))),
                 });
             }
+            CoreRange::TaskProposal { task, .. } => {
+                return Some(store::Request::Get {
+                    owner,
+                    key: store::Get::Jig(core::Key::Tasks(jig_domain_tasks::Key::Live(*task))),
+                });
+            }
             CoreRange::ProposalDecision { proposer, proposal } => {
                 return Some(store::Request::Get {
                     owner,

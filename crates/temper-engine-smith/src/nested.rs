@@ -39,7 +39,19 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         Some(wake) => wake_policy(wake)?,
         None => tasks::WakePolicy::DEFAULT,
     };
-    Ok(engine::Delegate { executor, spec, contract, authority, symbolic_grants, dependencies, wake })
+    Ok(engine::Delegate {
+        executor,
+        spec,
+        contract,
+        authority,
+        symbolic_grants,
+        dependencies,
+        wake,
+        tracked: None,
+        label: 0,
+        flags: tasks::Flags::PLAIN,
+        budget: jig_domain_people::Budget::Named,
+    })
 }
 
 pub(crate) fn delegates(value: &Value) -> Result<Box<[engine::Delegate]>, Problem> {

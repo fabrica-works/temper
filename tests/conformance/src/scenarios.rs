@@ -41,6 +41,12 @@ fn ci_repair(record: &root::Record) -> bool {
     )
 }
 pub(crate) fn ask(world: &mut World, key: u8, ask: people::Ask) {
+    if let people::Ask::Amend { task, revision, .. } = &ask {
+        world.peers.observed.push(jig_conformance::referee::Observed::Named {
+            task: *task,
+            revision: jig_conformance::referee::Revision::Spec(*revision),
+        });
+    }
     send(
         world,
         engine::Event::Party(engine::PartyInput::Ask {
@@ -695,6 +701,7 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
                     }]),
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
+                    ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
                 }]),
             },
         },

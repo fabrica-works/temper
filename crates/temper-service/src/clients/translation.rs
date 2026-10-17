@@ -69,6 +69,7 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         | core::Event::PartyInputsLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
+        | core::Event::DecidedProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
         | core::Event::HistoricalEscalation { .. }
         | core::Event::NamedAnswer { .. }

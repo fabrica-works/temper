@@ -1,28 +1,8 @@
-//! Total owner routing; tokens pass unchanged (client.md, 3.3 and 6.2).
-#![deny(
-    clippy::indexing_slicing,
-    clippy::arithmetic_side_effects,
-    clippy::as_conversions,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::wildcard_enum_match_arm
-)]
+//! Root obligations pass unchanged to the native client shell (client.md, 6.2).
 use jig_client::contract::VersionRange;
 use jig_client_protocol_link as link;
-use skein_lib::{List, RequestRecord, Secret};
+use skein_lib::Secret;
 use temper_client_domain as client;
-pub mod family;
-
-/// Each link output has exactly one destination.
-#[derive(Debug)]
-pub enum Up {
-    Root(client::Event),
-    Shell(link::Request),
-    Kept(client::store::Record),
-    Keep(Option<Secret>),
-    Signing(link::Signing),
-    Notice(Notice),
-}
 /// Values shown outside the domain, including one-time credentials.
 #[derive(Debug)]
 pub enum Notice {
@@ -35,10 +15,10 @@ pub enum Notice {
     Unasked,
     Fact(link::Fact),
 }
-/// Each root output either steps the link or tells its shell.
+/// Each root obligation has exactly one destination.
 #[derive(Debug)]
 pub enum Down {
-    Link(link::Event),
+    Shell(jig_client::Request),
     Duty(Duty),
     Nothing,
 }
@@ -51,182 +31,13 @@ pub enum Duty {
     Fact(client::Fact),
 }
 #[must_use]
-pub fn up(request: link::Request, family: &mut family::Family) -> Up {
+pub fn down(request: client::Request) -> Down {
     match request {
-        transport @ (link::Request::Save { .. }
-        | link::Request::Erase { .. }
-        | link::Request::Exchange { .. }
-        | link::Request::OpenStream { .. }
-        | link::Request::CloseStream) => Up::Shell(transport),
-        link::Request::Kept { record } => {
-            let dropped = match &record.record.request.request {
-                jig_client::Ask::Family(record) => {
-                    record.family == temper_client_protocol_wire::FORGE
-                        && record.version != temper_client_protocol_wire::CLIENT_VERSION
-                }
-                jig_client::Ask::Jig(_) => false,
-            };
-            if dropped {
-                return Up::Notice(Notice::Dropped);
-            }
-            match kept(record, family) {
-                Some(record) => Up::Kept(record),
-                None => Up::Notice(Notice::Unread),
-            }
-        }
-        link::Request::Answer { attempt, envelope, answer, .. } => {
-            // Every Answer ends its attempt, even when the keyed request retries.
-            let forge = family.attempts.answered(attempt, true);
-            let answer = match answer {
-                Some(jig_client::Answered::Jig(jig_client::contract::Answer::Refused(refusal))) if forge => {
-                    match jig_client::contract::EntranceRefusal::new(refusal) {
-                        Ok(refusal) => Some(client::Answered::Forge(client::forge::Answer::EntranceRefused(refusal))),
-                        Err(_) => None,
-                    }
-                }
-                Some(jig_client::Answered::Jig(answer)) => Some(client::Answered::Jig(answer)),
-                Some(jig_client::Answered::Family(record)) => {
-                    family::answer(&record, &family.wire, &family.link).map(client::Answered::Forge)
-                }
-                None => None,
-            };
-            let envelope = match &answer {
-                None => match envelope {
-                    skein_lib::RequestEnvelope::Final => skein_lib::RequestEnvelope::Lost,
-                    skein_lib::RequestEnvelope::Again
-                    | skein_lib::RequestEnvelope::Lost
-                    | skein_lib::RequestEnvelope::SignedOut => envelope,
-                },
-                Some(_) => envelope,
-            };
-            Up::Root(client::Event::Answer { attempt, envelope, answer })
-        }
-        link::Request::Watch { watch, event } => {
-            Up::Root(client::Event::Jig(jig_client_view::Event::Watch { watch, event }))
-        }
-        link::Request::Ended { watch, end } => {
-            Up::Root(client::Event::Jig(jig_client_view::Event::Ended { watch, end }))
-        }
-        link::Request::Read { read, result } => match result {
-            jig_client::Readout::Jig(result) => {
-                Up::Root(client::Event::Jig(jig_client_view::Event::Read { read, result }))
-            }
-            jig_client::Readout::Limit | jig_client::Readout::Family { .. } | jig_client::Readout::NotServed { .. } => {
-                Up::Notice(Notice::Unasked)
-            }
-        },
-        link::Request::Hello { family: None, versions } => {
-            Up::Root(client::Event::Jig(jig_client_view::Event::Hello { served: versions.is_some_and(link::serves) }))
-        }
-        link::Request::Hello { family: Some(number), versions } => {
-            if number == temper_client_protocol_wire::FORGE {
-                Up::Root(client::Event::Forge(client::forge::Event::Served { versions }))
-            } else {
-                Up::Notice(Notice::Served { family: number, versions })
-            }
-        }
-        link::Request::Signing { signing } => Up::Signing(signing),
-        link::Request::ServiceCredential { party, credential } => Up::Notice(Notice::Credential { party, credential }),
-        link::Request::Dropped => Up::Notice(Notice::Dropped),
-        link::Request::NotKept { .. } | link::Request::FamilyDelivery { .. } => Up::Notice(Notice::Unasked),
-        link::Request::Fact { fact } => Up::Notice(Notice::Fact(fact)),
-    }
-}
-/// Credential persistence precedes the terminal's signing notice.
-#[must_use]
-pub fn signing(signing: &link::Signing, credential: Option<&Secret>) -> List<Up> {
-    let mut ups = List::with_capacity(2);
-    let notice = match signing {
-        link::Signing::SignedIn { .. } => Some(Notice::SignedIn),
-        link::Signing::SignedOut => Some(Notice::SignedOut),
-        link::Signing::Again | link::Signing::Refused | link::Signing::Lost => None,
-    };
-    if let Some(notice) = notice {
-        ups.push(Up::Keep(credential.cloned())).expect("credential and notice fit");
-        ups.push(Up::Notice(notice)).expect("credential and notice fit");
-    }
-    ups
-}
-#[must_use]
-pub fn down(request: client::Request, family: &mut family::Family) -> Down {
-    match request {
-        client::Request::Save { record } => match saved(record, family) {
-            Some(record) => Down::Link(link::Event::Save { record }),
-            None => Down::Duty(Duty::Fact(client::Fact::InvalidRecord)),
-        },
-        client::Request::Erase { key } => Down::Link(link::Event::Erase { key: erased(key) }),
-        client::Request::Send { attempt, key, ask: client::Ask::Jig(ask) } => {
-            Down::Link(link::Event::Send { attempt, key, ask: jig_client::Ask::Jig(ask) })
-        }
-        client::Request::Send { attempt, key, ask: client::Ask::Forge(ask) } => {
-            match family::request(&ask, &family.wire) {
-                Some(record) => {
-                    if family.attempts.sent(attempt).is_err() {
-                        Down::Duty(Duty::Fact(client::Fact::TableFull))
-                    } else {
-                        Down::Link(link::Event::Send { attempt, key, ask: jig_client::Ask::Family(record) })
-                    }
-                }
-                None => Down::Duty(Duty::Fact(client::Fact::InvalidRecord)),
-            }
-        }
-        client::Request::Jig(request) => match request {
-            client::JigOut::Read { read, what } => {
-                Down::Link(link::Event::Read { read, what: jig_client::Readable::Jig(what) })
-            }
-            client::JigOut::Open { watch, subject } => {
-                Down::Link(link::Event::Open { watch, subject: jig_client::Watchable::Jig(subject) })
-            }
-            client::JigOut::Continue { watch, subject } => Down::Link(link::Event::Continue { watch, subject }),
-            client::JigOut::Close { watch } => Down::Link(link::Event::Close { watch }),
-            client::JigOut::Answered { .. } | client::JigOut::Unknown { .. } => Down::Nothing,
-        },
+        client::Request::Client { request } => Down::Shell(request),
+        client::Request::Jig(client::JigOut::Answered { .. } | client::JigOut::Unknown { .. }) => Down::Nothing,
         client::Request::Show { address, replace } => Down::Duty(Duty::Show { address, replace }),
         client::Request::SignIn { provider, back } => Down::Duty(Duty::SignIn { provider, back }),
         client::Request::SignOut => Down::Duty(Duty::SignOut),
         client::Request::Fact { fact } => Down::Duty(Duty::Fact(fact)),
     }
-}
-#[must_use]
-pub fn saved(record: client::store::Record, family: &family::Family) -> Option<link::Saved> {
-    Some(match record {
-        client::store::Record::Table { version, record } => link::Saved {
-            version,
-            record: RequestRecord {
-                key: record.key,
-                scope: record.scope,
-                first_sent: record.first_sent,
-                request: jig_client::Held {
-                    key: record.request.key,
-                    request: match record.request.request {
-                        client::Ask::Jig(ask) => jig_client::Ask::Jig(ask),
-                        client::Ask::Forge(ask) => jig_client::Ask::Family(family::request(&ask, &family.wire)?),
-                    },
-                },
-            },
-        },
-    })
-}
-#[must_use]
-pub fn kept(saved: link::Saved, family: &family::Family) -> Option<client::store::Record> {
-    let link::Saved { version, record } = saved;
-    let request = match record.request.request {
-        jig_client::Ask::Jig(ask) => client::Ask::Jig(ask),
-        jig_client::Ask::Family(record) => client::Ask::Forge(family::restored(&record, &family.wire)?),
-    };
-    Some(client::store::Record::Table {
-        version,
-        record: RequestRecord {
-            key: record.key,
-            scope: record.scope,
-            first_sent: record.first_sent,
-            request: client::store::Held { key: record.request.key, request },
-        },
-    })
-}
-
-#[must_use]
-pub fn erased(key: client::store::Key) -> skein_lib::RequestKey {
-    let client::store::Key::Table(key) = key;
-    key
 }

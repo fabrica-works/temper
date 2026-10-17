@@ -92,23 +92,12 @@ fn a_part_the_side_does_not_hold_says_it_cannot_be_shown() {
 }
 #[test]
 fn the_navigation_slot_is_spliced_with_no_child() {
-    let view = fixtures::built(fixtures::FORGE);
+    let view = fixtures::built();
     let mut found = 0_u32;
     for node in view.tree().nodes() {
         if node.slot == Some(crate::forge::nav(fixtures::FORGE)) {
             found += 1;
             assert_eq!(node.size, 1, "navigation slot has no child");
-        }
-    }
-    assert_eq!(found, 1);
-}
-#[test]
-fn a_slot_of_another_connector_says_it_cannot_be_shown() {
-    let view = fixtures::built(fixtures::OTHER);
-    let mut found = 0_u32;
-    for node in view.tree().nodes() {
-        if node.role == Role::Status && node.name.as_deref() == Some(b"Cannot show this part.".as_slice()) {
-            found += 1;
         }
     }
     assert_eq!(found, 1);

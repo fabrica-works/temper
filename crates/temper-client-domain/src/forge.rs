@@ -3,6 +3,7 @@
 //! `Show` retains a part; `PartsLeft` frees that generation and every older one.
 use jig_client::contract::Part;
 use skein_lib::{Env, List, Queue, Time};
+pub mod family;
 mod form;
 mod vocabulary;
 pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form};
@@ -22,7 +23,7 @@ pub enum Event {
     Answered { request: skein_lib::Token, answer: Answer },
     Went { address: Address },
     Left,
-    Served { versions: Option<jig_client::contract::VersionRange> },
+    Served { served: Served },
     Show { part: Part, generation: u32 },
     PartsLeft { generation: u32 },
 }
@@ -33,7 +34,7 @@ pub enum Fact {
 #[derive(Debug)]
 pub enum Request {
     Show { address: Address },
-    Send { request: skein_lib::Token, scope: u64, ask: Ask },
+    Send { request: skein_lib::Token, ask: jig_client::Ask },
     Fact { fact: Fact },
 }
 #[derive(Debug)]
@@ -43,7 +44,6 @@ struct Held {
 }
 #[derive(Debug)]
 pub struct Side {
-    config: Config,
     address: Option<Address>,
     served: Served,
     form: Option<Form>,
@@ -54,13 +54,12 @@ pub struct Side {
 }
 impl Side {
     #[must_use]
-    pub fn new(limits: &Limits, config: Config) -> Side {
+    pub fn new(limits: &Limits, seed: u64) -> Side {
         Side {
-            config,
             address: None,
             served: Served::Unknown,
             form: None,
-            serial: 0,
+            serial: skein_lib::Rng::new(seed).next_u64(),
             party: None,
             held: List::with_capacity(limits.parts),
             shown: 0,
@@ -115,7 +114,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 side.changed();
             }
         }
-        Event::Served { versions } => served(side, versions),
+        Event::Served { served: value } => served(side, value),
         Event::Act { act } => act_on(side, &env.limits, act, out),
         Event::Progress { request, progress } => {
             if let Some(draft) = &mut side.form
@@ -185,7 +184,7 @@ fn act_on(side: &mut Side, limits: &Limits, act: Act, out: &mut Queue<Request>) 
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
         Act::Adopt => {
-            let Some(party) = side.party else {
+            let Some(_party) = side.party else {
                 return;
             };
             let Some(draft) = &mut side.form else {
@@ -203,7 +202,9 @@ fn act_on(side: &mut Side, limits: &Limits, act: Act, out: &mut Queue<Request>) 
                 side.serial = side.serial.checked_add(1).expect("forge request serial fits u64");
                 let request = skein_lib::Token::new(side.serial);
                 draft.pending = Some((request, skein_lib::RequestProgress::Parked));
-                out.push(Request::Send { request, scope: party, ask: Ask::Adopt(adoption) });
+                let bounds = wire_limits(limits).expect("forge bounds are checked");
+                let ask = family::request(&adoption, &bounds).expect("validated adoption fits wire");
+                out.push(Request::Send { request, ask: jig_client::Ask::Family(ask) });
             }
             side.changed();
         }
@@ -262,11 +263,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.checks).checked_mul(4)?)
 }
 
-fn served(side: &mut Side, versions: Option<jig_client::contract::VersionRange>) {
-    side.served = match versions {
-        Some(range) if range.contains(side.config.version) => Served::Yes,
-        Some(_) | None => Served::OutOfDate,
-    };
+fn served(side: &mut Side, served: Served) {
+    side.served = served;
     if let Some(draft) = &mut side.form {
         draft.served = side.served;
         if side.served == Served::OutOfDate
@@ -276,4 +274,56 @@ fn served(side: &mut Side, versions: Option<jig_client::contract::VersionRange>)
         }
     }
     side.changed();
+}
+
+/// The forge's receiving limits, shared by its bytes and bounds accounting.
+#[must_use]
+pub fn wire_limits(limits: &Limits) -> Option<temper_client_protocol_wire::v1::Limits> {
+    temper_client_protocol_wire::limits(&temper_client_protocol_wire::Bounds {
+        field_bytes: limits.field_bytes,
+        checks: limits.checks,
+        contexts: limits.checks,
+        refusal_bytes: 65_536,
+    })
+}
+pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: jig_client::Told) -> Option<Event> {
+    use jig_client::{Outcome, Told};
+    match told {
+        Told::Pending { key } => {
+            let pending = client.pending(key)?;
+            let progress = match pending.progress {
+                jig_client::Progress::InFlight => skein_lib::RequestProgress::InFlight,
+                jig_client::Progress::Retrying { .. } => skein_lib::RequestProgress::Retrying,
+                jig_client::Progress::NotServed | jig_client::Progress::Parked => skein_lib::RequestProgress::Parked,
+                jig_client::Progress::Unknown => skein_lib::RequestProgress::Unknown,
+            };
+            Some(Event::Progress { request: skein_lib::Token::new(key.number), progress })
+        }
+        Told::Answered { key, outcome } => {
+            let request = skein_lib::Token::new(key.number);
+            let answer = match outcome {
+                Outcome::Answered(jig_client::Answered::Family(record)) => {
+                    let link =
+                        jig_client_protocol_link::Limits::new(limits.client.domain, limits.client.exchanges).ok()?;
+                    family::answer(&record, &wire_limits(&limits.forge)?, &link)?
+                }
+                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused(why))) => {
+                    Answer::EntranceRefused(jig_client::contract::EntranceRefusal::new(why).ok()?)
+                }
+                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)))
+                | Outcome::Unknown
+                | Outcome::Limit
+                | Outcome::NotKept
+                | Outcome::Unconfirmed => Answer::Unknown,
+            };
+            Some(Event::Answered { request, answer })
+        }
+        Told::Kept { .. }
+        | Told::Dropped { .. }
+        | Told::Link { .. }
+        | Told::Changed { .. }
+        | Told::Text { .. }
+        | Told::Ended { .. }
+        | Told::Page { .. } => None,
+    }
 }

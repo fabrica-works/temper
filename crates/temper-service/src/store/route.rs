@@ -136,7 +136,33 @@ pub fn up(routes: &mut Routes, event: store::Event, into: &mut Queue<Up>) {
         store::Event::Restored { owner, rows, next } | store::Event::Loaded { owner, rows, next } => {
             page(routes, owner, rows, next, None, into);
         }
-        store::Event::Got { owner, row } => {
+        store::Event::Got { owner, mut row } => {
+            if let Some(Flight {
+                range: engine::Range::Core(engine::CoreRange::TaskProposal { task, proposal }), ..
+            }) = routes.pending.get(&owner)
+                && let Some(store::Row::Jig(core::Record::Tasks(jig_domain_tasks::Stored::Live(live)))) = &row
+            {
+                let mut pointer = None;
+                for kept in &live.proposal_rows {
+                    if kept.proposal == *proposal {
+                        pointer = Some(kept.revision);
+                        break;
+                    }
+                }
+                if live.number == *task
+                    && let Some(revision) = pointer
+                {
+                    into.push(Up::Ask(store::Request::Get {
+                        owner,
+                        key: store::Get::Jig(core::Key::Tasks(jig_domain_tasks::Key::History {
+                            task: *task,
+                            revision,
+                        })),
+                    }));
+                    return;
+                }
+                row = None;
+            }
             let rows: Box<[store::Row]> = match row {
                 Some(row) => Box::new([row]),
                 None => Box::new([]),

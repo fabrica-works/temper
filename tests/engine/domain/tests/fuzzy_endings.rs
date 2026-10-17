@@ -128,6 +128,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                     symbolic_grants: Box::new([]),
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
+                    ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
                 };
                 let body = engine::Call {
                     completion: 1,
@@ -141,7 +142,7 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 let Some(temper_engine_domain::CallAnswer::Delegated(numbers)) = driver.answered(90) else {
                     panic!("child was made atomically, seed {seed}");
                 };
-                let child = numbers[0];
+                let child = numbers[0].task;
                 let body = engine::Call {
                     completion: 2,
                     position: 2,

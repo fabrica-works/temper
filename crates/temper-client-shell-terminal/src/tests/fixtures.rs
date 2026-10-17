@@ -4,35 +4,31 @@ use skein_lib::{RequestRecord, Token};
 use temper_client_domain as client;
 pub const ATTEMPT: Token = Token::new(101);
 pub const READ: Token = Token::new(102);
-pub const WATCH: Token = Token::new(103);
 pub const SERVICE: u64 = 7;
-pub const PARTY: u64 = 9;
 pub fn credential() -> skein_lib::Secret {
     skein_lib::Secret::new(Box::from(CREDENTIAL))
 }
 pub const CREDENTIAL: &[u8] = b"one-time-service-credential";
-pub fn table_record() -> client::store::Record {
-    client::store::Record::Table {
-        version: client::store::VERSION,
-        record: RequestRecord {
-            key: [9; 16],
-            scope: SERVICE,
-            first_sent: None,
-            request: client::store::Held {
-                key: jig_client::Key { asker: jig_client::Asker::JIG, number: ATTEMPT.raw() },
-                request: client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
-            },
+pub fn table_record() -> RequestRecord<jig_client::Held> {
+    RequestRecord {
+        key: [9; 16],
+        scope: SERVICE,
+        first_sent: None,
+        request: jig_client::Held {
+            key: jig_client::Key { asker: jig_client::Asker::JIG, number: ATTEMPT.raw() },
+            request: jig_client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
         },
     }
+}
+pub fn link_limits() -> link::Limits {
+    let native = crate::limits::native();
+    link::Limits::new(native.client.client.domain, native.client.client.exchanges).expect("link bounds")
 }
 pub fn inbox_read() -> contract::Read {
     contract::Read::Inbox { project: None, group: contract::InboxReadGroup::Needs, kind: None, goal: None, after: None }
 }
-pub fn family() -> crate::route::family::Family {
-    crate::limits::family(&crate::limits::native()).expect("bounded fixture family")
-}
 pub fn wire_limits() -> temper_client_protocol_wire::v1::Limits {
-    family().wire
+    client::forge::wire_limits(&crate::limits::native().client.forge).expect("forge wire bounds")
 }
 pub fn adoption() -> client::forge::Adoption {
     client::forge::Adoption {
@@ -70,21 +66,12 @@ pub fn adopted(protection: client::forge::Protection) -> client::forge::Adopted 
         protection,
     }
 }
-pub fn send_adoption(attempt: Token) -> client::Request {
-    client::Request::Send { attempt, key: [9; 16], ask: client::Ask::Forge(client::forge::Ask::Adopt(adoption())) }
-}
-pub fn final_answer(attempt: Token, answer: jig_client::Answered) -> link::Request {
-    link::Request::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(answer), why: None }
-}
 pub fn role_refusal() -> contract::Refusal {
     contract::Refusal::Role { held: None }
 }
-pub fn entrance(refusal: contract::Refusal) -> contract::EntranceRefusal {
-    contract::EntranceRefusal::new(refusal).expect("fixed entrance facts")
-}
 pub fn core_refusal() -> Box<[u8]> {
     use jig_client_protocol_wire as w;
-    let limits = family().link.wire;
+    let limits = link_limits().wire;
     let value = w::Refusal::Role(w::RefusalRole::new(&limits, w::RefusalRoleParts { held: None }).expect("role fits"));
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measure fits"));
     value.encode(&mut writer).expect("measured room");
@@ -140,7 +127,15 @@ pub fn adoption_page(
     synthetic_header(&mut builder, None, false);
     let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
     builder.open(skein_ui::Role::Main);
-    temper_client_view::forge::page::page(&mut builder, form, b"Project: Shop", forge, jig, &mut bindings);
+    temper_client_view::forge::page::page(
+        &mut builder,
+        form,
+        b"Project: Shop",
+        forge,
+        jig,
+        &mut bindings,
+        limits.text_per_node,
+    );
     builder.close();
     builder.close();
     visible(builder.finish())
@@ -197,20 +192,18 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
     visible(builder.finish())
 }
 pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> skein_ui::Tree {
-    use jig_client::contract::{Delivery, ReadResult, Subject, WatchEvent};
-    use jig_client_view::Event as JigEvent;
     use skein_lib::{Env, Queue, Wall};
-    use temper_client_domain::{Event, JigOut, Request};
+    use temper_client_domain::Event;
     let mut limits = crate::limits::native().client;
     limits.jig.text = 32;
     limits.jig.rows = 8;
     limits.jig.document_bytes = 16_384;
-    limits.table.bytes = 4096;
+    limits.client.domain.requests.bytes = 4096;
     let env = Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits };
     let (jig, forge) = page_words();
     let mut view =
         temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, jig, forge, 1);
-    let mut root = client::new(&limits, 16, client::forge::Config { connector: 1, version: 1 });
+    let mut root = client::unlinked(&limits, 16);
     root_navigation(&mut root, &limits);
     let mut out = Queue::with_capacity(client::max_out(&limits));
     client::step(
@@ -223,70 +216,122 @@ pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> ske
         },
         &mut out,
     );
+    for event in [
+        jig_client::Event::StartUnlinked { kept: skein_lib::List::with_capacity(0) },
+        jig_client::Event::SignIn { with: jig_client::With::Transport },
+    ] {
+        client::step(&mut root, &env, Event::Client { event }, &mut out);
+    }
     if signed_out {
         client::step(&mut root, &env, Event::SignedOut, &mut out);
     } else {
-        client::step(&mut root, &env, Event::Jig(JigEvent::Hello { served: true }), &mut out);
-        for _ in 0..128 {
-            let Some(request) = out.pop() else {
-                break;
-            };
-            match request {
-                Request::Jig(JigOut::Read { read, what }) => {
-                    let value = read_value(&what);
-                    if let Some(value) = value {
-                        let result = ReadResult::Value(value);
-                        client::step(&mut root, &env, Event::Jig(JigEvent::Read { read, result }), &mut out);
-                    }
-                }
-                Request::Jig(JigOut::Open { watch, subject } | JigOut::Continue { watch, subject }) => {
-                    client::step(
-                        &mut root,
-                        &env,
-                        Event::Jig(JigEvent::Watch { watch, event: WatchEvent::Opened }),
-                        &mut out,
-                    );
-                    let delivery = match subject {
-                        Subject::Frame => Some(Delivery::Frame(Box::new(jig_client_world::stories::frame(1)))),
-                        Subject::Task { .. } => Some(Delivery::Task(Box::new(jig_client_world::stories::task()))),
-                        Subject::Deployment => {
-                            Some(Delivery::Deployment(Box::new(jig_client_world::stories::deployment())))
-                        }
-                        Subject::Tree { .. }
-                        | Subject::Chips { .. }
-                        | Subject::Inbox { .. }
-                        | Subject::Goals { .. }
-                        | Subject::Tasks { .. }
-                        | Subject::Conversations
-                        | Subject::Run { .. } => None,
-                    };
-                    if let Some(delivery) = delivery {
-                        client::step(
-                            &mut root,
-                            &env,
-                            Event::Jig(JigEvent::Watch { watch, event: WatchEvent::Delivered(delivery) }),
-                            &mut out,
-                        );
-                    }
-                }
-                Request::Show { address: next, .. } => {
-                    if next != client::Address::Jig(address) {
-                        client::step(&mut root, &env, Event::Went { place: client::Place::Address(next) }, &mut out);
-                    }
-                }
-                Request::Save { .. }
-                | Request::Erase { .. }
-                | Request::Send { .. }
-                | Request::Jig(JigOut::Close { .. } | JigOut::Answered { .. } | JigOut::Unknown { .. })
-                | Request::SignIn { .. }
-                | Request::SignOut
-                | Request::Fact { .. } => {}
-            }
-        }
+        client::step(
+            &mut root,
+            &env,
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } },
+            },
+            &mut out,
+        );
+        populate_page(&mut root, &env, address, &mut out);
         assert!(out.is_empty(), "fixture settles within its step budget: {out:?}");
     }
+    let settled = Env { now: env.now.saturating_add(env.limits.jig.notice_life), ..env };
+    client::fire(&mut root, &settled, &mut out);
     temper_client_view::build(&mut view, &root, &mut Queue::with_capacity(tree_limits().patches));
     copy_tree(view.tree())
+}
+fn populate_page(
+    root: &mut client::Domain,
+    env: &skein_lib::Env<client::Limits>,
+    address: jig_client_view::address::Address,
+    out: &mut skein_lib::Queue<client::Request>,
+) {
+    use jig_client::contract::{Delivery, ReadResult, Subject, WatchEvent};
+    use temper_client_domain::{Event, Request};
+    for _ in 0..128 {
+        let Some(request) = out.pop() else {
+            break;
+        };
+        match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(what) },
+                    },
+            } => {
+                let value = read_value(&what);
+                if let Some(value) = value {
+                    let result = ReadResult::Value(value);
+                    client::step(
+                        root,
+                        env,
+                        Event::Client {
+                            event: jig_client::Event::Up {
+                                up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) },
+                            },
+                        },
+                        out,
+                    );
+                }
+            }
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(subject) }
+                            | jig_client::Down::Continue { watch, subject },
+                    },
+            } => {
+                client::step(
+                    root,
+                    env,
+                    Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::Watched { watch, event: WatchEvent::Opened },
+                        },
+                    },
+                    out,
+                );
+                let delivery = match subject {
+                    Subject::Frame => Some(Delivery::Frame(Box::new(jig_client_world::stories::frame(1)))),
+                    Subject::Task { .. } => Some(Delivery::Task(Box::new(jig_client_world::stories::task()))),
+                    Subject::Deployment => {
+                        Some(Delivery::Deployment(Box::new(jig_client_world::stories::deployment())))
+                    }
+                    Subject::Tree { .. }
+                    | Subject::Chips { .. }
+                    | Subject::Inbox { .. }
+                    | Subject::Goals { .. }
+                    | Subject::Tasks { .. }
+                    | Subject::Conversations
+                    | Subject::Run { .. } => None,
+                };
+                if let Some(delivery) = delivery {
+                    client::step(
+                        root,
+                        env,
+                        Event::Client {
+                            event: jig_client::Event::Up {
+                                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(delivery) },
+                            },
+                        },
+                        out,
+                    );
+                }
+            }
+            Request::Show { address: next, .. } => {
+                if next != client::Address::Jig(address) {
+                    client::step(root, env, Event::Went { place: client::Place::Address(next) }, out);
+                }
+            }
+            Request::Client { .. }
+            | Request::Jig(_)
+            | Request::SignIn { .. }
+            | Request::SignOut
+            | Request::Fact { .. } => {}
+        }
+    }
 }
 fn root_navigation(root: &mut client::Domain, limits: &client::Limits) {
     client::configure_navigation(root, client::navigation(limits)).expect("fixture navigation");
@@ -592,4 +637,38 @@ fn activity_document() -> contract::ActivityPage {
     })
     .expect("one conversation entry");
     contract::ActivityPage { cut: false, rows, before: None, after: None }
+}
+
+pub fn native() -> crate::client::NativeClient {
+    crate::client::NativeClient::new(
+        crate::client::Settings {
+            engine: skein_io::Addr::Ip("127.0.0.1:7100".parse().expect("loopback")),
+            directory: Box::from(*b"client"),
+            limits: crate::limits::native(),
+        },
+        skein_io::kernel::Fd::new(100),
+        1000,
+        7,
+        crate::client::Start::Token,
+    )
+    .expect("native client")
+}
+pub fn service_answer() -> Box<[u8]> {
+    use jig_client_protocol_wire as w;
+    let limits = link_limits().wire;
+    let service = w::MadeService::new(&limits, w::MadeServiceParts { party: SERVICE, credential: credential() })
+        .expect("service fits");
+    let made =
+        w::OutcomeMade::new(&limits, w::OutcomeMadeParts { what: w::Made::Service(service) }).expect("made fits");
+    let done =
+        w::Final::Done(w::Done::new(&limits, w::DoneParts { outcome: w::Outcome::Made(made) }).expect("done fits"));
+    let mut bytes = skein_lib::Writer::new(usize::try_from(done.measure()).expect("record fits"));
+    done.encode(&mut bytes).expect("measured final");
+    let owned =
+        w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: w::VERSION, record: bytes.finish() })
+            .expect("owned fits");
+    let answer = w::Answer::FinalAnswer(owned);
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer fits"));
+    answer.encode(&mut bytes).expect("measured answer");
+    bytes.finish()
 }

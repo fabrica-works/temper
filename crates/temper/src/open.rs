@@ -103,7 +103,7 @@ pub(crate) fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, Refused
             &view.tree,
             directory.as_os_str().as_bytes().into(),
             link,
-            bounds.client.table.requests,
+            bounds.client.client.domain.requests.requests,
         );
         let signals = skein_shell::open_termination_signals().expect("termination signals");
         owned.push(signals);

@@ -87,7 +87,7 @@ impl Clients {
             .or(Err(invalid(What::Bound)))?;
         served
             .push(kit::Served {
-                family: Some(temper_client_protocol_wire::FORGE),
+                family: Some(temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge)),
                 first: temper_client_protocol_wire::CLIENT_VERSION,
                 last: temper_client_protocol_wire::CLIENT_VERSION,
             })

@@ -1,15 +1,14 @@
 mod fixtures;
 mod form;
-use crate::{Address, Ask, Event, Fact, Request, forge, store::Record};
+use crate::{Address, Event, Fact, Request, forge};
 use jig_client::contract::{self, Part, PartScope};
-use jig_client_view::boundary::Offset;
 use jig_client_view::page::navigation::Destination;
-use skein_lib::{List, Queue, RequestRecord};
+use skein_lib::{List, Queue};
 
 #[test]
 fn the_forge_address_goes_to_the_forge_side() {
     let limits = fixtures::limits();
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     fixtures::start(&mut root, List::with_capacity(0));
     let address = forge::Address::Adopt { project: fixtures::PROJECT };
     let mut out = Queue::with_capacity(crate::max_out(&limits));
@@ -26,7 +25,7 @@ fn the_forge_address_goes_to_the_forge_side() {
 #[test]
 fn a_family_hello_outside_the_version_makes_the_side_out_of_date() {
     let limits = fixtures::limits();
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     for (name, versions, expected) in [
         ("served", contract::VersionRange { first: 1, last: 1 }, forge::Served::Yes),
@@ -36,51 +35,34 @@ fn a_family_hello_outside_the_version_makes_the_side_out_of_date() {
         crate::step(
             &mut root,
             &fixtures::env(&limits),
-            Event::Forge(forge::Event::Served { versions: Some(versions) }),
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::FamilyServed { family: fixtures::FORGE, versions: Some(versions) },
+                },
+            },
             &mut out,
         );
         assert_eq!(root.forge().served(), expected, "{name}");
     }
 }
 
-fn kept(version: u16) -> List<Record> {
-    let mut records = List::with_capacity(3);
-    for (key, scope) in [(1, 7), (2, 7), (3, 8)] {
-        records
-            .push(Record::Table {
-                version,
-                record: RequestRecord {
-                    key: [key; 16],
-                    scope,
-                    first_sent: None,
-                    request: crate::store::Held {
-                        key: jig_client::Key { asker: jig_client::Asker::JIG, number: u64::from(key) },
-                        request: Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 })),
-                    },
-                },
-            })
-            .expect("kept fixtures fit");
-    }
-    records
-}
 #[test]
 fn a_part_of_the_forges_number_is_held_by_its_side() {
     let limits = fixtures::limits();
     let env = fixtures::env(&limits);
-    for forge in [fixtures::FORGE, 9] {
-        let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: forge, version: 1 });
-        let mut out = Queue::with_capacity(crate::max_out(&limits));
-        let part = Part::Connector { connector: forge };
-        crate::parts::show(&mut root, &env, part.clone(), 1, PartScope::Project(fixtures::PROJECT), &mut out);
-        assert!(root.forge().contains(&part, 1), "forge {forge}");
-        assert!(out.is_empty(), "forge {forge} reads no document");
-    }
+    let forge = fixtures::FORGE;
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    let part = Part::Connector { connector: forge };
+    crate::parts::show(&mut root, &env, part.clone(), 1, PartScope::Project(fixtures::PROJECT), &mut out);
+    assert!(root.forge().contains(&part, 1), "forge {forge}");
+    assert!(out.is_empty(), "forge {forge} reads no document");
 }
 #[test]
 fn a_part_of_another_connector_is_reported_unknown() {
     let limits = fixtures::limits();
     let env = fixtures::env(&limits);
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     let part = Part::Connector { connector: fixtures::OTHER };
     crate::parts::show(&mut root, &env, part.clone(), 1, PartScope::Project(fixtures::PROJECT), &mut out);
@@ -92,7 +74,7 @@ fn a_part_of_another_connector_is_reported_unknown() {
 fn parts_left_forget_the_parts_of_that_generation() {
     let limits = fixtures::limits();
     let env = fixtures::env(&limits);
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     for generation in [1, 2, 3] {
         crate::parts::show(&mut root, &env, fixtures::resource(), generation, PartScope::Deployment, &mut out);
@@ -114,7 +96,7 @@ fn a_part_past_the_sides_bound_is_reported_parts_full() {
     let mut limits = fixtures::limits();
     limits.forge.parts = 1;
     let env = fixtures::env(&limits);
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::parts::show(&mut root, &env, fixtures::connector(), 1, PartScope::Deployment, &mut out);
     crate::parts::show(&mut root, &env, fixtures::connector(), 1, PartScope::Deployment, &mut out);
@@ -123,82 +105,6 @@ fn a_part_past_the_sides_bound_is_reported_parts_full() {
     assert!(out.is_empty());
     assert!(!root.forge().contains(&fixtures::resource(), 1));
     assert_eq!(forge::shown(root.forge()), 1);
-}
-#[test]
-fn kept_requests_are_restored_parked_and_counted_per_scope() {
-    let limits = fixtures::limits();
-    let env = fixtures::env(&limits);
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
-    let watch = fixtures::start(&mut root, kept(crate::store::VERSION));
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::take(&mut root, &env, &mut out);
-    assert!(out.is_empty(), "kept work starts parked");
-    fixtures::confirm(&mut root, watch, 9, &mut out);
-    assert_eq!(root.jig().page(), &jig_client_view::page::Page::SomeoneElse);
-    out = Queue::with_capacity(crate::max_out(&limits));
-    for (scope, expected) in [(7, 2), (8, 1)] {
-        root.table.confirmed(Some(scope));
-        root.table.link(true);
-        crate::take(&mut root, &env, &mut out);
-        let mut sent = 0_u32;
-        for _ in 0..out.len() {
-            match out.pop().expect("counted output") {
-                Request::Send { .. } => sent += 1,
-                Request::Save { .. }
-                | Request::Erase { .. }
-                | Request::Jig(_)
-                | Request::Show { .. }
-                | Request::SignIn { .. }
-                | Request::SignOut
-                | Request::Fact { .. } => {}
-            }
-        }
-        assert_eq!(sent, expected, "scope {scope}");
-    }
-}
-#[test]
-fn a_table_record_of_another_version_is_dropped_as_invalid() {
-    let limits = fixtures::limits();
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
-    let env = fixtures::env(&limits);
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::step(
-        &mut root,
-        &env,
-        Event::Start {
-            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
-            kept: kept(3),
-            offset: Offset { minutes: 0 },
-        },
-        &mut out,
-    );
-    let mut invalid = 0_u32;
-    for _ in 0..out.len() {
-        match out.pop().expect("counted output") {
-            Request::Fact { fact: Fact::InvalidRecord } => invalid += 1,
-            Request::Fact {
-                fact:
-                    Fact::Jig(_)
-                    | Fact::TableFull
-                    | Fact::PartsFull
-                    | Fact::InvalidAnswer
-                    | Fact::UnknownConnector
-                    | Fact::KeptAnswered,
-            }
-            | Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Send { .. }
-            | Request::Jig(_)
-            | Request::Show { .. }
-            | Request::SignIn { .. }
-            | Request::SignOut => {}
-        }
-    }
-    assert_eq!(invalid, 3);
-    root.table.confirmed(Some(7));
-    root.table.link(true);
-    crate::take(&mut root, &env, &mut out);
-    assert!(out.is_empty(), "invalid version restores no requests");
 }
 #[test]
 fn temper_navigation_is_the_inbox_conversations_and_deployment() {
@@ -214,39 +120,14 @@ fn temper_navigation_is_the_inbox_conversations_and_deployment() {
             Destination::Jig(JigAddress::Deployment),
         ]
     );
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     assert_eq!(crate::configure_navigation(&mut root, navigation), Ok(()));
 }
 
 #[test]
-fn a_restored_record_of_version_one_is_dropped_as_invalid() {
-    let limits = fixtures::limits();
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
-    let env = fixtures::env(&limits);
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::step(
-        &mut root,
-        &env,
-        Event::Start {
-            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
-            kept: kept(1),
-            offset: Offset { minutes: 0 },
-        },
-        &mut out,
-    );
-    let mut invalid = 0_u32;
-    while let Some(request) = out.pop() {
-        if request == (Request::Fact { fact: Fact::InvalidRecord }) {
-            invalid += 1;
-        }
-    }
-    assert_eq!(invalid, 3);
-    assert_eq!(root.table.len(), 0, "version one restores no requests");
-}
-#[test]
 fn the_reference_uis_records_never_reach_the_small_store() {
     let limits = fixtures::limits();
-    let mut root = crate::new(&limits, fixtures::SEED, forge::Config { connector: fixtures::FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
     let record = jig_client_view::store::Record::Place {
         version: jig_client_view::store::STORE_VERSION,
         party: 9,
@@ -259,4 +140,25 @@ fn the_reference_uis_records_never_reach_the_small_store() {
         crate::route::route_jig(&mut root, &fixtures::env(&limits), &mut child, &mut out);
         assert!(out.is_empty(), "reference UI records produce neither store requests nor facts");
     }
+}
+
+#[test]
+fn an_asker_naming_no_child_is_a_fact_and_reaches_none() {
+    const UNKNOWN: jig_client::Asker = jig_client::Asker(65_535);
+    const REQUEST: u64 = 17;
+    let limits = fixtures::limits();
+    let mut root = fixtures::filled();
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::route::told(
+        &mut root,
+        &fixtures::env(&limits),
+        jig_client::Told::Answered {
+            key: jig_client::Key { asker: UNKNOWN, number: REQUEST },
+            outcome: jig_client::Outcome::Unknown,
+        },
+        &mut out,
+    );
+    assert_eq!(out.pop(), Some(Request::Fact { fact: Fact::UnknownAsker }));
+    assert_eq!(root.forge().form().expect("form").outcome, None);
+    assert!(out.is_empty());
 }

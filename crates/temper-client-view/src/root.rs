@@ -62,7 +62,15 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         if let Some(form) = root.forge().form() {
             let project = forge::page::project_name(root.jig(), form.project, &view.jig_words);
             builder.open(Role::Main);
-            forge::page::page(&mut builder, form, &project, &view.forge_words, &view.jig_words, &mut view.forge);
+            forge::page::page(
+                &mut builder,
+                form,
+                &project,
+                &view.forge_words,
+                &view.jig_words,
+                &mut view.forge,
+                view.limits.tree.text_per_node,
+            );
             builder.close();
         }
         jig_client_view::after_page(&mut builder, root.jig(), &view.jig_words, &mut view.jig);

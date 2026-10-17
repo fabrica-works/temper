@@ -932,6 +932,7 @@ pub(crate) fn subscribe_goal(domain: &mut Domain, env: &Env<Limits>, goal: u64, 
             | Work::ProposalLoaded { .. }
             | Work::ProposalFailed { .. }
             | Work::EndedLoaded { .. }
+            | Work::TaskProposalLoaded { .. }
             | Work::EndedFailed { .. } => {}
         }
     }
@@ -1728,12 +1729,7 @@ fn change_delegate(
                 }
             }
             let gate = found?;
-            let executor = match gate.kind {
-                forge_change::GateKind::Agent | forge_change::GateKind::Check => {
-                    tasks::Executor::Agent { charter: domain.config.forge_charter }
-                }
-                forge_change::GateKind::Person => tasks::Executor::Person(tasks::PersonAddress::Role(1)),
-            };
+            let executor = gate_executor(domain, gate.kind);
             (
                 executor,
                 Box::from(&b"Review this change at the named head"[..]),
@@ -1757,6 +1753,10 @@ fn change_delegate(
         }
     };
     Some(super::Delegate {
+        tracked: None,
+        label: 0,
+        flags: tasks::Flags::PLAIN,
+        budget: jig_domain_people::Budget::Named,
         executor,
         spec: tasks::Spec { words, parameters: parameters.into_boxed(), inputs: Box::new([]) },
         contract,
@@ -1765,6 +1765,15 @@ fn change_delegate(
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
     })
+}
+
+fn gate_executor(domain: &Domain, kind: forge_change::GateKind) -> tasks::Executor {
+    match kind {
+        forge_change::GateKind::Agent | forge_change::GateKind::Check => {
+            tasks::Executor::Agent { charter: domain.config.forge_charter }
+        }
+        forge_change::GateKind::Person => tasks::Executor::Person(tasks::PersonAddress::Role(1)),
+    }
 }
 
 /// Admit one project-funded repair of a broken landing branch. The owner row

@@ -7,7 +7,6 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
-use jig_client_protocol_link as link;
 use skein_lib::{Duration, RequestLimits};
 use temper_client_domain as client;
 /// Concurrent HTTP exchanges, beside the event stream.
@@ -24,8 +23,9 @@ pub struct Limits {
 #[must_use]
 pub fn native() -> Limits {
     Limits {
-        client: client::Limits {
-            jig: jig_client_view::Limits {
+        client: {
+            let jig = jig_client_view::Limits {
+                segments: 9,
                 watches: 16,                            // Ops's 8 raised to the target 16 live watches.
                 notices: 8,                             // Notices retained for display.
                 notice_life: Duration::from_secs(5),    // Notice display lifetime.
@@ -52,21 +52,27 @@ pub fn native() -> Limits {
                 conversation_words: 8, // Pending conversation snapshots.
                 navigation_entries: 8, // Navigation destinations.
                 updates_count: 99,     // Unread counter before its lower-bound mark.
-                backoff: jig_client_view::limits::ui::Backoff {
-                    first: Duration::from_secs(1), // First watch reconnect span.
-                    most: Duration::from_secs(30), // Longest watch reconnect span.
-                },
-                heartbeat: Duration::from_secs(30), // Quiet stream before Offline.
-            },
-            forge: client::forge::Limits { parts: 16, field_bytes: 256, checks: 8 }, // Forge parts in slots.
-            table: RequestLimits {
+            };
+            let requests = RequestLimits {
                 requests: 16,                   // Durable keyed requests.
                 bytes: 16_777_216,              // Whole request-table payload bytes.
                 out: 32,                        // Table outputs per iteration.
                 first: Duration::from_secs(1),  // First request retry span.
                 most: Duration::from_secs(30),  // Longest request retry span.
                 margin: Duration::from_secs(1), // Retention's safety margin.
-            },
+            };
+            client::Limits {
+                jig,
+                forge: client::forge::Limits { parts: 16, field_bytes: 256, checks: 8 },
+                client: client::limits::client(
+                    &jig,
+                    requests,
+                    EXCHANGES,
+                    jig_client::Backoff { first: Duration::from_secs(1), most: Duration::from_secs(30) },
+                    Duration::from_secs(30),
+                )
+                .expect("client profile fits"),
+            }
         },
         connections: jig_client_shell_native::Limits {
             exchanges: EXCHANGES,
@@ -95,52 +101,6 @@ pub fn native() -> Limits {
         },
     }
 }
-/// # Errors
-/// Returns the link's refusal if these client bounds cannot be encoded.
-pub fn link(limits: &Limits) -> Result<link::Limits, link::Unusable> {
-    let jig = limits.client.jig;
-    link::Limits::new(
-        jig_client::DomainLimits {
-            owners: &[jig_client::Spoken {
-                family: temper_client_protocol_wire::FORGE,
-                version: temper_client_protocol_wire::CLIENT_VERSION,
-            }],
-            requests: limits.client.table,
-            ask_bytes: limits.client.table.bytes,
-            handles: jig.watches,
-            watches: jig.watches,
-            reads: jig.reads,
-            turn_bytes: u32::try_from(jig.document_bytes).map_err(|_| link::Unusable::Limits)?,
-            document_bytes: jig.document_bytes,
-            backoff: jig_client::Backoff { first: jig.backoff.first, most: jig.backoff.most },
-            rows: jig.rows,
-            text: jig.text,
-            projects: jig.projects,
-            charters: jig.charters,
-            fields: jig.fields,
-            delegates: jig.delegates,
-            records: jig.records,
-            kept: jig.kept,
-            parts: jig.parts,
-            heartbeat: jig.heartbeat,
-        },
-        EXCHANGES,
-    )
-}
-/// Family bounds mirror the small forge's names, gates and protection contexts.
-#[must_use]
-pub fn family(limits: &Limits) -> Option<crate::route::family::Family> {
-    Some(crate::route::family::Family {
-        attempts: crate::route::family::Attempts::new(limits.client.table.requests),
-        wire: temper_client_protocol_wire::limits(&temper_client_protocol_wire::Bounds {
-            field_bytes: 256,
-            checks: 8,
-            contexts: 16,
-            refusal_bytes: 65_536,
-        })?,
-        link: link(limits).ok()?,
-    })
-}
 /// Checked words and the view bounds used at construction and accounting.
 #[must_use]
 pub fn view(
@@ -162,12 +122,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let (view, jig, forge) = view(limits)?;
     let root = client::worst_case(&limits.client)?;
     let view = temper_client_view::worst_case(&view, &limits.client, &jig, &forge)?;
-    let link = link::worst_case(&link(limits).ok()?)?;
-    root.checked_add(view)?.checked_add(link)?.checked_add(shell(limits)?)?.checked_add(skein_lib::Set::<
-        skein_lib::Token,
-    >::worst_case(
-        limits.client.table.requests
-    )?)
+    root.checked_add(view)?.checked_add(shell(limits)?)
 }
 /// The published `Shell::worst_case` formula, with every operation checked.
 #[must_use]
@@ -193,7 +148,7 @@ pub fn shell(limits: &Limits) -> Option<u64> {
     let heard = limits.connections.http.read.checked_mul(3)?.checked_add(8)?;
     skein_io::worst_case(&limits.io)?
         .checked_add(stream)?
-        .checked_add(skein_lib::Queue::<link::Heard>::worst_case(heard)?)?
+        .checked_add(skein_lib::Queue::<jig_client_protocol_http::Heard>::worst_case(heard)?)?
         .checked_add(connections.checked_mul(256)?.checked_mul(bytes)?)?
         .checked_add(connections.checked_mul(u64::from(limits.io.intake))?)
 }

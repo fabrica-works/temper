@@ -123,6 +123,7 @@ pub fn limits() -> engine::Limits {
     engine::Limits {
         templates: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.templates,
         documents: jig_domain_core::documents::DocumentLimits {
+            segments: 9,
             rows: 4,
             text_bytes: 4_096,
             chips: 4,

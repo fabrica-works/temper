@@ -802,6 +802,7 @@ fn change_world_with_policy(
                     }]),
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,
+                    ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
                 }]),
             },
         },
@@ -814,7 +815,7 @@ fn change_world_with_policy(
         .answers
         .iter()
         .find_map(|answer| match answer {
-            temper_engine_domain::CallAnswer::Delegated(numbers) => numbers.first().copied(),
+            temper_engine_domain::CallAnswer::Delegated(numbers) => numbers.first().map(|made| made.task),
             _ => None,
         })
         .expect("change task number");
@@ -2563,7 +2564,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
     world.send(event);
     world.until(Until::Ready);
     let proposal = match world.answers.last().expect("proposal answer") {
-        temper_engine_domain::CallAnswer::Proposed { proposal } => *proposal,
+        temper_engine_domain::CallAnswer::Proposed { proposal, .. } => *proposal,
         other => panic!("unexpected proposal answer: {other:?}"),
     };
     assert!(world.store.rows.values().any(|record| matches!(record, Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::ProposedEffect(effect) if effect.number == proposal))));

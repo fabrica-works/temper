@@ -670,7 +670,8 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
                 | Read::Dependency(_)
                 | Read::InputCheck(_)
                 | Read::Notes { .. }
-                | Read::Proposal(_) => {
+                | Read::Proposal(_)
+                | Read::TaskProposal { .. } => {
                     unreachable!("decision archive waiter")
                 }
             };

@@ -42,7 +42,7 @@ pub enum CallAnswer {
     /// A task holder's held-decision call was refused before mutation.
     EscalationRefused(jig_domain_tasks::Problem),
     /// Proposal entered its proposer's durable pending state.
-    Proposed { proposal: u64 },
+    Proposed { proposal: u64, holder: jig_domain_tasks::ProposalHolder },
     /// Proposal was accepted, rejected, passed, or withdrawn.
     ProposalDecided { proposal: u64, outcome: jig_domain_tasks::ProposalOutcome },
     /// Proposal action or current standing failed before mutation.
@@ -66,7 +66,7 @@ pub enum CallAnswer {
     /// A standing interest failed admission.
     SubscriptionRefused(jig_domain_tasks::Problem),
     /// All members of an authorized batch, in call order.
-    Delegated(Box<[u64]>),
+    Delegated(Box<[jig_domain_core::Made]>),
     /// A whole batch declined by authority, with its independent findings.
     DelegationDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// A whole batch refused by structural or finite-funding admission.
@@ -130,7 +130,9 @@ impl CallAnswer {
                 jig_domain_core::CallPart::EscalationDecided { task: *task, revision: *revision, outcome: *outcome }
             }
             CallAnswer::EscalationRefused(problem) => jig_domain_core::CallPart::EscalationRefused(problem.clone()),
-            CallAnswer::Proposed { proposal } => jig_domain_core::CallPart::Proposed { proposal: *proposal },
+            CallAnswer::Proposed { proposal, holder } => {
+                jig_domain_core::CallPart::Proposed { proposal: *proposal, holder: *holder }
+            }
             CallAnswer::ProposalDecided { proposal, outcome } => {
                 jig_domain_core::CallPart::ProposalDecided { proposal: *proposal, outcome: *outcome }
             }
@@ -189,7 +191,9 @@ impl CallAnswer {
                 CallAnswer::EscalationDecided { task: *task, revision: *revision, outcome: *outcome }
             }
             jig_domain_core::CallPart::EscalationRefused(problem) => CallAnswer::EscalationRefused(problem.clone()),
-            jig_domain_core::CallPart::Proposed { proposal } => CallAnswer::Proposed { proposal: *proposal },
+            jig_domain_core::CallPart::Proposed { proposal, holder } => {
+                CallAnswer::Proposed { proposal: *proposal, holder: *holder }
+            }
             jig_domain_core::CallPart::ProposalDecided { proposal, outcome } => {
                 CallAnswer::ProposalDecided { proposal: *proposal, outcome: *outcome }
             }
@@ -249,6 +253,8 @@ pub enum Key {
 pub enum CoreRange {
     /// One immutable decision for a later authenticated proposal caller.
     ProposalDecision { proposer: jig_domain_people::Proposer, proposal: u64 },
+    /// One task owner and the retained history position of its proposal.
+    TaskProposal { task: u64, proposal: u64 },
     /// Exactly one root-owned decision archive for a stale authenticated
     /// decision; no unbounded history restore.
     EscalationDecision {
@@ -334,6 +340,15 @@ impl CoreRange {
     pub fn contains(&self, key: &jig_domain_core::Key) -> bool {
         use jig_domain_core::{CoreKey, Key as Core};
         match self {
+            CoreRange::TaskProposal { task, proposal } => {
+                let Core::Tasks(
+                    jig_domain_tasks::Key::Live(found) | jig_domain_tasks::Key::History { task: found, .. },
+                ) = key
+                else {
+                    return false;
+                };
+                *task != 0 && *proposal != 0 && found == task
+            }
             CoreRange::ProposalDecision { proposer, proposal } => {
                 let Core::Core(CoreKey::ProposalDecision { proposer: found, proposal: number }) = key else {
                     return false;
@@ -510,6 +525,11 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                 jig_domain_people::Ask::Propose { action: jig_domain_people::Action::Batch(batch), reason, .. } => {
                     people_bytes::batch(batch)?.checked_add(u64::try_from(reason.len()).ok()?)
                 }
+                jig_domain_people::Ask::Propose {
+                    action: jig_domain_people::Action::Amend { amendment, .. },
+                    reason,
+                    ..
+                } => jig_domain_people::amendment_bytes(amendment)?.checked_add(u64::try_from(reason.len()).ok()?),
                 jig_domain_people::Ask::EditNote { scope, change, .. } => {
                     let scope_bytes = match scope.as_ref() {
                         jig_domain_people::NoteScope::Deployment
@@ -709,7 +729,9 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
             }
             Some(bytes)
         }
-        CallAnswer::Delegated(numbers) => u64::try_from(numbers.len()).ok()?.checked_mul(8),
+        CallAnswer::Delegated(numbers) => {
+            u64::try_from(numbers.len()).ok()?.checked_mul(u64::try_from(size_of::<jig_domain_core::Made>()).ok()?)
+        }
         CallAnswer::DelegationDenied { findings, .. }
         | CallAnswer::ForgeEffectDenied { findings, .. }
         | CallAnswer::ToolDenied { findings, .. } => u64::try_from(findings.len())

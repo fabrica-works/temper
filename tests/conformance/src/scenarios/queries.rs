@@ -10,6 +10,13 @@ use temper_engine_domain as root;
 
 const WATCH: u64 = 7090;
 const READ: u64 = 7091;
+const FIRST_QUERY_CHAT: u8 = 110;
+const SECOND_QUERY_CHAT: u8 = 111;
+const INITIAL: u8 = 0;
+const WAITING: u8 = 1;
+const READY: u8 = 2;
+const ADOPTION_WAIT: u64 = 6_000_000_000;
+const RETRY_WAIT: u64 = 1_000_000_000;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct State {
     next: Option<reads::Cursor>,
@@ -43,8 +50,12 @@ fn read(world: &mut World, from: Option<reads::Cursor>) {
 pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Result<bool, Violation> {
     match action {
         Action::WatchQuery => {
-            if *phase < 2 && world.peers.children.is_empty() {
-                ask(world, 110 + *phase, people::Ask::StartChat { project: 1, words: b"query task".as_slice().into() });
+            if *phase < READY && world.peers.children.is_empty() {
+                ask(
+                    world,
+                    if *phase == INITIAL { FIRST_QUERY_CHAT } else { SECOND_QUERY_CHAT },
+                    people::Ask::StartChat { project: 1, words: b"query task".as_slice().into() },
+                );
                 *phase += 1;
                 return Ok(true);
             }
@@ -71,22 +82,22 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
         }
         Action::EndTask => {
             let task = *world.peers.children.iter().find(|task| !super::ended(world, **task)).expect("live query task");
-            if *phase == 0 && !world.peers.assignments.iter().any(|a| a.task == task) {
-                world.advance(6_000_000_000);
-                *phase = 1;
+            if *phase == INITIAL && !world.peers.assignments.iter().any(|a| a.task == task) {
+                world.advance(ADOPTION_WAIT);
+                *phase = WAITING;
                 return Ok(true);
             }
-            if *phase == 1 {
-                world.advance(1_000_000_000);
-                *phase = 2;
+            if *phase == WAITING {
+                world.advance(RETRY_WAIT);
+                *phase = READY;
                 return Ok(true);
             }
             super::message(world, task);
         }
         Action::ReadEnded => {
-            if *phase == 0 {
+            if *phase == INITIAL {
                 world.peers.query.found.clear();
-                *phase = 1;
+                *phase = WAITING;
                 read(world, Some(reads::Cursor::Store { scope: reads::Scope::Tasks { query: query() }, after: None }));
                 return Ok(true);
             }

@@ -289,6 +289,7 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
             Work::EscalationFailed { waiter } => escalation::failed(domain, waiter),
             Work::ProposalLoaded { waiter, rows } => proposals::historical_loaded(domain, waiter, rows),
             Work::ProposalFailed { waiter } => proposals::historical_failed(domain, waiter),
+            Work::TaskProposalLoaded { waiter, rows } => proposals::task_loaded(domain, waiter, rows),
             Work::EndedLoaded { waiter, rows } => crate::archive::ended_loaded(domain, waiter, rows),
             Work::EndedFailed { waiter } => crate::archive::ended_failed(domain, waiter),
         }

@@ -122,7 +122,9 @@ pub(crate) fn propose_call(
             }));
             return;
         }
-        ProposedAction::Amend { task, amendment } => tasks::ProposalAction::Amend { task, amendment },
+        ProposedAction::Amend { task, revision, amendment } => {
+            tasks::ProposalAction::Amend { task, revision, amendment }
+        }
         ProposedAction::Widen { task, authority } => tasks::ProposalAction::Widen { task, authority },
         ProposedAction::Release { task } => tasks::ProposalAction::Release { task },
     };
@@ -131,4 +133,59 @@ pub(crate) fn propose_call(
         key,
         action: jig_domain_core::NamedAction::Propose { action, reason, as_holder },
     }));
+}
+
+pub(crate) fn task_begin(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    barrier: &mut Decision,
+    to: ReplyTo,
+    key: CallKey,
+    proposal: u64,
+) {
+    let read = super::Read::TaskProposal { to, key, proposal };
+    let id = match domain.archive_reads.insert(Some(read)) {
+        Ok(id) => id,
+        Err(Some(super::Read::TaskProposal { to, key, proposal })) => {
+            domain.work.push(Work::Core(jig_domain_core::Event::DecidedProposal {
+                to,
+                key,
+                proposal,
+                row: None,
+                busy: true,
+            }));
+            return;
+        }
+        Err(_) => unreachable!("task proposal read"),
+    };
+    super::emit(
+        barrier,
+        &env.limits,
+        super::Delivery::Load {
+            waiter: id.token(),
+            range: super::Range::Core(crate::CoreRange::TaskProposal { task: key.task, proposal }),
+            after: None,
+        },
+    );
+}
+pub(crate) fn task_loaded(domain: &mut Domain, waiter: Token, rows: Option<Box<[super::Record]>>) {
+    let Some(super::Read::TaskProposal { to, key, proposal }) = super::take_read(domain, waiter) else {
+        unreachable!("task proposal read")
+    };
+    domain.archive_reads.retire(super::Id::from_token(waiter));
+    let busy = rows.is_none();
+    let row = task_proposal(rows);
+    domain.work.push(Work::Core(jig_domain_core::Event::DecidedProposal { to, key, proposal, row, busy }));
+}
+
+fn task_proposal(rows: Option<Box<[super::Record]>>) -> Option<tasks::Proposal> {
+    let rows = rows?;
+    if rows.len() != 1 {
+        return None;
+    }
+    let super::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::History(row))) = rows.into_iter().next()?
+    else {
+        return None;
+    };
+    Some(*row.proposal?)
 }

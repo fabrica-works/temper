@@ -35,6 +35,10 @@ pub fn adoption(forge: u16) -> forge::Adoption {
 #[must_use]
 pub fn report_delegate(words: &[u8], dependencies: Box<[engine::Dependency]>) -> engine::Delegate {
     engine::Delegate {
+        tracked: None,
+        label: 0,
+        flags: tasks::Flags::PLAIN,
+        budget: jig_domain_people::Budget::Named,
         executor: tasks::Executor::Agent { charter: 1 },
         spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
@@ -104,7 +108,7 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
     let Some(engine::CallAnswer::Delegated(children)) = driver.answered(60) else {
         panic!("one delegate admitted: {:?}", driver.answered(60));
     };
-    let child = children[0];
+    let child = children[0].task;
     (driver, parent, child)
 }
 

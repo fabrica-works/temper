@@ -12,7 +12,7 @@ use temper_client_domain::{Limits, forge};
 use temper_client_view as view;
 use temper_engine_domain as engine;
 use temper_engine_domain_world::direct::Driver;
-pub const FORGE: u16 = 0;
+pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const FORGE_HOST: &[u8] = b"forge.example";
 pub const REPOSITORIES: &[(&[u8], &[u8], u32)] = &[(b"acme", b"shop", 7), (b"acme", b"second", 8)];
 pub const PARTY: u64 = 1;
@@ -20,8 +20,9 @@ pub const SEED: u64 = 1101;
 pub const WITHIN: Duration = Duration::from_secs(1);
 #[must_use]
 pub fn domain_limits() -> Limits {
-    Limits {
-        jig: jig_client_view::Limits {
+    {
+        let jig = jig_client_view::Limits {
+            segments: 9,
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -48,21 +49,27 @@ pub fn domain_limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_millis(10),
-                most: Duration::from_millis(80),
-            },
-            heartbeat: Duration::from_millis(100),
-        },
-        forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-        table: RequestLimits {
+        };
+        let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
             out: 16,
             first: Duration::from_millis(10),
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
-        },
+        };
+        Limits {
+            jig,
+            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
+            client: temper_client_domain::limits::client(
+                &jig,
+                requests,
+                8,
+                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                Duration::from_millis(100),
+            )
+            .expect("client profile fits"),
+        }
     }
 }
 

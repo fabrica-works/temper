@@ -1,7 +1,7 @@
 //! Root, view, link and native transport as one host (client.md, 6.2).
 use crate::{
     limits,
-    route::{self, Down, Duty, Up},
+    route::{self, Down, Duty},
 };
 use jig_client_protocol_link as link;
 use jig_client_shell_native::Shell;
@@ -42,7 +42,6 @@ pub enum Shown {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
-    WaitingLink,
     WaitingToken,
     Running,
     Closing { started: bool },
@@ -50,15 +49,16 @@ enum Phase {
 /// The composition holds no person; its caller drives the semantic tree.
 pub struct NativeClient {
     shell: Shell,
-    link: link::Link,
-    family: route::family::Family,
     root: domain::Domain,
     view: view::View,
     env: Env<domain::Limits>,
     out: Queue<domain::Request>,
-    linked: Queue<link::Request>,
     patches: Queue<skein_ui::Patch>,
-    kept: List<domain::store::Record>,
+    credential: Option<skein_lib::Secret>,
+    with: Option<jig_client::With>,
+    authentication: skein_lib::Map<skein_lib::Token, bool>,
+    kept_keys: skein_lib::Set<jig_client::Key>,
+    credential_notice: Option<(u64, skein_lib::Secret)>,
     address: domain::Address,
     phase: Phase,
     dirty: bool,
@@ -84,54 +84,34 @@ impl NativeClient {
         let bounds = settings.limits;
         let mut memory = limits::worst_case(&bounds).expect("native capacities are checked");
         let (view_limits, jig_words, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
-        let link =
-            link::Link::new(&limits::link(&bounds).expect("native link capacities are checked")).expect("checked link");
-        let notices = link.max_out().checked_add(domain::max_out(&bounds.client)).expect("notice capacity");
-        let records = bounds
-            .client
-            .jig
-            .records
-            .checked_add(bounds.client.jig.kept)
-            .and_then(|n| n.checked_add(bounds.client.jig.parts))
-            .expect("kept record capacity");
+        let notices = domain::max_out(&bounds.client);
         memory = memory
-            .checked_add(Queue::<link::Request>::worst_case(link.max_out()).expect("link output memory"))
-            .and_then(|n| n.checked_add(Queue::<Shown>::worst_case(notices)?))
+            .checked_add(Queue::<Shown>::worst_case(notices).expect("notice memory"))
             .and_then(|n| n.checked_add(Queue::<Signing>::worst_case(limits::EXCHANGES)?))
-            .and_then(|n| n.checked_add(List::<domain::store::Record>::worst_case(records)?))
-            .and_then(|n| n.checked_add(u64::from(records).checked_mul(bounds.client.jig.document_bytes)?))
-            .and_then(|n| n.checked_add(u64::from(notices).checked_mul(40)?))
+            .and_then(|n| n.checked_add(skein_lib::Map::<skein_lib::Token, bool>::worst_case(limits::EXCHANGES)?))
             .expect("native queues fit memory");
-        let mut linked = Queue::with_capacity(link.max_out());
-        let mut link = link;
+        memory = memory
+            .checked_add(
+                skein_lib::Set::<jig_client::Key>::worst_case(bounds.client.client.domain.requests.requests)
+                    .expect("kept key slots"),
+            )
+            .and_then(|n| n.checked_add(bounds.client.jig.document_bytes))
+            .expect("notice memory fits");
         let mut shell = Shell::new(jig_client_shell_native::Settings {
             engine: settings.engine,
             directory: settings.directory,
             limits: bounds.connections,
             io: bounds.io,
         });
-        let token_start = match start {
-            Start::Link(printed) => {
-                let secret = shell.sign_in(&printed)?;
-                link.step(Time::ZERO, link::Event::SignIn { with: link::With::Link(secret) }, &mut linked);
-                false
-            }
-            Start::Token => true,
+        let with = match start {
+            Start::Link(printed) => Some(jig_client::With::Link(shell.sign_in(&printed)?)),
+            Start::Token => None,
         };
         shell.adopt(directory, user, seed);
-        let mut root = domain::new(
-            &bounds.client,
-            seed,
-            domain::forge::Config {
-                connector: temper_client_protocol_wire::FORGE,
-                version: temper_client_protocol_wire::CLIENT_VERSION,
-            },
-        );
+        let mut root = domain::new(&bounds.client, seed);
         domain::configure_navigation(&mut root, domain::navigation(&bounds.client)).expect("native navigation fits");
         Ok(Self {
             shell,
-            link,
-            family: limits::family(&bounds).expect("native family capacities are checked"),
             root,
             view: view::View::new(
                 &view_limits,
@@ -142,11 +122,14 @@ impl NativeClient {
             ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds.client },
             out: Queue::with_capacity(domain::max_out(&bounds.client)),
-            linked,
             patches: Queue::with_capacity(view_limits.tree.patches),
-            kept: List::with_capacity(records),
+            credential: None,
+            with,
+            authentication: skein_lib::Map::with_capacity(limits::EXCHANGES),
+            kept_keys: skein_lib::Set::with_capacity(bounds.client.client.domain.requests.requests),
+            credential_notice: None,
             address: domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
-            phase: if token_start { Phase::WaitingToken } else { Phase::WaitingLink },
+            phase: Phase::WaitingToken,
             dirty: false,
             signing_out: false,
             notices: Queue::with_capacity(notices),
@@ -183,8 +166,14 @@ impl NativeClient {
     /// Refuses a link outside the configured engine's address.
     pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
         let secret = self.shell.sign_in(printed)?;
-        self.link.step(self.env.now, link::Event::SignIn { with: link::With::Link(secret) }, &mut self.linked);
-        self.outputs();
+        if self.loaded {
+            self.event(domain::Event::Client {
+                event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) },
+            });
+            self.outputs();
+        } else {
+            self.with = Some(jig_client::With::Link(secret));
+        }
         Ok(())
     }
     /// Each sign-in outcome is handed to the caller unchanged, once.
@@ -200,7 +189,7 @@ impl NativeClient {
         match self.phase {
             Phase::Running => true,
             Phase::Closing { started } => started,
-            Phase::WaitingLink | Phase::WaitingToken => false,
+            Phase::WaitingToken => false,
         }
     }
     #[must_use]
@@ -223,19 +212,89 @@ impl NativeClient {
             self.notices.push(Shown::Terminal(notice));
         }
         domain::step(&mut self.root, &self.env, event, &mut self.out);
+        if self.root.client().link().state == jig_client::Link::Live
+            && let Some(party) = self.root.client().link().party
+        {
+            let other = self
+                .kept_keys
+                .iter()
+                .any(|key| self.root.client().pending(*key).is_some_and(|pending| pending.party != party));
+            while let Some(key) = self.kept_keys.iter().next().copied() {
+                self.kept_keys.remove(&key);
+            }
+            if other {
+                self.notices.push(Shown::Terminal(crate::terminal::Notice::OtherPartyKept));
+            }
+        }
         self.dirty = true;
     }
-    fn start(&mut self) {
-        if matches!(self.phase, Phase::WaitingLink | Phase::WaitingToken) {
-            self.phase = Phase::Running;
-            self.notices.push(Shown::Terminal(crate::terminal::Notice::SignedIn));
-            let capacity = self.kept.capacity();
-            let kept = std::mem::replace(&mut self.kept, List::with_capacity(capacity));
-            self.event(domain::Event::Start {
-                address: self.address.clone(),
-                kept,
-                offset: jig_client_view::boundary::Offset { minutes: 0 },
-            });
+    fn transport(&mut self, event: jig_client::Event) {
+        self.credential_notice = match &event {
+            jig_client::Event::Reply { message, .. } => service_credential(message, &self.env.limits.client),
+            jig_client::Event::Start { .. }
+            | jig_client::Event::StartUnlinked { .. }
+            | jig_client::Event::SignIn { .. }
+            | jig_client::Event::SignOut
+            | jig_client::Event::SignOutLost
+            | jig_client::Event::Watch { .. }
+            | jig_client::Event::Unwatch { .. }
+            | jig_client::Event::Read { .. }
+            | jig_client::Event::Send { .. }
+            | jig_client::Event::Streamed { .. }
+            | jig_client::Event::StreamGone
+            | jig_client::Event::Stored
+            | jig_client::Event::NotStored
+            | jig_client::Event::Up { .. }
+            | jig_client::Event::Lost { .. } => None,
+        };
+        let signing = match &event {
+            jig_client::Event::Reply { exchange, message } => self.authentication.remove(exchange).map(|out| {
+                use jig_client_protocol_wire as w;
+                let mut reader = skein_lib::Reader::new(message);
+                if out {
+                    match w::SignOutAnswer::decode(&w::CEILINGS, &mut reader) {
+                        Ok(w::SignOutAnswer::SignedOut) if reader.is_empty() => Signing::SignedOut,
+                        Ok(w::SignOutAnswer::SignedOut) | Err(_) => Signing::Lost,
+                        Ok(w::SignOutAnswer::NotReady) => Signing::Again,
+                    }
+                } else {
+                    match w::SignInAnswer::decode(&w::CEILINGS, &mut reader) {
+                        Ok(w::SignInAnswer::SignedIn(value)) if reader.is_empty() => {
+                            Signing::SignedIn { party: value.party() }
+                        }
+                        Ok(w::SignInAnswer::Refused) => Signing::Refused,
+                        Ok(w::SignInAnswer::NotReady) => Signing::Again,
+                        Ok(w::SignInAnswer::SignedIn(_)) | Err(_) => Signing::Lost,
+                    }
+                }
+            }),
+            jig_client::Event::Lost { exchange } => self.authentication.remove(exchange).map(|_| Signing::Lost),
+            jig_client::Event::Start { .. }
+            | jig_client::Event::StartUnlinked { .. }
+            | jig_client::Event::SignIn { .. }
+            | jig_client::Event::SignOut
+            | jig_client::Event::SignOutLost
+            | jig_client::Event::Watch { .. }
+            | jig_client::Event::Unwatch { .. }
+            | jig_client::Event::Read { .. }
+            | jig_client::Event::Send { .. }
+            | jig_client::Event::Streamed { .. }
+            | jig_client::Event::StreamGone
+            | jig_client::Event::Stored
+            | jig_client::Event::NotStored
+            | jig_client::Event::Up { .. } => None,
+        };
+        if matches!(event, jig_client::Event::NotStored) {
+            self.notices.push(Shown::Terminal(crate::terminal::Notice::StoreFailed));
+        }
+        self.event(domain::Event::Client { event });
+        let credential = self.root.client().link().credential.cloned();
+        if credential != self.credential {
+            self.shell.keep(credential.clone());
+            self.credential = credential;
+            self.saving_signing = signing;
+        } else if let Some(signing) = signing {
+            self.signed(signing);
         }
     }
     fn signed(&mut self, signing: Signing) {
@@ -245,11 +304,11 @@ impl NativeClient {
         match &signing {
             Signing::SignedIn { .. } => {
                 self.seen.signed_in = self.seen.signed_in.saturating_add(1);
-                self.start();
+                self.notices.push(Shown::Terminal(crate::terminal::Notice::SignedIn));
             }
             Signing::SignedOut => {
                 self.signing_out = false;
-                self.event(domain::Event::SignedOut);
+                self.notices.push(Shown::Terminal(crate::terminal::Notice::SignedOut));
             }
             Signing::Again | Signing::Lost | Signing::Refused => {
                 if self.signing_out {
@@ -262,61 +321,51 @@ impl NativeClient {
         self.outputs();
     }
     fn outputs(&mut self) {
-        // A link event can synchronously emit another root request. Drain the
-        // two bounded queues together before admitting the next external event.
-        while !self.out.is_empty() || !self.linked.is_empty() {
-            while let Some(request) = self.out.pop() {
-                match route::down(request, &mut self.family) {
-                    Down::Link(event) => self.link.step(self.env.now, event, &mut self.linked),
-                    Down::Duty(duty) => match duty {
-                        Duty::Show { address, .. } => {
-                            if self.address != address {
-                                self.go(address);
-                            }
-                        }
-                        Duty::SignIn { .. } => self.notices.push(Shown::SignInAsked),
-                        Duty::SignOut => {
-                            if !matches!(self.phase, Phase::Closing { .. }) {
-                                self.signing_out = true;
-                                self.link.step(self.env.now, link::Event::SignOut, &mut self.linked);
-                            }
-                        }
-                        Duty::Fact(_) => self.seen.facts = self.seen.facts.saturating_add(1),
-                    },
-                    Down::Nothing => {}
-                }
+        while let Some(request) = self.out.pop() {
+            if let domain::Request::Jig(domain::JigOut::Answered {
+                answer:
+                    jig_client::contract::Answer::Done(jig_client::contract::Outcome::Made {
+                        what: jig_client::contract::Made::Service { party },
+                    }),
+                ..
+            }) = &request
+                && self.credential_notice.as_ref().is_some_and(|(made, _)| made == party)
+                && let Some((party, credential)) = self.credential_notice.take()
+            {
+                self.notices.push(Shown::Notice(route::Notice::Credential { party, credential }));
             }
-            while let Some(request) = self.linked.pop() {
-                match route::up(request, &mut self.family) {
-                    Up::Root(event) => self.event(event),
-                    Up::Shell(request) => {
-                        if matches!(self.phase, Phase::Closing { .. })
-                            && matches!(request, link::Request::Exchange { .. } | link::Request::OpenStream { .. })
-                        {
-                            continue;
-                        }
-                        self.shell.down(request);
-                    }
-                    Up::Keep(credential) => self.shell.keep(credential),
-                    Up::Signing(signing) => {
-                        if matches!(signing, Signing::SignedIn { .. } | Signing::SignedOut) {
-                            for up in &route::signing(&signing, self.link.credential()) {
-                                if let Up::Keep(credential) = up {
-                                    self.shell.keep(credential.clone());
-                                }
-                            }
-                            // The notice follows the credential's durable write.
-                            self.saving_signing = Some(signing);
-                        } else {
-                            self.signed(signing);
+            match route::down(request) {
+                Down::Shell(request) => {
+                    if let jig_client::Request::Exchange { exchange, message, .. } = &request {
+                        let kind = match message {
+                            jig_client::Message::SignInLink(_) | jig_client::Message::SignInService => Some(false),
+                            jig_client::Message::SignOut => Some(true),
+                            jig_client::Message::Request(_)
+                            | jig_client::Message::Read(_)
+                            | jig_client::Message::Watch(_)
+                            | jig_client::Message::Unwatch(_)
+                            | jig_client::Message::StreamGone(_) => None,
+                        };
+                        if let Some(kind) = kind {
+                            self.authentication.insert(*exchange, kind).expect("bounded sign-in exchanges");
                         }
                     }
-                    Up::Kept(record) => self.kept.push(record).expect("link's kept records fit"),
-                    Up::Notice(notice) => {
-                        self.seen.facts = self.seen.facts.saturating_add(1);
-                        self.notices.push(Shown::Notice(notice));
-                    }
+                    self.shell.down(request);
                 }
+                Down::Duty(duty) => match duty {
+                    Duty::Show { address, .. } => {
+                        if self.address != address {
+                            self.go(address);
+                        }
+                    }
+                    Duty::SignIn { .. } => self.notices.push(Shown::SignInAsked),
+                    Duty::SignOut => {
+                        self.signing_out = true;
+                        self.event(domain::Event::Client { event: jig_client::Event::SignOut });
+                    }
+                    Duty::Fact(_) => self.seen.facts = self.seen.facts.saturating_add(1),
+                },
+                Down::Nothing => {}
             }
         }
     }
@@ -331,39 +380,42 @@ impl Host for NativeClient {
             return;
         }
         if let Some((credential, records)) = self.shell.loaded() {
-            if self.phase == Phase::WaitingToken
-                && let Some(credential) = credential
-            {
-                self.link.step(now, link::Event::SignIn { with: link::With::Held(credential) }, &mut self.linked);
-            }
             self.loaded = true;
-            let mut kept = List::with_capacity(u32::try_from(records.len()).expect("shell's bounded store"));
+            self.credential.clone_from(&credential);
+            self.phase = Phase::Running;
+            let mut kept = List::with_capacity(u32::try_from(records.len()).expect("bounded store"));
+            let bounds = link::Limits::new(self.env.limits.client.domain, self.env.limits.client.exchanges)
+                .expect("checked link bounds");
             for record in records {
-                kept.push(record).expect("exact record capacity");
+                if let Some(key) = kept_key(&record, &bounds) {
+                    self.kept_keys.insert(key).expect("bounded kept keys");
+                }
+                kept.push(record).expect("counted store");
             }
-            self.link.step(now, link::Event::Start { kept }, &mut self.linked);
+            self.event(domain::Event::Start {
+                address: self.address.clone(),
+                kept,
+                offset: jig_client_view::boundary::Offset { minutes: 0 },
+            });
+            let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
+            if let Some(with) = with {
+                self.event(domain::Event::Client { event: jig_client::Event::SignIn { with } });
+            }
             self.outputs();
-            if self.phase == Phase::WaitingToken {
-                self.start();
-            }
         }
-        if let Some(ok) = self.shell.kept() {
-            let signing = self.saving_signing.take().expect("pending credential write");
+        if let Some(ok) = self.shell.kept()
+            && let Some(signing) = self.saving_signing.take()
+        {
             self.signed(if ok { signing } else { Signing::Lost });
         }
         while let Some(event) = self.shell.events().pop() {
-            if matches!(event, link::Event::NotStored) {
-                self.notices.push(Shown::Terminal(crate::terminal::Notice::StoreFailed));
-            }
-            self.link.step(now, event, &mut self.linked);
+            self.transport(event);
             self.outputs();
         }
         if self.started() {
             domain::fire(&mut self.root, &self.env, &mut self.out);
             self.outputs();
             domain::take(&mut self.root, &self.env, &mut self.out);
-            self.outputs();
-            self.link.fire(now, &mut self.linked);
             self.outputs();
             view::build(&mut self.view, &self.root, &mut self.patches);
             if !self.patches.is_empty() {
@@ -393,18 +445,13 @@ impl Host for NativeClient {
     fn work_pending(&self, now: Time) -> bool {
         self.shell.work_pending(now)
             || !self.out.is_empty()
-            || !self.linked.is_empty()
             || (!matches!(self.phase, Phase::Closing { .. }) && self.started() && self.dirty)
     }
     fn next_deadline(&self) -> Option<Time> {
         [self.shell.next_deadline(), self.next_policy_deadline()].into_iter().flatten().min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        if matches!(self.phase, Phase::Closing { .. }) {
-            None
-        } else {
-            [domain::next_deadline(&self.root), self.link.next_deadline()].into_iter().flatten().min()
-        }
+        if matches!(self.phase, Phase::Closing { .. }) { None } else { domain::next_deadline(&self.root) }
     }
     fn is_empty(&self) -> bool {
         matches!(self.phase, Phase::Closing { .. }) && self.shell.is_empty()
@@ -416,3 +463,43 @@ impl Host for NativeClient {
         self.shell.operations()
     }
 }
+
+fn kept_key(record: &jig_client::Record, limits: &link::Limits) -> Option<jig_client::Key> {
+    use jig_client_protocol_wire as w;
+    let mut reader = skein_lib::Reader::new(&record.bytes);
+    let kept = w::Kept::decode(&limits.wire, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    let mut reader = skein_lib::Reader::new(kept.record());
+    let row =
+        link::translate::store::restore_table(w::TableEntry::decode(&limits.wire, &mut reader).ok()?, limits).ok()?;
+    if !reader.is_empty() || row.key.as_slice() != record.key.as_ref() {
+        return None;
+    }
+    Some(row.request.key)
+}
+fn service_credential(message: &[u8], limits: &jig_client::Limits) -> Option<(u64, skein_lib::Secret)> {
+    use jig_client_protocol_wire as w;
+    let limits = link::Limits::new(limits.domain, limits.exchanges).ok()?;
+    let mut reader = skein_lib::Reader::new(message);
+    let w::Answer::FinalAnswer(owned) = w::Answer::decode(&limits.wire, &mut reader).ok()? else { return None };
+    if !reader.is_empty() || owned.owner() != &w::Owner::Jig || owned.version() != w::VERSION {
+        return None;
+    }
+    let mut reader = skein_lib::Reader::new(owned.record());
+    let w::Final::Done(done) = w::Final::decode(&limits.wire, &mut reader).ok()? else { return None };
+    if !reader.is_empty() {
+        return None;
+    }
+    let w::Outcome::Made(made) = done.into_parts().outcome else { return None };
+    let w::Made::Service(service) = made.into_parts().what else { return None };
+    let service = service.into_parts();
+    if service.credential.expose().is_empty() {
+        return None;
+    }
+    Some((service.party, service.credential))
+}
+
+#[cfg(test)]
+mod tests;

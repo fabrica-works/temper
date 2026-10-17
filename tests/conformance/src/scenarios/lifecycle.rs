@@ -12,6 +12,11 @@ use skein_lib::{Duration, List, ReplyTo, Token};
 use temper_engine_domain as root;
 
 const KEY: u8 = 120;
+const COMPOUND_REPLY: ReplyTo = ReplyTo::new(Token::new(6_120));
+const INITIAL: u8 = 0;
+const FINISH_ATTEMPTS: u8 = 2;
+const DELEGATING: u8 = 3;
+const READY: u8 = 6;
 const GRACE: Duration = Duration::from_secs(2);
 const DELEGATE_REPLY: u64 = 8120;
 const DELEGATE_COMPLETION: u32 = 1;
@@ -56,6 +61,7 @@ fn delegate(world: &mut World) {
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
+        ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
     });
     crate::link::call(
         world,
@@ -85,26 +91,30 @@ fn compound(world: &mut World) {
     ask(world, KEY, people::Ask::Compound { project: 1, operations });
 }
 pub(super) fn prepare(world: &mut World, phase: &mut u8) -> Result<bool, Violation> {
-    if *phase < 3 {
+    if *phase < DELEGATING {
         delegate(world);
-        *phase = 3;
+        *phase = DELEGATING;
         return Ok(true);
     }
     let children = world
         .peers
         .answers
         .iter()
-        .find_map(
-            |answer| if let root::CallAnswer::Delegated(children) = answer { Some(children.to_vec()) } else { None },
-        )
+        .find_map(|answer| {
+            if let root::CallAnswer::Delegated(children) = answer {
+                Some(children.iter().map(|made| made.task).collect())
+            } else {
+                None
+            }
+        })
         .expect("compound delegates admitted");
     world.peers.children = children;
     let running = world.peers.children.iter().all(|&child| {
         matches!(row(world, child).phase, tasks::Phase::Active(tasks::Active::Running { attempt })
             if world.peers.assignments.iter().any(|a| a.task == child && a.attempt == attempt))
     });
-    if !running && *phase < 6 {
-        world.advance(if *phase == 3 { ADOPTION_WAIT } else { RETRY_WAIT });
+    if !running && *phase < READY {
+        world.advance(if *phase == DELEGATING { ADOPTION_WAIT } else { RETRY_WAIT });
         *phase += 1;
         return Ok(true);
     }
@@ -132,13 +142,13 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
             people::Ask::Cancel { project: 1, task: parent(world).0, reason: REASON.into(), grace: Some(GRACE) },
         );
     } else {
-        if *phase == 0 {
+        if *phase == INITIAL {
             check(
                 row(world, parent(world).0).grace.is_some() && world.clock().now < world.peers.lifecycle.until,
                 "task did not retain its grace through both inside-grace restarts",
             )?;
         }
-        if world.peers.lifecycle.finishes && *phase < 2 && !super::ended(world, parent(world).0) {
+        if world.peers.lifecycle.finishes && *phase < FINISH_ATTEMPTS && !super::ended(world, parent(world).0) {
             super::message(world, parent(world).0);
             *phase += 1;
             return Ok(true);
@@ -148,7 +158,7 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
 }
 pub(crate) fn delivered(peers: &mut Peers, delivery: &root::Delivery) {
     if let root::Delivery::WebReply { to, reply: people::Reply::Outcome(outcome) } = delivery
-        && *to == ReplyTo::new(Token::new(6_000 + u64::from(KEY)))
+        && *to == COMPOUND_REPLY
     {
         if let Some(previous) = peers.lifecycle.answer {
             assert_eq!(*outcome, previous, "a compound retry must repeat its keyed answer");

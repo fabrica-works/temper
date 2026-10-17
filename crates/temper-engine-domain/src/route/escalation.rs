@@ -110,6 +110,7 @@ fn query(read: Read) -> Query {
     match read {
         Read::Escalation(query) => query,
         Read::Proposal(_)
+        | Read::TaskProposal { .. }
         | Read::Ended(_)
         | Read::Transcript { .. }
         | Read::Dependency(_)

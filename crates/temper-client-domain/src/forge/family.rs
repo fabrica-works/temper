@@ -7,44 +7,12 @@
     clippy::panic,
     clippy::wildcard_enum_match_arm
 )]
+use crate::forge;
 use jig_client_protocol_link as link;
-use skein_lib::{List, Reader, Set, Token, Writer};
-use temper_client_domain::forge;
+use skein_lib::{List, Reader, Writer};
 use temper_client_protocol_wire::{self as wire, v1 as w};
-
-#[derive(Debug)]
-pub struct Attempts {
-    set: Set<Token>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Full;
-impl Attempts {
-    #[must_use]
-    pub const fn new(most: u32) -> Self {
-        Self { set: Set::with_capacity(most) }
-    }
-    /// # Errors
-    /// Refuses when the bounded attempts table is full.
-    pub fn sent(&mut self, attempt: Token) -> Result<(), Full> {
-        match self.set.insert(attempt) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Full),
-        }
-    }
-    #[must_use]
-    pub fn answered(&mut self, attempt: Token, last: bool) -> bool {
-        if last { self.set.remove(&attempt) } else { self.set.contains(&attempt) }
-    }
-}
-#[derive(Debug)]
-pub struct Family {
-    pub attempts: Attempts,
-    pub wire: w::Limits,
-    pub link: link::Limits,
-}
 #[must_use]
-pub fn request(ask: &forge::Ask, limits: &w::Limits) -> Option<jig_client::Family> {
-    let forge::Ask::Adopt(a) = ask;
+pub fn request(a: &forge::Adoption, limits: &w::Limits) -> Option<jig_client::Family> {
     let mut checks = List::with_capacity(limits.adopt_checks);
     for check in &a.checks {
         if checks.push(*check).is_err() {
@@ -67,37 +35,15 @@ pub fn request(ask: &forge::Ask, limits: &w::Limits) -> Option<jig_client::Famil
         },
     )
     .ok()?;
-    Some(jig_client::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::adopt(&record) })
-}
-#[must_use]
-pub fn restored(record: &jig_client::Family, limits: &w::Limits) -> Option<forge::Ask> {
-    if record.family != wire::FORGE {
-        return None;
-    }
-    if record.version != wire::CLIENT_VERSION {
-        return None;
-    }
-    let mut reader = Reader::new(&record.bytes);
-    let a = w::Adopt::decode(limits, &mut reader).ok()?.into_parts();
-    if !reader.is_empty() {
-        return None;
-    }
-    Some(forge::Ask::Adopt(forge::Adoption {
-        project: a.project,
-        home: a.home,
-        forge: a.forge,
-        owner: a.owner,
-        name: a.name,
-        prefix: a.prefix,
-        role: role_from(&a.role),
-        landing: a.landing,
-        ci: a.ci,
-        checks: a.checks.into_boxed(),
-    }))
+    Some(jig_client::Family {
+        family: wire::number(wire::Owner::Forge),
+        version: wire::CLIENT_VERSION,
+        bytes: wire::adopt(&record),
+    })
 }
 #[must_use]
 pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limits) -> Option<forge::Answer> {
-    if record.family != wire::FORGE {
+    if record.family != wire::number(wire::Owner::Forge) {
         return None;
     }
     if record.version != wire::CLIENT_VERSION {
@@ -179,10 +125,6 @@ pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client::c
         jig_client::contract::Answer::Done(_) => None,
     }
 }
-#[must_use]
-pub const fn served(versions: jig_client::contract::VersionRange) -> forge::Served {
-    if versions.contains(wire::CLIENT_VERSION) { forge::Served::Yes } else { forge::Served::OutOfDate }
-}
 const fn role_to(role: forge::Role) -> w::Role {
     match role {
         forge::Role::Owned => w::Role::Owned,
@@ -198,12 +140,4 @@ const fn role_from(role: &w::Role) -> forge::Role {
         w::Role::Fork => forge::Role::Fork,
         w::Role::Context => forge::Role::Context,
     }
-}
-#[must_use]
-pub fn up(request: link::Request, family: &mut Family) -> super::Up {
-    super::up(request, family)
-}
-#[must_use]
-pub fn down(request: temper_client_domain::Request, family: &mut Family) -> super::Down {
-    super::down(request, family)
 }

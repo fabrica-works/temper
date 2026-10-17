@@ -117,9 +117,32 @@ pub fn request(
     who: ClientId,
     attempt: Token,
     key: [u8; 16],
-    ask: &forge::Ask,
+    ask: &jig_client::Family,
 ) -> engine::Event {
-    let forge::Ask::Adopt(value) = ask;
+    use temper_client_protocol_wire::{self as w, v1};
+    assert_eq!(w::owner(ask.family), Some(w::Owner::Forge));
+    assert_eq!(ask.version, w::CLIENT_VERSION);
+    let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
+    let mut reader = skein_lib::Reader::new(&ask.bytes);
+    let a = v1::Adopt::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts();
+    assert!(reader.is_empty());
+    let value = forge::Adoption {
+        project: a.project,
+        home: a.home,
+        forge: a.forge,
+        owner: a.owner,
+        name: a.name,
+        prefix: a.prefix,
+        landing: a.landing,
+        ci: a.ci,
+        checks: a.checks.into_boxed(),
+        role: match a.role {
+            v1::Role::Owned => forge::Role::Owned,
+            v1::Role::Adopted => forge::Role::Adopted,
+            v1::Role::Fork => forge::Role::Fork,
+            v1::Role::Context => forge::Role::Context,
+        },
+    };
     let sign_in = transport.sign_in(who).expect("authenticated adoption");
     let reply_to = transport.reply_to(Reply::Keyed {
         client: who,
@@ -131,8 +154,8 @@ pub fn request(
         reply_to,
         sign_in,
         key,
-        digest: digest(value),
-        request: adoption(value, crate::fixtures::FORGE_HOST),
+        digest: digest(&value),
+        request: adoption(&value, crate::fixtures::FORGE_HOST),
     })
 }
 /// # Errors
@@ -156,7 +179,7 @@ pub fn incoming(
         )) => return Err(Box::new(request)),
     };
     let (to, body) = match delivery {
-        Delivery::Application { to, outcome: value } => (to, value.as_ref().map(outcome)),
+        Delivery::Application { to, outcome: value } => (to, value),
         Delivery::WebReply { to, reply } => {
             // Preserve the affine answer right until its route is known.
             let matching = transport.reply_tokens().into_iter().find(|token| to == skein_lib::ReplyTo::new(*token));
@@ -168,12 +191,6 @@ pub fn incoming(
             }
             let (envelope, answer) =
                 wire::answers::keyed(wire::answers::reply(reply)).expect("application admission disposition");
-            let answer = answer.map(|value| match value {
-                jig_client::contract::Answer::Refused(why) => client::Answered::Forge(forge::Answer::EntranceRefused(
-                    jig_client::contract::EntranceRefusal::new(why).expect("fixed entrance facts"),
-                )),
-                jig_client::contract::Answer::Done(_) => panic!("adoption's body comes from its connector"),
-            });
             let Reply::Keyed { client, attempt, .. } = transport.take_reply(to.into_token()).expect("original route")
             else {
                 panic!("keyed route")
@@ -181,7 +198,19 @@ pub fn incoming(
             if envelope == RequestEnvelope::SignedOut {
                 transport.signed_out(client);
             }
-            return Ok(Some((client, client::Event::Answer { attempt, envelope, answer })));
+            return Ok(Some((
+                client,
+                client::Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer {
+                            attempt,
+                            envelope,
+                            answer: answer.map(jig_client::Answered::Jig),
+                            why: None,
+                        },
+                    },
+                },
+            )));
         }
         delivery @ (Delivery::Result { .. }
         | Delivery::Host(_)
@@ -211,10 +240,29 @@ pub fn incoming(
     assert_eq!(connector, crate::fixtures::FORGE);
     Ok(Some((
         client,
-        client::Event::Answer {
-            attempt,
-            envelope: RequestEnvelope::Final,
-            answer: Some(client::Answered::Forge(body.unwrap_or(forge::Answer::Unknown))),
+        client::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: RequestEnvelope::Final,
+                    why: None,
+                    answer: Some(jig_client::Answered::Family(jig_client::Family {
+                        family: connector,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                        bytes: temper_service::family::answer(
+                            body,
+                            &forge::wire_limits(&crate::app::limits().forge).expect("wire bounds"),
+                            &jig_client_protocol_link::Limits::new(
+                                crate::app::limits().client.domain,
+                                crate::app::limits().client.exchanges,
+                            )
+                            .expect("link bounds")
+                            .wire,
+                        )
+                        .expect("whole forge answer"),
+                    })),
+                },
+            },
         },
     )))
 }

@@ -356,3 +356,83 @@ fn projection_row() -> core::Record {
         },
     }))
 }
+
+const TASK: u64 = 7;
+const PROPOSAL: u64 = 19;
+const REVISION: u64 = 3;
+const ONE_ROW: u32 = 1;
+const LOAD_BYTES: u32 = 8192;
+const LOAD_OUTPUTS: u32 = 2;
+
+struct DecidedRows {
+    live: Option<jig_domain_tasks::TaskRecord>,
+    history: Option<core::Record>,
+    expected: Box<[engine::Record]>,
+}
+#[test]
+fn a_task_proposal_load_follows_the_live_owners_history_pointer() {
+    let history = fixtures::withdrawn_history(TASK, PROPOSAL);
+    assert_decided_load(DecidedRows {
+        live: Some(proposal_owner()),
+        history: Some(history.clone()),
+        expected: Box::new([engine::Record::Core(history)]),
+    });
+}
+#[test]
+fn a_task_proposal_load_without_its_owner_is_empty() {
+    assert_decided_load(DecidedRows {
+        live: None,
+        history: Some(fixtures::withdrawn_history(TASK, PROPOSAL)),
+        expected: Box::new([]),
+    });
+}
+#[test]
+fn a_task_proposal_load_without_its_pointer_is_empty() {
+    assert_decided_load(DecidedRows {
+        live: Some(fixtures::task_record(TASK)),
+        history: Some(fixtures::withdrawn_history(TASK, PROPOSAL)),
+        expected: Box::new([]),
+    });
+}
+#[test]
+fn a_task_proposal_load_without_its_history_is_empty() {
+    assert_decided_load(DecidedRows { live: Some(proposal_owner()), history: None, expected: Box::new([]) });
+}
+fn proposal_owner() -> jig_domain_tasks::TaskRecord {
+    let mut live = fixtures::task_record(TASK);
+    live.proposal_rows = Box::new([jig_domain_tasks::ProposalRow { proposal: PROPOSAL, revision: REVISION }]);
+    live
+}
+fn assert_decided_load(rows: DecidedRows) {
+    use jig_domain_tasks as tasks;
+    let mut routes = fixtures::routes();
+    let range = engine::Range::Core(engine::CoreRange::TaskProposal { task: TASK, proposal: PROPOSAL });
+    let Some(store::Request::Get { owner, key }) = route::down(&mut routes, load(range, None, ONE_ROW, LOAD_BYTES))
+    else {
+        panic!("live lookup")
+    };
+    let store::Get::Jig(key) = key else { panic!("jig owner") };
+    assert_eq!(key, core::Key::Tasks(tasks::Key::Live(TASK)));
+    let mut out = Queue::with_capacity(LOAD_OUTPUTS);
+    let live = stored_live(rows.live);
+    route::up(&mut routes, store::Event::Got { owner, row: live }, &mut out);
+    if let Some(Up::Ask(store::Request::Get { owner: history_owner, key })) = out.iter().next() {
+        assert_eq!(*history_owner, owner, "retained route");
+        let store::Get::Jig(key) = key else { panic!("jig history") };
+        assert_eq!(*key, core::Key::Tasks(tasks::Key::History { task: TASK, revision: REVISION }));
+        out.pop().expect("history lookup");
+        let history = stored_history(rows.history);
+        route::up(&mut routes, store::Event::Got { owner, row: history }, &mut out);
+    }
+    let (load_owner, loaded, next) = page(&mut out);
+    assert_eq!((load_owner, loaded.as_ref(), next), (fixtures::OWNER, rows.expected.as_ref(), None));
+    assert!(out.is_empty());
+    assert!(routes.idle());
+}
+
+fn stored_live(row: Option<jig_domain_tasks::TaskRecord>) -> Option<store::Row> {
+    Some(store::Row::Jig(core::Record::Tasks(jig_domain_tasks::Stored::Live(Box::new(row?)))))
+}
+fn stored_history(row: Option<core::Record>) -> Option<store::Row> {
+    Some(store::Row::Jig(row?))
+}

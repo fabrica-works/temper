@@ -1,5 +1,4 @@
 //! The shell adapter observes requests and trees, never a domain's decisions.
-use jig_client::contract::{Answer, Made, Outcome, ReadNone, ReadResult, WatchEnd};
 use jig_client_view::boundary::Offset;
 use jig_client_world::{
     harness::{App, CardKey, Duty, Receipt, Seen, Sent, StoreWrite},
@@ -7,13 +6,34 @@ use jig_client_world::{
 };
 use skein_lib::{Env, List, Queue, RequestEnvelope, Time};
 use skein_ui::{Act, NodeId, Patch, Tree};
-use temper_client_domain::{self as domain, Action, Address, Event, JigOut, Request};
+use temper_client_domain::{self as domain, Action, Address, JigOut, Request};
 use temper_client_view as view;
 
 use crate::fixtures;
 
 /// temper's root and view on jig's common client world kit.
 pub struct Temper;
+/// The shell world's Start carries its unlinked client's own typed records.
+#[derive(Debug)]
+pub enum Event {
+    Root(domain::Event),
+    Start { address: Address, kept: List<skein_lib::RequestRecord<jig_client::Held>>, offset: Offset },
+}
+impl From<domain::Event> for Event {
+    fn from(event: domain::Event) -> Self {
+        Self::Root(event)
+    }
+}
+impl Event {
+    #[must_use]
+    pub fn root(&self) -> Option<&domain::Event> {
+        match self {
+            Self::Root(event) => Some(event),
+            Self::Start { .. } => None,
+        }
+    }
+}
+
 /// The same small story capacities as ops's jig profile.
 #[must_use]
 pub fn limits() -> domain::Limits {
@@ -25,8 +45,8 @@ impl App for Temper {
     type Limits = domain::Limits;
     type Event = Event;
     type Request = Request;
-    type Record = domain::store::Record;
-    type Key = domain::store::Key;
+    type Record = skein_lib::RequestRecord<jig_client::Held>;
+    type Key = [u8; 16];
     type Address = Address;
     fn limits() -> Self::Limits {
         limits()
@@ -35,7 +55,7 @@ impl App for Temper {
         let limits = limits();
         let (jig, forge) = fixtures::phrasebooks(&limits);
         let bounds = fixtures::view_bounds(&limits, &jig, &forge);
-        let mut root = domain::new(&limits, seed, domain::forge::Config { connector: fixtures::FORGE, version: 1 });
+        let mut root = domain::unlinked(&limits, seed);
         domain::configure_navigation(&mut root, domain::navigation(&limits)).expect("navigation fits");
         (root, view::View::new(&bounds, &limits, jig, forge, fixtures::FORGE))
     }
@@ -50,10 +70,27 @@ impl App for Temper {
         Event::Start { address, kept: records, offset: Offset { minutes: offset } }
     }
     fn went(address: Address) -> Event {
-        Event::Went { place: domain::Place::Address(address) }
+        domain::Event::Went { place: domain::Place::Address(address) }.into()
     }
     fn step(root: &mut Self::Root, env: &Env<Self::Limits>, event: Event, out: &mut Queue<Request>) {
-        domain::step(root, env, event, out);
+        match event {
+            Event::Root(event) => domain::step(root, env, event, out),
+            Event::Start { address, kept, offset } => {
+                domain::step(
+                    root,
+                    env,
+                    domain::Event::Client { event: jig_client::Event::StartUnlinked { kept } },
+                    out,
+                );
+                domain::step(
+                    root,
+                    env,
+                    domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
+                    out,
+                );
+                domain::step(root, env, domain::Event::Start { address, kept: List::with_capacity(0), offset }, out);
+            }
+        }
     }
     fn fire(root: &mut Self::Root, env: &Env<Self::Limits>, out: &mut Queue<Request>) {
         domain::fire(root, env, out);
@@ -71,46 +108,67 @@ impl App for Temper {
         view.tree()
     }
     fn act(view: &mut Self::View, node: NodeId, act: Act) -> Option<Event> {
-        view::act(view, node, act).map(|action| Event::Act { action })
+        view::act(view, node, act).map(|action| domain::Event::Act { action }.into())
     }
     fn duty(request: Request) -> Duty<Self> {
         match request {
-            Request::Save { record } => Duty::Store(StoreWrite::Save(record)),
-            Request::Erase { key } => Duty::Store(StoreWrite::Erase(key)),
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Save { record } } } => {
+                Duty::Store(StoreWrite::Save(record))
+            }
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Erase { key } } } => {
+                Duty::Store(StoreWrite::Erase(key))
+            }
+            Request::Client { request: jig_client::Request::SignOut } | Request::SignOut => Duty::SignOut,
+            Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider, back } => Duty::SignIn { provider, back },
-            Request::SignOut => Duty::SignOut,
-            Request::Send { .. }
-            | Request::Jig(
-                JigOut::Read { .. } | JigOut::Open { .. } | JigOut::Continue { .. } | JigOut::Close { .. },
-            ) => Duty::Wire(request),
             Request::Fact { .. } | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. }) => Duty::Fact,
         }
     }
     fn record_key(record: &Self::Record) -> Self::Key {
-        match record {
-            domain::store::Record::Table { record, .. } => domain::store::Key::Table(record.key),
-        }
+        record.key
     }
     fn unsent(request: Request) -> Option<Event> {
-        match request {
-            Request::Send { attempt, .. } => {
-                Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
+        let event = match request {
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } } => {
+                jig_client::Event::Up {
+                    up: jig_client::Up::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None, why: None },
+                }
             }
-            Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+            Request::Client { request: jig_client::Request::Exchange { exchange, .. } } => {
+                jig_client::Event::Lost { exchange }
             }
-            Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
+            Request::Client { request: jig_client::Request::OpenStream { .. } } => jig_client::Event::StreamGone,
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open { watch, .. }
+                            | jig_client::Down::Close { watch }
+                            | jig_client::Down::Continue { watch, .. },
+                    },
+            } => jig_client::Event::Up {
+                up: jig_client::Up::WatchEnded { watch, end: jig_client::contract::WatchEnd::Dropped },
+            },
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Read { read, .. } } } => {
+                jig_client::Event::Up { up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Limit } }
             }
-            Request::Save { .. }
-            | Request::Erase { .. }
+            Request::Client {
+                request:
+                    jig_client::Request::Save { .. }
+                    | jig_client::Request::Erase { .. }
+                    | jig_client::Request::CloseStream
+                    | jig_client::Request::Told { .. }
+                    | jig_client::Request::SignOut
+                    | jig_client::Request::Down { down: jig_client::Down::Save { .. } | jig_client::Down::Erase { .. } },
+            }
             | Request::Show { .. }
-            | Request::SignOut
             | Request::SignIn { .. }
+            | Request::SignOut
             | Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. }) => None,
-        }
+            | Request::Jig(_) => return None,
+        };
+        Some(domain::Event::Client { event }.into())
     }
     fn max_out(limits: &Self::Limits) -> u32 {
         domain::max_out(limits)
@@ -125,17 +183,21 @@ impl App for Temper {
             + 2 * view::worst_case(&bounds, limits, &jig, &forge).expect("shell model projection bound")
     }
     fn window_changed(event: &Event) -> bool {
-        match event {
-            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => {
-                observe::jig_window_changed(act)
-            }
-            Event::Start { .. }
-            | Event::Went { .. }
-            | Event::Answer { .. }
-            | Event::Jig(_)
-            | Event::Forge(_)
-            | Event::SignedOut => false,
-            Event::Act { action: Action::Forge(_) } => true,
+        match event.root() {
+            Some(
+                domain::Event::Act { action: Action::Jig(act) }
+                | domain::Event::Jig(jig_client_view::Event::Act { act }),
+            ) => observe::jig_window_changed(act),
+            Some(domain::Event::Act { action: Action::Forge(_) }) => true,
+            Some(
+                domain::Event::Start { .. }
+                | domain::Event::Went { .. }
+                | domain::Event::Client { .. }
+                | domain::Event::Jig(_)
+                | domain::Event::Forge(_)
+                | domain::Event::SignedOut,
+            )
+            | None => false,
         }
     }
     fn seen(tree: &Tree) -> Vec<Seen> {
@@ -163,31 +225,56 @@ impl App for Temper {
         seen
     }
     fn sent(request: &Request) -> Option<Sent> {
-        let Request::Send { attempt, key, ask } = request else { return None };
-        match ask {
-            domain::Ask::Forge(_) => {
-                Some(Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None })
+        let Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request } },
+        } = request
+        else {
+            return None;
+        };
+        Some(match request {
+            jig_client::Ask::Family(_) => {
+                Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None }
             }
-            domain::Ask::Jig(ask) => Some(observe::jig_sent(*attempt, *key, ask)),
-        }
+            jig_client::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),
+        })
     }
     fn received(event: &Event) -> Vec<Receipt> {
+        let Some(event) = event.root() else { return vec![Receipt::Started] };
         match event {
-            Event::Jig(event) => observe::jig_received(event),
-            Event::Answer { attempt, envelope, answer } => {
-                if *envelope == RequestEnvelope::SignedOut {
-                    return vec![Receipt::Parked];
-                }
-                let words = match answer {
-                    Some(domain::Answered::Jig(Answer::Done(Outcome::Made {
-                        what: Made::Words { task, message },
-                    }))) => Some((*task, *message)),
-                    Some(domain::Answered::Jig(_) | domain::Answered::Forge(_)) | None => None,
+            domain::Event::Jig(event) => observe::jig_received(event),
+            domain::Event::Client { event: jig_client::Event::Up { up } } => {
+                let jig = match up {
+                    jig_client::Up::Served { served, .. } => Some(jig_client_view::Event::Hello { served: *served }),
+                    jig_client::Up::Watched { watch, event } => {
+                        Some(jig_client_view::Event::Watch { watch: *watch, event: event.clone() })
+                    }
+                    jig_client::Up::WatchEnded { watch, end } => {
+                        Some(jig_client_view::Event::Ended { watch: *watch, end: *end })
+                    }
+                    jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) } => {
+                        Some(jig_client_view::Event::Read { read: *read, result: result.clone() })
+                    }
+                    jig_client::Up::SignedOut => return vec![Receipt::Parked],
+                    jig_client::Up::SignedIn
+                    | jig_client::Up::NotKept { .. }
+                    | jig_client::Up::FamilyServed { .. }
+                    | jig_client::Up::Answer { .. }
+                    | jig_client::Up::FamilyDelivered { .. }
+                    | jig_client::Up::ReadDone { .. } => None,
                 };
-                vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
+                if let Some(event) = jig {
+                    return observe::jig_received(&event);
+                }
+                observe::received(&jig_client_test_domain::Event::Client {
+                    event: jig_client::Event::Up { up: up.clone() },
+                })
             }
-            Event::SignedOut => vec![Receipt::Parked],
-            Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::Forge(_) => vec![],
+            domain::Event::SignedOut => vec![Receipt::Parked],
+            domain::Event::Start { .. }
+            | domain::Event::Went { .. }
+            | domain::Event::Act { .. }
+            | domain::Event::Forge(_)
+            | domain::Event::Client { .. } => vec![],
         }
     }
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {

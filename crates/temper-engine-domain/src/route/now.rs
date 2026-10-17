@@ -151,6 +151,9 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         core::Now::HistoricalPersonTask { request, person, project, task } => {
             ended(domain, env, decision, EndedRead::PersonTask { request, person, project, task });
         }
+        core::Now::DecidedProposal { to, key, proposal } => {
+            proposals::task_begin(domain, env, decision, to, key, proposal);
+        }
         core::Now::HistoricalProposal { request, person, project, proposer, proposal } => {
             proposals::historical_begin(domain, env, decision, request, person, project, proposer, proposal);
         }
@@ -250,6 +253,7 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: 
             Some(
                 Read::Escalation(_)
                 | Read::Proposal(_)
+                | Read::TaskProposal { .. }
                 | Read::Transcript { .. }
                 | Read::Dependency(_)
                 | Read::InputCheck(_)

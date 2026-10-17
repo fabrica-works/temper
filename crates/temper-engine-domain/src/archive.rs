@@ -16,6 +16,7 @@ use skein_lib::{Id, List, Queue, ReplyTo, Token};
 pub(crate) enum Waiting {
     Escalation,
     Proposal,
+    TaskProposal,
     Ended,
     Transcript,
     Dependency,
@@ -27,6 +28,7 @@ pub(crate) fn waiting(domain: &Domain, waiter: Token) -> Option<Waiting> {
     match domain.archive_reads.get(Id::from_token(waiter))? {
         Some(Read::Escalation(_)) => Some(Waiting::Escalation),
         Some(Read::Proposal(_)) => Some(Waiting::Proposal),
+        Some(Read::TaskProposal { .. }) => Some(Waiting::TaskProposal),
         Some(Read::Ended(_)) => Some(Waiting::Ended),
         Some(Read::Transcript { .. }) => Some(Waiting::Transcript),
         Some(Read::Dependency(_)) => Some(Waiting::Dependency),
@@ -118,6 +120,7 @@ pub(crate) fn take_note_owner(domain: &mut Domain, waiter: Token) -> Option<Toke
             Read::Ended(_)
             | Read::Escalation(_)
             | Read::Proposal(_)
+            | Read::TaskProposal { .. }
             | Read::Transcript { .. }
             | Read::Dependency(_)
             | Read::InputCheck(_),

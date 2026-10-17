@@ -388,7 +388,7 @@ impl World {
     /// engine made durable and returned through the worker's next start.
     pub fn resume(&mut self, words: &[u8], script: Script) {
         self.process.resume(script);
-        let ask = parties::Ask::Say { task: parties::Task::Last, words: words.into(), release: false };
+        let ask = parties::Ask::Say { task: parties::Task::Last, words: words.into(), release: None };
         self.act(ask, [44; 16]);
     }
 
@@ -439,7 +439,7 @@ impl World {
                 let ask = match ask {
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
                     parties::Ask::Say { task: parties::Task::Number(task), words, release } => {
-                        people::Ask::Say { project, task, words, release }
+                        people::Ask::Say { project, task, words, release: release.is_some() }
                     }
                     parties::Ask::Stop { task: parties::Task::Number(task) } => people::Ask::Stop { project, task },
                     other @ (parties::Ask::Close { .. }

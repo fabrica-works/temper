@@ -52,6 +52,7 @@ pub(crate) fn request_load(
             | crate::CoreRange::EndedRead { .. }
             | crate::CoreRange::EscalationDecision { .. }
             | crate::CoreRange::ProposalDecision { .. }
+            | crate::CoreRange::TaskProposal { .. }
             | crate::CoreRange::Notes(jig_domain_notes::Range::Entry { .. }),
         ) => 1,
         Range::Core(
@@ -76,6 +77,7 @@ pub(crate) fn request_load(
             }
             Range::Core(
                 crate::CoreRange::ProposalDecision { .. }
+                | crate::CoreRange::TaskProposal { .. }
                 | crate::CoreRange::EscalationDecision { .. }
                 | crate::CoreRange::Calls
                 | crate::CoreRange::Deployment
@@ -94,7 +96,7 @@ pub(crate) fn request_load(
             }
         }
         match range {
-            Range::Core(crate::CoreRange::ProposalDecision { .. }) => {
+            Range::Core(crate::CoreRange::ProposalDecision { .. } | crate::CoreRange::TaskProposal { .. }) => {
                 domain.work.push(Work::ProposalFailed { waiter });
                 return;
             }
@@ -158,6 +160,10 @@ pub(crate) fn load_outputs(
                         domain.work.push(Work::EndedLoaded { waiter, rows });
                     }
                     Some(Waiting::Ended) => domain.work.push(Work::EndedFailed { waiter }),
+                    Some(Waiting::TaskProposal) => domain.work.push(Work::TaskProposalLoaded {
+                        waiter,
+                        rows: if cut.is_none() && next.is_none() { Some(rows) } else { None },
+                    }),
                     Some(Waiting::Proposal) if cut.is_none() && next.is_none() => {
                         domain.work.push(Work::ProposalLoaded { waiter, rows });
                     }
@@ -182,6 +188,7 @@ pub(crate) fn load_outputs(
                     Some(Waiting::Transcript) => transcript_failed(domain, waiter),
                     Some(Waiting::Ended) => domain.work.push(Work::EndedFailed { waiter }),
                     Some(Waiting::Proposal) => domain.work.push(Work::ProposalFailed { waiter }),
+                    Some(Waiting::TaskProposal) => domain.work.push(Work::TaskProposalLoaded { waiter, rows: None }),
                     Some(Waiting::Escalation) => domain.work.push(Work::EscalationFailed { waiter }),
                     None => {}
                 }
@@ -237,6 +244,7 @@ pub(crate) fn startup_page(
         Range::Core(
             crate::CoreRange::EscalationDecision { .. }
             | crate::CoreRange::ProposalDecision { .. }
+            | crate::CoreRange::TaskProposal { .. }
             | crate::CoreRange::Turns { .. }
             | crate::CoreRange::TaskTranscript { .. }
             | crate::CoreRange::TaskResult { .. }

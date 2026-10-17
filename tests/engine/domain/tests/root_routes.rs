@@ -153,10 +153,7 @@ fn proposed(driver: &Driver) -> u64 {
         .iter()
         .find_map(|delivery| {
             if let Delivery::WebReply {
-                reply:
-                    people::Reply::Outcome(
-                        people::Outcome::Proposed { proposal, .. } | people::Outcome::AmendProposed { proposal, .. },
-                    ),
+                reply: people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }),
                 ..
             } = delivery
             {
@@ -516,13 +513,18 @@ fn a_requester_may_amend_and_cancel_without_role_control_bits() {
     assert!(replied(&driver, &people::Outcome::Cancelled { task }));
 }
 
-#[test]
-fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
-    let (mut driver, _, _, maintainer_session, _, member_session) = people_roles_driver();
-    driver.send(hello_with(Token::new(7), 2, Duration::from_secs(1), Box::new([])));
+const WIDER_GOAL_REQUEST: u64 = 2045;
+const PROPOSE_WIDER_REQUEST: u64 = 2046;
+const ACCEPT_WIDER_REQUEST: u64 = 2047;
+const WIDER_WORKER: u64 = 7;
+const WIDER_STOP: Duration = Duration::from_secs(1);
+
+fn wider_amendment() -> (Driver, u64, u64, u64, u64, people::Authority) {
+    let (mut driver, _, _, maintainer_session, member, member_session) = people_roles_driver();
+    driver.send(hello_with(Token::new(WIDER_WORKER), 2, WIDER_STOP, Box::new([])));
     driver.settle();
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2045)),
+        reply_to: ReplyTo::new(Token::new(WIDER_GOAL_REQUEST)),
         sign_in: member_session,
         key: [216; 16],
         ask: goal(b"goal", 50, 1),
@@ -538,22 +540,40 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
         notes: 0,
         note_resources: Box::new([]),
     };
+    (driver, maintainer_session, member_session, member, task, wider)
+}
+
+fn propose_wider_amendment(driver: &mut Driver, member_session: u64, task: u64, wider: people::Authority) {
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2046)),
+        reply_to: ReplyTo::new(Token::new(PROPOSE_WIDER_REQUEST)),
         sign_in: member_session,
         key: [217; 16],
-        ask: amend(&driver, task, person_amendment(None, Some(wider), b"more scope")),
+        ask: people::Ask::Propose {
+            project: 1,
+            reason: b"more scope".as_slice().into(),
+            action: people::Action::Amend {
+                task,
+                revision: live(driver, task).revisions.spec,
+                amendment: Box::new(person_amendment(None, Some(wider), b"more scope")),
+            },
+        },
     }));
     driver.settle();
+}
+
+#[test]
+fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
+    let (mut driver, maintainer_session, member_session, member, task, wider) = wider_amendment();
+    propose_wider_amendment(&mut driver, member_session, task, wider);
     let proposal = proposed(&driver);
     assert_eq!(live(&driver, task).authority.budget.spend, 50);
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2047)),
+        reply_to: ReplyTo::new(Token::new(ACCEPT_WIDER_REQUEST)),
         sign_in: maintainer_session,
         key: [218; 16],
         ask: people::Ask::DecideProposal {
             project: 1,
-            proposer: people::Proposer::Task(task),
+            proposer: people::Proposer::Party(member),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -561,8 +581,8 @@ fn a_members_wider_amendment_waits_for_a_maintainer_to_accept() {
     driver.settle();
     assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
         Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ProposalDecided {
-            proposer: people::Proposer::Task(proposer), proposal: decided, choice: people::ProposalChoice::Accepted, ..
-        }), .. } if *proposer == task && *decided == proposal
+            proposer: people::Proposer::Party(proposer), proposal: decided, choice: people::ProposalChoice::Accepted, ..
+        }), .. } if *proposer == member && *decided == proposal
     )));
     assert_eq!(live(&driver, task).authority.budget.spend, 150);
 }
@@ -1508,7 +1528,7 @@ fn call_batch(
 ) -> Box<[u64]> {
     tool_call(driver, parent, call, engine::Tool::Delegate { batch });
     match driver.answered(call) {
-        Some(engine::CallAnswer::Delegated(numbers)) => numbers.clone(),
+        Some(engine::CallAnswer::Delegated(numbers)) => numbers.iter().map(|made| made.task).collect(),
         other => panic!("whole batch answered: {other:?}"),
     }
 }
@@ -1531,7 +1551,7 @@ fn assigned_task(driver: &Driver, task: u64) -> engine::Assignment {
 
 /// The proposal a run's call made, from its answer.
 fn proposal_of(driver: &Driver, call: u64) -> u64 {
-    let Some(engine::CallAnswer::Proposed { proposal }) = driver.answered(call) else {
+    let Some(engine::CallAnswer::Proposed { proposal, .. }) = driver.answered(call) else {
         panic!("proposal routed: {:?}", driver.answered(call))
     };
     *proposal
@@ -2082,6 +2102,7 @@ fn plain_delegate(words: &[u8]) -> engine::Delegate {
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
+        ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
     }
 }
 
@@ -2097,11 +2118,11 @@ fn a_delegate_batch_and_its_named_answer_commit_together() {
     let Some(engine::CallAnswer::Delegated(numbers)) = driver.answered(99) else {
         panic!("delegation answer after commit")
     };
-    let child = numbers[0];
+    let child = numbers[0].task;
     assert!(driver.transactions.iter().any(|writes| {
         writes.iter().any(|write| {
             matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Call(record))))
-            if record.part == jig_domain_core::CallPart::Delegated(Box::new([child])))
+            if record.part == jig_domain_core::CallPart::Delegated(numbers.clone()))
         }) && writes.iter().any(|write| {
             matches!(write, Write::Save(Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))))
                 if task.number == child && task.requester == tasks::Party::Task(parent.task))
@@ -2118,7 +2139,7 @@ fn a_delegate_result_enters_its_requesters_inbox_with_the_end() {
         driver.advance(true);
     }
     let Some(engine::CallAnswer::Delegated(numbers)) = driver.answered(100) else { panic!("one child was made") };
-    let child = numbers[0];
+    let child = numbers[0].task;
     park_task(&mut driver, &parent);
     let child_assignment = assigned_task(&driver, child);
     let result = tasks::TaskResult::Report { words: b"spike complete".as_slice().into() };
@@ -4181,3 +4202,6 @@ fn signing_out_routes_to_people_and_expires_the_session() {
 
 #[path = "root_routes/ended_read.rs"]
 mod ended_read;
+
+#[path = "root_routes/proposal_archive.rs"]
+mod proposal_archive;

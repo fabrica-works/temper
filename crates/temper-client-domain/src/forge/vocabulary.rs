@@ -34,12 +34,6 @@ pub struct Adoption {
     pub checks: Box<[u32]>,
 }
 
-/// The forge's keyed requests: one, the adoption.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Ask {
-    Adopt(Adoption),
-}
-
 /// What temper may do in an adopted repository (03.2's `Kinds`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "each flag is one kind of the forge's, as the wire's record has it")]
@@ -114,11 +108,6 @@ pub enum Answer {
     Unknown,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Config {
-    pub connector: u16,
-    pub version: u32,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Served {
     Unknown,

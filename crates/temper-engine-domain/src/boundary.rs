@@ -168,10 +168,11 @@ pub enum Tool {
 
 /// Action a worker can submit for an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[expect(clippy::large_enum_variant, reason = "the worker boundary carries jig's bounded amendment whole")]
 pub enum ProposedAction {
     Effect { repository: forge_client::api::Repository, resource: forge::What, write: Box<forge_client::api::Write> },
     Batch(Box<[Delegate]>),
-    Amend { task: u64, amendment: tasks::Amendment },
+    Amend { task: u64, revision: u64, amendment: tasks::Amendment },
     Widen { task: u64, authority: tasks::Authority },
     Release { task: u64 },
 }
@@ -527,6 +528,7 @@ pub(crate) enum Work {
     EscalationFailed { waiter: Token },
     ProposalLoaded { waiter: Token, rows: Box<[Record]> },
     ProposalFailed { waiter: Token },
+    TaskProposalLoaded { waiter: Token, rows: Option<Box<[Record]>> },
     EndedLoaded { waiter: Token, rows: Box<[Record]> },
     EndedFailed { waiter: Token },
 }
@@ -546,6 +548,7 @@ pub(crate) struct PreparedWorkspace {
 
 /// Bodies the fleet names by token while it routes them (jig's `domain/hosts.md`, 6.4).
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "bounded call ownership moves whole through the fleet handoff")]
 pub(crate) enum Payload {
     /// The drain's answer to a relayed call.
     Busy,
@@ -589,6 +592,7 @@ pub(crate) enum EndedRead {
 pub(crate) enum Read {
     Escalation(escalation::Query),
     Proposal(proposals::Query),
+    TaskProposal { to: ReplyTo, key: CallKey, proposal: u64 },
     Ended(EndedRead),
     Transcript { task: u64 },
     Dependency(DependencyRead),

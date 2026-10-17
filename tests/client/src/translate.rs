@@ -1,4 +1,5 @@
 //! One exhaustive bridge between jig's client contract and temper's party boundary.
+use jig_client::{Ask, Down, Readable, Watchable};
 use jig_client_world::{
     harness::ClientId,
     joint::{
@@ -9,7 +10,7 @@ use jig_client_world::{
 };
 use jig_domain_core as core;
 use jig_domain_people as people;
-use temper_client_domain::{self as client, Event, JigOut, Request};
+use temper_client_domain::{Event, Request};
 use temper_engine_domain::{self as engine, Delivery, PartyInput, PartyRequest};
 pub mod forge;
 
@@ -42,6 +43,7 @@ pub fn party(event: core::Event) -> engine::Event {
         core::Event::ApplicationPart { .. } => panic!("the client kit does not make ApplicationPart"),
         core::Event::ApplicationFinished { .. } => panic!("the client kit does not make ApplicationFinished"),
         core::Event::ProjectionSettled { .. } => panic!("the client kit does not make ProjectionSettled"),
+        core::Event::DecidedProposal { .. } => panic!("the client kit does not answer archived proposals"),
         core::Event::SettledCall { .. } => panic!("the client kit does not make SettledCall"),
         core::Event::EffectStart { .. } => panic!("the client kit does not make EffectStart"),
         core::Event::EffectConnector(..) => panic!("the client kit does not make EffectConnector"),
@@ -119,12 +121,13 @@ pub fn request(
     limits: &jig_client_view::Limits,
 ) -> Vec<engine::Event> {
     let mut events = Vec::new();
-    match request {
-        Request::Send { attempt, key, ask } => {
+    let Request::Client { request: jig_client::Request::Down { down } } = request else { panic!("typed wire request") };
+    match down {
+        Down::Send { attempt, key, request: ask } => {
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
-                client::Ask::Jig(ask) => ask,
-                client::Ask::Forge(ask) => {
+                Ask::Jig(ask) => ask,
+                Ask::Family(ask) => {
                     events.push(forge::request(transport, who, *attempt, *key, ask));
                     return events;
                 }
@@ -134,42 +137,36 @@ pub fn request(
                 transport.reply_to(Reply::Keyed { client: who, attempt: *attempt, key: *key, owner: KeyedOwner::Jig });
             events.push(party(core::Event::People(people::Event::Ask { reply_to, sign_in, key: *key, ask })));
         }
-        Request::Jig(out) => match out {
-            JigOut::Read { read, what } => {
-                let sign_in = transport.sign_in(who).expect("authenticated read");
-                let owner = wire::reads::read(what, limits.text).expect("whole read translates");
-                let reply = transport.reply_to(Reply::Read { client: who, read: *read, what: what.clone() });
-                events.push(party(core::Event::Read { reply, sign_in, read: owner }));
+
+        Down::Read { read, what: Readable::Jig(what) } => {
+            let sign_in = transport.sign_in(who).expect("authenticated read");
+            let owner = wire::reads::read(what, limits.text).expect("whole read translates");
+            let reply = transport.reply_to(Reply::Read { client: who, read: *read, what: what.clone() });
+            events.push(party(core::Event::Read { reply, sign_in, read: owner }));
+        }
+        Down::Open { watch, subject: Watchable::Jig(subject) } => {
+            let sign_in = transport.sign_in(who).expect("authenticated watch");
+            let watcher = transport.open(who, *watch, Watched::Jig(subject.clone()));
+            events.push(party(
+                wire::watches::watch(watcher, sign_in, subject, limits.rows).expect("whole watch translates"),
+            ));
+        }
+        Down::Continue { watch, subject } => {
+            if let Some(event) = transport.continued(who, *watch, subject.clone()).expect("original run continuation") {
+                events.push(party(event));
             }
-            JigOut::Open { watch, subject } => {
-                let sign_in = transport.sign_in(who).expect("authenticated watch");
-                let watcher = transport.open(who, *watch, Watched::Jig(subject.clone()));
-                events.push(party(
-                    wire::watches::watch(watcher, sign_in, subject, limits.rows).expect("whole watch translates"),
-                ));
+        }
+        Down::Close { watch } => {
+            if let Some(watcher) = transport.watch_token(who, *watch) {
+                let terminals = transport.close_watch(watcher);
+                events.push(party(core::Event::Unwatch { watcher }));
+                events.extend(terminals.into_iter().map(party));
             }
-            JigOut::Continue { watch, subject } => {
-                if let Some(event) =
-                    transport.continued(who, *watch, subject.clone()).expect("original run continuation")
-                {
-                    events.push(party(event));
-                }
-            }
-            JigOut::Close { watch } => {
-                if let Some(watcher) = transport.watch_token(who, *watch) {
-                    let terminals = transport.close_watch(watcher);
-                    events.push(party(core::Event::Unwatch { watcher }));
-                    events.extend(terminals.into_iter().map(party));
-                }
-            }
-            JigOut::Answered { .. } | JigOut::Unknown { .. } => panic!("shell duty never goes on wire"),
-        },
-        Request::Save { .. }
-        | Request::Erase { .. }
-        | Request::Show { .. }
-        | Request::SignIn { .. }
-        | Request::SignOut
-        | Request::Fact { .. } => panic!("shell duty never goes on wire"),
+        }
+        Down::Read { what: Readable::Family(_), .. } | Down::Open { subject: Watchable::Family(_), .. } => {
+            panic!("no forge reads or watches")
+        }
+        Down::Save { .. } | Down::Erase { .. } => panic!("shell duty never goes on wire"),
     }
     events
 }
@@ -257,20 +254,40 @@ fn delivery_packet(
 /// The kit's shared packet carrier has a test application owner; only jig belongs here.
 #[must_use]
 pub fn callback(event: jig_client_test_domain::Event) -> Event {
-    use jig_client_test_domain::{Answered, Event as KitEvent};
     match event {
-        KitEvent::Jig(event) => Event::Jig(event),
-        KitEvent::Answer { attempt, envelope, answer } => {
-            let answer = match answer {
-                Some(Answered::Jig(answer)) => Some(client::Answered::Jig(answer)),
-                Some(Answered::First(_)) => panic!("no test application's answer belongs to temper"),
-                None => None,
+        jig_client_test_domain::Event::Client { event } => Event::Client { event },
+        jig_client_test_domain::Event::Jig(event) => {
+            use jig_client_view::Event as Ui;
+            let up = match event {
+                Ui::Hello { served } => jig_client::Up::Served { served, versions: None },
+                Ui::Watch { watch, event } => jig_client::Up::Watched { watch, event },
+                Ui::Ended { watch, end } => jig_client::Up::WatchEnded { watch, end },
+                Ui::Read { read, result } => {
+                    jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
+                }
+                Ui::SignedOut => jig_client::Up::SignedOut,
+                event @ (Ui::Start { .. }
+                | Ui::Kept { .. }
+                | Ui::KeptGone { .. }
+                | Ui::Went { .. }
+                | Ui::Act { .. }
+                | Ui::Ask { .. }
+                | Ui::Progress { .. }
+                | Ui::Answered { .. }
+                | Ui::ShowObjects { .. }
+                | Ui::ShowSections { .. }
+                | Ui::ObjectsLeft
+                | Ui::SignOutLost
+                | Ui::Frame { .. }) => return Event::Jig(event),
             };
-            Event::Answer { attempt, envelope, answer }
+            Event::Client { event: jig_client::Event::Up { up } }
         }
-        KitEvent::SignedOut => Event::SignedOut,
-        KitEvent::Start { .. } | KitEvent::Went { .. } | KitEvent::Act { .. } | KitEvent::First(_) => {
-            panic!("no test application event belongs to temper")
+        jig_client_test_domain::Event::SignedOut => {
+            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }
         }
+        jig_client_test_domain::Event::Start { .. }
+        | jig_client_test_domain::Event::Went { .. }
+        | jig_client_test_domain::Event::Act { .. }
+        | jig_client_test_domain::Event::First(_) => panic!("no test application event belongs to temper"),
     }
 }

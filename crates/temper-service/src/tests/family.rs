@@ -244,3 +244,16 @@ fn an_adopted_repository_keeps_its_protection_rule() {
     assert_eq!(rule.contexts.as_slice(), &[b"ci/build".as_slice().into()]);
     assert_eq!((rule.approvals, rule.dismiss_stale), (2, true));
 }
+
+#[test]
+fn a_request_under_the_pages_owner_is_answered_undecodable() {
+    let pages = wire::number(wire::Owner::Pages);
+    let Err(answer) = family::to_root(exchange(pages, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], &w::CEILINGS)
+    else {
+        panic!("pages is not served")
+    };
+    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
+        panic!("undecodable answer")
+    };
+    assert_eq!(to, REPLY);
+}

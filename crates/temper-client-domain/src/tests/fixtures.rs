@@ -1,14 +1,16 @@
-use crate::{Address, Event, JigOut, Limits, Request, forge, store::Record};
+use crate::{Address, Event, Limits, Request, forge};
 use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
-pub const FORGE: u16 = 1;
+pub const FORGE_ASKER: jig_client::Asker = jig_client::Asker(1);
+pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const OTHER: u16 = 2;
 pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
-    Limits {
-        jig: jig_client_view::Limits {
+    {
+        let jig = jig_client_view::Limits {
+            segments: 9,
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -35,21 +37,27 @@ pub fn limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_millis(10),
-                most: Duration::from_millis(80),
-            },
-            heartbeat: Duration::from_millis(100),
-        },
-        forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-        table: RequestLimits {
+        };
+        let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
             out: 16,
             first: Duration::from_millis(10),
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
-        },
+        };
+        Limits {
+            jig,
+            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
+            client: crate::limits::client(
+                &jig,
+                requests,
+                8,
+                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                Duration::from_millis(100),
+            )
+            .expect("client profile fits"),
+        }
     }
 }
 pub fn env(limits: &Limits) -> Env<Limits> {
@@ -86,7 +94,7 @@ pub fn frame(party: u64) -> WatchEvent {
 pub const PARTY: u64 = 73;
 pub fn on_adoption_page() -> crate::Domain {
     let limits = limits();
-    let mut root = crate::new(&limits, SEED, forge::Config { connector: FORGE, version: 1 });
+    let mut root = crate::unlinked(&limits, SEED);
     let frame = start(&mut root, List::with_capacity(0));
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     confirm(&mut root, frame, PARTY, &mut out);
@@ -135,7 +143,9 @@ pub fn act_then_adopt(root: &mut crate::Domain, acts: &[forge::Act]) -> u32 {
 pub fn sends(out: &mut Queue<Request>) -> u32 {
     let mut sent = 0_u32;
     for _ in 0..out.len() {
-        if let Some(Request::Send { .. }) = out.pop() {
+        if let Some(Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Send { .. } } }) =
+            out.pop()
+        {
             sent = sent.checked_add(1).expect("bounded output count");
         }
     }
@@ -191,7 +201,7 @@ pub fn adopted() -> forge::Answer {
         protection: forge::Protection::Unknown,
     })
 }
-pub fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
+pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_client::Held>>) -> Token {
     let limits = limits();
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::step(
@@ -199,47 +209,86 @@ pub fn start(root: &mut crate::Domain, kept: List<Record>) -> Token {
         &env(&limits),
         Event::Start {
             address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
-            kept,
+            kept: List::with_capacity(0),
             offset: Offset { minutes: 0 },
         },
         &mut out,
     );
-    let mut frame = None;
-    for _ in 0..out.len() {
-        match out.pop().expect("counted output") {
-            Request::Jig(JigOut::Open { watch, subject }) => match subject {
-                contract::Subject::Frame => frame = Some(watch),
-                contract::Subject::Inbox { .. }
-                | contract::Subject::Task { .. }
-                | contract::Subject::Conversations
-                | contract::Subject::Tree { .. }
-                | contract::Subject::Chips { .. }
-                | contract::Subject::Goals { .. }
-                | contract::Subject::Tasks { .. }
-                | contract::Subject::Run { .. }
-                | contract::Subject::Deployment => {}
+    crate::step(root, &env(&limits), Event::Client { event: jig_client::Event::StartUnlinked { kept } }, &mut out);
+    crate::step(
+        root,
+        &env(&limits),
+        Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
+        &mut out,
+    );
+    crate::step(
+        root,
+        &env(&limits),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Served {
+                    served: true,
+                    versions: Some(contract::VersionRange {
+                        first: jig_client_protocol_wire::VERSION,
+                        last: jig_client_protocol_wire::VERSION,
+                    }),
+                },
             },
-            Request::Jig(
-                JigOut::Read { .. }
-                | JigOut::Continue { .. }
-                | JigOut::Close { .. }
-                | JigOut::Answered { .. }
-                | JigOut::Unknown { .. },
-            )
-            | Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Send { .. }
-            | Request::Show { .. }
-            | Request::SignIn { .. }
-            | Request::SignOut
-            | Request::Fact { .. } => {}
+        },
+        &mut out,
+    );
+    let mut frame = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Frame) },
+                },
+        } = request
+        {
+            frame = Some(watch);
         }
     }
     frame.expect("start opens a frame watch")
 }
 pub fn confirm(root: &mut crate::Domain, watch: Token, party: u64, out: &mut Queue<Request>) {
     let limits = limits();
-    let env = env(&limits);
-    crate::step(root, &env, Event::Jig(jig_client_view::Event::Hello { served: true }), out);
-    crate::step(root, &env, Event::Jig(jig_client_view::Event::Watch { watch, event: frame(party) }), out);
+    crate::step(
+        root,
+        &env(&limits),
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: frame(party) } } },
+        out,
+    );
+}
+
+pub fn adopted_bytes() -> jig_client::Family {
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    let limits = forge::wire_limits(&limits().forge).expect("wire limits");
+    let kinds = w::Kinds::new(
+        &limits,
+        w::KindsParts { skein_bools: [true, true, true, true, false, false, false, false, true] },
+    )
+    .expect("kinds");
+    let adopted = w::Adopted::new(
+        &limits,
+        w::AdoptedParts {
+            forge: FORGE,
+            repository: 7,
+            owner: Box::from(*b"acme"),
+            name: Box::from(*b"shop"),
+            role: w::Role::Owned,
+            home: true,
+            kinds,
+            protection: w::Protection::Unknown,
+        },
+    )
+    .expect("adopted repository");
+    let answer =
+        w::AdoptAnswer::new(&limits, w::AdoptAnswerParts { outcome: w::Outcome::Adopted(adopted) }).expect("answer");
+    jig_client::Family {
+        family: wire::number(wire::Owner::Forge),
+        version: wire::CLIENT_VERSION,
+        bytes: wire::answer(&answer),
+    }
 }

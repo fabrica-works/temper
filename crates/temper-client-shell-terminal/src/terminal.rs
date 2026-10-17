@@ -28,6 +28,7 @@ pub enum Notice {
     SignInRefused,
     SignedOut,
     Credential { party: u64, token: Secret },
+    OtherPartyKept,
     StoreFailed,
     DirectoryRefused,
 }
@@ -170,6 +171,9 @@ impl Loop {
                     b", shown once: ",
                     &encoded,
                 ]));
+            }
+            Notice::OtherPartyKept => {
+                self.wait(join(&[b"work of another party is kept in ", &self.directory, b", and waits for them"]));
             }
             Notice::StoreFailed => {
                 self.wait(join(&[b"cannot write the small store in ", &self.directory]));

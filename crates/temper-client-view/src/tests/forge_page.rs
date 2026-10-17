@@ -82,7 +82,7 @@ fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_client_v
     limits.text_bytes = 262_144;
     let mut builder = skein_ui::Builder::new(&limits);
     let mut bindings = Bindings::new(limits.bindings, 8, 1);
-    page::page(&mut builder, form, b"Shop", words, jig, &mut bindings);
+    page::page(&mut builder, form, b"Shop", words, jig, &mut bindings, fixtures::tree_limits().text_per_node);
     builder.finish()
 }
 fn adopted() -> forge::Answer {
@@ -240,7 +240,7 @@ fn the_outcomes_link_opens_the_projects_resources() {
     let mut bindings = Bindings::new(32, 8, 1);
     let mut form = form();
     form.outcome = Some(adopted());
-    page::page(&mut builder, &form, b"Shop", &words, &jig, &mut bindings);
+    page::page(&mut builder, &form, b"Shop", &words, &jig, &mut bindings, fixtures::tree_limits().text_per_node);
     let tree = builder.finish();
     let link = node_of_role(&tree, Role::Link);
     assert_eq!(

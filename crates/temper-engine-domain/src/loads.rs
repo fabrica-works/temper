@@ -321,7 +321,8 @@ fn check(entry: &Entry, limits: &Limits, rows: &[Record], next: Option<Key>) -> 
                 | crate::CoreRange::TaskResult { .. }
                 | crate::CoreRange::EndedRead { .. }
                 | crate::CoreRange::EscalationDecision { .. }
-                | crate::CoreRange::ProposalDecision { .. },
+                | crate::CoreRange::ProposalDecision { .. }
+                | crate::CoreRange::TaskProposal { .. },
             ) => {
                 return Err(Failure::Cursor);
             }
@@ -384,6 +385,7 @@ fn valid_range(range: &Range) -> bool {
             *task != 0
         }
         Range::Core(crate::CoreRange::EscalationDecision { task, revision }) => *task != 0 && *revision != 0,
+        Range::Core(crate::CoreRange::TaskProposal { task, proposal }) => *task != 0 && *proposal != 0,
         Range::Core(crate::CoreRange::ProposalDecision { proposal, .. }) => *proposal != 0,
         Range::Core(crate::CoreRange::Turns { task, attempt }) => *task != 0 && *attempt != 0,
         Range::Core(crate::CoreRange::Notes(jig_domain_notes::Range::Entry { name })) => *name != 0,

@@ -11,7 +11,6 @@ pub(crate) fn event(event: &temper_client_domain::Event) -> Option<Notice> {
     if matches!(
         event,
         Event::SignedOut
-            | Event::Answer { envelope: skein_lib::RequestEnvelope::SignedOut, .. }
             | Event::Jig(
                 Jig::Ended { end: WatchEnd::SignedOut, .. }
                     | Jig::Read { result: ReadResult::None(ReadNone::SignedOut), .. }

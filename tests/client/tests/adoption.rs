@@ -99,8 +99,5 @@ fn a_reload_with_an_adoption_pending_sends_it_once() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     assert_eq!(world.front().applications_admitted(), 1);
-    assert!(
-        !world.kept(person).iter().any(|record| matches!(record, temper_client_domain::store::Record::Table { .. })),
-        "the retried adoption's record retired"
-    );
+    assert!(world.kept(person).is_empty(), "the retried adoption's record retired");
 }

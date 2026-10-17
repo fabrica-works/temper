@@ -12,6 +12,31 @@ use skein_lib::Writer;
 
 /// The forge connector's number on jig's client wire (client.md, 4.6).
 pub const FORGE: u16 = 1;
+/// The application's stable owners on jig's client wire (client.md, 4.6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Owner {
+    /// The forge's requests and records.
+    Forge,
+    /// The application's pages, using jig's operations and subjects.
+    Pages,
+}
+/// The owner's number, never assigned to another owner.
+#[must_use]
+pub const fn number(owner: Owner) -> u16 {
+    match owner {
+        Owner::Forge => FORGE,
+        Owner::Pages => 2,
+    }
+}
+/// The owner a number names, if this build knows it.
+#[must_use]
+pub const fn owner(number: u16) -> Option<Owner> {
+    match number {
+        FORGE => Some(Owner::Forge),
+        2 => Some(Owner::Pages),
+        _ => None,
+    }
+}
 /// Every record's version, served by both ends (client.md, 4.6).
 pub const CLIENT_VERSION: u32 = 1;
 

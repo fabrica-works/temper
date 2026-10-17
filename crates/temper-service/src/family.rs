@@ -16,10 +16,11 @@ pub fn to_root(
     match exchange {
         kit::ToApplication::Request { reply_to, sign_in, key, family, version, record, digest } => {
             let mut reader = Reader::new(&record);
-            let request = if family == wire::FORGE && version == wire::CLIENT_VERSION {
-                w::Adopt::decode(limits, &mut reader).ok()
-            } else {
-                None
+            let request = match wire::owner(family) {
+                Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => {
+                    w::Adopt::decode(limits, &mut reader).ok()
+                }
+                Some(wire::Owner::Forge | wire::Owner::Pages) | None => None,
             };
             let Some(request) = request else {
                 return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));

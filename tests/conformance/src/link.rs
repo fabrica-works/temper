@@ -21,6 +21,12 @@ const RETRY: u64 = 1_000_000_000;
 /// its answer is relayed down and asks it again after a busy answer or a
 /// lost engine.
 pub fn call(world: &mut Harness<Temper>, task: u64, attempt: u64, name: u64, body: engine::Call) {
+    if matches!(body.tool, engine::Tool::Propose { .. }) {
+        world.peers.observed.push(r::Observed::ProposeAsked { proposer: r::Source::Task(task) });
+    }
+    if let engine::Tool::Amend { target, revision, .. } = &body.tool {
+        world.peers.observed.push(r::Observed::Named { task: *target, revision: r::Revision::Spec(*revision) });
+    }
     let now = world.clock().now;
     world.peers.calls.insert(name, (task, attempt, body.clone()));
     world.peers.retries.insert(name, now + RETRY);
@@ -174,7 +180,7 @@ fn relayed(peers: &mut Peers, now: Time, call: &[u8], answer: host::Relayed) -> 
     // A call asked again may be answered twice; the worker took the first.
     let Some((task, attempt, body)) = peers.calls.remove(&name) else { return Vec::new() };
     peers.retries.remove(&name);
-    if let engine::CallAnswer::Proposed { proposal } = &answer {
+    if let engine::CallAnswer::Proposed { proposal, .. } = &answer {
         peers.pending_proposal = Some(*proposal);
     }
     let mut requires = Vec::new();

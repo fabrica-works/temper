@@ -41,6 +41,7 @@ pub fn page(
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
+    text_limit: u32,
 ) {
     builder.open(Role::Heading { level: 1 });
     words::text(words, builder, Word::Title, &[Hole::Name(copy_of(project_name))]);
@@ -93,7 +94,7 @@ pub fn page(
         );
     }
     if let Some(answer) = &form.outcome {
-        outcome(builder, form, answer, words, jig, bindings);
+        outcome(builder, form, answer, words, jig, bindings, text_limit);
     }
 }
 fn text_field(
@@ -197,6 +198,7 @@ fn outcome(
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
+    text_limit: u32,
 ) {
     match answer {
         forge::Answer::Adopted(adopted) => {
@@ -228,12 +230,12 @@ fn outcome(
         }
         forge::Answer::CoreRefused(refusal) => {
             builder.open(Role::Alert);
-            jig.refusal(builder, refusal);
+            jig.refusal(builder, refusal, text_limit);
             builder.close();
         }
         forge::Answer::EntranceRefused(refusal) => {
             builder.open(Role::Alert);
-            jig.refusal(builder, refusal.refusal());
+            jig.refusal(builder, refusal.refusal(), text_limit);
             builder.close();
         }
         forge::Answer::ForgeRefused(reason) => {

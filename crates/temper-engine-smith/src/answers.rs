@@ -170,7 +170,7 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             task_problem(&mut text, problem)?;
             true
         }
-        CallAnswer::Proposed { proposal } => {
+        CallAnswer::Proposed { proposal, .. } => {
             text.add(b"Proposed as ")?;
             text.number(*proposal)?;
             false
@@ -243,7 +243,7 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
                 if at > 0 {
                     text.add(b", ")?;
                 }
-                text.number(*id)?;
+                text.number(id.task)?;
             }
             false
         }

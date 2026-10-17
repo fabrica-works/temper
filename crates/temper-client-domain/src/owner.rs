@@ -1,15 +1,28 @@
-//! Keep: the child/table routing shape and exhaustive owner variants.
-//! Replace: Ops connector sides with the forge's side and temper's navigation.
-use skein_lib::Token;
-/// The table echoes the requesting child's token, or a restored record's scope.
-/// The child request token, or restored request scope with no live child.
+//! Exhaustive child askers (client.md, 3.3).
+/// A child owning every handle and request it gives the shared client.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
-    Forge(Token),
-    /// jig owns this live request.
-    Jig(Token),
-    /// The original child disappeared on reload.
-    Kept {
-        scope: u64,
-    },
+    Jig,
+    Forge,
+}
+impl Owner {
+    #[must_use]
+    pub fn asker(self) -> jig_client::Asker {
+        match self {
+            Self::Jig => jig_client::Asker::JIG,
+            Self::Forge => jig_client::Asker(u32::from(temper_client_protocol_wire::number(
+                temper_client_protocol_wire::Owner::Forge,
+            ))),
+        }
+    }
+    #[must_use]
+    pub fn of(asker: jig_client::Asker) -> Option<Self> {
+        if asker == Self::Jig.asker() {
+            Some(Self::Jig)
+        } else if asker == Self::Forge.asker() {
+            Some(Self::Forge)
+        } else {
+            None
+        }
+    }
 }

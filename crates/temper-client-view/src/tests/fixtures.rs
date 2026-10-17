@@ -1,13 +1,13 @@
 use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall, Writer};
 use temper_client_domain::{Limits, forge};
-pub const FORGE: u16 = 1;
-pub const OTHER: u16 = 2;
+pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
-    Limits {
-        jig: jig_client_view::Limits {
+    {
+        let jig = jig_client_view::Limits {
+            segments: 9,
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -34,21 +34,27 @@ pub fn limits() -> Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_millis(10),
-                most: Duration::from_millis(80),
-            },
-            heartbeat: Duration::from_millis(100),
-        },
-        forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-        table: RequestLimits {
+        };
+        let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
             out: 16,
             first: Duration::from_millis(10),
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
-        },
+        };
+        Limits {
+            jig,
+            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
+            client: temper_client_domain::limits::client(
+                &jig,
+                requests,
+                8,
+                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                Duration::from_millis(100),
+            )
+            .expect("client profile fits"),
+        }
     }
 }
 pub fn words() -> crate::words::Words {
@@ -113,7 +119,7 @@ pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[
 }
 pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> skein_ui::Tree {
     let limits = forge::Limits { parts: 1, field_bytes: 256, checks: 8 };
-    let mut side = forge::Side::new(&limits, forge::Config { connector: FORGE, version: 1 });
+    let mut side = forge::Side::new(&limits, SEED);
     if held {
         forge::step(
             &mut side,
@@ -129,9 +135,9 @@ pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> skein_u
 pub fn part_text(words: &crate::words::Words, part: Part, held: bool) -> Box<[u8]> {
     text(&part_tree(words, part, held))
 }
-pub fn built(root_forge: u16) -> crate::View {
+pub fn built() -> crate::View {
     let domain = domain_limits();
-    let root = temper_client_domain::new(&domain, SEED, forge::Config { connector: root_forge, version: 1 });
+    let root = temper_client_domain::unlinked(&domain, SEED);
     let jig = jig_words();
     let forge = words();
     let envelope = crate::Limits::of(&domain, &jig, &forge).expect("composed envelope fits");
@@ -164,10 +170,10 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     use jig_client::contract::{
         self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, ProjectRole, Subject, WatchEvent,
     };
-    use temper_client_domain::{Address, Event, JigOut, Request};
+    use temper_client_domain::{Address, Event, Request};
     let limits = domain_limits();
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
-    let mut root = temper_client_domain::new(&limits, SEED, forge::Config { connector: FORGE, version: 1 });
+    let mut root = temper_client_domain::unlinked(&limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
     temper_client_domain::step(
         &mut root,
@@ -179,9 +185,22 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
         },
         &mut out,
     );
+    for event in [
+        jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
+        jig_client::Event::SignIn { with: jig_client::With::Transport },
+        jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } },
+    ] {
+        temper_client_domain::step(&mut root, &env, Event::Client { event }, &mut out);
+    }
     let mut watch = None;
     for _ in 0..out.len() {
-        if let Some(Request::Jig(JigOut::Open { watch: token, subject: Subject::Frame })) = out.pop() {
+        if let Some(Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                },
+        }) = out.pop()
+        {
             watch = Some(token);
         }
     }
@@ -199,26 +218,34 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     temper_client_domain::step(
         &mut root,
         &env,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch: watch.expect("frame opened"),
-            event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                party: FrameParty {
-                    number: 73,
-                    kind: PartyKind::Person,
-                    login: DocumentText::complete(contract::Text::new(Box::from(*b"pat"), 32).expect("login fits")),
-                    name: DocumentText::complete(contract::Text::new(Box::from(*b"Pat"), 32).expect("name fits")),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("frame opened"),
+                    event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
+                        party: FrameParty {
+                            number: 73,
+                            kind: PartyKind::Person,
+                            login: DocumentText::complete(
+                                contract::Text::new(Box::from(*b"pat"), 32).expect("login fits"),
+                            ),
+                            name: DocumentText::complete(
+                                contract::Text::new(Box::from(*b"Pat"), 32).expect("name fits"),
+                            ),
+                        },
+                        projects,
+                        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+                        needs_total: 0,
+                        updates: contract::Count { value: 0, limited: false },
+                        results_seen: 0,
+                        charters: List::with_capacity(0),
+                        cut: false,
+                        retention: Duration::from_secs(1000),
+                        deployment_role: None,
+                    }))),
                 },
-                projects,
-                needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
-                needs_total: 0,
-                updates: contract::Count { value: 0, limited: false },
-                results_seen: 0,
-                charters: List::with_capacity(0),
-                cut: false,
-                retention: Duration::from_secs(1000),
-                deployment_role: None,
-            }))),
-        }),
+            },
+        },
         &mut out,
     );
     root

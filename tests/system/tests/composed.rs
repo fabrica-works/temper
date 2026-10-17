@@ -39,7 +39,7 @@ fn a_persons_words_reach_smith_through_the_live_worker_channel() {
         jig_fake_parties::Ask::Say {
             task: jig_fake_parties::Task::Last,
             words: Box::from(&b"continue with these words"[..]),
-            release: false,
+            release: None,
         },
         [42; 16],
     );

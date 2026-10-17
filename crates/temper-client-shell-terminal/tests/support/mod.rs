@@ -182,7 +182,7 @@ impl World {
             &tree_limits(),
             Box::from(*b"client"),
             (!signed_in).then(|| Secret::new(Box::from(*b"private-link"))),
-            limits::native().client.table.requests,
+            limits::native().client.client.domain.requests.requests,
         );
         terminal.terminal.adopt(stdin, stdout).expect("terminal pipes");
         let mut world = Self {

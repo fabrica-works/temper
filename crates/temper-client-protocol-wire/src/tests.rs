@@ -68,3 +68,12 @@ fn limits_take_each_bound_from_its_source_field() {
     let bounds = crate::Bounds { checks: 65, ..fixtures::BOUNDS };
     assert_eq!(crate::limits(&bounds), None, "past the checks ceiling");
 }
+
+#[test]
+fn each_owner_has_its_number_and_back() {
+    for (owner, number) in [(crate::Owner::Forge, 1), (crate::Owner::Pages, 2)] {
+        assert_eq!(crate::number(owner), number);
+        assert_eq!(crate::owner(number), Some(owner));
+    }
+    assert_eq!(crate::owner(65_535), None, "a number no owner of this build has");
+}

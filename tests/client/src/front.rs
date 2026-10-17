@@ -1,4 +1,5 @@
 //! Real engine root on its direct store driver, with jig's protocol correlation.
+use crate::app::Event;
 use crate::{app::Temper, fixtures, translate};
 use jig_client_world::{
     harness::{ClientId, Front, FrontFault, Observed},
@@ -6,7 +7,7 @@ use jig_client_world::{
 };
 use skein_lib::{Duration, RequestEnvelope, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use temper_client_domain::{self as client, Event, Request};
+use temper_client_domain::{self as client, Event as RootEvent, Request};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 
@@ -96,6 +97,25 @@ impl Joint {
             sign_outs: BTreeMap::new(),
         }
     }
+    fn hello(&mut self, who: ClientId) {
+        self.callbacks
+            .push((who, translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())).into()));
+        self.callbacks.push((
+            who,
+            RootEvent::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::FamilyServed {
+                        family: fixtures::FORGE,
+                        versions: Some(jig_client::contract::VersionRange {
+                            first: temper_client_protocol_wire::CLIENT_VERSION,
+                            last: temper_client_protocol_wire::CLIENT_VERSION,
+                        }),
+                    },
+                },
+            }
+            .into(),
+        ));
+    }
     fn advance(&mut self, now: Time) {
         self.now = now;
         self.engine.env.now = now;
@@ -112,13 +132,27 @@ impl Joint {
             self.parked.entry(who).or_default().push(request);
             return;
         }
-        if let Request::Send { attempt, .. } = &request
+        if let Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } } =
+            &request
             && let Some(envelope) = self.keyed_fault.take()
         {
             if envelope == RequestEnvelope::SignedOut {
                 self.transport.signed_out(who);
+                self.sign_outs.entry(who).or_default().push_back(None);
+                self.callbacks.push((
+                    who,
+                    RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }.into(),
+                ));
             }
-            self.callbacks.push((who, Event::Answer { attempt: *attempt, envelope, answer: None }));
+            self.callbacks.push((
+                who,
+                RootEvent::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer { attempt: *attempt, envelope, answer: None, why: None },
+                    },
+                }
+                .into(),
+            ));
             return;
         }
         for event in translate::request(&mut self.transport, who, &request, &self.limits.jig) {
@@ -134,15 +168,22 @@ impl Joint {
             }
             packets::Incoming::Callback { client, event } => {
                 let event = translate::callback(event);
-                if matches!(event, Event::Answer { .. }) && self.lose_answers != 0 {
+                if matches!(
+                    event,
+                    RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
+                ) && self.lose_answers != 0
+                {
                     self.lose_answers -= 1;
                 } else {
-                    self.callbacks.push((client, event));
+                    self.callbacks.push((client, event.into()));
                 }
             }
             packets::Incoming::SignedOut { client, sign_in } => {
                 self.sign_outs.entry(client).or_default().push_back(Some(sign_in));
-                self.callbacks.push((client, Event::SignedOut));
+                self.callbacks.push((
+                    client,
+                    Event::Root(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }),
+                ));
             }
             packets::Incoming::SignInAgain { .. } | packets::Incoming::SignInFailed { .. } => {
                 panic!("the deployment owner signs in")
@@ -155,7 +196,7 @@ impl Joint {
                 if self.lose_answers != 0 {
                     self.lose_answers -= 1;
                 } else {
-                    self.callbacks.push((client, event));
+                    self.callbacks.push((client, event.into()));
                 }
             }
             Ok(None) => {}
@@ -253,7 +294,8 @@ impl Front<Temper> for Joint {
                 name: b"Person".as_slice().into(),
             },
         );
-        self.callbacks.push((who, Event::Jig(self.transport.hello())));
+        self.callbacks
+            .push((who, Event::Root(translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())))));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
     }
@@ -270,10 +312,15 @@ impl Front<Temper> for Joint {
             self.offline_until = None;
             self.observed.push(Observed::Reachable { live: true });
             for who in self.transport.clients() {
-                self.callbacks.push((who, Event::Jig(self.transport.hello())));
+                self.hello(who);
                 if self.transport.sign_in(who).is_none() {
                     self.sign_outs.entry(who).or_default().push_back(None);
-                    self.callbacks.push((who, Event::SignedOut));
+                    self.callbacks.push((
+                        who,
+                        Event::Root(RootEvent::Client {
+                            event: jig_client::Event::Up { up: jig_client::Up::SignedOut },
+                        }),
+                    ));
                 }
             }
             for (who, requests) in std::mem::take(&mut self.parked) {
@@ -327,17 +374,28 @@ impl Front<Temper> for Joint {
         self.advance(now);
         self.detach(who);
         if self.offline_until.is_none() {
-            self.callbacks.push((who, Event::Jig(self.transport.hello())));
+            if self.transport.sign_in(who).is_some() {
+                self.callbacks.push((
+                    who,
+                    RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }.into(),
+                ));
+            }
+            self.hello(who);
             if self.transport.sign_in(who).is_none() {
                 self.sign_outs.entry(who).or_default().push_back(None);
-                self.callbacks.push((who, Event::SignedOut));
+                self.callbacks.push((
+                    who,
+                    Event::Root(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }),
+                ));
             }
         }
     }
     fn received(&mut self, who: ClientId, event: &Event) {
-        if let Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: jig_client::contract::WatchEvent::Delivered(_),
+        if let Event::Root(RootEvent::Client {
+            event:
+                jig_client::Event::Up {
+                    up: jig_client::Up::Watched { watch, event: jig_client::contract::WatchEvent::Delivered(_) },
+                },
         }) = event
             && let Some(event) = self.transport.taken(who, *watch)
         {
@@ -346,14 +404,24 @@ impl Front<Temper> for Joint {
     }
     fn sign_in(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
-        self.callbacks.retain(|(client, event)| *client != who || !matches!(event, Event::SignedOut));
+        self.callbacks.retain(|(client, event)| {
+            *client != who
+                || !matches!(
+                    event,
+                    Event::Root(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } })
+                )
+        });
         self.sign_outs.remove(&who);
-        self.callbacks.push((who, Event::Jig(self.transport.hello())));
+        self.callbacks
+            .push((who, Event::Root(translate::callback(jig_client_test_domain::Event::Jig(self.transport.hello())))));
         let event = translate::party(self.transport.start_sign_in(who));
         self.send(event);
     }
     fn delivers(&mut self, client: ClientId, event: &Event) -> bool {
-        if !matches!(event, Event::SignedOut) {
+        if !matches!(
+            event,
+            Event::Root(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } })
+        ) {
             return true;
         }
         let sign_in = self
@@ -366,7 +434,7 @@ impl Front<Temper> for Joint {
     fn sign_out(&mut self, who: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
         if self.offline_until.is_some() {
-            self.callbacks.push((who, Event::Jig(jig_client_view::Event::SignOutLost)));
+            self.callbacks.push((who, Event::Root(RootEvent::Jig(jig_client_view::Event::SignOutLost))));
             return;
         }
         let Some(sign_in) = self.transport.sign_in(who) else { return };
@@ -395,3 +463,6 @@ fn core_rows(engine: &Driver) -> BTreeMap<jig_test_domain::Key, jig_test_domain:
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests;

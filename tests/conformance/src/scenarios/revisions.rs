@@ -14,11 +14,9 @@ fn target(world: &World) -> u64 {
         .peers
         .answers
         .iter()
-        .find_map(
-            |answer| {
-                if let engine::CallAnswer::Delegated(tasks) = answer { tasks.first().copied() } else { None }
-            },
-        )
+        .find_map(|answer| {
+            if let engine::CallAnswer::Delegated(tasks) = answer { tasks.first().map(|made| made.task) } else { None }
+        })
         .expect("race delegate admitted")
 }
 fn call(world: &mut World, name: u64, completion: u32, tool: engine::Tool) {
@@ -45,6 +43,7 @@ pub(super) fn party_amend(world: &mut World) -> Result<(), Violation> {
                 symbolic_grants: Box::new([]),
                 dependencies: Box::new([]),
                 wake: tasks::WakePolicy::DEFAULT,
+                ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
             }]),
         },
     );

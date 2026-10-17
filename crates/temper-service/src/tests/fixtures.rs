@@ -762,3 +762,25 @@ pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
 }
 mod forge;
 pub use forge::{ForgeFace, hook};
+
+pub fn withdrawn_history(task: u64, proposal: u64) -> jig_domain_core::Record {
+    use jig_domain_tasks as tasks;
+    jig_domain_core::Record::Tasks(tasks::Stored::History(tasks::History {
+        task,
+        revision: 3,
+        by: tasks::Party::Task(task),
+        change: tasks::Change::ProposalWithdrawn,
+        reason: Box::new([]),
+        at: skein_lib::Wall::EPOCH,
+        amendment: None,
+        proposal: Some(Box::new(tasks::Proposal {
+            number: proposal,
+            proposer: task,
+            project: 1,
+            action: tasks::ProposalAction::Release { task },
+            reason: Box::new([]),
+            as_holder: false,
+            state: tasks::ProposalState::Withdrawn,
+        })),
+    }))
+}

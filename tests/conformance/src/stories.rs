@@ -350,6 +350,7 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
+        ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
     };
     let tool = engine::Tool::Delegate { batch: Box::new([milestone]) };
     crate::link::call(world, goal, run.attempt, 8301, engine::Call { completion: 301, position: 0, tool });
