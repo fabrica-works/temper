@@ -799,9 +799,13 @@ per session are in each file.
     and takes under 0.5 s; otherwise it goes, or into a `fuzzy_` binary,
     and the log keeps the cause. 21.3 deletes the panels test and moves
     the two over 1 s (`an_environment_answer_can_be_lost_at_its_native_byte_face`,
-    `an_environment_chat_stays_live_while_its_provision_finishes`) to
-    `fuzzy_joint.rs`, as a small fix outside its Files, and reports the
-    gate's time.
+    `an_environment_chat_stays_live_while_its_provision_finishes`), with
+    their helpers `ready_environment` and `environment_chat`, to a new
+    `tests/ops/tests/fuzzy_bytes.rs` (09:08Z, point 2: `fuzzy_joint.rs`
+    is over 800 lines and ends at 800 or fewer), as a small fix outside
+    its Files; where p and the eight survival tests already check what
+    one of the two checks, it deletes that test instead. It reports the
+    gate's focused and fuzzy times.
   - 08:16Z, point 2 (the jig sessions that edit `tests/ops`): README "A
     test's helpers once": before a helper goes into a test file, search
     the crate's fixtures and the other test files. `see(words)` is defined

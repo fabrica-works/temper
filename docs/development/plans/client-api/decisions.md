@@ -1539,6 +1539,9 @@ choice would have been the user's (development.md, 10.4).
      4. **At either stop,** report the counts and the files left, and wait. Trim nothing to fit.
      5. **Unchanged:** rulings 236 to 239; 03.5's Shape, Files, Test shape and Proof (its two proofs under ruling 229).
 
+242. **The 08:16Z steer's two moved tests go to fuzzy_bytes.rs** (steer of 2026-10-17T09:08Z).
+     The 09:08Z steer's point 2 amends the README's 08:16Z point 1 text (ruling 234): jig 21.3 moves `an_environment_answer_can_be_lost_at_its_native_byte_face` and `an_environment_chat_stays_live_while_its_provision_finishes`, with their helpers `ready_environment` and `environment_chat`, to a new `tests/ops/tests/fuzzy_bytes.rs`, not to `tests/ops/tests/fuzzy_joint.rs`, which is over 800 lines at jig `154e10942` and ends at 800 or fewer (code-organization.md, 7: a file over 800 lines at the base grows by at most 40); where p and the eight survival tests already check what one of the two checks, 21.3 deletes that test instead, and the log keeps the cause. Its report gives the gate's focused and fuzzy times (README, Test time: fuzzy 22.291 s of 24.9 s at 21.2's landing). The rest of the 08:16Z point 1 stands.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
