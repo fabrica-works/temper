@@ -18,7 +18,7 @@ reference UI onto these task queries.
   to 5.4), 6, 6.1, 7.1 and 7.2; `docs/design/protocol/client.md`,
   sections 3, 6 and 7; `docs/design/client/domain/client.md`, sections
   7 and 8.1; `docs/design/domain/engine.md`, 11.5;
-  `docs/design/client/domain/objects.md`, sections 2, 4 and 5.
+  `docs/design/client/domain/objects.md`, sections 2, 4, 5 and 11.
 - jig 14's session file (`jig/14-wire.md`): its Choices and its sketches
   (`TaskFlags`, the renamed operations) hold here.
 - The plan's `decisions.md`, 3 and 9; `findings/wire-and-client.md`,
@@ -63,7 +63,9 @@ reference UI onto these task queries.
   the contract call it `Me`.
 - **Accepting's effect stays the proposal's `funding`**
   (`OwnerProposal.funding`); `Effect` holds releasing, cancelling (the
-  legacy `Impact`, reused, not copied) and moving.
+  legacy `Impact`, reused, not copied, less `effects_pending`,
+  `effects_settling` and `takeover_budget`: the designer's answer of
+  2026-10-17T11:23Z) and moving.
 - **A release's effect on a hold of an uncertain effect is `Uncertain`:**
   made again or not, as the release's `again` says; the card offers both
   (objects.md, 5).
@@ -379,6 +381,18 @@ hotspot: `crates/jig-domain-core/src/documents.rs`. At `b6a63f8c1` the
 `Offered` literals and `Act` uses of `documents.rs` (491, 703-718),
 `escalations.rs` (27, 30), `notes.rs` (60, 63) and `projects/tests.rs`
 (151, 427), and the map of `offers.rs` (11-28) (ruling 249).
+For the designer's answer of 2026-10-17T11:23Z:
+`crates/jig-domain-tasks/src/{run.rs (`run_attempt`, 129: `pub`),
+lib.rs (`pub use run::run_attempt;`)}`; the contract's `Impact`
+(`documents.rs:1099-1106`); the link's `impact_fields`
+(`translate/documents_part3.rs:71-80`) and its fixtures
+`tests/fixtures/{reads_part2.rs (92-106), reads_part6.rs (74-83)}`; the
+view's `confirmation.rs` (226, 416-431) and
+`phrases/{jig.rs (634-636, 1459-1460, 2291-2292, 2764-2765), english.rs
+(1367-1374)}`; and the other `Impact` literals, found once with `git grep
+-l -E 'effects_pending|effects_settling|PendingEffects|SettlingEffects'
+-- crates tests testing examples ':!*/generated/*'` (16 files at
+`b6a63f8c1`, these among them).
 Shape:
 - Core: `acts::Act` renames `Write` to `Message`, `TakeOver` to `Move`,
   `MarkSeen` to `Seen`, gains `Withdraw`, and loses `AmendRelease` (the
@@ -388,10 +402,29 @@ Shape:
   Release(ReleaseEffect), Cancel(Impact), Move { reservation: u64 } }`,
   made when the document is made: a release's from the hold's reason
   (judged afresh, a run again, or uncertain), a cancel's from the task's
-  live tree (its tasks by phase, its live runs, its pending proposals,
-  its effects pending and settling), a move's from the reservation the
-  move takes (`tasks.takeover_budget`, as
-  `documents/live_delegates.rs:33` reads it).
+  live tree (below), a move's from the reservation the move takes
+  (`tasks.takeover_budget`, as `documents/live_delegates.rs:33` reads
+  it).
+- A cancel's `Impact` (the designer's answer of 2026-10-17T11:23Z;
+  contract.md, 5.4: "the live tasks below the task, counted by phase;
+  and, of the task and those below it, the live runs (each attempt
+  claimed whose answer its task has not heard) and the pending
+  proposals (each a task made that no holder has decided)"), over `core.tasks.view_tasks()` and
+  `task_tree::descendant`, as `task_tree::tree` (`task_tree.rs:813`)
+  walks them:
+  - `tasks`: each live task below the task, never the task itself,
+    `PhaseCounts::add`ed (`task_tree.rs:256`);
+  - `live_runs`: the task and each live task below it whose
+    `tasks::run_attempt(&row.phase)` is `Some` (`run.rs:129`: claimed
+    or running, closing at `Stage::Run`, or held from one of those);
+    no writer slot is read (a run with no write hold takes none, and a
+    lost run's slot outlives it);
+  - `proposals`: the task and each live task below it whose `proposal`
+    is `ProposalState::Pending`, as `task_tree::proposal`
+    (`task_tree.rs:630`) reads it;
+  - no effect is counted: "Its effects are its connectors' (5.1): each
+    withdraws the entries not yet sent and settles those in flight, and
+    the document counts none of them".
 - Core's `Impact` and `ReleaseEffect` are new, in `acts/effects.rs` (the
   sketch: the core has no `Impact`). `Impact.tasks` is the core's
   `documents::PhaseCounts` (`task_tree.rs:228`, ten fields), which
@@ -400,22 +433,37 @@ Shape:
   among them) by: `waiting`, `closing`, `held`, `done`, `failed` and
   `cancelled` as they are; `running` the working class, `idle + starting
   + running + backing_off`; `ended` 0 (the core counts each ending by
-  its outcome; `ended` is for chips whose source gives none). The
-  wire's `Impact.takeover_budget` has no source in a cancel's effect
-  (contract.md, 5.4 gives a move's reservation as `Effect::Move`): the
-  core's `Impact` has no such field, and the translation writes 0
-  (ruling 249).
-- Wire: `PhaseCounts` and `Impact` move before `Offered` (no byte
-  change); `enum ReleaseEffect { judged, run_again, uncertain }`,
-  `EffectRelease { what: ReleaseEffect }`, `EffectMove { reservation:
-  u64 }`, `enum Effect { release: EffectRelease, cancel: Impact,
+  its outcome; `ended` is for chips whose source gives none). `Impact`
+  loses `effects_pending`, `effects_settling` and `takeover_budget` in
+  the wire and the contract (the designer's answer of
+  2026-10-17T11:23Z): a move's reservation is `Effect::Move`'s
+  (contract.md, 5.4), and a cancel's effects are each connector's
+  panel's (objects.md, 11).
+- Wire: `PhaseCounts` moves before `Offered` (no byte change), and
+  `Impact`, changed in place to `record Impact { tasks: PhaseCounts
+  live_runs: u32 proposals: u32 }`, with it; `enum ReleaseEffect {
+  judged, run_again, uncertain }`, `EffectRelease { what: ReleaseEffect
+  }`, `EffectMove { reservation: u64 }`, `enum Effect { release: EffectRelease, cancel: Impact,
   move_task: EffectMove }`; `Offered { act, admission, effect: option
   Effect }`; `ActKind` renames `write` to `message`, `take_over` to
   `move_task`, `mark_seen` to `seen`, gains `withdraw`, and loses
   `amend_release`.
-- Contract: the sketch's `Effect`, `ReleaseEffect`, `Offered`.
+- Contract: the sketch's `Effect`, `ReleaseEffect`, `Offered`; `Impact`
+  loses the three fields (`TaskContext.impact` and `Escalation.impact`
+  keep the smaller record).
+- Reference UI: the confirmation's `impact_words` says one line for the
+  effects in place of two: `JigPhrase::PendingEffects` (254) becomes
+  `EffectsSettle`, with no hole, in English "Effects not yet begun will
+  be withdrawn; begun effects will settle"; `SettlingEffects` goes, its
+  number 255 left unused (the table has gaps); `TakeoverFunds` takes
+  `Effect::Move`'s `reservation` (objects.md, 11: "in jig's words, that
+  effects not yet made are withdrawn and those in flight settle").
 Test shape: the core's unit tests (`crates/jig-domain-core/src/tests/acts.rs`):
-`a_cancel_offer_counts_the_tree_it_would_end`,
+`a_cancel_offer_counts_the_tree_it_would_end` (one test, asserting
+three facts: the task's own live run and pending proposal count in
+`live_runs` and `proposals`, never in `tasks`; a running delegate with
+no write hold counts in `live_runs`; a decided proposal is not
+counted),
 `a_release_offer_on_an_uncertain_effect_says_uncertain`,
 `a_move_offer_names_the_reservation_it_takes`,
 `a_party_s_own_proposal_offers_withdraw_to_its_proposer_alone`;
@@ -432,7 +480,11 @@ Don't: compute an effect in the client or the reference UI; copy
 Size: at most 300 lines.
 Removes: `ActKind`'s `write`, `take_over`, `mark_seen`,
 `amend_release`, and the core's `Act::AmendRelease`; the reference UI's
-reading of `LiveDelegate.takeover_budget` for a move's effect.
+reading of `LiveDelegate.takeover_budget` for a move's effect;
+`Impact`'s `effects_pending`, `effects_settling` and `takeover_budget`
+(wire, contract) and `JigPhrase::SettlingEffects`: the Files' `git
+grep` prints nothing after 22.4 (the designer's answer of
+2026-10-17T11:23Z).
 
 ## Interface sketches
 
@@ -453,8 +505,8 @@ and `Impact` before `Offered`, `WaitsOn` with its parts before `Task`):
 ```
 # Moved before their first users, unchanged:
 record PhaseCounts { ended: u32 waiting: u32 running: u32 held: u32 closing: u32 done: u32 failed: u32 cancelled: u32 }
-record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 effects_pending: u32 effects_settling: u32 takeover_budget: u64 }
 # Added, or changed in place:
+record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 }
 enum PhaseClass { working, waiting, held, closing, ended }
 enum ExecutorKind { agent, procedure, person }
 enum QueryOrder { number, changed, activity, priority, ended }
@@ -591,7 +643,7 @@ pub struct TaskPage { pub live: List<TaskLine>, pub live_after: Option<Cursor>, 
 /// What lifting a hold does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ReleaseEffect { Judged, RunAgain, Uncertain }
-/// What a decision will do, from the engine's state as the document was made (`Impact` is the contract's, `documents.rs:1099`).
+/// What a decision will do, from the engine's state as the document was made (`Impact` is the contract's, `documents.rs:1099`, less its three effect and take-over fields).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Effect { Release(ReleaseEffect), Cancel(Impact), Move { reservation: u64 } }
 /// One act the party may make now, its admission and its effect.
@@ -607,11 +659,15 @@ contract's `Effect` mirrors (the core has no `Impact`; `acts::Offered` gains
 /// What lifting a hold does: the task judged afresh, a run again, or an uncertain effect (made again or not, as the release says).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ReleaseEffect { Judged, RunAgain, Uncertain }
-/// What a cancel ends, from the task's live tree as the document is made (the wire's `Impact` less `takeover_budget`).
+/// What a cancel ends, from the task's live tree as the document is made (the wire's `Impact`; contract.md, 5.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Impact {
-    pub tasks: documents::PhaseCounts, pub live_runs: u32, pub proposals: u32, pub effects_pending: u32,
-    pub effects_settling: u32,
+    /// The live tasks below the task, by phase.
+    pub tasks: documents::PhaseCounts,
+    /// The task's and those below's attempts whose answer is not heard (`tasks::run_attempt`).
+    pub live_runs: u32,
+    /// The task's and those below's pending proposals.
+    pub proposals: u32,
 }
 /// What a decision will do.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
