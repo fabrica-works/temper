@@ -2041,6 +2041,16 @@ choice would have been the user's (development.md, 10.4).
      3. **Run the focused reproduction once more;** if it passes, run the gate and land. A failure at the answer See, or at the new wait again, is a block with the logs.
      4. **Unchanged:** the expected answer and its 5 s wait; no referee's or judge's check; 16.1's Proof; rulings 288 and 289's other steps. Aim to spend at most 30 minutes on steps 1 to 3.
 
+292. **jig 16.1: a focused diagnosis of the power-loss frame failure, main first** (process, jig-16.1's block of 2026-10-17T23:21:18Z).
+     Ruling 292 (process, jig-16.1's block of 2026-10-17T23:21:18Z): the report's proposal, a focused diagnosis by session 16, under ruling 229, before any repair. It is no plan defect until the diagnosis names a cause outside 16.1's Files: the failure is new (no ruling or log entry names `drawn_kills_and_drains_keep_the_conformance_rules` or `SKVC` before this report), the gate passed it on main at 23:19 (jig 15.6, `25fd50d50`), and 16.1's prepared commit changes what the core stores and reads. The observer's check (`tests/channel/src/world/store.rs:257`) holds every remainder of 26 bytes or more to start a `skein-kv` frame (`crates/skein-kv/src/frame.rs:10`); it found `[0, 0, 0, 18]` after the power loss before submission 118 of `calm(6)`.
+
+     1. **Whose change:** run the preserved reproduction (`logs/jig-16-1/gate2-power-loss-reproduction.rs`) once in a scratch worktree at jig `origin/main` (`25fd50d50` or later). If it fails there too, the defect is main's: a block with the logs.
+     2. **Where the bytes come from:** in the reproduction at the prepared commit, print at the failing check: the file, the segment's offset and the remainder's length; 32 bytes from 16 before the offset; the power loss's cut (which writes it kept and dropped, and their offsets); and the file's length as `skein-kv`'s recovery leaves it after the restart. Say whether `[0, 0, 0, 18]` is in the file the store recovered, or only in the bytes the observer reads (its capture, or bytes past the recovered length). Then say which of 16.1's changes moved the cut onto it (the bytes a stored record of 16.1's takes, or the count of writes before submission 118).
+     3. **Log the cause** in `logs/jig-16-1/gate-cause.md`, then:
+        - a cause in 16.1's Files: repair it, run the reproduction once, then the gate, and land;
+        - a cause in the observer (`tests/channel/src/world/`) or in `skein-kv`'s recovery: a block with the logs, naming the file, the line and the arithmetic at fault, with no repair; the supervisor then rules who repairs it.
+     4. **Unchanged:** the check at `store.rs:257`, and every referee's and judge's check; the fuzzy draws; the gate story's repair under ruling 291. Aim to spend at most 30 minutes on steps 1 to 3; past that, report what the logs show.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
