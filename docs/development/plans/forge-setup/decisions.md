@@ -439,6 +439,28 @@ run are appended after "For the user".
      - Unchanged: Size 180, the tests' names and Done when's count of 11; sketch 1's `todo!()` bodies are the
        implementer's to write.
 
+121. **01.3's recording made byte-stable; 720 lines** (plan question, temper 01's block of 2026-10-17T00:17:56Z).
+     Ruling 121, a plan question the session file asked for (01-users-tokens.md:385: "**Byte-stability:** a recording
+     at the base rewrote 34 transcripts. If two recordings of the group differ, raise it."). Two recordings differ in five
+     new responses: four token answers whose masked `created_at` aliases an earlier timestamp by second, and
+     `setup-token-git-discovery`, whose pkt-line object ids (a 4-digit length before 40 hexadecimal digits, so runs of 44 or
+     48) pass `Mask::bytes`, which recognizes runs of 40 or 64 (`mask.rs:90`).
+
+     - The recording is fixed, as the session proposes: an object-id mask that knows git's pkt-lines (the id after the
+       4-digit length, masked by the existing first-appearance rule, the length kept), and each captured token made in a
+       second of its own, so its `created_at` aliases no earlier timestamp. The instability is not accepted.
+     - What counts: after the fix, two recordings of the group in a row (the first one's transcripts committed) leave
+       `git status --short tools/forgejo-conformance/transcripts tools/forgejo-conformance/facts.txt` empty. Run that
+       check once, and quote its output in the report; nothing else is wanted.
+     - Size: 01.3 lands within 720 production lines by code-organization.md 6's command (the README's "Sizes" gives a codec
+       Size of 190 three times, 570), since the fix lives in `tools/forgejo-conformance/src/mask.rs` and `tokens.rs`, which
+       that command counts. Past 720, stop on a question again, with the count by file.
+     - A transcript or fact that the new mask changes beyond these five is refreshed in the same landing, with each test or
+       fixture that reads a changed id; list each in the commit body. None is expected: no transcript on main holds a
+       pkt-line object id (grep below).
+     - Unchanged: the 25 setup and 40 component facts; the masks' first-appearance rule and their 40- and 64-digit runs;
+       never trim a doc comment, a test or the formatting to meet a Size.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
