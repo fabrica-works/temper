@@ -543,7 +543,9 @@ commit body. Downstream, the temper step that first pins a jig holding
 :44`, `temper-client-shell-terminal/src/limits.rs:55, :59` and
 `temper-client-view/src/tests/fixtures.rs:37, :41`, and lists them in
 its commit body.
-Size: at most 380 lines (the root about 120, the bridge about 170, the
+Size (ruling 215): aim for at most 850 production lines, ruling 207's
+items 2 to 4 included; past 850, report the count by file and why; at
+950, stop and block. It was: at most 380 lines (the root about 120, the bridge about 170, the
 family sides about 40, the native shell about 25, `jig-client`'s
 sign-out about 25, ruling 197). The parts count together.
 Removes: the test root's `RequestTable` and its table owner `Owner`

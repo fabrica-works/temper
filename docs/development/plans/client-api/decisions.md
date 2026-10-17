@@ -1284,6 +1284,15 @@ choice would have been the user's (development.md, 10.4).
      4. No change to `Stored`, `Key`, the tasks-v3 schema, the codec, generated code or goldens. 06.5's Files gain `crates/jig-protocol-store/src/reads/point.rs:61-90`. Size stays at most 150 lines.
      5. Unchanged: the party arm (`DecidedProposal(number)`), the Shape's answers, its Test shape and its Don't ("keep decided proposals in memory to answer this").
 
+215. **jig 13.4: Size re-estimated to 850, stop at 950; no split** (plan defect, jig 13.4's block of 2026-10-17T03:42:54Z).
+     Ruling 215, plan defect: jig 13.4's Size is re-estimated, and 13.4 goes on as one increment. Its Size, "at most 380 lines (the root about 120, the bridge about 170, the family sides about 40, the native shell about 25, `jig-client`'s sign-out about 25, ruling 197)", was set before ruling 211 gave the family adapter "the family's subjects and touch whole" and before ruling 207 removed the view's timers. The draft counts 703 at `92274c78e` (`logs/jig-13/size-stop-20261017.txt`): the family side 176, the bridge 133, the test root about 200.
+
+     1. **No split.** No part lands by itself: the root's `RequestTable` goes with its replacement (13.4's Removes), and 10 of the 23 root tests failed at the last run.
+     2. **Size:** the 703 stand. Aim to land at most 850 production lines, counted by the command of the 03:42Z report, ruling 207's items 2 to 4 included (its 40 apart no longer apply); past 850, the report gives the count by file and why, and the session goes on. At 950, stop and block with the count by file. Counting at each commit stays. This replaces the 02:57:44Z steer's stop at 700 for 13.4, until 13.4 lands.
+     3. **The handle offset stands.** The test root's `reads: Slab<Reading>` and `watches: Slab<Watching>` (`testing/jig-client-test-domain/src/first.rs:178-179`) issue the same token values, so an `unwatch(handle)` removed a read. Read slots numbered above watch slots, in the root and in the view's bridge, as the report gives them, is a fix the Shape's "a handle's number its token's" needs; the design leaves an application's tokens its own (`client/domain/view.md`, 647: "an application's are its own, as its tokens are"). The commit body names the collision with its file:line and the offset. No new test: the root tests that failed on it are its proof.
+     4. **The fixes outside Files** (`cards::contains` widened to `pub(crate)`; the test view's dev dependency on the wire crate) stand, within the README's 20 lines each; list each in the commit body, and each further one.
+     5. **Unchanged:** 13.4's Shape, Removes, Test shape and Proof; the 02:57:44Z steer's points 2 and 3; ruling 211.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
