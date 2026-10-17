@@ -1259,6 +1259,13 @@ choice would have been the user's (development.md, 10.4).
      - 13.4: the root tests keep their requests and subjects (`root.rs:489`'s `parameters: None`; the deployment page's six reads and the scoped outboxes); nothing infers a value. Its reads and touches cross once 13.s2 lands; until then it goes on with the hosts, the view and the rest.
      - Unchanged: ruling 208 (no `Refused` record); 13.s2's Don't list; the test connector's types and schema.
 
+212. **jig 03.5's dropped `run_spent <= spent` checks stand** (scope, the check of 2026-10-17T01:59:16Z, point 4).
+     The drop stands, and nothing replaces either check. jig 03.5 (`b1213c1e2`) removed, without a ruling, `&& task.run_spent <= task.spent` from the referee's Spend promise (`testing/jig-conformance/src/referee.rs`, :554-556 before it) and `|| task.run_spent > task.numbers.spent` from `crates/jig-domain-tasks/src/stored.rs`'s `valid_record` (:340 before it). Both were wrong once a task is funded anew: `funders/refunding.rs:90` sets `numbers.spent = 0` on an accepted Amend or Widen (`control.rs:427`) and on a Move (`moving.rs:326`), and `run_spent` goes back to 0 only at the next claim (`run.rs:104`). The design names no per-run counter: `git grep run_spent origin/main -- docs` in jig prints nothing. Its promise is authority.md 31-32, "Recorded spend never exceeds a budget. A run reserves each completion's maximum before making it", which the referee keeps (`referee.rs:559-563`, `total <= task.budget && task.run_reserved <= task.reserved`), and authority.md 290-293 says a task funded anew's "old funder is given back what the task had left and keeps what it spent".
+
+     Checked: with both checks restored at jig `40d1bec49`, `heavy cargo nextest run --no-fail-fast -p jig-conformance -p jig-domain-tasks -p jig-core-world -p jig-tasks-world` ran 579 tests, 1 failed: `an_amendment_accepted_by_another_funder_funds_its_task_anew` (`tests/tasks/tests/funding.rs:399`), "world store corrupted: Problem { task: Some(1), why: Restore, .. }" at the restart after `(spent, run_spent) == (1, 4)` (the run's `logs/20261017T030505-679.log`).
+
+     No session changes anything for this ruling.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
