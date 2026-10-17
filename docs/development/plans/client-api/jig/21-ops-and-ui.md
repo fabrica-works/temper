@@ -209,10 +209,13 @@ gate runs `p_accepts_a_restart_from_the_incidents_page` (tests/ops);
 nothing else.
 Don't: no change to `ops`'s families' meaning or pages; no file of
 `ops`'s root changed outside that one commit.
-Size: at most 250 lines; ruling 221 re-estimates it with ruling 192's
-four value mappings: aim to land at most 950 production lines; past 950,
-the report gives the count by file and why, and the session goes on; at
-1,100, stop and block with the count by file.
+Size: at most 250 lines; ruling 225 re-estimates it with ruling 192's
+four value mappings as plain functions, field by field: aim to land at
+most 4,500 production lines; past 4,500, the report gives the count by
+file and why, and the session goes on; at 5,000, stop and block with the
+count by file. Ruling 225: an owner's read refusal crosses in `ops`'s
+wire, as jig 13.3's `ReadAnswer` does: `ops-client-v1.schema`, its
+generated code and goldens join the Files.
 Removes: `ops`'s root's `RequestTable` and its table owner,
 `owner::Owner`.
 
