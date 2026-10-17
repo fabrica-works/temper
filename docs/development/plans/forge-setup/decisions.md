@@ -629,6 +629,21 @@ run are appended after "For the user".
      free slot starts it now, in a fresh session. Until it lands, a gate that fails on one of these three tests alone is
      run once more, unchanged, without asking; a second failure is a question, with both logs.
 
+134. **10.1 and 13.1 against main** (re-check of temper-10.1, ready check of temper-13.1).
+     Ruling 134, the re-check of temper-10.1 after 08.x and 09.3 landed, and the ready check of temper-13.1, both at
+     temper 4764383ae (scratch worktrees: clippy clean, default suites passed, fuzzy 0 tests in reach). Amends
+     `temper/10-reconcile.md` (Choice 8; 10.1's "Corrections against main") and `temper/13-box.md` (Needs; 13.1's
+     "Corrections against main"):
+
+     - 10.1: `Settings.hook_secret_bytes` from `forge_component.hook_secret_bytes`, landed with 05.2 (replaces ruling 122's
+       interim); the directory test also overrides `setup.backoff_max_ms` and writes a private `admin_token`; `USAGE`'s
+       three test copies and `forge.rs:146`'s usage; the shell's `Refused::words()`, prefixed once; `owned.rs` already
+       has `run` and `Running::start`: a free name, `server.log`, `Option<Child>`, the port from `start`; the service's
+       `Profile`, `Clock` not `Instant`, bounded accepts; nine line references.
+     - 13.1: needs 10.2 at start too; Files gain `crates/temper/src/forge.rs` (the check's result); the box's values are
+       `temper-box/src/limits.rs:40-48`; four paths and twelve line references.
+     - Unchanged: Sizes, tests, proofs and Done when.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

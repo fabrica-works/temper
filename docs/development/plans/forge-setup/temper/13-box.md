@@ -8,7 +8,7 @@ until a stop. Then the process tier runs the real binary on an owned
 Forgejo: the sign-in link on its stdout, each other line on its stderr
 under its step's prefix, Forgejo answering, a stop that leaves no
 process (13.1); Forgejo killed and restarted with the engine still
-serving (13.2). Needs at start: temper 12.2 and 10.1.
+serving (13.2). Needs at start: temper 12.2, 10.1 and 10.2 (`tier_configuration`, `binaries()`).
 
 ## Read first
 
@@ -138,6 +138,14 @@ Files (under `crates/temper/`): `src/lib.rs` (**hotspot, client-api 05.2**: `USA
 client-api 07.4**: `temper-box.workspace = true`, 12.1's entry); `src/tests.rs` (the two `USAGE` literals, :7 and
 :14, and two tests); `tests/startup.rs`; `tests/process.rs` and `tests/support/{mod.rs,boxed.rs}` (**hotspot**;
 `mod.rs` gains `pub mod boxed;`); the root `Cargo.lock`.
+**Corrections against main (ruling 134, at temper 4764383ae):** Files gain `crates/temper/src/forge.rs` (:165 and :185
+take `super::setup::check(..)`'s result: `(_, checked, _)` once it is a triple); the box's values are
+`crates/temper-box/src/limits.rs:40-48`, not the service's `small` profile; `checks.rs:14` is
+`temper-service/src/startup/checks.rs:14`; `forge.rs:244-246` is `temper-service/src/forge.rs:233` (the `SecretBytes`
+arm) and :262-265; readiness is `instance.rs:107` (`GET /api/v1/version`, called at :75), not :69; skein-world is
+pinned at `8a51e10b` (Cargo.lock:1237); `tests/support/mod.rs` takes `pub mod boxed;` first in its group (rustfmt).
+Lines: `lib.rs` `USAGE` :24, `Command` :27, `configure` :45-68, `run` :69-82, `pub mod` list :18-22; `support/mod.rs`
+`configuration` :20, `Scratch::new` :50, `Process` :199, `Judge` :255.
 Shape:
 - `USAGE` ends ` | temper box CONFIG.json` (protocol.md 4's order, after the `temper forge` forms of 08.1, 08.2 and
   10.1). `Command::Box { configuration: PathBuf }`, taken in `configure`'s `serve` branch; `run`: `Command::Box {

@@ -62,8 +62,8 @@ on polling. `forges[].user` as a file is temper 07.3's. The session Needs, at it
    is the repository, and the job clones with its own token (03.3's fact; decisions.md 25).
 8. **`application.webhooks` reaches reconcile when it exists:** `Settings.listener` is `None` while `Named` lacks the
    member; whichever of 05.3 (which adds it) and 10.1 lands second wires it, and 11.1 proves it. `Settings.hook_secret_bytes`
-   likewise: until 05.3 adds `forge_component.hook_secret_bytes`, `forge.rs` gives it `token_bytes` (512 shipped,
-   `temper-service/src/forge.rs:113`), and whichever lands second sets it from `hook_secret_bytes` (ruling 122).
+   comes from `forge_component.hook_secret_bytes` (`temper-engine-protocol-forge/src/limits.rs:50`, 128 shipped,
+   `temper-service/src/forge.rs:139`), which landed with a1a734f4d (ruling 134, in place of ruling 122's interim).
 
 ## Rules that bind it
 
@@ -92,6 +92,24 @@ Files: new `crates/temper-forge-setup-shell/src/{reconcile,exchange}.rs`, `src/l
 (client-api 05.2 hotspot: `USAGE` :23 alone), `src/tests.rs` (the two literals, :7, :14), `tests/forge.rs` (08.2's),
 `tests/process.rs`, `tests/support/owned.rs` (hotspots).
 Shape: sketches A-C.
+**Corrections against main (ruling 134, at temper 4764383ae; a reference patch, with a stub host:
+`~/src/rust/tmp/temper/forge-setup/logs/supervisor/10-1-check-4764383.patch`):**
+- `reconcile_makes_a_missing_forge_directory_private` overrides `setup.backoff_max_ms` (at most 299, say 100) beside
+  `setup.deadline_ms` 300 (`check.rs:125-155` refuses one without the other), and writes a private `admin_token`
+  (the machine's first need, `reconcile.rs:147`).
+- `USAGE` (`lib.rs:24`) and its copies: `src/tests.rs:7, :14, :129`, and `forge.rs:146`'s `usage` string.
+- The shell's `Refused` gives `words()`, without prefix or newline; `forge::Refused::line()` (`forge.rs:24-29`) adds
+  `temper forge reconcile: forge N: ` once.
+- `tests/support/owned.rs` has `run(directory, program) -> Command` (:180, nine users) and `Running::start` (:192):
+  the tier's runner is `owned::run_forge` (or another free name), `Running` logs to `server.log` (`instance.rs:121`
+  reads it), holds `child: Option<Child>` so `into_child` can take it past its `Drop`, and `start` returns the port
+  `prepared_processes` (:253) gives.
+- The fixture's profile is `temper_service::limits::Profile`, not jig's; times are `skein_shell::Clock`, never
+  `std::time::Instant` (clippy); `Peer::serve_after`'s accepts are nonblocking within about 1 s, so a run that never
+  connects ends; `Stage` and `Why` are worded by exhaustive matches.
+- Lines: `address()` `lib.rs:203`, `current_dir` :375; `limits::{documents, http}` `limits.rs:325, :343` (`http` takes
+  `(l, tls, &io)`); `profile` `temper-service/src/limits.rs:249`; `Instance::exchange` `instance.rs:216`; `client.rs`
+  `encode` :38 (its `Err(Refusal)` is a `Reply` of its own), `decoder` :117, `step` :195.
 - **The exchange** (`exchange.rs`): one `skein_http::client::Client` over one socket per request, as `connection.rs:158-259`
   does without TLS, with `close: true`: `io::Request::Connect`; the call with `Host`, `Authorization`, `User-Agent`,
   `Content-Type`; `temper_forge_forgejo::client::encode` (client.rs:36) gives the method (01.1's `Put` mapped too), target and body; the answer's
