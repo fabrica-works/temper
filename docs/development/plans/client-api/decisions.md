@@ -1681,6 +1681,17 @@ choice would have been the user's (development.md, 10.4).
      4. **If no cause is found in 30 minutes,** or the cause is in `jig-client` or `jig-client-domain` (ruling 235): report the trace log's path and the lines from the engine's withdrawal to the card's drop, and block again naming the story; do not run it again. 21.3 goes on meanwhile with the lost-answer failures and both changed-crate suites.
      5. **Unchanged:** the crash/reload story (seed 4503) is done under ruling 255; ruling 254, points 3 to 5; rulings 229 and 253; Size stop 3,000.
 
+257. **jig 21.4's Shapes against main** (ready check of jig-21.4).
+     Ruling 257 (plan defect, jig 21.4's re-check at jig `48a745eb9`, after 21.3 landed; temper `524738afe`): 21.4's Files and Done-when grep miss users that 21.3 left or moved; corrected in `jig/21-ops-and-ui.md`, 21.4 ("Re-check at jig `48a745eb9`"), and in `temper/03-client.md`, 03.6's Files.
+
+     1. **Files gain:** the Ui's `ui/client.rs` (`Told::{Answered, Kept, Dropped}`), `signin.rs:44`, `limits/ui.rs` and `ui.rs`'s `kept` bounds, `notices.rs` and the phrases of the two refusals and the dropped count; the Ui's tests the removed variants reach (74 errors in `cargo check -p jig-client-view` with them removed); each family side's `family/client.rs` or `family.rs` for its own `me` handle; the roots' `JigOut::{Answered, Unknown}` and their users; `tests/client/tests/fuzzy_memory.rs:286`; the users of the `limits.rs` heap bounds and of `limits.jig.kept`.
+     2. **The factor 3** in both roots' `limits.rs` is derived again from the hand-offs that remain (`Named`, `ShowPart`/`PartsLeft` still nest first, jig, first), and the commit body says the derivation.
+     3. **The Done-when grep** adds `KeptGone`, `JigOut::(Answered|Unknown)`, `Request::(Confirmed|Retention)\b`, and `tests/client` and `tests/ops`: 36 lines on `48a745eb9`, none after 21.4.
+     4. **temper 03.6's Files** add `crates/temper-client-shell-terminal/src/client/tests.rs:46` and `crates/temper-client-view/src/tests/forge_page.rs:201`.
+     5. **Unchanged:** 21.4's Scope, Shape, Test shape, Proof and Size (at most 300 lines); the sketch (its `Event`, `Request`, `How` and `Refused` are in `boundary.rs`, re-exported at `lib.rs:126`).
+
+     Checked by a read-only sub-agent at jig `48a745eb9`: the sketch under `clippy -D warnings`, clean; both Proof commands passed (2 of 2 in 0.24 s; 1 of 1 under fuzzy, 1.13 s); the 8 packages 21.4 reaches, 1,119 of 1,119 (default) and 59 of 59 (fuzzy). Refresh any further copy of what 21.4 removes, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

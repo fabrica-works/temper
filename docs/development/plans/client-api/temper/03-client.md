@@ -712,7 +712,14 @@ limits.rs, route.rs}`; `tests/client/src/{app.rs, front.rs, translate.rs,
 fixtures.rs}` (as jig 21.3 changes "the worlds' fronts"),
 `tests/one-process/src/world.rs`, `crates/temper/tests/support/person.rs`.
 Found by `git grep -n -e 'bridge::' -e 'Event::Confirmed' -e FrameIs
--e 'Request::Link' -- '*.rs'` in temper.
+-e 'Request::Link' -- '*.rs'` in temper. Ruling 257 (jig 21.4's
+re-check at jig `48a745eb9`) adds the users of `JigOut::{Answered,
+Unknown}` and `KeptGone` outside these:
+`crates/temper-client-shell-terminal/src/client/tests.rs:46` and
+`crates/temper-client-view/src/tests/forge_page.rs:201`; the others
+(`route.rs:108-117`, `forge.rs:95`, the shell's `client.rs:325` and
+`route.rs:37`, `tests/client/src/app.rs:125`, `translate.rs:271`) are in
+them.
 Shape:
 - The root: `ui: jig_client_view::Ui`, made with temper's navigation
   (`Inbox`, `Conversations`, `Deployment`, as

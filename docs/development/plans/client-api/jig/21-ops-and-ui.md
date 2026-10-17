@@ -434,6 +434,51 @@ client-view `tests.rs:1619-1620`,
 `tests/client/tests/shell.rs:30` (it builds `Event::Ask { ByValue }`)
 and `tests/client/src/observe.rs:230-242` (it matches `Event::{Kept,
 KeptGone, Ask, Frame}`), which no grep covers.
+Re-check at jig `48a745eb9` (after 21.3, ruling 257). The lines above
+moved: ops client-domain `tests.rs:1130-1181`, ops client-view
+`tests.rs:1599-1600`, `family_terminals.rs:262`; `Request::Frame` at
+ops `infrastructure.rs:98`, `observability.rs:83`, `first.rs:64`;
+`observe.rs:187-199`; the factor 3 at ops `limits.rs:35-73`, the test
+root's :33-44. The Files gain:
+- in `crates/jig-client-view/src`: `ui/client.rs` (`Told::Answered`
+  :27, `Told::Kept` :39-49, which builds `Event::Kept`, `Told::Dropped`
+  :96); `signin.rs:44` (`Request::Confirmed { party: None }`);
+  `limits/ui.rs:29, :86` and `ui.rs:82, :172` (`kept`,
+  `kept_requests`: the Ui's own bounded list of kept keys, since the
+  client offers `pending(key)` alone); `notices.rs:38-61`, and the
+  phrases of the "too many requests in flight" refusal and the dropped
+  count's notice (`phrases/jig.rs` :142, :1213, :1951, :2518,
+  `english.rs:762`; none says a count or "in flight" now,
+  `english.rs:958` says "Request limit reached");
+- the Ui's tests the removed variants reach (74 errors in
+  `cargo check -p jig-client-view` with them removed):
+  `tests/domain/{spine.rs (:221, :248), lifecycle.rs,
+  conversations.rs, time.rs, policy.rs, answers.rs}`,
+  `tests/fixtures/client.rs:193-198`, `tests/bridge.rs:68`;
+- for each family side's own `me` handle: `testing/jig-client-test-domain/src/family/client.rs`
+  (`asked` :26, `told` :137, which takes only `Latest::Family`), ops
+  `examples/ops/client-domain/src/family.rs` (`asked` :72, :184, `told`
+  :109, :221, `Told::Link { .. } => return` :170, :282);
+- the roots' `JigOut::{Answered, Unknown}`, which carry the
+  `Request::{Answered, Unknown}` this increment removes: both roots'
+  `boundary.rs` (test :37-38, ops :45-46) and `route.rs` (test :144-146,
+  ops :191-193), ops `tests_support.rs:128-129`, the test root's
+  `tests/root.rs:72, :632`, `tests/root/client.rs:72`,
+  `tests/root/fixtures.rs:212`, `tests/client/src/test.rs:268`,
+  `tests/ops/src/client/app.rs:198`;
+- `tests/client/tests/fuzzy_memory.rs:286` (it builds `Event::Kept`);
+  the users of the `limits.rs` heap bounds,
+  `tests/client/tests/{client_construction.rs,
+  fuzzy_random_regressions.rs, owner_budget.rs}` and
+  `tests/ops/tests/fuzzy_client.rs`; the `limits.jig.kept` guards (ops
+  `limits.rs:28`, the test root's :25), ops client-domain
+  `tests.rs:387` and the `kept: 4` fixtures.
+
+The factor 3 is derived again from the hand-offs that remain (the
+`Named` route, `first.rs:305, :499`, and `ShowPart`/`PartsLeft`,
+`application.rs:278, :280`, `page/routing.rs:117`, still nest first, jig,
+first), and the commit body says the derivation. Refresh any further
+copy of what this increment removes, and list it in the commit body.
 Shape: `Event::Ask { ask: ByValue }`, `Event::Frame { asked }`,
 `Request::FrameIs`, `Request::Answered { asked }`, `Request::Unknown {
 asked }`, `Event::Kept { scope, requests }`, `Event::KeptGone`,
@@ -536,8 +581,12 @@ impl Ui {
   crates/jig-client-view/src/reads.rs crates/jig-client-view/src/link.rs
   crates/jig-client-view/src/versions.rs` prints nothing.
 - `git -C ~/src/rust/jig grep -n -E -e 'FrameIs|ByValue' -e 'Kept \{ scope'
+  -e 'KeptGone' -e 'JigOut::(Answered|Unknown)' -e
+  'Request::(Confirmed|Retention)\b'
   -e 'fn watch_event' -e 'Event::Frame' -e 'Request::Frame' -e
   'FrameShown' origin/main --
   crates/jig-client-view/src testing/jig-client-test-domain/src
   testing/jig-client-test-view/src examples/ops/client-domain/src
-  examples/ops/client-view/src` prints nothing.
+  examples/ops/client-view/src tests/client tests/ops` prints nothing
+  (ruling 257 added `KeptGone`, `JigOut`, `Request::(Confirmed|Retention)`
+  and the two `tests` directories).
