@@ -73,10 +73,11 @@ stay until jig 16.
 - **A compound's operations reuse the operations' records,** each naming
   its project; one naming another project than its compound's is refused
   not well formed at its place, by the translation, before the core.
-- **A batch and a compound cross as pieces** bounded by the keyed
-  request's 1,048,576 bytes (`Create.tasks`, `ProposeBatch.tasks`,
-  `Compound.operations`): with `list` their worst case passes `u32`
-  (skein-codegen: "encoded worst case for Create exceeds u32").
+- **A batch and a compound cross as pieces** of at most 1,048,576 bytes
+  each (`Create.tasks`, `ProposeBatch.tasks`, `Compound.operations`), in a
+  keyed request of at most 1,114,240 bytes (14.1) (ruling 222): with `list`
+  their worst case passes `u32` (skein-codegen: "encoded worst case for
+  Create exceeds u32").
 - **The scripted engine answers the new operations as not offered**
   (`Refusal::NotOffered`) until jig 16.3 models `Create`, `Propose` and
   `Compound` for the reference UI's chats and goals; no client world
@@ -127,25 +128,45 @@ carrying an `ApplicationScope` in place of its project.
 Files: `crates/jig-client-protocol-wire/schema/client-v8.schema` and
 `client-v8-part1.schema` (generated `src/generated/v8.rs`, goldens);
 `crates/jig-protocol-engine-clients/src/{component.rs (keyed request,
-at the base 671-677), reads.rs (58-64), watches.rs (180-190), boundary.rs
+695-698 at jig `1350b6564`) (ruling 222), reads.rs (58-64), watches.rs (180-190), boundary.rs
 (ToApplication, 70-93), served.rs (new), translate/answers.rs,
 routes.rs}`; `crates/jig-client-protocol-link/src/` (the answer, read and
 opening translations; the link's version state);
 `crates/jig-client-domain/src/contract/` (`NotServed`, `Served`, `Owner`,
-`Scope`, `Window`); `crates/jig-client/src/` (the family `Watch` and
-`Read`'s scope); `testing/jig-test-service/src/family.rs` (to_root,
-153-209: its `scope()` goes); `ops`'s client root, which jig 21.2 put on
+`Scope`, `Window`); the family record `jig_client_domain::Family {
+family, version, bytes }`, which `Ask::Family`, `Readable::Family` and
+`Watchable::Family` hold (the family `Send`, `Read` and `Watch` of Shape),
+and its users: `crates/jig-client-domain/src/{boundary.rs (:10), domain.rs,
+requests.rs, reads.rs}`, `crates/jig-client-protocol-link/src/component.rs`,
+`crates/jig-client-protocol-link/src/translate/{reads.rs, watches.rs,
+store.rs}`, `crates/jig-client-view/src/bridge.rs`,
+`testing/jig-client-test-domain/src/family/{client.rs, wire.rs}`,
+`tests/client-protocol/src/family.rs`,
+`tests/client/src/{test.rs, scripted.rs, observe.rs}` (ruling 222);
+`testing/jig-test-service/src/family.rs` (to_root, 6-69: its `scope()`,
+70-82, goes) (ruling 222); `ops`'s client root, which jig 21.2 put on
 `jig_client` (`examples/ops/client-domain`), and its wire crate,
 `jig-ops-client-protocol-wire` (jig 21.1: `schema/ops-client-v1.schema`
 and `src/codec.rs`, v1 edited in place): the scope of its families'
 `Subject { scope, kind }` moves out of the subject's record and bytes
-into the family `Watch` and `Read`; the wire's
+into the family `Watch` and `Read`, in the module of
+`examples/ops/client-domain/src/` that jig 21.2 adds to map its values to
+`Family` (`git grep -n -w Family -- examples/ops` at the increment's start
+finds it; no line at jig `1350b6564`) (ruling 222); the wire's
 users of `Answer`, 7 production files at the base (the link's
 `component.rs` and `translate/answers.rs`; the component's
 `component.rs`, `limits.rs`, `routes.rs`, `sign_in.rs`,
 `translate/answers.rs`); tests: the wire crate's `src/tests.rs`,
-`tests/engine-clients/tests/{requests,closing}.rs`. Shared hotspot:
-`crates/jig-protocol-engine-clients/src/translate/`.
+`tests/engine-clients/tests/{requests,closing}.rs`, and the users of
+`Answer` and of the family record that these missed:
+`tests/client-protocol/src/native/wire.rs` (106-111, an exhaustive match
+on `Answer`), `crates/jig-client/src/tests/{fixtures.rs (293), sign_in.rs
+(29), store.rs (191)}`, `crates/jig-protocol-engine-clients/src/tests/{asks.rs,
+watches.rs, reads.rs}` with their `fixtures/` (`asks.rs:95` and `:155` send
+raw bytes, `b"abc"` and `[255]`, as the keyed request, which becomes a
+`FamilyRequest` holding them; the digest constant stays) (ruling 222). Shared hotspot:
+`crates/jig-protocol-engine-clients/src/translate/`. Refresh any further
+copy, and list it in the commit body. (ruling 222)
 Shape:
 - Wire: `Served { owner, first, last }` moves before the answers;
   `NotServed { owner: Owner, served: list 16 Served }`; `enum KeyedAnswer
@@ -164,11 +185,18 @@ Shape:
   `FamilyRequest { scope: Scope, record: bytes 1048576 }`: a family's
   keyed request's `Keyed.request` is a `FamilyRequest` whose `record` is
   the family's bytes, the digest taken over those bytes as they came.
+  The keyed request's ceiling rises with them: `Keyed.request`
+  (`client-v8.schema`) and `TableEntry.request` (`client-v8-part1.schema`)
+  become `bytes 1114240`, since `Create.tasks`, `Compound.operations`,
+  `ProposeBatch.tasks` and `FamilyRequest.record` at 1,048,576 encode to
+  1,048,584 bytes or more, which `Keyed::new` refuses at 1,048,576, and a
+  full `Propose` with its reason is 1,114,126 (ruling 222).
 - Engine: the three serve checks answer the typed record (`served.rs`:
   `pub(crate) fn not_served(settings: &Settings, owner: w::Owner, limits:
   &w::Limits) -> w::NotServed`) instead of `respond(400, ..)`;
   `ToApplication::{Read, Watch}` gain `scope:
-  core::documents::ApplicationScope` and `window:
+  people::ApplicationScope` (`core::documents::ApplicationScope` is private,
+  `crates/jig-domain-core/src/documents.rs:23`) (ruling 222) and `window:
   core::documents::Window`, decoded from `FamilyRecord` after the serve
   check, and `ToApplication::Request` gains `scope` in place of the
   project its application decoded, from `FamilyRequest`; the test
@@ -185,12 +213,15 @@ Shape:
   family `Watch`, `Read` and `Send` name `scope: Scope` beside their
   bytes (the window is the `Watch`'s).
 Test shape:
-- `crates/jig-client-protocol-wire/src/tests.rs`: extend
+- `crates/jig-client-protocol-wire/src/tests.rs`: add
   `version_not_served_is_tag_zero_of_each_answer` (the first byte of each
-  of the four answers' `not_served` encodings is `0`), and extend
+  of the four answers' `not_served` encodings is `0`) and
+  `a_family_record_round_trips_with_its_scope_and_window`, each as a row of
+  the `wire_values_round_trip_unchanged` table (`tests.rs:321`), the only
+  way a function without `#[test]` runs there (ruling 222); and extend
   `each_answer_kind_round_trips_unchanged` (its loop gains
   `KeyedAnswer::NotServed(fixtures::not_served())`, a fixture added to
-  `src/tests/fixtures.rs`); add `a_family_record_round_trips_with_its_scope_and_window`.
+  `src/tests/fixtures.rs`).
 - `crates/jig-protocol-engine-clients/src/tests/answers.rs`, fixtures in
   `src/tests/fixtures.rs` and `fixtures/answers.rs`:
   `a_keyed_request_outside_its_owners_range_is_answered_not_served`,
@@ -206,7 +237,11 @@ Test shape:
   ```rust
   #[test]
   fn a_family_read_hands_its_scope_and_window_to_the_application() {
-      let mut peer = Peer::started(&fixtures::settings());
+      let mut settings = fixtures::settings();
+      settings.served = List::with_capacity(2);
+      settings.served.push(Served { family: None, first: 8, last: 8 }).expect("jig");
+      settings.served.push(Served { family: Some(1), first: 1, last: 1 }).expect("family 1");
+      let mut peer = Peer::started(&settings);
       let bearer = signed_in(&mut peer);
       let record = fixtures::family_read(w::Scope::Own, fixtures::window(3));
       peer.post(b"/jig/v1/read", record, Some(&bearer));
@@ -214,7 +249,7 @@ Test shape:
           panic!("the read reaches the application");
       };
       assert_eq!(family, 1);
-      assert_eq!(scope, core::documents::ApplicationScope::Own);
+      assert_eq!(scope, people::ApplicationScope::Own);
       assert_eq!(window, core::documents::Window { rows: 3, after: None });
   }
   ```
@@ -222,15 +257,20 @@ Test shape:
   (`fixtures::family_read`, `fixtures::window` and
   `Peer::take_application` are added to the world's
   `src/fixtures.rs` and `src/peer.rs`; `signed_in` is
-  `tests/requests.rs:9`'s, moved to the fixtures; the variant name of
-  the own scope is jig 07's.)
+  `tests/requests.rs:9`'s, moved to the fixtures; the test imports
+  `jig_domain_people as people`, `jig_protocol_engine_clients::{Served,
+  ToApplication}` and `skein_lib::List`; `fixtures::settings()`
+  (`tests/engine-clients/src/fixtures.rs:18-32`) serves only jig `8..=8`
+  in a list of capacity 1, so the test sets capacity 2 and adds family 1's
+  `1..=1`; `core::documents::ApplicationScope` is private, and the own
+  scope is `people::ApplicationScope::Own`.) (ruling 222)
 - `tests/client-protocol/tests/client.rs` (jig 12's story file):
   `a_request_pending_across_a_restart_that_stops_serving_its_family_stays_unsent`
   (jig 12's `Story`, `tests/client-protocol/src/client.rs`, gains
   `restart_serving(served)`: the engine restarts, as the world's
   `FrontFault::Restart` restarts it, with `Settings.served` for family 1
   set to `2..=2`, beside the fixture's `1..=1` at
-  `tests/client-protocol/src/fixtures.rs:69-72`, the reason being the
+  `tests/client-protocol/src/fixtures.rs:61-64` (ruling 222), the reason being the
   test; the family's request is sent with `src/family.rs:15`'s `request`
   while its answer is cut, `Story::cut_answer`), and
   `a_family_request_in_the_deployment_scope_reaches_the_people_child_with_it`
@@ -238,7 +278,7 @@ Test shape:
   story's engine records the people child's admitted ask, and it is
   `people::Ask::Application { scope: ApplicationScope::Deployment, .. }`).
 - Limits: the engine's from the world's fixtures
-  (`tests/client-protocol/src/fixtures.rs:76-100`, hand-set at the base;
+  (`tests/client-protocol/src/fixtures.rs:71-94` (ruling 222), hand-set at the base;
   this plan does not move them). Ceilings: unit under 20 ms, world under
   0.5 s.
 Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world -E
@@ -256,7 +296,7 @@ family subject's or a family request's scope in the application's
 protocol layer.
 Size: at most 300 lines.
 Removes: the HTTP 400 answers to an unserved version (three sites); the
-test service's `scope()` (family.rs:197-209).
+test service's `scope()` (family.rs:70-82) (ruling 222).
 
 ### 14.2 The operations renamed and merged in place
 Scope: `Move`, `Seen` over a conversation's turns, `Decide`, `Answer`,
@@ -278,7 +318,11 @@ answers.rs}`; users: the reference UI's acts and cards
 escalation, question and person task cards, the cancel confirmation),
 `testing/jig-client-scripted-engine/src/{requests.rs, payload.rs}`,
 `testing/jig-client-test-records/src/lib.rs`, the conversation's read
-position (`Seen::Replies` users); tests `tests/client`,
+position (`Seen::Replies` users), the link's `restore_ask`, an exhaustive
+match of 23 arms (`crates/jig-client-protocol-link/src/translate/store.rs:78`),
+the asks of `crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`,
+and `Ask::DecideProposal` at `tests/ops/src/client/stories.rs:300,457`
+(ruling 222); tests `tests/client`,
 `tests/client-protocol`, the crates' own. The users are what `rg -l -e
 'Ask::(TakeOver|MarkSeen|DecideProposal|DecideEscalation|AnswerQuestion|AnswerPerson)\b'
 -e 'Seen::Replies\b' -e 'w::(TakeOver|MarkSeen|SeenReplies)\b' crates
@@ -349,7 +393,8 @@ fn a_cancel_with_a_grace_ends_the_task_once_its_grace_has_passed() {
     let mut story = Story::live(fixtures::SEED);
     let task = story.running_task();
     let grace = Duration::from_millis(200);
-    let cancel = contract::Ask::Cancel { project: 1, task, reason: b"enough".as_slice().into(), grace: Some(grace) };
+    let reason = contract::Text::new(Box::from(b"enough".as_slice()), 64).expect("fits");
+    let cancel = contract::Ask::Cancel { project: 1, task, reason, grace: Some(grace) };
     story.send(CANCEL, Ask::Jig(Box::new(cancel)));
     assert!(story.run_until(|s| !s.answered(CANCEL).is_empty(), Duration::from_secs(1)));
     assert!(matches!(
@@ -369,7 +414,8 @@ fn a_cancel_with_a_grace_ends_the_task_once_its_grace_has_passed() {
 (`tests/client-protocol/src/client.rs`); `running_task`,
 `heard_asked_to_finish`, `phase` and `elapsed_since_answer` are added to
 `Story` by this increment, and `CANCEL` is a `Key` constant beside
-jig 12's `STOP`.) Limits
+jig 12's `STOP`; `contract::Text` has no `From<&[u8]>`, so the test makes
+its reason with `Text::new` and a bound of 64 (ruling 222).) Limits
 from the world's fixtures; the grace's span limit from
 `jig_protocol_config::profile::profile(Profile::Small)`
 (`crates/jig-protocol-config/src/profile.rs:45`), the test's 200 ms
@@ -403,15 +449,19 @@ answers.rs}`; users: the reference UI's words to a stopped chat and its
 amend-and-release act, its conversation's sending (`Write` users),
 `testing/jig-client-scripted-engine/src/requests.rs` (it models a
 compound of `Message` and `Release`, and of `Amend` and `Release`, as it
-modelled `Write { release }` and `Amend { release }`), test records;
-`Made::Words`' users (the reference UI's outcome words);
+modelled `Write { release }` and `Amend { release }`), test records, the
+link's `restore_ask` (`crates/jig-client-protocol-link/src/translate/store.rs:78`:
+arms for `Message` and `Compound`, none for `Write`, `Amend` without its
+release) and the asks of
+`crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`
+(ruling 222); `Made::Words`' users (the reference UI's outcome words);
 `OwnerOutcomeSaid.released`'s users (at jig `5a9a97485`):
 `crates/jig-client-domain/src/contract/owner_outcome.rs:67`,
 `crates/jig-client-protocol-link/src/translate/answers.rs:73`,
 `crates/jig-client-view/src/owner_outcome.rs:143`,
 `testing/jig-client-scripted-engine/src/payload/owner_outcome.rs:49`,
 `tests/client/src/joint/wire/outcomes.rs:40-41`,
-`tests/client/src/observe.rs:553-554`, and their tests.
+`tests/client/src/observe.rs:558-559` (at jig `1350b6564`) (ruling 222), and their tests.
 Shape:
 - Wire: `Message { project: u32, task: u64, words: text 65536 }` (was
   `Write`, less `release`); `Amend` loses `release`; `enum Operation {
@@ -454,7 +504,7 @@ the component's tests: `a_compound_reaches_the_people_child_in_order`,
 `a_compound_refusal_names_its_first_failing_place`; the link's:
 `a_compound_answer_names_its_first_message_and_operations` (the
 engine's `Outcome::Compound` out of `translate/answers.rs`'s error arm,
-:186 at jig 983862753, and through the link to the contract's answer,
+:176 at jig `1350b6564` (ruling 222), and through the link to the contract's answer,
 its three fields unchanged);
 `tests/client-protocol/tests/protocol.rs`:
 `words_to_a_stopped_task_release_it_in_one_compound_request` (the
@@ -482,7 +532,13 @@ crates/jig-client-view crates/jig-protocol-engine-clients/src
 testing/jig-client-scripted-engine tests/client tests/client-protocol
 crates/jig-client-protocol-wire/schema | grep -c released`).
 Removes: `Write`, `Write.release`, `Amend.release`, `MadeWords`,
-`Made::Words`, `OwnerOutcomeSaid.released`.
+`Made::Words`, `OwnerOutcomeSaid.released`; and, with `Amend.release`,
+`OwnerOutcomeAmended.released` and `OwnerOutcomeAmendProposed.released`
+(`client-v8.schema:303-304`), which nothing sets once it goes:
+`Amend`'s answer is "amended" (jig `client/domain/contract.md:164`),
+and a `Release` releases (`:285-286`). `people::Outcome::Amended`'s
+`released` stays until the step after 14.3, as `Said`'s does; the two
+count within this Size (ruling 222).
 
 ### 14.4 `Create`
 Scope: a party's `Create` of a batch (contract.md, 3.2; tasks' fields
@@ -499,7 +555,10 @@ refusals.rs}`; `crates/jig-client-protocol-link/src/translate/{operations.rs,
 answers.rs}`; users: each exhaustive match over the contract's `Refusal`
 and `Limit` (the reference UI's refusal words, the scripted engine's
 refusals), the scripted engine's request handling (`Create` answered
-not offered, jig 16.3 models it); downstream, the repository downstream
+not offered, jig 16.3 models it), the link's `restore_ask` (an arm for
+`Create`: `crates/jig-client-protocol-link/src/translate/store.rs:78`) and
+the asks of `crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`
+(ruling 222); downstream, the repository downstream
 of jig's family refusal translation (one production file) follows at
 its repin.
 Shape: wire, in this order before `Ask`: `FieldRule` and
@@ -553,11 +612,19 @@ Files: the v8 schema; the component's `translate/{operations.rs,
 answers.rs, refusals.rs}`; the contract's `operations.rs`,
 `refusals.rs`; the link's `translate/{operations.rs, answers.rs}`;
 users of `RefusalAuthority.proposable` (the reference UI's authority
-refusal words, the scripted engine's refusals, test records); the
+refusal words, the scripted engine's refusals, test records, and
+`testing/jig-client-test-view/src/{connector_values_refusal.rs (19),
+connector_values.rs (301)}`, `tests/client/src/joint/wire/refusals.rs`
+(17, 200), `tests/engine-clients/tests/requests.rs` (230),
+`testing/jig-client-test-domain/src/tests/root.rs` (739)); the link's
+`restore_ask` (arms for `Propose` and `Withdraw`:
+`crates/jig-client-protocol-link/src/translate/store.rs:78`) and the asks of
+`crates/jig-client-protocol-link/src/tests/fixtures/link_store.rs`
+(ruling 222); the
 reference UI's amend confirmation (objects.md, 11: "beyond those is
 proposed, and to whom (a `Propose` of the amendment)"), which at the
 base sends `Ask::Amend` for an amendment its offer says is proposable
-(`crates/jig-domain-client/src/tests/confirmation.rs:311` tests it) and
+(`crates/jig-client-view/src/tests/domain/confirmation.rs:311` tests it) (ruling 222) and
 now sends `Propose` of the amendment, saying to whom; the scripted
 engine's model of a proposed amendment; downstream, the same family
 refusal translation as 14.4.
@@ -582,8 +649,7 @@ Test shape: the component's tests:
 `tests/client-protocol/tests/client.rs` (jig 12's story file):
 `a_party_proposes_a_batch_and_withdraws_it_before_it_is_decided`,
 `a_create_beyond_authority_is_refused_naming_who_could_accept`; the
-reference UI's (at the base `crates/jig-domain-client/src/tests/confirmation.rs`,
-followed to `jig-client-view`):
+reference UI's (`crates/jig-client-view/src/tests/domain/confirmation.rs`) (ruling 222):
 `a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_words`
 (`:295`, its proposable amendment at `:311`) keeps its name and its
 other assertions, and expects `Ask::Propose` of the amendment where it
@@ -701,6 +767,8 @@ Besides: `ReadAnswer`, `OpenAnswer` gain `not_served: NotServed`, and
 and `OwnerPersonCapacityActionMarkSeen` hold `SeenThrough`. `StartChat`,
 `Close`, `SetGoal`, `Prioritise` and their records stay until jig 16;
 `me`, the task line, task queries and `Offered` are jig 22's.
+`Keyed.request` and `TableEntry.request` become `bytes 1114240` (14.1)
+(ruling 222).
 
 `crates/jig-client-domain/src/contract/` (jig 11's module), the types
 whose wire records are above; owned by this session, used by jig 15's
@@ -802,7 +870,7 @@ Each command runs once, after the session's last increment lands.
 - `git -C ~/src/rust/jig fetch origin && git -C ~/src/rust/jig log
   origin/main --grep='^Plan: client-api$'
   --format='%(trailers:key=Step,valueonly,separator=)' | grep -c
-  '^jig-14\.'` prints 5.
+  '^jig-14\.[0-9]'` prints 5 (ruling 222).
 - The replaced records are gone: `git -C ~/src/rust/jig grep -n -E
   '^(record|enum) (Write|TakeOver|MarkSeen|SeenReplies|MadeWords)\b'
   origin/main -- crates/jig-client-protocol-wire/schema` prints nothing.

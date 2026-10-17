@@ -260,7 +260,17 @@ clients.rs, clients/peer.rs}`, `tests/codecs/tests/client_wire.rs`,
 `tests/client/src/translate/forge.rs`. Users of jig's client wire found
 by `git grep -n -w jig_client_protocol_wire -- '*.rs'` in temper (at the
 base, under its old name `jig_protocol_client_wire`: 11 files, 13 lines,
-`logs/w9/users-jig-client-crates.txt`).
+`logs/w9/users-jig-client-crates.txt`). This repin is the first to take
+jig 14, and its changes reach, at temper `ad71c83c6`:
+`crates/temper-service/src/family.rs:12-61` and
+`crates/temper-service/src/tests/family.rs:36,103,118` (they match and
+build `ToApplication`, which jig 14.1 gives a `scope`, and a `window` for
+`Read` and `Watch`), `crates/temper-engine-domain/src/route/applications.rs:25`
+(derives the application's scope itself),
+`crates/temper-client-shell-terminal/src/route/family.rs:70,177` (builds
+`jig_client::Family` and uses the wire's `Answer::FinalAnswer`, `KeyedAnswer`
+after jig 14.1) and `crates/temper-service/src/family/refusals.rs:25` (the
+`proposable` arm) (ruling 222).
 Shape:
 - `temper_service::family::answer(outcome:
   Option<forge::ApplicationOutcome>, limits: &w::Limits, jig:
