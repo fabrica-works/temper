@@ -665,7 +665,10 @@ host holding the client.
 Don't: decode a family's bytes in `jig-client`; keep a map from keys to
 children or a `_` arm on an asker (jig's `root.md`, 5 and 10); give
 jig's reference UI an asker of temper's.
-Size: at most 300 lines.
+Size: at most 300 lines; ruling 238 re-estimates it with the repin
+onto jig 21.2 and rulings 236 and 237: aim 750, stop at 850 added lines
+by code-organization.md's command, the repin's repairs included; the
+repairs outside the Files aim 300, stop at 350 (README, Pins).
 Removes: the root's `RequestTable`, `store.rs`, `Owner::Kept`, the
 terminal's `route/family.rs`, the forge's `Config { connector, version
 }` (the wire crate's `Owner` and `CLIENT_VERSION` in its place).

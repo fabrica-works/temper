@@ -1511,6 +1511,14 @@ choice would have been the user's (development.md, 10.4).
      - **The bound stays 200** for all the repin's repairs outside 03.5's Files, ruling 236's included, counted as the README says and given in the report; past 200, stop and report the count and the files left.
      - **Unchanged:** ruling 236; 03.5's Shape and Files; implementer.md 8.2's rule for any other boundary type.
 
+238. **temper 03.5: the repin's repairs aim 300, stop 350; Size aim 750, stop 850** (plan defect, temper 03.5's block of 2026-10-17T08:34:31Z).
+     Ruling 238 (plan defect, temper 03.5's block of 2026-10-17T08:34:31Z): option A, with numbers. development.md, 5.7: "At most about 200 lines besides `Cargo.lock`, and no change of design. A break that needs more, or a decision, is a question"; this ruling answers it. The repin onto jig 21.2 carries what jig landed since temper's pin `c92d4a09d` (rulings 207, 210, 236, 237), with no change of design, and cannot land apart from 03.5's client move: 23 of its errors are in 03.5's own Files (`client.rs:298, 355, 358` among them). So 03.5 keeps it, and no supplement step comes before it.
+
+     - **The repairs outside 03.5's Files:** aim 300 added lines, stop at 350, counted as the README's Pins say (`git diff --numstat origin/main...HEAD -- <the changed paths outside the increment's Files> ':!Cargo.lock'`, first column, summed once before landing) and given in the report. 231 now (`logs/temper-03/03.5-repin-count.txt`). They include ruling 237's range with two focused tests, each under 0.5 s: the service's store answers a decided proposal from the owner's live row, then the history row its `proposal_rows` names, and with no row when either is absent; the engine answers a named withdrawal's call from that load. Then the clippy fixes and the users the whole-workspace check names.
+     - **03.5's Size:** aim 750, stop at 850 added lines by code-organization.md's command, the repairs above included (629 now, unfinished). Trim nothing to fit: no formatting, doc comment, test or assertion.
+     - **At either stop,** report the counts and the files left, and wait.
+     - **Unchanged:** rulings 236 and 237's Decisions but their bound; 03.5's Shape, Files, Test shape and Proof; the 04:24Z steer's constant cleanup in `lifecycle.rs` and `queries.rs`, counted with the repairs.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
