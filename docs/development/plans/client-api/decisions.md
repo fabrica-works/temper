@@ -1503,6 +1503,14 @@ choice would have been the user's (development.md, 10.4).
      - **Pins:** run the `cargo update` for skein last (`smith-host-protocol --precise` floats skein again); the lock keeps one revision each of jig `154e1094`, skein `8a51e10b`, smith `29fa97c9`.
      - **Unchanged:** 03.5's Shape and Files; implementer.md 8.2's rule for any other boundary type; rulings 207 and 210's downstream fixtures at this repin.
 
+237. **temper 03.5: a decided proposal loads as jig's kit loads it** (scope, temper 03.5's block of 2026-10-17T08:25:44Z).
+     Ruling 237 (scope, temper 03.5's block of 2026-10-17T08:25:44Z): option A in its place, answered as jig's own code answers it. The README's Pins, as ruling 236 quotes them, cover it: "what else jig landed since temper's last repin, adapted the way jig adapted its own reference code ..., in at most 200 added lines outside the Shape's Files". jig's reference roots do not ignore `Now::DecidedProposal`: `ops` routes it as a core load with `HistoricalProposal` (`examples/ops/domain/src/route.rs:1376-1386`, `Output::CoreLoad`), and the test service gives it to its store (`testing/jig-test-service/src/route.rs:160`), which answers it with jig's kit, `jig_protocol_store::historical`.
+
+     - **What the load reads, as the kit does:** first the owner's live row, `tasks::Key::Live(key.task)` (`crates/jig-protocol-store/src/historical.rs:16`); then the one history row the owner's `proposal_rows` names for the proposal, `tasks::Key::History { task, revision }` (`historical.rs:197-206`, `next`; `reads/point.rs:227-234`, `proposal_key`); the answer is `core::Event::DecidedProposal { to, key, proposal, row, busy: false }`, `row` the history row's `proposal`, or none when either row is absent (`historical.rs:75-77`, `task_proposal` at :208-211). Use the kit's functions where temper's store path can call them; otherwise copy them.
+     - **temper's range:** one new `CoreRange` variant (`crates/temper-engine-domain/src/store.rs:249`) that names what the kit's key names, the owner task and the proposal (not `tasks::Key::DecidedProposal`, which the kit does not read for this `Now`), with its membership and validation beside `ProposalDecision`'s (`loads.rs:324, :387`, `restart.rs:54, :78`), the service's two reads, and the bounded callback. It is the one further boundary change this ruling allows.
+     - **The bound stays 200** for all the repin's repairs outside 03.5's Files, ruling 236's included, counted as the README says and given in the report; past 200, stop and report the count and the files left.
+     - **Unchanged:** ruling 236; 03.5's Shape and Files; implementer.md 8.2's rule for any other boundary type.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
