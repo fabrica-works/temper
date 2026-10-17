@@ -276,3 +276,17 @@ fn assert_box_streams(ended: &support::boxed::Outcome) {
     assert!(lines().all(|line| steps.iter().any(|step| line.starts_with(step))), "each stderr line names its step");
     assert!(lines().any(|line| line.starts_with(b"runner 1: ")), "the runner's lines arrive prefixed");
 }
+
+#[test]
+fn temper_box_restarts_a_killed_forgejo_while_the_engine_serves() {
+    let scratch = support::Scratch::new("box_kill");
+    let forgejo = support::owned::tier_configuration(scratch.path());
+    let kill = support::boxed::Plan::KillForgejo;
+    let ended = support::boxed::run(scratch.path(), forgejo, kill, Duration::from_secs(120));
+    let (killed, restarted) = ended.forgejo_pids.expect("Forgejo was killed and came back");
+    assert_ne!(killed, restarted, "another Forgejo process answers");
+    assert_eq!(ended.engine_served, Some(true), "the same engine process answered while Forgejo was back");
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "stopped as asked: {}", String::from_utf8_lossy(&ended.stderr));
+    assert_eq!(ended.left, Some(Vec::new()), "no process the box started outlived it");
+    scratch.remove();
+}
