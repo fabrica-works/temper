@@ -3,12 +3,13 @@
 A preparation of an owned forge whose `state` records a Forgejo older than the pin dumps it into
 `backups/forgejo-<old>-to-<new>.zip`, migrates it and records the pin; one whose runner is older has the runner's files
 prepared again, with no dump; a recorded version newer than its pin, Forgejo's or the runner's, is refused, and `temper
-forge run` words that direction (15.1). The plan's last temper work: a box at the pinned versions never meets it
+forge run` words that direction (15.1). A runner added to a prepared forge is registered, and one removed recorded as
+none (setup.md 6.3 item 4). The plan's last temper work: a box at the pinned versions never meets it
 (decisions.md, 10, 17). It extends temper 07's and 08's types in place.
 
 ## Read first
 
-- Design: setup.md 6.3 (item 3, the commands' bullets, `Interrupted`), 6.4 (the locks, `run`'s checks), 3 (`backups/`),
+- Design: setup.md 6.3 (its preamble, items 3 and 4, the commands' bullets, `Interrupted`), 6.4 (the locks, `run`'s checks), 3 (`backups/`),
   13.1; the designer's answers 20, 21, 38 and 39 (in setup.md 6.3, temper `b05af1f7`). Plan: decisions.md 8, 10, 17;
   `temper/03-command-line.md`: 03.2's `cli-dump-…` and `cli-migrate-…` facts, 03.3's `runner-register-…` facts. skein:
   `programming-model.md` 3, `testing-strategy.md` 2.1. temper: `workflow.md` 2.
@@ -24,7 +25,14 @@ forge run` words that direction (15.1). The plan's last temper work: a box at th
   migrated, then recorded; an older runner has its files prepared again under the runner's lock too, with no dump; a newer
   one, Forgejo's or the runner's, refuses. The dump is a command like the others: skein-io, output bounded and masked
   (13.1). **Interrupted** (answer 38): `state` is not marked ended, so the next preparation repeats it.
-- **6.4:** `run` refuses a `state` not at the pins, "naming what to run": for an older one, to prepare.
+- **6.3, item 4** (the designer's answer to ruling 120's questions): "A runner added is prepared under the runner's lock
+  too, as a first preparation prepares it: its secret drawn into `runner/secret` when that file is missing, and kept
+  otherwise; registered; its connection written. A runner removed is recorded as none, and its files and its
+  registration are left, unused". "A runner's recorded version is compared with its pin only while the setup has one."
+- **6.4:** `run` checks "that `state` records a preparation at the pinned versions, with a runner exactly when the setup
+  has one; refuses otherwise, naming what to run: `temper forge prepare` for a forge not prepared, a preparation that did
+  not end, an older version, or a runner added or removed (6.3); no command of this temper for a newer version, or one
+  it cannot read".
 
 ## Choices this plan makes
 
@@ -64,46 +72,54 @@ forge run` words that direction (15.1). The plan's last temper work: a box at th
 ## Increments
 
 ### 15.1 The upgrade
-Scope: setup.md 6.3 item 3 and 13.1: an older Forgejo is dumped, migrated and recorded; an older runner has its
-files prepared again; a newer or unreadable version of either is refused by `prepare` and `run`.
+Scope: setup.md 6.3 items 3 and 4, 6.4 and 13.1: an older Forgejo is dumped, migrated and recorded; an older runner has
+its files prepared again; a runner added is registered and one removed recorded as none; a newer or unreadable version of
+either is refused by `prepare` and `run`, and `run` names `prepare` for a runner added or removed.
 Needs: temper 08.2 (`run.rs`, `forge.rs`), and through it 08.1 (`temper forge prepare`, the shell's host,
 `files.rs`, `owned.rs`) and 07.4 (the machine, `Drive`); 03.2 and 03.3 (the dump and runner facts).
 Files: `crates/temper-forge-setup/src/upgrade.rs` (new), `lib.rs` (a `mod`), `src/prepare.rs` (07.4's: the arm),
 `src/spec.rs` (`Command::Dump`), `src/place.rs` (`File::DumpPartial`, `Place::backup`), `src/run.rs` (08.2's:
 `Refusal::Versions`), `src/tests/upgrade.rs` (new), `src/tests.rs` (`mod upgrade;`), `src/tests/prepare.rs` (07.4's
-`a_recorded_version_other_than_the_pin_is_refused`, `tests/prepare.rs:196-203`, is renamed
-`a_runner_that_state_and_the_setup_disagree_on_is_refused`: its one row, Forgejo `another-version`, goes, since the
-garbage row of `the_upgrade_refuses_…` covers it, and two rows take its place, a setup without a runner against a
-`state` with one and the reverse, both `Failure::Recorded`; ruling 120), `src/tests/files.rs` (a row
+`a_recorded_version_other_than_the_pin_is_refused`, `tests/prepare.rs:196-203`, goes: its one row, Forgejo
+`another-version`, is the garbage row of `the_upgrade_refuses_…`, and a runner's presence is no longer refused), `src/tests/run.rs`
+(08.2's), `src/tests/files.rs` (a row
 `(File::DumpPartial, b"/srv/forge-2/backups/dump.partial.zip")` in the table at `:43-56`), `src/tests/spec.rs`, `src/tests/fixtures.rs` (07.1's, extended: `Drive::reach`, `older`,
 `backup`, `ran_ok`); `crates/temper-forge-setup-shell/src/{prepare,files}.rs`, `tests/files.rs` (08.1's);
 `crates/temper/src/forge.rs` (words), `tests/forge.rs` (three tests), `tests/process.rs` (**hotspot**: two tests),
 `tests/support/owned.rs` (**hotspot**: `record_versions`, `file`). The docs that say only a first preparation takes
-the runner's lock, or that any version mismatch is `Recorded`, follow the upgrade: `Request::Lock` (`prepare.rs:58`),
-`Failure::Recorded` (`prepare.rs:89-91`), `File::RunnerLock` (`place.rs:34`).
+the runner's lock follow setup.md 6.3's preamble: `Request::Lock` (`prepare.rs:58`), `File::RunnerLock` (`place.rs:34`).
+`Failure::Recorded` (`prepare.rs:89-91`) goes, with its words in `forge.rs`: each case it held now has its own course.
 Shape: sketch 1, and these changes in place. `Command` gains `Dump`, built by `spec::command`; `File` gains `DumpPartial`,
 and `Place::backup(name)` is `<directory>/backups/<name>`. `Request` gains `Exists { path: Box<[u8]> }` (answered
 `Event::Exists(bool)`) and `Rename { from: Box<[u8]>, to: Box<[u8]> }` (answered `Done`); `Failure` gains `Newer { which:
-Which, recorded: Box<[u8]> }` and `Unreadable { which: Which }`, and `Recorded` keeps the runner-presence mismatch (07.4's
-question on a runner added or removed). On a finished `state` of matching runner presence and passed binary checks the
-machine takes `course(state.forgejo, VERSION)` and, when the setup has a runner, `course(state.runner, RUNNER_VERSION)`,
-and keeps the two `Course` values as fields of `Prepare` (`prepare.rs:114`), never as a `bool`: it has three, and a
-fourth trips clippy's `struct_excessive_bools`. A
-`Newer` or `Unreadable` ends the preparation before `Layout`, nothing written; two `Same` are 07.4's later preparation;
-else, with an older runner `Request::Lock(File::RunnerLock)` first (08.1's host takes it without waiting; a held one ends
+Which, recorded: Box<[u8]> }` and `Unreadable { which: Which }`, and `Recorded` goes. `Found` gains `runner_secret: bool`,
+whether `runner/secret` exists, which the host fills as it fills `admin_token`. On a finished `state` and passed binary
+checks the machine takes `course(state.forgejo, VERSION)` and, when the setup and `state` both have a runner,
+`course(state.runner, RUNNER_VERSION)`; a runner in the setup and not in `state` is added, one in `state` and not in the
+setup removed, whatever version it records (setup.md 6.3 item 4). It keeps Forgejo's `Course` and the runner's (a
+`Course`, added, removed or none: an enum of the machine's own) as fields of `Prepare` (`prepare.rs:114`), never as a
+`bool`: it has three, and a fourth trips clippy's `struct_excessive_bools`. A
+`Newer` or `Unreadable` ends the preparation before `Layout`, nothing written; Forgejo's `Same` with the runner's `Same`,
+or no runner in either, is 07.4's later preparation;
+else, with an older or added runner `Request::Lock(File::RunnerLock)` first (08.1's host takes it without waiting; a held one ends
 the run naming the runner, so an older runner's files are never prepared beside a running runner; a Forgejo-only upgrade
 takes Forgejo's lock alone, as setup.md 6.3 item 3 reads, and goes on beside a running runner), its `Done` going on to
 `Layout` (`Phase::Lock`'s arm, `prepare.rs:400`, goes to `begin()` only for a first preparation), and after `Layout`: `Exists(backup)`
 and, when absent, `Run Dump` then `Rename` partial to backup (Forgejo older); `Write app.ini`; `Run Migrate` (Forgejo
-older); `Run Register` and `Write RunnerConfiguration` (runner older); `Write State` with the pins; then the later
-preparation's `admin_token` when missing. The backup is `backup_name(state.forgejo, VERSION)`. The host answers `Exists` and
+older); `Draw` and `Write RunnerSecret` (runner added, and `Found.runner_secret` false: the draw's index 4,
+`prepare.rs:232`); `Run Register` and `Write RunnerConfiguration` (runner older or added); `Write State` with the pins, and
+the runner's only when the setup has one; then the later preparation's `admin_token` when missing. A runner removed adds
+no request: `app.ini`'s `[actions]` follows the setup (07.4's `ini::text`), and its files are left. The backup is `backup_name(state.forgejo, VERSION)`. The host answers `Exists` and
 `Rename` with `files::exists(&Path) -> io::Result<bool>` and `files::rename(&Path, &Path) -> io::Result<()>` (sync the file,
-rename it, sync the directory). `Refusal::Versions` gains `course` (the worse of the two). `forge.rs` words `Newer` for
+rename it, sync the directory). `Refusal::Versions` gains `course` (the worse of the two). `admit_state` checks the runner's presence both ways, before
+the versions: `Refusal::Runner { recorded: bool }` (`recorded`: `state` has a runner the setup lacks); `Versions`
+compares the runner's version only when both have one. `forge.rs` words `Newer` for
 `prepare` as `forge N: forgejo is prepared at <recorded>, newer than this temper's pin <pinned>: its migrations only go
 forward` (`runner` likewise), `Unreadable` as `... is prepared at a version this temper cannot read`; `run` words
 `Refusal::Versions` by its `course`: `Older` as 08.2's, `Newer` as 08.2's with the tail `: no command of this temper runs
 it`, `Unreadable` as `prepared at a version this temper cannot read: no command of this temper runs it` (the recorded bytes
-are not echoed).
+are not echoed); `Refusal::Runner` as `prepared with a runner, and the setup has none` or `prepared without a runner, and
+the setup has one`, each then 08.2's `: run temper forge prepare CONFIG.json N`.
 Test shape: `src/tests/upgrade.rs` on `fixtures::Drive` (< 20 ms each); rows are literals; the recorded versions are
 inputs (`16.0.5`, `13.1.0`; `older(forgejo, runner)` takes `None` for the pin), the pins' names come from `VERSION` and
 `RUNNER_VERSION`. Limits: none of its own.
@@ -117,11 +133,19 @@ inputs (`16.0.5`, `13.1.0`; `older(forgejo, runner)` takes `None` for the pin), 
 - `the_upgrade_compares_versions_by_number_not_text` (`9.9.9` < `10.0.0`, `1.10.0` > `1.9.0`, `1.0` = `1.0.0`; the
   bounds read: `1.2.3.4`, `999999999.0.0`)
 - `the_upgrade_prepares_an_older_runner_again_without_a_dump` (`Lock(RunnerLock)` first, no Dump or Migrate, `State` last)
+- `a_runner_added_to_a_prepared_forge_is_registered_under_its_lock` (rows: `Found.runner_secret` false: `Lock(RunnerLock)`
+  first, `Draw`, `Write RunnerSecret`, `Register`, `RunnerConfiguration`, `State` with the runner's pin; true: the same
+  without `Draw` and `RunnerSecret`)
+- `a_runner_removed_writes_no_runner_file_and_records_none` (no `Lock`; `app.ini` with `ENABLED = false` (`ini.rs:64`); no
+  `Register`, `RunnerSecret` or `RunnerConfiguration`; `State` with no runner)
+- in `src/tests/run.rs`, 08.2's `the_run_refuses_a_forge_not_prepared_at_the_pins` gains two rows, a runner added and one
+  removed, each `Refusal::Runner`
 
 Beside them (< 0.5 s each): the shell's `tests/files.rs` `a_renamed_file_exists_under_its_new_name_only`; in
 `crates/temper/tests/forge.rs`, on 08.1's and 08.2's scripts, `a_newer_recorded_forgejo_refuses_the_preparation_untouched`
 (`state`, `app.ini`, `backups/` unchanged; both versions named), `the_run_refuses_a_newer_recorded_version_in_its_own_words`
-(rows: newer, unreadable; the words above) and `an_interrupted_upgrade_leaves_the_state_for_the_next_preparation` (as 08.1's
+(rows: newer, unreadable; the words above), `the_run_names_prepare_for_a_runner_added_or_removed` (rows: a setup with a
+runner on a `state` without one, and the reverse; exit 1, the words above) and `an_interrupted_upgrade_leaves_the_state_for_the_next_preparation` (as 08.1's
 `a_termination_signal_kills_…`, with `owned::record_versions` Forgejo `16.0.5` and `hang("forgejo", "dump")`: exit 1 `forge
 1: interrupted`, `state` byte-equal, no backup file).
 ```rust
@@ -164,11 +188,13 @@ Command: `heavy --gate sh -c 'export NEXTEST_DOUBLE_SPAWN=0; cargo build -p temp
 temper --profile process -E "test(=an_older_recorded_forgejo_is_dumped_then_upgraded) +
 test(=an_older_recorded_runner_has_its_files_prepared_again_without_a_dump)"'` ends `2 tests run: 2 passed`, about 30 s, at
 most 90 s. Nothing runs higher: the migration finds nothing to do on a v17 database (its order after the dump is the unit
-test's), and no older binary is used.
+test's), and no older binary is used. A runner added runs the first preparation's `Register` and configuration, which
+08.1's process test runs on the real binaries: no process test of its own.
 Don't: touch the first-preparation or same-version paths; prune, restore or overwrite a backup; dump on a first
 preparation or after a preparation that did not end; name a version in production code.
-Size: 180 (150 in the drafts: the runner's arm and the partial's rename are the difference).
-Removes: nothing.
+Size: 230 (150 in the drafts: the runner's arm and the partial's rename are the difference; a runner added or removed,
+about 50).
+Removes: `Failure::Recorded` and its words (08.1's); 07.4's `a_recorded_version_other_than_the_pin_is_refused`.
 
 ## Interface sketches
 
@@ -198,18 +224,18 @@ pub fn backup_name(recorded: &[u8], pinned: &[u8]) -> Box<[u8]> { todo!() }
 
 ## Questions to raise when reached
 
-A recorded version this temper cannot read is refused (Choices). Asked of the designer with ruling 120: what `run`
-names when the setup and `state` disagree on the runner's presence (08.2's `admit_state` makes it `Versions`, with no
-recorded version for `course`), and setup.md 6.3's preamble against its item 3 on the runner's lock. Until answered:
-15.1 leaves 08.2's words for a presence mismatch as they land, and words only the cases that have a `course`.
+A recorded version this temper cannot read is refused (Choices). Asked of the designer with ruling 120, and answered
+(setup.md 6.3 and 6.4): a runner added or removed is converged by `prepare` (item 4), and `run` names `prepare` for it
+(`Refusal::Runner`, above); the runner's lock is taken "when it writes the runner's files: at a first preparation, and
+for a runner older than its pin (item 3) or added (item 4)".
 
 ## Done when
 
 With the two binaries exported (Rules):
 1. The upgrade works on the real binaries: 15.1's command ends `2 tests run: 2 passed`.
 2. The default-suite tests pass: `heavy cargo nextest run -p temper-forge-setup -p temper-forge-setup-shell -p temper
-   -E 'test(~the_upgrade_) + test(~newer_recorded) + test(~an_interrupted_upgrade) + test(~a_renamed_file)'` ends `11 tests
-   run: 11 passed`.
+   -E 'test(~the_upgrade_) + test(~newer_recorded) + test(~an_interrupted_upgrade) + test(~a_renamed_file) +
+   test(~a_runner_added) + test(~a_runner_removed) + test(~the_run_names_prepare)'` ends `14 tests run: 14 passed`.
 3. No version in production code: `git grep -n -E '"v?[0-9]+\.[0-9]+\.[0-9]+"' origin/main --
    crates/temper-forge-setup/src crates/temper-forge-setup-shell/src ':!*/tests/*' ':!*/tests.rs'` prints nothing.
 4. The default suite passes, 08.1's boundary test included: `heavy cargo nextest run -p temper-forge-setup

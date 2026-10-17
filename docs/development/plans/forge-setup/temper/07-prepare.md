@@ -386,7 +386,9 @@ pub fn step(machine: &mut Prepare, event: Event, out: &mut Queue<Request>) { tod
 
 ## Questions to raise when reached
 
-1. **A runner added to or removed from a prepared forge** (`state.runner` and the setup disagree): `Recorded`, as any mismatch. **The order of several
+1. **A runner added to or removed from a prepared forge** (`state.runner` and the setup disagree): `Recorded`, as any mismatch; answered
+   after 07.4 landed (setup.md 6.3 item 4): a later preparation registers a runner added and records one removed as none, and
+   temper 15.1 builds it, `Recorded` going. **The order of several
    owned forges' steps** is pinned by no test. **A bot named `temper-admin`, or an org named like the person or the bot** (Forgejo shares user and org
    names): only the person's login is refused (setup.md 8). **The runner's `timeout` 3 h and `shutdown_timeout` 0 s** are the plan's until temper 08.2.
 

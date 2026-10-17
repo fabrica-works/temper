@@ -263,9 +263,10 @@ private, never edited by hand:
 ### 6.3 The preparation
 
 `temper forge prepare CONFIG.json FORGE`, before Forgejo runs. It takes
-Forgejo's lock (6.4), and the runner's too for a first preparation,
-which alone writes the runner's files; checks the binaries; and decides
-by `state`:
+Forgejo's lock (6.4), and the runner's too when it writes the runner's
+files: at a first preparation, and for a runner older than its pin
+(item 3) or added (item 4); checks the binaries; and decides by
+`state`:
 
 1. **The first preparation:** the layout of section 3; `app.ini`;
    `forgejo migrate`; temper's admin, `temper-admin`, made as a site
@@ -291,7 +292,8 @@ by `state`:
    a drawn password again. A forge's directory that holds Forgejo's files
    with no `state` is refused, naming it: the preparation removes only
    what a first preparation it recorded left.
-2. **A later preparation at the same versions:** `app.ini` written again,
+2. **A later preparation at the same versions, with a runner exactly
+   when `state` records one:** `app.ini` written again,
    so a change of the setup reaches Forgejo; `admin_token` made again
    when missing, under a fresh suffix, for temper's admin, which
    Forgejo's command line cannot make twice: an admin a person deleted
@@ -306,6 +308,16 @@ by `state`:
    lock too, with no dump, since the runner keeps no data. A recorded
    version newer than its pin, Forgejo's or the runner's, refuses:
    Forgejo's migrations only go forward.
+4. **A runner added or removed:** the setup and `state` disagree on
+   whether there is one, and `app.ini`'s `[actions]` follows the setup
+   (6.2). A runner added is prepared under the runner's lock too, as a
+   first preparation prepares it: its secret drawn into `runner/secret`
+   when that file is missing, and kept otherwise; registered; its
+   connection written. A runner removed is recorded as none, and its
+   files and its registration are left, unused, so that a runner added
+   again registers as the same one. A runner's recorded version is
+   compared with its pin only while the setup has one. Either may come
+   with an upgrade, in one preparation.
 
 - **Forgejo's command line only,** on the work path, never its web: under
   the lock no Forgejo runs, so nothing writes its database beside the
@@ -333,14 +345,18 @@ by `state`:
 `temper forge run CONFIG.json FORGE forgejo|runner`:
 
 - **Checks** the binary, and that `state` records a preparation at the
-  pinned versions; refuses otherwise, naming what to run.
+  pinned versions, with a runner exactly when the setup has one;
+  refuses otherwise, naming what to run: `temper forge prepare` for a
+  forge not prepared, a preparation that did not end, an older version,
+  or a runner added or removed (6.3); no command of this temper for a
+  newer version, or one it cannot read.
 - **Takes the lock,** an exclusive lock, taken without waiting, on a
   file of the forge's directory, Forgejo's or the runner's, and hands it
   across the exec as the process's standard input, so the process holds
   it for its life. Two Forgejos never share a work path, and no
   preparation runs under one: the preparation takes Forgejo's lock, and
-  a first preparation the runner's too, and refuses, naming the forge,
-  while one it needs is held.
+  the runner's too when it writes the runner's files (6.3), and refuses,
+  naming the forge, while one it needs is held.
 - **Replaces itself** (`execve`) by `forgejo web` or `forgejo-runner
   daemon`, with the spec's arguments and the spec's environment alone:
   cleared, then `HOME` in the forge's directory, `PATH`, and git's
@@ -650,7 +666,8 @@ temper                       the binary: temper forge prepare|run|reconcile, tem
   configuration for each setup, as golden text.
 - **The preparation's decisions:** a first preparation; one at the same
   versions; an upgrade, dumped before migrated; a newer recorded version
-  refused; another binary refused; a missing `admin_token` made again,
+  refused; a runner added, under its lock, and one removed; another
+  binary refused; a missing `admin_token` made again,
   under a fresh name; a preparation cut short made again from an empty
   layout; Forgejo's files with no `state` refused; a later preparation
   taking Forgejo's lock alone.
