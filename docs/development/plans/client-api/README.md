@@ -361,6 +361,15 @@ per session are in each file.
     jig's pin of it, and skein to jig's pin of it only where that is
     forward ("temper's skein ahead", below) (each read as above), in
     place of 5.7's "each to its `origin/main`".
+  - **skein's cap** (ruling {ruling}, the director's request of
+    2026-10-17T23:46Z): no skein move of this plan, the closing repin's
+    included, takes jig's or temper's skein past skein `2733882` ("Mark
+    hearth's render active on debian-8gb-hel1-1"). hearth's `skein_io`
+    changes (`Locked`, `Busy`, `Lock`, `ListPage`) start at its child
+    `089ed83`, and jig and temper take them in temper's next plan,
+    `tools` (`later.md`). "temper's skein ahead" holds: nothing moves
+    back. A target past the cap (`git -C ~/src/rust/skein merge-base
+    --is-ancestor <target> 2733882` failing) is a question.
 - **Format versions** (development.md, 5.1): each changes once in this
   plan, at its owner's landing, and is edited in place after:
   - jig's store: tasks v3, owner jig 02.1; people v3, owner jig 02.3;
