@@ -756,6 +756,20 @@ per session are in each file.
     `--profile fuzzy` (the gate's second half). Fix all that fail, then
     `land` again. `land` is not your test loop. `land`'s gate is
     unchanged.
+  - 06:20Z, point 1 (jig 21.2, 21.3 and 21.4): code-organization.md, 7: a
+    test function is at most 40 lines, and a miss is noted in the landing's
+    report. jig 13.4 grew seven base tests past 40 lines and its report
+    names none. `testing/jig-client-test-domain/src/tests/root.rs` spells
+    `Event::Client { event: jig_client::Event::Up { up:
+    jig_client::Up::Answer { attempt, envelope: RequestEnvelope::Final,
+    answer, why: None } } }` ten times, about 12 lines each, in
+    `a_final_answer_reaches_the_child_that_asked_unread_and_once` (30 to 60
+    lines) among them. In a test you add or edit, build it once: `fn
+    final_answer(attempt: Token, answer: Answer) -> Event` in
+    `tests/root/fixtures.rs` beside `drive` (21.2: in the ops tests' support
+    module); the 60-line test then takes about 38 lines. In your landing
+    report, name each test function over 40 lines that your commit leaves,
+    with its length at the base and now.
 
 ## Prerequisites the run checks at its start
 
