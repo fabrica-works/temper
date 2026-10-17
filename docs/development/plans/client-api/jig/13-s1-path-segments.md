@@ -18,19 +18,25 @@ leaves out the first segments, shows in their place the mark `…` ...
 then the last segments that fit, the last one always. ... what the view
 acts on (a filter by a resource, a draft's pattern) takes the whole
 path". jig-view's compose is not raised (`view.md`, 10).
-Needs: jig 13.2's landing (the step follows 12.1's and 13.2's moves of
-the files below).
-Files, at jig `e1b483760`'s code (each line moves with 12.1 and 13.2;
-follow it by its name):
-- the client's limits: `segments: u32` beside `rows` and `text`
-  (`jig_client_domain::Limits` after jig 12.1), set by the application in
-  code; each literal of it gains `segments`, 4 in jig's (the small
+Needs: jig 13.2's landing (landed, jig `c92d4a09d`; the step follows
+12.1's and 13.2's moves of the files below).
+Files, at jig `e1b483760`'s code, lines refreshed at jig `c92d4a09d` by
+ruling 198 (follow each by its name):
+- the client's limits: `segments: u32` beside `rows` and `text`, in
+  `jig_client_domain::Limits` and in the view's own `Limits`
+  (`crates/jig-client-view/src/limits/ui.rs:18`), set by the application
+  in code; each literal of either gains `segments`, 4 in jig's (the small
   profile's `authority.segments`, `tasks.hold_segments` and
-  `tasks.authority_segments`, `profile/small.rs:47, :67, :119`): at
-  `e1b483760`, `git grep -n 'conversation_words:' -- '*.rs'` prints 10
-  literals of the page's limits, of which 12.1 makes the client's; list
-  each one in the commit body;
-- link: `crates/jig-client-protocol-link/src/limits.rs:31, :41, :79`
+  `tasks.authority_segments`, `profile/small.rs:47, :67, :120`); the
+  literals are the ones the compiler names (the example and test
+  domains' `Limits` among them: `infrastructure.rs:106`,
+  `observability.rs:91`, `first.rs:73`, `second.rs`'s `Side::new`); the
+  scripted engine's `Bounds` (`tests/client/src/stories.rs:79`,
+  `testing/jig-client-scripted-engine/src/lib.rs:38`) is not one, and
+  its `payload.rs:80-91`, which bounds every list by `bounds.rows`,
+  stays: s1's tests do not run on it, and a story on it that refuses a
+  path is reported; list each literal in the commit body;
+- link: `crates/jig-client-protocol-link/src/limits.rs:41, :51, :89`
   (`part_resource_path`, `owner_part_key_path_value`,
   `owner_pattern_segments`, each `client.rows` today),
   `translate/documents.rs:312, :330`, `translate/pages.rs:84, :108`,
@@ -38,25 +44,53 @@ follow it by its name):
 - view (`crates/jig-client-view/src/`): `owner_chip.rs:39-45, :95-97`,
   `jig-client-domain`'s `contract/resource_names.rs:9-11`
   (`resource_path_fits(path, rows, text)`), `owner_amendment.rs:27-29`,
-  `owner_historical.rs:487` (`path.capacity() > l.rows`) and `:571-573`,
+  `owner_historical.rs:487` (`path.capacity() > l.rows`) and `:572-574`,
   `owner_authority.rs:95-103` (`worst_case_words` from `rows`),
   `sections/project/owner.rs:203-205` take `segments`; the cut where
   paths are written (`words/held.rs:118-122`, `owner_authority.rs:117-125`,
-  `policy_edit.rs:107-108`);
-  `limits.rs:77-80`'s node text holds a phrase, the mark and
-  `literal_segment::max_bytes(text)`;
+  `policy_edit.rs:107-108`, `proposed_task.rs:91-95`,
+  `owner_historical.rs:92-94`);
+  `limits.rs:74-78`'s node text holds a phrase, the mark and
+  `literal_segment::max_bytes(text)`; the node counts derived from
+  `rows` take `segments` for a path's part, `rows` for the rest:
+  `owner_authority::document_nodes` (`owner_authority.rs:180`, its 9
+  callers) and `proposed_task::part_nodes` (`proposed_task.rs:146`, its
+  4 callers); the notes filter (`sections/project/notes.rs:36, :78-102`)
+  takes the whole path;
+- the view's tests that pin a page's capacity or scale `rows` to make a
+  path fit (`page_capacity.rs:857, :878`; `owner_amendment.rs:391`;
+  `owner_project.rs:296, :460, :982`) set `segments` beside `rows`, and
+  their pins are regenerated; refresh any further such test, and list it
+  in the commit body;
 - `resource_path_fits` callers, which pass `segments`:
   `examples/ops/client-domain/src/infrastructure.rs:955`,
   `examples/ops/client-domain/src/observability.rs:678`,
   `testing/jig-client-test-domain/src/first.rs:953`, `second.rs:44`;
 - core: `crates/jig-domain-core/src/documents/task_tree.rs`, `path`
   (`:328-340`, `documents.lines` today) and the approval part
-  (`:404-411`), and `project_note.rs`' `path` calls (`:147-148`), by the
+  (`:404-411`), and `project_note.rs`' `fn path` (`:147-148`), by the
   names' bound: the most of the three above, derived where the engine's
-  limits are made; `documents.lines` bounds short lists alone.
+  limits are made; `documents.lines` bounds short lists alone. The bound
+  is `DocumentLimits`' new field `segments` (`documents.rs:90`), which
+  no operator sets: `set_documents`
+  (`jig-protocol-config/src/overrides.rs:392`) destructures it as
+  `segments: _` and has no name for it, and the engine's limits set it to
+  the most of the three once the overrides are applied (one place: name
+  it in the report). The worst-case sizers size a path by it, not by
+  `lines`: `task_tree.rs:968-1018` (`overview_worst_case`,
+  `grant_worst_case`, `authority_worst_case`), `offers.rs:221-223`,
+  `project_note.rs:569-577`. Its literals: `small.rs:157` (derived from
+  the profile's three), `standard.rs:100` (by its spread),
+  `offers/tests.rs:60`, `jig-domain-core/src/tests.rs:127`, and any
+  further one the compiler names.
 Test shape:
-- a task holding a name of `authority.segments` segments, at
-  `documents.lines` 2, has its task line and `task` document served;
+- a task holding a name of `tasks.hold_segments` segments (4 in
+  `tests/core/src/world.rs:35`; a held name is bounded by it,
+  `jig-domain-tasks/src/holds.rs:174`), in a world whose
+  `documents.lines` is 2 (32 in `world.rs:126`), has its task line and
+  `task` document served: the test sets `lines` on the world's limits,
+  and if the world's `limits()` takes none, the step adds the one
+  parameter it needs;
 - the link decodes a path of `segments` segments at `rows: 2`, and
   refuses one more as too large;
 - a path past a node's text shows `…` and its last segments, and the
@@ -65,8 +99,13 @@ Proof: each test beside its kind (the engine's task line in
 `tests/core/tests/task_queries.rs`, its `task` document in
 `tests/core/tests/application_documents.rs`; the link's decode in
 `crates/jig-client-protocol-link/src/tests/documents.rs`; the view's cut
-in `crates/jig-client-view/src/tests/owner_chip.rs`); jig's gate, by
-`land`.
+in `crates/jig-client-view/src/tests/owner_chip.rs`, the notes filter's
+whole path beside `sections/project/notes.rs`'s tests); jig's gate, by
+`land`. Downstream, the temper step that first pins a jig holding this
+step sets `segments` in `temper-client-shell-terminal/src/limits.rs:52-59`,
+`temper-client-domain/src/tests/fixtures.rs:37-44`,
+`temper-client-view/src/tests/fixtures.rs:34-41` and `forge_route.rs:611`
+(ruling 198), and lists them in its commit body.
 Size: aim for at most 160 production lines; past it, report why.
 Don't: cut a path in the client's data or the engine's documents; change
 what `rows` bounds besides paths; raise `compose`; give the engine a
