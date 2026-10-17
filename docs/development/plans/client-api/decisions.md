@@ -1784,6 +1784,14 @@ choice would have been the user's (development.md, 10.4).
      3. **The fake's other users** (`tests/core/tests/peers.rs:215`, `tests/channel/src/referee.rs`, `tests/channel/src/fixtures.rs:414`, `tests/conformance/src/actions.rs:41`, `tests/core/src/faults.rs:56`) change only where the engine's removed fields reach them.
      4. **Unchanged:** the rest of ruling 265; ruling 210's point 4; Size at most 150 production lines.
 
+267. **14.4: the fixture repair dropped, Create goes on** (process, jig 14.4's block of 2026-10-17T15:49:24Z).
+     Ruling 267 (process, jig 14.4's block of 2026-10-17T15:49:24Z): the fixture repair is dropped, not retried; 14.4 goes on with `Create` from 14.3's landing.
+
+     1. **The repair made the tests it aimed at slower** in the gate: the channel's resumed window 0.274 s to 0.884 s, ops' second-seed restart 0.266 s to 0.775 s, the first-seed restart 0.260 s to 0.935 s, and the gate timed out at 15 s twice (15.016 s, 15.004 s) where 14.3's passed at 13.945 s. Smaller capacities and buffers cost round trips. The commit `5e4afc0c8` does not land: reset `client-api/jig-14-4` to `a37b5fe12`, keeping its logs in `logs/jig-14/`.
+     2. **No further timing repair in 14.4:** ruling 264's points 2 and 3 end for 14.4. Its landing gate passes under the 15 s stop, a rule; if a gate times out again with no failing test, block with the gate's time and its three slowest tests, and run `land` no third time.
+     3. **The focused suite's time** (13.945 s of 15 s at 14.3) is the supervisor's to plan next, apart from 14.4.
+     4. **Unchanged:** README "Test time" and its Never list; 14.4's Scope, Shape, Test shape, Proof and Size; ruling 262.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
