@@ -734,6 +734,18 @@ per session are in each file.
     in `requests.rs:159` beside an inline copy at :62-66. The first of you
     to add a test there moves `answer` into `fixtures.rs`, `pub`, builds
     `final_answer` on it, and uses both.
+  - 04:24Z, point 1 (temper, sessions that add or edit tests): README
+    23:45Z, point 2 binds temper's new tests as it binds jig's: a request
+    id, a duration and a time are consts, and a stage counter is consts
+    or a small enum. temper 03.s2's scenarios wrote `110 + *phase`
+    (`tests/conformance/src/scenarios/queries.rs:47`),
+    `world.advance(6_000_000_000)` (`queries.rs:75`; `lifecycle.rs:18`
+    already names it `ADOPTION_WAIT`), `6_000 + u64::from(KEY)` again
+    (`lifecycle.rs:151`, from `scenarios.rs:47`) and a `phase: &mut u8`
+    compared with bare 0, 2, 3 and 6. The first of you to edit
+    `queries.rs` or `lifecycle.rs` names these sites and reports it as a
+    small fix outside your Files. Base lines elsewhere, seeds and
+    expected values keep their literals.
 
 ## Prerequisites the run checks at its start
 

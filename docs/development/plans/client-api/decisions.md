@@ -1302,6 +1302,9 @@ choice would have been the user's (development.md, 10.4).
      4. **temper 04.4** removes this mark too, and its Proof runs the story once (its Files and Proof say so now, with the step-18 failure seen at `40d1bec49`).
      5. **Unchanged:** rulings 199, 201, 202 and 213's points 1 and 5; s2's Don't, whose "a skipped or ignored scenario" means the conformance scenarios; every assertion of the story; 03.4's turn after s2.
 
+217. **temper's tests name their numbers (README 23:45Z, point 2)** (steer of 2026-10-17T04:24Z).
+     Steer of 2026-10-17T04:24Z, from the check of 2026-10-17T04:24Z, point 1: README 23:45Z, point 2 (named request ids, durations and times in tests) binds temper's sessions; temper 03.s2's scenarios left bare numbers in `tests/conformance/src/scenarios/queries.rs` and `lifecycle.rs`, which the first temper session to edit either file names. Recorded in the README as "04:24Z, point 1 (temper)".
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
