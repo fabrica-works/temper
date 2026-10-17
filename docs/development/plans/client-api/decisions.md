@@ -2017,6 +2017,14 @@ choice would have been the user's (development.md, 10.4).
      4. **A further test that pinned label 0** for a task `StartChat` or `SetGoal` made: refresh it to the template's label, and list it in the commit body.
      5. **Unchanged:** 16.1's Proof, its 1 s bound and its other Files; the reference UI reads the chat label from `me` and never writes it as a number; no referee's or judge's check changes; 16.2 and 16.3 as planned.
 
+289. **jig 16.1: a focused diagnosis of the native chat's absent answer, under ruling 229** (process, jig-16.1's block of 2026-10-17T23:03:01Z).
+     Ruling 289 (process, jig-16.1's block of 2026-10-17T23:03:01Z): the report's proposal: a focused diagnosis of the native chat's absent answer, under ruling 229, before any further repair, gate or land. The gate story `a_person_s_chat_is_answered_by_the_in_process_worker` (`tests/one-process/tests/one_process.rs:5`) failed twice at its third person step, the answer's See of `Script::answered_chat` (`tests/client-protocol/src/native.rs:17`): once in the gate, once after the three-line `Go` to task 1's Activity, so the first cause logged (the answer no longer shown in the Conversations list) is not the whole cause.
+
+     1. **Diagnose:** in the focused reproduction (`gate1-focused`), print, when the answer's See gives up: the person's address and the page's text; the chat's task number, phase and report as the engine's store holds them; and whether the in-process worker took the chat's run and answered. Log the cause in `logs/jig-16-1/gate-cause.md`. Aim to spend at most 30 minutes on it; past that, report what the logs show.
+     2. **Change only what that log names.** A cause in the story's input or in the test code of `tests/client-protocol` or `tests/one-process` is in 16.1's Files for this; list each such file in the commit body. A cause in production code outside 16.1's Files is a block with the logs.
+     3. **Then run the gate story once** in the focused test, and land once. Its count stands at 2: the same failure point a third time is a block with the logs.
+     4. **Unchanged:** the story's expected answer and its 5 s wait; no referee's or judge's check changes; 16.1's Proof, which passed (run 3, 0.205 s); ruling 288.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
