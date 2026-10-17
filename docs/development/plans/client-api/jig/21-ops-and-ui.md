@@ -244,21 +244,46 @@ Needs: 21.2 (both roots on the client).
 Files: `crates/jig-client-view/src/{ui.rs, boundary.rs, page.rs and
 page/**, objects.rs, application.rs, conversation/**, frame/me.rs,
 lib.rs}`; removed: `bridge.rs`, `watches.rs`, `reads.rs`, `link.rs`,
-`versions.rs`, the spine's watch functions (the moved domain.rs's
-`open`, `retire`, `close_*`, `watch_event`, findings 2's "watch spine",
-lines 830-1167 at the base); both roots' `route.rs` (the Ui stepped
+`versions.rs`, the spine's watch functions (in
+`crates/jig-client-view/src/ui.rs` at jig `154e10942`: `open` :465,
+`retire` :481, `close_one`, `close_page` and `close_all` :505-521,
+`close_watch` :560, `watch_event` :813, `watch_end`, `terminal_watch`
+and `read_final_task` :958-1109); both roots' `route.rs` (the Ui stepped
 with `&Client`; `ops`'s in its own commit); `testing/jig-client-test-view`,
 `examples/ops/client-view` (they read `ui.sections()`, `ui.shown()`);
 the worlds' fronts.
+Re-check at jig `154e10942` (after 21.2): the users of what 21.3 removes
+join the Files. `Request::{SignIn, Fact}`, `Act::SignIn` and
+`signin::Provider` in the view crate: `signin.rs`, `action.rs:77`,
+`binding.rs:168`, `pages/not_the_work.rs:31-39`, `limits/ui.rs:19`
+(`providers`), `sizes/pages.rs:292-295`, `store.rs:70, :81, :125`,
+`intents.rs:114, :182`. In both roots: `boundary.rs`'s `Fact::Jig`
+(`testing/jig-client-test-domain/src/boundary.rs:41`,
+`examples/ops/client-domain/src/boundary.rs:50`), `domain.rs`'s
+`provider()` (ops :120, the test root :97), `lib.rs`, and ops's
+`tests_support.rs:24, :133`. The setups of `providers: 2` and
+`provider(..)`: `tests/client/src/test.rs:29, :167, :169`,
+`tests/ops/src/joint/fixture.rs:101`, `tests/ops/src/client/app.rs:39,
+:156`, `tests/client-protocol/src/fixtures.rs:79`, ops client-domain
+`tests.rs:26`, ops client-view `tests.rs:23`,
+`testing/jig-client-test-view/src/tests/transport.rs:85`,
+`testing/jig-client-test-domain/src/tests/root/fixtures.rs:19`.
+`tests/client/src/observe.rs:203-241` (`jig_received`, an exhaustive
+match on the Ui's `Event` that feeds the referee's receipts,
+`tests/client/src/harness/referee.rs:215-221`). The view's `Domain`
+becomes `Ui` in each file that names it (`git grep -n -w 'Domain' --
+crates/jig-client-view/src`, and what the compiler names): those join
+the Files, listed in the commit body.
 Ready check (ruling 192): the watch spine's `open`, `retire` and
-`close_*` are at `crates/jig-domain-client/src/domain.rs:479, :502,
-:528-583` (13.2 moves them), `watch_event` at :838; `ui.sections()` is
-read by `crates/jig-client-view/src/pages.rs:107-219` and
+`close_*`, and `watch_event`, are in `ui.rs` since 13.2 (lines above);
+`ui.sections()` is read by `crates/jig-client-view/src/pages.rs:108-220` and
 `sections/task.rs:61` (the examples call `shown()` alone). The sketch
-derives `Debug`, `PartialEq` and `Eq` on `Request` and on
-`jig_client::Event` (`crates/jig-client/src/client.rs`, which joins the
-Files: it derives `Debug` alone), and `How` derives `Copy, PartialEq,
-Eq`; `Request` is not `Clone` (`With` is not). `step` and `fire` take
+derives `Debug`, `PartialEq` and `Eq` on the Ui's `Event` and `Request`,
+`Debug` on `Ui` and `Refused`, and `How` derives `Copy, PartialEq, Eq`;
+`next_deadline` and `shown` are `#[must_use]`. `jig_client::Event` and
+`jig_client::Request` derive `Debug, PartialEq, Eq` since `5c06a7e98`
+(`crates/jig-client/src/client.rs:10, :29`): `client.rs` is not in the
+Files; `Request` is not `Clone` (`With` is not). `step` and `fire` take
 `wall`, as the sketch has them (view.md, 18.1, amended), and the Ui's
 `Request::{SignIn, Fact, Continue}` go (the designer's answer of
 2026-10-17, in the Shape).
@@ -285,13 +310,13 @@ party the Ui comes back to the place it kept (view.md, 18.6), with no
 `back`. The test application's view puts its "Sign in with Test"
 button (`tests/client/tests/shell.rs:78`) in the slot; its act is the
 test root's own sign-in request, which its worlds carry as `Duty::SignIn`
-does at jig `5274ad08e` (`tests/client/src/harness/world.rs:556,
-:607-614`), less the `back` it goes to; `ops`'s the same, in its own
+does at jig `154e10942` (`Duty::SignIn`,
+`tests/client/src/harness/world.rs:565`), less the `back` it goes to; `ops`'s the same, in its own
 commit. `Request::Fact` and the moved `facts.rs` go (view.md, 18.1): no
 root, world or shell reads a fact (each drops it:
-`tests/client/src/harness/world.rs:558`,
-`tests/client/src/joint/front.rs:221`,
-`tests/client-protocol/src/front.rs:225`), and the five lines that name
+`tests/client/src/harness/world.rs:567`,
+`tests/client/src/joint/front.rs:224`,
+`tests/client-protocol/src/native.rs:190`), and the five lines that name
 a `Fact` in four of the moved crate's test files (`git grep -c` at jig
 `5274ad08e`) check the refusal the page or the act shows instead
 (view.md, 18.2 and 18.4). A handle the
@@ -372,14 +397,19 @@ page/**, frame/me.rs, boundary.rs, ui.rs}`;
 `testing/jig-client-test-domain/src/{first.rs, second.rs, route.rs}`;
 `examples/ops/client-domain/src/{infrastructure.rs, observability.rs,
 route.rs}`; the worlds' fronts.
-Ready check (ruling 192): the Files gain `limits.rs` in ops (:42-80) and
+Ready check (ruling 192): the Files gain `limits.rs` in ops (about
+:38-80 since 21.2) and
 in the test root (:39-49), whose factor 3 comes from the frame hand-offs
 this increment removes; the tests that build `Event::Link` and
-`Event::Confirmed` (ops client-domain `tests.rs:1414-1465`, ops
-client-view `tests.rs:1621`, the test domain's
-`tests/family_terminals.rs:54, :265`); and the family sides'
+`Event::Confirmed` (at jig `154e10942`: ops client-domain `tests.rs:1135-1186`, ops
+client-view `tests.rs:1619-1620`,
+`testing/jig-client-test-domain/src/tests/family_terminals.rs:55-56,
+:266`); and the family sides'
 `Request::Frame` (ops `infrastructure.rs:97`, `observability.rs:82`;
-`first.rs:63`) and `FrameShown`, which go and join the Done-when grep.
+`first.rs:63`) and `FrameShown`, which go and join the Done-when grep;
+`tests/client/tests/shell.rs:30` (it builds `Event::Ask { ByValue }`)
+and `tests/client/src/observe.rs:230-242` (it matches `Event::{Kept,
+KeptGone, Ask, Frame}`), which no grep covers.
 Shape: `Event::Ask { ask: ByValue }`, `Event::Frame { asked }`,
 `Request::FrameIs`, `Request::Answered { asked }`, `Request::Unknown {
 asked }`, `Event::Kept { scope, requests }`, `Event::KeptGone`,
@@ -412,9 +442,10 @@ Removes: the by-value hand-offs; `Kept { scope, requests }`.
 ## Interface sketches
 
 Checked at the base with `heavy cargo clippy -p jig-w6-sketch
---all-targets -- -D warnings` in a scratch crate, the page's types named
-at their base paths (`jig_domain_client::{action, address, pages,
-contract}`), passing. The Ui owns its place, page, working set, intents,
+--all-targets -- -D warnings` in a scratch crate, and again at jig
+`154e10942` with the derives and `#[must_use]` below, passing; `Record`
+and `StoreKey` are the view's `store::{Record, StoreKey}`, which keep
+their names. The Ui owns its place, page, working set, intents,
 drafts and notices; it reads documents, pending requests and the link
 from the client the root lends; the root owns only the client and its
 children.
@@ -422,6 +453,7 @@ children.
 ```rust
 // crates/jig-client-view/src/ui.rs (21.3)
 /// What the reference UI hears (view.md, 18.1).
+#[derive(Debug, PartialEq, Eq)]
 pub enum Event {
     /// Its own records, as the application kept them; the place it starts at; its seed.
     Start { records: List<Record>, place: Place, seed: u64 },
@@ -436,25 +468,31 @@ pub enum Event {
     /// What the client told under `Asker::JIG`, and the link, as the root routes them.
     Client { told: Told },
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum How { Push, Replace }
 /// What the reference UI asks (view.md, 18.1).
+#[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     /// One of the client's events, `Watch`, `Unwatch`, `Read`, `Send` or
     /// `SignOut`, which the root gives the client in the same step.
     Client { asked: jig_client::Event },
     Show { place: Place, how: How },
     Save { records: List<Record> },
-    Erase { records: List<RecordKey> },
+    Erase { records: List<StoreKey> },
     ShowPart { part: Part, scope: PartScope },
     PartsLeft,
 }
+#[derive(Debug)]
 pub enum Refused { Navigation, Arrangement }
+#[derive(Debug)]
 pub struct Ui { /* place, page, objects, intents, drafts, notices, seed */ }
 impl Ui {
     pub fn new(navigation: Navigation, home: Address, arrangement: Arrangement) -> Result<Ui, Refused>;
     pub fn step(&mut self, now: Time, wall: Wall, client: &Client, event: Event, out: &mut Queue<Request>);
     pub fn fire(&mut self, now: Time, wall: Wall, client: &Client, out: &mut Queue<Request>);
+    #[must_use]
     pub fn next_deadline(&self) -> Option<Time>;
+    #[must_use]
     pub fn shown(&self) -> u64;
 }
 ```
@@ -474,7 +512,8 @@ impl Ui {
   crates/jig-client-view/src/reads.rs crates/jig-client-view/src/link.rs
   crates/jig-client-view/src/versions.rs` prints nothing.
 - `git -C ~/src/rust/jig grep -n -E -e 'FrameIs|ByValue' -e 'Kept \{ scope'
-  -e 'fn watch_event' -e 'Event::Frame' origin/main --
+  -e 'fn watch_event' -e 'Event::Frame' -e 'Request::Frame' -e
+  'FrameShown' origin/main --
   crates/jig-client-view/src testing/jig-client-test-domain/src
   testing/jig-client-test-view/src examples/ops/client-domain/src
   examples/ops/client-view/src` prints nothing.

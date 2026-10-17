@@ -779,6 +779,33 @@ per session are in each file.
     module); the 60-line test then takes about 38 lines. In your landing
     report, name each test function over 40 lines that your commit leaves,
     with its length at the base and now.
+  - 08:16Z, point 1 (jig 21.3, 21.4, and every jig session that adds tests
+    to the default suite): The focused suite has 15 s, and jig 21.2
+    landed at 13.744 s (92%; 11.806 s before it). Six of its new tests are
+    cause-finding reproductions that stayed in the default suite, each
+    building a whole signed-in world;
+    `an_accepted_restart_opens_its_remediation_panels` (over 2 s) repeats
+    the steps of p at `tests/ops/tests/fuzzy_joint.rs:100-114`. Before
+    `land`, run `grep 'SLOW \[' <the gate's log>` and name in your report
+    each test you added that it lists. A test you wrote to find a cause
+    stays in the default suite only if it checks what the Proof does not
+    and takes under 0.5 s; otherwise it goes, or into a `fuzzy_` binary,
+    and the log keeps the cause. 21.3 deletes the panels test and moves
+    the two over 1 s (`an_environment_answer_can_be_lost_at_its_native_byte_face`,
+    `an_environment_chat_stays_live_while_its_provision_finishes`) to
+    `fuzzy_joint.rs`, as a small fix outside its Files, and reports the
+    gate's time.
+  - 08:16Z, point 2 (the jig sessions that edit `tests/ops`): README "A
+    test's helpers once": before a helper goes into a test file, search
+    the crate's fixtures and the other test files. `see(words)` is defined
+    in `tests/ops/tests/client_stories.rs:27`, `fuzzy_joint.rs:20` and
+    (jig 21.2) `tests/ops/src/joint/bytes/tests.rs:7`, `press` in the same
+    three, and the incident search and `remediation` twice
+    (`fuzzy_joint.rs:35, :48`; `bytes/tests.rs:41, :102`). The first of
+    you to edit one of them moves `see(words)`, `press(role, words)`,
+    `incident_lead(engine)` and `remediation(engine, lead)` into
+    `tests/ops/src/joint/fixture.rs`, `pub`, and uses them in the three
+    files; report it as a small fix outside your Files.
 
 ## Prerequisites the run checks at its start
 
