@@ -29,6 +29,9 @@ impl Tokens {
     pub fn new(id: u64) -> Self {
         Self { id, file: File::ApiToken, cap: None, page: 1, phase: Phase::Read }
     }
+    pub fn cap(&self) -> Option<u32> {
+        self.cap
+    }
     pub fn name(&self) -> &'static [u8] {
         match self.file {
             File::ApiToken => b"temper-api",
@@ -179,13 +182,13 @@ impl Tokens {
         }
     }
 }
-fn reply(event: Event) -> Result<Reply, Why> {
+pub(super) fn reply(event: Event) -> Result<Reply, Why> {
     match event {
         Event::Reply(reply) => Ok(reply),
         Event::Begin | Event::Read(_) | Event::Written | Event::Drawn(_) => Err(Why::Unexpected),
     }
 }
-fn unexpected(reply: Reply) -> Why {
+pub(super) fn unexpected(reply: Reply) -> Why {
     match reply {
         Reply::Status(status) => Why::Refused(status),
         Reply::Down => Why::Down,

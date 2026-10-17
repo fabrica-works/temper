@@ -40,6 +40,9 @@ impl World {
         service.setup_mut().token(admin, b"setup-admin", &[b"all"], fixtures::secret(fixtures::ADMIN));
         if owned {
             service.setup_mut().account(b"ada", true, b"Ada");
+        } else {
+            service.setup_mut().org(b"acme", b"temper-admin");
+            service.setup_mut().org(b"work", b"temper-admin");
         }
         Self {
             entry: fixtures::entry(owned),
@@ -53,6 +56,9 @@ impl World {
             secrets: vec![fixtures::secret(fixtures::ADMIN)],
         }
     }
+    pub fn missing_org(&mut self, name: &[u8]) {
+        self.entry.orgs = Box::new([name.into()]);
+    }
     pub fn listening(&mut self, address: SocketAddr) {
         self.listener = Some(address);
     }
@@ -61,6 +67,9 @@ impl World {
         self.files.iter().find(|(f, _)| *f == file).map(|(_, value)| value)
     }
     pub fn put(&mut self, file: File, bytes: Secret) {
+        if matches!(file, File::ApiToken | File::GitToken | File::WebhookSecret) {
+            self.secrets.push(bytes.clone());
+        }
         if let Some((_, value)) = self.files.iter_mut().find(|(f, _)| *f == file) {
             *value = bytes;
         } else {
@@ -94,6 +103,9 @@ impl World {
     }
     pub fn reconcile(&mut self) -> Ended {
         self.secrets.extend(self.service.setup().issued().iter().map(|token| token.secret.clone()));
+        for org in &self.entry.orgs {
+            self.secrets.extend(self.service.setup().subscriptions(org).map(|hook| hook.secret.clone()));
+        }
         let mut machine = Reconcile::new(&self.entry, self.listener);
         let mut out = Queue::with_capacity(reconcile::MAX_OUT);
         let mut event = Event::Begin;

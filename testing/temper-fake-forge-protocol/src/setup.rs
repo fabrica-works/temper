@@ -8,7 +8,11 @@ use temper_forge_forgejo::{
     server::{self, Answer},
 };
 mod accounts;
+mod hooks;
+mod orgs;
 mod tokens;
+pub use hooks::Subscription;
+pub use orgs::{Organization, Team};
 /// A setup account; its password is never retained.
 #[derive(Debug)]
 pub struct Account {
@@ -31,6 +35,12 @@ pub struct Issued {
 pub struct Store {
     accounts: List<Account>,
     tokens: List<Issued>,
+    orgs: List<Organization>,
+    teams: List<Team>,
+    hooks: List<Subscription>,
+    next_org: u64,
+    next_team: u64,
+    next_hook: u64,
     next_account: u64,
     next_token: u64,
     string_bytes: usize,
@@ -42,6 +52,12 @@ impl Store {
         Self {
             accounts: List::with_capacity(cap),
             tokens: List::with_capacity(cap),
+            orgs: List::with_capacity(cap),
+            teams: List::with_capacity(cap),
+            hooks: List::with_capacity(cap),
+            next_org: 1,
+            next_team: 1,
+            next_hook: 1,
             next_account: 1,
             next_token: 1,
             string_bytes: usize::try_from(limits.documents.string_bytes).expect("u32 fits"),
@@ -119,7 +135,18 @@ impl Store {
             Request::CreateUser { .. }
             | Request::Tokens { .. }
             | Request::CreateToken { .. }
-            | Request::DeleteToken { .. } => {
+            | Request::DeleteToken { .. }
+            | Request::Org { .. }
+            | Request::CreateOrg { .. }
+            | Request::Teams { .. }
+            | Request::CreateTeam { .. }
+            | Request::EditTeam { .. }
+            | Request::TeamMembers { .. }
+            | Request::OrgHooks { .. }
+            | Request::CreateOrgHook { .. }
+            | Request::EditOrgHook { .. }
+            | Request::DeleteOrgHook { .. }
+            | Request::AddMember { .. } => {
                 let admin = match self.user(user) {
                     Some(account) => account.is_admin,
                     None => false,
@@ -133,17 +160,6 @@ impl Store {
             Request::ApiSettings
             | Request::RepositoryById { .. }
             | Request::Repository { .. }
-            | Request::Org { .. }
-            | Request::CreateOrg { .. }
-            | Request::Teams { .. }
-            | Request::CreateTeam { .. }
-            | Request::EditTeam { .. }
-            | Request::TeamMembers { .. }
-            | Request::OrgHooks { .. }
-            | Request::CreateOrgHook { .. }
-            | Request::EditOrgHook { .. }
-            | Request::DeleteOrgHook { .. }
-            | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }
             | Request::Issue { .. }
@@ -188,21 +204,21 @@ impl Store {
             Request::Tokens { login, page } => self.list_tokens(login, *page, config, limits),
             Request::CreateToken { login, name, scopes } => self.create_token(login, name, scopes, limits),
             Request::DeleteToken { login, id } => self.delete_token(login, *id, limits),
+            Request::Org { name } => self.read_org(name, limits),
+            Request::CreateOrg { person, name } => self.create_org(person, name, limits),
+            Request::Teams { org, page } => self.list_teams(org, *page, config, limits),
+            Request::CreateTeam { org, spec } => self.create_team(org, spec, limits),
+            Request::EditTeam { team, spec } => self.edit_team(*team, spec, limits),
+            Request::TeamMembers { team, page } => self.members(*team, *page, config, limits),
+            Request::AddMember { team, login } => self.add_member(*team, login, limits),
+            Request::OrgHooks { org, page } => self.list_hooks(org, *page, config, limits),
+            Request::CreateOrgHook { org, hook } => self.create_hook(org, hook, limits),
+            Request::EditOrgHook { org, id, hook } => self.edit_hook(org, *id, hook, limits),
+            Request::DeleteOrgHook { org, id } => self.delete_hook(org, *id, limits),
             Request::User
             | Request::ApiSettings
             | Request::RepositoryById { .. }
             | Request::Repository { .. }
-            | Request::Org { .. }
-            | Request::CreateOrg { .. }
-            | Request::Teams { .. }
-            | Request::CreateTeam { .. }
-            | Request::EditTeam { .. }
-            | Request::TeamMembers { .. }
-            | Request::OrgHooks { .. }
-            | Request::CreateOrgHook { .. }
-            | Request::EditOrgHook { .. }
-            | Request::DeleteOrgHook { .. }
-            | Request::AddMember { .. }
             | Request::UserSearch { .. }
             | Request::Issues { .. }
             | Request::Issue { .. }
@@ -268,7 +284,10 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
                 .checked_add(u64::from(limits.http.head).max(40))?,
         )?,
     )?;
-    account.checked_add(issued.checked_mul(2)?)
+    account
+        .checked_add(issued.checked_mul(2)?)?
+        .checked_add(orgs::worst_case(limits)?)?
+        .checked_add(hooks::worst_case(limits)?)
 }
 
 fn joined(parts: &[&[u8]]) -> Box<[u8]> {
@@ -281,4 +300,14 @@ fn joined(parts: &[&[u8]]) -> Box<[u8]> {
         writer.put(part).expect("sized setup message");
     }
     writer.finish()
+}
+
+fn empty() -> Reply {
+    Reply { status: 204, headers: Box::new([]), body: Box::new([]) }
+}
+fn absent(limits: &Limits) -> Reply {
+    refusal(404, b"The target couldn't be found.", limits)
+}
+fn full(limits: &Limits) -> Reply {
+    refusal(503, b"setup store is full", limits)
 }

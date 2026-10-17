@@ -48,3 +48,19 @@ pub fn bot_tokens(world: &mut crate::World) -> u64 {
     world.put(File::GitToken, secret(GIT));
     id
 }
+#[must_use]
+pub fn team(name: &[u8]) -> temper_forge_forgejo::document::TeamSpec {
+    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+    TeamSpec {
+        name: name.into(),
+        permission: Access::Write,
+        includes_all_repositories: true,
+        units: Units { code: Access::Write, issues: Access::Write, pulls: Access::Write, actions: Access::Write },
+    }
+}
+#[must_use]
+pub fn listener() -> std::net::SocketAddr {
+    "127.0.0.1:9898".parse().expect("listener")
+}
+pub const URL: &[u8] = b"http://127.0.0.1:9898/hooks/1";
+pub const WEBHOOK: &[u8] = b"webhook-secret-present-before-reconcile";

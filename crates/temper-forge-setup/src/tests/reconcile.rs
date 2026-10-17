@@ -45,7 +45,7 @@ fn an_absent_bot_is_made_with_a_drawn_password_and_the_marker() {
     assert_eq!(run.step(user(fixtures::person(b"temper", b"temper:bot"))), Need::Read(File::ApiToken));
     run.kept_tokens();
     assert_eq!(run.step(Event::Read(None)), Need::Write { file: File::User, bytes: secret(b"42") });
-    assert_eq!(run.step(Event::Written), Need::Done);
+    assert_eq!(run.step(Event::Written), Need::Send { request: Request::ApiSettings, token: secret(fixtures::ADMIN) });
 }
 #[test]
 fn a_bot_with_the_marker_is_kept_and_nothing_is_written() {
@@ -53,7 +53,10 @@ fn a_bot_with_the_marker_is_kept_and_nothing_is_written() {
     run.bot_lookup();
     assert_eq!(run.step(user(fixtures::person(b"temper", b"note temper:bot account"))), Need::Read(File::ApiToken));
     run.kept_tokens();
-    assert_eq!(run.step(Event::Read(Some(secret(b"42")))), Need::Done);
+    assert_eq!(
+        run.step(Event::Read(Some(secret(b"42")))),
+        Need::Send { request: Request::ApiSettings, token: secret(fixtures::ADMIN) }
+    );
 }
 #[test]
 fn a_user_of_the_bots_login_without_the_marker_is_refused_naming_the_login() {
@@ -113,7 +116,10 @@ fn the_bots_id_is_written_in_decimal_only_when_the_file_differs() {
             Need::Write { file: File::User, bytes: secret(b"42") },
             "{old:?}"
         );
-        assert_eq!(run.step(Event::Written), Need::Done);
+        assert_eq!(
+            run.step(Event::Written),
+            Need::Send { request: Request::ApiSettings, token: secret(fixtures::ADMIN) }
+        );
     }
 }
 #[test]
@@ -152,5 +158,53 @@ fn a_draw_of_another_length_stops_before_creating_the_bot() {
     assert_eq!(
         run.step(Event::Drawn(secret(&[0x0a; 31]))),
         Need::Stop(Failure { forge: 1, step: Stage::Bot, subject: b"temper".as_slice().into(), why: Why::Unexpected })
+    );
+}
+#[test]
+fn hook_urls_are_written_for_loopback_v4_and_v6() {
+    use crate::reconcile::hook_url;
+    use core::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+    for (address, forge, expected) in [
+        (SocketAddr::from((Ipv4Addr::LOCALHOST, 9898)), 1, Some(b"http://127.0.0.1:9898/hooks/1".as_slice())),
+        (SocketAddr::from((Ipv6Addr::LOCALHOST, 65535)), 65535, Some(b"http://[::1]:65535/hooks/65535".as_slice())),
+        (SocketAddr::from((Ipv4Addr::new(127, 2, 3, 4), 80)), 2, Some(b"http://127.2.3.4:80/hooks/2".as_slice())),
+        (SocketAddr::from((Ipv4Addr::new(192, 0, 2, 1), 9898)), 1, None),
+    ] {
+        assert_eq!(hook_url(address, forge).as_deref(), expected, "{address}");
+    }
+}
+#[test]
+fn a_lower_hook_met_later_deletes_the_higher_one_kept() {
+    use temper_forge_forgejo::request::{HookSpec, Page};
+    let mut run = Run::hook_listing();
+    assert_eq!(
+        run.step(Event::Reply(Reply::Rows(Box::new([fixtures::hook_row(7), fixtures::hook_row(3)])))),
+        Need::Send {
+            request: Request::DeleteOrgHook { org: b"acme".as_slice().into(), id: 7 },
+            token: secret(fixtures::ADMIN)
+        }
+    );
+    assert_eq!(
+        run.step(Event::Reply(Reply::Empty)),
+        Need::Send {
+            request: Request::OrgHooks { org: b"acme".as_slice().into(), page: Page { page: Some(1), limit: Some(2) } },
+            token: secret(fixtures::ADMIN)
+        }
+    );
+    assert_eq!(
+        run.step(Event::Reply(Reply::Rows(Box::new([fixtures::hook_row(3)])))),
+        Need::Send {
+            request: Request::EditOrgHook {
+                org: b"acme".as_slice().into(),
+                id: 3,
+                hook: HookSpec {
+                    url: b"http://127.0.0.1:9898/hooks/1".as_slice().into(),
+                    secret: secret(b"webhook-secret"),
+                    events: fixtures::subscribed(),
+                    active: true,
+                }
+            },
+            token: secret(fixtures::ADMIN)
+        }
     );
 }

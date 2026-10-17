@@ -322,3 +322,50 @@ pub fn failed() -> crate::prepare::Event {
         stderr: secret(b"broken"),
     })
 }
+impl Run {
+    pub fn hook_listing() -> Self {
+        use crate::reconcile::{Event, Reply};
+        use temper_forge_forgejo::document::{ApiSettings, Document, Org, Row, Team};
+        let mut run = Self::managed();
+        run.machine = crate::reconcile::Reconcile::new(&run.entry, Some(SocketAddr::from((Ipv4Addr::LOCALHOST, 9898))));
+        run.bot_lookup();
+        run.step(Event::Reply(Reply::Document(Document::User(person(b"temper", b"temper:bot")))));
+        run.kept_tokens();
+        run.step(Event::Read(Some(secret(b"42"))));
+        run.step(Event::Reply(Reply::Document(Document::ApiSettings(ApiSettings {
+            max_response_items: 2,
+            default_paging_num: 30,
+        }))));
+        run.step(Event::Reply(Reply::Document(Document::Org(Org { id: 1, name: b"acme".as_slice().into() }))));
+        run.step(Event::Reply(Reply::Rows(Box::new([]))));
+        run.step(Event::Reply(Reply::Document(Document::Team(Team { id: 1, spec: team_spec() }))));
+        run.step(Event::Reply(Reply::Rows(Box::new([Row::User(person(b"temper", b"temper:bot"))]))));
+        run.step(Event::Read(Some(secret(b"webhook-secret"))));
+        run
+    }
+}
+pub fn team_spec() -> temper_forge_forgejo::document::TeamSpec {
+    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+    TeamSpec {
+        name: b"temper".as_slice().into(),
+        permission: Access::Write,
+        includes_all_repositories: true,
+        units: Units { code: Access::Write, issues: Access::Write, pulls: Access::Write, actions: Access::Write },
+    }
+}
+pub fn hook_row(id: u64) -> temper_forge_forgejo::document::Row {
+    temper_forge_forgejo::document::Row::Hook(temper_forge_forgejo::document::Hook {
+        id,
+        url: b"http://127.0.0.1:9898/hooks/1".as_slice().into(),
+        events: Box::new([]),
+        active: false,
+    })
+}
+
+pub fn subscribed() -> Box<[Box<[u8]>]> {
+    let mut events = skein_lib::List::with_capacity(22);
+    for event in temper_forge_forgejo::delivery::SUBSCRIBED {
+        events.push(event.into()).expect("events");
+    }
+    events.into_boxed()
+}

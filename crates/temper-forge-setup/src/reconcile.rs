@@ -1,4 +1,6 @@
 //! One forge reconciled from its answers, with one need outstanding (setup.md, 5).
+mod hooks;
+mod orgs;
 mod tokens;
 use crate::{
     place::File,
@@ -6,6 +8,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use core::net::SocketAddr;
+pub use hooks::hook_url;
 use skein_lib::{Decimal, Queue, Secret, Writer, bytes};
 use temper_forge_forgejo::{
     document::{Document, Row},
@@ -83,6 +86,8 @@ enum State {
     Tokens,
     Id(u64),
     Written,
+    Orgs,
+    Hooks,
     Ended,
 }
 /// One forge's state; credentials remain beside the machine's requests.
@@ -93,12 +98,24 @@ pub struct Reconcile {
     admin: Option<Secret>,
     state: State,
     tokens: Option<tokens::Tokens>,
+    orgs: Option<orgs::Orgs>,
+    hooks: Option<hooks::Hooks>,
+    listener: Option<SocketAddr>,
 }
 impl Reconcile {
     /// Starts one entry; hooks use the listener when their step is reached.
     #[must_use]
-    pub fn new(entry: &Entry, _listener: Option<SocketAddr>) -> Self {
-        Self { forge: entry.forge, bot: entry.bot.clone(), admin: None, state: State::Begin, tokens: None }
+    pub fn new(entry: &Entry, listener: Option<SocketAddr>) -> Self {
+        Self {
+            forge: entry.forge,
+            bot: entry.bot.clone(),
+            admin: None,
+            state: State::Begin,
+            tokens: None,
+            orgs: Some(orgs::Orgs::new(entry)),
+            hooks: None,
+            listener,
+        }
     }
     fn send(&self, request: Request) -> Need {
         Need::Send { request, token: self.admin.clone().expect("admin checked before bot") }
@@ -163,8 +180,7 @@ impl Reconcile {
                         Some(value) => value.expose() == digits.as_bytes(),
                         None => false,
                     } {
-                        self.admin = None;
-                        Need::Done
+                        self.start_orgs()
                     } else {
                         self.state = State::Written;
                         Need::Write { file: File::User, bytes: Secret::new(bytes::copy_of(digits.as_bytes())) }
@@ -175,14 +191,13 @@ impl Reconcile {
                 }
             },
             State::Written => match event {
-                Event::Written => {
-                    self.admin = None;
-                    Need::Done
-                }
+                Event::Written => self.start_orgs(),
                 Event::Begin | Event::Read(_) | Event::Reply(_) | Event::Drawn(_) => {
                     self.stop(Stage::Bot, Why::Unexpected)
                 }
             },
+            State::Orgs => orgs::advance(self, event),
+            State::Hooks => hooks::advance(self, event),
             State::Ended => unreachable!("terminal machine is not advanced"),
         }
     }
@@ -211,19 +226,12 @@ impl Reconcile {
     fn draw(&mut self, event: Event) -> Need {
         match event {
             Event::Drawn(value) if value.len() == 32 => {
-                let mut password = Writer::new(64);
-                for byte in value.expose() {
-                    for nibble in [byte >> 4, byte & 15] {
-                        let digit = b"0123456789abcdef".get(usize::from(nibble)).expect("hex digit");
-                        password.put(&[*digit]).expect("32 bytes as 64 hex digits");
-                    }
-                }
                 self.state = State::Create;
                 self.send(Request::CreateUser {
                     login: self.bot.login.clone(),
                     email: self.bot.email.clone(),
                     full_name: bytes::copy_of(b"temper:bot"),
-                    password: Secret::new(password.finish()),
+                    password: hex(&value),
                     must_change_password: false,
                 })
             }
@@ -281,9 +289,52 @@ pub fn step(machine: &mut Reconcile, event: Event, out: &mut Queue<Need>) {
         | State::Create
         | State::Tokens
         | State::Id(_)
-        | State::Written => {
+        | State::Written
+        | State::Orgs
+        | State::Hooks => {
             let need = machine.advance(state, event);
             out.push(need);
         }
+    }
+}
+
+fn hex(value: &Secret) -> Secret {
+    let mut out = Writer::new(64);
+    for byte in value.expose() {
+        for nibble in [byte >> 4_u8, byte & 15] {
+            out.put(&[*b"0123456789abcdef".get(usize::from(nibble)).expect("hex digit")])
+                .expect("32 bytes as 64 hex digits");
+        }
+    }
+    Secret::new(out.finish())
+}
+impl Reconcile {
+    fn start_orgs(&mut self) -> Need {
+        self.state = State::Orgs;
+        let cap = self.tokens.as_ref().expect("tokens checked").cap();
+        let orgs = self.orgs.as_mut().expect("org walk");
+        orgs.begin(cap);
+        let name = orgs.name().into();
+        if cap.is_some() { self.send(Request::Org { name }) } else { self.send(Request::ApiSettings) }
+    }
+    fn start_hooks(&mut self, names: Box<[Box<[u8]>]>, cap: u32) -> Need {
+        let url = match self.listener {
+            Some(address) => hook_url(address, self.forge),
+            None => None,
+        };
+        if let Some(url) = url {
+            self.hooks = Some(hooks::Hooks::new(names, cap, url));
+            self.state = State::Hooks;
+            Need::Read(File::WebhookSecret)
+        } else {
+            self.admin = None;
+            self.state = State::Ended;
+            Need::Done
+        }
+    }
+    fn stop_named(&mut self, stage: Stage, name: &[u8], why: Why) -> Need {
+        let Need::Stop(mut failure) = self.stop(stage, why) else { unreachable!("stop") };
+        failure.subject = name.into();
+        Need::Stop(failure)
     }
 }
