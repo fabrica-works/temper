@@ -1128,6 +1128,15 @@ choice would have been the user's (development.md, 10.4).
 
      If s2 finds a further client file the pin forces, it carries that file too and lists it in the commit body.
 
+202. **temper 03.s2 repairs Grace's forge release in temper's engine** (plan defect, temper 03.s2's block of 2026-10-17T01:52:07Z).
+     Option A. The repair is already in s2's scope. s2's Shape (`temper/03-s2-repin-sweep.md`, ruling 199) reads: "with every repair it needs in temper's engine, store and conformance adapters and their tests, the four new conformance scenarios (`Compound`, `Grace`, ...) ... each runs against temper's adapter and passes." The forge release and its `EffectFailed` hold live in temper's engine crates (`crates/temper-engine-domain/src/route/forge_route.rs`, and the `temper-engine-domain-forge*` crates).
+
+     1. The diagnosis and the repair are in s2: aim for at most 30 minutes of diagnosis. Past that, report what was found, with the file:line where the release fails, and go on with the other scenarios.
+     2. The regression test goes at the lowest layer that shows the failure: a unit or engine test of the release after a cold start, at most 40 lines, under 20 ms. It is counted with the test lines, apart. The repair's production lines count in s2's 550.
+     3. If the diagnosis puts the cause outside temper, report it as a block naming the file:line and the repository, and never skip `Grace`. Outside temper means jig's `Grace` scenario or engine side, or a rule of the design that temper's release breaks.
+
+     This changes nothing else in ruling 201's split.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
