@@ -1951,6 +1951,16 @@ choice would have been the user's (development.md, 10.4).
      - `tests/client-protocol/src/client/operations.rs:8: pub fn running_task`; `fixtures/queries.rs:7: pub fn task_query`, `:27: pub fn task_lines`; no `fn me` or `fn line` on `Story`; `skein-lib/src/time.rs:21: pub struct Wall(u64);`, with `from_nanos` and `as_nanos` and no add.
      - The re-check's sub-agent: the `facts`, `shapes` and `words` sketches clean under clippy `-D warnings`; 1,092 of 1,092 focused and 37 of 37 fuzzy in `jig-client`, `jig-boundary`, `jig-client-view`, `jig-client-world`, `jig-client-protocol-world` and `jig-client-test-kit`, with 15.2's `skein-ui` dependency and graph pin and the corrected `dangerous` test. Not compiled: the `thread` and `check` sketches (their types exist on main).
 
+283. **jig 15.1: the joint question wait, reproduced at the joint tier** (process, jig 15.1's block of 2026-10-17T20:57:18Z).
+     Ruling 283 (process, jig 15.1's block of 2026-10-17T20:57:18Z): the joint proof `a_running_chat_reads_as_writing_from_the_engine_s_documents` goes on, under ruling 229, once its failure point is reproduced at the tier where it fails. Its second run failed at the same `run_until` (`tests/client-protocol/tests/client.rs:659`) after the focused core test `a_scripted_chat_question_waits_for_its_requester` passed: the cause lies between the core and the joint story (the engine's and the link's translation of the wait, the story's document and line access, or the joint world's fake worker), which no focused test has logged yet. The assertion prints nothing when `run_until` gives up.
+
+     The harness correction stands: a chat's delegate asks the chat. The design admits it ("| a question, expecting an answer | a delegate | yes |", tasks.md, 8.1), and the core projects an unanswered question in a person-requested task's inbox as that person's `Question` entry (`jig-domain-core/src/inbox.rs:172-183`), which the engine gives as `WaitedFor::Question` (`jig-protocol-engine-clients/src/translate/queries.rs:67`).
+
+     1. **Now:** write a focused test at the joint tier (`jig-client-protocol-world`), with the proof's story up to its question, that prints, when its wait ends, the task document's and the task line's `chip` and `waits_on`, and the people child's entries for the chat's person; log its cause in `logs/jig-15/proof-15.1-failure-2.md`, and change only what that log names.
+     2. **Then run the proof once.** Ruling 229's count for this proof stands at 2 of 6: a run failing at a later point is progress; the same point again, or a cause in production code outside 15.1's Files, is a block with the logs.
+     3. **Make the diagnostic test's two wildcard arms exhaustive** (jig's `clippy.toml`; the 20:56Z report), or remove the test once the joint proof passes, if the joint test covers it.
+     4. **Unchanged:** 15.1's Proof and its 1 s bound; ruling 229's rule; no change to a referee's or judge's check; the harness changes stay in `testing/jig-fake-workers/src/lib.rs` and jig 12's `Story`, each named in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
