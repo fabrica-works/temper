@@ -336,9 +336,12 @@ carries the client's transport requests and events,
 `jig-client`"; the designer's answer of 2026-10-17).
 Needs: 13.3, and jig-13.s2 before the family sides' values cross the client (ruling 205).
 Files: `testing/jig-client-test-domain/src/{domain.rs, boundary.rs,
-route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}` (its 25
-`jig_client_domain` uses in 12 files go to `jig_client::`, as 13.2's
-do);
+route.rs, owner.rs, limits.rs, store.rs, first.rs, second.rs}` (its 26
+`jig_client_domain` uses in 13 files, 13.3's `family/wire.rs:179`
+among them, go to `jig_client::`, as 13.2's do);
+`testing/jig-client-test-domain/Cargo.toml` (`jig-client` for
+`jig-client-domain`), `Cargo.lock` and
+`tests/boundary/src/tests/graph.rs:244`, together (ruling 207);
 `crates/jig-client-view/src/{bridge.rs (new), ui.rs (the spine's
 silence and reopen timers go), lib.rs}`;
 `testing/jig-client-test-view/{src/tests.rs:72, :115,
@@ -366,13 +369,17 @@ Re-check (ruling 191, jig `73734dd6f`): users the Files miss:
 `tests/client-protocol/src/fixtures.rs:136` (`profile.table`),
 `tests/protocol.rs:204` (`store::Record::Table`);
 `tests/client/src/joint/people_stories.rs:385`,
-`stories/referee_stories.rs:40` (`Event::Answer`),
+`tests/client/src/joint/stories/referee_stories.rs:40` (`Event::Answer`),
 `tests/client/tests/{faults.rs:85, :153, shell.rs:48}` (`Record::Table`),
-`unlinked.rs:17-22` (`world.table`, jig 12.5's);
+`tests/client/tests/unlinked.rs:24` (`world.table`, jig 12.5's);
+`tests/client-protocol/src/client.rs` (:4 the link crate, :148
+`Request`);
 `tests/ops/src/joint/front.rs:129-144`, which matches the root's
 `Event` exhaustively and takes its new arm. The reference test's
-`root.first()` and `root.jig()` are accessors 13.4 adds (`domain.rs:12-13`
-are `pub(crate)` fields). The sketches take `#[must_use]` on each `pub
+`root.first()` and `root.jig()` exist
+(`testing/jig-client-test-domain/src/domain.rs:30-36`); it imports
+`crate::route` and `jig_client::Told`, calls `crate::max_out(..)`, and
+names `Link::Live` (ruling 207). The sketches take `#[must_use]` on each `pub
 fn` that returns a value, and `Owner::asker` converts by `to_le_bytes`
 as `Owner::opaque` does, never `as u32` (`as_conversions` is denied).
 The bridge's tells and values without a reference UI counterpart, and
@@ -435,7 +442,7 @@ and 18.6; client.md, 4, 8.3 and 11; line numbers at jig `5274ad08e`):
 - *A sign-out that does not reach the engine.* `jig-client` tells
   `Link` when it sets `sign_out_lost` (client.md, 4.2, amended; the
   arm at `crates/jig-client/src/client.rs:276-277`). `Client::unlinked`
-  answers `SignOut` at once (`client.rs:236`); it leaves the sign-out to
+  answers `SignOut` at once (`client.rs:232`); it leaves the sign-out to
   its world instead, which answers it signed out or not reached, as the
   link does from the wire, so that
   `a_lost_sign_out_keeps_the_person_signed_in_and_says_so`
@@ -513,12 +520,36 @@ gate runs `signing_in_and_starting_a_chat` (tests/client); nothing
 else.
 Don't: no map from handles or keys to children in the root; no `_` arm
 on an asker or an owner; no change to `ops` (jig 21.2).
+The view's timers' limits and states (ruling 207; jig `view.md`,
+1097-1100: "Backoffs and heartbeats are the client's (client.md,
+section 8)"): in `crates/jig-client-view/src/`, `Limits.backoff` and
+`Limits.heartbeat` go (`limits/ui.rs`), with their readers (`ui.rs:489,
+:927, :981, :983, :1239`), the silence timer (`Timer::Silent`), `retry`
+(`ui.rs:986`), `Following::Reopening` (`watches.rs`,
+`page/routing.rs:64`, `versions.rs`) and what then has no reader; the
+view's `Watch.behind` is set from the client's handle state alone: the
+bridge gives a `Changed` whose `client.document(..)` is `State::Behind`
+as a new `WatchEvent::Behind`, which sets `behind` and keeps the
+document, `State::Live` as `Delivered(..)`, which clears it
+(`ui.rs:884`), `Opening` as nothing; `WatchEnd::{Dropped, Busy,
+Stopping, Closed}` each retire the watch, as `Closed` does today outside
+recovery. `tests/client/src/joint/session.rs:118`,
+`tests/client-protocol/src/fixtures.rs:143, :153` and
+`tests/client/tests/unlinked.rs:35` take the heartbeat and backoff from
+the client's `Limits` (`jig-client-domain`'s `limits.rs:19, :29`).
+Refresh each further site the compiler names, and list it in the
+commit body. Downstream, the temper step that first pins a jig holding
+13.4 drops the two fields at `temper-client-domain/src/tests/fixtures.rs:40,
+:44`, `temper-client-shell-terminal/src/limits.rs:55, :59` and
+`temper-client-view/src/tests/fixtures.rs:37, :41`, and lists them in
+its commit body.
 Size: at most 380 lines (the root about 120, the bridge about 170, the
 family sides about 40, the native shell about 25, `jig-client`'s
 sign-out about 25, ruling 197). The parts count together.
 Removes: the test root's `RequestTable` and its table owner `Owner`
 (with `Kept { scope }`), `KeptAnswered`; the reference UI's silence and
-reopen timers; the native shell's dependency on
+reopen timers, with the view's `Limits.backoff` and `heartbeat`, `retry`
+and `Following::Reopening` (ruling 207); the native shell's dependency on
 `jig-client-protocol-link`.
 
 ## Interface sketches
