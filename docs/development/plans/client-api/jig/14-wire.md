@@ -363,7 +363,14 @@ Shape (wire, mirrored field for field by the contract):
   AnswerOn }`; `Ask.answer: Answer` replaces `answer_question` and
   `answer_person`.
 - `Cancel { project, task, reason, grace: option duration }`;
-  `Amendment` gains `tracked: option bool`, `priority: option u32`;
+  `Amendment` gains `tracked: option Tracking`, with `record
+  TrackingTracked { priority: u32 }` and `enum Tracking { tracked:
+  TrackingTracked, untracked }` declared before it, mirroring
+  `people::Tracking` variant for variant (ruling 260: tasks.md, 3,
+  "Whether it is tracked, and its priority if so"); the contract's
+  `Amendment.tracked: Option<Tracking>`, `enum Tracking { Tracked {
+  priority: u32 }, Untracked }`; a change of priority alone is an
+  amendment whose only change is `tracked: Some(Tracked { priority })`;
   `Amend.revision: option Revision`; `AdmissionLimit` gains `grace`.
 - The policy's template overrides, declared before `PolicyEdit` and
   mirroring `people::TemplateOverride` field for field:
@@ -722,7 +729,9 @@ record VerdictChoice { code: u32 words: u32 followups: u32 fields: list 32 Field
 # Added, or changed in place:
 record NotServed { owner: Owner served: list 16 Served }
 enum KeyedAnswer { not_served: NotServed, final_answer: Owned, busy, not_ready, signed_out }
-record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option bool priority: option u32 }
+record TrackingTracked { priority: u32 }
+enum Tracking { tracked: TrackingTracked, untracked }
+record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking }
 record SeenConversation { task: u64 through: u64 }
 enum SeenThrough { results: SeenResults, conversation: SeenConversation }
 record TemplateCharter { value: u32 }

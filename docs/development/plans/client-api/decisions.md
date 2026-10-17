@@ -1707,6 +1707,16 @@ choice would have been the user's (development.md, 10.4).
      2. Later sessions read it in the README; their prompts do not repeat it (ruling 167, point 4).
      3. Unchanged: points 1 and 3, already given to jig 21.4; ruling 258.
 
+260. **14.2's Amendment carries people's Tracking** (plan defect, jig 14.2's block of 2026-10-17T13:41:31Z).
+     Ruling 260 (plan defect, jig 14.2's block of 2026-10-17T13:41:31Z): not a design gap. The design answers in its own words, jig's `docs/design/domain/tasks.md`, 3 (:122): "**Whether it is tracked,** and its priority if so"; the people child already keeps it so, `people::Amendment.tracked: Option<Tracking>`, `Tracking { Tracked { priority: u32 }, Untracked }` (jig 04). The plan's two independent options made pairs the design has no meaning for. The wire takes your option B, mirroring people:
+
+     1. **Wire:** `record TrackingTracked { priority: u32 }`, `enum Tracking { tracked: TrackingTracked, untracked }`, declared before `Amendment`; `Amendment` gains `tracked: option Tracking`, in place of `tracked: option bool` and `priority: option u32`.
+     2. **Contract** (`crates/jig-client-domain/src/contract/asks.rs`): `pub enum Tracking { Tracked { priority: u32 }, Untracked }`, `Amendment.tracked: Option<Tracking>`, mirrored field for field.
+     3. **Translation:** `None` leaves tracking unchanged; `Some(Tracked { priority })` and `Some(Untracked)` become `people::Tracking`'s same variant. No refusal is added.
+     4. **A change of priority alone** is an amendment whose only change is `tracked: Some(Tracked { priority })`; it names no revision (contract.md, 3.2: "A change of priority alone names no revision: the first commit decides"). `a_priority_only_amend_names_no_revision` stands, built so.
+     5. **Later sketches** follow: jig 16's goal move sends `Amendment { tracked: Some(Tracking::Tracked { priority: p }), .. }`; jig 22's task-query story amends with `Some(Tracking::Tracked { priority: 2 })`. Refresh any further copy of `tracked: option bool` or `priority: option u32` in an `Amendment`, and list it in the commit body.
+     6. **Unchanged:** the rest of 14.2's Shape, Test shape and Size; the record merges, grace and template overrides you have going.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -200,7 +200,8 @@ Shape: the section watches `queries::goals(project)` and reads
 chip and phase in words, its progress (`phases`), its spend against its
 budget, its deadline and what is held below; moving a goal sends `Ask::Compound
 { project, operations }` of `Operation::Amend { revision: None, change:
-Amendment { priority: Some(p), .. } }`, one per goal whose priority
+Amendment { tracked: Some(Tracking::Tracked { priority: p }), .. } }`
+(ruling 260), one per goal whose priority
 changes, and the board says what priority does (pages.md, 6.2). The
 overview watches `queries::goals(project)` with a window of its first
 rows, under its own handle. A refusal for authority whose `proposable`

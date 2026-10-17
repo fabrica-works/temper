@@ -283,8 +283,8 @@ Test shape: the component's tests: `a_task_query_subject_reaches_the_core_with_i
 of project 1, one tracked: the query `tracked: Some(true)` delivers one
 line, by priority; then the story amends the other task tracked, with
 priority 2, by `Amend { revision: None, change: Amendment { tracked:
-Some(true), priority: Some(2), .. } }` (jig 14.2 makes `Amend.revision`
-optional and gives `Amendment` `tracked` and `priority`; at `b6a63f8c1`
+Some(Tracking::Tracked { priority: 2 }), .. } }` (jig 14.2 makes `Amend.revision`
+optional and gives `Amendment` `tracked: Option<Tracking>`, ruling 260; at `b6a63f8c1`
 it has neither) (ruling 249), and the next delivery holds two
 lines, the first one's first), `a_task_line_says_what_its_task_waits_on`;
 `tests/client/tests/stories.rs` (scripted):
