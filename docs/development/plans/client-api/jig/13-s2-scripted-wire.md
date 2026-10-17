@@ -32,6 +32,15 @@ Files, at jig `795ca6bc3` (follow each by its name):
   `ApplicationOutcome` stay as they are. v1 is edited in place, as jig
   `23e3fbbdb` edited it in this run; the README's "Format versions"
   names no owner for it.
+- the same schema, by ruling 211 (jig's `client/domain/root.md`, 42-45:
+  "An application's requests, reads and subjects ride the client as
+  bytes ...; its wire crate encodes and decodes them"): `family::Subject`
+  whole (`family.rs:7-29`: both scopes, every `Kind`, `Effect(ProposalKey)`
+  and `OwnerEffect` apart) for the reads and opens, default the draft's
+  `FamilySubject` in place of `ClientSubject` in `Subject` and `Read`
+  (:86-87); and the family's `Ask::Touch` (`family.rs:137-142`) with
+  `parameters` optional, default `value: option` in `ApplicationRequest`
+  (:56);
 - its generated code and goldens, written only by the README's
   "Generated code" command for the test client wire;
 - the codec: `testing/jig-client-test-protocol-wire/src/codec.rs`, and a
@@ -46,12 +55,18 @@ Files, at jig `795ca6bc3` (follow each by its name):
   users: `testing/jig-test-service`, `tests/client-protocol`,
   `tests/client-wire`); list each in the commit body.
 Shape: `family::wire`'s new functions return the family's value equal to
-the one encoded, for each variant on the wire. `request`'s `Invalid::MissingValue`
-for `Ask::Touch` without parameters (`family/wire.rs:60-61`) stays; a
-story that sends one is a question before `land`.
+the one encoded, for each variant on the wire. `subject` and `request`
+return the family's value whole (ruling 211): `Ask::Touch` without
+parameters crosses as `None`, and `Invalid::MissingValue`,
+`Invalid::Scope` and `Invalid::CoreEffectReference` (`family/wire.rs:10-13`)
+go, with their tests, where nothing else returns them. What the test
+service answers for a subject it holds no row for stays as it is; a
+story that needs another answer is a block.
 Test shape: in `tests/client-wire/tests/test_client_wire.rs`, one round
 trip per new kind (item, part with and without parameters, touched,
-moved, gone), and one test that encoding `Refused` returns its
+moved, gone; a touch with and without parameters; a subject under each
+scope, `Effect(ProposalKey)` and a deployment `Outbox` among them), and
+one test that encoding `Refused` returns its
 `Invalid`, its values as the scripted world's fixtures build
 them (`tests/client/src/scripted.rs:32-40`), request ids and revisions
 named (README, 23:45Z, point 2).
@@ -60,6 +75,6 @@ in the joint world.
 Don't: no change to `jig_test_connector`'s types or to the test
 connector's schema (`testing/jig-test-store/schema/test-connector-v1.schema`);
 no field dropped, defaulted or inferred; no generated file edited by hand.
-Size: aim 220 hand-written lines (schema about 25, codec about 100,
+Size: aim 540 hand-written lines (ruling 211; was 220) (schema about 25, codec about 100,
 `family/wire.rs` about 45, tests about 50); generated code and goldens
 apart. Past the aim, the report gives the counts.

@@ -1251,6 +1251,14 @@ choice would have been the user's (development.md, 10.4).
         - Past the step, people's `Say`: `tests/conformance/src/stories.rs:220, 241`, `tests/engine/domain/src/direct.rs:347`, `tests/engine/domain/tests/forge_routes.rs:2068` and `tests/system/src/world.rs:244`.
      6. **Unchanged:** people's `Amend { release: Option<u64> }` names its revision, and stays. Nothing is deferred: no `later.md` row.
 
+211. **jig 13.s2 carries the family's subjects and touch whole** (plan defect, jig 13.4's block of 2026-10-17T02:37:03Z).
+     Ruling 211 (plan defect, jig 13.4 and 13.s2): both carriers whole, as 13.4 proposes, and 13.s2 carries them. jig's `client/domain/root.md`, 42-45: "**Families as bytes.** An application's requests, reads and subjects ride the client as bytes under their owner's number and version, on the same connection and through the same request table; its wire crate encodes and decodes them (section 7)." 13.s2's Files named the family's documents and answers only, and its "`Invalid::MissingValue` ... stays" assumed no story sends a touch without parameters; the first side sends one for an untouched item (`first.rs:741-751`).
+
+     - 13.s2: the test client wire carries `family::Subject` whole (both scopes, every `Kind`, `Effect(ProposalKey)` and `OwnerEffect` apart), default its draft's `FamilySubject` in `Subject` and `Read`; and `Ask::Touch` with `parameters: Option<u64>` as it is, default `value: option`. `subject` and `request` return the family's value whole; `Invalid::MissingValue`, `Invalid::Scope` and `Invalid::CoreEffectReference` go, with their tests, where nothing else returns them. Size aim 540 (was 220). Each match the compiler names (`testing/jig-test-service`, `tests/client-protocol`, `tests/client/src/joint/requests.rs:86, :101, :150`) is in its Files; list each in the commit body.
+     - What the test service answers for a subject it holds no row for stays as it is; a story that needs another answer is a block.
+     - 13.4: the root tests keep their requests and subjects (`root.rs:489`'s `parameters: None`; the deployment page's six reads and the scoped outboxes); nothing infers a value. Its reads and touches cross once 13.s2 lands; until then it goes on with the hosts, the view and the rest.
+     - Unchanged: ruling 208 (no `Refused` record); 13.s2's Don't list; the test connector's types and schema.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
