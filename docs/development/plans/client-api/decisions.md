@@ -1847,6 +1847,46 @@ choice would have been the user's (development.md, 10.4).
      - `git -C jig grep -l 'Offered {' origin/main | wc -l`: 53.
      - The re-check's sub-agent: corrected sketches clean under `clippy --workspace --all-targets -D warnings`; 2,335 of 2,335 focused and 95 of 95 fuzzy in the packages depending on `jig-client-domain`.
 
+274. **jig 15.1 and 15.3: working, parked, and shapes' fields from me** (design, the designer's answer of 2026-10-17T18:00Z).
+     Ruling 274 (design, the designer's answer of 2026-10-17T18:00Z, jig `6155e83e0`, temper `d55ffe2b2`): the designer's decision, below; jig 22.1's `BoundsCreate` gains `authority`, and jig 15.1 may start once its needs land.
+
+
+     1. **`Active` says working.** hosts.md, 6.5: "The engine shows a run as
+        writing, or as running a tool, only on such a fact". pages.md, 4
+        gains the row "running, neither writing nor in a tool its host names,
+        or nothing reported yet | working, and for how long", and 15.1's
+        `ChatStatus` gains `Working { since }`. `Ending` says working too.
+     2. **A run waiting with nobody named says parked.** engine.md, 7.4: "A
+        run that calls `wait` keeps its host's slot while it waits ... Idle
+        past its charter's threshold, it parks". The row now reads "idle: its
+        run waiting, holding its slot, or parked | parked".
+     3. **No observation:** a claimed run says starting, a running one
+        working, since its `phase_since`.
+     4. **The order** (pages.md, 4 now): held, closing and ended first; then
+        a party it waits on, in any active stage; then the stage, and the
+        observed work. The plan's 15.1 has the whole match and five table rows.
+     5. **Authority comes from `me`.** contract.md, 5.3 already says creating
+        carries "the authority they may give it, from their role and their
+        pool". The wire lacked it, so jig 22.1's `BoundsCreate` gains
+        `authority: OwnerAuthorityDocument`, `chat_authority`'s
+        (`funding.rs:40`). `shapes` takes it whole, `shallower - 1` levels
+        shallower. Its spend is the budget named, and its deadline the task's
+        (`now` plus a span: `chat` and `set_goal` take `now: Wall`).
+     6. **Wake is the executor's.** contract.md, 3.6: "wake and park, which
+        are the charter's". `NewTask.wake` becomes optional, and the engine's
+        translation gives none the default an agent's `delegate` gets
+        (`nested.rs:44`). That is 15.3's first commit. People and the store
+        are unchanged.
+     7. **No parameters, inputs, dependencies or named grants.**
+     8. **Variants:** `Amount(n)` is a request, `Named` with spend n. `Given`
+        is the draft's for `set_goal`, and `NotOffered::Template` for `chat`
+        (it asks no budget). `Approval`, a cut verdict, `shallower` 0, and a
+        chat's chosen executor or given deadline are also
+        `NotOffered::Template`. configuration.md, 3: "an approval names a
+        state its procedure gives, so no template makes one".
+     9. **Nothing is deferred.** If 22.1 lands before the steer reaches it,
+        a step before jig 15.3 adds the authority.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
