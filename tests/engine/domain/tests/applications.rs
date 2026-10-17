@@ -111,6 +111,7 @@ fn driver() -> Driver {
 }
 fn adopt(driver: &mut Driver, request: forge::Adoption, reply: u64) {
     driver.send(engine::Event::Party(engine::PartyInput::Application {
+        scope: jig_domain_people::ApplicationScope::Project(request.project),
         reply_to: ReplyTo::new(Token::new(reply)),
         sign_in: driver.session(),
         key: [95; 16],

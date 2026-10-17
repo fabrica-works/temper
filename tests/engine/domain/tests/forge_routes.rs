@@ -607,6 +607,7 @@ impl World {
         }));
         self.until(Until::SignedIn);
         self.send(engine::Event::Party(engine::PartyInput::Application {
+            scope: jig_domain_people::ApplicationScope::Project(1),
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],
@@ -2013,6 +2014,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
     );
     fake::grant(&mut world.fake, b"org/extra", 1, raw::Permission::Admin);
     world.send(engine::Event::Party(engine::PartyInput::Application {
+        scope: jig_domain_people::ApplicationScope::Project(1),
         reply_to: ReplyTo::new(Token::new(98)),
         sign_in: world.signed_in.expect("owner session"),
         key: [98; 16],
@@ -2067,7 +2069,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         reply_to: ReplyTo::new(Token::new(100)),
         sign_in: world.signed_in.expect("owner session"),
         key: [100; 16],
-        ask: people::Ask::Say { project: 1, task: first.task, words: Box::from(&b"Continue"[..]), release: false },
+        ask: people::Ask::Say { project: 1, task: first.task, words: Box::from(&b"Continue"[..]) },
     }));
     for _ in 0..150 {
         world.tick();

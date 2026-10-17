@@ -189,7 +189,13 @@ fn act_on(side: &mut Side, limits: &Limits, act: Act, out: &mut Queue<Request>) 
                 draft.pending = Some((request, skein_lib::RequestProgress::Parked));
                 let bounds = wire_limits(limits).expect("forge bounds are checked");
                 let ask = family::request(&adoption, &bounds).expect("validated adoption fits wire");
-                out.push(Request::Send { request, ask: jig_client::Ask::Family(ask) });
+                out.push(Request::Send {
+                    request,
+                    ask: jig_client::Ask::Family {
+                        scope: jig_client::contract::Scope::Project(adoption.project),
+                        record: ask,
+                    },
+                });
             }
             side.changed();
         }
@@ -291,9 +297,10 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
                         jig_client_protocol_link::Limits::new(limits.client.domain, limits.client.exchanges).ok()?;
                     family::answer(&record, &wire_limits(&limits.forge)?, &link)?
                 }
-                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused(why))) => {
-                    Answer::EntranceRefused(jig_client::contract::EntranceRefusal::new(why).ok()?)
-                }
+                Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
+                    refusal: why,
+                    ..
+                })) => Answer::EntranceRefused(jig_client::contract::EntranceRefusal::new(why).ok()?),
                 Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)))
                 | Outcome::Unknown
                 | Outcome::Limit

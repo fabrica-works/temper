@@ -482,6 +482,7 @@ impl World {
         }));
         self.until(Until::SignedIn);
         self.send(engine::Event::Party(engine::PartyInput::Application {
+            scope: jig_domain_people::ApplicationScope::Project(1),
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: self.signed_in.expect("signed in"),
             key: [91; 16],

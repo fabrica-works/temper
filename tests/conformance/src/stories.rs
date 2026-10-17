@@ -214,11 +214,7 @@ fn lost_merge(world: &mut World) -> Result<(), Violation> {
 }
 fn person_words(world: &mut World) -> Result<(), Violation> {
     let task = world.peers.assignments[0].task;
-    scenarios::ask(
-        world,
-        81,
-        people::Ask::Say { project: 1, task, words: b"Check the edge case".as_slice().into(), release: false },
-    );
+    scenarios::ask(world, 81, people::Ask::Say { project: 1, task, words: b"Check the edge case".as_slice().into() });
     world.drain()?;
     if !world
         .peers
@@ -234,12 +230,7 @@ fn person_words(world: &mut World) -> Result<(), Violation> {
         scenarios::ask(
             world,
             83,
-            people::Ask::Say {
-                project: 1,
-                task,
-                words: b"Continue with the edge case".as_slice().into(),
-                release: false,
-            },
+            people::Ask::Say { project: 1, task, words: b"Continue with the edge case".as_slice().into() },
         );
     }
 

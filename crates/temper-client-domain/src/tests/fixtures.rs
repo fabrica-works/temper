@@ -1,5 +1,5 @@
 use crate::{Address, Event, Limits, Request, forge};
-use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
+use jig_client::contract::{self, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEvent};
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 pub const FORGE_ASKER: jig_client::Asker = jig_client::Asker(1);
@@ -72,8 +72,8 @@ pub fn resource() -> contract::Part {
     contract::Part::Resource { connector: FORGE, path }
 }
 pub fn frame(party: u64) -> WatchEvent {
-    WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-        party: FrameParty {
+    WatchEvent::Delivered(Delivery::Me(Box::new(Me {
+        party: MeParty {
             number: party,
             kind: PartyKind::Person,
             login: DocumentText::complete(contract::Text::new(Box::from(*b"fixture-login"), 32).expect("login fits")),
@@ -241,8 +241,7 @@ pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_c
         if let Request::Client {
             request:
                 jig_client::Request::Down {
-                    down:
-                        jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Frame) },
+                    down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(contract::Subject::Me) },
                 },
         } = request
         {

@@ -11,18 +11,18 @@ pub(super) fn start(
     sign_in: u64,
     key: [u8; 16],
     digest: [u8; 32],
+    scope: people::ApplicationScope,
     request: forge::Adoption,
 ) {
     assert!(domain.application.is_none(), "one application admission value");
     let owner = Token::new(domain.next_application_owner);
     domain.next_application_owner = domain.next_application_owner.checked_add(1).expect("application owner counter");
-    let project = request.project;
     domain.application = Some((owner, request));
     domain.work.push(Work::Core(core::Event::Application {
         reply_to,
         sign_in,
         key,
-        scope: people::ApplicationScope::Project(project),
+        scope,
         connector: domain.config.forge_connector,
         digest,
         owner,

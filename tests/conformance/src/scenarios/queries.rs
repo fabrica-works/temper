@@ -43,7 +43,7 @@ fn read(world: &mut World, from: Option<reads::Cursor>) {
         root::Event::Party(root::PartyInput::Read {
             reply_to: ReplyTo::new(Token::new(READ)),
             sign_in: world.peers.sign_in.expect("signed in"),
-            read: reads::Read::Tasks { query: query(), from },
+            read: reads::Read::Tasks { query: query(), live: None, ended: from },
         }),
     );
 }
@@ -172,13 +172,13 @@ pub(crate) fn delivered(peers: &mut Peers, store: &Store, delivery: &root::Deliv
     if let root::Delivery::Read { reply, answer } = delivery
         && *reply == ReplyTo::new(Token::new(READ))
     {
-        let reads::Answer::Page(page) = answer else { panic!("ended query page: {answer:?}") };
-        for row in &page.rows {
-            let reads::PageRow::Line(value) = row else { panic!("ended line") };
+        let reads::Answer::Tasks(page) = answer else { panic!("ended query page: {answer:?}") };
+        let reads::EndedGroup::Rows { rows, next, .. } = &page.ended else { panic!("ended index") };
+        for value in rows {
             line(store, value);
             peers.query.found.push(value.chip.number);
         }
-        peers.query.next.clone_from(&page.next);
+        peers.query.next.clone_from(next);
     }
 }
 

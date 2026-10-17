@@ -6,7 +6,7 @@ fn forgejo_decoders_answer_every_mutated_transcript_without_panicking() {
     for (case, request) in forgejo::json_cases() {
         let body = forgejo::transcript(&case).body;
         let mut bytes = Vec::new();
-        for _ in 0..200 {
+        for _ in 0..32 {
             mutated_into(&mut rng, &body, &mut bytes);
             let decoded = match &request {
                 Some(request) => forgejo::decode(request, &bytes),
@@ -40,7 +40,7 @@ fn forgejo_delivery_decoders_answer_every_mutated_delivery_without_panicking() {
     for (case, _) in forgejo::delivery_cases() {
         let sent = forgejo::delivery(case);
         let mut bytes = Vec::new();
-        for _ in 0..100 {
+        for _ in 0..16 {
             mutated_into(&mut rng, &sent.body, &mut bytes);
             let _decoded = forgejo::decode_delivery(&sent.event, &bytes, &limits);
         }

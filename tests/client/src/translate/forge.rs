@@ -117,6 +117,7 @@ pub fn request(
     who: ClientId,
     attempt: Token,
     key: [u8; 16],
+    scope: jig_client::contract::Scope,
     ask: &jig_client::Family,
 ) -> engine::Event {
     use temper_client_protocol_wire::{self as w, v1};
@@ -151,6 +152,11 @@ pub fn request(
         owner: KeyedOwner::Application { connector: crate::fixtures::FORGE },
     });
     engine::Event::Party(PartyInput::Application {
+        scope: match scope {
+            jig_client::contract::Scope::Project(project) => jig_domain_people::ApplicationScope::Project(project),
+            jig_client::contract::Scope::Deployment => jig_domain_people::ApplicationScope::Deployment,
+            jig_client::contract::Scope::Own => jig_domain_people::ApplicationScope::Own,
+        },
         reply_to,
         sign_in,
         key,

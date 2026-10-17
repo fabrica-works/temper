@@ -167,7 +167,7 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
 }
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     use jig_client::contract::{
-        self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, ProjectRole, Subject, WatchEvent,
+        self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
     use temper_client_domain::{Address, Event, Request};
     let limits = domain_limits();
@@ -196,7 +196,7 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
         if let Some(Request::Client {
             request:
                 jig_client::Request::Down {
-                    down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                    down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Me) },
                 },
         }) = out.pop()
         {
@@ -205,12 +205,14 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     }
     let mut projects = List::with_capacity(1);
     projects
-        .push(ProjectRole {
+        .push(MeProject {
             project: PROJECT,
             name: Some(DocumentText::complete(contract::Text::new(Box::from(*b"Shop"), 32).expect("name fits"))),
             role: HeldRole::Policy { role: 1 },
             pool: None,
             chat_budget: 0,
+            templates: List::with_capacity(0),
+            creating: None,
         })
         .expect("one project");
     temper_client_domain::step(
@@ -220,8 +222,8 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
                     watch: watch.expect("frame opened"),
-                    event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                        party: FrameParty {
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(Me {
+                        party: MeParty {
                             number: 73,
                             kind: PartyKind::Person,
                             login: DocumentText::complete(

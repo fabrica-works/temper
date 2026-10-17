@@ -63,12 +63,7 @@ impl Cache {
             files: BTreeMap::new(),
             history,
             life,
-            limits: jig_client_protocol_link::Limits::new(
-                temper_client_shell_terminal::limits::native().client.client.domain,
-                temper_client_shell_terminal::limits::native().client.client.exchanges,
-            )
-            .expect("native link limits")
-            .wire,
+            limits: super::native_link_limits().wire,
         }
     }
     fn path(&self, fd: Fd) -> Option<&Vec<u8>> {

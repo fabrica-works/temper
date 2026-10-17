@@ -352,6 +352,6 @@ pub fn say_ask(sign_in: u64, task: u64, key: u8) -> engine::Event {
         reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
         sign_in,
         key: [key; 16],
-        ask: people::Ask::Say { project: 1, task, words: Box::from([key]), release: false },
+        ask: people::Ask::Say { project: 1, task, words: Box::from([key]) },
     })
 }

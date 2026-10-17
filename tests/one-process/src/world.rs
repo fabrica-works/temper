@@ -355,8 +355,8 @@ impl Host for Person {
                         let frame = self.wire.received.iter().any(|event| {
                             matches!(
                                 event,
-                                referee::client::Received::Delivery(jig_client::contract::Delivery::Frame(_))
-                                    | referee::client::Received::Read(jig_client::contract::ReadValue::Frame(_))
+                                referee::client::Received::Delivery(jig_client::contract::Delivery::Me(_))
+                                    | referee::client::Received::Read(jig_client::contract::ReadValue::Me(_))
                             )
                         });
                         PROGRESS.with(|progress| progress.borrow_mut().press_had_frame.push((self.life, frame)));

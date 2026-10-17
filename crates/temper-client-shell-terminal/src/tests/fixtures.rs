@@ -294,7 +294,7 @@ fn populate_page(
                     out,
                 );
                 let delivery = match subject {
-                    Subject::Frame => Some(Delivery::Frame(Box::new(jig_client_world::stories::frame(1)))),
+                    Subject::Me => Some(Delivery::Me(Box::new(jig_client_world::stories::frame(1)))),
                     Subject::Task { .. } => Some(Delivery::Task(Box::new(jig_client_world::stories::task()))),
                     Subject::Deployment => {
                         Some(Delivery::Deployment(Box::new(jig_client_world::stories::deployment())))
@@ -409,7 +409,7 @@ pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, b
     use skein_ui::{Role, Run};
     builder.open(Role::Page);
     builder.open(Role::Region);
-    builder.name(b"Frame");
+    builder.name(b"Me");
     builder.region(jig_client_view::regions::JigRegion::Link.region());
     builder.open(Role::Status);
     builder.text(Run::Plain, b"Live");
@@ -601,7 +601,7 @@ pub fn control_text() -> skein_ui::Tree {
 fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
     use contract::{Read, ReadValue};
     match what {
-        Read::Frame => Some(ReadValue::Frame(Box::new(jig_client_world::stories::frame(1)))),
+        Read::Me => Some(ReadValue::Me(Box::new(jig_client_world::stories::frame(1)))),
         Read::Task { .. } => Some(ReadValue::Task(Box::new(jig_client_world::stories::task()))),
         Read::Project { .. } => Some(ReadValue::Project(Box::new(jig_client_world::stories::project()))),
         Read::Deployment => Some(ReadValue::Deployment(Box::new(jig_client_world::stories::deployment()))),
@@ -617,6 +617,7 @@ fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
         | Read::Conversations { .. }
         | Read::Goals { .. }
         | Read::Spend { .. }
+        | Read::Tasks { .. }
         | Read::Notes { .. } => None,
     }
 }
@@ -663,7 +664,7 @@ pub fn service_answer() -> Box<[u8]> {
     let owned =
         w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: w::VERSION, record: bytes.finish() })
             .expect("owned fits");
-    let answer = w::Answer::FinalAnswer(owned);
+    let answer = w::KeyedAnswer::FinalAnswer(owned);
     let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer fits"));
     answer.encode(&mut bytes).expect("measured answer");
     bytes.finish()

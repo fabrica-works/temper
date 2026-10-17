@@ -14,9 +14,9 @@ fn another_partys_kept_work_prints_its_line_once() {
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
                     watch,
-                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Frame(
-                        Box::new(jig_client_world::stories::frame(CURRENT_PARTY)),
-                    )),
+                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(Box::new(
+                        jig_client_world::stories::frame(CURRENT_PARTY),
+                    ))),
                 },
             },
         });

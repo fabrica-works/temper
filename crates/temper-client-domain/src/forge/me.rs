@@ -17,7 +17,7 @@ pub(crate) fn told(side: &mut Side, client: &Client, told: &Told, out: &mut Queu
                 Link::Starting | Link::Live | Link::Offline if !side.me => {
                     side.me = true;
                     out.push(Request::Client {
-                        asked: jig_client::Event::Watch { handle: handle(), subject: Watchable::Jig(Subject::Frame) },
+                        asked: jig_client::Event::Watch { handle: handle(), subject: Watchable::Jig(Subject::Me) },
                     });
                 }
                 Link::SignedOut | Link::OutOfDate => {
@@ -33,7 +33,7 @@ pub(crate) fn told(side: &mut Side, client: &Client, told: &Told, out: &mut Queu
         }
         Told::Changed { handle: value } if *value == handle() => {
             let Some(document) = client.document(*value) else { return true };
-            let Some(Latest::Jig(Delivery::Frame(frame))) = document.latest else { return true };
+            let Some(Latest::Jig(Delivery::Me(frame))) = document.latest else { return true };
             party(side, Some(frame.party.number));
         }
         Told::Ended { handle: value, .. } if *value == handle() => {

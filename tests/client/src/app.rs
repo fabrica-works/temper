@@ -229,7 +229,7 @@ impl App for Temper {
             return None;
         };
         Some(match request {
-            jig_client::Ask::Family(_) => {
+            jig_client::Ask::Family { .. } => {
                 Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None }
             }
             jig_client::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),

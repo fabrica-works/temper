@@ -469,7 +469,9 @@ fn service_credential(message: &[u8], limits: &jig_client::Limits) -> Option<(u6
     use jig_client_protocol_wire as w;
     let limits = link::Limits::new(limits.domain, limits.exchanges).ok()?;
     let mut reader = skein_lib::Reader::new(message);
-    let w::Answer::FinalAnswer(owned) = w::Answer::decode(&limits.wire, &mut reader).ok()? else { return None };
+    let w::KeyedAnswer::FinalAnswer(owned) = w::KeyedAnswer::decode(&limits.wire, &mut reader).ok()? else {
+        return None;
+    };
     if !reader.is_empty() || owned.owner() != &w::Owner::Jig || owned.version() != w::VERSION {
         return None;
     }

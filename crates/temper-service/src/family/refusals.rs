@@ -4,9 +4,18 @@ use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
-        p::Refusal::NotWellFormed { .. } => {
-            return Err(w::Problem { reason: skein_codec::Reason::Tag, path: w::Path::RefusalTag });
-        }
+        p::Refusal::NotWellFormed { at, why } => w::Refusal::Malformed(w::RefusalMalformed::new(
+            limits,
+            w::RefusalMalformedParts {
+                at,
+                why: match why {
+                    p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
+                    p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
+                    p::Malformed::Cycle => w::Malformed::Cycle,
+                    p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
+                },
+            },
+        )?),
         p::Refusal::Disposal { task, issue } => {
             let issue = match issue {
                 p::DisposalIssue::Missing => w::DisposalIssue::Missing,
@@ -46,7 +55,8 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
-        p::Refusal::NotOffered | p::Refusal::NoEscalationHolder => w::Refusal::NotOffered,
+        p::Refusal::NotOffered => w::Refusal::NotOffered,
+        p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
     })
 }
@@ -115,7 +125,8 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Duplicate => w::AdmissionLimit::Duplicate,
         p::LimitKind::Empty => w::AdmissionLimit::Empty,
         p::LimitKind::Batch => w::AdmissionLimit::Batch,
-        p::LimitKind::ProjectLiveTasks | p::LimitKind::Goals => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::ProjectLiveTasks => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::Goals => w::AdmissionLimit::Goals,
         p::LimitKind::LiveTasks => w::AdmissionLimit::LiveTasks,
         p::LimitKind::Tree => w::AdmissionLimit::Tree,
         p::LimitKind::Depth => w::AdmissionLimit::Depth,
@@ -123,7 +134,9 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Subscription => w::AdmissionLimit::Subscription,
         p::LimitKind::Dependencies => w::AdmissionLimit::Dependencies,
         p::LimitKind::Cycle => w::AdmissionLimit::Cycle,
-        p::LimitKind::Operations | p::LimitKind::Grace | p::LimitKind::Spec => w::AdmissionLimit::Spec,
+        p::LimitKind::Operations => w::AdmissionLimit::Operations,
+        p::LimitKind::Grace => w::AdmissionLimit::Grace,
+        p::LimitKind::Spec => w::AdmissionLimit::Spec,
         p::LimitKind::Contract => w::AdmissionLimit::Contract,
         p::LimitKind::Authority => w::AdmissionLimit::Authority,
         p::LimitKind::Inputs => w::AdmissionLimit::Inputs,

@@ -147,7 +147,7 @@ pub struct Peers {
 pub enum Delivery {
     Root(engine::Request),
     /// An input admission handed back, for its peer to send again.
-    Returned(engine::Event),
+    Returned(Box<engine::Event>),
     Resume,
 }
 
@@ -389,7 +389,7 @@ impl Application for Temper {
             });
         }
         if let Some(event) = domain.returned.take() {
-            outputs.push(Output::Deliver(Delivery::Returned(event)));
+            outputs.push(Output::Deliver(Delivery::Returned(Box::new(event))));
         }
         if outputs.is_empty() && !domain.root.quiescent() && !domain.probed {
             outputs.push(Output::Deliver(Delivery::Resume));
@@ -446,7 +446,7 @@ impl Application for Temper {
     ) -> Vec<Input<Event, observations::Record>> {
         let request = match delivery {
             Delivery::Root(request) => request,
-            Delivery::Returned(event) => return vec![Input::Event(Event::Root(event))],
+            Delivery::Returned(event) => return vec![Input::Event(Event::Root(*event))],
             Delivery::Resume => return vec![Input::Event(Event::Fire)],
         };
         let request = match request {
@@ -570,6 +570,7 @@ impl Application for Temper {
                 if !peers.adopting {
                     peers.adopting = true;
                     events.push(engine::Event::Party(engine::PartyInput::Application {
+                        scope: jig_domain_people::ApplicationScope::Project(1),
                         reply_to: ReplyTo::new(Token::new(91)),
                         sign_in,
                         key: [91; 16],

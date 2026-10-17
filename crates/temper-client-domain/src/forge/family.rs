@@ -112,7 +112,7 @@ pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client::c
     if !reader.is_empty() {
         return None;
     }
-    let final_answer = j::Final::Refused(j::Refused::new(&limits.wire, j::RefusedParts { refusal }).ok()?);
+    let final_answer = j::Final::Refused(j::Refused::new(&limits.wire, j::RefusedParts { refusal, at: None }).ok()?);
     let mut writer = Writer::new(usize::try_from(final_answer.measure()).expect("measured record fits usize"));
     final_answer.encode(&mut writer).ok()?;
     let owned = j::Owned::new(
@@ -120,8 +120,8 @@ pub fn core_refusal(bytes: &[u8], limits: &link::Limits) -> Option<jig_client::c
         j::OwnedParts { owner: j::Owner::Jig, version: j::VERSION, record: writer.finish() },
     )
     .ok()?;
-    match link::translate::answers::answer(j::Answer::FinalAnswer(owned), limits).ok()? {
-        jig_client::contract::Answer::Refused(refusal) => Some(refusal),
+    match link::translate::answers::answer(j::KeyedAnswer::FinalAnswer(owned), limits).ok()? {
+        jig_client::contract::Answer::Refused { refusal, .. } => Some(refusal),
         jig_client::contract::Answer::Done(_) => None,
     }
 }

@@ -10,6 +10,14 @@ use skein_lib::{
 };
 use std::collections::BTreeMap;
 
+pub(super) fn native_link_limits() -> jig_client_protocol_link::Limits {
+    jig_client_protocol_link::Limits::new(
+        temper_client_shell_terminal::limits::native().client.client.domain,
+        temper_client_shell_terminal::limits::native().client.client.exchanges,
+    )
+    .expect("native bounds")
+}
+
 pub(crate) enum Received {
     SignedIn(u64),
     Answer { key: [u8; 16], answer: client::Answer },
@@ -78,11 +86,7 @@ impl Connection {
         if self.sent.len() < end + 4 + length {
             return;
         }
-        let limits = jig_client_protocol_link::Limits::new(
-            temper_client_shell_terminal::limits::native().client.client.domain,
-            temper_client_shell_terminal::limits::native().client.client.exchanges,
-        )
-        .expect("native bounds");
+        let limits = native_link_limits();
         let keyed =
             wire::Keyed::decode(&limits.wire, &mut Reader::new(&self.sent[end + 4..])).expect("sent keyed request");
         self.sent_application = Some(());
@@ -128,11 +132,7 @@ impl Connection {
     fn answer(&self, bytes: &[u8], received: &mut Vec<Received>) {
         let end = mark(&self.sent, b"\r\n\r\n").expect("sent request header");
         let path = self.sent.split(|byte| *byte == b' ').nth(1).expect("request target");
-        let limits = jig_client_protocol_link::Limits::new(
-            temper_client_shell_terminal::limits::native().client.client.domain,
-            temper_client_shell_terminal::limits::native().client.client.exchanges,
-        )
-        .expect("native bounds");
+        let limits = native_link_limits();
         match path {
             b"/jig/v1/sign-in/link" => {
                 let wire::SignInAnswer::SignedIn(value) =
@@ -145,11 +145,11 @@ impl Connection {
             b"/jig/v1/request" => {
                 let keyed =
                     wire::Keyed::decode(&limits.wire, &mut Reader::new(&self.sent[end + 4..])).expect("request bytes");
-                let value = wire::Answer::decode(&limits.wire, &mut Reader::new(bytes)).expect("answer bytes");
-                if matches!(&value, wire::Answer::FinalAnswer(document) if document.owner() == &wire::Owner::Jig) {
+                let value = wire::KeyedAnswer::decode(&limits.wire, &mut Reader::new(bytes)).expect("answer bytes");
+                if matches!(&value, wire::KeyedAnswer::FinalAnswer(document) if document.owner() == &wire::Owner::Jig) {
                     let answer = translate::answers::answer(value, &limits).expect("jig answer document");
                     received.push(Received::Answer { key: *keyed.key(), answer });
-                } else if let wire::Answer::FinalAnswer(document) = value {
+                } else if let wire::KeyedAnswer::FinalAnswer(document) = value {
                     let wire::Owner::Family(family) = document.owner() else { panic!("application family owner") };
                     let record = jig_client::Family {
                         family: family.number(),
@@ -179,11 +179,7 @@ impl Connection {
         }
     }
     fn stream(&mut self, received: &mut Vec<Received>) {
-        let limits = jig_client_protocol_link::Limits::new(
-            temper_client_shell_terminal::limits::native().client.client.domain,
-            temper_client_shell_terminal::limits::native().client.client.exchanges,
-        )
-        .expect("native bounds");
+        let limits = native_link_limits();
         while let Some(end) = mark(&self.body, b"\n\n") {
             let event: Vec<_> = self.body.drain(..end + 2).collect();
             let data: Vec<_> = event

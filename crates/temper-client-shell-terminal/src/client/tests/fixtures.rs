@@ -22,7 +22,7 @@ pub(super) fn started_kept() -> (NativeClient, skein_lib::Token) {
     while let Some(request) = host.out.pop() {
         if let domain::Request::Client {
             request:
-                Request::Down { down: Down::Open { watch, subject: Watchable::Jig(jig_client::contract::Subject::Frame) } },
+                Request::Down { down: Down::Open { watch, subject: Watchable::Jig(jig_client::contract::Subject::Me) } },
         } = request
         {
             frame = Some(watch);

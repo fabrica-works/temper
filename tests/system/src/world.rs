@@ -241,7 +241,7 @@ impl World {
             reply_to: ReplyTo::new(Token::new(2000 + u64::from(key))),
             sign_in: self.root.session(),
             key: [key; 16],
-            ask: people::Ask::Say { project: 1, task: self.assignment.task, words: words.into(), release: false },
+            ask: people::Ask::Say { project: 1, task: self.assignment.task, words: words.into() },
         }));
         self.root.settle();
         let assignment = self.root.last_assignment();

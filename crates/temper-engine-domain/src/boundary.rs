@@ -343,6 +343,7 @@ pub enum PartyInput {
         sign_in: u64,
     },
     Application {
+        scope: people::ApplicationScope,
         reply_to: ReplyTo,
         sign_in: u64,
         key: [u8; 16],

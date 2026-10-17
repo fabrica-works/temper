@@ -127,8 +127,8 @@ pub fn request(
             let sign_in = transport.sign_in(who).expect("authenticated keyed request");
             let ask = match ask {
                 Ask::Jig(ask) => ask,
-                Ask::Family(ask) => {
-                    events.push(forge::request(transport, who, *attempt, *key, ask));
+                Ask::Family { record: ask, scope } => {
+                    events.push(forge::request(transport, who, *attempt, *key, *scope, ask));
                     return events;
                 }
             };
@@ -163,7 +163,7 @@ pub fn request(
                 events.extend(terminals.into_iter().map(party));
             }
         }
-        Down::Read { what: Readable::Family(_), .. } | Down::Open { subject: Watchable::Family(_), .. } => {
+        Down::Read { what: Readable::Family { .. }, .. } | Down::Open { subject: Watchable::Family { .. }, .. } => {
             panic!("no forge reads or watches")
         }
         Down::Save { .. } | Down::Erase { .. } => panic!("shell duty never goes on wire"),

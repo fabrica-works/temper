@@ -142,9 +142,7 @@ fn run_smith(
         engine::Parts::none(),
     );
     world.send(answer);
-    for _ in 0..30 {
-        world.tick();
-    }
+    world.until(Until::Ready);
     agent
 }
 
@@ -197,6 +195,14 @@ fn a_small_fix_made_in_a_smith_chat_lands_through_the_fake_forge() {
     ));
     for _ in 0..200 {
         world.tick();
+        if world.store.rows.values().any(|stored| {
+            matches!(stored,
+                Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
+                    if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }))
+            )
+        }) {
+            break;
+        }
     }
     assert!(world.store.rows.values().any(|stored| matches!(stored,
         Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)

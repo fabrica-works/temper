@@ -439,7 +439,7 @@ impl World {
                 let ask = match ask {
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
                     parties::Ask::Say { task: parties::Task::Number(task), words, release } => {
-                        people::Ask::Say { project, task, words, release: release.is_some() }
+                        say(project, task, words, release)
                     }
                     parties::Ask::Stop { task: parties::Task::Number(task) } => people::Ask::Stop { project, task },
                     other @ (parties::Ask::Close { .. }
@@ -619,9 +619,7 @@ impl World {
         let reply = match reply {
             people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
             people::Reply::Outcome(people::Outcome::Started { task }) => parties::Reply::Started { task },
-            people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
-                parties::Reply::Said { task, message, released }
-            }
+            people::Reply::Outcome(people::Outcome::Said { task, message }) => parties::Reply::Said { task, message },
             people::Reply::Outcome(people::Outcome::Stopped { task }) => parties::Reply::Changed { task },
             other @ (people::Reply::Outcome(_)
             | people::Reply::SignedOut
@@ -631,6 +629,7 @@ impl World {
         self.party.reply(to.raw(), reply);
         if signed_in && self.adoption == Adoption::Pending {
             self.root_events.push_back(engine::Event::Party(engine::PartyInput::Application {
+                scope: jig_domain_people::ApplicationScope::Project(1),
                 reply_to: ReplyTo::new(ADOPTION),
                 sign_in: self.party.sign_in.expect("authenticated party"),
                 key: [90; 16],
@@ -793,4 +792,16 @@ fn grant_read(config: &mut engine::Config, limits: &mut engine::Limits) {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     config.core.authority = domain;
+}
+
+fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> people::Ask {
+    match release {
+        Some(revision) => {
+            let mut operations = skein_lib::List::with_capacity(2);
+            operations.push(people::Operation::Message { task, words }).expect("two operations");
+            operations.push(people::Operation::Release { task, revision, again: None }).expect("two operations");
+            people::Ask::Compound { project, operations }
+        }
+        None => people::Ask::Say { project, task, words },
+    }
 }

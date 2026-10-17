@@ -66,7 +66,9 @@ fn adopt_sends_one_keyed_request_and_a_second_press_none() {
     assert_eq!(record.scope, fixtures::PARTY, "confirmed party scopes the table, distinct from project");
     let Some(Request::Client {
         request:
-            jig_client::Request::Down { down: jig_client::Down::Send { key, request: jig_client::Ask::Family(family), .. } },
+            jig_client::Request::Down {
+                down: jig_client::Down::Send { key, request: jig_client::Ask::Family { record: family, .. }, .. },
+            },
     }) = out.pop()
     else {
         panic!("one keyed adoption");
@@ -170,7 +172,7 @@ fn an_adoption_is_the_forges_family_bytes_under_its_asker() {
         panic!("kept adoption")
     };
     assert_eq!(record.request.key.asker, fixtures::FORGE_ASKER);
-    let jig_client::Ask::Family(record) = record.request.request else { panic!("opaque family") };
+    let jig_client::Ask::Family { record, .. } = record.request.request else { panic!("opaque family") };
     let mut reader = skein_lib::Reader::new(&record.bytes);
     let adoption = temper_client_protocol_wire::v1::Adopt::decode(
         &forge::wire_limits(&fixtures::limits().forge).expect("wire bounds"),
@@ -217,7 +219,7 @@ fn a_kept_adoption_of_another_version_is_dropped_and_its_form_shows_none_pending
         panic!("kept adoption")
     };
     let key = record.request.key;
-    let jig_client::Ask::Family(family) = &mut record.request.request else { panic!("family") };
+    let jig_client::Ask::Family { record: family, .. } = &mut record.request.request else { panic!("family") };
     family.version = OTHER_VERSION;
     let mut kept = skein_lib::List::with_capacity(1);
     kept.push(record).expect("one kept request");
@@ -254,4 +256,97 @@ fn a_family_the_engine_does_not_serve_marks_the_form_out_of_date() {
     assert_eq!(root.forge().form().expect("form").served, forge::Served::OutOfDate);
     assert!(root.client().link().not_served.contains(&fixtures::FORGE));
     assert!(fixtures::form_act(&mut root, forge::Act::Adopt).is_empty());
+}
+
+const NEXT_FORGE_VERSION: u32 = temper_client_protocol_wire::CLIENT_VERSION + 1;
+fn version_answer(limits: &jig_client_protocol_link::Limits) -> Box<[u8]> {
+    use jig_client_protocol_wire as w;
+    let owner = w::Owner::Family(w::Family::new(&limits.wire, w::FamilyParts { number: fixtures::FORGE }).unwrap());
+    let mut served = skein_lib::List::with_capacity(1);
+    served
+        .push(
+            w::Served::new(
+                &limits.wire,
+                w::ServedParts { owner: owner.clone(), first: NEXT_FORGE_VERSION, last: NEXT_FORGE_VERSION },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let answer =
+        w::KeyedAnswer::NotServed(w::NotServed::new(&limits.wire, w::NotServedParts { owner, served }).unwrap());
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).unwrap());
+    answer.encode(&mut bytes).unwrap();
+    bytes.finish()
+}
+fn version_refused() -> (crate::Domain, jig_client::Key) {
+    use jig_client_protocol_link as link;
+    let mut root = fixtures::filled();
+    let mut out = fixtures::form_act(&mut root, forge::Act::Adopt);
+    let Some(Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Save { record } } }) =
+        out.pop()
+    else {
+        panic!("kept adoption")
+    };
+    let stable = record.request.key;
+    let Some(Request::Client {
+        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request: ask } },
+    }) = out.pop()
+    else {
+        panic!("adoption sent")
+    };
+    let limits = fixtures::limits();
+    let bounds = link::Limits::new(limits.client.domain, limits.client.exchanges).unwrap();
+    let mut link = link::Link::new(&bounds).unwrap();
+    let mut sent = Queue::with_capacity(link.max_out());
+    link.step(skein_lib::Time::ZERO, link::Event::Send { attempt, key, ask }, &mut sent);
+    let Some(link::Request::Exchange { exchange, .. }) = sent.pop() else { panic!("keyed exchange") };
+    link.step(skein_lib::Time::ZERO, link::Event::Reply { exchange, message: version_answer(&bounds) }, &mut sent);
+    while let Some(request) = sent.pop() {
+        let up = match request {
+            link::Request::Hello { family: Some(family), versions } => {
+                jig_client::Up::FamilyServed { family, versions }
+            }
+            link::Request::Answer { attempt, envelope, answer, why } => {
+                jig_client::Up::Answer { attempt, envelope, answer, why }
+            }
+            link::Request::Save { .. }
+            | link::Request::Erase { .. }
+            | link::Request::Kept { .. }
+            | link::Request::Dropped
+            | link::Request::Exchange { .. }
+            | link::Request::NotKept { .. }
+            | link::Request::ServiceCredential { .. }
+            | link::Request::OpenStream { .. }
+            | link::Request::Signing { .. }
+            | link::Request::CloseStream
+            | link::Request::Watch { .. }
+            | link::Request::FamilyDelivery { .. }
+            | link::Request::Ended { .. }
+            | link::Request::Hello { family: None, .. }
+            | link::Request::Read { .. }
+            | link::Request::Fact { .. } => panic!("version refusal's typed answer: {request:?}"),
+        };
+        crate::step(
+            &mut root,
+            &fixtures::env(&limits),
+            Event::Client { event: jig_client::Event::Up { up } },
+            &mut out,
+        );
+    }
+    (root, stable)
+}
+#[test]
+fn a_version_not_served_answer_marks_the_form_out_of_date() {
+    let (mut root, _) = version_refused();
+    assert_eq!(root.forge().form().expect("form").served, forge::Served::OutOfDate);
+    assert!(fixtures::form_act(&mut root, forge::Act::Adopt).is_empty(), "disabled sends nothing");
+}
+#[test]
+fn an_out_of_date_form_keeps_its_pending_adoption() {
+    let (root, key) = version_refused();
+    assert_eq!(
+        root.forge().form().expect("form").pending,
+        Some((skein_lib::Token::new(key.number), skein_lib::RequestProgress::Parked))
+    );
+    assert_eq!(root.client().pending(key).expect("kept adoption").progress, jig_client::Progress::NotServed);
 }

@@ -7,6 +7,8 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
 const REPLY: ReplyTo = ReplyTo::new(Token::new(19));
+const REQUEST_KEY: [u8; 16] = [5; 16];
+const WATCHER: Token = Token::new(7);
 fn configured(git: &[u8]) -> Box<[crate::settings::Forge]> {
     let mut forges = fixtures::engine().forges;
     forges.get_mut(0).unwrap().git = git.into();
@@ -34,7 +36,16 @@ fn adopt() -> w::Adopt {
     .unwrap()
 }
 fn exchange(family: u16, version: u32, record: Box<[u8]>) -> kit::ToApplication {
-    kit::ToApplication::Request { reply_to: REPLY, sign_in: 3, key: [5; 16], family, version, record, digest: [7; 32] }
+    kit::ToApplication::Request {
+        reply_to: REPLY,
+        sign_in: 3,
+        key: REQUEST_KEY,
+        family,
+        version,
+        record,
+        digest: [7; 32],
+        scope: people::ApplicationScope::Project(7),
+    }
 }
 #[test]
 fn an_adopt_reaches_the_root_with_its_forges_host() {
@@ -42,7 +53,8 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
     let event =
         family::to_root(exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())), &forges, &w::CEILINGS)
             .unwrap();
-    let root::Event::Party(root::PartyInput::Application { reply_to, sign_in, key, digest, request }) = event else {
+    let root::Event::Party(root::PartyInput::Application { reply_to, sign_in, key, digest, request, .. }) = event
+    else {
         panic!("application request")
     };
     assert_eq!((reply_to, sign_in, key, digest), (REPLY, 3, [5; 16], [7; 32]));
@@ -100,7 +112,15 @@ fn a_forge_family_read_is_unknown() {
     for (row, family, version, expected) in
         [("forge", wire::FORGE, 1, (REPLY, wire::FORGE, None)), ("other", 2, 3, (REPLY, 2, None))]
     {
-        let input = kit::ToApplication::Read { reply: REPLY, sign_in: 3, family, version, record: Box::new([]) };
+        let input = kit::ToApplication::Read {
+            reply: REPLY,
+            sign_in: 3,
+            family,
+            version,
+            record: Box::new([]),
+            scope: people::ApplicationScope::Project(7),
+            window: jig_domain_core::documents::Window { rows: 2, after: None },
+        };
         let Err(answer) = family::to_root(input, &[], &w::CEILINGS) else { panic!("{row}: unknown read") };
         let kit::Event::Application(kit::FromApplication::Read { reply, family, record }) = *answer else {
             panic!("{row}: read")
@@ -114,8 +134,15 @@ fn a_forge_family_watch_is_refused_unknown() {
         ("forge", wire::FORGE, 1, (Token::new(7), jig_domain_core::WatchRefusal::Unknown)),
         ("other", 2, 3, (Token::new(7), jig_domain_core::WatchRefusal::Unknown)),
     ] {
-        let input =
-            kit::ToApplication::Watch { watcher: Token::new(7), sign_in: 3, family, version, record: Box::new([]) };
+        let input = kit::ToApplication::Watch {
+            watcher: WATCHER,
+            sign_in: 3,
+            family,
+            version,
+            record: Box::new([]),
+            scope: people::ApplicationScope::Project(7),
+            window: jig_domain_core::documents::Window { rows: 2, after: None },
+        };
         let Err(answer) = family::to_root(input, &[], &w::CEILINGS) else { panic!("{row}: refused watch") };
         let kit::Event::WatchRefused { watcher, why } = *answer else { panic!("{row}: refusal") };
         assert_eq!((watcher, why), expected, "{row}");
@@ -134,7 +161,7 @@ fn a_git_base_with_a_port_keeps_it_in_the_host() {
     }
 }
 fn encoded(outcome: Option<forge::ApplicationOutcome>) -> w::Outcome {
-    let jig = fixtures::engine().jig.limits.clients.wire;
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
     let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
     let mut reader = Reader::new(&bytes);
     let answer = w::AdoptAnswer::decode(&w::CEILINGS, &mut reader).unwrap();
@@ -256,4 +283,44 @@ fn a_request_under_the_pages_owner_is_answered_undecodable() {
         panic!("undecodable answer")
     };
     assert_eq!(to, REPLY);
+}
+
+const NOT_OFFERED_RECORD: &[u8] = &[11];
+const NO_ESCALATION_RECORD: &[u8] = &[13];
+const PROPOSABLE_WRITER_RECORD: &[u8] = &[6, 13, 1, 1];
+const MALFORMED_POSITION: u32 = 3;
+const MALFORMED_RECORD: &[u8] = &[0, 0, 0, 0, 3, 3];
+fn refusal_bytes(refusal: people::Refusal) -> Box<[u8]> {
+    let w::Outcome::CoreRefused(record) = encoded(Some(forge::ApplicationOutcome::CoreRefused(refusal))) else {
+        panic!("core refusal")
+    };
+    record.into_parts().refusal
+}
+#[test]
+fn a_core_refusal_is_carried_as_jigs_refusal_record() {
+    assert_eq!(refusal_bytes(people::Refusal::NotOffered).as_ref(), NOT_OFFERED_RECORD);
+}
+#[test]
+fn a_refusal_naming_no_one_to_escalate_to_is_carried_with_its_facts() {
+    assert_eq!(refusal_bytes(people::Refusal::NoEscalationHolder).as_ref(), NO_ESCALATION_RECORD);
+}
+#[test]
+fn an_authority_refusal_keeps_whom_a_proposal_could_go_to() {
+    let refusal =
+        people::Refusal::Authority { lacking: people::Lack::Writer, proposable: Some(people::Accepter::Role(1)) };
+    assert_eq!(refusal_bytes(refusal).as_ref(), PROPOSABLE_WRITER_RECORD);
+}
+#[test]
+fn a_malformed_refusal_keeps_its_position_and_reason() {
+    let refusal = people::Refusal::NotWellFormed { at: MALFORMED_POSITION, why: people::Malformed::Cycle };
+    assert_eq!(refusal_bytes(refusal).as_ref(), MALFORMED_RECORD);
+}
+#[test]
+fn a_family_request_keeps_its_supplied_admission_scope() {
+    let mut input = exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt()));
+    let kit::ToApplication::Request { scope, .. } = &mut input else { panic!("request") };
+    *scope = people::ApplicationScope::Deployment;
+    let event = family::to_root(input, &[], &w::CEILINGS).unwrap();
+    let root::Event::Party(root::PartyInput::Application { scope, .. }) = event else { panic!("application") };
+    assert_eq!(scope, people::ApplicationScope::Deployment);
 }
