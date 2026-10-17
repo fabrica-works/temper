@@ -1765,6 +1765,7 @@ dependencies = [
  "temper-engine-domain",
  "temper-engine-protocol-forge",
  "temper-forge-setup",
+ "temper-forge-setup-shell",
  "temper-protocol-store",
  "temper-service",
  "temper-throwaway-forgejo",
@@ -2156,6 +2157,19 @@ dependencies = [
  "skein-json",
  "skein-lib",
  "temper-forge-forgejo",
+]
+
+[[package]]
+name = "temper-forge-setup-shell"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-config",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-shell",
+ "temper-forge-forgejo",
+ "temper-forge-setup",
 ]
 
 [[package]]

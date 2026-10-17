@@ -4,14 +4,14 @@ use super::configure;
 fn serve_without_a_configuration_path_is_a_usage_error() {
     assert_eq!(
         configure(["serve".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE\n".into())
     );
 }
 #[test]
 fn an_unknown_command_prints_the_usage_line() {
     assert_eq!(
         configure(["unknown".into(), "config.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE\n".into())
     );
 }
 
@@ -120,4 +120,12 @@ fn sign_in_without_two_arguments_prints_its_usage() {
             "{row}"
         );
     }
+}
+
+#[test]
+fn forge_without_its_arguments_prints_its_usage() {
+    assert_eq!(
+        super::forge::start(&[]).expect_err("usage refused").line(),
+        "temper forge prepare: usage: temper forge prepare CONFIG.json FORGE\n"
+    );
 }

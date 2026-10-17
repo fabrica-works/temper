@@ -15,12 +15,13 @@ use temper_service::{
     settings::{Agent, Files, Seeds},
 };
 
+pub mod forge;
 mod host;
 pub mod open;
 mod setup;
 pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -29,6 +30,7 @@ pub enum Command {
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
     SignIn { arguments: Vec<OsString> },
+    Forge { arguments: Vec<OsString> },
 }
 fn prefixed(command: &str, why: &str) -> String {
     let mut lines = String::new();
@@ -43,6 +45,9 @@ pub(crate) fn problems(found: &service::startup::Problems) -> String {
 pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, String> {
     let usage = || format!("temper: invalid arguments\n{USAGE}\n");
     let command = args.next().ok_or_else(usage)?;
+    if command == "forge" {
+        return Ok(Command::Forge { arguments: args.collect() });
+    }
     if command == "open" {
         return Ok(Command::Open { arguments: args.collect() });
     }
@@ -66,6 +71,7 @@ pub fn run(command: Command) -> Result<u8, String> {
         Command::Serve { configuration } => serve(&configuration).map_err(|why| prefixed("temper serve", &why))?,
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
+        Command::Forge { arguments } => return Ok(forge::run(&arguments)),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
         Command::SignIn { arguments } => return Ok(sign_in::run(&arguments, &Clock::new())),
     };

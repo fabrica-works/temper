@@ -109,3 +109,41 @@ fn a_running_engine_lends_the_record_temper_sign_in_kept() {
     assert_eq!(child.exit(issuer, browser, Some(engine), support::WITHIN), 0, "stderr: {}", child.stderr());
     scratch.remove();
 }
+
+#[test]
+fn forge_prepare_makes_an_owned_forge_then_remakes_nothing() {
+    let scratch = support::Scratch::new("forge_prepare_real");
+    let forgejo = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO is required");
+    let runner = std::env::var_os("TEMPER_FORGEJO_RUNNER").expect("TEMPER_FORGEJO_RUNNER is required");
+    support::owned::configuration(
+        scratch.path(),
+        &support::owned::Names {
+            forgejo: std::path::Path::new(&forgejo),
+            runner: Some(std::path::Path::new(&runner)),
+            port: 3000,
+            bot: "temper-bot",
+            person: "ada",
+            orgs: &["workshop"],
+        },
+    );
+    let first = support::owned::prepare(scratch.path(), 1);
+    assert_eq!(first.status.code(), Some(0), "{}", String::from_utf8_lossy(&first.stderr));
+    let before: Vec<_> = support::owned::files(scratch.path())
+        .iter()
+        .map(|path| {
+            assert!(support::private(path), "{} is private", path.display());
+            fs_read(path)
+        })
+        .collect();
+    let secret = fs_read(&scratch.path().join("forge-1/runner/secret"));
+    assert_eq!(secret.len(), 40);
+    assert!(secret.iter().all(u8::is_ascii_hexdigit));
+    let second = support::owned::prepare(scratch.path(), 1);
+    assert_eq!(second.status.code(), Some(0), "{}", String::from_utf8_lossy(&second.stderr));
+    let after: Vec<_> = support::owned::files(scratch.path()).iter().map(|path| fs_read(path)).collect();
+    assert_eq!(after, before);
+    scratch.remove();
+}
+fn fs_read(path: &std::path::Path) -> Vec<u8> {
+    std::fs::read(path).expect("prepared file")
+}

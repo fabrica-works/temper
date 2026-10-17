@@ -18,6 +18,7 @@ members = [
     "tests/worker/protocol-git",
     "crates/temper-forge-forgejo",
     "crates/temper-forge-setup",
+    "crates/temper-forge-setup-shell",
     "crates/temper-worker-protocol-git",
     "crates/temper-client-protocol-wire",
     "tools/forgejo-conformance",
@@ -55,6 +56,7 @@ publish = false
 
 [workspace.dependencies]
 temper-box = { path = "crates/temper-box" }
+temper-forge-setup-shell = { path = "crates/temper-forge-setup-shell" }
 temper-forge-setup = { path = "crates/temper-forge-setup" }
 jig-boundary = { git = "https://github.com/forgetic/jig.git" }
 temper-fake-git = { path = "testing/temper-fake-git" }

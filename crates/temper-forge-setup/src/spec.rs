@@ -177,5 +177,8 @@ pub fn admin_token(owned: &Owned, place: &Place, name: &[u8]) -> Spec {
 /// Checks a binary in the same isolated environment as its commands.
 #[must_use]
 pub fn version(which: Which, owned: &Owned, place: &Place) -> Spec {
-    specification(which, owned, place, words(&[b"--version"]))
+    let mut spec = specification(which, owned, place, words(&[b"--version"]));
+    // The work path does not exist until the first preparation creates its layout.
+    spec.directory.clone_from(&place.directory);
+    spec
 }
