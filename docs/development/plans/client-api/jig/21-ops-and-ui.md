@@ -350,10 +350,31 @@ and feed its `Up` (jig 12.5) for documents. Added:
 (a project's settings read, then another handle's `Changed`: the
 settings still show; the page left: they are gone). The client
 world's referee (tests/client, `harness/referee.rs`) gains testing.md,
-6.3's "A sign-out told: a sign-out the engine did not receive is never
-shown done", with its referee test
-`a_sign_out_shown_done_before_the_engine_received_it_is_caught`. Each
-under 20 ms.
+6.3's "A sign-out told", as jig `bbb6303aa` amended it: "After a person
+asks to sign out, the sign-in page is a fault while the engine still
+holds the sign-in they asked to end. Once the engine has ended it, by
+that sign-out or by an end of its own ..., before the ask or after it,
+the page shows that end, whatever became of the ask. The world observes
+each end of a sign-in where the engine makes it". At jig `15266f311`:
+`Observed::SignOutReceived { client }` becomes `Observed::SignInEnded {
+client }`, pushed where `SignOutReceived` is (`scripted.rs:507`,
+`joint/session/signing.rs:37`, which the joint front's `SignedOut` fault
+already calls, ops' `client/transport.rs:474`) and in each scripted
+front's `FrontFault::SignedOut` arm (`scripted.rs:453`, ops'
+`client/transport.rs:417`); a scripted front pushes it once for each
+client bound to the ended sign-in's party. The referee keeps, beside
+`sign_out_asked`, the clients whose sign-in the engine ended: a
+`SignInEnded` adds its client; `Seen::SignedOut` passes when its client
+has no sign-out asked or is among them, and then leaves both sets;
+nothing else takes a client out of the ended ones (a reload does not:
+the scripted engine keeps the sign-in it ended). Referee tests:
+`a_sign_out_shown_done_before_the_engine_received_it_is_caught`, as it
+is, and `a_sign_in_the_engine_ended_shows_the_sign_in_page_after_a_lost_sign_out`
+(`Truth(SignInEnded)`, then `SignOutAsked`, then `Seen::SignedOut`:
+`Verdict::Passed`), the order of seed 101 of
+`random_people_in_new_chat_starts`. No other referee rule or judge
+changes, and the Ui does not: it shows the sign-in page once the link
+says signed out (view.md, 18.6). Each under 20 ms.
 Proof: joint layer: `heavy cargo nextest run -p jig-client-protocol-world
 -E 'test(a_person_signs_in_by_the_printed_link_and_starts_a_chat) |
 test(a_slow_reader_gets_fewer_deliveries_and_others_are_answered)'`,
