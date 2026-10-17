@@ -7,12 +7,11 @@ publish.workspace = true
 
 [dependencies]
 jig-client-protocol-http.workspace = true
-jig-client-domain.workspace = true
+jig-client.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-http.workspace = true
 skein-shell.workspace = true
-jig-domain-client.workspace = true
 jig-client-view.workspace = true
 skein-ui.workspace = true
 skein-ui-text.workspace = true

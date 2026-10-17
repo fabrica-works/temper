@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-jig-client-domain.workspace = true
+jig-client.workspace = true
 serde_json.workspace = true
 temper-service.workspace = true
 temper-client-shell-terminal.workspace = true
@@ -21,11 +21,10 @@ temper-fake-checkout.workspace = true
 temper-fake-forge-domain.workspace = true
 temper-fake-forge-protocol.workspace = true
 jig-channel-world.workspace = true
-jig-domain-client.workspace = true
+jig-client-view.workspace = true
 jig-domain-core.workspace = true
 jig-domain-people.workspace = true
 jig-domain-tasks.workspace = true
-jig-client-view.workspace = true
 skein-ui.workspace = true
 skein-fake-person.workspace = true
 jig-client-shell-native.workspace = true
