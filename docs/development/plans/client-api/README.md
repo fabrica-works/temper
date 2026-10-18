@@ -964,7 +964,15 @@ per session are in each file.
     names, in a commit of its own that names `temper-14.1` and rulings
     354 and 356, and list any further copy of the value. That is no block
     and no failure outside your Files. A refusal of another kind, or a
-    shortfall one repair does not close, is a block.
+    shortfall one repair does not close, is a block. Until forge-setup's
+    `temper-14.s2` lands (the director's request of 2026-10-18T16:33Z;
+    the steer of 16:35Z): no edit to either `memory_bytes`. A refusal of
+    a memory is a block (kind: process), with its line, your worktree's
+    path, and whether your change adds to the worker's worst case (the
+    worker root, the agent program and its arguments: temper-service's
+    `worker_worst_case`); go on with work that does not rest on the
+    gate. A shortfall of a few bytes in a path longer than the one the
+    example was measured from is the path's, not your change's.
   - 2026-10-18 13:34Z, point 1 (jig-19.5, jig-20.1 and every later jig
     increment, until the run's end; ruling 364): Test time, jig: the
     fuzzy aim of 24.91 s is a guide, as the focused aim is (ruling 275).

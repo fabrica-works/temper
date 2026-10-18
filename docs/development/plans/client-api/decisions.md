@@ -3014,6 +3014,9 @@ choice would have been the user's (development.md, 10.4).
      - **Scope and end:** 06.6 only, from now. temper's `client.md`, 3.5,
        names the call's place for `client-pages`, after a jig plan.
 
+377. **Hold owned.json's memory_bytes until forge-setup's temper-14.s2** (steer of 2026-10-18T16:35Z).
+     The director's request of 2026-10-18T16:33Z (temper's forge-setup run on x1): `serve_prepares_once_on_the_owned_example` fails on temper `main` in longer checkout paths ("workers[0].memory_bytes: the worst case passes memory_bytes by 8 bytes"), because the worker's worst case counts the document's resolved paths; forge-setup's designer is deciding the example's room for a person's directory, and forge-setup's `temper-14.s2` then sets owned.json's two `memory_bytes`. This run holds every edit to them until that step lands: the README's 13:34Z point 3 gains the hold. A refusal of a memory becomes a block (kind: process), so that a raise that cannot wait is ruled here and noted in `supervision.md` for the director.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
