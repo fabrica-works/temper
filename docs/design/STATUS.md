@@ -34,7 +34,7 @@ development.md, section 3.3).
 | `protocol/git.md` | yes | nothing but its open questions (containment between hosts, section 10) |
 | `protocol/setup.md` | partly | 15, later: GitHub's setup, the binaries' digests, webhooks from another host, CI's isolation, provisioning at adoption, reconcile over TLS, the lock and the exec on skein's shell: not planned (forge-setup's `later.md`) |
 | `client.md` | partly | built: the forge's words and "Shown on the forge." (4.1, 4.2), its records (4.6). Left: the client root on `jig-client`, with two owners, temper's pages and the forge's side, routing by asker (3.1, 3.3), the pages its stories use after the mockups (Inbox, Chats, Chat, the task's page, the adoption form) and their confirmations, on jig's helpers (3.5, 3.6), their cards temper's own, from the documents and `jig-client`'s `facts`, jig's words for a decision's facts under temper's phrasebook (1, 3.5, 5.1), the forge's family as bytes and its form a page of temper's (4.3 to 4.7), `Owner` in the wire crate (4.6); the view on `skein-ui` (5); the terminal on skein's `skein-ui-text` over `jig-client-shell-native`, its line bytes, its host adding skein's terminal's worst case and operations to its own (6.2, 6.8), a path's segments apart from the rows, a long path shown cut (5.4), an authority's entries apart from the rows, 12, a long authority shown in part (5.4), keeping the credential's file through `jig-client-shell-native` and signing in again with `Held` (6, 7), the root started before the sign-in, jig's client opening no watch until signed in (3.4); `temper-service` owning the clients' listener, jig's default HTTP mapping under `/jig` with its example guards, the link route's `GET` answered not found (8); `tests/client` with jig's check, given temper's phrasebook (10); the crates `temper-protocol-client-wire` renamed `temper-client-protocol-wire` and `temper-shell-terminal` `temper-client-shell-terminal`, by the client naming rule; the client root, view root and native client copied from jig's retired, the banner's word for each link state and temper's main while signed out or out of date (5.1, 6.6), the adoption's title for a project `me` does not name (4.4), the kept work dropped said in a line of the terminal's (3.4, 6.6): client-api; 6.8, 10: the terminal on skein's print by its own tree, and made from `limits::native()`'s limits in a unit test: forgejo-17; the board, the changes page, an agent's task page, a goal's page's history, budget, authority and acts, the confirmations no present story makes (3.5, 3.6), the rebound-Host attack story in the process tier (10), a chat's proposal at the call that made it, once jig's turns name what their calls made (3.5; jig's `domain/engine.md`, 7.2): not planned (client-api's `later.md`, temper's next client plan). Not planned: the forge's parts beyond adoption (`web/ux/forge.md`), the browser, the forge as a sign-in provider through `Mint` (section 11) |
-| `testing.md` | partly | the domain and system worlds, the client's joint world (6.3), the tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer, deliveries and setup routes (4.2), the fake git program (4.3), owned mode with CI, webhooks and the hinted story, the box's test and reconcile's world (2.6) stand; a scenario's limits from the shipped profile in every world, fixture and process configuration (5.1), and the live story ending at its task's first terminal failure, with each run's summary (2.7): not planned; 2.1, 2.6: the client's tiers on `jig-client`: client-api; 2.6: the rebound-Host attack story, and the process tier's person finding the goal on the board: not planned (client-api's `later.md`); 2.4: the focused real-loop world on one ring, with hosted agents, native clients and fake peers, and its real-git bridge: not planned; 2.4, 2.6 and 6.3, the agents' tools' stories: not planned (`tools.md`) |
+| `testing.md` | partly | the domain and system worlds, the client's joint world (6.3), the tiers below the domain (2.2, 2.5 to 2.7), the fake forge's protocol layer, deliveries and setup routes (4.2), the fake git program (4.3), owned mode with CI, webhooks and the hinted story, the box's test and reconcile's world (2.6) stand; a scenario's limits from the shipped profile in every world, fixture and process configuration (5.1), and the live story ending at its task's first terminal failure, with each run's summary (2.7): not planned; 2.1, 2.6: the client's tiers on `jig-client`: client-api; 2.6: the rebound-Host attack story, and the process tier's person finding the goal on the board: not planned (client-api's `later.md`); 2.4: the focused real-loop world on one ring, with hosted agents, native clients and fake peers, its tools' stories, and the forge host's move from `tests/one-process` to `testing/` with webhook delivery (4.2): the tools plan; 2.4: its real-git bridge, sh-subset CI, faults in the loop and several workers: not planned; 2.6 and 6.3, the agents' tools' stories: not planned (`tools.md`) |
 | `tools.md` | no | all: not planned. jig's named key and its read of one turn come first (section 13); then area 1 (5.5), `temper ctl` for a chat to a landed change; areas 2 to 4 as the QA loop reaches them; the MCP endpoint and the tools in jig later (section 14) |
 | `web/architecture.md` | no | all: temper's browser shell, `temper-client-shell-web`, on skein's `skein-ui-web` and jig's `jig-client-shell-web`, its sign-in by the printed link's page and cookie, its tier with jig's cross-site and framed-page stories: not planned |
 | `web/ux/forge.md` | partly | built: "Shown on the forge." and the adoption form (5.1). Left: the forge's read family and its subject records (2.5, 9), a change's result and why it stopped (2.5), the changes page and landing queues (3), approvals at a head (4), repositories' health, their landing rules in a project's settings and the deployment's forge parts (5.2 to 5.4), holds in the forge's words (6), a goal's issue, landings as news and findings (7): not planned; the changes page: not planned (client-api's `later.md`, temper's next client plan) |
@@ -69,9 +69,14 @@ order of its pages, not contract (`client.md`, 3.5).
   temper's next plan of its client.
 - **The real-loop world** (`testing.md`, 2.4; `tools.md`, 11.3):
   a small focused suite on one ring, with the standalone service, hosted
-  smith agents, native clients and fake peers. Chat, waits, persistence
-  and teardown first; clone, push and landing wait for the real-git
-  bridge (testing.md, section 10). Waits for a plan of its own.
+  smith agents, native clients and fake peers. The tools plan builds it
+  with its tools' stories: chat, waits, persistence and teardown, then
+  forge, clone, push and landing stories on the fake git program over
+  the shared forge, and the forge host's move from `tests/one-process`
+  to `testing/`, webhook delivery with it. Waits for the real-git
+  bridge, with the forge kit's move (`draft/forge-kit.md`, section 5),
+  and for sh-subset CI, faults in the loop and several workers
+  (`testing.md`, section 10): a plan of their own.
 - **The agents' tools, `temper ctl`** (`tools.md`): waits for jig's
   named key and its read of one turn (`tools.md`, section 13).
 - **After standalone** (`protocol/README.md`, section 14): between hosts
@@ -137,13 +142,14 @@ order of its pages, not contract (`client.md`, 3.5).
   (skein's `notes.md`), once `temper serve` runs real work.
 - **smith's changed APIs** (smith's `domain/host.md`, section 11): the
   typed agent face, smith's inline agent, removed modes, which temper
-  takes at its next repin of smith, after smith's reliability plan.
-- **smith's parity changes, for temper's next repin of smith** (smith's
-  parity plan, its `later.md`; skein's development.md, 5.7): smith's
-  transcript version 4, and the tools domain's new `Call` and `Outcome`
-  variants, for jobs, which temper's generated crates and its users of
-  `smith-domain-tools` follow. Waits for the plan that moves temper's
-  smith past them.
+  takes with the repin of the next item.
+- **smith's parity changes, for the tools plan's repin of smith**
+  (smith's parity plan, its `later.md`; skein's development.md, 5.7):
+  temper's pin of smith is at transcript version 3, which `tests/client`
+  names; the tools plan moves it to smith's main, at transcript version
+  5, with jobs (`Request::Job`). Jobs are carried as `domain/agent.md`,
+  4.3 says: `temper-engine-smith`'s `turn` answers the job request as
+  not a turn. Waits for the tools plan.
 
 ## 4. Drafts
 

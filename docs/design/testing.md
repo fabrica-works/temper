@@ -133,15 +133,18 @@ on the real kernel in the focused suite, within its existing budget.
 - **What runs:** `temper-service`'s system module, with the engine,
   store and one worker as standalone runs them; smith's agent hosts;
   the tools' root over jig's native client transport; and skein's fake
-  LLM peer on loopback. The fake forge's HTTP host joins stories that
-  need its API. Configuration, the store and client credentials live in
-  a scratch directory on the real filesystem. Loopback listeners use
-  ports assigned by the kernel, passed to their clients once bound.
+  LLM peer on loopback. The forge host joins stories that need the
+  forge. Configuration, the store and client credentials live in a
+  scratch directory on the real filesystem. Listeners are on loopback,
+  on a port the kernel assigns, passed to their clients once bound. A
+  story never uses a fixed port.
 - **Agents share the loop.** The harness answers the worker's spawn
   with a hosted smith agent, joined by real pipes, and drives its
-  `iterate` in the same loop. External programs such as git and sh run
-  as real child processes. Launching the `temper agent` executable,
-  with its own loop and ring, is checked by the process tier (2.6).
+  `iterate` in the same loop. The agent's LLM is skein's fake peer,
+  which plays the story's scripted turns. git is the fake git program
+  (4.3); other external programs, such as sh, run as real child
+  processes. Launching the `temper agent` executable, with its own
+  loop and ring, is checked by the process tier (2.6).
 - **Reuse across worlds.** The host composition, fake state machines,
   scenario scripts and outside referee observations are shared with
   the one-process world wherever they apply. Backend setup supplies
@@ -152,8 +155,8 @@ on the real kernel in the focused suite, within its existing budget.
   restarted on the same directory retains the work, and a call whose
   answer was lost is retried under its named key and made once
   (tools.md, 11.3). The named-key story waits for jig's contract
-  (tools.md, section 13). Forge API stories follow; stories that clone,
-  push or land wait for the real-git bridge below.
+  (tools.md, section 13). Forge API stories follow, then stories that
+  clone, push or land, on the fake git program (below).
 - **Checks between iterations:** the harness checks memory ownership,
   operations and descriptor release, and the teardown invariant of
   testing-strategy.md, section 6; the referee checks the same outside
@@ -161,13 +164,27 @@ on the real kernel in the focused suite, within its existing budget.
   peers stay available until their clients have settled. Traces and scratch files
   accompany a failure, which is reproduced in the lowest tier that
   shows it (testing-strategy.md, sections 6 and 9).
-- **The forge and real git:** the existing HTTP fake shares an
-  in-memory forge with the fake git program (4.2, 4.3). Real git cannot
-  clone or push into that store. Full repository stories need a bridge
-  that keeps git's objects and refs consistent with the fake API's
-  heads, comparisons and merges. Its design is open (section 10);
-  those stories are added only once it exists. The initial stories
-  need neither an owned Forgejo nor its runner.
+- **The forge and git:** the forge host and the fake git program share
+  one in-memory forge (4.2, 4.3). Stories that clone, push or land run
+  on the fake git program over that forge; none waits for the real-git
+  bridge, which is later work (section 10). The stories need neither an
+  owned Forgejo nor its runner.
+- **The forge host** serves the fake forge's protocol layer (4.2) on a
+  loopback listener and writes the fake forge's signed deliveries to
+  the listeners of hooked repositories. It is a crate of the fake
+  forge's family under `testing/`, and names no engine or worker type,
+  so that it moves with the fake forge: skein-fake-peers hosts it
+  (draft/forge-kit.md, section 2; skein's `draft/forge.md`, section 7).
+  The one-process world and the real loop both host it.
+- **CI and webhooks.** CI follows the fake forge's content marker, the
+  cue that passes a repository's checks on a commit whose file at a
+  path holds it (4.2); a subset of sh that runs a workflow's steps is
+  later work (section 10). The forge host delivers a hooked
+  repository's webhooks to the engine's webhooks' listener
+  (protocol/forge.md, section 5). Polling stays as the backstop, at
+  paces the configuration sets short (`poll`, `poll_max` and `slow`).
+  A story that misses its time guide (6.1) is made cheaper or moved to
+  the fuzzy suite, never named as an exception.
 
 Most behavioural cases remain in the domain and system worlds. This
 tier keeps a few stories of transport, persistence and lifecycle, within
@@ -467,8 +484,9 @@ sees.
   typed transport only: by the fake git program in the one-process world
   (4.3), as by the fake checkout in the domain worlds. Real git meets an
   owned Forgejo in the process and live tiers, and the throwaway Forgejo
-  for the tools (2.6). The real-loop world's repository stories require
-  a real-git bridge, still to be designed (2.4, section 10).
+  for the tools (2.6). The real-loop world's repository stories run on
+  the fake git program too (2.4); a real-git bridge is later work
+  (section 10).
 - **CI follows content.** A repository's CI runs its checks in the shell
   subset (4.3) on the pushed tree, so a change that is wrong fails on the
   forge as it fails in the run.
@@ -776,7 +794,9 @@ by the commands in `docs/development/workflow.md`. In temper:
   protocol-world test at most 0.5 s, and a one-process or real-loop story
   at most 1 s.
   A test that misses its guide is made cheaper or moved to the fuzzy
-  suite, never merged with another.
+  suite, never merged with another and never named as an exception: a
+  real-loop story with CI and webhooks (2.4) is held to the 1 s as any
+  other.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
@@ -842,6 +862,7 @@ crates/temper-client-shell-terminal/tests  the terminal's machine world (client.
 testing/temper-fake-forge-domain    the fake forge's domain (4.2)
 testing/temper-fake-forge-protocol  the fake forge's protocol layer: Forgejo's API over skein's HTTP server
 testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
+testing/temper-fake-forge-host      the forge host: the protocol layer on a loopback listener, and signed deliveries to hooked repositories (2.4)
 testing/temper-throwaway-forgejo    the throwaway Forgejo and its runner, for the tools (2.6)
 tests/<component>/<child>           a child domain's world, temper-<component>-<child>-world
 tests/<component>/domain            a component's world: the engine's, the worker's
@@ -906,9 +927,10 @@ By tier:
   skein-kv's in-memory mode in place of jig's fake store
   (protocol/store.md, section 6).
 - **The real-loop world** (2.4): the hosted service, agents and clients,
-  the fake peers, the first stories and their checks; repository stories
-  wait for the real-git bridge. The one-process world, its fake forge
-  service and fake git program are built.
+  the fake peers, the forge host, the first stories and their checks,
+  and repository stories on the fake git program over the shared forge.
+  The one-process world, its fake forge service and fake git program are
+  built.
 - **The process tier and the live tier,** with their scripts; the
   process tier on owned mode, with CI, webhooks, the hinted story and
   `temper box`'s test (protocol/setup.md, 13.4).
@@ -947,9 +969,15 @@ By fake:
   in the scratch directory, with an adapter for git access and the fake
   API's reads and merges. The design must keep object identities, refs,
   protection and merge results consistent, and reuse the fake's policies
-  and scenario expectations. Until it is designed and built, clone,
-  push and landing stories run in the simulated and process tiers;
-  the real loop covers chat, client transport, persistence and lifecycle.
+  and scenario expectations. It is designed against the fake forge in
+  skein, with the forge kit's move (draft/forge-kit.md,
+  section 5). Until it is built, the real loop's clone, push and
+  landing stories run on the fake git program over the shared
+  in-memory forge (2.4), and real git meets a forge in the process
+  tier (2.6); no story waits for the bridge.
+- **What the real loop leaves for later:** the real-git bridge (above),
+  CI that runs a workflow's steps in a subset of sh (how much sh,
+  below), faults in the loop, and several workers (section 9).
 - **How much sh:** which commands and syntax the subset takes. It stays a
   subset of POSIX, so that real sh agrees.
 - **Where the shell's interpreter lives,** so that the machine and the

@@ -172,6 +172,14 @@ permission on it.
   with what it is now, and the run decides again on that.
 - **Not the engine's:** `wait`, `finish` and `deliver` (jig's
   `domain/engine.md`, 7.3). `deliver` is a push (section 6).
+- **Jobs are smith's** (smith's `domain/tools.md`), not `read_job`'s,
+  which reads a CI job's log. A `shell` command that runs past its
+  yield goes on as a job in the agent's process, under the charter's
+  `shell` (from `policy.shell`); the run reads or stops it with smith's
+  `job`. Neither the engine nor the worker routes or answers a job.
+  `temper-engine-smith`'s `turn` takes a turn request alone, and
+  answers any other request, a job's included, as not a turn
+  (`Problem::Type`).
 
 ### 4.4 Result contracts
 

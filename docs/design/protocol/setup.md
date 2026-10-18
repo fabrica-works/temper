@@ -969,7 +969,10 @@ Each is intended; what it needs is named with it.
   the owned example only.
 - **Overrides of `app.ini`.** Default: none; the settings are temper's.
 - **A token for the person's scripts and agents.** Default: none; the
-  person makes one on Forgejo's web.
+  person makes one on Forgejo's web, with the scopes they choose. A QA
+  harness playing the person makes one so, with read scopes alone, for
+  the agent it runs (`../tools.md`, section 10); never the preparation's
+  `admin_token`, which reconcile alone reads (section 9).
 - **Backups beyond an upgrade's.** Default: the person's, of the forge's
   directory and the store, with the box stopped.
 - **Two deployments on one managed forge.** Default: each its own bot

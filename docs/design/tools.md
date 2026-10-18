@@ -6,7 +6,8 @@ changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
 deployment on coding tasks of growing size, then on temper's features,
 until the first milestone (`README.md`, section 2) is usable for real
-tasks. Their QA loop extends the tools area by area (5.5). What
+tasks. Their QA loop extends the tools area by area (5.5). Their
+bounds are section 12; what
 the tools ask of jig is section 13; an MCP endpoint and the tools'
 extraction into jig are later (section 14). What is still open is
 listed in section 15.
@@ -88,14 +89,14 @@ listed in section 15.
 ## 4. The crates
 
 ```
-temper-client-tools          the table, a call, the runner, marks and conditions, the rendering (text,
-│                            JSON), the argv parser and help, the guide; the tools' root
+temper-client-tools          the table, a call, the runner, digests and conditions, the rendering (text,
+│                            JSON), the argv parser and help, the guide, the limits; the tools' root
 ├── jig-client               jig's client and its helpers (shapes, facts, thread, words)
 ├── temper-client-domain     the forge's client side (client.md, 3.1 and section 4) and its words (4.1, 4.7)
 ├── temper-client-protocol-wire  the forge family's records (client.md, 4.6)
 └── skein-json               the JSON writer and tokenizer
 temper-client-shell-cli      the host: argv to a call, the one-shot host over jig-client-shell-native,
-│                            the directory's lock, printing, exit status
+│                            the directory's lock and address, printing, exit status
 ├── temper-client-tools
 └── jig-client-shell-native  jig's native transport: HTTP, the small store's file, the token's
 temper                       the binary: `temper ctl` runs the host
@@ -105,7 +106,7 @@ temper                       the binary: `temper ctl` runs the host
   the tools are to agents what `temper-client-view` is to people.
 - **jig's part apart from temper's.** `temper-client-tools`' module
   `jig` holds what is generic: jig's part of the table, the call, the
-  runner, marks and conditions, the rendering. It names no temper item:
+  runner, digests and conditions, the rendering. It names no temper item:
   a boundary test fails the gate when a file under `src/jig/` names
   `temper`, or an item of the crate outside `crate::jig`. Extraction is then
   that module moved into a crate of jig's (section 14).
@@ -146,8 +147,8 @@ temper                       the binary: `temper ctl` runs the host
 
 ### 5.2 Reads
 
-A read answers with a document, or a page and its cursor, and its mark
-(5.4). It needs no key.
+A read answers with a document, or a page and its cursor, and, for a
+watch's subject, its digest (5.4). It needs no key.
 
 | Tool | What it answers | jig's |
 |---|---|---|
@@ -155,19 +156,24 @@ A read answers with a document, or a page and its cursor, and its mark
 | `inbox [--project P] [--kind K] [--root N] [--after C]` | what needs the party, then updates, each with its acts | `inbox` |
 | `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
 | `task N [--tree] [--activity K] [--run]` | a task's document, with its acts; with its live tree, its K latest activity lines, its live run, in one answer | `task{n}`, `tree{root}`, `activity{n}`, `run{n}` |
-| `chat N [--before C]` | a conversation: turns, words and provisional text in order, a page from its end | `activity{n}`, `run{n}`, through `thread` |
+| `chat N [--before C]` | a conversation: turns, words and, where the run's host gives it, provisional text, in order, a page from its end | `activity{n}`, `run{n}`, through `thread` |
 | `activity N [--before C] [--limit K]` | a task's activity, a page from its end | `activity{n}` |
 | `turn N A.T [--part K] [--from B]` | one turn of task N, attempt A, turn T, whole: its text, each call and its result | jig's read of one turn (section 13) |
-| `run N` | a task's live run: its attempt, its provisional text, its current call | `run{n}` |
+| `run N` | a task's live run: its attempt, its provisional text where its host gives it, its current call | `run{n}` |
 
+- **Provisional text is the run's host's.** An agent process gives none
+  (`protocol/llm.md`, section 7), and `chat` and `run` then print none:
+  a run shows by its activity, and its words as each turn commits.
 - **A turn too large for a page** comes in a page by its size in place
-  of its bytes (jig's `protocol/store.md`, 7.3). `activity`, `chat` and
-  `task --activity` print it as one line, its number, its size and the
-  call that reads it: `turn 3.7 · 412 KB · read with: turn 41 3.7`.
+  of its bytes (jig's `client/domain/contract.md`, section 6).
+  `activity`, `chat` and `task --activity` print it as one line, its
+  number, its size and the call that reads it: `turn 3.7 · 412 KB ·
+  read with: turn 41 3.7`.
 - **`turn`** prints each part of the turn cut to the tools' window, each
   cut with the call that reads on (`--part K --from B`). A turn past the
-  client's limit for one document is answered with its size and that
-  it is past it; the agent reports it as a finding.
+  engine's bound on one read, or the client's limit for one document, is
+  answered with its size and that it is past the limit, exit 0; the
+  agent reports it as a finding (section 12).
 - **The forge's changes are read on the forge,** with its API or `git`,
   as a person reads them there. A part of the forge's that the engine
   does not serve prints "Shown on the forge.", with the resource in the
@@ -186,7 +192,7 @@ agent must name.
 | `chat --project P TEXT` | starts a chat | `shapes::chat`, a `Create` | yes |
 | `message N TEXT` | words to a task | `Message` | yes |
 | `close N [--move D]...` | closes a chat: its live delegates cancelled, or moved to the party where named | `shapes::close_chat`, a compound request | yes |
-| `adopt --project P --forge F --owner O --name N [--role owned\|fork\|context] [--home]` | adopts a repository | the forge family's request (`client.md`, 4.4) | yes |
+| `adopt --project P [--forge F] --owner O --name N --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`client.md`, 4.4) | yes |
 | `answer N M TEXT` | answers question M of task N | `Answer` | |
 | `decide P/K accept\|reject\|pass-up [REASON]` | decides a proposal | `Decide` | |
 | `decide N --hold R release\|leave\|pass-up [REASON]` | decides an escalation | `Decide` | |
@@ -199,6 +205,13 @@ agent must name.
   proposal by its number, an escalation and a release by the hold's
   revision. An agent copies them from the acts a result printed (6.1);
   it never has to know which an act needs.
+- **`adopt` takes the adoption form's fields and defaults** (`client.md`,
+  4.4): forge 1, role `owned`, prefix `temper/`, the home and CI on.
+  `--landing` names the landing branch. A context repository is never
+  the home: `--role context` turns the home off. `--no-ci` needs at
+  least one `--check`, a gate number, each number once. The form's
+  checks are the parser's: a call that fails one exits 1 before
+  anything is sent.
 - **No confirmation.** The person's client says what an act will do
   before sending it (`client.md`, 3.6); an agent reads it in the
   document's acts and their effects, and the revision is its promise.
@@ -212,35 +225,61 @@ agent must name.
 ### 5.4 Waiting
 
 ```
-wait SUBJECT [--since MARK] [--until CONDITION] [--timeout DURATION]
+wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
 ```
 
 - **The subject** is a watch's (jig's `client/domain/contract.md`, 7.1):
   `me`, `inbox`, `task N`, `tree N`, `run N`, or a task query as `tasks`
   takes it.
-- **A mark** is a digest of the subject's document as the engine
-  delivered it, the first 8 bytes of its SHA-256 (skein's `lib.md`,
-  6.2), printed as 16 hex digits with every read of that subject and
-  every wait's answer. jig's revisions move only with what a party
-  decides about (jig's `client/domain/contract.md`, 5.2), so they cannot
-  say that a document changed; the mark can, and needs nothing of jig.
-- **`--since MARK`:** answered at the first delivery whose mark differs;
-  without it, at the first change after the watch's first delivery.
+- **A digest** is the first 8 bytes of the SHA-256 (skein's `lib.md`,
+  6.2) of the subject's document as `--json` prints it (6.2), without
+  its `digest` field, printed as 16 hex digits. Two calls of the same
+  tools, under the same limits, print the same digest for the same
+  document. jig's revisions move only with what a party decides about
+  (jig's `client/domain/contract.md`, 5.2), so they cannot say that a
+  document changed; the digest can, and needs nothing of jig. It is not
+  the mark the engine keeps per watch (jig's `client/domain/contract.md`,
+  7.2), which no tool prints.
+- **Which reads print one:** a read whose arguments are a watch's
+  subject, with every wait's answer: `me`; `inbox` and `tasks` without
+  a cursor; `task N`; `run N`. `task N --tree --run` prints one for
+  each subject, `task N`, `tree N` and `run N`, each over its own part
+  of the result. `--activity`'s lines, `chat`, `activity` and `turn` are
+  pages, not subjects, and print none.
+- **`--since DIGEST`:** answered at the first delivery whose digest
+  differs; without it, at the first change after the watch's first
+  delivery.
 - **`--until CONDITION`:** answered at the first delivery that meets it,
-  the first delivery included. Conditions are named facts over the
-  document:
+  the first delivery included; with `--since`, at the first delivery
+  whose digest differs and that meets it. Conditions are named facts
+  over the document:
 
   | Subject | Conditions |
   |---|---|
   | `me` | `waiting` (something waits for the party) |
   | `inbox` | `waiting`; `updates` (an unread update) |
-  | `task N` | `ended`; `waiting-on-me`; `held`; `phase:<phase>` |
+  | `task N` | `ended`; `waiting-on-me`; `held`; `replied` (a chat's run done for now); `phase:<phase>` |
   | `tree N` | `waiting-on-me` (a proposal or a question below waits for the party); `ended` |
   | `run N` | `ended` |
 
+- **`replied`** holds while a chat's status (jig's
+  `client/domain/client.md`, section 19, its facts) is parked, waiting
+  for you, waiting for them, held, closing or ended. A chat wakes on its
+  person's words (jig's `domain/tasks.md`, 8.3), so a wait begun once
+  `chat` or `message` has answered is not met by the reply before them:
+  `message 41 TEXT --key k`, then `wait task 41 --until replied`.
+- **`phase:<phase>`** names the client's phase in lower case, hyphenated:
+  `waiting`, `idle`, `due`, `preparing`, `claimed`, `running`,
+  `backing-off`, `active`, `closing`, `held`, `ended`, `done`, `failed`,
+  `cancelled`.
 - **`--timeout`:** 300 seconds by default, at most 3600; answered with
-  the current document, its mark, and that the condition is not met
+  the current document, its digest, and that the condition is not met
   (6.3).
+- **A watch that ends under a wait** (jig's `client/domain/contract.md`,
+  7.2) answers it: met where the condition is `ended` and the subject
+  ended; refused where the party may no longer see the subject; failed
+  where the sign-in ended or the engine stopped; otherwise, not met,
+  with the last document and its digest (6.3).
 - **Level-triggered, as the watch is** (jig's
   `client/domain/contract.md`, 7.2): deliveries between are coalesced,
   and the answer is the document as it is when answered. A change before
@@ -258,8 +297,8 @@ The table grows in the order the QA loop reaches temper's surface. Each
 area lands with its stories (section 11).
 
 1. **A chat to a landed change** (the first QA loop, the milestone's
-   story, `README.md`, section 2): `sign-in`, `sign-out`, `pending`,
-   `help`; every read of 5.2; `wait`; every act of 5.3.
+   story, `README.md`, section 2): the host's tools of 5.6; every read
+   of 5.2; `wait`; every act of 5.3.
 2. **Goals and plans:** `goal --project P [--priority I] [--budget A |
    --as-allowed] [--deadline T] TEXT` (`shapes::set_goal`, keyed),
    `proposal P/K`, `amend N --spec R CHANGE... REASON`, `withdraw P/K`,
@@ -280,13 +319,28 @@ area lands with its stories (section 11).
   designer as a design question, and joins the table as a row of an
   area.
 
+### 5.6 The host's tools
+
+| Tool | What it does |
+|---|---|
+| `sign-in FILE\|-` | signs in by the link `temper serve` printed, read from FILE, or from stdin for `-`; writes `token` and `address` (8.1) |
+| `sign-out` | ends the sign-in and erases the token |
+| `pending` | lists what DIRECTORY's store keeps: each request's key, its tool and when it was first sent |
+| `help [TOOL]` | the guide, then the tools (11.5); with TOOL, its record of the table |
+
+- **`pending` reads the store's file only:** it takes no lock, starts
+  no client and sends nothing (8.3).
+- **A TEXT of `-`** is read from stdin, to its end. A call takes at
+  most one `-`, and none with `--call -`; otherwise it is a usage
+  error.
+
 ## 6. What a result looks like
 
 ### 6.1 Text
 
 The default: plain UTF-8 lines, no colour, no wrapping. A document
-prints its header line, its fields, its acts and its mark. A goal
-waiting on the agent:
+prints its header line, its fields, its acts and, for a watch's
+subject, its digest (5.4). A goal waiting on the agent:
 
 ```
 task 41 · goal · running · shop · priority 2
@@ -298,7 +352,7 @@ acts:
   answer 44 3 TEXT
   stop 41
   cancel 41 REASON
-mark: task 7c1e09a2b44f0d13
+digest: task 7c1e09a2b44f0d13
 ```
 
 - **Acts as calls,** without the `temper ctl DIRECTORY` prefix; a keyed
@@ -313,23 +367,40 @@ mark: task 7c1e09a2b44f0d13
   `done: task 41, chat`; `proposed: 3/17, to maintainers`; `decided
   first: by ada, accepted, 14:02`; for `adopt`, `client.md`, 4.7's
   words.
+- **What a call sends first** (8.2, step 4) prints on stderr, a line
+  each: `kept: ` and its key, then its outcome as an act's prints.
 
 ### 6.2 JSON
 
-`--json` prints the result record instead: one JSON document on stdout,
+`--json` prints the result record instead: one JSON object on stdout,
 written with `skein-json`'s writer, the result's fields by their names
-in the table, numbers as jig's integers, no floats. The JSON is the
-contract for scripts; the text follows temper's words, and may change
-with them.
+in the table, in snake case, numbers as jig's integers, no floats. The
+JSON is the contract for scripts; the text follows temper's words, and
+may change with them.
+
+- **`help TOOL --json`** prints the tool's record of the table.
+- **`--call`'s arguments** are named as the table names them:
+  `decide`'s are `proposal`, or `task` and `hold`, then `outcome` and
+  `reason`.
+- **The `kept:` lines,** under `--json`, are one JSON object a line on
+  stderr.
 
 ### 6.3 Exit status
 
 | Status | Meaning | Prints |
 |---|---|---|
 | 0 | a read answered, an act done or proposed, a wait's condition met | the result |
-| 1 | the call failed: usage, the directory refused, the engine unreachable, signed out, the client's limit, unknown past the retention | one line on stderr, `temper ctl: ...` |
-| 2 | refused by the engine | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
-| 3 | a wait's timeout, its condition not met | the current document and its mark |
+| 1 | the call failed: usage, the directory refused or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention; a wait's watch ended by the sign-in's end or the engine's stop | one line on stderr, `temper ctl: ...` |
+| 2 | refused by the engine, a key conflict among them (section 7); a wait's subject no longer visible to the party | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
+| 3 | a wait's timeout, or its subject's watch ended, its condition not met | the current document, or the last, and its digest |
+
+- **A call whose link stays down** past its deadline exits 1, and what
+  it sent stays in the small store, for the next call that sends (8.2).
+- **`adopt`:** adopted exits 0, with branch protection unknown or not
+  (`client.md`, 4.7, prints "Branch protection could not be read."
+  then); unknown past the retention exits 1; each other outcome of 4.7,
+  not found, no access and refused among them, exits 2, in 4.7's
+  words.
 
 ### 6.4 Bounded
 
@@ -339,11 +410,10 @@ with them.
 - **Long texts are paged, never whole by default:** `chat`, `activity`
   and `turn` take a cursor or an offset. An agent's context is the
   budget the defaults are chosen for.
-- **The numbers** are constants of `temper-client-tools`' `limits`
-  module, beside the client's (`client.md`, section 2), and within
-  them. A path is never cut: the tools print it whole, within the
-  client's bound on a path's segments (`jig-client-domain`'s `Limits`,
-  `segments`).
+- **The numbers** are section 12's. A path is never cut: the tools
+  print it whole, within the client's bound on a path's segments
+  (`jig-client-domain`'s `Limits`, `segments`); nor is an authority,
+  within its bound on an authority's entries.
 
 ## 7. Requests: once, and named
 
@@ -361,9 +431,16 @@ with them.
   the same party, within the engine's retention, is the same request: a
   rerun after a lost answer, an agent's own timeout or a lost context
   gets the first answer, never a second chat. The same name with another
-  ask is refused as a key conflict. Nothing is kept on the agent's side,
-  so a rerun is the same request from any directory signed in as the
-  party.
+  ask is refused by the engine as a key conflict. The name, not
+  DIRECTORY, makes a request the same: a rerun from any directory signed
+  in as the party is the same request, and DIRECTORY's store keeps a
+  request only until it is answered (8.2). Past the engine's retention,
+  which `me` prints, the name is free again, and asking under it is a
+  new request.
+- **A name the client holds already** is answered `Held`, nothing sent
+  (jig's `client/domain/client.md`, section 6). A call sends what
+  DIRECTORY kept, and waits for each answer, before it sends its own
+  (8.2), so it meets `Held` only past that; it exits 1.
 - **Names are the party's.** Agents sharing a party give their names a
   prefix of their own; the guide says so (11.5).
 - **Acts that decide name the revision the agent saw;** a moved one is
@@ -388,15 +465,21 @@ temper ctl help [TOOL]
   and the engine's address, `address`, all `jig-client-shell-native`'s
   or beside them, `0o700` and refused unless the user's own. A
   DIRECTORY is `temper ctl`'s or `temper open`'s, never both's (section 15).
+- **`address`** is `temper-client-shell-cli`'s: one line,
+  `http://HOST:PORT`, `0o600`, written by `sign-in` and read by every
+  other call.
 - **`--call FILE`** reads one call as JSON, `{"tool": ..., "arguments":
   {...}}`, from FILE, or from stdin for `-`.
-- **`sign-in LINK`** signs in by the link `temper serve` printed, on
-  loopback, writes the token and the address the link names, as `temper
-  open` does (`client.md`, section 7). `sign-out` ends the sign-in and
-  erases the token. Every other tool signs in with the token DIRECTORY
-  holds (`SignIn { with: Held }`).
+- **`sign-in FILE|-`** signs in by the link `temper serve` printed, read
+  from FILE or stdin and never an argument (section 9), on loopback, and
+  writes the token and the address the link names, as `temper open`
+  does (`client.md`, section 7). `sign-out` ends the sign-in and erases
+  the token. Every other tool signs in with the token DIRECTORY holds
+  (`SignIn { with: Held }`).
 - **Loopback only,** as `temper open`, until the clients' listener
-  serves TLS.
+  serves TLS: a call checks that `address` is on loopback, `127.0.0.0/8`
+  or `[::1]`, before it sends the token, and otherwise exits 1, "the
+  engine's address must be on loopback".
 - **No configuration file;** its inputs are its arguments and DIRECTORY.
 
 ### 8.2 One call, one process
@@ -407,11 +490,12 @@ as the terminal's host is:
 
 1. parse the arguments against the table; a usage error exits 1 before
    anything is opened;
-2. open DIRECTORY; for a call that sends, take its lock (8.3) and load
-   the small store's records;
+2. open DIRECTORY and check its address (8.1); for a call that sends,
+   take its lock (8.3) and load the small store's records;
 3. start the tools' root, sign in with the token, wait for `me`;
 4. send what the store kept, each answered as a line on stderr, `kept:
-   ...`;
+   ...` (6.1); the step ends once each is answered and its record
+   erased, so that the store keeps nothing when the call is sent;
 5. run the call: a read answered, an act's answer durable, a wait's
    condition met or its timeout;
 6. print the result on stdout, close the stream, exit with the call's
@@ -420,17 +504,30 @@ as the terminal's host is:
 - **A termination signal** stops the call; what it sent stays in the
   small store, and the next call that sends sends it again under its
   key.
-- **`pending`** lists what the small store keeps, and its progress.
+- **A link down** past the link's deadline (section 12), at step 3, 4
+  or 5, exits 1; what was sent stays in the small store, as after a
+  signal.
+- **`pending`** lists what the small store keeps (5.6).
 
 ### 8.3 Several calls at once
 
 An agent runs a `wait` while it acts, or several agents share a party.
 
-- **A call that sends** takes an exclusive lock on DIRECTORY's store for
-  its run, so two never write the small store over each other. A second
-  waits for the lock.
-- **A read and a wait** take no lock and start the client with nothing
-  kept: they write no record and send nothing but reads and watches.
+- **A call that sends** takes an exclusive lock on DIRECTORY for its
+  run, so two never write the small store over each other: skein's
+  `Lock` on a root (skein's `io.md`, section 5), on DIRECTORY itself,
+  since `store` is replaced by a rename on each write. A second tries
+  again every 100 ms, and past the lock's wait (section 12) exits 1,
+  "DIRECTORY is busy with another call". The lock ends with the process,
+  however it ends.
+- **Which take it:** every act, `sign-in` and `sign-out`; never
+  `pending`, `help`, a read or a wait.
+- **A read and a wait** take no lock, and hold their client's store in
+  memory, empty, never DIRECTORY's file: they write no record and send
+  nothing but reads and watches. A client loaded from DIRECTORY's
+  records would send the stream they name gone (jig's
+  `client/domain/client.md`, section 11), ending the watches of the
+  call that opened it.
 - **Several parties** are several directories, each signed in as its
   own.
 
@@ -448,7 +545,8 @@ An agent runs a `wait` while it acts, or several agents share a party.
   `0o600`, refused if the file exists, and never prints it. The agent
   signs in with it (`sign-in --service FILE`) and acts within that
   role's authority and pool. QA plays several parties this way.
-- **Credentials are files,** private, never arguments, never printed.
+- **Credentials are files,** private, never arguments, never printed;
+  the printed link too, which `sign-in` reads from a file or stdin.
 - **The agent's LLM account is not the tools'.** The deployment's model
   account is handed in by its configuration, as the owned example has
   it (`protocol/setup.md`, 8.1; `protocol/credentials.md`, section 3).
@@ -461,12 +559,20 @@ harness's:
 
 - **Started:** `temper box CONFIG.json`; its stdout carries `temper
   serve`'s sign-in links, and the harness passes the first to `temper
-  ctl DIRECTORY sign-in LINK`.
-- **A repository to adopt,** in an org of the owned Forgejo, adopted
-  with `adopt` as the first act of area 1.
-- **The forge read directly:** its API and `git` on `owned.listen`, as
-  the person (`protocol/setup.md`, 6.5). A token for those reads is
-  `protocol/setup.md`'s open question (section 16).
+  ctl DIRECTORY sign-in -` on stdin.
+- **The person on Forgejo:** the harness plays the person of
+  `protocol/setup.md`, 6.5: it signs in on Forgejo's web with
+  `person_password` and changes it, and makes the repository to adopt
+  in an org, which the agent adopts with `adopt` as the first act of
+  area 1.
+- **The forge read directly:** its API and `git` on `owned.listen`, with
+  a token the harness makes for the person, as a person makes one
+  (`protocol/setup.md`, section 16), whose scopes are reads alone:
+  `read:repository`, `read:issue`, `read:organization` and `read:user`.
+  The agent is handed that token, never the preparation's
+  `admin_token`, which reconcile alone reads (`protocol/setup.md`,
+  section 9). Forgejo refuses the agent's writes with it; the agent
+  changes the forge only through temper, and the guide says so (11.5).
 - **Logs:** the engine's and the worker's in the box's stderr, each line
   prefixed by its step; Forgejo's in its directory. Outside the tools.
 - **Thrown away** by stopping the box with a termination signal and
@@ -481,9 +587,11 @@ harness's:
 - **The rendering:** each result kind in text and JSON, as golden text,
   with jig's and the forge's words; a turn by its size; a cut and its
   call.
-- **Marks and conditions:** a mark moves with a document's change and
-  only then; each condition over documents that meet and miss it.
+- **Digests and conditions:** a digest moves with a document's change
+  and only then; each condition over documents that meet and miss it.
 - **The boundary:** `src/jig/` names no temper item (section 4).
+- **The bounds:** each of the tools' ceilings within the client's limit
+  it reads from (section 12).
 
 ### 11.2 `tests/client`
 
@@ -491,26 +599,35 @@ harness's:
 beside the fake person, as a scripted agent making calls (`client.md`,
 section 10; `testing.md`, 6.3). Area 1's stories: a chat started, its
 reply waited for, a message, a turn too large for a page read whole,
-the chat closed; a repository adopted; a held task released. The
-world's faults hold: a call cut by a link drop or an engine restart,
-asked again under its named key, is made once. Each later area adds its
+the chat closed; a repository adopted; a held task released. A turn
+too large for a page exists only where the engine's bound on a turn
+passes its page bound, so the world's profile sets it so. The world's
+faults hold: a call cut by a link drop or an engine restart, asked
+again under its named key, is made once. Each later area adds its
 stories.
 
 ### 11.3 The real loop
 
 `tests/real-loop` hosts the tools' root over jig's native transport,
-the standalone engine and worker, smith's agents and skein's fake LLM
-peer on one thread and one real ring (`testing.md`, 2.4). Agents are
-hosted in that loop and joined to their worker by real pipes. The store
-and client credentials use a scratch directory on the real filesystem.
+the standalone engine and worker, smith's agents on skein's fake LLM
+peer's scripted turns, the fake forge's host, and the fake git program
+over the fake forge, on one thread and one real ring (`testing.md`,
+2.4). Agents are hosted in that loop and joined to their worker by real
+pipes. The store and client credentials use a scratch directory on the
+real filesystem.
 
 The first stories sign in, start a chat and wait for its reply, and
 satisfy one client's wait by another client's act; each drains with
-everything settled. Then a service restart retains the work, and a
-call whose answer was lost, retried under its named key, is made once.
-The named-key story waits for jig's contract (section 13). The fake
-forge's API joins stories that need it; clone, push and landing stories
-wait for its real-git bridge (`testing.md`, 2.4 and section 10).
+everything settled. Then a service restart retains the work. A call
+whose answer was lost is made once: the tools' root is dropped once
+the engine holds its request, before its answer, and a fresh one, on
+another DIRECTORY signed in as the same party, asks under the same name
+and is answered the first answer; the party has one chat. The forge's
+stories adopt a repository, and clone, push and land through the fake
+git program on the shared in-memory fake forge, with CI by the fake
+forge's content marker and its webhooks delivered to the engine
+(`testing.md`, 2.4). Real git waits for the real-git bridge (`testing.md`,
+section 10).
 
 These are a small set of focused tests at the gate. They reuse lower
 worlds' scripts and outside expectations where applicable, and add
@@ -539,7 +656,8 @@ real git and CI (`testing.md`, 2.6).
 
 `temper ctl help` prints a short guide, then the tools from the table:
 how to sign in, the loop of 5.4, naming keys and their prefix, reading
-acts, the exit statuses. The guide is text of `temper-client-tools`; a
+acts, the exit statuses, reading the forge and never changing it but
+through temper (section 10). The guide is text of `temper-client-tools`; a
 test fails when it names a tool the table lacks.
 
 ### 11.6 Findings into stories
@@ -550,6 +668,41 @@ the lowest tier that shows it, before its fix lands: a domain world,
 (`draft/qa.md`, section 1). A story's calls are the tools' calls, so an
 agent's history of `temper ctl` commands transcribes into one.
 
+## 12. The bounds
+
+Four bounds decide how much of a document a call prints:
+
+| Bound | Whose | It decides | Past it |
+|---|---|---|---|
+| a page's bytes | the engine's (jig's `client/domain/contract.md`, section 6) | whether a turn comes in a page by its bytes or by its size | the turn's line, its size and the call that reads it (5.2) |
+| one read's bytes | the engine's (the read of one turn, jig's `client/domain/contract.md`, section 6) | whether `turn` is answered whole | its size, and that it is past the limit |
+| one document's bytes | the client's, `document_bytes` | whether the client takes a document whole | a turn: its size, and that it is past the limit; any other document: the client's `Limit`, exit 1 |
+| the tools' window | the tools' | how much of a result prints | the rest by its cursor, or `--part` and `--from` (6.4) |
+
+- **A turn past either read bound** answers exit 0, with its size and
+  "past the limit; report it": the agent reports it as a finding, and
+  never works around it.
+- **The tools' window is within the client's limit:** a step test fails
+  when one of the tools' ceilings passes the client limit it reads from
+  (11.1).
+
+The numbers are constants of `temper-client-tools`' `limits` module. The
+client's are the tools' own preset of `jig-client`'s `Limits`, not the
+terminal's, whose window shows two rows:
+
+| What | Bound |
+|---|---|
+| rows: a list's page, the activity lines `task` adds, a conversation's page; the client's rows per window | 50 |
+| a result's text | 32 KiB |
+| a turn's part | 16 KiB |
+| one document, the client's `document_bytes` | 1 MiB |
+| a path's segments; an authority's entries | 9; 12, as the terminal's (`client.md`, 5.4) |
+| the link's deadline: the engine unreachable, or a call's request or answer unheard | 30 s |
+| the lock's wait | 60 s, tried every 100 ms |
+| a wait's timeout | 300 s by default, at most 3600 (5.4) |
+
+The client's other limits are the terminal's (`client.md`, section 2).
+
 ## 13. What it asks of jig
 
 Area 1 needs two things of jig and skein, which the tools do not work
@@ -558,16 +711,19 @@ around:
 - **A named key.** `jig-client`'s `Send` under an engine key the
   application gives, in place of the one the request table draws (jig's
   `client/domain/client.md`, section 6), which needs skein's request
-  table to admit a request under a given key, refused when it holds that
-  key already (skein's `lib.md`, section 12). Everything else of keyed
-  requests stays: kept before sent, sent again until durable, answered
-  once, a second ask under the key a conflict (jig's
-  `client/domain/contract.md`, 3.1).
+  table to admit a request under a given key, refused as `Held` when it
+  holds that key already (skein's `lib.md`, section 12), which the
+  client answers `Held`. Everything else of keyed requests stays: kept
+  before sent, sent again until durable, answered once, the same name
+  asked again answered the first answer, and with another ask a
+  conflict (jig's `client/domain/contract.md`, 3.1).
 - **A read of one turn.** A contract read, `turn{n, attempt, turn}`
   (jig's `client/domain/contract.md`, section 6), answered from the
   store's `Scope::Turn` (jig's `protocol/store.md`, 7.3) with the turn
-  decoded, within the client's limit for one document, and with its size
-  in its place past it.
+  decoded, within the engine's bound on one read and the client's limit
+  for one document, and with its size in its place past either; on a
+  page, a turn past the page's bound keeps its size as the client
+  decodes it.
 
 Everything else the tools use is jig's as designed: its helpers
 (`shapes`, `facts`, `thread`, `words`), the documents' acts and `me`'s
