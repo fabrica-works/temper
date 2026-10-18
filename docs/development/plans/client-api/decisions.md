@@ -3203,6 +3203,26 @@ choice would have been the user's (development.md, 10.4).
      3. **Then:** the focused startup test, the process tier with both exports, and `land`, as your Next says. A refusal of another kind, or a shortfall this one repair does not close, is a block.
      4. **Unchanged:** the worst-case accounting, 14.s2's test, and the README's 13:34Z point 3 otherwise.
 
+399. **Ruling 399 of client-api** (design gap, the designer's answer of 2026-10-18T22:06Z to temper repin's question of 2026-10-18T21:56:58Z).
+     Ruling 399, kind: design gap. The designer's answer of 2026-10-18T22:06Z (jig `479a8f42d`, temper `e1e56152b`), and the supervisor's step jig-22.s1 (`jig/22-s1-text-parameters.md`, a README row; the repin waits for it):
+
+     (a): a task's byte parameter is text. Landed: jig `479a8f42d` (`client/domain/contract.md` 5.3, `domain/tasks.md` 3 and 4, `STATUS.md`); temper `e1e56152b` (`domain/root.md` 6, `STATUS.md`; the plan's README, Rules, the closing repin; `later.md`).
+
+     1. **The design it rests on.** jig's `contract.md`, 5.3, as landed: "a task's spec, its words and its text parameters, refused with a spec's other faults wherever the tasks child admits a spec, a batch's, an amendment's or a proposal's, whoever made it: a party, an agent's tool, a procedure's step, a recurring task … A value that is not text, such as a commit's id, is a task's parameter only as text its application spells, such as its hexadecimal digits." The wire already says so: `record ParameterBytes { name: u32 value: text 65536 }` (`client-v8.schema:217`).
+     2. **jig-22.s1, the supervisor's to add.** Needs: nothing. temper-repin waits for it.
+        - Shape: `valid_spec` (`crates/jig-domain-tasks/src/batch.rs:361`) also returns false when `spec.words` or a `Parameter::Bytes` value is not UTF-8. It checks with one private fn under the `#[expect(clippy::disallowed_methods, reason = "client/domain/contract.md, 5.3 requires UTF-8 text validation")]` that `jig-domain-people/src/words.rs:50-53` uses. Its callers refuse as they do today: `Refusal::Spec` at `batch.rs:278` and `control.rs:299`, false in proposals, recurring and the restore (`stored.rs:177`, `:328`, `:1067`). The doc comments of `Parameter::Bytes` and `Spec::words` (`boundary.rs:340-345`, `:362-363`) say UTF-8 text.
+        - Tests, in `crates/jig-domain-tasks/src/tests/`: a batch whose member has a 32-byte non-UTF-8 parameter is refused `Refusal::Spec`; so is one with non-UTF-8 words, and an amendment with either.
+        - Proof: jig's gate, run by `land`.
+        - Size: aim at most 30 production lines added; past 60, block with the count.
+        - Don't: change the wire, a store schema or golden, `small::text`'s `expect` (`documents/small.rs:11`), or `Parameter::Bytes`'s name.
+     3. **temper-repin, as the README's Rules now say:** "Step 1 also spells a change's delegates' commits as text …, in a commit of its own before the gate runs: `change_delegate`'s Resolve (name 6) and Gate (name 8) parameters (`crates/temper-engine-domain/src/route/forge_route.rs:1712`, `:1725`) take the commit's lowercase hexadecimal digits, 40 when its last 12 bytes are zero (a SHA-1 id's padding) and 64 otherwise." Step 1's jig is `origin/main` with jig-22.s1. The candidate `3e55564e6`, with ruling 398's repair, stays.
+        - Test: a domain test (`tests/engine/domain/tests/forge_routes.rs`) that a resolution's and a gate's delegate carry their commit as those digits.
+        - Size: aim at most 30 production lines added; start from the route's `append_hex` (`forge_route.rs:107`).
+        - Bound: measure it first. A Resolve delegate's spec is 52 bytes of words, its base and branch, and 40 or 64 digits, against the forge tier's `tasks.spec_bytes` 512 (`crates/temper/tests/support/forgejo.rs:223`). The process tier, the repin's Proof, is the measure.
+        - Don't: change what reads a procedure's name 6 (`forge_route.rs:1034`, `:1498`), or the brief.
+     4. **What stays.** The projection's `expect` is 5.3's invariant, not the defect. A store whose live task holds a non-UTF-8 parameter fails the restore's check (`stored.rs:328`); nothing is migrated.
+     5. **Deferred:** the brief spells every commit in 64 digits, a SHA-1 id's padding included (`temper-engine-domain-forge/src/brief.rs:191`, `:252`); a row in `later.md`, for a temper plan after this one.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

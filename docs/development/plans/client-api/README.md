@@ -75,6 +75,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/14-s1-words-release.md` | jig-14.s1 (ruling 210): words release nothing; the words' release leaves the engine | jig 14.3 | |
 | `jig/14-s2-focused-suite.md` | jig-14.s2 (ruling 269): jig's focused suite cheaper, beside jig 14 | nothing (beside jig 14.4) | |
 | `jig/22-documents.md` | jig 22: the wire's documents: `me`, the task line and queries, offers and a decision's effect | jig 14 | |
+| `jig/22-s1-text-parameters.md` | jig-22.s1 (ruling 399): a task's words and byte parameters refused when they are not UTF-8 | nothing | |
 | `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | 15.2, 15.3, 15.4: 15.1; 15.5: 15.2; 15.6: 15.3, 15.5 (ruling 248) |
 | `jig/15-s1-facts-in-words.md` | jig-15.s1 (ruling 394): a decision's facts in `facts`, their words in `words`, the referee in the application's phrasebook; the joint transport on `jig-client`'s limits | nothing (beside jig 20.5) | |
 | `jig/21-ops-and-ui.md` | jig 21: `ops` and the reference UI's state on the client alone; `ops`'s wire crate | jig 13 | |
@@ -118,7 +119,7 @@ more says so in its row and its file. Dependencies are by capability:
 
 The closing repin, `temper-repin` (development.md, 5.7), has no file:
 it starts once every jig and skein step has landed and temper 07 and
-temper-07.s1 have (ruling 394),
+temper-07.s1 have (ruling 394), jig-22.s1 among them (ruling 399),
 and moves temper's pins of jig, skein and smith to jig's (Rules).
 
 31 sessions and the repin: jig 23, skein 1, temper 7. jig 21, 22 and 23
