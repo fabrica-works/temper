@@ -3068,6 +3068,13 @@ choice would have been the user's (development.md, 10.4).
      4. **Files gain** the users of `Limits.jig` outside them: `crates/temper-client-domain/src/{acts.rs, pages/{chat,chats,inbox,task}.rs, tests/fixtures.rs, tests/pages/chats.rs}` (Landed). Refresh any further user your sweep (`logs/temper-07/users-07.4.txt`) finds, and list it in the commit body.
      5. **Size:** these lines count within 07.4's Size, as its Shape's own.
 
+386. **jig-test's navigation offers the Conversations page** (plan defect, jig 20.2's block of 2026-10-18T18:41:43Z).
+     Ruling 386, kind: plan defect. jig-test's navigation offers the Conversations page, in 20.2.
+     1. **The application chooses the navigation's jig pages:** "the navigation | jig's pages the application offers, in its order, then its own entries in a slot" (jig's `client/domain/pages.md`, the table at :557). jig-test offers none: its domain starts `Navigation::new(limits.jig.navigation_entries)` (`testing/jig-client-test-domain/src/domain.rs:33`), whose entries are empty. It now offers `Destination::Jig(Address::Conversations { project: None })`, which `Navigation::offered` shows when the person's frame has chats.
+     2. **Files gain** `testing/jig-client-test-domain/src/domain.rs` and each test or golden of jig-test's frame the new link changes: refresh each, and list it in the commit body (Landed).
+     3. **The focused test** (ruling 384, point 2) goes where jig-test's root is built (`testing/jig-client-test-domain/src/tests/root/`), at most 40 lines, in place of the reproduction in `jig-client-view`'s `tests/cards.rs`: it renders jig-test's inbox, presses its Conversations link with no server document delivered, and finds the script's controls (`First words`, `Start a conversation`). The script presses that link, then those controls. If the form needs a server answer there, stop with the rendered names (a block).
+     4. **Ruling 384, points 4 to 7 hold:** one browser run of the pending-request story alone; then the three stories, the gate, and land. The entry and its test count within 20.2's Size; stop 240.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

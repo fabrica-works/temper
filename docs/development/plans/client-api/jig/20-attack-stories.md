@@ -227,7 +227,11 @@ Files: `testing/jig-client-fake-person-browser/src/stories.rs`;
 `tests/client-browser/src/lib.rs` (`Tier::reserved(name)`: a
 configuration on a port it reserved, and `Tier::request_script()`, the
 reference UI's acts that make a request, a task made from the inbox, in
-jig's words); `tests/client-browser/tests/browser_jig_stories.rs`.
+jig's words); `tests/client-browser/tests/browser_jig_stories.rs`;
+`testing/jig-client-test-domain/src/domain.rs` (jig-test's navigation
+offers the Conversations page, ruling 386), a test in its
+`src/tests/root/`, and each test or golden of jig-test's frame the
+new link changes.
 Shape: `stories::a_reload_keeps_a_pending_request(setup, states, request:
 &mut dyn Play, pending: Find, made: Find) -> Outcome`;
 `stories::a_reload_with_nothing_pending_meets_no_warning(setup, states,
