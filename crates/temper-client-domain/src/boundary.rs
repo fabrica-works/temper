@@ -34,5 +34,6 @@ pub enum Request {
     Client { request: jig_client::Request },
     Show { address: Address, replace: bool },
     SignOut,
+    Dropped { count: u32 },
     Fact { fact: Fact },
 }

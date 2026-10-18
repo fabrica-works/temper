@@ -60,7 +60,7 @@ fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_client_v
     limits.text_bytes = 262_144;
     let mut builder = skein_ui::Builder::new(&limits);
     let mut bindings = Bindings::new(limits.bindings, 8, 1);
-    page::page(&mut builder, form, b"Shop", words, jig, &mut bindings, fixtures::tree_limits().text_per_node);
+    page::page(&mut builder, form, Some(b"Shop"), words, jig, &mut bindings, fixtures::tree_limits().text_per_node);
     builder.finish()
 }
 fn adopted() -> forge::Answer {
@@ -213,7 +213,7 @@ fn the_outcomes_link_opens_the_projects_resources() {
     let mut bindings = Bindings::new(32, 8, 1);
     let mut form = form();
     form.outcome = Some(adopted());
-    page::page(&mut builder, &form, b"Shop", &words, &jig, &mut bindings, fixtures::tree_limits().text_per_node);
+    page::page(&mut builder, &form, Some(b"Shop"), &words, &jig, &mut bindings, fixtures::tree_limits().text_per_node);
     let tree = builder.finish();
     let link = node_of_role(&tree, Role::Link);
     assert_eq!(
@@ -327,4 +327,13 @@ fn the_adoption_page_is_titled_with_the_project_me_names() {
     let tree = fixtures::build(&mut view, &root);
     let title = fixtures::find(tree, Role::Heading { level: 1 }, b"Adopt a repository into shop");
     assert!(title.is_some(), "the title names the project as me names it");
+}
+
+#[test]
+fn the_adoption_page_for_a_project_me_does_not_name_is_titled_by_its_number() {
+    const UNKNOWN_PROJECT: u32 = 7;
+    let mut view = fixtures::view();
+    let root = fixtures::adoption_page(UNKNOWN_PROJECT, b"shop");
+    let tree = fixtures::build(&mut view, &root);
+    assert!(fixtures::find(tree, Role::Heading { level: 1 }, b"Adopt a repository into project 7").is_some());
 }

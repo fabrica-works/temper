@@ -39,7 +39,6 @@ pub(crate) const PERSON_WAIT: Duration = Duration::from_secs(5);
 // crates/temper/tests/support/configuration.rs: the process tier's short lists.
 pub(crate) const DOCUMENT_LINES: u32 = 2;
 pub(crate) const CHAT_WAIT_MS: u32 = 1000;
-pub(crate) const GOAL_BUDGET: &[u8] = b"100";
 pub(crate) const FORGE_STATUSES: u32 = 8;
 pub(crate) const CI_SILENT: u32 = 0;
 pub(crate) const CI_PASSES: u32 = 1000;

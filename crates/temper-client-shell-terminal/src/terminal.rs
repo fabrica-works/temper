@@ -29,6 +29,7 @@ pub enum Notice {
     SignedOut,
     Credential { party: u64, token: Secret },
     OtherPartyKept,
+    Dropped { count: u32 },
     StoreFailed,
     DirectoryRefused,
 }
@@ -172,6 +173,12 @@ impl Loop {
                     &encoded,
                 ]));
             }
+            Notice::Dropped { count } => self.wait(join(&[
+                skein_lib::Decimal::of(u64::from(count)).as_bytes(),
+                b" requests kept in ",
+                &self.directory,
+                b" were not sent: another version of temper made them",
+            ])),
             Notice::OtherPartyKept => {
                 self.wait(join(&[b"work of another party is kept in ", &self.directory, b", and waits for them"]));
             }

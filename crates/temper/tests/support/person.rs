@@ -235,7 +235,14 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
     use skein_ui::Role;
     let mut steps = answered_chat(b"Hello", super::ANSWER).steps.into_vec();
     steps.extend([
-        Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: Some(1) }) },
+        Step::Go {
+            address: Address::Inbox {
+                filter: temper_client_domain::address::Filter {
+                    project: Some(1),
+                    ..temper_client_domain::address::Filter::ALL
+                },
+            },
+        },
         Step::See { find: Find::named(Role::Link, b"Adopt a repository"), within: super::WITHIN },
         Step::Press { find: Find::named(Role::Link, b"Adopt a repository") },
         Step::See { find: Find::named(Role::TextField, b"Owner"), within: super::WITHIN },
@@ -253,8 +260,8 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
             words: b"@forge_chat Land a small change".as_slice().into(),
         },
         Step::Press { find: Find::named(Role::Button, b"Start") },
-        Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }) },
-        inbox_reply(b"Task 2:"),
+        Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
+        inbox_reply(b"@forge_chat Land a small change"),
     ]);
     Script { steps: steps.into_boxed_slice(), resume: false }
 }
@@ -263,14 +270,14 @@ pub fn found() -> Script {
     Script {
         resume: true,
         steps: Box::new([
-            Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }) },
-            inbox_reply(b"Task 2:"),
+            Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
+            inbox_reply(b"@forge_chat Land a small change"),
         ]),
     }
 }
 fn inbox_reply(task: &[u8]) -> Step<Address> {
     Step::See {
-        find: Find::text(b"Reply message:")
+        find: Find::named(skein_ui::Role::Heading { level: 3 }, b"Reply")
             .within(Box::new([Target::Role { role: skein_ui::Role::Item, name: task.into() }])),
         within: super::WITHIN,
     }

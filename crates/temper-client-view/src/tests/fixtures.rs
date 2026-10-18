@@ -141,7 +141,11 @@ pub fn part_text(words: &crate::words::Words, part: Part, held: bool) -> Box<[u8
 }
 pub fn built() -> crate::View {
     let domain = domain_limits();
-    let root = temper_client_domain::unlinked(&domain, SEED);
+    let mut root = temper_client_domain::unlinked(&domain, SEED);
+    root_event(
+        &mut root,
+        temper_client_domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
+    );
     let jig = jig_words();
     let forge = words();
     let envelope = crate::Limits::of(&domain, &jig, &forge).expect("composed envelope fits");
@@ -442,3 +446,44 @@ pub fn inbox_with_document(
 }
 
 pub mod task;
+
+pub fn signed_out() -> temper_client_domain::Domain {
+    let mut root = root_in_project(Some(PROJECT));
+    root_event(&mut root, temper_client_domain::Event::SignedOut);
+    root
+}
+pub fn out_of_date() -> temper_client_domain::Domain {
+    let mut root = root_in_project(Some(PROJECT));
+    root_event(
+        &mut root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up { up: jig_client::Up::Served { served: false, versions: None } },
+        },
+    );
+    root
+}
+pub fn main_text(tree: &skein_ui::Tree) -> Box<[u8]> {
+    let mut main = None;
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == skein_ui::Role::Main {
+            let end = index
+                .checked_add(usize::try_from(node.size).expect("fixture subtree fits"))
+                .expect("fixture index fits");
+            main = tree.nodes().get(index..end);
+        }
+    }
+    let main = main.expect("fixture main");
+    let mut bytes = 0_usize;
+    for node in main {
+        for run in &node.text {
+            bytes = bytes.checked_add(run.text.len()).expect("fixture text fits");
+        }
+    }
+    let mut writer = Writer::new(bytes);
+    for node in main {
+        for run in &node.text {
+            writer.put(&run.text).expect("main text counted");
+        }
+    }
+    writer.finish()
+}

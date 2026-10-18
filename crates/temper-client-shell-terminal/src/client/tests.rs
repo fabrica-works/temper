@@ -51,3 +51,22 @@ fn a_service_credential_is_a_notice_never_a_root_event() {
     host.outputs();
     assert!(host.notices().is_none());
 }
+
+#[test]
+fn kept_work_of_another_version_prints_its_line_once() {
+    let mut host = common::native();
+    host.out.push(domain::Request::Dropped { count: 2 });
+    host.outputs();
+    let notice = crate::terminal::Client::notice(&mut host).expect("dropped-work notice");
+    assert!(crate::terminal::Client::notice(&mut host).is_none(), "the host emits it once");
+    let mut world = machine::World::signed_in();
+    world.client.notice_at_once(notice);
+    world.run_until(PRINTED);
+    world.run_until(STILL_PRINTED);
+    assert_eq!(
+        world.shell_lines(),
+        vec![Box::<[u8]>::from(
+            b"temper: 2 requests kept in client were not sent: another version of temper made them\n".as_slice()
+        )]
+    );
+}

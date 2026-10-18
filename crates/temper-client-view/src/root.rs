@@ -45,17 +45,7 @@ impl View {
     }
     fn adoption_main(&mut self, b: &mut Builder, root: &Domain) {
         let Some(form) = root.forge().form() else { return };
-        let fallback;
-        let project = match crate::pages::project_name(root.pages(), root.client(), form.project) {
-            Some(name) => name,
-            None => {
-                fallback = self.jig_words.say(
-                    jig_client_view::phrases::jig::JigPhrase::FrameProjectNumber,
-                    &[skein_ui::phrases::Hole::Number(u64::from(form.project))],
-                );
-                &fallback
-            }
-        };
+        let project = crate::pages::project_name(root.pages(), root.client(), form.project);
         b.open(Role::Main);
         forge::page::page(
             b,
@@ -90,7 +80,17 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     crate::frame::navigation(&mut builder, root, &view.forge_words, &mut view.pages);
-    if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
+    if let Some(word) = crate::frame::unavailable(root) {
+        builder.open(Role::Main);
+        builder.open(Role::Paragraph);
+        view.forge_words.text(
+            &mut builder,
+            if word == Word::SignedOut { Word::SignedOutMain } else { Word::OutOfDateMain },
+            &[],
+        );
+        builder.close();
+        builder.close();
+    } else if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
         crate::pages::inbox::main(
             &mut builder,
             root,
@@ -125,7 +125,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig);
     }
     if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
-    } else {
+    } else if crate::frame::unavailable(root).is_none() {
         jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
     }
     builder.close();

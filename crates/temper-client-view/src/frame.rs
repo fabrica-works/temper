@@ -66,11 +66,26 @@ fn action(builder: &mut Builder, role: Role, words: &[u8], act: Act, bindings: &
     builder.bind(bindings.insert(act));
     builder.close();
 }
+pub(crate) fn unavailable(root: &Domain) -> Option<crate::words::Word> {
+    match root.client().link().state {
+        jig_client::Link::SignedOut => Some(crate::words::Word::SignedOut),
+        jig_client::Link::OutOfDate => Some(crate::words::Word::OutOfDate),
+        jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => None,
+    }
+}
 pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
     let pages = root.pages();
     let me = pages.me(root.client());
     builder.open(Role::Banner);
     text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]));
+    if let Some(word) = unavailable(root) {
+        builder.open(Role::Region);
+        builder.region(link_region());
+        text(builder, Role::Status, &words.say(word, &[]));
+        builder.close();
+        builder.close();
+        return;
+    }
     if let Some(me) = me {
         for selected in [true, false] {
             for row in &me.projects {
@@ -128,6 +143,9 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     builder.close();
 }
 pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
+    if unavailable(root).is_some() {
+        return;
+    }
     let name = words.say(
         crate::words::Word::Inbox,
         &[skein_ui::phrases::Hole::Number(u64::from(match root.pages().me(root.client()) {

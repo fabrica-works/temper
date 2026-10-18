@@ -101,3 +101,26 @@ fn a_page_behind_says_behind_after_the_links_state() {
         [Box::from(*b"Offline"), Box::from(*b"Behind"), Box::from(*b"Pat")]
     );
 }
+
+#[test]
+fn signed_out_the_main_says_so_and_nothing_else() {
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &fixtures::signed_out());
+    assert_eq!(&*fixtures::main_text(tree), b"Signed out.");
+    assert_eq!(fixtures::banner_statuses(tree).as_ref(), [Box::from(*b"Signed out")]);
+    assert!(fixtures::find(tree, Role::Button, b"Sign out").is_none());
+    for node in tree.nodes() {
+        assert_ne!(node.role, Role::Navigation);
+    }
+}
+#[test]
+fn an_engine_not_serving_jigs_version_says_temper_is_out_of_date() {
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &fixtures::out_of_date());
+    assert_eq!(&*fixtures::main_text(tree), b"This temper is out of date: run the temper the engine runs.");
+    assert_eq!(fixtures::banner_statuses(tree).as_ref(), [Box::from(*b"Out of date")]);
+    assert!(fixtures::find(tree, Role::Button, b"Sign out").is_none());
+    for node in tree.nodes() {
+        assert_ne!(node.role, Role::Navigation);
+    }
+}

@@ -58,3 +58,15 @@ fn a_held_task_released_from_a_goals_plan_runs_again() {
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     assert_eq!(world.front().engine.task(held).expect("released delegate").tries, jig_domain_tasks::Tries::NONE);
 }
+
+#[test]
+fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
+    let mut world = fixtures::world(fixtures::SEED);
+    fixtures::replied_chat(world.front(), b"Hello");
+    let person = world.client(fixtures::PARTY, fixtures::inbox());
+    let reply = Find::named(Role::Heading { level: 3 }, b"Reply")
+        .within(Box::new([skein_fake_person::Target::Role { role: Role::Item, name: Box::from(*b"Hello") }]));
+    world.person(person, vec![Step::See { find: reply, within: fixtures::WITHIN }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}

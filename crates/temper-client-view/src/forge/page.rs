@@ -18,14 +18,17 @@ fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bind
 pub fn page(
     builder: &mut Builder,
     form: &forge::Form,
-    project_name: &[u8],
+    project_name: Option<&[u8]>,
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
     text_limit: u32,
 ) {
     builder.open(Role::Heading { level: 1 });
-    let title = words::say(words, Word::Title, &[Hole::Name(copy_of(project_name))]);
+    let title = match project_name {
+        Some(name) => words::say(words, Word::Title, &[Hole::Name(copy_of(name))]),
+        None => words::say(words, Word::TitleNumber, &[Hole::Number(u64::from(form.project))]),
+    };
     builder.name(&title);
     builder.text(skein_ui::Run::Plain, &title);
     builder.close();

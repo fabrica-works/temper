@@ -68,6 +68,10 @@ pub enum Word {
     Again,
     DoNotRepeat,
     Brand,
+    SignedOut,
+    OutOfDate,
+    SignedOutMain,
+    OutOfDateMain,
     InboxTitle,
     NeedsYou,
     InboxUpdates,
@@ -119,7 +123,7 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 105] = [
+const ALL: [Word; 109] = [
     Word::TaskHeader,
     Word::Asked,
     Word::Plan,
@@ -176,6 +180,10 @@ const ALL: [Word; 105] = [
     Word::Again,
     Word::DoNotRepeat,
     Word::Brand,
+    Word::SignedOut,
+    Word::OutOfDate,
+    Word::SignedOutMain,
+    Word::OutOfDateMain,
     Word::InboxTitle,
     Word::NeedsYou,
     Word::InboxUpdates,
@@ -230,6 +238,10 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "closed phrase identifier codec, exhaustive over Word")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::SignedOut => 180,
+            Self::OutOfDate => 181,
+            Self::SignedOutMain => 182,
+            Self::OutOfDateMain => 183,
             Self::TaskHeader => 161,
             Self::Asked => 162,
             Self::Plan => 163,
@@ -548,6 +560,10 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
         Word::Adoption => (&[b"Adopt a repository"], &[]),
         Word::Live => (&[b"Live"], &[]),
         Word::Offline => (&[b"Offline"], &[]),
+        Word::SignedOut => (&[b"Signed out"], &[]),
+        Word::OutOfDate => (&[b"Out of date"], &[]),
+        Word::SignedOutMain => (&[b"Signed out."], &[]),
+        Word::OutOfDateMain => (&[b"This temper is out of date: run the temper the engine runs."], &[]),
         Word::Connecting => (&[b"Connecting"], &[]),
         Word::Behind => (&[b"Behind"], &[]),
         Word::SignOut => (&[b"Sign out"], &[]),

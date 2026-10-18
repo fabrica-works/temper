@@ -178,7 +178,10 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
             forge_me(root, env, &told, out);
             Owner::Jig.asker()
         }
-        Told::Dropped { .. } => Owner::Jig.asker(),
+        Told::Dropped { count } => {
+            out.push(Request::Dropped { count: *count });
+            return;
+        }
         Told::Kept { key, .. } | Told::Pending { key } | Told::Answered { key, .. } => key.asker,
         Told::Changed { handle } | Told::Text { handle } | Told::Ended { handle, .. } | Told::Page { handle, .. } => {
             handle.asker

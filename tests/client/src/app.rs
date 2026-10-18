@@ -120,7 +120,7 @@ impl App for Temper {
             Request::Client { request: jig_client::Request::SignOut } | Request::SignOut => Duty::SignOut,
             Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
-            Request::Fact { .. } => Duty::Fact,
+            Request::Fact { .. } | Request::Dropped { .. } => Duty::Fact,
         }
     }
     fn record_key(record: &Self::Record) -> Self::Key {
@@ -163,7 +163,8 @@ impl App for Temper {
             }
             | Request::Show { .. }
             | Request::SignOut
-            | Request::Fact { .. } => return None,
+            | Request::Fact { .. }
+            | Request::Dropped { .. } => return None,
         };
         Some(domain::Event::Client { event }.into())
     }
@@ -267,7 +268,11 @@ impl App for Temper {
                 request:
                     jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Jig(ask), .. } },
             } => Some(ask),
-            Request::Client { .. } | Request::Show { .. } | Request::SignOut | Request::Fact { .. } => None,
+            Request::Client { .. }
+            | Request::Show { .. }
+            | Request::SignOut
+            | Request::Fact { .. }
+            | Request::Dropped { .. } => None,
         }
     }
     fn received(event: &Event) -> Vec<Receipt> {

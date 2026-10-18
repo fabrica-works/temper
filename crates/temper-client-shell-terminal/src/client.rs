@@ -340,6 +340,7 @@ impl NativeClient {
                     }
                     self.shell.down(request);
                 }
+                Down::Notice(notice) => self.notices.push(Shown::Notice(notice)),
                 Down::Duty(duty) => match duty {
                     Duty::Show { address, .. } => {
                         if self.address != address {

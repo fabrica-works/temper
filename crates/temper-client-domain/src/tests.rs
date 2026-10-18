@@ -173,3 +173,13 @@ fn the_forges_side_learns_its_party_from_its_own_me_handle() {
     assert!(!root.forge().form().expect("adoption page").confirmed);
     assert_eq!(root.jig().frame_summary(root.client()).party, Some(fixtures::PARTY));
 }
+
+#[test]
+fn dropped_work_goes_to_the_shell_with_its_count() {
+    let limits = fixtures::limits();
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::route::told(&mut root, &fixtures::env(&limits), jig_client::Told::Dropped { count: 2 }, &mut out);
+    assert_eq!(out.pop(), Some(Request::Dropped { count: 2 }));
+    assert!(out.is_empty());
+}

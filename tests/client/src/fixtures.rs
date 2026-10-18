@@ -261,10 +261,7 @@ pub fn read(
 }
 #[must_use]
 pub fn project() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
-        project: 1,
-        section: jig_client_view::address::ProjectSection::Overview,
-    })
+    temper_client_domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL }
 }
 #[must_use]
 pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<skein_fake_person::Step<temper_client_domain::Address>> {
@@ -399,6 +396,25 @@ pub fn chat(front: &mut Joint, words: &[u8]) -> u64 {
     }));
     driver.settle();
     driver.last_assignment().task
+}
+const FIRST_REPLY_TURN: u32 = 1;
+const REPLY_SPEND: u64 = 0;
+/// A real committed worker turn puts this chat in the inbox's replies group.
+pub fn replied_chat(front: &mut Joint, words: &[u8]) -> u64 {
+    let task = chat(front, words);
+    let assignment = front.engine.last_assignment();
+    let event = temper_engine_domain_world::protocol::turn(
+        QUESTION_WORKER,
+        task,
+        assignment.attempt,
+        FIRST_REPLY_TURN,
+        REPLY_SPEND,
+        None,
+        b"reply",
+    );
+    front.engine.send(event);
+    front.engine.settle();
+    task
 }
 #[must_use]
 pub fn chat_page(task: u64) -> temper_client_domain::Address {

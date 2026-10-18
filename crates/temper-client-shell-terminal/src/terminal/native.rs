@@ -52,9 +52,9 @@ impl Client for NativeClient {
                 Shown::Notice(route::Notice::Credential { party, credential }) => {
                     return Some(Notice::Credential { party, token: credential });
                 }
+                Shown::Notice(route::Notice::Dropped { count }) => return Some(Notice::Dropped { count }),
                 Shown::Notice(
-                    route::Notice::Dropped
-                    | route::Notice::Unread
+                    route::Notice::Unread
                     | route::Notice::Served { .. }
                     | route::Notice::Unasked
                     | route::Notice::Fact(_)

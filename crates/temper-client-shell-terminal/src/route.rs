@@ -9,7 +9,7 @@ pub enum Notice {
     SignedIn,
     SignedOut,
     Credential { party: u64, credential: Secret },
-    Dropped,
+    Dropped { count: u32 },
     Unread,
     Served { family: u16, versions: Option<VersionRange> },
     Unasked,
@@ -20,6 +20,7 @@ pub enum Notice {
 pub enum Down {
     Shell(jig_client::Request),
     Duty(Duty),
+    Notice(Notice),
 }
 /// Navigation, authentication and facts stay in the host.
 #[derive(Debug)]
@@ -34,6 +35,7 @@ pub fn down(request: client::Request) -> Down {
         client::Request::Client { request } => Down::Shell(request),
         client::Request::Show { address, replace } => Down::Duty(Duty::Show { address, replace }),
         client::Request::SignOut => Down::Duty(Duty::SignOut),
+        client::Request::Dropped { count } => Down::Notice(Notice::Dropped { count }),
         client::Request::Fact { fact } => Down::Duty(Duty::Fact(fact)),
     }
 }

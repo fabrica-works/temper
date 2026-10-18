@@ -28,10 +28,7 @@ pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
 pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     let mut steps = vec![
         Step::Go {
-            address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
-                project: fixtures::PROJECT,
-                section: jig_client_view::address::ProjectSection::Overview,
-            }),
+            address: temper_client_domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
         },
         see(Find::named(Role::Link, b"Adopt a repository")),
         press(Role::Link, b"Adopt a repository"),
@@ -42,19 +39,10 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
         press(Role::Check, b"Make it the project's home"),
         press(Role::Button, b"Adopt"),
         see(Find::text(b"Adopted acme/app on forge 1 as owned.")),
-        Step::Go {
-            address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Project {
-                project: fixtures::PROJECT,
-                section: jig_client_view::address::ProjectSection::Goals,
-            }),
-        },
-        see(Find::named(Role::TextArea, b"Goal specification")),
-        ty(Role::TextArea, b"Goal specification", b"@plan Fix the adopted repository"),
-        press(Role::Button, b"Charter 1"),
-        ty(Role::TextField, b"Goal budget", fixtures::GOAL_BUDGET),
-        press(Role::Button, b"Set goal"),
-        see(Find::named(Role::Button, b"Confirm")),
-        press(Role::Button, b"Confirm"),
+        Step::Go { address: temper_client_domain::Address::Chats },
+        see(Find::named(Role::TextArea, b"Start a chat")),
+        ty(Role::TextArea, b"Start a chat", b"@plan Fix the adopted repository"),
+        press(Role::Button, b"Start"),
     ];
     steps.push(see(Find::text(b"@plan Fix the adopted repository")));
     steps

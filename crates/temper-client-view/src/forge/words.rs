@@ -10,6 +10,7 @@ use skein_ui::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     Title,
+    TitleNumber,
     Forge,
     Owner,
     Name,
@@ -60,8 +61,9 @@ pub enum Word {
 }
 use HoleKind::{Name, Number};
 type Row = (Word, &'static [&'static [u8]], &'static [HoleKind]);
-const ROWS: [Row; 48] = [
+const ROWS: [Row; 49] = [
     (Word::Title, &[b"Adopt a repository into ", b""], &[Name]),
+    (Word::TitleNumber, &[b"Adopt a repository into project ", b""], &[Number]),
     (Word::Forge, &[b"Forge number"], &[]),
     (Word::Owner, &[b"Owner"], &[]),
     (Word::Name, &[b"Name"], &[]),
@@ -166,7 +168,8 @@ fn name_bytes(word: Word, index: usize, text: u32) -> u32 {
         }
         Word::InFlight | Word::Unknown => 513,
         Word::NoSuchForge | Word::Unreachable | Word::InvalidAnswer => 256,
-        Word::Forge
+        Word::TitleNumber
+        | Word::Forge
         | Word::Owner
         | Word::Name
         | Word::Role
