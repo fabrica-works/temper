@@ -779,6 +779,48 @@ run are appended after "For the user".
        Size (151 of 140 support lines is within the README's 3.5 times), Proof and Done when. The startup code's stages stay
        as they are: 14.1 changes no `startup.rs`.
 
+144. **11.2's hinted story, the designer's answer** (design gap, ready check of temper-11.2).
+     Ruling 144, the designer's answer to Q2 of temper 11.2: temper 3a323b3b2 (setup.md 10 and 13.4, testing.md 2.6, `temper/11-hinted.md`, `later.md`).
+
+
+     1. **The hinted story proves one wait: CI on a head, row 3.** setup.md 10, "Checked", now says: "the process tier's
+        hinted story (13.4) checks the table's third row, CI on a head: the one wait of its landing that the forge ends. Its
+        other waits end on temper's own writes, its push, its pull request and its merge, whose deliveries are echoes."
+        Rows 1 and 2, when someone else moves them, are checked from hints in the worlds, like the other rows.
+     2. **The control also raises `stall`, and the job outlasts `settle`.** "Within its budget, only the job's end delivery
+        brings a read of its CI": the keep's `poll`, `poll_max` and `slow`; "so is the change's `stall`, whose end reads its
+        pull request afresh"; "its job outlasts `settle` from its change's push, so the settle window's reads end before CI
+        does". Without the slow job, a pull read not mergeable after it opens starts the settle window's reads (at `hinted`,
+        doubling, until `settle`). One of them can see CI passed, and the control lands again.
+     3. **11.2, amended in place** (11-hinted.md, 11.2's "Amended by the designer's answer to Q2"):
+        - `raise_paces` sets four names to `RAISED_MS`. The fourth is `forge.change_policy.stall_ms` (names.rs:120; the
+          profile's 30 s, temper-service `src/limits.rs`:154).
+        - `repository` (support/forgejo.rs:353) writes `check.sh` as `test ! -e slow || sleep 60`, then
+          `test -s README.md`.
+        - In the hinted case, `landing` calls 11.1's `forgejo.push("slow")` after `Throwaway::start`, before `temper serve`.
+          The landed story never pushes it, so its job is unchanged.
+        - 60 s is twice `settle`. The window ends `settle` after the change enters `Checking`, a few seconds after the push
+          that starts the job.
+        - Unchanged: the control, its command and its expected `chat did not` line. If it lands, raise Q2 again.
+        - Don't now also lists `settle_ms`, shortening the 60 s, and pushing `slow` in the landed story.
+        - Done when counts 4 names, and greps the `check.sh` line once. Size: about 18.
+     4. **Not a limit's sufficiency:** this answer measured nothing. The control, run by hand once, is the measurement
+        (development.md 4.5).
+     5. **Deferred, one later.md row, for the supervisor to place.** It was found while checking the answer against the code:
+        - A change names its branch and base alone (temper-engine-domain `route/forge_route.rs`:1582). So the keep never
+          reads its pull's CI on `poll` to `poll_max`, as domain/forge.md 5.1 and 5.2 say it should.
+        - With no hint, CI's end is read only at the change's `stall`.
+        - The shipped `stall` is 30 s, "from the engine forge world fixture" (`src/limits.rs`:154, :323). It holds as Stalled
+          any change whose CI runs longer, hooks or not: a held change waits for a release.
+        - The tier's 2 s CI never meets this. A box whose repository's CI takes minutes does.
+
+
+     **The supervisor places item 5's row** (plan scope, development.md 10.4): deferred to temper's next plan, before the
+     dogfood run (14.2's steps 4 and 8), and not a step of this run. 14.2's walk commits `check.sh` as `test -s README.md`
+     (14-example.md, 14.2, Shape 1), and the tier's CI takes about 2 s, so no story or check of this plan meets a 30 s
+     `stall`. `later.md`'s row now says so. Unchanged: 11.2's Size (about 18), its control and Done when as the amendment
+     gives them; 11.1's block (ruling 139) and 14.1.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
