@@ -2396,6 +2396,15 @@ choice would have been the user's (development.md, 10.4).
      Ruling 142 stands: "From now, temper's Proofs on the process tier run at their layer, as their Proof lines say". Its premise, pueued in `/sys/fs/cgroup/runner/pueued` ("For the user", E), was lost when pueued was started by hand at 04:17Z (supervision.md, "Resumed, 2026-10-18T04:19:30Z"): it ran in `/user.slice/user-0.slice/session-c1.scope`, so skein-world's `Tree::prepare` (`testing/skein-world/src/tree.rs:149-164` at skein `8a51e10b8`) fell back to the walk and refused the second `Binary` with `Error::Other(16)`. The supervisor moved pueued (pid 3638856) back into `/sys/fs/cgroup/runner/pueued` at 07:17Z; tasks queued from then run there, and tasks started before it do not.
      The cause is the machine, not temper's code: no production change is wanted for it, inside or outside 05.1's Files.
 
+325. **The clients' startup clock: temper-05.1 repairs it** (plan defect, temper 06's block of 2026-10-18T07:27:27Z).
+     Plan defect: temper's startup gives the clients component a clock of zero, and temper-05.1 repairs it, in its own Files.
+     - The cause, as temper 06 found it: `crates/temper-service/src/clients.rs:112` builds the component with `Env { now: Time::ZERO, wall: Wall::EPOCH, .. }`, and jig's `Component::new` mints the startup link then (`component.rs:78`, `fresh_link`: `until: env.now.saturating_add(env.limits.link_span)`, :91). On a machine up longer than `link_span`, the first real-clock sign-in finds the link expired, mints a fresh one and refuses the attempt (:309-312).
+     - 05.1's Files name `clients.rs`, `system.rs`, `engine.rs`, `lib.rs` and the binary (`crates/temper/src/host.rs`), and its Proof is the same process test, `temper_open_signs_in_prints_the_inbox_and_exits_on_q`. So 05.1 gives the component the service's first `now` and `wall` before it mints that link; the shape is 05.1's, within those Files, and jig is unchanged.
+     - Its regression test: in `crates/temper-service/src/tests/clients.rs`, the startup link signs in at a named uptime of 600 s, temper 06's reproduction (`logs/temper-06/process324-focused.patch`). It fails before the repair and passes after it.
+     - Size: the repair and its test, at most 40 lines together, count apart from 05.1's 250.
+     - temper 06 does not touch `clients.rs`, and runs no further process Proof for this: 05.1's Proof run, after the repair, is the same test on the same main.
+     - jig's copy, `testing/jig-test-service/src/clients.rs:136`, has the same `Time::ZERO`, but that crate has no binary and runs only in simulated worlds, whose clocks start at zero: it stays as it is.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

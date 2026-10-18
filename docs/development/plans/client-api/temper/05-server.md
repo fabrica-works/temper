@@ -178,6 +178,22 @@ take precedence over the increments below where they differ.
 Refresh any further copy of these lines or names, and list it in the
 commit body.
 
+## The startup clock (ruling 325)
+
+- **05.1 repairs the clients' startup clock,** in its Files:
+  `clients.rs:112` builds the component with `Env { now: Time::ZERO,
+  wall: Wall::EPOCH, .. }`, and jig's `Component::new` mints the startup
+  link then, until `env.now + link_span`; on a machine up longer than
+  `link_span`, the first sign-in finds it expired and is refused. The
+  component gets the service's first `now` and `wall` before it mints
+  that link; the shape is 05.1's, within its Files, jig unchanged.
+- **Its regression test:** in `tests/clients.rs`, the startup link signs
+  in at a named uptime of 600 s (temper 06's reproduction,
+  `logs/temper-06/process324-focused.patch` in the run's directory). It
+  fails before the repair and passes after it.
+- **Size:** the repair and its test, at most 40 lines together, count
+  apart from 05.1's 250.
+
 ## Increments
 
 ### 05.1 The clients' listener in `temper-service`, and `/jig` mounted
