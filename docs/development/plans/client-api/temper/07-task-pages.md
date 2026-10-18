@@ -427,7 +427,13 @@ answer to ruling 320). Ruling 388: with the native replacements of the
 reference UI's renderers, it lands whole, with no question; past the
 stop, block with the count. Ruling 389: the stop is 2,000 production
 lines added, what is left counted before more code is written, and
-jig's enums said in `jig-client`'s words, not copied.
+jig's enums said in `jig-client`'s words, not copied. Ruling 390
+(interim, until the designer answers the question of 19:10Z): 07.4
+lands now without the card renderers' replacement, at up to 400
+production lines added; temper's calls into `jig-client-view`'s card
+renderers, and `jig-client-view` in `temper-client-view`'s manifest for
+them alone, stay until the step the answer gives, which meets Done
+when's two greps.
 Removes: the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,

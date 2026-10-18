@@ -3093,6 +3093,24 @@ choice would have been the user's (development.md, 10.4).
      3. **Copy only what temper's pages reach.** A helper or phrase that no copied renderer reaches stays in jig. A word `jig-client`'s `words` already gives (a phase, hold, refusal, wait or chat status: `Word`, `crates/jig-client/src/words.rs:15-21`) is said through `Words::say_word` (`crates/temper-client-view/src/words.rs:452`), as `confirm.rs:185` says a hold today, not copied: `client.md`, 5.1, "temper's phrasebook, English, with jig's words for jig's enums (`jig-client`'s `words`) under it". Temper's phrasebook gets only the phrases the copied renderers say that `jig-client`'s words lack, with today's English. If saying an enum through `jig-client`'s words changes a test's or a golden's words, keep `jig-client`'s, record the golden again, and name each change in the report.
      4. **The count by file** (ruling 388, point 4) gives the copied renderers and phrases apart from the rest of 07.4.
 
+390. **temper 07.4 lands its removal now; the card renderers wait for the designer** (plan defect, temper 07.4's block of 2026-10-18T19:09:25Z).
+     Ruling 390, kind: plan defect (interim; the design gap is the designer's, `question.md` of 2026-10-18T19:10:59Z). No 5,000-line stop: 07.4 lands now what no answer changes, at up to 400 production lines added (removals not counted), with no question; past it, block with the count. The replacement of `jig-client-view`'s card renderers waits for the answer.
+
+     1. **A design gap, not a Size.** At 4,442 lines, the copy is most of the rendering in jig's reference UI, all but its roots and pages. The design names where the words for jig's enums come from (`client.md`, 5.1: "jig's words for jig's enums (`jig-client`'s `words`)"), and that the pages are the mockups'. It does not say where the rendering of jig's other facts comes from: copied from jig, a part jig gives, or temper's own cards after its mockups. That is the designer's question.
+     2. **What lands now:**
+        - the reference UI's child of temper's root, its records, places and slots, `Address::Jig`, `Owner::Jig`, `parts.rs`, and the forge side's held parts all go;
+        - the users of `Limits.jig` (ruling 385);
+        - the two mains, the adoption's title row and the dropped count's line;
+        - the stories moved off jig's pages, and the goldens of jig's pages (07.4's Files).
+
+        The domain's part of the draft already passes its 61 tests (the report of 18:55Z). Its lines outside the renderers' replacement count 191 (Checked).
+     3. **What stays:**
+        - temper's calls into `jig-client-view`'s card renderers (`confirm.rs`, `pages/chat.rs`, `pages/inbox.rs`), with the `jig_client_view::words::Words` they take;
+        - `jig-client-view` in `temper-client-view`'s manifest, for those calls alone.
+
+        No other crate of temper names it. Done when's two greps wait for the step the answer gives. The draft's `presentation/` copies, `specification.rs` and `document_text.rs` stay out of this landing: keep them on a branch of your worktree, named in the report.
+     4. **Today's tree and words stay** (ruling 388, point 3): the view tests and goldens pass unchanged, except those 07.4's Files name. Give the count by file in the commit and the report (ruling 388, point 4).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
