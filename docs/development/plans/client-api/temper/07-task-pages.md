@@ -324,7 +324,9 @@ Files:
 - `crates/temper-client-domain/src/{route.rs, domain.rs, address.rs,
   boundary.rs, limits.rs, owner.rs (`Owner::Jig`), parts.rs (goes),
   forge.rs (`Held`, `Event::Show`, `Event::PartsLeft` go), lib.rs}`,
-  `Cargo.toml`;
+  `Cargo.toml`; and the users of `Limits.jig` (ruling 385):
+  `src/{acts.rs, pages/{chat,chats,inbox,task}.rs, tests/fixtures.rs,
+  tests/pages/chats.rs}`;
 - `crates/temper-client-view/src/{root.rs, limits.rs, words.rs,
   forge.rs, forge/{bindings,page,words}.rs}` (the outcome's refusals in
   `jig-client`'s words, `Word::refusal`, `crates/jig-client/src/words.rs:105`,

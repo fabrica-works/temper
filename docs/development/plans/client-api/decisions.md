@@ -3060,6 +3060,14 @@ choice would have been the user's (development.md, 10.4).
      6. **The channel SLOW:** ruling 378, point 3 gave `a_resumed_run_is_sent_only_its_current_window` to jig 20.1, which landed it unrepaired after two diagnoses (`logs/jig-20/resumed-window-20.1.md`, `resumed-window-20.2.md`). It runs 0.257 s alone, under jig's focused period of 500 ms; its gate times (0.693 to 0.941 s) are the gate's load. As ruling 378, point 2 did for temper's adoption test, it is named, not repaired again: the README's 13:34Z point 1 gains that exception (Landed). Name it in your report with the gate's time and its time alone.
      7. **Bound:** 30 minutes from this unblock for points 2 and 3; one browser run (point 4); then the gate. Size unchanged: 124 production lines against 120, stop 240.
 
+385. **temper 07.4's pages keep their card bound as Limits.cards** (plan defect, temper 07.4's block of 2026-10-18T18:37:27Z).
+     Ruling 385, kind: plan defect. Yes, the proposal: `Limits` loses `jig` and gains `cards: u32`; no bound changes.
+     1. **The design names the pages' limits** in the domain's `limits.rs`: "jig-client's limits, the pages', the forge side's, and their sum" (`client.md`, 3.2). `cards` is the pages' own: the open cards of the task, inbox and chat pages, where `jig.objects` is read today. Its doc comment says so. A field is no new type (07.4's Shape).
+     2. **Each value stays:** `cards` takes `objects`' value at each preset and fixture (native 16; the domain's, view's and client tier's fixtures 3). `rows`, `text` and `document_bytes` come from `client.domain`, which `limits::client` fills from those same values today; `reads` stays the client's and binds no card.
+     3. **`limits::client`** takes no `jig_client_view::Limits`: the values it copies come from the callers' presets and fixtures, each unchanged. `worst_case`'s check `limits.jig.kept < limits.client.domain.requests.requests` reads `client.domain.kept`, which `limits::client` copies from `jig.kept`; the reference UI's terms of the sum (`jig_client_view::worst_case`, `max_out`, its queues) go with its child.
+     4. **Files gain** the users of `Limits.jig` outside them: `crates/temper-client-domain/src/{acts.rs, pages/{chat,chats,inbox,task}.rs, tests/fixtures.rs, tests/pages/chats.rs}` (Landed). Refresh any further user your sweep (`logs/temper-07/users-07.4.txt`) finds, and list it in the commit body.
+     5. **Size:** these lines count within 07.4's Size, as its Shape's own.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
