@@ -2758,6 +2758,16 @@ choice would have been the user's (development.md, 10.4).
      3. **Then the one** joint run that ruling 357, point 3 leaves; if it fails at step 4 again, report with the log, no further run.
      4. **Unchanged:** every bound of ruling 357, point 4.
 
+360. **jig-19.5 traces the story's root request** (process, jig-19's block of 2026-10-18T13:22:37Z).
+     Ruling 360, process, under ruling 229: yes, a traced run of the story itself, since the standalone exchange returns 200.
+
+     1. **Trace:** at most two runs of the canonical root-file story, 20 minutes from this unblock, with temporary trace lines in jig-test-service only, at its admission (`testing/jig-test-service/src/server.rs:124-128`: the phase, `connections.len()` and `capacity()` at each accepted socket, and each `io::Request::Reject`) and at each connection's end (whether the root response's bytes were written before it). The trace lines are not committed; the diagnostic source goes in `logs/jig-19/`.
+     2. **Then:** write the cause line, with its file:line and the counts, in `logs/jig-19/failure-19.5-root-close.md`.
+        - If the trace shows the root request's socket rejected at admission (the static hypothesis, `limits.rs:77-80`, `Profile::Small => 4`), stop and report with the counts and which sockets held the four: the connection limit is not this ruling's to change.
+        - If it names a cause in 19.5's Files, or in the one file of ruling 358, point 2, repair it as that point says, then ruling 358, point 3's one canonical run.
+        - If the service wrote the 200 and the harness still records `Some(0)`, the cause is past the service, in skein's harness or the world: stop with the cause line.
+     3. **Unchanged:** ruling 358, point 4; `Profile::Small`'s limits.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
