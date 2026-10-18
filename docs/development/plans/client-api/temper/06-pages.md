@@ -572,7 +572,8 @@ temper-client-world -E 'test(a_message_in_a_chat_is_answered_in_its_conversation
 (under 0.5 s).
 Don't: interleave turns and text by hand (jig's `thread` does); show a
 message sent before its answer.
-Size: at most 300 lines.
+Size: at most 300 lines. Ruling 359: the chat lands with ruling 357's named
+final-task repair at up to 650 production lines; no split.
 Removes: nothing.
 
 ### 06.6 A chat's proposals in place, and closing it

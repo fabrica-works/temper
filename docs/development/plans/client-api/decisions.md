@@ -2750,6 +2750,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Then one** canonical root-file story run; if it fails again, report with the log, no further run.
      4. **Unchanged:** skein's harness and its check, the stories' assertions, `Phase::Aborting`'s behaviour, every deadline; ruling 355's `Server::done` repair and its focused regression stay.
 
+359. **temper-06.5 lands at up to 650** (plan defect, temper-06's block of 2026-10-18T13:22:00Z).
+     Ruling 359, plan defect: 06.5's Size of 300 did not foresee the chat's final-task read; as rulings 330 and 345 did for 06.2 and 06.3, the step lands whole.
+
+     1. **Size:** 06.5 lands with the named repair (`pages/chat.rs`'s task watch's terminal `SubjectEnded`, the final task's read under ruling 235, its result rendered with jig's public result helpers) at up to 650 production lines; no split. Past 650, stop and report.
+     2. **No further diagnosis:** ruling 357's three focused runs are spent. Keep the focused reproduction as the step's test.
+     3. **Then the one** joint run that ruling 357, point 3 leaves; if it fails at step 4 again, report with the log, no further run.
+     4. **Unchanged:** every bound of ruling 357, point 4.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
