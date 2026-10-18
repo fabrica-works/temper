@@ -70,6 +70,7 @@ pub struct Seeds {
 #[derive(Debug)]
 pub struct Engine {
     pub jig: jig_protocol_config::Engine,
+    pub clients: crate::startup::application::Clients,
     pub files: Files,
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,

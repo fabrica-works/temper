@@ -21,7 +21,12 @@ fn in_process(address: &config::Address) -> bool {
     }
 }
 /// Standalone's requirements on jig's parts, including absolute agent paths.
-pub fn standalone(engine: &config::Engine, workers: &[config::Worker], problems: &mut Problems) {
+pub fn standalone(
+    engine: &config::Engine,
+    clients: &super::application::Clients,
+    workers: &[config::Worker],
+    problems: &mut Problems,
+) {
     let root = Path::root();
     if workers.len() != 1 {
         problems.push(root.member(b"workers"), What::Standalone);
@@ -36,10 +41,10 @@ pub fn standalone(engine: &config::Engine, workers: &[config::Worker], problems:
     if engine.hosts.workers.len() != 1 || !hosts_match {
         problems.push(root.member(b"engine").member(b"hosts").member(b"workers"), What::Standalone);
     }
-    match engine.clients.listener {
+    match clients.listener {
         config::Address::Addr(Addr::Ip(socket)) if socket.ip().is_loopback() => {}
         config::Address::Addr(Addr::Ip(_) | Addr::InProcess(_)) | config::Address::Host { .. } => {
-            problems.push(root.member(b"engine").member(b"clients").member(b"listener"), What::Loopback);
+            problems.push(root.member(b"application").member(b"clients").member(b"listener"), What::Loopback);
         }
     }
     if engine.connectors.as_ref() != [1] {

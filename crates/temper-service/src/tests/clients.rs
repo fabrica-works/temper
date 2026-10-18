@@ -142,7 +142,14 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
     let config = super::fixtures::engine().jig;
     let mut journal = super::fixtures::engine().limits.root.journal;
     journal.commits = 1;
-    let mut clients = crate::clients::Clients::new(&config, &super::fixtures::seeds(), 64, &journal).unwrap();
+    let mut clients = crate::clients::Clients::new(
+        &config,
+        &super::fixtures::engine().clients.listener,
+        &super::fixtures::seeds(),
+        64,
+        &journal,
+    )
+    .unwrap();
     clients.commit(3, &[root::Write::Erase(root::Key::Core(core::Key::People(people::Key::SignIn(7))))]);
     assert!(!clients.commit_room());
     let mut events = skein_lib::Queue::with_capacity(64);

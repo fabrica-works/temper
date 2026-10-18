@@ -5,6 +5,35 @@ use jig_protocol_config::{self as config, Path, Segment};
 
 const REFUSED_TEMPLATE: u32 = 7;
 
+#[test]
+fn the_clients_listener_is_read_from_the_application_member() {
+    let jig = fixtures::engine().jig;
+    let (members, problems) = application(fixtures::APPLICATION, &jig);
+    assert_eq!(&*lines(&problems), b"", "example accepted");
+    let config::Address::Addr(skein_io::Addr::Ip(listener)) = members.unwrap().clients.listener else {
+        panic!("a socket address")
+    };
+    assert_eq!(listener, "127.0.0.1:7100".parse::<core::net::SocketAddr>().unwrap());
+}
+#[test]
+fn a_missing_clients_member_is_named_by_its_path() {
+    let jig = fixtures::engine().jig;
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    let input = input.replace("\"clients\":{\"listener\":{\"socket\":\"127.0.0.1:7100\"}},", "");
+    let (members, problems) = application(input.as_bytes(), &jig);
+    assert!(members.is_none());
+    assert_eq!(&*lines(&problems), b"application.clients: missing\n");
+}
+#[test]
+fn an_in_process_clients_listener_is_refused_as_a_form() {
+    let jig = fixtures::engine().jig;
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    let input = input.replace("\"socket\":\"127.0.0.1:7100\"", "\"in_process\":\"clients\"");
+    let (members, problems) = application(input.as_bytes(), &jig);
+    assert!(members.is_none());
+    assert_eq!(&*lines(&problems), b"application.clients.listener: invalid form\n");
+}
+
 fn application(input: &[u8], jig: &config::Engine) -> (Option<application::Members>, Problems) {
     let document =
         config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 }).unwrap();

@@ -95,7 +95,12 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     }
     let application = application.expect("required application checked");
     let workers = workers.into_boxed();
-    checks::standalone(engine.as_ref().expect("required engine checked"), &workers, &mut problems);
+    checks::standalone(
+        engine.as_ref().expect("required engine checked"),
+        &application.clients,
+        &workers,
+        &mut problems,
+    );
     if workers.len() != application.workers.len() {
         problems.push(root.member(b"application").member(b"workers"), What::Jig(config::What::Bound));
     }
@@ -149,7 +154,7 @@ pub fn named(document: &[u8]) -> Result<Named, Problems> {
     let files = all_files(&parsed);
     Ok(Named {
         files,
-        clients: parsed.engine.clients.listener,
+        clients: parsed.application.clients.listener,
         forges: parsed.application.forges,
         identities: parsed.application.identities,
         overrides: parsed.application.overrides,
@@ -224,6 +229,7 @@ pub fn startup(
         .ok_or(problem(indexed(0).member(b"limits"), What::Jig(config::What::Bound)))?;
     let engine = settings::Engine {
         jig: parsed.engine,
+        clients: parsed.application.clients,
         files: settings::Files { entries: files.entries.clone() },
         forges: resolved.forges,
         identities: resolved.identities,

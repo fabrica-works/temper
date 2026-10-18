@@ -107,7 +107,8 @@ impl Service {
             .expect("client pass headroom")
             .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
             .expect("client routing room");
-        let clients = clients::Clients::new(&settings.jig, seeds, client_room, &limits.journal)?;
+        let clients =
+            clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
         let forge = crate::forge::Layer::new(
             forge_settings,
             settings.limits.forge_component,

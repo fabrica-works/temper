@@ -10,6 +10,7 @@ use skein_lib::{List, bytes};
 
 #[derive(Debug)]
 pub struct Members {
+    pub clients: Clients,
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
@@ -17,6 +18,30 @@ pub struct Members {
     pub limits: limits::Limits,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
     pub workers: Box<[Worker]>,
+}
+/// The application's clients listener (configuration.md, section 3).
+#[derive(Debug)]
+pub struct Clients {
+    /// The socket address used for the listener, Host guard and printed links.
+    pub listener: config::Address,
+}
+/// Read the listener with jig's address reader, refusing non-socket forms.
+#[must_use]
+pub fn clients(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Clients> {
+    let mut object = read::object(document, at, path, problems)?;
+    let at = read::required(&mut object, document, b"listener", path, problems);
+    read::finish(object, document, path, problems);
+    let path = path.member(b"listener");
+    let mut found = config::Problems::empty();
+    let listener = config::address::read(document, at?, &path, &mut found);
+    problems.append(found, &Path::root());
+    let listener = listener?;
+    let socket = match listener {
+        config::Address::Addr(skein_io::Addr::Ip(_)) => true,
+        config::Address::Addr(skein_io::Addr::InProcess(_)) | config::Address::Host { .. } => false,
+    };
+    read::form(socket, path, problems);
+    Some(Clients { listener })
 }
 #[derive(Debug)]
 pub struct Forge {
@@ -381,6 +406,11 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
         read::list(&mut object, document, b"identities", jig.limits.core.accounts.credentials, &path, problems);
     let workers_ats = read::list(&mut object, document, b"workers", jig.limits.core.fleet.workers, &path, problems);
     let charter = read::number(&mut object, document, b"charter", &path, problems);
+    let clients_at = read::required(&mut object, document, b"clients", &path, problems);
+    let clients = match clients_at {
+        Some(at) => clients(document, at, &path.member(b"clients"), problems),
+        None => None,
+    };
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
     if object.member(document, b"webhooks").is_some() {
         problems.push(path.member(b"webhooks"), What::NotBuilt);
@@ -449,6 +479,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
         return None;
     }
     Some(Members {
+        clients: clients?,
         forges: forges.into_boxed(),
         identities: identities.into_boxed(),
         workers: workers.into_boxed(),

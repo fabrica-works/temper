@@ -23,33 +23,13 @@ fn started(input: &[u8], files: &crate::settings::Files, agent: &crate::settings
 #[test]
 fn standalone_shape_is_required_of_jigs_parts() {
     let mut engine = fixtures::engine().jig;
+    let mut clients = fixtures::engine().clients;
     engine.hosts.workers = Box::new([engine.hosts.workers.into_iter().next().unwrap()]);
     let mut workers = Box::new([fixtures::worker_settings().jig, fixtures::worker_settings().jig]);
-    for (change, path, what) in [
-        (Shape::TwoWorkers, Path::root().member(b"workers"), What::Standalone),
-        (
-            Shape::WorkerSocket,
-            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"engine"),
-            What::Standalone,
-        ),
-        (Shape::HostSocket, Path::root().member(b"engine").member(b"hosts").member(b"listener"), What::Standalone),
-        (Shape::ClientProcess, Path::root().member(b"engine").member(b"clients").member(b"listener"), What::Loopback),
-        (Shape::ClientRemote, Path::root().member(b"engine").member(b"clients").member(b"listener"), What::Loopback),
-        (Shape::Connectors, Path::root().member(b"engine").member(b"connectors"), What::Connectors),
-        (
-            Shape::Program,
-            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"agent").member(b"program"),
-            What::Absolute,
-        ),
-        (
-            Shape::Configuration,
-            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"agent").member(b"configuration"),
-            What::Absolute,
-        ),
-    ] {
-        let count = apply_shape(change, &mut engine, &mut *workers);
+    for (change, path, what) in standalone_shapes() {
+        let count = apply_shape(change, &mut engine, &mut clients, &mut *workers);
         let mut found = Problems::empty();
-        checks::standalone(&engine, &workers[..count], &mut found);
+        checks::standalone(&engine, &clients, &workers[..count], &mut found);
         assert_eq!(found.problems.len(), 1, "row {path:?}");
         assert_eq!(found.problems.get(0).unwrap().what, what, "row {path:?}");
         assert_eq!(found.problems.get(0).unwrap().path, path, "row {change:?}");
@@ -196,13 +176,18 @@ enum Shape {
     Program,
     Configuration,
 }
-fn apply_shape(shape: Shape, engine: &mut config::Engine, workers: &mut [config::Worker]) -> usize {
+fn apply_shape(
+    shape: Shape,
+    engine: &mut config::Engine,
+    clients: &mut crate::startup::application::Clients,
+    workers: &mut [config::Worker],
+) -> usize {
     use core::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     use skein_io::{Addr, Name};
     let socket = config::Address::Addr(Addr::Ip(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 7100))));
     let local = config::Address::Addr(Addr::InProcess(Name::new(b"workers").unwrap()));
     engine.hosts.listener = Box::new([local.clone()]);
-    engine.clients.listener = socket.clone();
+    clients.listener = socket.clone();
     engine.connectors = Box::new([1]);
     for worker in workers.iter_mut() {
         worker.engine = local.clone();
@@ -213,9 +198,9 @@ fn apply_shape(shape: Shape, engine: &mut config::Engine, workers: &mut [config:
         Shape::TwoWorkers => return 2,
         Shape::WorkerSocket => workers[0].engine = socket,
         Shape::HostSocket => engine.hosts.listener = Box::new([socket]),
-        Shape::ClientProcess => engine.clients.listener = local,
+        Shape::ClientProcess => clients.listener = local,
         Shape::ClientRemote => {
-            engine.clients.listener =
+            clients.listener =
                 config::Address::Addr(Addr::Ip(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 7100))));
         }
         Shape::Connectors => engine.connectors = Box::new([1, 2]),
@@ -223,4 +208,37 @@ fn apply_shape(shape: Shape, engine: &mut config::Engine, workers: &mut [config:
         Shape::Configuration => workers[0].agent.configuration = b"agent.json".as_slice().into(),
     }
     1
+}
+
+fn standalone_shapes() -> [(Shape, Path, What); 8] {
+    [
+        (Shape::TwoWorkers, Path::root().member(b"workers"), What::Standalone),
+        (
+            Shape::WorkerSocket,
+            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"engine"),
+            What::Standalone,
+        ),
+        (Shape::HostSocket, Path::root().member(b"engine").member(b"hosts").member(b"listener"), What::Standalone),
+        (
+            Shape::ClientProcess,
+            Path::root().member(b"application").member(b"clients").member(b"listener"),
+            What::Loopback,
+        ),
+        (
+            Shape::ClientRemote,
+            Path::root().member(b"application").member(b"clients").member(b"listener"),
+            What::Loopback,
+        ),
+        (Shape::Connectors, Path::root().member(b"engine").member(b"connectors"), What::Connectors),
+        (
+            Shape::Program,
+            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"agent").member(b"program"),
+            What::Absolute,
+        ),
+        (
+            Shape::Configuration,
+            Path::root().member(b"workers").child(config::Segment::Index(0)).member(b"agent").member(b"configuration"),
+            What::Absolute,
+        ),
+    ]
 }

@@ -55,11 +55,12 @@ fn invalid(what: What) -> Problems {
 impl Clients {
     pub fn new(
         config: &config::Engine,
+        listener: &config::Address,
         seeds: &Seeds,
         room: u32,
         journal: &root::JournalLimits,
     ) -> Result<Self, Problems> {
-        let config::Address::Addr(listener) = config.clients.listener else {
+        let config::Address::Addr(listener) = listener else {
             return Err(invalid(What::Form));
         };
         let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
@@ -122,7 +123,7 @@ impl Clients {
         Ok(Self {
             component,
             initial: Some(settings),
-            server: crate::server::Server::new(listener, &crate::limits::server(&config.limits)),
+            server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
             mount: http::Mount::new(http_settings(), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
             mount_out: Queue::with_capacity(room),

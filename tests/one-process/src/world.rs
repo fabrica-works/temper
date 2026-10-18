@@ -262,7 +262,7 @@ impl Person {
         self.client = Some(
             NativeClient::new(
                 ClientSettings {
-                    engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
+                    engine: skein_io::Addr::Ip(fixtures::CLIENTS),
                     directory: b"private".as_slice().into(),
                     limits: fixtures::client_limits(),
                 },
@@ -589,7 +589,7 @@ fn person(inherited: &Inherited) -> Proc {
         person.client = Some(
             NativeClient::new(
                 ClientSettings {
-                    engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
+                    engine: skein_io::Addr::Ip(fixtures::CLIENTS),
                     directory: b"private".as_slice().into(),
                     limits: fixtures::client_limits(),
                 },

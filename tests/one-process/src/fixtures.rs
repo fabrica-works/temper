@@ -74,6 +74,8 @@ pub(crate) const ADOPTION_FORM_STEPS: usize = 7;
 pub(crate) const ADOPTION_REPLY_STEP: usize = 7;
 pub(crate) const PREPARED_REPOSITORY: &[u8] = b"workspaces/0/app";
 pub(crate) const AGENTS: u32 = 2;
+pub(crate) const CLIENTS: std::net::SocketAddr =
+    std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), 7102);
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
     Settings { seed, config: skein_sim::Config::calm() }
@@ -120,6 +122,7 @@ pub(crate) fn document() -> Vec<u8> {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
     value["application"] = serde_json::json!({
+        "clients":{"listener":{"socket":CLIENTS.to_string()}},
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:3000"},"transport":"plaintext",
             "git":"http://127.0.0.1:3000","api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge.git-token","login":"worker","author":{"name":"Worker","email":"worker@example.invalid"}}],

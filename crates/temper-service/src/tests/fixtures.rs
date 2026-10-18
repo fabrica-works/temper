@@ -48,7 +48,6 @@ pub const ENGINE: &[u8] = br#"{
 {"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
 ],
 "clients": {
-"listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,
 "link": true
 },
@@ -84,6 +83,7 @@ pub fn engine() -> settings::Engine {
     .expect("engine document");
     settings::Engine {
         jig: jig_protocol_config::engine(&document, 0).expect("typed jig engine"),
+        clients: crate::startup::application::Clients { listener: jig_protocol_config::Address::Addr(http::address()) },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: Box::new([settings::Forge {
             number: 1,
@@ -745,7 +745,9 @@ pub use worker::{
 };
 pub use worker_git::{IDENTITY, WorkerStand, started_worker};
 pub fn clients() -> crate::clients::Clients {
-    crate::clients::Clients::new(&engine().jig, &seeds(), 64, &engine().limits.root.journal).unwrap()
+    let engine = engine();
+    crate::clients::Clients::new(&engine.jig, &engine.clients.listener, &seeds(), 64, &engine.limits.root.journal)
+        .unwrap()
 }
 mod startup;
 pub use startup::{APPLICATION, document, files, parsed, startup_agent, with, without, worker_runtime};
