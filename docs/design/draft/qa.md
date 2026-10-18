@@ -130,7 +130,7 @@ How an agent uses the product as a person does.
   never the pages. The pages are the fake person's, in the worlds; the
   browser's QA drives the browser.
 - **A path an explorer found** is written down as a story: a tool's
-  calls transcribe into the worlds' calls (`../tools.md`, 11.5), the
+  calls transcribe into the worlds' calls (`../tools.md`, 11.6), the
   finding's regression test.
 - **For any application on jig,** the same tools once they are jig's
   (`../tools.md`, section 14).

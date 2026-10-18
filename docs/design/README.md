@@ -53,8 +53,9 @@ section 8.
   smith's agent, one process per run; `temper forge` and `temper box`
   set a forge up and run it (`protocol/setup.md`).
 - **Tested at every tier** (`testing.md`): domains and fakes in worlds,
-  then through bytes, then the real binary with an owned Forgejo, its
-  runner and real git, then a real model.
+  then through bytes, then the standalone service, hosted agents and
+  fake peers on one real ring, then the real binary with an owned
+  Forgejo, its runner and real git, then a real model.
 
 ## 2. The first milestone
 

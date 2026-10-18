@@ -51,7 +51,7 @@ listed in section 15.
   file; then larger changes, held changes released, questions answered;
   then goals with plans, decisions, several parties. What breaks is
   fixed, and what is slow made faster, each fix with a story in the
-  worlds (11.5).
+  worlds (11.6).
 - **Production later.** An agent driving temper for a person, or a
   service of a project acting as a party, uses the same tools; MCP gives
   them to agents that have no shell (section 14).
@@ -136,7 +136,7 @@ temper                       the binary: `temper ctl` runs the host
   (5.5).
 - **Everything else is derived from it:** the parser and `temper ctl
   help [TOOL]`, the JSON of arguments and results, and the tool names
-  the guide may use (11.4). A test checks that each derivation names
+  the guide may use (11.5). A test checks that each derivation names
   every tool.
 - **A call is a value:** a tool's name and its arguments, decoded from
   argv or from JSON and checked against the table before anything is
@@ -365,7 +365,7 @@ with them.
   so a rerun is the same request from any directory signed in as the
   party.
 - **Names are the party's.** Agents sharing a party give their names a
-  prefix of their own; the guide says so (11.4).
+  prefix of their own; the guide says so (11.5).
 - **Acts that decide name the revision the agent saw;** a moved one is
   refused, and the agent reads again. A repeat of a decision is answered
   as decided first, by the party itself.
@@ -496,7 +496,31 @@ world's faults hold: a call cut by a link drop or an engine restart,
 asked again under its named key, is made once. Each later area adds its
 stories.
 
-### 11.3 The process tier
+### 11.3 The real loop
+
+`tests/real-loop` hosts the tools' root over jig's native transport,
+the standalone engine and worker, smith's agents and skein's fake LLM
+peer on one thread and one real ring (`testing.md`, 2.4). Agents are
+hosted in that loop and joined to their worker by real pipes. The store
+and client credentials use a scratch directory on the real filesystem.
+
+The first stories sign in, start a chat and wait for its reply, and
+satisfy one client's wait by another client's act; each drains with
+everything settled. Then a service restart retains the work, and a
+call whose answer was lost, retried under its named key, is made once.
+The named-key story waits for jig's contract (section 13). The fake
+forge's API joins stories that need it; clone, push and landing stories
+wait for its real-git bridge (`testing.md`, 2.4 and section 10).
+
+These are a small set of focused tests at the gate. They reuse lower
+worlds' scripts and outside expectations where applicable, and add
+checks of the full transport, persistence and teardown on the real
+kernel. Most tool behaviour stays in `tests/client`; the harness checks
+memory ownership, outstanding operations and release between iterations.
+A real-loop failure is kept with its trace and reproduced lower down
+where possible; its seed does not replay the kernel's schedule.
+
+### 11.4 The process tier
 
 `temper serve` and `temper ctl` as processes over skein's fake LLM peer
 (`testing.md`, 2.6), on a scratch directory of their own: sign-in by the
@@ -506,17 +530,23 @@ a termination signal, then asked again under its key, made once; the
 exit statuses; two acts at once on one DIRECTORY, serialized by the
 lock.
 
-### 11.4 The agents' guide
+The executable boundary is checked here: argv through `main`, printed
+output, exit statuses, the directory's lock, OS signals and agent
+process launch. The owned Forgejo and runner prove the change against
+real git and CI (`testing.md`, 2.6).
+
+### 11.5 The agents' guide
 
 `temper ctl help` prints a short guide, then the tools from the table:
 how to sign in, the loop of 5.4, naming keys and their prefix, reading
 acts, the exit statuses. The guide is text of `temper-client-tools`; a
 test fails when it names a tool the table lacks.
 
-### 11.5 Findings into stories
+### 11.6 Findings into stories
 
 Each bug an agent finds through the tools ends as a story in
-`tests/client`, the process tier or a domain world, before its fix lands
+the lowest tier that shows it, before its fix lands: a domain world,
+`tests/client`, the simulated world, the real loop or the process tier
 (`draft/qa.md`, section 1). A story's calls are the tools' calls, so an
 agent's history of `temper ctl` commands transcribes into one.
 
