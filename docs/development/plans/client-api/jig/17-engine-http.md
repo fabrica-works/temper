@@ -121,7 +121,7 @@ worlds' clients sending a `Host` the allow-list takes.
   `prefix` and `loopback` only, and 17.5's guards' fixture builds it with
   both fields named, so a field added fails that fixture's build.
 
-## Corrections at jig `5b4e287f0` (ruling {ruling}, the ready check of jig 17, 2026-10-18)
+## Corrections at jig `5b4e287f0` (ruling 302, the ready check of jig 17, 2026-10-18)
 
 These take precedence over the increments' Files, Shape, Test shape and
 sketches where they differ. Refresh any further copy or derived value,
@@ -184,6 +184,48 @@ and list it in the commit body.
   with the array, or return a slice. With these the sketches pass
   clippy. jig pins skein at `ca5b75ef7`, where `skein_lib::sha256` is
   not yet: a sketch that needs it takes the repin first.
+
+## Corrections at jig `6605e0564` (ruling 307, the re-check after jig 16.5)
+
+These take precedence over the section above and the increments where
+they differ.
+
+- **Lines moved by 16.5:** `small.rs`'s `CLIENTS` is :256-270 (its
+  `exchanges: 8` :264) and `clients: CLIENTS` :249; `standard.rs`'s
+  `CLIENTS` :146-147, its driver's line :136 (`clients: CLIENTS` :140);
+  the world's provider tests `tests/engine-clients/tests/closing.rs:108,
+  :131, :140, :308, :318`; `crates/jig-client-protocol-link/src/tests/fixtures.rs:275-278`;
+  `tests/client-protocol/src/native/wire.rs:177`.
+- **17.4, who builds `SignedIn`:** `component.rs:484-486`,
+  `crates/jig-client-protocol-link/src/tests/fixtures.rs:275-278` and
+  `crates/jig-client/src/tests/fixtures.rs:239-242`;
+  `src/tests/fixtures/services.rs:77` (`signed_in_answer`) decodes one,
+  and builds none.
+- **17.4, the limit's name:** `token: option secret 48` makes the
+  generated limit `signed_in_token_some`, in place of `signed_in_token`.
+  Its users: `crates/jig-protocol-engine-clients/src/limits.rs:25` and
+  `:52` (the worst case gains the option's one-byte tag), and
+  `crates/jig-client-protocol-wire/src/tests.rs:43`, in 17.4's Files.
+- **17.4, the readers of `.token()`** take the option
+  (`.as_ref().expect(..)` in tests):
+  `crates/jig-protocol-engine-clients/src/tests/services.rs:70, 71`;
+  `tests/engine-clients/src/{peer.rs:349, fixtures.rs:92,
+  peer/closing.rs:103}`; `tests/engine-clients/tests/{sign_in.rs:45,
+  requests.rs:17, closing.rs:128}`; `tests/client-protocol/src/native/wire.rs:177`
+  (`credential` takes the option). The link's guard at
+  `crates/jig-client-protocol-link/src/sign_in.rs:97, 100` reads
+  `token().as_ref().is_some_and(|t| t.len() == 40)`.
+- **17.4, the regenerated files:** `generated/v8.rs` and the goldens
+  `golden/v8/{record_signed_in_*, enum_sign_in_answer_signed_in_*}.bin`
+  (`SKEIN_CODEGEN_WRITE=1`, then the drift test). So edited, the
+  workspace's `cargo check --all-targets` passed and the drift test 3 of
+  3; no other suite was run.
+- **17.1 and 17.2, a user the Files miss:** `tests/ops/src/joint/bytes.rs`
+  (jig-ops-world) uses the component's `Limits`, `Io`, `Link` and
+  `Provider`.
+
+Refresh any further copy of these lines or names, and list it in the
+commit body.
 
 ## Increments
 
