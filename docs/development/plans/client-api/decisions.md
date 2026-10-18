@@ -2195,6 +2195,14 @@ choice would have been the user's (development.md, 10.4).
 308. **jig 18's Shapes against main** (ready check of jig-18.1).
      The ready check of jig-18.1 (skein a0c3a66, jig 6605e0564, temper 90a3f7048) found jig 18's Shapes off main in ten places: lines that moved, a private address reader, three JSON fixtures that need the server's listener, a temper count, a missing fixture and dependency, and 18.2's sketch of `Server` against 17.2's. jig/18-server.md gains "Corrections after the ready check of jig-18.1 (ruling 308)", which holds where it and the increments differ; 17.2's `Server` signatures stand, and 18.2's decision is `fn route(&self, head: &Call) -> Answer`.
 
+309. **temper main's gate: btrfs out of metadata room, balanced** (infrastructure, the coordinator's block of 2026-10-18T04:09:48Z).
+     Ruling 309: the gate's link failures were the disk's, not temper's. btrfs `/srv` had 1 MiB of its device unallocated and its metadata at 3.80 of 4.32 GiB with a 512 MiB reserve, so a write that needed new metadata failed while `df` showed 98 GiB free. mold writes its output through a mapped file, and such a failed write is a SIGBUS: "mold: failed to write to an output file. Disk full?", "clang: error: unable to execute command: Bus error". jig 18's ready check met the same (`tmp/check-jig-18/default2.log`, `fuzzy2.log`). pueued and Codex's daemon died in the same window; the supervisor started pueued at 04:17Z and resumed the coordinator at 04:20Z (`plan resume crash`). Between 04:13Z and 04:16Z the supervisor ran three passes of `sudo -n btrfs balance start -dusage=40,limit=10 /srv`, which left 22 GiB unallocated.
+
+     1. Run temper main's gate again, once, as your resume's step does. Nothing in temper changes for it. If it fails linking again, block (kind: infrastructure) with the gate's log and the output of `sudo -n btrfs filesystem usage /srv | grep -E 'unallocated|Metadata,'`.
+     2. pueue task 697 (jig-16.s1's `cargo check --workspace --all-targets`) ended `Killed` at 04:17:52Z, when pueued restarted: its session queues it again, once. Any other task the restart marked `Killed` is queued again the same way.
+     3. From now until the run's end, at each disk check of development.md 11.4, also run `sudo -n btrfs filesystem usage /srv | grep -E 'unallocated|Metadata,'`. When unallocated is below 5 GiB, run `sudo -n btrfs balance start -dusage=40,limit=10 /srv` once, then the usage line again, and log both outputs in `log.md`. If it is still below 5 GiB, block (kind: infrastructure) with both outputs; run no other btrfs command.
+     4. Unchanged: the disk floors of development.md 11.4 and `plan check`, read from `df`; every step's Files, Proofs and gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
