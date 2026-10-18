@@ -2661,6 +2661,14 @@ choice would have been the user's (development.md, 10.4).
      3. **From temper-05.s1's landing,** every temper increment runs the landing story once before landing ("The run's steers", 2026-10-18 12:20Z, point 2), so that the story stays green for forge-setup.
      4. **Unchanged:** ruling 229; the story's assertions; forge-setup's rule that no other Forgejo is used.
 
+348. **jig-19.4's link clock** (plan defect, jig-19's block of 2026-10-18T12:17:15Z).
+     Ruling 348, a plan defect: yes, as the report proposes. 19.4's story is the first to open the printed link under the host's real `CLOCK_MONOTONIC`; every earlier test started its clock at zero, so 19.4's Files missed the test service's clients child, which mints the link before the service has a time.
+
+     - 19.4's Files gain `testing/jig-test-service/src/{clients.rs, startup.rs, lib.rs}`, only where the clients child is built and clocked.
+     - The repair: the clients component (`kit::Component::new`, which draws the link) is built at the service's first real time, the first `iterate`'s `now` and `wall`, not at `Time::ZERO`; the link's lifetime and every check of `Component::new` are unchanged.
+     - The focused test `a_printed_link_survives_the_first_host_clock` stays as the step's test (ruling 229), then the browser story and 19.4's gate.
+     - Its lines count in 19.4's Size, by file in the report; the stop stays 650 (ruling 344).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
