@@ -20,6 +20,10 @@ default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
 global-timeout = "60s"
 slow-timeout = { period = "20s" }
 
+[[profile.fuzzy.overrides]]
+filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"
+priority = 20
+
 # Measuring, not gating: no budget. With -j 1, each test's own time:
 #   cargo nextest run --workspace --profile measure -j 1
 #   cargo nextest run --workspace --profile measure -j 1 --ignore-default-filter -E 'binary(/^fuzzy_/)'
