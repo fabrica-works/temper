@@ -2534,6 +2534,46 @@ choice would have been the user's (development.md, 10.4).
      network again, it blocks (infrastructure) with land's output, and runs
      nothing else for it.
 
+337. **jig-19.4's service credential duty** (plan defect, jig 19's block of 2026-10-18T11:23:57Z).
+     Plan defect: 19.4's Files miss the client's half of a duty the design
+     gives it. `protocol/browser.md`, 3.2: "to *step*'s duties, the client's
+     transport requests as HTTP, in the order the client gave them, and a
+     service's credential to show once (section 11)"; 11: "A service's
+     credential, shown once, in the reference: in the sign-in part's dialog of
+     its own … The part never keeps it, nor does the client". The link already
+     gives it (`link::Request::ServiceCredential { party, credential }`,
+     `boundary.rs:95`, "The shell shows this once; it never enters the
+     client's domain"); `jig_client` drops it (`client.rs:426`).
+
+     The proposal is authorized:
+     - `jig_client::Request` (`crates/jig-client/src/client.rs:33-43`) gains
+       `ServiceCredential { party: u64, credential: Secret }`; `client.rs:426`
+       pushes it for the link's request instead of dropping it, and the client
+       keeps nothing of it. One focused test in `crates/jig-client/src/tests/`:
+       the link's request comes out once, as that variant.
+     - Each exhaustive match on `jig_client::Request` gains its arm. The
+       browser shell of 19.4 shows it as 19.4's Shape says; every other host,
+       in jig and in temper, drops it, as the client does today, and the
+       routes that forward each client request forward it too
+       (`examples/ops/client-domain/src/route.rs:295`,
+       `testing/jig-client-test-domain/src/route.rs:198`). In jig, `git grep -n
+       -E 'Request::SignOut' -- '*.rs'` names 26 lines, the matches among them
+       (`jig-client-shell-native/src/{connections.rs:113, shell.rs:127}`,
+       `jig-client-view/src/tests/fixtures/client.rs:324`, `tests/client/`,
+       `tests/client-protocol/`, `tests/ops/`, `examples/ops/`,
+       `testing/jig-client-test-domain/`).
+     - temper takes it at the repin that first pins a jig past 19.4
+       (`temper-repin`; temper-04.s1 pins at jig-17.s1, before it):
+       `crates/temper-client-domain/src/route.rs:158` forwards it,
+       `tests/client/src/app.rs:160` and temper's terminal shell drop it. Those
+       arms are that repin's repairs.
+     - The client's variant, its forwarding and its test count toward 19.4's
+       Size; the arms of the other hosts are counted apart, by file, in the
+       commit body.
+
+     Refresh any further match or copy the compiler finds by this rule, and
+     list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

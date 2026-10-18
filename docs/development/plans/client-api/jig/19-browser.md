@@ -374,8 +374,9 @@ clippy.toml, jig_client_test_shell_web.css, files/robots.txt, pictures/}`,
 `Cargo.toml` (the two members, `skein-fake-person-browser`,
 `skein-ui-bundle`, `skein-scratch`, `[profile.dev.package.skein-ui-bundle]`);
 `tests/boundary/src/tests/graph.rs` (roles, if a list names client
-crates). Shared hotspots: workspace `Cargo.toml`, `Cargo.lock`,
-`tests/boundary/src/tests/graph.rs`.
+crates); `crates/jig-client/src/client.rs` and the exhaustive matches on
+`jig_client::Request` (ruling 337). Shared hotspots: workspace
+`Cargo.toml`, `Cargo.lock`, `tests/boundary/src/tests/graph.rs`.
 Shape:
 - `jig-client-test-shell-web`: `crate-type = ["cdylib"]`, its
   dependencies under `[target.'cfg(target_arch = "wasm32")'.dependencies]`,
