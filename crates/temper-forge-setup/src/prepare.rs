@@ -357,7 +357,7 @@ impl Prepare {
             Command::Migrate => self.after_migrate(),
             Command::CreateAdmin => self.token(),
             Command::CreatePerson => {
-                let Some(password) = first_line(&ran.stdout) else {
+                let Some(password) = person_password(&ran.stdout) else {
                     return self.end(Err(Failure::Unread { command }));
                 };
                 self.password = Some(password.clone());
@@ -430,6 +430,19 @@ fn first_line(value: &Secret) -> Option<Secret> {
     let end = bytes::find(input, b"\n").unwrap_or(input.len());
     let line = input.get(..end)?.strip_suffix(b"\r").unwrap_or(input.get(..end)?);
     if line.is_empty() { None } else { Some(Secret::new(bytes::copy_of(line))) }
+}
+fn person_password(value: &Secret) -> Option<Secret> {
+    let line = first_line(value)?;
+    let input = line.expose();
+    let first = bytes::find(input, b"'")?.checked_add(1)?;
+    let mut last = first;
+    for (at, byte) in input.iter().enumerate() {
+        if *byte == b'\'' {
+            last = at;
+        }
+    }
+    let password = input.get(first..last)?;
+    if password.is_empty() { None } else { Some(Secret::new(bytes::copy_of(password))) }
 }
 fn hex(input: &[u8], count: usize) -> Secret {
     let mut w = Writer::new(count.checked_mul(2).expect("bounded hex"));

@@ -96,7 +96,7 @@ fn another_runner_binary_is_refused_naming_its_path_and_line() {
 fn a_first_preparation_runs_its_commands_in_order() {
     let mut drive = person(true);
     assert_eq!(
-        drive.send(fixtures::ran(b"person-password\nextra text\n")),
+        drive.send(fixtures::person_created()),
         Request::Write { file: File::PersonPassword, contents: Secret::new(b"person-password".as_slice().into()) }
     );
     assert_eq!(
@@ -114,7 +114,7 @@ fn a_first_preparation_runs_its_commands_in_order() {
     assert_eq!(drive.send(Event::Done), Request::End(Ok(())));
 }
 #[test]
-fn a_first_preparation_records_its_start_first_and_its_end_last() {
+fn a_preparation_records_its_start_and_end() {
     let mut drive = drawing(false);
     let Request::Write { file: File::State, contents } = drive.drawn(false) else { panic!("record before layout") };
     let state = state::decode(contents.expose()).unwrap();
@@ -127,12 +127,20 @@ fn a_first_preparation_records_its_start_first_and_its_end_last() {
     );
     assert_eq!(state.secrets.jwt_secret.expose(), b"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI");
     let mut drive = person(false);
-    let Request::Write { file: File::PersonPassword, .. } = drive.send(fixtures::ran(b"person-password\n")) else {
+    let Request::Write { file: File::PersonPassword, .. } = drive.send(fixtures::person_created()) else {
         panic!("password")
     };
     let Request::Write { file: File::State, contents } = drive.send(Event::Done) else { panic!("record last") };
     assert!(state::decode(contents.expose()).unwrap().prepared);
     assert_eq!(drive.send(Event::Done), Request::End(Ok(())));
+}
+#[test]
+fn a_person_password_without_quotes_ends_preparation() {
+    let mut drive = person(false);
+    assert_eq!(
+        drive.send(fixtures::ran(b"person-password\n")),
+        Request::End(Err(Failure::Unread { command: Command::CreatePerson }))
+    );
 }
 #[test]
 fn a_first_preparation_with_a_runner_asks_for_the_runners_lock() {
@@ -195,7 +203,7 @@ fn forgejos_files_with_no_state_are_refused() {
 #[test]
 fn a_failed_command_names_its_status_and_none_of_the_secrets() {
     let mut drive = person(true);
-    drive.send(fixtures::ran(b"person-password\n"));
+    drive.send(fixtures::person_created());
     drive.send(Event::Done);
     drive.send(Event::Done);
     let output = b"0000000000000000000000000000000000000000000000000000000000000000 0101010101010101010101010101010101010101010101010101010101010101 AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI 0404040404040404040404040404040404040404 admin-token person-password";

@@ -172,6 +172,9 @@ pub fn later() -> crate::prepare::Found {
         files: true,
     }
 }
+pub fn person_created() -> crate::prepare::Event {
+    ran(b"generated random password is 'person-password'\nNew user 'ada' has been successfully created!\n")
+}
 pub fn ran(stdout: &[u8]) -> crate::prepare::Event {
     use crate::prepare::{Event, Exit, Ran};
     Event::Ran(Ran {

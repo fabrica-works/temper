@@ -109,7 +109,7 @@ if [ -f "$base/{program}.fail" ] && [ "$1" = "$(cat "$base/{program}.fail")" ]; 
 if [ -f "$base/{program}.hang" ] && [ "$1" = "$(cat "$base/{program}.hang")" ]; then sleep 60 & echo $! > "$base/hung"; wait; fi
 case "$1 $3" in
     'admin generate-access-token') echo fixture-admin-token;;
-    'admin create') echo fixture-person-password;;
+    'admin create') echo "generated random password is 'fixture-person-password'";;
     'forgejo-cli register') echo fixture-runner-uuid;;
 esac
 "#,
