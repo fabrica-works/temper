@@ -258,7 +258,7 @@ impl Person {
                 ClientSettings {
                     engine: skein_io::Addr::Ip(fixtures::CLIENTS),
                     directory: b"private".as_slice().into(),
-                    limits: fixtures::client_limits(),
+                    limits: stories::client_limits(),
                 },
                 self.root.take().expect("private root"),
                 1000,
@@ -585,7 +585,7 @@ fn person(inherited: &Inherited) -> Proc {
                 ClientSettings {
                     engine: skein_io::Addr::Ip(fixtures::CLIENTS),
                     directory: b"private".as_slice().into(),
-                    limits: fixtures::client_limits(),
+                    limits: stories::client_limits(),
                 },
                 person.root.take().expect("private root"),
                 1000,

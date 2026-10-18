@@ -12,6 +12,19 @@ pub(crate) fn set(story: Story) {
     STORY.with(|slot| slot.set(story));
 }
 
+pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
+    let mut limits = fixtures::client_limits();
+    if STORY.with(|slot| matches!(slot.get(), Story::Adopt)) {
+        // Batch this whole-exchange story without changing the other stories' schedule.
+        limits.io.receive = 16_384;
+        limits.io.intake = limits.io.receive;
+        limits.io.output = limits.io.receive;
+        limits.connections.http.read = limits.io.receive;
+        limits.connections.http.send = limits.io.receive;
+    }
+    limits
+}
+
 pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     let mut steps = vec![
         Step::Go {
