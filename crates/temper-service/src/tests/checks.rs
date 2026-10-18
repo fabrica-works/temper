@@ -162,7 +162,7 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
 fn one_ios_entities_hold_both_services_and_their_children() {
     let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":9}"#);
     let found = crate::named(&document).unwrap_err();
-    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 49 bytes, past its bound of 48\n".as_slice());
+    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 53 bytes, past its bound of 48\n".as_slice());
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -297,7 +297,7 @@ fn hook_connections_past_the_process_sockets_are_refused() {
         fixtures::with(&fixtures::webhook_document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge_component.hooks":40}"#);
     assert_eq!(
         &*lines(&crate::named(&document).unwrap_err()),
-        b"engine.limits.io.sockets: 66 bytes, past its bound of 48\n"
+        b"engine.limits.io.sockets: 70 bytes, past its bound of 48\n"
     );
 }
 #[test]

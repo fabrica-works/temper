@@ -311,7 +311,7 @@ pub fn handed_on(name: &[u8]) -> bool {
 #[must_use]
 pub fn server(jig: &jig_protocol_config::Limits) -> crate::server::Limits {
     crate::server::Limits {
-        connections: 4,
+        connections: 8,
         http: skein_http::server::Limits {
             head: 4096,
             headers: 32,
