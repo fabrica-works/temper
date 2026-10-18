@@ -51,6 +51,11 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
     match place {
         Place::Address(address) => {
+            let address = if let Address::Jig(jig_client_view::address::Address::Task { task, .. }) = address {
+                Address::Task { task }
+            } else {
+                address
+            };
             pages(root, env, crate::pages::Event::Went { address: address.clone() }, out);
             if let Some(reference) = address.reference() {
                 forge(root, env, forge::Event::Left, out);

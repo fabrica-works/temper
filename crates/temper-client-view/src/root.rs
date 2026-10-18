@@ -89,6 +89,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             &mut view.pages,
             &mut view.jig,
         );
+    } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
+        crate::pages::task::main(&mut builder, root, &view.forge_words, &mut view.pages);
     } else if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
         && let Some(form) = root.forge().form()
     {

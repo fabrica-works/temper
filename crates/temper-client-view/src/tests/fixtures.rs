@@ -184,6 +184,13 @@ pub(super) fn root_at(
     address: temper_client_domain::Address,
     limits: &Limits,
 ) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>) {
+    let (root, me, page, _) = root_at_with_tree(address, limits);
+    (root, me, page)
+}
+pub(super) fn root_at_with_tree(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>, Option<skein_lib::Token>) {
     use jig_client::contract::{
         self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
@@ -210,6 +217,7 @@ pub(super) fn root_at(
     }
     let mut watch = None;
     let mut inbox_watch = None;
+    let mut tree_watch = None;
     for _ in 0..out.len() {
         if let Some(Request::Client {
             request:
@@ -220,6 +228,8 @@ pub(super) fn root_at(
         {
             if subject == Subject::Me {
                 watch = Some(token);
+            } else if let Subject::Tree { .. } = subject {
+                tree_watch = Some(token);
             } else if let Subject::Inbox { .. } | Subject::Task { .. } = subject {
                 inbox_watch = Some(token);
             }
@@ -272,7 +282,7 @@ pub(super) fn root_at(
         },
         &mut out,
     );
-    (root, watch.expect("me opened"), inbox_watch)
+    (root, watch.expect("me opened"), inbox_watch, tree_watch)
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
     let mut root = root_in_project(Some(PROJECT));
@@ -425,3 +435,5 @@ pub fn inbox_with_document(
     }
     root
 }
+
+pub mod task;

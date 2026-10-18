@@ -25,7 +25,7 @@ fn an_entry_naming_a_task_links_to_its_page_by_number() {
     assert_eq!(
         crate::act(&mut view, node, Act::Press),
         Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-            address: temper_client_domain::Address::Jig(jig_client_view::address::Address::task(fixtures::INBOX_TASK))
+            address: temper_client_domain::Address::Task { task: fixtures::INBOX_TASK }
         }))
     );
 }

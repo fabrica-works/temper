@@ -9,6 +9,7 @@ use skein_lib::{Env, Queue, Time};
 pub mod chat;
 pub mod chats;
 pub mod inbox;
+pub mod task;
 #[derive(Debug)]
 pub struct Pages {
     address: Address,
@@ -18,6 +19,7 @@ pub struct Pages {
     pub(crate) inbox: Option<inbox::Inbox>,
     chats: Option<chats::Chats>,
     chat: Option<chat::Chat>,
+    task: Option<task::Task>,
     next: u64,
     pub(crate) serial: u64,
     seen: Option<(u64, jig_client::Key)>,
@@ -96,6 +98,7 @@ impl Pages {
             inbox: None,
             chats: None,
             chat: None,
+            task: None,
             next: 1,
             serial: 0,
             seen: None,
@@ -117,6 +120,10 @@ impl Pages {
     #[must_use]
     pub const fn chat(&self) -> Option<&chat::Chat> {
         self.chat.as_ref()
+    }
+    #[must_use]
+    pub const fn task(&self) -> Option<&task::Task> {
+        self.task.as_ref()
     }
     #[must_use]
     pub fn cards(&self) -> Option<&skein_lib::List<inbox::Card>> {
@@ -244,6 +251,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
     if let Some(chats) = &mut pages.chats {
         chats.configure(me, pages.project, &env.limits, out);
     }
+    redirect_chat(pages, client, out);
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
 }
 pub fn fire(_pages: &mut Pages, _env: &Env<Limits>, _client: &Client, _out: &mut Queue<Request>) {}
@@ -266,7 +274,9 @@ fn contains(me: &Me, project: Option<u32>) -> bool {
 }
 
 fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<Request>) {
-    if (pages.inbox.is_none() && pages.chats.is_none() && pages.chat.is_none()) || pages.address != address {
+    if (pages.inbox.is_none() && pages.chats.is_none() && pages.chat.is_none() && pages.task.is_none())
+        || pages.address != address
+    {
         if let Some(inbox) = pages.inbox.take() {
             pages.next = inbox.leave(out);
         }
@@ -275,6 +285,12 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         }
         if let Some(chat) = pages.chat.take() {
             pages.next = chat.leave(out);
+        }
+        if let Some(task) = pages.task.take() {
+            pages.next = task.leave(out);
+        }
+        if let Address::Task { task } = address {
+            pages.task = Some(task::Task::new(task, pages.next, &env.limits, out));
         }
         if let Address::Chat { task } = address {
             pages.chat = Some(chat::Chat::new(task, pages.next, &env.limits, out));
@@ -312,6 +328,9 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if let Some(task) = &mut pages.task {
+        return task.told(client, told, out);
+    }
     if let Some(chat) = &mut pages.chat {
         if !chat.told(client, told, out) {
             return false;
@@ -391,5 +410,13 @@ fn choose_project(pages: &mut Pages, client: &Client, project: u32) {
                 break;
             }
         }
+    }
+}
+
+fn redirect_chat(pages: &Pages, client: &Client, out: &mut Queue<Request>) {
+    if let Some(task) = &pages.task
+        && let Some(address) = task.chat(client, pages.me(client))
+    {
+        out.push(Request::Show { address });
     }
 }

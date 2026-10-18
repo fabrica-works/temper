@@ -163,7 +163,7 @@ fn entry(
             bindings,
             Role::Link,
             &words.say(Word::Task, &[Hole::Number(task)]),
-            Act::Go { address: Address::Jig(jig_client_view::address::Address::task(task)) },
+            Act::Go { address: Address::Task { task } },
         );
     }
     if let Some(page) = &card.page {

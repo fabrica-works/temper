@@ -100,6 +100,10 @@ pub fn part(builder: &mut Builder, side: &temper_client_domain::forge::Side, par
         builder.close();
         return;
     }
+    drawn(builder, part, words);
+}
+/// Draw a part named by a document, without a reference UI slot.
+pub fn drawn(builder: &mut Builder, part: &Part, words: &Words) {
     match part {
         Part::Connector { .. } => words.text(builder, Word::Connector, &[]),
         Part::Resource { path, .. } => path_text(builder, path.as_slice(), words),

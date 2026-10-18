@@ -38,6 +38,7 @@ pub fn worst_case(
     forge: &Words,
 ) -> Option<u64> {
     skein_ui::worst_case(&limits.tree)?
+        .checked_add(skein_lib::List::<u64>::worst_case(domain.jig.rows.checked_add(1)?)?)?
         .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?

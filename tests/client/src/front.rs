@@ -122,6 +122,34 @@ impl Joint {
             2,
         )
     }
+    /// A real forge procedure is admitted by this scenario's policy.
+    #[must_use]
+    pub(crate) fn with_procedures(seed: u64, limits: &client::Limits) -> Self {
+        use jig_domain_authority as a;
+        const PROJECT: u32 = 1;
+        const PROCEDURE: u32 = 2;
+        const EXECUTORS: u32 = 1;
+        const POLICY_OUT: u32 = a::POLICY_MAX_OUT;
+        const SLOTS: u32 = 1;
+        let mut config = walking::config(seed);
+        let mut rules = config.core.authority.rules().clone();
+        let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
+        let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
+        rules.ceiling.delegation.kinds.clone_from(&kinds);
+        policy.ceiling.delegation.kinds.clone_from(&kinds);
+        policy.roles[0].authority.delegation.kinds = kinds;
+        let mut authority_limits = *config.core.authority.limits();
+        authority_limits.executors = EXECUTORS;
+        let mut domain = a::Domain::new(rules, authority_limits).expect("procedure policy limits");
+        let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
+        a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
+        assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
+        config.core.authority = domain;
+        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        engine_limits.authority = authority_limits;
+        let engine = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
+        Self::with_engine(seed, limits, engine, SLOTS)
+    }
     fn with_engine(seed: u64, limits: &client::Limits, mut engine: Driver, slots: u32) -> Self {
         engine.send(temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([])));
         engine.settle();

@@ -11,6 +11,26 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    TaskHeader,
+    Asked,
+    Plan,
+    Latest,
+    Agent,
+    Procedure,
+    AskedBy,
+    AskedByPerson,
+    AskedByTask,
+    AskedByDeployment,
+    Deadline,
+    Priority,
+    Folded,
+    HeldBelow,
+    ActivityAt,
+    DecisionMade,
+    UnreadTurn,
+    Opaque,
+    Milestone,
+
     RunBegan,
     RunEnded,
     LinesLeft,
@@ -99,7 +119,26 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 86] = [
+const ALL: [Word; 105] = [
+    Word::TaskHeader,
+    Word::Asked,
+    Word::Plan,
+    Word::Latest,
+    Word::Agent,
+    Word::Procedure,
+    Word::AskedBy,
+    Word::AskedByPerson,
+    Word::AskedByTask,
+    Word::AskedByDeployment,
+    Word::Deadline,
+    Word::Priority,
+    Word::Folded,
+    Word::HeldBelow,
+    Word::ActivityAt,
+    Word::DecisionMade,
+    Word::UnreadTurn,
+    Word::Opaque,
+    Word::Milestone,
     Word::RunBegan,
     Word::RunEnded,
     Word::LinesLeft,
@@ -188,8 +227,29 @@ const ALL: [Word; 86] = [
     Word::Unshowable,
 ];
 impl Word {
+    #[expect(clippy::too_many_lines, reason = "closed phrase identifier codec, exhaustive over Word")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::TaskHeader => 161,
+            Self::Asked => 162,
+            Self::Plan => 163,
+            Self::Latest => 164,
+            Self::Agent => 165,
+            Self::Procedure => 166,
+            Self::AskedBy => 167,
+            Self::AskedByPerson => 168,
+            Self::AskedByTask => 169,
+            Self::AskedByDeployment => 170,
+            Self::Deadline => 171,
+            Self::Priority => 172,
+            Self::Folded => 173,
+            Self::HeldBelow => 174,
+            Self::ActivityAt => 175,
+            Self::DecisionMade => 176,
+            Self::UnreadTurn => 177,
+            Self::Opaque => 178,
+            Self::Milestone => 179,
+
             Self::CancelDelegate => 157,
             Self::TakeDelegate => 158,
             Self::Close => 153,
@@ -319,8 +379,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(192);
-        let mut phrases = List::with_capacity(192);
+        let mut shapes = List::with_capacity(256);
+        let mut phrases = List::with_capacity(256);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -375,10 +435,10 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 192,
+            phrases: 256,
             holes: 3,
-            segments: 716,
-            text_bytes: 6144,
+            segments: 1024,
+            text_bytes: 8192,
             hole_bytes: joined.max(513),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
@@ -407,9 +467,29 @@ impl Words {
         Some(most.max(crate::forge::words::capacity(self)?))
     }
 }
+#[expect(clippy::too_many_lines, reason = "closed English phrase codec, one row per Word")]
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::TaskHeader => (&[b"Task details"], &[]),
+        Word::Asked => (&[b"What was asked"], &[]),
+        Word::Plan => (&[b"Plan"], &[]),
+        Word::Latest => (&[b"Latest activity"], &[]),
+        Word::Agent => (&[b"Agent"], &[]),
+        Word::Procedure => (&[b"Procedure"], &[]),
+        Word::AskedBy => (&[b"Asked by ", b""], &[Name]),
+        Word::AskedByPerson => (&[b"Asked by person ", b""], &[Number]),
+        Word::AskedByTask => (&[b"Asked by task ", b""], &[Number]),
+        Word::AskedByDeployment => (&[b"Asked by deployment of project ", b""], &[Number]),
+        Word::Deadline => (&[b"Due ", b""], &[HoleKind::Wall]),
+        Word::Priority => (&[b"Priority ", b""], &[Number]),
+        Word::Folded => (&[b"Folded: ", b" ", b""], &[Number, Name]),
+        Word::HeldBelow => (&[b"Held below: ", b""], &[Number]),
+        Word::ActivityAt => (&[b"At ", b""], &[HoleKind::Wall]),
+        Word::DecisionMade => (&[b"Decision made"], &[]),
+        Word::UnreadTurn => (&[b"Turn could not be decoded"], &[]),
+        Word::Opaque => (&[b"Opaque content: ", b" bytes"], &[Number]),
+        Word::Milestone => (&[b"Milestone ", b""], &[Number]),
         Word::RunBegan => (&[b"Run ", b" began"], &[Number]),
         Word::RunEnded => (&[b"Run ", b" ended"], &[Number]),
         Word::LinesLeft => (&[b"Earlier lines omitted ", b""], &[Number]),

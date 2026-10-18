@@ -96,3 +96,5 @@ fn a_part_the_side_does_not_hold_says_it_cannot_be_shown() {
 }
 
 mod chat;
+
+mod task;

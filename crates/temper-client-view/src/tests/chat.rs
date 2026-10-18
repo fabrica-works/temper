@@ -12,27 +12,12 @@ const COMMITTED: u32 = 0;
 const LINES: u32 = 4;
 const BYTES: u64 = 65536;
 const TEXT: u32 = 32;
-const EXCHANGES: u32 = 8;
-const SPENT: u64 = 7;
-const BELOW: u64 = 2;
-fn task() -> c::Task {
-    use jig_client_protocol_wire::v8 as w;
-    let mut record = jig_client_test_records::task_record().into_parts();
-    record.chip = jig_client_test_records::owner_waiting_chip_record();
-    let record = w::Task::new(&w::CEILINGS, record).expect("checked fixture");
-    let link = jig_client_protocol_link::Limits::new(fixtures::limits().client.domain, EXCHANGES).expect("link");
-    let mut task = jig_client_protocol_link::translate::documents::task(record, &link).expect("task");
-    let c::ChipPhase::Owner { phase, .. } = task.chip.details.as_mut() else { panic!("owner chip") };
-    *phase = c::OwnerChipPhase::Active(c::RunStage::Idle);
-    task.budget.numbers.spent = SPENT;
-    task.budget.numbers.spent_below = BELOW;
-    task
-}
+
 #[test]
 fn a_chats_header_says_its_status_and_spend() {
     let mut b = Builder::new(&fixtures::tree_limits());
     let root = fixtures::root_in_project(Some(fixtures::PROJECT));
-    crate::pages::chat::header(&mut b, &task(), root.pages().me(root.client()), &fixtures::words());
+    crate::pages::chat::header(&mut b, &fixtures::task::document(), root.pages().me(root.client()), &fixtures::words());
     let tree = b.finish();
     assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
     assert!(fixtures::find(&tree, Role::Paragraph, b"Spent 7; delegates spent 2").is_some());
@@ -190,7 +175,7 @@ fn chat_root() -> temper_client_domain::Domain {
             grace: Some(CLOSE_GRACE),
         })
         .expect("template");
-    let mut task = task();
+    let mut task = fixtures::task::document();
     task.chip.task = TASK;
     task.project = fixtures::PROJECT;
     task.acts = List::with_capacity(SINGLE_TEMPLATE);
@@ -270,7 +255,7 @@ fn proposal_root() -> temper_client_domain::Domain {
     use temper_client_domain::Event;
     let limits = fixtures::domain_limits();
     let (mut root, _, watch) = fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &limits);
-    let mut task = task();
+    let mut task = fixtures::task::document();
     task.chip.task = TASK;
     task.proposals = List::with_capacity(SINGLE_TEMPLATE);
     task.proposals.push(PROPOSAL).expect("one proposal");

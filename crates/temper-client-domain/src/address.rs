@@ -4,6 +4,7 @@ pub enum Address {
     Inbox { filter: Filter },
     Chats,
     Chat { task: u64 },
+    Task { task: u64 },
     Adopt { project: u32 },
     Jig(jig_client_view::address::Address),
 }
@@ -34,7 +35,7 @@ impl Address {
     pub fn reference(&self) -> Option<jig_client_view::address::Address> {
         match self {
             Self::Jig(address) => Some(*address),
-            Self::Inbox { .. } | Self::Adopt { .. } | Self::Chats | Self::Chat { .. } => None,
+            Self::Inbox { .. } | Self::Adopt { .. } | Self::Chats | Self::Chat { .. } | Self::Task { .. } => None,
         }
     }
 }

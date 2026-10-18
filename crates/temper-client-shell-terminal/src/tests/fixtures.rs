@@ -443,10 +443,7 @@ const INBOX_CARDS: [(&[u8], &[u8]); 6] = [
     (b"Reply", b"OAuth login? replied"),
 ];
 pub fn task_page() -> skein_ui::Tree {
-    page(
-        jig_client_view::address::Address::Task { task: 9, section: jig_client_view::address::TaskSection::Activity },
-        false,
-    )
+    task::page()
 }
 pub fn project_page() -> skein_ui::Tree {
     page(
@@ -802,3 +799,5 @@ pub fn chats_page() -> skein_ui::Tree {
 }
 
 pub mod chat;
+
+mod task;

@@ -1,37 +1,37 @@
-== Task 9 == Live
+== Refresh token handling == Live
 temper
-[1] First (selected)
+[1] Shop (selected)
 * Pat
 [2] Sign out
 [3] Inbox 0
 [4] Chats
 [5] Adopt a repository
-Task 9:
-  - Task 9: Chat nine:
-      ## Task 9: Chat nine
-      * Open
-      Task 9: Chat nine:
-        [6] Task 9: Chat nine
-        Agent
-        * Cannot show this part.
-      [7] Write
-  In project 1
+Task details:
+  ## Task details
+  Task 9
+  Refresh token handling
+  Agent
+  * Running
+  Shop
+  Asked by Pat
   Priority 1
-Task 9:
-  [8] Overview
-  [9] Activity (current)
-  [10] History
-  [11] Budget and authority
-Activity:
-  ## Activity
-  Waiting for news
-  Parked; your words resume it
-  - Conversation:
-      - Conversation:
-          At 00:00
-          By party 1
-          Pat
-          A fixture conversation
-          * Sent
-  Start of the list
-  End of the list
+What was asked:
+  ## What was asked
+  Rotate tokens safely.
+  Shown on the forge.
+Plan:
+  ## Plan
+  Plan:
+    - [6] Task 9
+      Refresh token handling
+      Agent
+      * Running
+      - [7] Task 12
+        Review the change
+        Agent
+        * Held
+    * Held below: 1
+Latest activity:
+  ## Latest activity
+  - At 0
+    The review needs attention.

@@ -1,6 +1,7 @@
 mod chat;
 mod chats;
 mod inbox;
+mod task;
 use super::fixtures;
 use crate::{
     Action, Address,

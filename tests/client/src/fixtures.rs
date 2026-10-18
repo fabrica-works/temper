@@ -404,3 +404,156 @@ pub fn chat(front: &mut Joint, words: &[u8]) -> u64 {
 pub fn chat_page(task: u64) -> temper_client_domain::Address {
     temper_client_domain::Address::Chat { task }
 }
+
+const GOAL_REPLY: Token = Token::new(1201);
+const GOAL_KEY: [u8; 16] = [41; 16];
+const GOAL_PROJECT: u32 = 1;
+const GOAL_PRIORITY: u32 = 1;
+const GOAL_LABEL: u32 = 2;
+const DELEGATE_CALL: u64 = 1202;
+const DELEGATE_COMPLETION: u32 = 1;
+const DELEGATE_POSITION: u32 = 1;
+const RETRY_AT: Time = Time::from_nanos(2_000_000_000);
+const NO_SPEND: u64 = 0;
+/// A tracked goal with a failed delegate, held by the real engine.
+pub fn goal_with_held_delegate(front: &mut Joint) -> (u64, u64) {
+    *front = Joint::with_questions(SEED, &domain_limits());
+    let goal = make_goal(front, false);
+    let driver = &mut front.engine;
+    let parent = driver.last_assignment();
+    assert_eq!(parent.task, goal);
+    driver.call(
+        QUESTION_WORKER,
+        parent.task,
+        parent.attempt,
+        DELEGATE_CALL,
+        engine::Call {
+            completion: DELEGATE_COMPLETION,
+            position: DELEGATE_POSITION,
+            tool: engine::Tool::Delegate {
+                batch: Box::new([temper_engine_domain_world::fixtures::report_delegate(
+                    b"Review the change",
+                    Box::new([]),
+                )]),
+            },
+        },
+    );
+    driver.settle();
+    let Some(engine::CallAnswer::Delegated(children)) = driver.answered(DELEGATE_CALL) else {
+        panic!("delegate admitted: {:?}", driver.answered(DELEGATE_CALL));
+    };
+    let held = children[0].task;
+    driver.answer(QUESTION_WORKER, parent.task, parent.attempt, NO_SPEND, tasks::End::Parked, engine::Parts::none());
+    driver.settle();
+    fail_delegate(driver, held);
+    driver.env.now = RETRY_AT;
+    engine::fire(&mut driver.root, &driver.env);
+    engine::release(&mut driver.root, &driver.env, &mut driver.out);
+    driver.collect();
+    driver.settle();
+    fail_delegate(driver, held);
+    assert!(matches!(driver.task(held).expect("delegate").phase, tasks::Phase::Held { .. }));
+    (goal, held)
+}
+fn fail_delegate(driver: &mut Driver, held: u64) {
+    let run = driver.last_assignment();
+    assert_eq!(run.task, held, "delegate has the next worker attempt");
+    driver.answer(
+        QUESTION_WORKER,
+        held,
+        run.attempt,
+        NO_SPEND,
+        tasks::End::Failed(tasks::Class::Run),
+        engine::Parts::none(),
+    );
+    driver.settle();
+}
+fn make_goal(front: &mut Joint, procedure: bool) -> u64 {
+    let driver = &mut front.engine;
+    driver.sign_in();
+    driver.settle();
+    if procedure {
+        adopt_goal_repository(driver);
+    }
+    let jig_domain_people::Ask::Create { mut batch, .. } = driver.chat_ask(GOAL_PROJECT, b"Fix the adopted repository")
+    else {
+        panic!("create fixture");
+    };
+    batch[0].tracked = Some(GOAL_PRIORITY);
+    batch[0].label = GOAL_LABEL;
+    batch[0].flags.conversation = false;
+    batch[0].flags.listed = true;
+    if procedure {
+        batch[0].authority.tools = NO_TOOLS;
+        batch[0].parameters = Box::new([jig_domain_people::Parameter::Resource {
+            name: REPOSITORY_PARAMETER,
+            connector: FORGE_CONNECTOR,
+            resource: GOAL_REPOSITORY,
+        }]);
+        batch[0].executor =
+            jig_domain_people::TaskExecutor::Procedure { connector: FORGE_CONNECTOR, code: FORGE_PROCEDURE };
+        batch[0].contract =
+            jig_domain_people::Contract::Change { connector: FORGE_CONNECTOR, kind: FORGE_CHANGE, words: REPORT_BYTES };
+    }
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(GOAL_REPLY),
+        sign_in: driver.session(),
+        key: GOAL_KEY,
+        ask: jig_domain_people::Ask::Create { project: GOAL_PROJECT, batch },
+    }));
+    driver.settle();
+    let mut reply = None;
+    for delivery in driver.delivered.iter().rev() {
+        if let engine::Delivery::WebReply { reply: value, .. } = delivery {
+            reply = Some(value);
+            break;
+        }
+    }
+    let Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Created { first, .. })) = reply else {
+        panic!("goal creation expected: {reply:?}");
+    };
+    *first
+}
+#[must_use]
+pub fn task_page(task: u64) -> temper_client_domain::Address {
+    temper_client_domain::Address::Task { task }
+}
+#[must_use]
+pub fn plan_item(task: u64, status: &[u8]) -> skein_fake_person::Find {
+    use skein_fake_person::{Find, Target};
+    Find::named(skein_ui::Role::Status, status).within(Box::new([Target::ExactRole {
+        role: skein_ui::Role::TreeItem,
+        name: format!("Task {task}").into_bytes().into_boxed_slice(),
+    }]))
+}
+const FORGE_CONNECTOR: u16 = 0;
+const NO_TOOLS: u64 = 0;
+const FORGE_PROCEDURE: u32 = 2;
+const FORGE_CHANGE: u16 = 1;
+const REPORT_BYTES: u32 = 32;
+/// A tracked procedure root whose chip names its forge-owned panel.
+pub fn goal_with_forge_panel(front: &mut Joint) -> u64 {
+    *front = Joint::with_procedures(SEED, &domain_limits());
+    make_goal(front, true)
+}
+
+const ADOPT_FORGE: u16 = 1;
+const ADOPT_REPLY: Token = Token::new(1203);
+const ADOPT_KEY: [u8; 16] = [43; 16];
+const ADOPT_DIGEST: [u8; 32] = [43; 32];
+const REPOSITORY_PARAMETER: u32 = 1;
+const GOAL_REPOSITORY: u64 = 7;
+fn adopt_goal_repository(driver: &mut Driver) {
+    let mut request = temper_engine_domain_world::fixtures::adoption(ADOPT_FORGE);
+    request.owner = b"acme".as_slice().into();
+    request.name = b"shop".as_slice().into();
+    driver.send(engine::Event::Party(engine::PartyInput::Application {
+        scope: jig_domain_people::ApplicationScope::Project(GOAL_PROJECT),
+        reply_to: skein_lib::ReplyTo::new(ADOPT_REPLY),
+        sign_in: driver.session(),
+        key: ADOPT_KEY,
+        digest: ADOPT_DIGEST,
+        request,
+    }));
+    driver.settle();
+}
