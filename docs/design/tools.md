@@ -358,11 +358,25 @@ area lands with its stories (section 11).
 |---|---|
 | `sign-in FILE\|-` | signs in by the link `temper serve` printed, read from FILE, or from stdin for `-`; writes `token` and `address` (8.1) |
 | `sign-out` | ends the sign-in and erases the token |
-| `pending` | lists what DIRECTORY's store keeps: each request's key, its tool and when it was first sent |
+| `pending` | lists what DIRECTORY's store keeps: each request's operation, its party and when it was first sent, and how many records these tools cannot read |
 | `help [TOOL]` | the guide, then the tools (11.5); with TOOL, its record of the table |
 
 - **`pending` reads the store's file only:** it takes no lock, starts
   no client and sends nothing (8.3).
+- **A `pending` row** is a line each: the request's operation, as a
+  `kept:` line names it (6.1); its party, `party N`; and when it was
+  first sent, in temper's words for a wall time, or `not sent` (skein's
+  `lib.md`, section 12). No name and no key, as a `kept:` line prints
+  none. Under `--json`: `pending`, rows of `operation`, `party` and
+  `first_sent`, a wall time as jig's integer, or `null`; and `unread`.
+- **A record these tools cannot read,** of a store version, or of a
+  family's owner or version, that they do not declare, is counted, never
+  listed: jig's client reads nothing of such a record, drops it at start
+  and says how many (jig's `protocol/client.md`, section 10), and
+  `pending` says what a call's client will. Its line, `N kept records
+  these tools cannot read; a call that sends drops them`, follows the
+  rows, and the call exits 0. A file that is not a small store's at all
+  exits 1, "DIRECTORY's store cannot be read".
 - **A TEXT of `-`** is read from stdin, to its end. A call takes at
   most one `-`, and none with `--call -`; otherwise it is a usage
   error.
@@ -401,11 +415,16 @@ digest: task 7c1e09a2b44f0d13
   first: by ada, accepted, 14:02`; for `adopt`, `client.md`, 4.7's
   words.
 - **What a call sends first** (8.2, step 4) prints on stderr, a line
-  each: `kept: `, the request's name where it has one, and its
-  operation, jig's or the forge's (`stop`, `adopt`), then its outcome
-  as an act's prints, which names what it made or decided. No key is
-  printed: the client's is the runner's, and the engine's is drawn or a
-  name's digest, neither of use to an agent.
+  each: `kept: `, the request's operation, jig's or the forge's (`stop`,
+  `adopt`), then its outcome as an act's prints, which names what it
+  made or decided. No name and no key: a request's record keeps the
+  engine's key, drawn or a name's digest, and the client's, the
+  runner's (jig's `protocol/client.md`, section 10), never the name,
+  and neither key is of use to an agent.
+- **What it does not send** prints a line on stderr too: another
+  party's kept requests, `kept: N for party P, unsent while it is not
+  signed in here` (8.2); the records the client dropped at start,
+  `dropped: N kept records these tools cannot read` (5.6).
 
 ### 6.2 JSON
 
@@ -420,14 +439,15 @@ may change with them.
   `decide`'s are `proposal`, or `task` and `hold`, then `outcome` and
   `reason`.
 - **The `kept:` lines,** under `--json`, are one JSON object a line on
-  stderr: `name`, or `null`; `operation`; `outcome`, as the act's.
+  stderr: `operation` and `outcome`, as the act's; another party's,
+  `party` and `unsent`; the dropped, `dropped`.
 
 ### 6.3 Exit status
 
 | Status | Meaning | Prints |
 |---|---|---|
 | 0 | a read answered, an act done or proposed, a wait's condition met | the result |
-| 1 | the call failed: usage, the directory refused or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention, not kept (DIRECTORY's store not written); the client's own answers alike, a read past its limits among them; a wait's watch ended by the sign-in's end | one line on stderr, `temper ctl: ...` |
+| 1 | the call failed: usage, the directory refused, its store unreadable (5.6), or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention, not kept (DIRECTORY's store not written); the client's own answers alike, a read past its limits among them; a wait's watch ended by the sign-in's end | one line on stderr, `temper ctl: ...` |
 | 2 | refused by the engine, and only by it: a key conflict among them (section 7); a wait's subject no longer visible to the party | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
 | 3 | a wait's timeout, or its subject's watch ended, its condition not met | the current document, or the last, and its digest |
 
@@ -492,7 +512,8 @@ may change with them.
 - **A name the client holds already** is answered `Held`, nothing sent
   (jig's `client/domain/client.md`, section 6). A call sends what
   DIRECTORY kept, and waits for each answer, before it sends its own
-  (8.2), so it meets `Held` only past that; it exits 1.
+  (8.2), so it meets `Held` only past that, or for a name another
+  party's parked request holds (8.2); it exits 1.
 - **Names are the party's.** Agents sharing a party give their names a
   prefix of their own; the guide says so (11.5).
 - **Acts that decide name the revision the agent saw;** a moved one is
@@ -545,9 +566,10 @@ as the terminal's host is:
 2. open DIRECTORY and check its address (8.1); for a call that sends,
    take its lock (8.3) and load the small store's records;
 3. start the tools' root, sign in with the token, wait for `me`;
-4. send what the store kept, each answered as a line on stderr, `kept:
-   ...` (6.1); the step ends once each is answered and its record
-   erased, so that the store keeps nothing when the call is sent;
+4. send what the store kept for `me`'s party, each answered as a line
+   on stderr, `kept: ...` (6.1); the step ends once each is answered
+   and its record erased, so that the store keeps nothing of the
+   party's when the call is sent;
 5. run the call: a read answered, an act's answer durable, a wait's
    condition met or its timeout;
 6. print the result on stdout, close the stream, exit with the call's
@@ -560,6 +582,11 @@ as the terminal's host is:
 - **A link down** past the link's deadline (section 12), at step 3, 4
   or 5, exits 1; what was sent stays in the small store, as after a
   signal.
+- **Another party's kept requests,** in a DIRECTORY signed in again as
+  another party, stay parked and unsent, until their party signs in
+  there again or the retention passes and they are answered unknown
+  (jig's `client/domain/client.md`, section 11). Step 4 does not wait
+  for them; the call says how many (6.1) and goes on.
 - **`pending`** lists what the small store keeps (5.6).
 
 ### 8.3 Several calls at once
@@ -675,7 +702,11 @@ everything settled. Then a service restart retains the work. A call
 whose answer was lost is made once: the tools' root is dropped once
 the engine holds its request, before its answer, and a fresh one, on
 another DIRECTORY signed in as the same party, asks under the same name
-and is answered the first answer; the party has one chat. The forge's
+and is answered the first answer; the party has one chat. A
+DIRECTORY whose store holds a record of a store version the tools do
+not read: `pending` counts it, and the next call that sends says it
+dropped it. One signed in again as another party: the first party's
+kept request stays unsent, and the call goes on. The forge's
 stories adopt a repository, and clone, push and land through the fake
 git program on the shared in-memory fake forge, with CI by the fake
 forge's content marker and its webhooks delivered to the engine
