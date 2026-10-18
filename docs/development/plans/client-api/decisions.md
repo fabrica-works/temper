@@ -2701,6 +2701,15 @@ choice would have been the user's (development.md, 10.4).
      2. **The session** then reruns the story's focused log on that `main` before any repair: a cause the repin removed needs no commit, and the report says so; the others go as the file's Shape says.
      3. **Unchanged:** the file's Shape, Test shape, Proof, Size and Don't; ruling 229; the steer of 12:20Z, point 2, which counts from temper-05.s1's landing.
 
+353. **temper-04.s1's server ends a held call in the drain** (process, temper-04.s1's block of 2026-10-18T12:41:30Z).
+     Ruling 353, process, within ruling 346's point 2, its first branch: the log names temper's own HTTP server in the drain, so the repair is temper's, in s1's increment. `protocol/service.md`, 5, "A shutdown drains", point 4: "Each component closes, its peers told, and reports closed."
+
+     1. **The repair:** in the drain, a connection whose call has nothing left to send and whose clients' component has closed is ended as the drain ends the others (`crates/temper-service/src/server.rs`, `end`), so its stall deadline goes with it. Where call `Token(279)` should have been finished, the server or its mount adapter (`clients.rs`), is the log's to say; change only what it names. A call that still has a response to send is sent first, as now.
+     2. **The test:** reproduce it first in a focused test of the server, a closing phase with a held call and nothing queued (ruling 229); it stays as the step's test.
+     3. **Every leftover at once:** in each focused run from now, log every policy deadline the host holds at teardown, with its owner, not only the first. If any remains after this repair, report them all in one block and stop.
+     4. **Bound:** three focused runs and 30 minutes from this unblock; ruling 339's 200 lines, ruling 351's abort included; each file outside the Files named in the commit body.
+     5. **Unchanged:** every deadline's value, the stall bound among them; the referee's check; the `Server::stop` patch stays out; ruling 351's points 1, 2 and 5.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
