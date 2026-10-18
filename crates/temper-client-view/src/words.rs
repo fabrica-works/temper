@@ -17,6 +17,14 @@ pub enum Word {
     Message,
     Send,
     Stop,
+    Close,
+    CloseGrace,
+    CloseGraceNanos,
+    CloseNow,
+    DelegateCancel,
+    DelegateMove,
+    CancelDelegate,
+    TakeDelegate,
     Older,
     StartChat,
     Start,
@@ -91,13 +99,21 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 78] = [
+const ALL: [Word; 86] = [
     Word::RunBegan,
     Word::RunEnded,
     Word::LinesLeft,
     Word::Message,
     Word::Send,
     Word::Stop,
+    Word::Close,
+    Word::CloseGrace,
+    Word::CloseGraceNanos,
+    Word::CloseNow,
+    Word::DelegateCancel,
+    Word::DelegateMove,
+    Word::CancelDelegate,
+    Word::TakeDelegate,
     Word::Older,
     Word::StartChat,
     Word::Start,
@@ -174,6 +190,14 @@ const ALL: [Word; 78] = [
 impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::CancelDelegate => 157,
+            Self::TakeDelegate => 158,
+            Self::Close => 153,
+            Self::CloseGrace => 154,
+            Self::CloseGraceNanos => 159,
+            Self::CloseNow => 160,
+            Self::DelegateCancel => 155,
+            Self::DelegateMove => 156,
             Self::RunBegan => 150,
             Self::RunEnded => 151,
             Self::LinesLeft => 152,
@@ -295,8 +319,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(184);
-        let mut phrases = List::with_capacity(184);
+        let mut shapes = List::with_capacity(192);
+        let mut phrases = List::with_capacity(192);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -351,9 +375,9 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 184,
+            phrases: 192,
             holes: 3,
-            segments: 686,
+            segments: 716,
             text_bytes: 6144,
             hole_bytes: joined.max(513),
         };
@@ -391,6 +415,14 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
         Word::LinesLeft => (&[b"Earlier lines omitted ", b""], &[Number]),
         Word::Message => (&[b"Message"], &[]),
         Word::Send => (&[b"Send"], &[]),
+        Word::CancelDelegate => (&[b"Cancel delegate ", b""], &[Number]),
+        Word::TakeDelegate => (&[b"Take delegate ", b""], &[Number]),
+        Word::Close => (&[b"Close"], &[]),
+        Word::CloseGrace => (&[b"Close chat: allow ", b" seconds to finish, then cancel"], &[HoleKind::Span]),
+        Word::CloseGraceNanos => (&[b"Close chat: allow ", b" nanoseconds to finish, then cancel"], &[Number]),
+        Word::CloseNow => (&[b"Close chat now"], &[]),
+        Word::DelegateCancel => (&[b"Delegate ", b" will be cancelled"], &[Number]),
+        Word::DelegateMove => (&[b"Delegate ", b" will be moved to you"], &[Number]),
         Word::Stop => (&[b"Stop"], &[]),
         Word::Older => (&[b"Older"], &[]),
         Word::StartChat => (&[b"Start a chat"], &[]),

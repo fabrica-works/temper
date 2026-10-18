@@ -1891,6 +1891,7 @@ dependencies = [
  "jig-core-world",
  "jig-domain-authority",
  "jig-domain-core",
+ "jig-domain-host",
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",

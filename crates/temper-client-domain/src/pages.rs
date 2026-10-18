@@ -38,6 +38,11 @@ pub enum Act {
     },
     Send,
     Stop,
+    Close,
+    DelegateFate {
+        task: u64,
+        fate: jig_client::shapes::Fate,
+    },
     Older,
     ClosedChats,
     Filter {
@@ -113,6 +118,13 @@ impl Pages {
     pub const fn chat(&self) -> Option<&chat::Chat> {
         self.chat.as_ref()
     }
+    #[must_use]
+    pub fn cards(&self) -> Option<&skein_lib::List<inbox::Card>> {
+        if let Some(chat) = &self.chat { Some(&chat.cards) } else { Some(&self.inbox.as_ref()?.cards) }
+    }
+    pub(crate) fn cards_mut(&mut self) -> Option<&mut skein_lib::List<inbox::Card>> {
+        if let Some(chat) = &mut self.chat { Some(&mut chat.cards) } else { Some(&mut self.inbox.as_mut()?.cards) }
+    }
     pub(crate) fn seeded(seed: u64) -> Self {
         Self { serial: skein_lib::Rng::new(seed).next_u64(), ..Self::new() }
     }
@@ -180,18 +192,16 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Act {
-            act: act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm | Act::Cancel),
-        } => crate::acts::step(pages, env, act, out),
-        Event::Act { act: Act::Project { project } } => {
-            if let Some(me) = pages.me(client) {
-                for row in &me.projects {
-                    if row.project == project {
-                        pages.project = Some(project);
-                        break;
-                    }
-                }
-            }
-        }
+            act:
+                act @ (Act::Close
+                | Act::DelegateFate { .. }
+                | Act::Decide { .. }
+                | Act::CardWords { .. }
+                | Act::Again { .. }
+                | Act::Confirm
+                | Act::Cancel),
+        } => confirmation(pages, env, client, act, out),
+        Event::Act { act: Act::Project { project } } => choose_project(pages, client, project),
         Event::Act { act: Act::SignOut } => out.push(Request::Client(jig_client::Event::SignOut)),
         Event::Act { act: Act::Go { address } } => out.push(Request::Show { address }),
         Event::Told { told: Told::Changed { handle } } if handle == me_handle() => {
@@ -317,4 +327,69 @@ fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Req
         return false;
     }
     true
+}
+
+fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act, out: &mut Queue<Request>) {
+    let closing = match &pages.confirm {
+        Some(open) => open.act == jig_client::contract::ActKind::Cancel,
+        None => false,
+    };
+    match act {
+        Act::Close => {
+            if let Some(chat) = &mut pages.chat {
+                chat.prepare_close(client);
+                if chat.closing.is_some() {
+                    pages.confirm = Some(crate::acts::Confirm {
+                        object: jig_client::contract::ObjectKey::Task(chat.task),
+                        revision: None,
+                        act: jig_client::contract::ActKind::Cancel,
+                        again: None,
+                    });
+                }
+            }
+        }
+        Act::DelegateFate { task, fate } => {
+            if closing && let Some(chat) = &mut pages.chat {
+                chat.delegate_fate(task, fate);
+            }
+        }
+        Act::Confirm if closing => {
+            pages.confirm = None;
+            if let Some(chat) = &mut pages.chat {
+                chat.close(&mut pages.serial, out);
+            }
+        }
+        Act::Cancel => {
+            pages.confirm = None;
+            if let Some(chat) = &mut pages.chat {
+                chat.closing = None;
+            }
+        }
+        act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm) => {
+            crate::acts::step(pages, env, act, out);
+        }
+        Act::Project { .. }
+        | Act::SignOut
+        | Act::ChatWords { .. }
+        | Act::StartChat
+        | Act::MessageWords { .. }
+        | Act::Send
+        | Act::Stop
+        | Act::Older
+        | Act::ClosedChats
+        | Act::Filter { .. }
+        | Act::Seen
+        | Act::Go { .. } => unreachable!("only deciding acts routed here"),
+    }
+}
+
+fn choose_project(pages: &mut Pages, client: &Client, project: u32) {
+    if let Some(me) = pages.me(client) {
+        for row in &me.projects {
+            if row.project == project {
+                pages.project = Some(project);
+                break;
+            }
+        }
+    }
 }

@@ -83,10 +83,10 @@ pub fn revision(page: &ReadValue) -> Option<contract::Revision> {
     }
 }
 fn find_card(pages: &mut Pages, object: ObjectKey) -> Option<&mut Card> {
-    let inbox = pages.inbox.as_mut()?;
-    for index in 0..inbox.cards.len() {
-        if inbox.cards.get(index)?.object == object {
-            return inbox.cards.get_mut(index);
+    let cards = pages.cards_mut()?;
+    for index in 0..cards.len() {
+        if cards.get(index)?.object == object {
+            return cards.get_mut(index);
         }
     }
     None
@@ -130,6 +130,8 @@ pub(super) fn step(pages: &mut Pages, env: &Env<Limits>, act: Act, out: &mut Que
         Act::MessageWords { .. }
         | Act::Send
         | Act::Stop
+        | Act::Close
+        | Act::DelegateFate { .. }
         | Act::Older
         | Act::ChatWords { .. }
         | Act::StartChat
@@ -199,10 +201,10 @@ fn send(pages: &mut Pages, open: Confirm, out: &mut Queue<Request>) {
 }
 pub(super) fn told(pages: &mut Pages, told: &Told) -> bool {
     if let Told::Answered { key, outcome } = told
-        && let Some(inbox) = &mut pages.inbox
+        && let Some(cards) = pages.cards_mut()
     {
-        for index in 0..inbox.cards.len() {
-            let card = inbox.cards.get_mut(index).expect("bounded index");
+        for index in 0..cards.len() {
+            let card = cards.get_mut(index).expect("bounded index");
             if card.key == Some(*key) {
                 card.outcome = Some(outcome.clone());
                 return true;

@@ -150,8 +150,12 @@ pub(crate) fn main(
     jig_bindings: &mut JigBindings,
 ) {
     let Some(open) = root.pages().confirmation() else { return };
-    let Some(inbox) = root.pages().inbox() else { return };
-    for card in &inbox.cards {
+    if open.act == ActKind::Cancel {
+        close(b, root, words, jig, bindings);
+        return;
+    }
+    let Some(cards) = root.pages().cards() else { return };
+    for card in cards {
         if card.object != open.object {
             continue;
         }
@@ -209,4 +213,61 @@ pub(crate) fn progress_text(b: &mut Builder, jig: &jig_client_view::words::Words
             jig_client::Progress::Unknown => jig_client_view::intents::Progress::Unknown,
         },
     );
+}
+
+fn close(b: &mut Builder, root: &Domain, words: &Words, jig: &jig_client_view::words::Words, bindings: &mut Bindings) {
+    use jig_client::contract::Ask;
+    let Some(chat) = root.pages().chat() else { return };
+    let Some(Ask::Compound { operations, .. }) = &chat.closing else { return };
+    b.open(Role::Dialog);
+    b.name(&words.say(Word::Close, &[]));
+    jig.status(b, P::Dangerous, &[]);
+    if let Some(task) = chat.task(root.client())
+        && let Some(Effect::Cancel(impact)) = jig_client::facts::effect(task.acts.as_slice(), ActKind::Cancel)
+    {
+        jig_client_view::confirmation::impact_words(b, impact, jig);
+    }
+    close_choices(b, chat.task, operations, words, bindings);
+    b.close();
+}
+pub(crate) fn close_choices(
+    b: &mut Builder,
+    chat: u64,
+    operations: &skein_lib::List<jig_client::contract::Operation>,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    use jig_client::contract::Operation;
+    use skein_ui::phrases::Hole;
+    for operation in operations {
+        match operation {
+            Operation::Cancel { task, grace, .. } if *task == chat => match grace {
+                Some(grace) if grace.as_nanos() % 1_000_000_000 == 0 => {
+                    words.text(b, Word::CloseGrace, &[Hole::Span(*grace)]);
+                }
+                Some(grace) => words.text(b, Word::CloseGraceNanos, &[Hole::Number(grace.as_nanos())]),
+                None => words.text(b, Word::CloseNow, &[]),
+            },
+            Operation::Cancel { task, .. } => delegate(b, *task, Word::DelegateCancel, words, bindings),
+            Operation::Move { task, .. } => delegate(b, *task, Word::DelegateMove, words, bindings),
+            Operation::Message { .. }
+            | Operation::Amend { .. }
+            | Operation::Release { .. }
+            | Operation::Stop { .. } => {}
+        }
+    }
+    button(b, bindings, words, Word::Confirm, Act::Confirm);
+    button(b, bindings, words, Word::Cancel, Act::Cancel);
+}
+
+fn delegate(b: &mut Builder, task: u64, word: Word, words: &Words, bindings: &mut Bindings) {
+    use jig_client::shapes::Fate;
+    use skein_ui::phrases::Hole;
+    words.text(b, word, &[Hole::Number(task)]);
+    for (word, fate) in [(Word::CancelDelegate, Fate::Cancel), (Word::TakeDelegate, Fate::Move)] {
+        b.open(Role::Button);
+        b.name(&words.say(word, &[Hole::Number(task)]));
+        b.bind(bindings.insert(Act::DelegateFate { task, fate }));
+        b.close();
+    }
 }

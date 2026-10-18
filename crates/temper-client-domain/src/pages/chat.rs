@@ -9,6 +9,7 @@ pub enum Sending {
     Message,
     Stop,
     Seen,
+    Close,
 }
 #[derive(Debug)]
 pub struct Chat {
@@ -22,6 +23,8 @@ pub struct Chat {
     pub pending: List<(Key, Sending)>,
     pub outcome: Option<jig_client::Outcome>,
     pub seen: u64,
+    pub cards: List<super::inbox::Card>,
+    pub closing: Option<c::Ask>,
     pub final_task: Option<Box<c::Task>>,
 }
 impl Chat {
@@ -43,15 +46,20 @@ impl Chat {
             next: first.checked_add(2).expect("chat handles fit"),
             thread,
             words: Box::default(),
-            pending: List::with_capacity(3),
+            pending: List::with_capacity(4),
             outcome: None,
             seen: 0,
+            cards: List::with_capacity(limits.jig.objects),
+            closing: None,
             final_task: None,
         }
     }
     pub(crate) fn leave(&self, out: &mut Queue<Request>) -> u64 {
         for handle in [Some(self.document), Some(self.activity), self.run].into_iter().flatten() {
             unwatch(handle, out);
+        }
+        for card in &self.cards {
+            unwatch(card.handle, out);
         }
         self.next
     }
@@ -71,6 +79,7 @@ impl Chat {
                 if let Some(Latest::Jig(c::Delivery::Task(task))) = latest(client, handle) {
                     read(self.activity, self.thread.document(task), out);
                     self.watch_run(task, out);
+                    self.proposals(task, out);
                 }
             }
             Told::Ended { handle, why: jig_client::Why::SubjectEnded | jig_client::Why::Unknown }
@@ -96,6 +105,7 @@ impl Chat {
                 if let Some(task) = task {
                     read(self.activity, self.thread.document(&task), out);
                     self.watch_run(&task, out);
+                    self.proposals(&task, out);
                     self.final_task = Some(task);
                 }
             }
@@ -127,6 +137,20 @@ impl Chat {
                 self.outcome = Some(outcome);
             }
             Told::Pending { key } if self.pending_key(key) => {}
+            Told::Page { handle, page } if self.card_handle(handle) => {
+                for index in 0..self.cards.len() {
+                    let card = self.cards.get_mut(index).expect("bounded card");
+                    if card.handle == handle {
+                        card.page = match page {
+                            Readout::Jig(c::ReadResult::Value(value)) => Some(value),
+                            Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => {
+                                None
+                            }
+                        };
+                        break;
+                    }
+                }
+            }
             Told::Link { .. }
             | Told::Pending { .. }
             | Told::Answered { .. }
@@ -141,6 +165,124 @@ impl Chat {
             self.thread.end_run();
         }
         true
+    }
+    fn card_handle(&self, handle: Handle) -> bool {
+        for card in &self.cards {
+            if card.handle == handle {
+                return true;
+            }
+        }
+        false
+    }
+    fn card(&self, object: c::ObjectKey) -> Option<&super::inbox::Card> {
+        for index in 0..self.cards.len() {
+            let card = self.cards.get(index)?;
+            if card.object == object {
+                return Some(card);
+            }
+        }
+        None
+    }
+    fn sending(&self, kind: Sending) -> bool {
+        for (_, pending) in &self.pending {
+            if *pending == kind {
+                return true;
+            }
+        }
+        false
+    }
+    fn proposals(&mut self, task: &c::Task, out: &mut Queue<Request>) {
+        for card in &self.cards {
+            let c::ObjectKey::Proposal(key) = card.object else { continue };
+            if !task.proposals.as_slice().contains(&key) {
+                unwatch(card.handle, out);
+            }
+        }
+        let mut ordered = List::with_capacity(self.cards.capacity());
+        for key in &task.proposals {
+            let object = c::ObjectKey::Proposal(*key);
+            if ordered.len() == ordered.capacity() {
+                break;
+            }
+            if let Some(card) = self.card(object) {
+                ordered.push(card.clone()).expect("retained cards fit");
+                continue;
+            }
+            let handle = handle(self.next);
+            self.next = self.next.checked_add(1).expect("chat handles fit");
+            ordered
+                .push(super::inbox::Card {
+                    object,
+                    group: c::InboxGroup::Proposals,
+                    project: Some(task.project),
+                    position: None,
+                    handle,
+                    page: None,
+                    words: None,
+                    key: None,
+                    outcome: None,
+                })
+                .expect("bounded cards");
+            read(handle, Some(c::Read::Proposal { proposal: *key }), out);
+        }
+        self.cards = ordered;
+    }
+
+    pub(crate) fn prepare_close(&mut self, client: &Client) {
+        self.closing = None;
+        let Some(task) = self.task(client) else { return };
+        if !allowed(task, c::ActKind::Cancel) || self.sending(Sending::Close) {
+            return;
+        }
+        let Some(Latest::Jig(c::Delivery::Me(me))) = latest(client, super::me_handle()) else { return };
+        let mut delegates = List::with_capacity(task.delegates.len());
+        for delegate in &task.delegates {
+            delegates
+                .push(jig_client::shapes::Delegate { task: delegate.chip.task, fate: jig_client::shapes::Fate::Cancel })
+                .expect("delegates fit");
+        }
+        let reason = c::Text::new(Box::from(*b"Chat closed"), u32::MAX).expect("bounded close reason");
+        self.closing = jig_client::shapes::close_chat(me, task.project, self.task, delegates.as_slice(), reason).ok();
+    }
+    pub(crate) fn delegate_fate(&mut self, task: u64, fate: jig_client::shapes::Fate) {
+        if let Some(c::Ask::Compound { project, operations }) = &mut self.closing {
+            for index in 0..operations.len() {
+                let operation = operations.get_mut(index).expect("bounded operation");
+                match operation {
+                    c::Operation::Cancel { task: number, reason, .. }
+                    | c::Operation::Move { task: number, reason, .. }
+                        if *number == task && task != self.task =>
+                    {
+                        *operation = match fate {
+                            jig_client::shapes::Fate::Cancel => {
+                                c::Operation::Cancel { project: *project, task, reason: reason.clone(), grace: None }
+                            }
+                            jig_client::shapes::Fate::Move => {
+                                c::Operation::Move { project: *project, task, reason: reason.clone() }
+                            }
+                        };
+                        break;
+                    }
+                    c::Operation::Message { .. }
+                    | c::Operation::Amend { .. }
+                    | c::Operation::Cancel { .. }
+                    | c::Operation::Release { .. }
+                    | c::Operation::Stop { .. }
+                    | c::Operation::Move { .. } => {}
+                }
+            }
+        }
+    }
+    pub(crate) fn close(&mut self, serial: &mut u64, out: &mut Queue<Request>) {
+        let Some(ask) = self.closing.take() else { return };
+        if self.sending(Sending::Close) {
+            return;
+        }
+        *serial = serial.checked_add(1).expect("chat keys fit");
+        let key = Key { asker: Owner::Pages.asker(), number: *serial };
+        self.pending.push((key, Sending::Close)).expect("one close fits");
+        self.outcome = None;
+        out.push(Request::Client(jig_client::Event::Send { key, request: jig_client::Ask::Jig(Box::new(ask)) }));
     }
     fn watch_run(&mut self, task: &c::Task, out: &mut Queue<Request>) {
         if let c::ChipPhase::Owner {
@@ -200,6 +342,8 @@ impl Chat {
             | Act::Again { .. }
             | Act::Confirm
             | Act::Cancel
+            | Act::Close
+            | Act::DelegateFate { .. }
             | Act::Go { .. } => unreachable!("only conversation acts routed here"),
         }
     }
@@ -215,7 +359,7 @@ impl Chat {
             Sending::Seen if self.thread.loaded > self.seen => {
                 c::Ask::Seen { through: c::SeenThrough::Conversation { task: self.task, through: self.thread.loaded } }
             }
-            Sending::Message | Sending::Stop | Sending::Seen => return,
+            Sending::Message | Sending::Stop | Sending::Seen | Sending::Close => return,
         };
         for (_, pending) in &self.pending {
             if *pending == kind {
@@ -248,9 +392,14 @@ pub fn thread_limits(limits: &Limits) -> jig_client::thread::Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     jig_client::thread::worst_case(&thread_limits(limits))?
-        .checked_add(List::<(Key, Sending)>::worst_case(3)?)?
+        .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
         .checked_add(u64::from(limits.jig.text))?
-        .checked_add(limits.jig.document_bytes)
+        .checked_add(limits.jig.document_bytes)?
+        // Refresh can briefly retain old cards beside their replacements.
+        .checked_add(super::inbox::worst_case(limits)?)?
+        // A received task's delegate list is bounded by its document bytes.
+        .checked_add(List::<c::Operation>::worst_case(u32::try_from(limits.jig.document_bytes).ok()?.checked_add(1)?)?)?
+        .checked_add(u64::from(u32::try_from(limits.jig.document_bytes).ok()?.checked_add(1)?).checked_mul(11)?)
 }
 fn handle(number: u64) -> Handle {
     Handle { asker: Owner::Pages.asker(), number }

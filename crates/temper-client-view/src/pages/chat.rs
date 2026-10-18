@@ -42,6 +42,9 @@ pub(crate) fn main(
         text(b, Role::Paragraph, task.chip.title.bytes());
         header(b, task, root.pages().me(root.client()), words);
         conversation(b, &chat.thread, root, words, jig, jig_bindings);
+        for card in &chat.cards {
+            crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
+        }
         if let Some(result) = &task.result {
             result_text(b, result, root, jig, jig_bindings);
         }
@@ -55,6 +58,7 @@ pub(crate) fn main(
             super::chats::outcome_text(b, jig, outcome, jig_bindings.text_limit());
         }
     }
+    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
     b.close();
 }
 fn result_text(
@@ -105,6 +109,9 @@ fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, binding
     }
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Stop) {
         control(b, bindings, Role::Button, &words.say(Word::Stop, &[]), Act::Stop);
+    }
+    if temper_client_domain::pages::chat::allowed(task, c::ActKind::Cancel) {
+        control(b, bindings, Role::Button, &words.say(Word::Close, &[]), Act::Close);
     }
     control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
     if let jig_client::thread::window::Edge::More(_) = chat.thread.lines.edges.after {

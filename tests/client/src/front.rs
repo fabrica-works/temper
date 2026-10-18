@@ -68,6 +68,29 @@ impl Joint {
         );
         Self::with_engine(seed, &limits, engine, 1)
     }
+    /// A chat's allotment leaves pool funding for the goal it proposes.
+    #[must_use]
+    pub fn with_goal_proposals(seed: u64, limits: client::Limits) -> Self {
+        let mut config = walking::config(seed);
+        let rules = config.core.authority.rules().clone();
+        let mut policy = config.core.authority.policy(1).expect("fixture project").clone();
+        policy.roles[0].authority.budget.spend = 150;
+        let mut domain =
+            jig_domain_authority::Domain::new(rules, *config.core.authority.limits()).expect("goal authority");
+        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(&mut domain, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
+        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+        config.core.authority = domain;
+        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        engine_limits.people.sign_ins = 3;
+        engine_limits.fleet.slots = 2;
+        engine_limits.fleet.attempts = 4;
+        engine_limits.journal.writes = 4096;
+        engine_limits.journal.deliveries = 64;
+        engine_limits.journal.held = 192;
+        let engine = Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES);
+        Self::with_engine(seed, &limits, engine, 2)
+    }
     pub(crate) fn with_questions(seed: u64, limits: &client::Limits) -> Self {
         use jig_domain_authority as authority;
         let mut config = walking::config(seed);
@@ -159,6 +182,11 @@ impl Joint {
         self.now = now;
         self.engine.env.now = now;
         self.engine.env.wall = Wall::from_nanos(now.as_nanos());
+        if let Some(deadline) = self.engine.root.next_deadline(&self.engine.env)
+            && deadline <= now
+        {
+            engine::fire(&mut self.engine.root, &self.engine.env);
+        }
     }
     fn send(&mut self, event: engine::Event) {
         if matches!(event, engine::Event::Party(engine::PartyInput::SignedIn { .. })) {
@@ -225,9 +253,8 @@ impl Joint {
                     Event::Root(RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }),
                 ));
             }
-            packets::Incoming::SignInAgain { .. } | packets::Incoming::SignInFailed { .. } => {
-                panic!("the deployment owner signs in")
-            }
+            packets::Incoming::SignInAgain { why, .. } => panic!("the deployment owner signs in again: {why:?}"),
+            packets::Incoming::SignInFailed { failure, .. } => panic!("the deployment owner signs in: {failure:?}"),
         }
     }
     fn packet(&mut self, request: engine::Request) {
@@ -267,7 +294,13 @@ impl Joint {
                 return;
             }
         }
-        panic!("joint engine did not settle");
+        panic!(
+            "joint engine did not settle: quiescent={}; returned={}; events={:?}; pending={:?}",
+            self.engine.root.quiescent(),
+            self.engine.returned,
+            self.engine.events,
+            self.engine.store.pending
+        );
     }
     fn drain(&mut self) {
         self.settle();
@@ -282,6 +315,18 @@ impl Joint {
         }
         let deliveries = std::mem::take(&mut self.engine.delivered);
         for delivery in deliveries {
+            if let engine::Delivery::Link { channel, down: jig_domain_host::LinkDown::Cancel { run, attempt } } =
+                &delivery
+            {
+                self.engine.answer(
+                    *channel,
+                    run.raw(),
+                    attempt.raw(),
+                    0,
+                    jig_domain_tasks::End::Parked,
+                    engine::Parts::none(),
+                );
+            }
             if self.answer_runs
                 && let engine::Delivery::Assigned { assignment, .. } = &delivery
             {

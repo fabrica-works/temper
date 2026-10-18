@@ -180,7 +180,7 @@ pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, s
     );
     (root, me)
 }
-fn root_at(
+pub(super) fn root_at(
     address: temper_client_domain::Address,
     limits: &Limits,
 ) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>) {
@@ -220,7 +220,7 @@ fn root_at(
         {
             if subject == Subject::Me {
                 watch = Some(token);
-            } else if let Subject::Inbox { .. } = subject {
+            } else if let Subject::Inbox { .. } | Subject::Task { .. } = subject {
                 inbox_watch = Some(token);
             }
         }

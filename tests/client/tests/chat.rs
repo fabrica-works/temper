@@ -65,3 +65,225 @@ fn prepared_chat_answer_reaches_the_pages_task_watch() {
     assert!(front.engine.task(task).is_none(), "the answer ends the real run");
     assert_eq!(chat.task(root.client()).expect("task document").chip.phase, jig_client::contract::Phase::Ended);
 }
+const PAST_CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(6);
+#[test]
+fn a_closed_chat_shows_under_closed_in_the_chats() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let task = fixtures::chat(world.front(), b"A chat to close");
+    let person = world.client(fixtures::PARTY, fixtures::chat_page(task));
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Close"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Close") },
+            Step::See { find: Find::named(Role::Dialog, b"Close"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::Pause { span: PAST_CLOSE_GRACE },
+            Step::Press { find: Find::exactly_named(Role::Link, b"Chats") },
+            Step::See { find: Find::named(Role::Heading { level: 2 }, b"Closed"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"A chat to close"), within: fixtures::WITHIN },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    assert!(world.front().engine.task(task).is_none(), "the closed chat left live work");
+}
+const CLOSE_REQUEST: skein_lib::Token = skein_lib::Token::new(1107);
+const CLOSE_KEY: [u8; 16] = [37; 16];
+const CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(5);
+const AFTER_CANCEL_ANSWER: skein_lib::Time = skein_lib::Time::from_nanos(6_100_000_000);
+const AFTER_GRACE: skein_lib::Time = skein_lib::Time::from_nanos(6_000_000_000);
+#[test]
+fn a_prepared_close_expires_through_the_fronts_clock() {
+    use jig_client_world::harness::Front;
+    use temper_engine_domain::{self as engine, PartyInput};
+    let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
+    let task = fixtures::chat(&mut front, b"A chat to close");
+    front.engine.send(engine::Event::Party(PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(CLOSE_REQUEST),
+        sign_in: front.engine.session(),
+        key: CLOSE_KEY,
+        ask: jig_domain_people::Ask::Cancel {
+            project: 1,
+            task,
+            reason: b"Chat closed".as_slice().into(),
+            grace: Some(CLOSE_GRACE),
+        },
+    }));
+    front.engine.settle();
+    let _events = front.poll(AFTER_GRACE, skein_lib::Wall::from_nanos(AFTER_GRACE.as_nanos()));
+    let _events = front.poll(AFTER_CANCEL_ANSWER, skein_lib::Wall::from_nanos(AFTER_CANCEL_ANSWER.as_nanos()));
+    assert!(
+        front.engine.task(task).is_none(),
+        "grace timer ends live work: task={:?}; deadline={:?}; host={:?}; deliveries={:?}",
+        front.engine.task(task),
+        front.engine.root.next_deadline(&front.engine.env),
+        front.engine.host_requests,
+        front.engine.delivered
+    );
+}
+
+const PROPOSE_CALL: u64 = 1108;
+const PROPOSE_COMPLETION: u32 = 1;
+const PROPOSE_POSITION: u32 = 1;
+const PROPOSE_WORKER: skein_lib::Token = skein_lib::Token::new(7);
+const PROPOSE_BUDGET: u64 = 150;
+const GOAL_PRIORITY: u32 = 1;
+const BEFORE_INBOX_DECISION: skein_lib::Duration = skein_lib::Duration::from_millis(100);
+const AFTER_INBOX_DECISION: skein_lib::Duration = skein_lib::Duration::from_millis(500);
+fn proposed_goal(front: &mut temper_client_world::front::Joint) -> u64 {
+    use temper_engine_domain as engine;
+    *front = temper_client_world::front::Joint::with_goal_proposals(fixtures::SEED, fixtures::domain_limits());
+    let task = fixtures::chat(front, b"Propose a goal");
+    let run = front.engine.last_assignment();
+    let mut goal = temper_engine_domain_world::fixtures::report_delegate(b"A lasting goal", Box::new([]));
+    goal.authority.budget.spend = PROPOSE_BUDGET;
+    goal.tracked = Some(GOAL_PRIORITY);
+    front.engine.call(
+        PROPOSE_WORKER,
+        task,
+        run.attempt,
+        PROPOSE_CALL,
+        engine::Call {
+            completion: PROPOSE_COMPLETION,
+            position: PROPOSE_POSITION,
+            tool: engine::Tool::Propose {
+                action: engine::ProposedAction::Batch(Box::new([goal])),
+                reason: b"A lasting goal".as_slice().into(),
+                as_holder: true,
+            },
+        },
+    );
+    front.engine.settle();
+    assert!(
+        matches!(front.engine.answered(PROPOSE_CALL), Some(engine::CallAnswer::Proposed { .. })),
+        "run proposed a goal: {:?}",
+        front.engine.answered(PROPOSE_CALL)
+    );
+    task
+}
+#[test]
+fn the_goal_proposal_fixture_waits_for_the_chats_person() {
+    let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
+    let task = proposed_goal(&mut front);
+    assert!(
+        matches!(&front.engine.task(task).expect("chat").proposal,
+        Some(proposal) if matches!(proposal.state, jig_domain_tasks::ProposalState::Pending {
+            holder: jig_domain_tasks::ProposalHolder::Person(fixtures::PARTY), ..
+        })),
+        "pending: {:?}",
+        front.engine.task(task).expect("chat").proposal
+    );
+}
+#[test]
+fn a_goal_proposed_in_a_chat_accepted_in_the_inbox_leaves_the_chat() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let task = proposed_goal(world.front());
+    let chat = world.client(fixtures::PARTY, fixtures::chat_page(task));
+    let inbox = world.client(fixtures::PARTY, fixtures::inbox());
+    world.person(
+        chat,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Accept"), within: fixtures::WITHIN },
+            Step::Pause { span: AFTER_INBOX_DECISION },
+        ],
+    );
+    world.person(
+        inbox,
+        vec![
+            Step::Pause { span: BEFORE_INBOX_DECISION },
+            Step::See { find: Find::named(Role::Button, b"Accept"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Accept") },
+            Step::See { find: Find::named(Role::Dialog, b"Accept"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Accepted"), within: fixtures::WITHIN },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    assert!(world.root(chat).pages().chat().expect("chat").cards.is_empty(), "decided card left the live chat");
+    assert!(
+        world.front().engine.store.rows.values().any(|record| matches!(record,
+            temper_engine_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row)))
+            if row.requester == jig_domain_tasks::Party::Person(fixtures::PARTY)
+                && row.tracked == Some(GOAL_PRIORITY) && row.spec.words.as_ref() == b"A lasting goal"
+        )),
+        "engine holds the accepted goal"
+    );
+}
+
+const INBOX_CLIENT: jig_client_world::harness::ClientId = jig_client_world::harness::ClientId(1);
+#[test]
+fn the_proposal_fixture_admits_both_chat_and_inbox_clients() {
+    use jig_client_world::harness::Front;
+    let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
+    proposed_goal(&mut front);
+    for client in [DIAGNOSTIC_CLIENT, INBOX_CLIENT] {
+        front.bind(client, fixtures::PARTY);
+        front.poll(DIAGNOSTIC_NOW, DIAGNOSTIC_WALL);
+    }
+}
+
+type Probe = (temper_client_domain::Domain, skein_lib::Queue<temper_client_domain::Request>);
+const PROBE_ROUNDS: usize = 24;
+fn probe(address: temper_client_domain::Address) -> Probe {
+    use jig_client_world::harness::App;
+    use temper_client_world::app::Temper;
+    let limits = fixtures::domain_limits();
+    let (mut root, _) = Temper::new(fixtures::SEED);
+    let mut out = skein_lib::Queue::with_capacity(Temper::max_out(&limits));
+    Temper::step(
+        &mut root,
+        &skein_lib::Env { now: DIAGNOSTIC_NOW, wall: DIAGNOSTIC_WALL, limits },
+        Temper::start(address, Vec::new(), START_OFFSET),
+        &mut out,
+    );
+    (root, out)
+}
+fn pump(front: &mut temper_client_world::front::Joint, probes: &mut [Probe]) {
+    use jig_client_world::harness::{App, ClientId, Duty, Front};
+    use temper_client_world::app::Temper;
+    let env = skein_lib::Env { now: DIAGNOSTIC_NOW, wall: DIAGNOSTIC_WALL, limits: fixtures::domain_limits() };
+    for _ in 0..PROBE_ROUNDS {
+        for (index, (root, out)) in probes.iter_mut().enumerate() {
+            Temper::take(root, &env, out);
+            while let Some(request) = out.pop() {
+                if let Duty::Wire(request) = Temper::duty(request) {
+                    front.wire(ClientId(index), env.now, env.wall, request);
+                }
+            }
+        }
+        for (who, event) in front.poll(env.now, env.wall) {
+            front.received(who, &event);
+            let (root, out) = &mut probes[who.0];
+            Temper::step(root, &env, event, out);
+        }
+    }
+}
+#[test]
+fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
+    use jig_client_world::harness::Front;
+    use temper_client_domain::{Action, Event, pages::Act};
+    let mut front = temper_client_world::front::Joint::new(fixtures::SEED, fixtures::domain_limits());
+    let task = proposed_goal(&mut front);
+    let mut probes = vec![probe(fixtures::chat_page(task)), probe(fixtures::inbox())].into_boxed_slice();
+    for client in [DIAGNOSTIC_CLIENT, INBOX_CLIENT] {
+        front.bind(client, fixtures::PARTY);
+    }
+    pump(&mut front, &mut probes);
+    let object = probes[1]
+        .0
+        .pages()
+        .inbox()
+        .expect("inbox")
+        .cards
+        .as_slice()
+        .iter()
+        .find(|card| matches!(card.object, jig_client::contract::ObjectKey::Proposal(_)))
+        .expect("proposal")
+        .object;
+    let env = skein_lib::Env { now: DIAGNOSTIC_NOW, wall: DIAGNOSTIC_WALL, limits: fixtures::domain_limits() };
+    for act in [Act::Decide { object, revision: None, act: jig_client::contract::ActKind::Accept }, Act::Confirm] {
+        temper_client_domain::step(&mut probes[1].0, &env, Event::Act { action: Action::Pages(act) }, &mut probes[1].1);
+        pump(&mut front, &mut probes);
+    }
+    assert!(probes[0].0.pages().chat().expect("chat").cards.is_empty());
+}

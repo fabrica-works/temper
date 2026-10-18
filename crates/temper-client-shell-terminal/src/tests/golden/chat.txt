@@ -20,5 +20,6 @@ Conversation:
 [6] Message: (empty)
 [7] Send
 [8] Stop
-[9] Mark seen
-[10] Older
+[9] Close
+[10] Mark seen
+[11] Older

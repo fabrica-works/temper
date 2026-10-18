@@ -35,6 +35,7 @@ pub struct Fixture {
     pub client: Client,
     pub out: Queue<Request>,
     pub watch: Token,
+    pub me: Token,
 }
 pub fn opened() -> Fixture {
     let limits = limits();
@@ -57,19 +58,25 @@ pub fn opened() -> Fixture {
         &mut emitted,
     );
     let mut watch = None;
+    let mut me = None;
     while let Some(request) = emitted.pop() {
         if let jig_client::Request::Down {
             down: jig_client::Down::Open { watch: token, subject: Watchable::Jig(c::Subject::Task { .. }) },
         } = request
         {
             watch = Some(token);
+        } else if let jig_client::Request::Down {
+            down: jig_client::Down::Open { watch: token, subject: Watchable::Jig(c::Subject::Me) },
+        } = request
+        {
+            me = Some(token);
         }
     }
     let watch = watch.expect("task opened");
     deliver(&mut client, watch, task());
     while out.pop().is_some() {}
     chat.told(&client, Told::Changed { handle: chat.document }, &mut out);
-    Fixture { chat, client, out, watch }
+    Fixture { chat, client, out, watch, me: me.expect("automatic me watch") }
 }
 pub fn deliver(client: &mut Client, watch: Token, task: c::Task) {
     client.step(
@@ -89,4 +96,36 @@ pub fn handles(out: &mut Queue<Request>) -> Box<[Handle]> {
         }
     }
     handles.into_boxed()
+}
+pub const DELEGATE: u64 = 12;
+pub fn with_delegate() -> Fixture {
+    let mut fixture = opened();
+    let mut task = task();
+    task.acts = acts::offered(c::ActKind::Cancel, c::Admission::Allowed);
+    task.delegates = List::with_capacity(ONE);
+    let mut chip = task.chip.clone();
+    chip.task = DELEGATE;
+    task.delegates.push(c::LiveDelegate { chip, takeover_budget: 0 }).expect("delegate");
+    deliver(&mut fixture.client, fixture.watch, task);
+    let mut out = Queue::with_capacity(OUTPUTS);
+    fixture.client.step(
+        Time::ZERO,
+        Wall::EPOCH,
+        Event::Watch { handle: crate::pages::me_handle(), subject: Watchable::Jig(c::Subject::Me) },
+        &mut out,
+    );
+
+    fixture.client.step(
+        Time::ZERO,
+        Wall::EPOCH,
+        Event::Up {
+            up: jig_client::Up::Watched {
+                watch: fixture.me,
+                event: WatchEvent::Delivered(Delivery::Me(Box::new(chats::me()))),
+            },
+        },
+        &mut out,
+    );
+    while fixture.out.pop().is_some() {}
+    fixture
 }
