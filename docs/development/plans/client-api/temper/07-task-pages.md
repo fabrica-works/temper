@@ -78,12 +78,17 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   (`tests/one-process/src/stories.rs:109-112`) delegates the change as
   it does today.
 - **Pages not about the work:** once jig's reference UI goes, temper's
-  main says "Signed out." when the link is signed out (6.6), and jig's
-  words for the out-of-date state (jig's `words`, under temper's
-  phrasebook) when the engine does not serve this client's version of
-  jig's records; the banner keeps saying "Connecting" before `me`'s
-  first delivery (5.1). The link's states are `jig-client`'s `link()`
-  (jig's `client.md`, 8.2). temper adds no sentence of its own here.
+  main says "Signed out." when the link is signed out (6.6), a phrase
+  of temper's words: `jig-client`'s `words` has none for the link's
+  states (its `Word` is `Phase`, `Hold`, `Refusal`, `Waiting` and
+  `Status`, `crates/jig-client/src/words.rs:15-21`), and jig's are
+  `jig_client_view`'s (`crates/jig-client-view/src/words.rs:67-68`), which 07.4 removes. What the
+  main says when the engine does not serve this client's version of
+  jig's records is the designer's (asked at this session's ready check,
+  ruling 320): 07.4 takes it from the answer's amendment of this line.
+  The banner keeps saying "Connecting" before `me`'s first delivery
+  (5.1). The link's states are `jig-client`'s `link()` (jig's
+  `client.md`, 8.2).
 
 ## Rules that bind it
 
@@ -116,17 +121,23 @@ links to its task's page (`client.md`, 3.5).
 Needs: nothing beyond the session's start (temper 06).
 Files: `crates/temper-client-domain/src/pages/task.rs` (new), `pages.rs`,
 `address.rs` (`Address::Task { task }`); `crates/temper-client-view/src/pages/task.rs`
-(new), `forge.rs` (its part functions called from temper's page),
+(new), `forge.rs` (`pub fn drawn(builder, part, words)` split out of
+`part`, `:100`, which keeps its `side.contains` guard and calls it:
+temper's page, holding no slot, draws a part through `drawn`),
 `words.rs`; `crates/temper-client-shell-terminal/src/tests/golden/task.txt`
 (re-recorded by hand on temper's page); `tests/client/tests/task.rs`
 (new), `tests/client/src/fixtures.rs` (a goal with a plan, beside
-`held_chat` at :180).
+`held_chat` at :185).
 Shape:
-- `pages::task::Task { task: u64, document: Handle, tree: Handle,
-  activity: Handle, run: Option<Handle> }`, the handles under asker 2;
-  the kind of page (tracked, or header and plan only) decided from the
-  task document's tracked flag and executor's kind, the chat label from
-  `me`'s templates.
+- `pages::task::Task { number: u64, document: Handle, tree: Handle,
+  activity: Handle, run: Option<Handle>, shape: Shape }`, the handles
+  under asker 2 (a field `task` fails clippy's `struct_field_names`);
+  the kind of page (`Shape`: tracked, or header and plan only) decided
+  from the task document's `priority` (`jig_client_domain`'s
+  `contract::documents::Task`, `documents.rs:109`: `Some` for a tracked
+  task, jig's `contract.md`, "tracked | no | yes, with a priority") and
+  its chip's executor (`chip.executor`), the chat label from `me`'s
+  templates.
 - The view: `pages::task::{header, asked, plan, latest}`, each a region
   with its level-2 heading, after `task.html`'s order; the plan a tree
   of items, one per chip, its link named by the task's number.
@@ -222,35 +233,55 @@ Removes: nothing.
 
 Scope: `Adopt { project }` as one of temper's pages, in temper's frame:
 the form's nodes of 4.4 in its main, its title naming the project as
-`me` names it; jig's `after_page` no longer drawn after it; the
+`me` names it ("Adopt a repository into shop", `client.md`, 4.4 and
+its example in 6.4), where it says jig's "Project: Shop" today
+(`JigPhrase::Project`, `forge/page.rs:35`); jig's `after_page` no longer drawn after it; the
 navigation's "Adopt a repository" going to it (`client.md`, 4.3 to 4.5,
 5.2, 5.3).
 Needs: nothing beyond 07.1 (it changes other files; it may land before
 07.2).
-Files: `crates/temper-client-view/src/{root.rs, forge/page.rs (265
+Files: `crates/temper-client-view/src/{root.rs, forge/page.rs (269
 lines: `project_name` at its use of `root.jig()`), forge.rs}`;
 `crates/temper-client-domain/src/{route.rs, forge.rs}` (the forge's
 address goes to the forge side from temper's `Address::Adopt`, as 06.1
 moved it); the goldens `adopt_*.txt` (7 files at the base,
 `crates/temper-client-shell-terminal/src/tests/golden/`), whose frame
-lines change, by hand; `tests/client/tests/adoption.rs` (its 6 tests
-keep their names and expected values).
+lines and first line change, by hand: line 1 of each reads `==
+Adopt a repository into shop == Live`, as `client.md`, 4.4's example
+prints, where it says `Project: Shop`; the shell's
+`src/tests/fixtures.rs:133` passes the name alone, `b"shop"`; the view's
+`src/tests/forge_page.rs:31` expects "Adopt a repository into shop";
+`tests/client/tests/adoption.rs` (its 6 tests keep their names and
+expected values). Refresh any further copy of "Project: Shop" this
+increment's title changes, and list it in the commit body.
 Shape: `temper_client_view::forge::page::page(builder, form, project:
-&[u8], words, bindings)`, the project's name taken from `me` through
-the pages child (`pages::project_name(pages, client, project) ->
-Option<&[u8]>`), not from jig's reference UI.
+&[u8], words, jig, bindings, text_limit)`, its `jig` words and
+`text_limit` kept for `outcome` (`forge/page.rs:198`, its refusals at
+`:237` and `:242`), the project's name taken from `me` through the pages
+child (`pages::project_name(pages, client, project) -> Option<&[u8]>`),
+not from jig's reference UI. For a project `me` does not name (before
+its first delivery), the title keeps today's number
+(`JigPhrase::FrameProjectNumber`, `forge/page.rs:39`) in this increment:
+what it says once 07.4 removes jig's words is the designer's (ruling
+320).
 Test shape: the base's form and page tests
-(`crates/temper-client-view/src/tests/forge_page.rs`, 348 lines) keep
-their names and expected values but the frame's lines; one new view
-test:
+(`crates/temper-client-view/src/tests/forge_page.rs`, 343 lines) keep
+their names and expected values but the frame's lines and the title;
+one new view test, on the view's own fixtures (`view` `:148`, `build`
+`:155`, `find` `:159` of `src/tests/fixtures.rs`; temper-client-view
+does not depend on skein-fake-person):
 ```rust
 #[test]
 fn the_adoption_page_is_titled_with_the_project_me_names() {
-    let view = fixtures::built(&fixtures::adoption_page(fixtures::PROJECT, b"shop"));
-    let face = skein_fake_person::TreeFace::new(view.tree());
-    assert_eq!(face.names(Role::Heading { level: 1 }), ["Adopt a repository into shop"]);
+    let mut view = fixtures::view();
+    let root = fixtures::adoption_page(fixtures::PROJECT, b"shop");
+    let tree = fixtures::build(&mut view, &root);
+    let title = fixtures::find(tree, Role::Heading { level: 1 }, b"Adopt a repository into shop");
+    assert!(title.is_some(), "the title names the project as me names it");
 }
 ```
+(`fixtures::adoption_page`, a root on the adoption page whose `me`
+names `PROJECT`, is new in `src/tests/fixtures.rs`.)
 Proof: the joint world, once: `heavy cargo nextest run -p
 temper-client-world -E 'test(a_repository_adopted_from_the_navigation_link_is_held_by_the_engine)'`
 (under 0.5 s): the person adopts from the navigation's link on
@@ -278,31 +309,45 @@ recorded again by hand (`client.md`, 9; README, Done when, 8).
 Needs: 07.1, 07.3 (and 06.2 to 06.6, by the session's start).
 Files:
 - `crates/temper-client-domain/src/{route.rs, domain.rs, address.rs,
-  boundary.rs, limits.rs, parts.rs (goes), forge.rs (`Held`,
-  `Event::Show`, `Event::PartsLeft` go), lib.rs}`, `Cargo.toml`;
-- `crates/temper-client-view/src/{root.rs, limits.rs, words.rs}`,
+  boundary.rs, limits.rs, owner.rs (`Owner::Jig`), parts.rs (goes),
+  forge.rs (`Held`, `Event::Show`, `Event::PartsLeft` go), lib.rs}`,
   `Cargo.toml`;
-- `crates/temper-client-shell-terminal/src/{limits.rs, terminal.rs}`
-  and `crates/temper/src/open.rs` (the status region given to
-  `skein_ui_text::Settings` names temper's region alone, no region of
-  jig's), `Cargo.toml`, and
-  the goldens of jig's pages: `project.txt` and `deployment.txt` go
+- `crates/temper-client-view/src/{root.rs, limits.rs, words.rs,
+  forge.rs, forge/{bindings,page,words}.rs}` (the outcome's refusals in
+  `jig-client`'s words, `Word::refusal`, `crates/jig-client/src/words.rs:105`,
+  under temper's phrasebook), `src/tests.rs` (`:29`, `:56`, `:81`,
+  `:90-91` hold parts through `fixtures::part_text` and `part_tree`,
+  `src/tests/fixtures.rs:118-135`: they draw through 07.1's `drawn`, and
+  the test of a part not held goes with the held parts), `Cargo.toml`;
+- `crates/temper-client-shell-terminal/src/{limits.rs, terminal.rs,
+  client.rs, tests.rs}` (the status region given to
+  `skein_ui_text::Settings`, `terminal.rs:59` and `tests.rs:93` at the
+  base, wherever 06.1 left them, names temper's region alone, no region
+  of jig's), `src/tests/fixtures.rs` (`:18`, `:439`, `:564`),
+  `src/tests/render.rs:40-52`, `tests/support/mod.rs`, `Cargo.toml`,
+  and the goldens of jig's pages: `project.txt` and `deployment.txt` go
   with their tests; `signed_out.txt` recorded again on temper's main
   (by hand);
-- `tests/client/src/fixtures.rs:256` (`project()`, an address of jig's,
+- `tests/client/src/fixtures.rs:262` (`project()`, an address of jig's,
   becomes `Address::Inbox`, the stories pressing the navigation's
-  "Adopt a repository" there), `tests/client/Cargo.toml`;
+  "Adopt a repository" there) and its other users of jig's reference
+  UI, `tests/client/src/{app,translate}.rs`, `tests/client/Cargo.toml`;
 - `tests/one-process/src/stories.rs:15-46` (the goal given by a chat,
-  Choices; the adoption's steps from temper's navigation), `Cargo.toml`;
-- `crates/temper/tests/support/person.rs:231-279` (`adopt_and_change`
-  and `found` go to temper's addresses), `crates/temper/Cargo.toml`;
+  Choices; the adoption's steps from temper's navigation),
+  `tests/one-process/src/world.rs:213`, `Cargo.toml`;
+- `crates/temper/tests/support/person.rs:20` and `:231-279`
+  (`adopt_and_change` and `found` go to temper's addresses),
+  `crates/temper/Cargo.toml`;
 - the workspace `Cargo.toml` and `Cargo.lock`.
+  Each of these that 06.x has already moved is changed where 06.x left
+  it.
 Users found by `git grep -n -w -e jig_client_view -e 'Address::Jig' -e
 ShowPart -e PartsLeft -- '*.rs'` and `git grep -n jig-client-view --
 '*Cargo.toml'` in temper.
 Shape: no new type but temper's main for the link's states: `pages`
-shows "Signed out." or jig's out-of-date words (Choices) when
-`jig-client`'s `link()` says so, in place of the page at the address.
+shows "Signed out." (temper's words) or the out-of-date main (Choices:
+the designer's answer, ruling 320) when `jig-client`'s `link()` says
+so, in place of the page at the address.
 Each match on the root's children loses the reference UI's
 arm; `Address` loses `Jig`.
 Test shape: the view tests of the two mains in
@@ -311,11 +356,14 @@ fixtures; the reference test:
 ```rust
 #[test]
 fn signed_out_the_main_says_so_and_nothing_else() {
-    let view = fixtures::built(&fixtures::signed_out());
-    let face = skein_fake_person::TreeFace::new(view.tree());
-    assert_eq!(face.texts(Role::Main), ["Signed out."]);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &fixtures::signed_out());
+    assert_eq!(&*fixtures::main_text(tree), b"Signed out.");
 }
 ```
+(`fixtures::signed_out`, a root whose link is signed out, and
+`main_text`, the text of the main's nodes alone, beside `text` at
+`src/tests/fixtures.rs:94`, are new; `fixtures::built` takes no root.)
 Tests, each under 20 ms (unit) or 0.5 s (world):
 `signed_out_the_main_says_so_and_nothing_else`,
 `an_engine_not_serving_jigs_version_says_jigs_out_of_date_words`,
@@ -348,7 +396,7 @@ adds a page module of the same shape as 06's.
 ```rust
 // crates/temper-client-domain/src/pages/task.rs (07.1), checked at the ready check
 /// A task's page: the handles under asker 2, and what kind of page the task gets.
-pub struct Task { task: u64, document: Handle, tree: Handle, activity: Handle, run: Option<Handle>, shape: Shape }
+pub struct Task { number: u64, document: Handle, tree: Handle, activity: Handle, run: Option<Handle>, shape: Shape }
 /// What the task's page shows (client.md, 3.5).
 pub enum Shape {
     /// A tracked task: header, what was asked, plan, latest activity.
