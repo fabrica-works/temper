@@ -419,6 +419,18 @@ top-level `workers`, in the same order; standalone has one. Each:
   segments, 9, apart from its rows (jig's `client/domain/client.md`,
   section 14), so a page of the forge's work is never refused for a
   path, and a long path shows cut, with jig's mark (client.md, 5.4).
+- **The forge's authorities fit a document.** jig's documents carry an
+  authority's lists whole, with as many entries as the engine admits in
+  each, and neither cut nor refuse a document or an offer for one (jig's
+  `client/domain/contract.md`, 5.3), so a party who may amend a task
+  reads its document whatever `documents.lines` is. temper's client
+  takes an authority's entries, 12, apart from its rows (jig's
+  `client/domain/client.md`, section 14): the most the process tier
+  admits in a list, its `authority.grants` and `tasks.authority_grants`
+  of 12; the example admits at most the small profile's 8, its
+  `authority.implications`. A long authority shows in part, with jig's
+  mark (client.md, 5.4). The test above holds the engine's bounds on an
+  authority's lists to temper's client's.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,

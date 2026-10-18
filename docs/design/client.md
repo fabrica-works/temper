@@ -592,7 +592,14 @@ admits in a name (configuration.md, section 7), so a page of the
 forge's work is never refused for a path. A path longer than a node's
 text shows its last segments after jig's mark (jig's
 `client/domain/view.md`, section 7), which adds nothing to the view's
-limits.
+limits. An authority's entries have a bound of their own, 12, apart
+from the windows' rows (jig's `client/domain/client.md`, section 14),
+at least the most the engine admits in an authority's list
+(configuration.md, section 7), so a task's page is never refused for
+its authority, nor an amendment drafted from part of one. Each of an
+authority's lists shows at most the rows per window, then jig's mark
+(jig's `client/domain/view.md`, section 7), which adds nothing to the
+view's limits.
 
 ## 6. The terminal shell
 

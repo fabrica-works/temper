@@ -197,6 +197,79 @@ The answer to temper-04.3's question of 2026-10-18T05:45:00Z (jig
   (jig `documents/offers.rs:59-62`), waits on the designer's answer to
   the question of 2026-10-18T05:58:00Z, and the test asserts nothing of it.
 
+## Corrections after the designer's answer of 2026-10-18T06:20:06Z
+
+The answer to temper-04.4's question of 2026-10-18T05:58:00Z (jig
+35ab18732; temper's landing of this section).
+
+- **An authority crosses whole** (jig `client/domain/contract.md`, 5.3):
+  the engine never cuts an authority's lists at `documents.lines`, nor
+  refuses a task document or its Amend offer for one. Ruling 317's
+  reader stays. No temper code works around the refusal: the repair is
+  a jig step, then a temper step, which the supervisor adds and names
+  (the default: a jig supplement step after the newest landed jig step,
+  and `temper-04.s1` after it). The jig step needs nothing unlanded.
+- **The jig step,** on jig's main:
+  - Engine: `DocumentLimits` (`jig-domain-core/src/documents.rs:88`)
+    gains `grants`, `executors` and `implications`, derived where
+    `segments` is (`jig-protocol-config/src/overrides.rs:524`;
+    `profile/small.rs:158`, beside `name_segments`) and refused as
+    overrides as it is (`src/tests/overrides.rs:381`): the most of
+    `authority.grants` and `tasks.authority_grants`; the most of
+    `authority.executors` and `tasks.executor_kinds`;
+    `authority.implications`. `task_tree::authority`
+    (`documents/task_tree.rs:338-373`) sizes grants and notes' scopes by
+    `grants`, executors by `executors`, and cuts nothing;
+    `AuthorityLine.cut` goes, and `jig-protocol-engine-clients`'
+    `translate/owner.rs:262` writes the wire's `cut` false. These go:
+    `act_authority`'s refusal (`documents.rs:456-459`; its callers,
+    `acts/bounds.rs:76`, `:165`, `:168`, take `task_tree::authority`),
+    `task_tree.rs:736-745`, `documents/offers.rs:38`'s `!authority.cut &&
+    !ceiling.cut` and `:59-62`. `acts/bounds.rs:172-175` bounds
+    implications by `implications`; `offers.rs`'s grants check and
+    `heap_worst_case` take the new bounds.
+  - Link: `jig_client_domain::Limits` gains `authority` beside `rows` and
+    `segments`, 8 in jig's fixtures; each authority site of
+    `jig-client-protocol-link` that takes `client.rows` takes it instead
+    (`git grep -n rows -- crates/jig-client-protocol-link/src
+    ':!crates/jig-client-protocol-link/src/tests' | grep -E
+    'grant|kinds|note_resource|scopes|implication'` prints 17 lines: the
+    16 sites and `translate/asks.rs:213`'s signature). A document whose
+    authority the wire marks cut is refused, too large.
+  - View: `jig-client-view/src/owner_authority.rs`'s `body()` shows at
+    most `rows` entries of each list, then `AuthorityPhrase::Cut` once,
+    its English "More are held than shown"
+    (`owner_authority_words.rs:142`). `document_nodes` and
+    `worst_case_words` stay.
+  - Tests, one each: the engine serves a task document to its owner,
+    whose role holds `authority.grants` grants, at `documents.lines` 2,
+    with Amend `Admission::Bounded` and the role's grants whole; the link
+    decodes an authority of `authority` grants at `rows` 2 and refuses
+    one more, too large; the view shows `rows` grants and the mark for a
+    longer authority.
+  - Size: aim for at most 150 production lines; past it, the report
+    says why. Don't: change the wire's schema (client-v8); change what
+    `rows` bounds besides an authority's lists; raise `limits::compose`;
+    change creating's charters and procedures (`acts/bounds.rs:47-63`,
+    the plan's `later.md`).
+- **The temper step,** after the jig step's landing, repins to it
+  (README, "Pins"):
+  - `crates/temper-client-shell-terminal/src/limits.rs`: `authority: 12`
+    beside `segments: 9` (`:28`), the process tier's `authority.grants`
+    and `tasks.authority_grants`.
+  - `crates/temper/tests/configuration.rs`: three assertions after the
+    paths' (`:29`): the engine's `documents.grants`,
+    `documents.executors` and `documents.implications` each at most
+    `native.authority`.
+  - `tests/engine/domain/tests/forge_routes/paths.rs`:
+    `a_change_on_the_forges_deepest_branch_is_served_in_its_task_document`
+    first reads the producer's task document as the world's owner
+    (`policy.roles[0]`), before `sign_in_reader` (`:38`) takes its
+    session, and asserts it served with `Act::Amend`'s admission
+    `Admission::Bounded`; the reader's read stays.
+  - If the start refuses memory, `engine.memory_bytes` rises by what
+    the refusal names. Size: at most 10 production lines.
+
 ## Increments
 
 ### 04.1 `templates` in temper's configurations, in place of `chats`
