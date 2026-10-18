@@ -2444,6 +2444,9 @@ choice would have been the user's (development.md, 10.4).
      - Point 12: the coordinator hands an implementer over when it ends a turn past 100,000 tokens, between increments (development.md 7.3, step 4).
      - Ruling 309, point 3, amended: at each disk check, when `sudo -n btrfs filesystem usage /srv` shows unallocated below 10 GiB (not 5), the coordinator runs `sudo -n btrfs balance start -dusage=40,limit=10 /srv` once, then the usage line again, and logs both; it blocks (infrastructure) if it is still below 10 GiB. Seen: 11.20 GiB at 06:53:57Z, 1.20 GiB at 06:58:44Z, a cargo build taking 10 GiB in under five minutes.
 
+332. **jig-20's Shapes against main** (ready check of jig-20.1).
+     The ready check of jig-20 (skein 867095d14, jig 899bd8e68, temper 5cbbc1c0a; clippy on its sketches and skein's `skein-ui-web-tests`, and 20.2's and 20.3's pages in real Chromium under the `browser` profile; no whole-repository suite) found its file off main, corrected in `jig/20-attack-stories.md`, "Corrections after the ready check": the harness's `ServerAction::Stop` and the example's expected errors cited by symbol; `signed_out` is jig's "Sign in"; jig's stories give `expected` as the application's list plus `Failed to load resource`, since skein's replace it; the forging page's `fetch` calls end in `.catch`, without which it failed in Chromium; 20.5's stories take `Shown` pairs and `/test/panic`'s address; the sketches' functions take `#[must_use]`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

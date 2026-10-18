@@ -119,6 +119,50 @@ skein's stories for a browser shell that one person plays
   <the session's jig worktree> grep -n -i -w temper -- crates testing tests
   examples scripts` prints nothing at each jig increment's end".
 
+## Corrections after the ready check (ruling 332)
+
+The ready check (skein 867095d14, jig 899bd8e68, temper 5cbbc1c0a) found
+these; they replace what differs below. Code is named by path and
+symbol.
+- **20.1, "Killed":** the terminate signal of `Step::StopServer` is
+  `ServerAction::Stop` in skein's
+  `testing/skein-fake-person-browser/src/harness.rs`, the step in
+  `harness/script.rs`; not the child-exited handler.
+- **20.1, `signed_out`:** jig's sign-in page says "Sign in"
+  (`JigPhrase::SignInPage` in `jig-client-view/src/phrases/english.rs`,
+  shown by `pages/not_the_work.rs`), and no words to open the printed
+  link. `States::signed_out` is a `Find` of jig's `SignInPage` words;
+  its doc comment says so.
+- **20.2, the expected errors:** skein's
+  `tests/ui-web/tests/browser_example.rs` gives
+  `net::ERR_CONNECTION_REFUSED` and
+  `net::ERR_INCOMPLETE_CHUNKED_ENCODING` in its restart tests' own
+  `expected` lists, not in the `printed`/`restart` part of its Setup.
+- **20.3, `expected`:** skein's `stories.rs` replaces `expected` with a
+  story's own list; it adds nothing to the application's. jig's stories
+  build `expected` as the application's list plus `Failed to load
+  resource`.
+- **20.3, the forging page:** the second `fetch`, preflighted with
+  `Jig-Client`, is refused, and Chromium reports "Uncaught (in
+  promise)", which no `expected` holds. Both `fetch` calls end in
+  `.catch(() => {})`. With it, the page passed in real Chromium, same
+  site and other site; as written, it failed both.
+- **20.5:** `stories::back_and_forward` takes two `Shown { address,
+  sees }`, not paths: the inbox's (`/inbox`, its title) and a task's
+  (`/tasks/<n>`, its title), the task made before the story starts.
+  `stories::panic(setup, address, failed)` takes `/test/panic`'s address
+  too.
+- **Interface sketches:** each of the eight `pub fn` takes
+  `#[must_use]`, or clippy's `must_use_candidate` refuses it.
+- **Held:** every landed name the file gives; the guard order, header
+  values, `/jig` prefix and `SameSite=Strict` cookie of
+  `jig-protocol-engine-clients-http`; the 13 browser tests of "Done
+  when"; jig names temper nowhere. The reload order of 20.2 passed in
+  real Chromium. Not checked: the wire's, inbox rows' and printed
+  link's formats, 20.5's "application failed" words, and 20.1's
+  `Step::Reopen` against skein's `Step`; an implementer who finds one
+  off names it in its report.
+
 ## Increments
 
 ### 20.1 The kit, and a spent link signs the person out
