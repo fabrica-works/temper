@@ -986,7 +986,12 @@ per session are in each file.
     increment lands (README, Test time), whether or not your change made
     it slow. Time the test alone, cut the cost where the time goes, and
     give the before and after times in the report. Name each SLOW test of
-    your gate, except ruling 122's fuzzy walking sweep.
+    your gate, except ruling 122's fuzzy walking sweep. Except too
+    (ruling 378, the check of 16:35Z):
+    `an_adopted_repository_gets_its_change_pushed_through_git`, made
+    0.947 s alone by ruling 368, point 4, is not repaired again; a gate
+    that flags it under load is named in the report with its gate time
+    and its time alone.
   - 2026-10-18 13:34Z, point 4 (temper-06.6 and temper-07.1, until each
     lands; ruling 364): Size, temper 06.6 and 07.1: four steps of this
     part of the plan landed at 2.0 to 2.5 times their Size by ruling (330,

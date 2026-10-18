@@ -3017,6 +3017,9 @@ choice would have been the user's (development.md, 10.4).
 377. **Hold owned.json's memory_bytes until forge-setup's temper-14.s2** (steer of 2026-10-18T16:35Z).
      The director's request of 2026-10-18T16:33Z (temper's forge-setup run on x1): `serve_prepares_once_on_the_owned_example` fails on temper `main` in longer checkout paths ("workers[0].memory_bytes: the worst case passes memory_bytes by 8 bytes"), because the worker's worst case counts the document's resolved paths; forge-setup's designer is deciding the example's room for a person's directory, and forge-setup's `temper-14.s2` then sets owned.json's two `memory_bytes`. This run holds every edit to them until that step lands: the README's 13:34Z point 3 gains the hold. A refusal of a memory becomes a block (kind: process), so that a raise that cannot wait is ruled here and noted in `supervision.md` for the director.
 
+378. **The check of 16:35Z: test shape again, the adoption SLOW named, the channel SLOW to jig 20.1** (steer of 2026-10-18T16:48Z).
+     The check of 2026-10-18T16:35:16Z, three points. 1: the 11:42Z point 3 (one behaviour per test, every number a named const) said again, with 06.5's two two-behaviour chat tests and `clients_unwatch.rs`'s bare numbers seen; temper's sessions are among its "every later increment". 2: the README's 13:34Z point 2 gains one exception, `an_adopted_repository_gets_its_change_pushed_through_git`, already made 0.947 s alone by ruling 368, point 4, which a gate under load flags at 3.031 s: it is named, not repaired again. 3: jig-channel-world's `a_resumed_run_is_sent_only_its_current_window`, flagged SLOW by jig's gates since 11:53Z (0.693 to 0.941 s), is repaired under the 13:34Z point 1 by jig 20.1, the next jig increment to start; jig 19.5 lands with it named, as ruling 375, instruction 3, says, so that 19.5's chain is not delayed.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
