@@ -2245,6 +2245,13 @@ choice would have been the user's (development.md, 10.4).
      3. **Its users.** jig, at your review commit, names `http.body` only in `testing/jig-test-service/src/clients.rs:378` and `limits.rs:84`, the HTTP intake's: keep each on `clients_http.body`, or take `message_bytes` where it prices the component's share. temper's `crates/temper-service/src/clients.rs:314` copies `jig-test-service`'s worst case (`limits.http.body.checked_mul(64)`): temper 05.1's Files now say it follows that file as 17.3 lands it. Refresh any further copy, and list it in the commit body.
      4. Unchanged: 17.3's Scope, Files, Proof and Don't; 17.4's and 17.5's Sizes; ruling 312.
 
+315. **jig 17.3: main moved under the push** (infrastructure, jig-17.3's block of 2026-10-18T05:47:13Z).
+     Ruling 315: main moved under the push; nothing failed in the step. The designer's answer to the question of 05:45:00Z (jig `544a57091`, Markdown under `docs/design/` only) reached jig's main at 05:46:05Z while 17.3's gate ran. GitHub refused the push with "cannot lock ref 'refs/heads/main': is at 544a57091… but expected caeae1b06…", which `land` does not read as main moved (it matches only `non-fast-forward|fetch first|stale info`), so it exited 7 instead of starting again.
+
+     1. jig-17.3 runs `land` again in its worktree, with the same arguments as before. It rebases on `544a57091`, and since what moved main changed only Markdown under `docs/`, the tip's `Gate-Tree` still holds: `land` pushes without a new build or gate (`gated_before`). If it builds and gates after all, let it.
+     2. From now to the run's end, a `land` exit 7 whose push error says "cannot lock ref" is main moved: the coordinator has the step run `land` once more, without a block. A second exit 7 in a row is a block, with its log.
+     3. Unchanged: ruling 314; 17.3's commit and its report's numbers.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
