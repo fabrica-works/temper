@@ -2971,6 +2971,11 @@ choice would have been the user's (development.md, 10.4).
         command there, and `control` (`frame.rs:160`), the one helper that
         opens a role it is given (`rg -n '\.open\((role|r|kind)\)'`).
 
+375. **jig 19.5's fixture routes the stream record past the table referee** (process, jig 19.5's block of 2026-10-18T16:31:00Z).
+     Ruling 375, kind: process. The proposal is approved: in `tests/client-protocol/src/client.rs`, `Front::request`'s `Save` (`:125-132`) and the reload (`:296-303`) hand `Referee::stored` the 16-byte request records alone, and keep `STREAM_KEY`'s record in the store beside them; the small store's bound (`:165-168`) counts the request keys alone against `limits.domain.requests.requests`.
+     - This changes no referee check (ruling 229): `Referee::stored` (`:39-43`) records a request's key and scope for `keyed`, and no exchange is keyed by the stream's name. Ruling 373's part says it already: "a 16-byte key is a request; the stream's name warns of nothing", and `start_store` takes "that one record beside at most `requests.requests` of the table's".
+     - No designer: the design's stream name (`protocol/client.md`, 4) is unchanged; this is the fixture's routing, which ruling 373's Files missed.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
