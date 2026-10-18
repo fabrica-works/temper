@@ -890,6 +890,16 @@ run are appended after "For the user".
      Unchanged: 14.2's Files, checks (a) to (e), Size and Proof; 14.1 as landed. Refresh any further copy of the CLI's
      password line in a fixture that a suite shows failing, and list it in the commit body.
 
+148. **Two standing rules: a setup written once, a shared support function's users run** (hourly check of 2026-10-18T12:37Z).
+     Ruling 148, two standing rules in the README's "Rules of this plan", from the hourly check of 2026-10-18T12:37Z
+     (development.md, section 14.4): a setup written once (the second sighting of 11:34Z's point 7: 14.1's
+     `the_owned_example_fits_the_native_client` repeats its sibling's parse and four assertions; `owned_example` and
+     `boxed_example` repeat the lay and the write of `config.json`); and a shared support function changed, its users run
+     (14.1 rewrote `forgejo::configuration` and dropped the tier's `root.brief.gather_ms` 5000, running only the box's
+     stories). They bind temper 11 and 14 from their next increment. The steer of this check passes them on. Not a gate
+     check (skein b1d2276, point 6): temper has no `scripts/check.sh` yet (the workspace's AGENTS.md), and three steps are
+     left; a proposal for the retrospective.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

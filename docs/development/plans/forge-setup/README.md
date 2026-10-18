@@ -180,6 +180,14 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   limit or an id in a test is a named constant with its derivation beside it (the code's constant, the fixture's
   content, or the design's section). A limit is tested at the bound, which holds, and one past it, which does not, each
   in a test or row of its own. Landed tests that no increment touches stay.
+- **A setup written once (ruling 148; seen at 11:19Z and 12:37Z).** When two tests, or two helpers, would repeat
+  three lines or more (a parse and its assertions, a lay and a write of `config.json`), those lines are one named
+  function that takes what differs, and each test keeps its own name and its own further assertions. The hourly check
+  reads each landing's new tests for it. Landed tests that no increment touches stay.
+- **A shared support function changed, its users run (ruling 148; seen at 12:37Z).** An increment that changes a
+  `support` function that other stories call (`forgejo::configuration`, `owned::application`) lists each override or
+  member it drops or moves in its report, one line each, and runs the process tier once before landing; a story red on
+  `main` for a known cause stays red, with its cause named.
 
 ## Prerequisites the run checks at its start
 
