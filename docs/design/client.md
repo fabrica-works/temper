@@ -467,9 +467,10 @@ Then a button "Adopt", and below it the request's state or outcome.
 - **`Owner`:** temper's owners, one enum the engine's root and the
   client root share, with the functions from an owner to its number and
   back (jig's `client/domain/root.md`, section 15): `Forge`, `FORGE`'s
-  number; and `Pages`, temper's pages, 2, a number no connector takes,
-  never reused. `Pages` asks only for jig's operations, reads and
-  subjects, so no request, read or subject of its own reaches the
+  number; `Pages`, temper's pages, 2; and `Runner`, the agents' tools'
+  runner (`tools.md`, section 4), 3: numbers no connector takes, never
+  reused. `Pages` and `Runner` ask only for jig's operations, reads and
+  subjects, so no request, read or subject of their own reaches the
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first;
   it moves once per plan, at the first landing that changes one of

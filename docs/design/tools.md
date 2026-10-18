@@ -94,6 +94,7 @@ temper-client-tools          the table, a call, the runner, digests and conditio
 ├── jig-client               jig's client and its helpers (shapes, facts, thread, words)
 ├── temper-client-domain     the forge's client side (client.md, 3.1 and section 4) and its words (4.1, 4.7)
 ├── temper-client-protocol-wire  the forge family's records (client.md, 4.6)
+├── skein-ui                 phrases: jig's words and the tools' own, rendered as text
 └── skein-json               the JSON writer and tokenizer
 temper-client-shell-cli      the host: argv to a call, the one-shot host over jig-client-shell-native,
 │                            the directory's lock and address, printing, exit status
@@ -117,9 +118,13 @@ temper                       the binary: `temper ctl` runs the host
   `client/domain/root.md`, section 3): `jig-client` held; two children,
   each an owner and an asker, the runner and the forge's side; routing
   by asker. It holds no page and no view, as a service's root holds
-  none (jig's `client/domain/root.md`, section 11). Each call is the
-  runner's asker of its own, so several calls in flight need nothing
-  new of it.
+  none (jig's `client/domain/root.md`, section 11). The runner is one
+  owner, `Runner`, 3 (`client.md`, 4.6), and so one asker (jig's
+  `client/domain/root.md`, section 15). Each handle and key it gives
+  the client carries its call's number in the high 32 bits of its
+  number, calls numbered from one past the highest among the keys
+  kept at `Start`: several calls in flight need nothing new of the
+  root, and a new key never meets a kept one.
 - **Words:** jig's for jig's enums (`jig-client`'s `words`) and the
   forge's of `client.md`, 4.1 and 4.7, so an agent and a person name
   things alike. The view's overrides for its mockups stay the view's.
@@ -191,10 +196,10 @@ agent must name.
 |---|---|---|---|
 | `chat --project P TEXT` | starts a chat | `shapes::chat`, a `Create` | yes |
 | `message N TEXT` | words to a task | `Message` | yes |
-| `close N [--move D]...` | closes a chat: its live delegates cancelled, or moved to the party where named | `shapes::close_chat`, a compound request | yes |
+| `close N [--move D]... [--reason TEXT]` | closes a chat: its live delegates cancelled, or moved to the party where named; the reason empty unless given, as jig's reference UI sends it | `shapes::close_chat`, a compound request | yes |
 | `adopt --project P [--forge F] --owner O --name N --landing B [--role owned\|fork\|context] [--prefix X] [--no-home] [--no-ci] [--check G]...` | adopts a repository | the forge family's request (`client.md`, 4.4) | yes |
 | `answer N M TEXT` | answers question M of task N | `Answer` | |
-| `decide P/K accept\|reject\|pass-up [REASON]` | decides a proposal | `Decide` | |
+| `decide P/K accept\|reject\|pass-up [REASON]` | decides a proposal: P is `tN` for task N's, `pN` for party N's | `Decide` | |
 | `decide N --hold R release\|leave\|pass-up [REASON]` | decides an escalation | `Decide` | |
 | `release N --hold R [--again]` | lifts a hold | `Release` | |
 | `stop N` | cancels a task's run, the task held | `Stop` | |
@@ -202,9 +207,11 @@ agent must name.
 
 - **The arguments are jig's,** named as its operations name them, with
   the revisions they need (jig's `client/domain/contract.md`, 5.2): a
-  proposal by its number, an escalation and a release by the hold's
-  revision. An agent copies them from the acts a result printed (6.1);
-  it never has to know which an act needs.
+  proposal by its proposer and number, `t41/3` for task 41's third,
+  `p3/17` for party 3's seventeenth, as every result prints it, an
+  escalation and a release by the hold's revision. An agent copies them
+  from the acts a result printed (6.1); it never has to know which an
+  act needs.
 - **`adopt` takes the adoption form's fields and defaults** (`client.md`,
   4.4): forge 1, role `owned`, prefix `temper/`, the home and CI on.
   `--landing` names the landing branch. A context repository is never
@@ -230,22 +237,33 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
 
 - **The subject** is a watch's (jig's `client/domain/contract.md`, 7.1):
   `me`, `inbox`, `task N`, `tree N`, `run N`, or a task query as `tasks`
-  takes it.
+  takes it, with what its watch takes alone: `inbox` with no flag, the
+  inbox's watch being the party's whole inbox; `tasks` without
+  `--after` or `--ended`, `tasks{query}` following live tasks. Any
+  other is a usage error, exit 1.
 - **A digest** is the first 8 bytes of the SHA-256 (skein's `lib.md`,
   6.2) of the subject's document as `--json` prints it (6.2), without
-  its `digest` field, printed as 16 hex digits. Two calls of the same
-  tools, under the same limits, print the same digest for the same
-  document. jig's revisions move only with what a party decides about
-  (jig's `client/domain/contract.md`, 5.2), so they cannot say that a
-  document changed; the digest can, and needs nothing of jig. It is not
-  the mark the engine keeps per watch (jig's `client/domain/contract.md`,
-  7.2), which no tool prints.
+  its `digest` field, printed as 16 hex digits. A read and a wait digest
+  one form, the watch's document: for `inbox` and `tasks`, whose read is
+  a page and whose watch a window, the rows the watch's first window
+  holds, in its order, and whether more follow, within the tools' page
+  of rows (section 12). The read makes that form from its own rows and
+  prints its cursor beside it, outside the digest. A read's digest is
+  therefore a wait's first delivery's while nothing moved between them,
+  so a wait `--since` a read's digest never answers at once. Two calls
+  of the same tools, under the same limits, print the same digest for
+  the same document. jig's revisions move only with what a party decides
+  about (jig's `client/domain/contract.md`, 5.2), so they cannot say
+  that a document changed; the digest can, and needs nothing of jig. It
+  is not the mark the engine keeps per watch (jig's
+  `client/domain/contract.md`, 7.2), which no tool prints.
 - **Which reads print one:** a read whose arguments are a watch's
-  subject, with every wait's answer: `me`; `inbox` and `tasks` without
-  a cursor; `task N`; `run N`. `task N --tree --run` prints one for
-  each subject, `task N`, `tree N` and `run N`, each over its own part
-  of the result. `--activity`'s lines, `chat`, `activity` and `turn` are
-  pages, not subjects, and print none.
+  subject, with every wait's answer: `me`; `inbox` and `tasks` with the
+  arguments a wait takes (above); `task N`; `run N`.
+  `task N --tree --run` prints one for each subject, `task N`, `tree N`
+  and `run N`, each over its own part of the result. `--activity`'s
+  lines, `chat`, `activity` and `turn` are pages, not subjects, and
+  print none.
 - **`--since DIGEST`:** answered at the first delivery whose digest
   differs; without it, at the first change after the watch's first
   delivery.
@@ -259,7 +277,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   | `me` | `waiting` (something waits for the party) |
   | `inbox` | `waiting`; `updates` (an unread update) |
   | `task N` | `ended`; `waiting-on-me`; `held`; `replied` (a chat's run done for now); `phase:<phase>` |
-  | `tree N` | `waiting-on-me` (a proposal or a question below waits for the party); `ended` |
+  | `tree N` | `ended` |
   | `run N` | `ended` |
 
 - **`replied`** holds while a chat's status (jig's
@@ -268,25 +286,40 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   person's words (jig's `domain/tasks.md`, 8.3), so a wait begun once
   `chat` or `message` has answered is not met by the reply before them:
   `message 41 TEXT --key k`, then `wait task 41 --until replied`.
+- **`waiting-on-me`** covers task N's tree: what a task waits on is
+  computed over its tree (jig's `domain/tasks.md`, section 3), so a
+  question or a proposal below for the party meets it on `task N`, and
+  `tree N` needs no condition of its own.
 - **`phase:<phase>`** names the client's phase in lower case, hyphenated:
   `waiting`, `idle`, `due`, `preparing`, `claimed`, `running`,
-  `backing-off`, `active`, `closing`, `held`, `ended`, `done`, `failed`,
-  `cancelled`.
+  `backing-off`, `active`, `closing`, `held`. The ended phases, `ended`,
+  `done`, `failed` and `cancelled`, are never conditions: the engine
+  ends a task's watch as the task ends (jig's
+  `client/domain/contract.md`, 7.2), so a delivery may never show one.
+  `--until phase:done` and its kin are usage errors, exit 1, naming
+  `--until ended`.
+- **`ended`** is met by a delivery that shows the subject ended, or by
+  its watch's end because it ended. For `task N`, the answer is then the
+  task as a read of it gives it once ended, so it says how it ended.
 - **`--timeout`:** 300 seconds by default, at most 3600; answered with
   the current document, its digest, and that the condition is not met
   (6.3).
 - **A watch that ends under a wait** (jig's `client/domain/contract.md`,
   7.2) answers it: met where the condition is `ended` and the subject
   ended; refused where the party may no longer see the subject; failed
-  where the sign-in ended or the engine stopped; otherwise, not met,
-  with the last document and its digest (6.3).
+  where the sign-in ended; otherwise, not met, with the last document
+  and its digest (6.3). An engine that stops ends no watch: jig's
+  client opens again a watch the engine let go as it stopped (jig's
+  `client/domain/client.md`, 8.1), so the wait goes on while the
+  engine comes back, and fails as a link down past the link's deadline
+  (6.3, section 12).
 - **Level-triggered, as the watch is** (jig's
   `client/domain/contract.md`, 7.2): deliveries between are coalesced,
   and the answer is the document as it is when answered. A change before
   the wait began is in its first delivery, which `--since` compares.
 - **The loop:** `wait me --until waiting`; `inbox`; act; again. An agent
-  following one chat: `wait tree N --until waiting-on-me`, or `wait task
-  N --until ended`.
+  following one chat: `wait task N --until waiting-on-me`, or
+  `wait task N --until ended`.
 - **On a box,** the forge's webhooks make the engine's documents move
   soon after the forge does; with polling alone, the same waits answer
   later (`protocol/setup.md`, section 10).
@@ -364,11 +397,15 @@ digest: task 7c1e09a2b44f0d13
 - **Lists** print one line per row, its number first, then the cursor
   for the next page, or that there is none.
 - **An act's outcome** prints what was made or decided and its numbers:
-  `done: task 41, chat`; `proposed: 3/17, to maintainers`; `decided
+  `done: task 41, chat`; `proposed: p3/17, to maintainers`; `decided
   first: by ada, accepted, 14:02`; for `adopt`, `client.md`, 4.7's
   words.
 - **What a call sends first** (8.2, step 4) prints on stderr, a line
-  each: `kept: ` and its key, then its outcome as an act's prints.
+  each: `kept: `, the request's name where it has one, and its
+  operation, jig's or the forge's (`stop`, `adopt`), then its outcome
+  as an act's prints, which names what it made or decided. No key is
+  printed: the client's is the runner's, and the engine's is drawn or a
+  name's digest, neither of use to an agent.
 
 ### 6.2 JSON
 
@@ -383,17 +420,26 @@ may change with them.
   `decide`'s are `proposal`, or `task` and `hold`, then `outcome` and
   `reason`.
 - **The `kept:` lines,** under `--json`, are one JSON object a line on
-  stderr.
+  stderr: `name`, or `null`; `operation`; `outcome`, as the act's.
 
 ### 6.3 Exit status
 
 | Status | Meaning | Prints |
 |---|---|---|
 | 0 | a read answered, an act done or proposed, a wait's condition met | the result |
-| 1 | the call failed: usage, the directory refused or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention; a wait's watch ended by the sign-in's end or the engine's stop | one line on stderr, `temper ctl: ...` |
-| 2 | refused by the engine, a key conflict among them (section 7); a wait's subject no longer visible to the party | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
+| 1 | the call failed: usage, the directory refused or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention, not kept (DIRECTORY's store not written); the client's own answers alike, a read past its limits among them; a wait's watch ended by the sign-in's end | one line on stderr, `temper ctl: ...` |
+| 2 | refused by the engine, and only by it: a key conflict among them (section 7); a wait's subject no longer visible to the party | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
 | 3 | a wait's timeout, or its subject's watch ended, its condition not met | the current document, or the last, and its digest |
 
+- **2 is the engine's answer alone:** what it decided about the
+  request, with the alternatives it names. The client's own answers
+  are 1. Two of them never reach a call: unconfirmed, since the runner
+  sends nothing before `me` is live (8.2, step 3), and the client's key
+  conflict, since each call's keys are its own (section 4). Either is
+  the tools' bug: it exits 1, says so, and the guide says to report it
+  as a finding (11.5).
+- **A call cut by a signal** exits as the OS ends it: the tools catch
+  no signal, so its status is the OS's, never 0 (8.2).
 - **A call whose link stays down** past its deadline exits 1, and what
   it sent stays in the small store, for the next call that sends (8.2).
 - **`adopt`:** adopted exits 0, with branch protection unknown or not
@@ -437,6 +483,12 @@ may change with them.
   request only until it is answered (8.2). Past the engine's retention,
   which `me` prints, the name is free again, and asking under it is a
   new request.
+- **A named request is built from the call and `me` alone,** never from
+  the clock, so a rerun builds the same ask: a deadline a template gives
+  as a span is sent as that span, which the engine makes a wall when it
+  makes the task (jig's `client/domain/contract.md`, 3.2). A rerun
+  after `me` changed what the request is built from (a template, a
+  bound) is another ask, refused as a key conflict.
 - **A name the client holds already** is answered `Held`, nothing sent
   (jig's `client/domain/client.md`, section 6). A call sends what
   DIRECTORY kept, and waits for each answer, before it sends its own
@@ -501,9 +553,10 @@ as the terminal's host is:
 6. print the result on stdout, close the stream, exit with the call's
    status.
 
-- **A termination signal** stops the call; what it sent stays in the
-  small store, and the next call that sends sends it again under its
-  key.
+- **A termination signal** stops the call: the tools catch none, so its
+  exit status is the OS's. What it sent stays in the small store, the
+  next call that sends sends it again under its key, and a rerun under
+  its name gets its first answer (section 7).
 - **A link down** past the link's deadline (section 12), at step 3, 4
   or 5, exits 1; what was sent stays in the small store, as after a
   signal.
@@ -651,7 +704,8 @@ where possible; its seed does not replay the kernel's schedule.
 (`testing.md`, 2.6), on a scratch directory of their own, for what
 needs the executable: argv through `main`, printed output, the OS's
 exit statuses, the printed link read on stdin (`sign-in -`), an act cut
-by a termination signal then asked again under its key, made once, and
+by a termination signal, its status not 0, then asked again under its
+key, made once, and
 agent process launch. One landing on the owned Forgejo proves a change
 against real git and CI (`testing.md`, 2.6). The lock, DIRECTORY's files
 and a call's exit are the real loop's (11.3).
