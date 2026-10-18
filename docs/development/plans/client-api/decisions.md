@@ -3078,6 +3078,13 @@ choice would have been the user's (development.md, 10.4).
 387. **The check of 18:43Z: one report per landing, test shape, helpers once** (steer of 2026-10-18T18:44Z).
      The check of 2026-10-18T18:43Z, three points, in the README's "The run's steers" (2026-10-18 18:44Z, points 1 to 3). 1: one landing report per landing (07.2 and 19.5 filed three each, 06.6 two). 2: the 16:47Z point 1 again, not followed by 06.6 (`crates/temper-client-view/src/tests/chat.rs`, temper `689d89cf5`: four tests of two behaviours, two shared roots of about 55 and 60 lines inline); its landed tests are split when an increment next changes that file. 3: "A test's helpers once" again, for temper (`tree` defined in 14 test files, `document` and `page` in 9); copies in place are folded when an increment next touches their file.
 
+388. **temper 07.4 lands whole at up to 1,000 lines** (plan defect, temper 07.4's block of 2026-10-18T18:45:58Z).
+     Ruling 388, kind: plan defect. Yes, the proposal: 07.4 lands whole at up to 1,000 production lines added (removals not counted), with no question; past it, block with the count.
+     1. **The plan's 140 counted the removal alone.** temper's native pages still call the reference UI's renderers (`confirm.rs`, `pages/chat.rs`, `pages/inbox.rs`; Checked), and their replacements are temper's own: "Its pages, words, confirmations and navigation are temper's own" (`client.md`, section 1). A card's renderer written in temper is none of what the design forbids it to copy ("no client root, view root or native client of jig's").
+     2. **Whole, not in parts,** as the 13:34Z point 4 did for 06.6 and 07.1 (ruling 364): parts would keep `jig-client-view` in temper's manifests at a transitional end.
+     3. **Each replacement keeps today's words and tree:** the view tests and goldens pass unchanged, except those 07.4's Files name (jig's pages' goldens removed or recorded again). No behaviour removed, no test weakened. A renderer two pages share is written once (README, 2026-10-18 18:44Z, point 3).
+     4. **Give the count by file** in the commit and the report, name each file outside Files, and each lint exception with its reason.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
