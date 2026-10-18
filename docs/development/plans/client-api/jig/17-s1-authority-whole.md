@@ -59,3 +59,80 @@ Shape:
 
 Proof: land's gate (the three tests above are step tests). The
 repository downstream of jig repins to this step in its own step.
+
+## Corrections after the ready check (ruling 328)
+
+The ready check (skein 0be1255e7, jig 7d3becac7, temper 9ea74ad40)
+found the Shape off main in these places. They replace the Shape above
+where they differ.
+- **Engine, a second cut:** `documents/project_note.rs:175-214`
+  (`authority_line`) also cuts at `documents.lines` and sets `cut`. It
+  sizes grants and notes' scopes by `documents.grants` and executors by
+  `documents.executors`, and cuts nothing, as `task_tree::authority`
+  does. It joins the Files.
+- **Engine, `act_authority` stays** (`documents.rs:457-460`), a thin
+  wrapper over `task_tree::authority`, which is `pub(super)`
+  (`task_tree.rs:338`); `tests/document_offers.rs:60-100` calls it. Its
+  refusal goes, and `acts/bounds.rs` keeps calling it.
+- **Engine, the profiles:** `profile/standard.rs:98` spreads
+  `..small::DOCUMENTS`, so it sets the three derived fields from its own
+  `TASKS` and `AUTHORITY`, or `overrides.rs:80` refuses it.
+- **Engine tests, each literal that gains or loses a field:**
+  `AuthorityLine { cut }` in `documents/offers/tests.rs:40`,
+  `tests/frame_facts.rs:192`, `tests/project_baselines.rs:62`
+  (`jig-domain-core`); `jig-protocol-engine-clients/src/tests/fixtures/documents.rs:117`;
+  `tests/client/src/joint/wire/{me.rs:118, offers.rs:255-278,
+  owner.rs:244, :400, :468-473, :643-646}` (`owner.rs:244` copies
+  `translate/owner.rs:314`, which writes `cut: false`);
+  `tests/client/src/joint/stories.rs:47`;
+  `tests/core/src/referee/offers/facts.rs:54`, `:159`.
+  `DocumentLimits` in `tests/store/src/root.rs:106`,
+  `jig-protocol-store/src/tests/fixtures.rs:582`,
+  `tests/core/src/world.rs:126`, `jig-domain-core/src/tests.rs:126`,
+  `documents/offers/tests.rs:59`.
+- **Engine tests, the derived values:** `jig-protocol-config/src/tests/domain.rs:195`'s
+  Memory total moves from 18_576_824_223 to 18_576_825_183;
+  `tests/ops/src/conformance/config.rs:21-44` also sets
+  `core_limits.documents.grants` and `.executors`;
+  `jig-domain-core/src/tests/frame_facts.rs:145-146` sets
+  `limits.documents.executors = 3`, or `task_tree.rs:351` panics;
+  `tests/acts/kind_order.rs:16`, `:155`, `:173` take
+  `documents.implications`, and `make(..)` at `:160` is now `Ok`;
+  `tests/document_offers.rs`' `TooLarge` assertions become the step's
+  engine test, the role's grants whole. Rule: a test that raises an
+  authority bound after it builds its `Limits` derives the document
+  bounds again, as `overrides.rs:524` does.
+- **Link, `jig_client_domain::Limits` literals** take `authority: 8`:
+  the fixtures of `jig-client`, `jig-client-domain`,
+  `jig-client-protocol-link`, `jig-client-test-domain` and
+  `jig-client-test-view`; `examples/ops/client-domain/src/tests_support.rs`;
+  `jig-client-view/src/tests/fixtures/client.rs:73`;
+  `tests/client/src/test.rs:90`; `tests/client/tests/unlinked.rs:27`;
+  `tests/client-protocol/src/fixtures.rs:139`.
+- **Link, tools stay on `rows`:** `translate/pages.rs:45` and
+  `pages_part5.rs:121` (`authority_tools`). The design's lists
+  (`contract.md` 5.3, "An authority crosses whole") are grants, a grants
+  listing, notes' scopes, executors and implications; an authority's
+  tools are a set of at most 64 families (`jig-domain-authority`'s
+  `Tools`), which the engine never cuts. The step's tests give their
+  authorities at most `rows` tools.
+- **View, `rows` is threaded:** `body()` (`owner_authority.rs:146`),
+  `required_words` (`:51`) and `document_required_words` (`:89`) take
+  none now. `body()`, `render_words`, `document_words`, `render`,
+  `document` and the required-words functions take `rows` beside
+  `text_limit`, and their callers pass it: 18 calls in 9 files (`git
+  grep -n -E 'owner_authority::(render_words|document_words|required_words)\('
+  -- crates/jig-client-view/src`), `policy_edit.rs:68` among them, plus
+  the wrappers' own. The required words count at most `rows` entries
+  and the mark. The threading counts toward the aim; past 150, the
+  report says why, and that is no block. The Cut arm is at
+  `owner_authority_words.rs:142`, now "Authority document is cut"; its
+  English becomes "More are held than shown".
+- **Downstream:** skein has no user. temper's breaks at its repin
+  (`temper-client-domain/src/limits.rs:58-68`,
+  `tests/engine/domain/src/walking.rs:124-126`,
+  `tests/engine/domain/tests/forge_routes/paths.rs:86-88`) are
+  temper-04.s1's, which names them.
+
+Refresh any further literal or copy of these that the compiler finds,
+and list it in the commit body.

@@ -2421,6 +2421,9 @@ choice would have been the user's (development.md, 10.4).
      - No other step changes the mount crate, and no other use of `sse::Request::Finish` is in jig or temper. temper takes the repair with its next repin onto jig's main; no step is added for it.
      - Unchanged: every referee, judge and expected value; the gate; ruling 229 for any further cause outside these Files.
 
+328. **jig-17.s1's Shapes against main** (ready check of jig-17.s1).
+     The ready check of jig-17.s1 (skein 0be1255e7, jig 7d3becac7, temper 9ea74ad40; with its engine corrections, `cargo check` and nextest on the five crates it reached passed, 342 of 342; the fuzzy profile selected none) found its Shape off main, corrected in `jig/17-s1-authority-whole.md`, "Corrections after the ready check": `project_note.rs`' `authority_line`, a second cut, joins the Files; `act_authority` stays as a thin wrapper, without its refusal; `profile/standard.rs` sets the three derived fields; each literal of `AuthorityLine`, `DocumentLimits` and `jig_client_domain::Limits` the check found is named, with the derived values it moves and a rule for a test that raises an authority bound; the link's `authority_tools` stays on `rows`, outside the design's lists; the view threads `rows` through the authority's words and their 18 callers, which count toward the 150-line aim as a guide. temper's repin breaks are temper-04.s1's, which names them.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
