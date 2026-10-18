@@ -2742,6 +2742,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Then one** run of the joint proof; if it fails at step 4 again, report with the log, no further run.
      4. **Unchanged:** the proof's assertions and limits, the fake LLM's scripts, every referee and judge, every deadline; the Owner-activity repair already proved stays.
 
+358. **jig-19.5 diagnoses the status-zero root file** (process, jig-19's block of 2026-10-18T13:09:21Z).
+     Ruling 358, process, under ruling 229 (the same point failing twice is a block): yes, as the report proposes.
+
+     1. **Diagnose:** at most three focused runs and 30 minutes from this unblock. A status `Some(0)` is no HTTP answer: skein's harness records `0` only on `io::Event::Failed` (`testing/skein-fake-person-browser/src/harness/request.rs:83`) or `client::Event::Failed` (`:107`), while jig-test-service's route answers a missing root file `404` (`server/bundle.rs:102-104`). Log which of the two fires, with its failure's reason and the bytes the service wrote or did not write for that connection, at the lowest layer that shows it (implementer.md, 8.8): first jig-test-service's server on a real socket with the story's request as the harness sends it (method, path, host, headers), then the world. Write the cause line, with its file:line, in `logs/jig-19/failure-19.5-root-close.md`.
+     2. **Repair** only what that log names: in 19.5's Files, or in the one file of `testing/jig-test-service/` or `tests/client-browser/` it names, which joins 19.5's Files under this ruling (name it in the commit body); within 19.5's Size. A cause in skein, or in a jig crate outside those two, stops the step with the cause line.
+     3. **Then one** canonical root-file story run; if it fails again, report with the log, no further run.
+     4. **Unchanged:** skein's harness and its check, the stories' assertions, `Phase::Aborting`'s behaviour, every deadline; ruling 355's `Server::done` repair and its focused regression stay.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
