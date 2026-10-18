@@ -3230,6 +3230,9 @@ choice would have been the user's (development.md, 10.4).
      2. **The standing rule.** This is the same block a second time (ruling 384 was the first), so the README's 13:34Z point 1 now excepts any test that runs under its period alone: a jig increment whose gate flags such a test SLOW under load names it in its report with the gate's time and its time alone, from one serialized run of the flagged tests, and does not repair it (Landed). A flagged test at or over its period alone is still repaired first.
      3. **Named for the retrospective,** not for this run: `jig-client-protocol-world::fuzzy_protocol random_people_over_bytes_keep_the_referee_s_rules` runs 4.968 s alone, within 1% of its 5 s period, and `fuzzy_ops`' `p_story_survives_seeded_commit_crashes_and_random_presses` 4.079 s.
 
+401. **Ruling 401 of client-api** (plan defect, the hourly check of 2026-10-18T22:52Z).
+     Ruling 401, kind: plan defect, from the hourly check of 2026-10-18T22:52Z. Done when, item 12's temper half said `git -C ~/src/rust/temper diff c7095516 origin/main -- .config/nextest.toml` prints nothing, but ruling 326 (point 2) added one scheduling override there (`b2fdb71e7`): `[[profile.fuzzy.overrides]]`, `filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"`, `priority = 20`. It raises no budget or period. The item now says the diff prints only that override (Landed). The command is unchanged; the jig half is unchanged.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

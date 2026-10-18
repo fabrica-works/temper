@@ -1195,7 +1195,9 @@ Each command runs once, after `done.md`, reading `origin/main`.
     focused `global-timeout` (`-` 15s, `+` 30s, until the pass after the
     run puts 15 s back), and `git -C
     ~/src/rust/temper diff c7095516 origin/main -- .config/nextest.toml`
-    prints nothing.
+    prints only ruling 326's scheduling override, which raises no budget
+    (`[[profile.fuzzy.overrides]]`, its `filter` and `priority = 20`;
+    ruling 401).
 13. Each store family moved once: `git -C ~/src/rust/jig show
     origin/main:crates/jig-protocol-store/src/format.rs | grep -o -E
     'core: 3|tasks: 3|people: 3' | wc -l` prints 3 (at the base, the same
