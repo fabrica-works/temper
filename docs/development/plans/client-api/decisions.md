@@ -3223,6 +3223,13 @@ choice would have been the user's (development.md, 10.4).
      4. **What stays.** The projection's `expect` is 5.3's invariant, not the defect. A store whose live task holds a non-UTF-8 parameter fails the restore's check (`stored.rs:328`); nothing is migrated.
      5. **Deferred:** the brief spells every commit in 64 digits, a SHA-1 id's padding included (`temper-engine-domain-forge/src/brief.rs:191`, `:252`); a row in `later.md`, for a temper plan after this one.
 
+400. **Ruling 400 of client-api** (process, jig 22.s1's block of 2026-10-18T22:35:55Z).
+     Ruling 400, kind: process. The proposal stands: the 26 tests are reported, not repaired, and jig-22.s1 is complete as landed (jig `bbea94081`).
+
+     1. **Why.** Each of the 26 runs under its period alone, in one serialized run (`logs/jig-22-s1/slow-workflow.md`, log `20261018T223338-734.log`): 16 focused tests at 0.160 to 0.321 s against 500 ms, 10 fuzzy tests at 2.189 to 4.968 s against 5 s. Their gate flags are the gate's load, as ruling 384 found for `a_resumed_run_is_sent_only_its_current_window`. jig-22.s1 touched none of them: its change is `jig-domain-tasks`'s `valid_spec`.
+     2. **The standing rule.** This is the same block a second time (ruling 384 was the first), so the README's 13:34Z point 1 now excepts any test that runs under its period alone: a jig increment whose gate flags such a test SLOW under load names it in its report with the gate's time and its time alone, from one serialized run of the flagged tests, and does not repair it (Landed). A flagged test at or over its period alone is still repaired first.
+     3. **Named for the retrospective,** not for this run: `jig-client-protocol-world::fuzzy_protocol random_people_over_bytes_keep_the_referee_s_rules` runs 4.968 s alone, within 1% of its 5 s period, and `fuzzy_ops`' `p_story_survives_seeded_commit_crashes_and_random_presses` 4.079 s.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
