@@ -22,19 +22,25 @@ impl Bindings {
     pub fn begin(&mut self) {
         self.entries.clear();
     }
-    fn insert(&mut self, act: Act) -> Binding {
+    pub(crate) fn insert(&mut self, act: Act) -> Binding {
         self.next = self.next.checked_add(1).expect("pages binding tokens fit");
         let token = Token::new(self.next);
         self.entries.push((token, act)).expect("pages bindings fit");
         Binding { owner: owner(), token }
     }
     pub fn decode(&self, token: Token, act: skein_ui::Act) -> Option<temper_client_domain::Action> {
-        if act != skein_ui::Act::Press {
-            return None;
-        }
         for (key, meaning) in &self.entries {
             if *key == token {
-                return Some(temper_client_domain::Action::Pages(meaning.clone()));
+                let meaning = match (meaning, act) {
+                    (Act::Filter { filter }, skein_ui::Act::Input { value }) => {
+                        let mut filter = *filter;
+                        filter.goal = if value.is_empty() { None } else { Some(skein_ui::number(&value)?) };
+                        Act::Filter { filter }
+                    }
+                    (meaning, skein_ui::Act::Press) => meaning.clone(),
+                    _ => return None,
+                };
+                return Some(temper_client_domain::Action::Pages(meaning));
             }
         }
         None
@@ -94,7 +100,14 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         Some(document) => document.state == jig_client::State::Behind,
         None => false,
     };
-    if root.jig().borrow(root.client()).frame_summary().behind || me_behind {
+    let page_behind = match pages.inbox() {
+        Some(inbox) => match root.client().document(inbox.entries) {
+            Some(document) => document.state == jig_client::State::Behind,
+            None => false,
+        },
+        None => false,
+    };
+    if root.jig().borrow(root.client()).frame_summary().behind || me_behind || page_behind {
         text(builder, Role::Status, &words.say(crate::words::Word::Behind, &[]));
     }
     builder.close();

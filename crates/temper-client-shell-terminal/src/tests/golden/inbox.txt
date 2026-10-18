@@ -1,64 +1,45 @@
 == Inbox == Live
 temper
-[1] First (selected)
+[1] Shop (selected)
 * Pat
 [2] Sign out
 [3] Inbox 0
 [4] Chats
 [5] Adopt a repository
-Inbox:
-  [6] All projects
-  [7] Project: First
-  [8] All kinds
-  [9] Question
-  [10] Proposal
-  [11] Escalation
-  [12] Person task
-  [13] Result
-  [14] Reply
-  [15] All goals
-  0 need you
-  0 updates not read
-Needs you:
-  ## Needs you
-  - Waiting 0 min
-    - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  - Waiting 0 min
-    - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  - Waiting 0 min
-    - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  - Waiting 0 min
-    - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  Start of the list
-  End of the list
-Updates:
-  ## Updates
-  - - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  - New
-    - Object:
-        ## Object
-        In project 1
-        * Open
-        * Loading object
-  Start of the list
-  End of the list
+[6] All projects
+[7] Shop
+[8] Second
+[9] All kinds
+[10] Proposal
+[11] Question
+[12] Held
+[13] Person task
+[14] All goals
+[15] Goal: (empty)
+## Needs you
+- ### Proposal
+  Project 1
+  [16] Task 9
+  Add OAuth login
+- ### Question
+  Project 1
+  [17] Task 9
+  Which provider first?
+- ### Held
+  Project 1
+  [18] Task 9
+  Review needs attention
+- ### Person task
+  Project 1
+  [19] Task 9
+  Choose a provider
+## Updates
+- ### Updates
+  Project 1
+  [20] Task 9
+  Accessibility pass is done
+- ### Reply
+  Project 1
+  [21] Task 9
+  OAuth login? replied
+[22] Mark seen

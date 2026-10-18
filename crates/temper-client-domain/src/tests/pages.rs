@@ -1,3 +1,4 @@
+mod inbox;
 use super::fixtures;
 use crate::{
     Action, Address,

@@ -294,3 +294,90 @@ pub fn adopt_then_open_resources(
     ]);
     steps
 }
+
+const QUESTION_CHAT_REPLY: Token = Token::new(1002);
+const QUESTION_CHAT_KEY: [u8; 16] = [32; 16];
+pub(crate) const QUESTION_WORKER: Token = Token::new(7);
+pub(crate) const QUESTION_PROJECT: u32 = 1;
+const QUESTION_CALL: u64 = 1003;
+const QUESTION_DELEGATE: u64 = 1004;
+const QUESTION_COMPLETION: u32 = 1;
+const QUESTION_POSITION: u32 = 1;
+const QUESTION_ASSIGN_AT: Time = Time::from_nanos(2_000_000_000);
+/// A question committed by the running chat for its person.
+pub fn question(front: &mut Joint, words: &[u8]) -> u64 {
+    *front = Joint::with_questions(SEED, &domain_limits());
+    let driver = &mut front.engine;
+    driver.sign_in();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(QUESTION_CHAT_REPLY),
+        sign_in: driver.session(),
+        key: QUESTION_CHAT_KEY,
+        ask: driver.chat_ask(QUESTION_PROJECT, b"Question chat"),
+    }));
+    driver.settle();
+    let parent = driver.last_assignment();
+    driver.call(
+        QUESTION_WORKER,
+        parent.task,
+        parent.attempt,
+        QUESTION_DELEGATE,
+        engine::Call {
+            completion: QUESTION_COMPLETION,
+            position: QUESTION_POSITION,
+            tool: engine::Tool::Delegate {
+                batch: Box::new([temper_engine_domain_world::fixtures::report_delegate(
+                    b"Ask the person",
+                    Box::new([]),
+                )]),
+            },
+        },
+    );
+    driver.settle();
+    driver.answer(QUESTION_WORKER, parent.task, parent.attempt, 0, tasks::End::Parked, engine::Parts::none());
+    driver.settle();
+    driver.env.now = QUESTION_ASSIGN_AT;
+    engine::fire(&mut driver.root, &driver.env);
+    engine::release(&mut driver.root, &driver.env, &mut driver.out);
+    driver.collect();
+    driver.settle();
+    let run = driver.last_assignment();
+    assert_ne!(run.task, parent.task, "delegate assigned: {:?}", driver.answered(QUESTION_DELEGATE));
+    driver.call(
+        QUESTION_WORKER,
+        run.task,
+        run.attempt,
+        QUESTION_CALL,
+        engine::Call {
+            completion: QUESTION_COMPLETION,
+            position: QUESTION_POSITION,
+            tool: engine::Tool::Message {
+                target: parent.task,
+                form: engine::MessageForm::Question,
+                words: words.into(),
+            },
+        },
+    );
+    driver.settle();
+    assert!(
+        matches!(driver.answered(QUESTION_CALL), Some(engine::CallAnswer::Sent { .. })),
+        "question committed: {:?}",
+        driver.answered(QUESTION_CALL)
+    );
+    parent.task
+}
+#[test]
+fn the_question_fixture_commits_its_numbered_question_before_the_client_starts() {
+    let mut front = Joint::new(SEED, domain_limits());
+    let task = question(&mut front, b"Which provider first?");
+    assert!(
+        front
+            .engine
+            .task(task)
+            .expect("chat")
+            .inbox
+            .iter()
+            .any(|message| message.words.as_ref() == b"Which provider first?")
+    );
+}

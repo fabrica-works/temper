@@ -288,3 +288,77 @@ pub fn adopted_bytes() -> jig_client::Family {
         bytes: wire::answer(&answer),
     }
 }
+
+pub fn inbox_home(filter: crate::address::Filter) -> (crate::Domain, Token) {
+    let limits = limits();
+    let mut root = crate::unlinked(&limits, SEED);
+    let frame = start(&mut root, List::with_capacity(0));
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    confirm(&mut root, frame, PARTY, &mut out);
+    while out.pop().is_some() {}
+    crate::step(
+        &mut root,
+        &env(&limits),
+        Event::Went { place: crate::Place::Address(Address::Inbox { filter }) },
+        &mut out,
+    );
+    let mut watch = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        jig_client::Down::Open {
+                            watch: token,
+                            subject: jig_client::Watchable::Jig(contract::Subject::Inbox { .. }),
+                        },
+                },
+        } = request
+        {
+            watch = Some(token);
+        }
+    }
+    (root, watch.expect("temper's inbox watch"))
+}
+pub fn inbox_entries(root: &mut crate::Domain, watch: Token, rows: List<contract::InboxEntry>) -> Queue<Request> {
+    let limits = limits();
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    let inbox = contract::Inbox {
+        entries: rows,
+        needs: Needs { questions: 1, proposals: 0, escalations: 0, person_tasks: 0 },
+        updates: contract::Count { value: 0, limited: false },
+        results_seen: 0,
+        replies_seen: List::with_capacity(0),
+        more: false,
+    };
+    crate::step(
+        root,
+        &env(&limits),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox))) },
+            },
+        },
+        &mut out,
+    );
+    out
+}
+pub fn inbox_entry(
+    object: contract::ObjectKey,
+    group: contract::InboxGroup,
+    project: u32,
+    position: u64,
+) -> contract::InboxEntry {
+    contract::InboxEntry {
+        reply: None,
+        lineage: List::with_capacity(0),
+        goal: None,
+        recipient: None,
+        stall: None,
+        object,
+        project,
+        group,
+        position,
+        at: Wall::EPOCH,
+    }
+}

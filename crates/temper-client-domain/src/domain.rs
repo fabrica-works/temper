@@ -28,7 +28,7 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     }
     .expect("checked client limits");
     Domain {
-        pages: crate::pages::Pages::new(),
+        pages: crate::pages::Pages::seeded(rng.next_u64()),
         jig: jig_client_view::Ui::new(
             &limits.jig,
             jig_client_view::page::navigation::Navigation::new(0),

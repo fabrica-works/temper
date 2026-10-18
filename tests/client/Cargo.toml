@@ -21,6 +21,7 @@ jig-test-domain.workspace = true
 jig-core-world.workspace = true
 jig-client-view.workspace = true
 jig-domain-core.workspace = true
+jig-domain-authority.workspace = true
 jig-domain-people.workspace = true
 jig-domain-tasks.workspace = true
 jig-domain-views.workspace = true

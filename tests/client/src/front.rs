@@ -60,13 +60,47 @@ impl Joint {
     }
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits) -> Joint {
-        let mut engine = Driver::with_repositories(
+        let engine = Driver::with_repositories(
             Store::new(),
             walking::config(seed),
             &temper_engine_domain_world::fixtures::forge_limits(),
             fixtures::REPOSITORIES,
         );
-        engine.hello(Token::new(7));
+        Self::with_engine(seed, &limits, engine, 1)
+    }
+    pub(crate) fn with_questions(seed: u64, limits: &client::Limits) -> Self {
+        use jig_domain_authority as authority;
+        let mut config = walking::config(seed);
+        let mut rules = config.core.authority.rules().clone();
+        rules.ceiling.delegation.depth = 2;
+        let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
+        policy.ceiling.delegation.depth = 2;
+        policy.roles[0].authority.delegation.depth = 2;
+        let mut domain = authority::Domain::new(rules, *config.core.authority.limits()).expect("question authority");
+        let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
+        authority::step(
+            &mut domain,
+            authority::Event::Policy { project: fixtures::QUESTION_PROJECT, policy },
+            &mut out,
+        );
+        assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
+        config.core.authority = domain;
+        let mut engine_limits = temper_engine_domain_world::fixtures::forge_limits();
+        engine_limits.tasks.inbox_bytes = 512;
+        engine_limits.fleet.slots = 2;
+        engine_limits.fleet.attempts = 4;
+        engine_limits.journal.writes = 4096;
+        engine_limits.journal.deliveries = 64;
+        engine_limits.journal.held = 192;
+        Self::with_engine(
+            seed,
+            limits,
+            Driver::with_repositories(Store::new(), config, &engine_limits, fixtures::REPOSITORIES),
+            2,
+        )
+    }
+    fn with_engine(seed: u64, limits: &client::Limits, mut engine: Driver, slots: u32) -> Self {
+        engine.send(temper_engine_domain_world::protocol::hello_slots(fixtures::QUESTION_WORKER, slots, Box::new([])));
         engine.settle();
         let last_commit = engine.store.header().commits;
         let truth = jig_client_world::joint::truth::Truth::after(core_rows(&engine));
@@ -83,7 +117,7 @@ impl Joint {
                 first: jig_client_protocol_wire::VERSION,
                 last: jig_client_protocol_wire::VERSION,
             }),
-            limits,
+            limits: *limits,
             callbacks: Vec::new(),
             parked: BTreeMap::new(),
             offline_until: None,

@@ -102,3 +102,18 @@ fn signed_out_mid_request_is_made_once_after_signing_in() {
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
     assert_eq!(fixtures::chats(&world.front().engine), 1);
 }
+
+#[test]
+fn a_question_needing_the_person_is_shown_first_in_the_inbox() {
+    let mut world = fixtures::world(fixtures::SEED);
+    fixtures::question(world.front(), b"Which provider first?");
+    let person = world.client(fixtures::PARTY, fixtures::inbox());
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Heading { level: 2 }, b"Needs you"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"Which provider first?"), within: fixtures::WITHIN },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+}

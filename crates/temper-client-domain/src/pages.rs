@@ -1,21 +1,29 @@
 //! temper's pages own their handles and navigation (client.md, 3.1).
 use crate::{Address, Limits, owner::Owner};
+use alloc::boxed::Box;
 use jig_client::{
     Client, Handle, Latest, Link, Told, Watchable,
     contract::{Delivery, Me, Subject},
 };
 use skein_lib::{Env, Queue, Time};
+pub mod inbox;
 #[derive(Debug)]
 pub struct Pages {
     address: Address,
     project: Option<u32>,
     watching: bool,
     shown: u64,
+    inbox: Option<inbox::Inbox>,
+    next: u64,
+    serial: u64,
+    seen: Option<(u64, jig_client::Key)>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
     Project { project: u32 },
     SignOut,
+    Filter { filter: crate::address::Filter },
+    Seen,
     Go { address: Address },
 }
 #[derive(Debug)]
@@ -44,7 +52,18 @@ impl Pages {
             project: None,
             watching: false,
             shown: 0,
+            inbox: None,
+            next: 1,
+            serial: 0,
+            seen: None,
         }
+    }
+    #[must_use]
+    pub const fn inbox(&self) -> Option<&inbox::Inbox> {
+        self.inbox.as_ref()
+    }
+    pub(crate) fn seeded(seed: u64) -> Self {
+        Self { serial: skein_lib::Rng::new(seed).next_u64(), ..Self::new() }
     }
     #[must_use]
     pub const fn project(&self) -> Option<u32> {
@@ -66,7 +85,7 @@ impl Pages {
 pub fn me_handle() -> Handle {
     Handle { asker: Owner::Pages.asker(), number: 0 }
 }
-pub fn step(pages: &mut Pages, _env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
+pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Started => {
             pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
@@ -79,7 +98,38 @@ pub fn step(pages: &mut Pages, _env: &Env<Limits>, client: &Client, event: Event
                 }));
             }
         }
-        Event::Went { address } => pages.address = address,
+        Event::Went { address } => {
+            if pages.inbox.is_none() || pages.address != address {
+                if let Some(inbox) = pages.inbox.take() {
+                    pages.next = inbox.leave(out);
+                }
+                if let Address::Inbox { filter } = address {
+                    pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
+                }
+                pages.seen = None;
+            }
+            pages.address = address;
+        }
+        Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
+        Event::Act { act: Act::Seen } => {
+            if let Some(through) = match &pages.inbox {
+                Some(inbox) => inbox.results_through(),
+                None => None,
+            } && match pages.seen {
+                Some((old, _)) => old < through,
+                None => true,
+            } {
+                pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
+                let key = jig_client::Key { asker: Owner::Pages.asker(), number: pages.serial };
+                pages.seen = Some((through, key));
+                out.push(Request::Client(jig_client::Event::Send {
+                    key,
+                    request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Seen {
+                        through: jig_client::contract::SeenThrough::Results { through },
+                    })),
+                }));
+            }
+        }
         Event::Act { act: Act::Project { project } } => {
             if let Some(me) = pages.me(client) {
                 for row in &me.projects {
@@ -118,7 +168,14 @@ pub fn step(pages: &mut Pages, _env: &Env<Limits>, client: &Client, event: Event
                 }));
             }
         }
-        Event::Told { .. } => return,
+        Event::Told { told } => {
+            if !match &mut pages.inbox {
+                Some(inbox) => inbox.told(client, told, out),
+                None => false,
+            } {
+                return;
+            }
+        }
     }
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
 }

@@ -376,8 +376,72 @@ pub fn inbox_document(group: contract::InboxReadGroup) -> contract::InboxPage {
     contract::InboxPage { cut: false, rows, before: None, after: None }
 }
 pub fn inbox_page() -> skein_ui::Tree {
-    page(jig_client_view::address::Address::Inbox { project: None }, false)
+    use skein_ui::{Role, Run};
+    let mut builder = skein_ui::Builder::new(&tree_limits());
+    synthetic_frame(&mut builder, false);
+    builder.open(Role::Main);
+    builder.open(Role::Heading { level: 1 });
+    builder.text(Run::Plain, b"Inbox");
+    builder.close();
+    for name in [
+        b"All projects".as_slice(),
+        b"Shop",
+        b"Second",
+        b"All kinds",
+        b"Proposal",
+        b"Question",
+        b"Held",
+        b"Person task",
+        b"All goals",
+    ] {
+        builder.open(Role::Button);
+        builder.name(name);
+        builder.bind(binding());
+        builder.close();
+    }
+    builder.open(Role::TextField);
+    builder.name(b"Goal");
+    builder.value(b"", 0);
+    builder.bind(binding());
+    builder.close();
+    for (heading, cards) in [(b"Needs you".as_slice(), &INBOX_CARDS[..4]), (b"Updates".as_slice(), &INBOX_CARDS[4..])] {
+        builder.open(Role::Heading { level: 2 });
+        builder.text(Run::Plain, heading);
+        builder.close();
+        for (kind, body) in cards {
+            builder.open(Role::Item);
+            builder.open(Role::Heading { level: 3 });
+            builder.text(Run::Plain, kind);
+            builder.close();
+            builder.open(Role::Paragraph);
+            builder.text(Run::Plain, b"Project 1");
+            builder.close();
+            builder.open(Role::Link);
+            builder.name(b"Task 9");
+            builder.link(binding());
+            builder.close();
+            builder.open(Role::Paragraph);
+            builder.text(Run::Plain, body);
+            builder.close();
+            builder.close();
+        }
+    }
+    builder.open(Role::Button);
+    builder.name(b"Mark seen");
+    builder.bind(binding());
+    builder.close();
+    builder.close();
+    builder.close();
+    visible(builder.finish())
 }
+const INBOX_CARDS: [(&[u8], &[u8]); 6] = [
+    (b"Proposal", b"Add OAuth login"),
+    (b"Question", b"Which provider first?"),
+    (b"Held", b"Review needs attention"),
+    (b"Person task", b"Choose a provider"),
+    (b"Updates", b"Accessibility pass is done"),
+    (b"Reply", b"OAuth login? replied"),
+];
 pub fn task_page() -> skein_ui::Tree {
     page(
         jig_client_view::address::Address::Task { task: 9, section: jig_client_view::address::TaskSection::Activity },
@@ -400,7 +464,7 @@ pub fn signed_out_page() -> skein_ui::Tree {
     page(jig_client_view::address::Address::Inbox { project: None }, true)
 }
 
-pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {
+fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
     use skein_ui::{Role, Run};
     builder.open(Role::Page);
     builder.open(Role::Banner);
@@ -439,6 +503,10 @@ pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, b
         builder.close();
     }
     builder.close();
+}
+pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {
+    use skein_ui::{Role, Run};
+    synthetic_frame(builder, behind);
     builder.open(Role::Main);
     if let Some(title) = title {
         builder.open(Role::Heading { level: 1 });

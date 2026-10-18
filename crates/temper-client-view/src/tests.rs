@@ -1,6 +1,7 @@
 mod fixtures;
 mod forge_page;
 mod frame;
+mod inbox;
 use jig_client::contract::{Part, PartScope};
 use skein_ui::Role;
 

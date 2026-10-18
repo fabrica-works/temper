@@ -34,11 +34,10 @@ impl Address {
     pub fn reference(&self) -> Option<jig_client_view::address::Address> {
         use jig_client_view::address::Address as Jig;
         match self {
-            Self::Inbox { filter } => Some(Jig::Inbox { project: filter.project }),
             Self::Chats => Some(Jig::Conversations { project: None }),
             Self::Chat { task } => Some(Jig::task(*task)),
             Self::Jig(address) => Some(*address),
-            Self::Adopt { .. } => None,
+            Self::Inbox { .. } | Self::Adopt { .. } => None,
         }
     }
 }

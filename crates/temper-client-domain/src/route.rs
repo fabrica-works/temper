@@ -16,17 +16,16 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
     match event {
         Event::Start { address, kept, offset: _ } => {
             let jig_kept = List::with_capacity(0);
-            let jig_address = address.reference().unwrap_or(jig_client_view::address::Address::Inbox { project: None });
+            let jig_place = match address.reference() {
+                Some(address) => jig_client_view::address::Place::Jig(address),
+                None => jig_client_view::address::Place::Elsewhere,
+            };
             let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
             root.jig.step(
                 env.now,
                 env.wall,
                 &root.client,
-                jig_client_view::Event::Start {
-                    place: jig_client_view::address::Place::Jig(jig_address),
-                    records: jig_kept,
-                    seed: root.salt,
-                },
+                jig_client_view::Event::Start { place: jig_place, records: jig_kept, seed: root.salt },
                 &mut child,
             );
             if !root.unlinked {
@@ -64,6 +63,9 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
             } else if let Address::Adopt { project } = address {
                 jig(root, env, jig_client_view::Event::Left, out);
                 forge(root, env, forge::Event::Went { address: forge::Address::Adopt { project } }, out);
+            } else {
+                jig(root, env, jig_client_view::Event::Left, out);
+                forge(root, env, forge::Event::Left, out);
             }
         }
         Place::Missing => {
@@ -73,7 +75,7 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
     }
 }
 pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::Event, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(2);
+    let mut child = Queue::with_capacity(crate::pages::inbox::max_out(&env.limits));
     crate::pages::step(&mut root.pages, env, &root.client, event, &mut child);
     for _ in 0..child.len() {
         match child.pop().expect("counted pages output") {

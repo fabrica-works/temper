@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod forge;
 pub mod frame;
 pub mod limits;
+pub mod pages;
 mod root;
 pub mod words;
 pub use limits::{Limits, worst_case};

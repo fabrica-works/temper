@@ -57,14 +57,18 @@ pub fn limits() -> Limits {
     }
 }
 pub fn words() -> crate::words::Words {
-    crate::words::Words::english(FORGE, 64).expect("forge English fits")
+    static WORDS: std::sync::OnceLock<crate::words::Words> = std::sync::OnceLock::new();
+    WORDS.get_or_init(|| crate::words::Words::english(FORGE, 64).expect("forge English fits")).clone()
 }
 pub fn jig_words() -> jig_client_view::words::Words {
-    jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(32).expect("jig English fits"),
-        language: 0,
-        offset_minutes: 0,
-    }
+    static WORDS: std::sync::OnceLock<jig_client_view::words::Words> = std::sync::OnceLock::new();
+    WORDS
+        .get_or_init(|| jig_client_view::words::Words {
+            book: jig_client_view::phrases::english::english(32).expect("jig English fits"),
+            language: 0,
+            offset_minutes: 0,
+        })
+        .clone()
 }
 pub fn tree_limits() -> skein_ui::Limits {
     skein_ui::Limits {
@@ -169,19 +173,28 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     root_with_watch(project).0
 }
 pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, skein_lib::Token) {
+    let (root, me, _) = root_at(
+        temper_client_domain::Address::Jig(jig_client_view::address::Address::Inbox { project }),
+        &domain_limits(),
+    );
+    (root, me)
+}
+fn root_at(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>) {
     use jig_client::contract::{
         self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
-    use temper_client_domain::{Address, Event, Request};
-    let limits = domain_limits();
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
-    let mut root = temper_client_domain::unlinked(&limits, SEED);
-    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    use temper_client_domain::{Event, Request};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut root = temper_client_domain::unlinked(limits, SEED);
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(limits));
     temper_client_domain::step(
         &mut root,
         &env,
         Event::Start {
-            address: Address::Jig(jig_client_view::address::Address::Inbox { project }),
+            address,
             kept: List::with_capacity(0),
             offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
@@ -195,15 +208,20 @@ pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, s
         temper_client_domain::step(&mut root, &env, Event::Client { event }, &mut out);
     }
     let mut watch = None;
+    let mut inbox_watch = None;
     for _ in 0..out.len() {
         if let Some(Request::Client {
             request:
                 jig_client::Request::Down {
-                    down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Me) },
+                    down: jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(subject) },
                 },
         }) = out.pop()
         {
-            watch = Some(token);
+            if subject == Subject::Me {
+                watch = Some(token);
+            } else if let Subject::Inbox { .. } = subject {
+                inbox_watch = Some(token);
+            }
         }
     }
     let mut projects = List::with_capacity(2);
@@ -253,7 +271,7 @@ pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, s
         },
         &mut out,
     );
-    (root, watch.expect("me opened"))
+    (root, watch.expect("me opened"), inbox_watch)
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
     let mut root = root_in_project(Some(PROJECT));
@@ -306,4 +324,72 @@ pub fn banner_statuses(tree: &skein_ui::Tree) -> Box<[Box<[u8]>]> {
         }
     }
     names.into_boxed()
+}
+
+pub const INBOX_TASK: u64 = 9;
+pub const INBOX_REPLY_TASK: u64 = 10;
+pub const INBOX_QUESTION: u64 = 1;
+pub const INBOX_POSITION: u64 = 1;
+pub fn inbox_root() -> temper_client_domain::Domain {
+    inbox_root_filtered(temper_client_domain::address::Filter::ALL)
+}
+pub fn inbox_root_filtered(filter: temper_client_domain::address::Filter) -> temper_client_domain::Domain {
+    use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
+    let mut limits = domain_limits();
+    limits.jig.objects = 6;
+    let (mut root, _, watch) = root_at(temper_client_domain::Address::Inbox { filter }, &limits);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    let mut entries = List::with_capacity(6);
+    for (object, group) in [
+        (Object::Question { task: INBOX_TASK, message: INBOX_QUESTION }, Group::Questions),
+        (
+            Object::Proposal(contract::ProposalKey {
+                proposer: contract::Proposer::Task(INBOX_TASK),
+                number: INBOX_QUESTION,
+            }),
+            Group::Proposals,
+        ),
+        (Object::Escalation(INBOX_TASK), Group::Escalations),
+        (Object::PersonTask(INBOX_TASK), Group::PersonTasks),
+        (Object::Result(INBOX_TASK), Group::Results),
+        (Object::Task(INBOX_REPLY_TASK), Group::Replies),
+    ] {
+        entries
+            .push(contract::InboxEntry {
+                reply: None,
+                lineage: List::with_capacity(0),
+                goal: None,
+                recipient: None,
+                stall: None,
+                object,
+                project: PROJECT,
+                group,
+                position: INBOX_POSITION,
+                at: Wall::EPOCH,
+            })
+            .expect("six kinds");
+    }
+    let inbox = contract::Inbox {
+        entries,
+        needs: contract::Needs { questions: 1, proposals: 1, escalations: 1, person_tasks: 1 },
+        updates: contract::Count { value: 2, limited: false },
+        results_seen: 0,
+        replies_seen: List::with_capacity(0),
+        more: false,
+    };
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("inbox watch"),
+                    event: contract::WatchEvent::Delivered(contract::Delivery::Inbox(Box::new(inbox))),
+                },
+            },
+        },
+        &mut out,
+    );
+    root
 }

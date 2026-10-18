@@ -12,6 +12,22 @@ use skein_ui::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     Brand,
+    InboxTitle,
+    NeedsYou,
+    InboxUpdates,
+    AllProjects,
+    AllKinds,
+    AllGoals,
+    Goal,
+    Proposal,
+    Question,
+    Held,
+    PersonTask,
+    MarkSeen,
+    Task,
+    Project,
+    Reply,
+
     Inbox,
     Chats,
     Adoption,
@@ -47,8 +63,23 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 35] = [
+const ALL: [Word; 50] = [
     Word::Brand,
+    Word::InboxTitle,
+    Word::NeedsYou,
+    Word::InboxUpdates,
+    Word::AllProjects,
+    Word::AllKinds,
+    Word::AllGoals,
+    Word::Goal,
+    Word::Proposal,
+    Word::Question,
+    Word::Held,
+    Word::PersonTask,
+    Word::MarkSeen,
+    Word::Task,
+    Word::Project,
+    Word::Reply,
     Word::Inbox,
     Word::Chats,
     Word::Adoption,
@@ -88,6 +119,22 @@ impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
             Self::Brand => 100,
+            Self::InboxTitle => 110,
+            Self::NeedsYou => 111,
+            Self::InboxUpdates => 112,
+            Self::AllProjects => 113,
+            Self::AllKinds => 114,
+            Self::AllGoals => 115,
+            Self::Goal => 116,
+            Self::Proposal => 117,
+            Self::Question => 118,
+            Self::Held => 119,
+            Self::PersonTask => 120,
+            Self::MarkSeen => 121,
+            Self::Task => 122,
+            Self::Project => 123,
+            Self::Reply => 124,
+
             Self::Inbox => 101,
             Self::Chats => 102,
             Self::Adoption => 103,
@@ -123,43 +170,8 @@ impl Word {
             Self::Shown => 23,
             Self::Unshowable => 24,
         };
-        let owner = match self {
-            Self::Brand
-            | Self::Inbox
-            | Self::Chats
-            | Self::Adoption
-            | Self::Live
-            | Self::Offline
-            | Self::Connecting
-            | Self::Behind
-            | Self::SignOut
-            | Self::SignOutLost => crate::frame::owner(),
-            Self::Connector
-            | Self::Repository
-            | Self::Branch
-            | Self::Pull
-            | Self::Issue
-            | Self::Adopted
-            | Self::Path
-            | Self::Read
-            | Self::Push
-            | Self::OpenPull
-            | Self::MergePull
-            | Self::Review
-            | Self::Status
-            | Self::Comment
-            | Self::CreateIssue
-            | Self::CreateBranch
-            | Self::EditPull
-            | Self::UpdatePull
-            | Self::ClosePull
-            | Self::EditIssue
-            | Self::Reviewers
-            | Self::DeleteBranch
-            | Self::OtherKind
-            | Self::Shown
-            | Self::Unshowable => (Owner::Application { number: connector }).opaque(),
-        };
+        let owner =
+            if number >= 100 { crate::frame::owner() } else { (Owner::Application { number: connector }).opaque() };
         PhraseId { owner, number }
     }
 }
@@ -199,8 +211,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(83);
-        let mut phrases = List::with_capacity(83);
+        let mut shapes = List::with_capacity(98);
+        let mut phrases = List::with_capacity(98);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -237,9 +249,9 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 83,
+            phrases: 98,
             holes: 3,
-            segments: 581,
+            segments: 686,
             text_bytes: 6144,
             hole_bytes: joined.max(513),
         };
@@ -266,6 +278,22 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
         Word::Brand => (&[b"temper"], &[]),
+        Word::InboxTitle => (&[b"Inbox"], &[]),
+        Word::NeedsYou => (&[b"Needs you"], &[]),
+        Word::InboxUpdates => (&[b"Updates"], &[]),
+        Word::AllProjects => (&[b"All projects"], &[]),
+        Word::AllKinds => (&[b"All kinds"], &[]),
+        Word::AllGoals => (&[b"All goals"], &[]),
+        Word::Goal => (&[b"Goal"], &[]),
+        Word::Proposal => (&[b"Proposal"], &[]),
+        Word::Question => (&[b"Question"], &[]),
+        Word::Held => (&[b"Held"], &[]),
+        Word::PersonTask => (&[b"Person task"], &[]),
+        Word::MarkSeen => (&[b"Mark seen"], &[]),
+        Word::Task => (&[b"Task ", b""], &[Number]),
+        Word::Project => (&[b"Project ", b""], &[Number]),
+        Word::Reply => (&[b"Reply"], &[]),
+
         Word::Inbox => (&[b"Inbox ", b""], &[Number]),
         Word::Chats => (&[b"Chats"], &[]),
         Word::Adoption => (&[b"Adopt a repository"], &[]),
