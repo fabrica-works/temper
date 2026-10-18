@@ -3148,6 +3148,30 @@ choice would have been the user's (development.md, 10.4).
      3. **Drop `back_and_forward_move_between_the_inbox_and_a_task` and its `make_task` fixture from the candidate.** The panic story, the dev build's `/test/panic` and the rest of 20.5 stay. Give the browser count after the drop (rulings 378 and 379) in the report.
      4. **The rule for a further one:** a shared skein story that fails for a cause in skein's kit, and needs a skein change, moves to the same `later.md` row's kind, by ruling, with its failure. It is not repaired in jig.
 
+394. **jig-15.s1 and temper-07.s1: temper's own cards, the designer's answer** (design gap, the designer's answer of 2026-10-18T19:47Z to temper 07.4's question of 2026-10-18T19:10:59Z).
+     Ruling 394, kind: design gap. The designer's answer: jig `2bd1a5cbb` and temper `076c659a5`. The supervisor adds jig-15.s1 (`jig/15-s1-facts-in-words.md`; Needs nothing, beside jig 20.5) and temper-07.s1 (`temper/07-s1-own-cards.md`; Needs temper 07.4 and jig-15.s1), and `temper-repin` waits for temper-07.s1.
+
+     (c): temper's own cards, after its mockups. Landed: jig `2bd1a5cbb` (`client/domain/client.md` 19, `testing.md` 6.2, `view.md` 7, `STATUS.md`); temper `076c659a5` (`client.md` 1, 2, 3.5, 3.6, 5.1, 9, 10; `STATUS.md`; `temper/07-task-pages.md`; `later.md`).
+
+     1. **The design it rests on.** jig's `objects.md`, 2: "An application may present one of jig's objects itself instead, in nodes of its own … from the object's document as the client delivers it." temper's `client.md`, 1, as landed: "temper calls no renderer of jig's reference UI, and copies none of its modules, functions or phrase tables." 5.1: "jig's words for jig's enums and a decision's facts (`jig-client`'s `words`) under it, overridden phrase by phrase where the mockups word them otherwise".
+     2. **jig's check, in the application's words.** jig's `testing.md`, 6.2, as landed: "the referee says each fact as `words` says it in the phrasebook the application's world gives it … The referee holds no words of the reference UI's".
+     3. **jig-15.s1, the supervisor's to add.** It also carries ruling 392's transport change.
+        - Needs: nothing.
+        - Shape: `jig_client::facts` gives a decision's facts as data, from a document and an act: what `referee.rs:453-533` reads today, moved there. `jig_client::words` says them: the 26 phrases the referee says, their English unchanged, counted in `PHRASES` and `ALL`. jig-client-view says them from `words` and drops its own. The referee says them in the phrasebook a new `Settings` field gives (default: `words::english()`), and loses its `jig_client_view` imports (`referee.rs:17-18`). The joint transport (`document`, `stream`, `people_reply`, `read_with_codec`, and the 28 lines naming `jig_client_view::Limits` in `tests/client/src/joint`) takes `&jig_client::DomainLimits`.
+        - Tests: a world given an override holds a tree in it, and faults on a tree in jig's English.
+        - Proof: jig's gate, run by `land`.
+        - Size: measure it first, by file, in the first report. Aim at most 400 production lines added; past 600, block with the count.
+        - Don't: change an English text, a tree or a golden of jig's; move any other phrase.
+     4. **temper-07.s1, the supervisor's to add.** Needs: 07.4 (landed `5fd9d29c4`) and jig-15.s1.
+        - First commit: temper's jig pin alone moves to jig-15.s1's landing. Past 60 lines of repairs, counted with `git diff --numstat`, block with the count.
+        - The cards: the inbox's, a chat's, the task page's and the confirmations' cards become temper's own, after `inbox.html`, `index.html` and `task.html`. They are drawn from the documents and `facts`. A decision's facts are said in jig's words with temper's overrides; executors and outcomes are temper's own phrases. temper's world gives jig's referee temper's phrasebook.
+        - The removals: 07's Removes, and the `jig_client_view::Limits` in `translate.rs`. With them comes 07.4's world test `a_client_closed_on_a_tasks_page_opens_at_the_inbox_again`, which `5fd9d29c4` left for the child's removal. Done when: 07's two greps print nothing.
+        - Goldens and stories: each golden that shows a card is recorded again by hand, listed by file in the report. The stories keep their names, acts and expected values, except literals the new words rename.
+        - Size: measure it first, by card, before more code. Aim at most 1,200 production lines added; past 2,000 (ruling 389's stop), block with the count.
+        - Don't: call or copy anything of jig-client-view, or land the branch `client-api/temper-07-4-renderers-draft`.
+     5. **What it replaces.** Ruling 388, point 3, and ruling 389, points 2 and 3, no longer bind the cards. The default order: both steps run beside jig 20.4 and 20.5, and temper-repin waits for temper-07.s1. The README's order is the supervisor's.
+     6. **Deferred:** jig-client's words for executors and outcomes (jig's `view.md`, 7), in a `later.md` row. temper uses its own phrases for them until then.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
