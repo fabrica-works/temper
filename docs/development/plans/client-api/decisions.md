@@ -3175,6 +3175,16 @@ choice would have been the user's (development.md, 10.4).
 395. **The check of 20:13Z: frame.rs's tests split, a crossed 800 named, reports name only what changed** (steer of 2026-10-18T20:14Z).
      The check of 2026-10-18T20:13:51Z, three points, in the README's "The run's steers" (2026-10-18 20:14Z, points 1 to 3). 1: one behaviour per test again: temper `5fd9d29c4`'s `crates/temper-client-view/src/tests/frame.rs` has two tests of four behaviours each (`:106`, `:117`), split in place by the next session that changes the file; 18:44Z point 2 reached 07.4 only from its next increment. 2: a file a commit leaves over 800 is named in the report, also when it was at most 800 at the base: `crates/temper-client-shell-terminal/src/tests/fixtures.rs` went 795 to 803 under 07.4, whose report said no file over 800 changed. 3: a report names only what changed: 07.4's report of 19:49:26Z ran 24 lines and 3,664 bytes, its Size list repeating the commit body.
 
+396. **temper-07.s1: the adoption story ends at the outcome's sentence; the resources link goes** (plan defect, temper 07.s1's block of 2026-10-18T20:49:19Z).
+     Ruling 396, kind: plan defect. temper-07.s1 said the stories keep their acts, and did not see that one act reaches a page of jig's reference UI, which goes with `Address::Jig`. The design answers it: temper's pages (`client.md`, 3.5) list no resources page, and "no document says a repository is adopted: the outcome's sentence (4.7) is what tells the person" (4.3).
+
+     1. **Your proposal stands.** `a_repository_adopted_from_the_navigation_link_is_held_by_the_engine` keeps its name and its engine assertions (`applications_admitted`, `engine_adopted(1, 7)`). Its steps end at the outcome's See, "Adopted acme/shop on forge 1 as owned.". The fixture `adopt_then_open_resources` loses the press of "See the project's resources" and the See of the "Project" heading, and is renamed for what it now does.
+     2. **No resources page is added.**
+     3. **The link goes with the act.** The forge page's "See the project's resources" goes, with `Word::Resources`, `Meaning::Resources` and its binding to `jig_client_view::address::ProjectSection::Resources`. So does the focused test `the_outcomes_link_opens_the_projects_resources`, and line 26 of the golden `adopt_adopted.txt`, recorded again by hand.
+     4. **The unknown outcome says 4.7's words:** "It is not known whether OWNER/NAME was adopted.", without ": see the project's resources". `forge_page.rs:102`'s expected value follows: a literal the new words rename.
+     5. **A further act or link that reaches a page of jig's reference UI** goes the same way. The story keeps its name and its engine assertions, and ends at temper's last page. List each one in the report.
+     6. **Size:** these are removals, not counted against the aim.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

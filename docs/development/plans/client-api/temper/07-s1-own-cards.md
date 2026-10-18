@@ -29,7 +29,8 @@ Shape:
 3. **The world:** temper's world gives jig's referee temper's phrasebook, through jig-15.s1's `Settings` field.
 4. **The removals:**
    - 07's Removes: the reference UI's child, `Owner::Jig`, `Address::Jig`, `parts.rs`, the forge side's held parts, `Limits.jig`;
-   - the `jig_client_view::Limits` in `tests/client/src/translate.rs`.
+   - the `jig_client_view::Limits` in `tests/client/src/translate.rs`;
+   - the forge page's link to jig's project resources (`Word::Resources`, `Meaning::Resources`, `forge_page.rs`'s `the_outcomes_link_opens_the_projects_resources`, the golden `adopt_adopted.txt`'s line 26), and ": see the project's resources" in the unknown outcome, which says "It is not known whether OWNER/NAME was adopted." (`client.md`, 4.7; ruling 396).
 
    With them comes 07.4's world test
    `a_client_closed_on_a_tasks_page_opens_at_the_inbox_again`, which
@@ -37,7 +38,7 @@ Shape:
 
 Test shape: each golden that shows a card is recorded again by hand,
 listed by file in the report. The stories keep their names, acts and
-expected values, except literals the new words rename. Each test under
+expected values, except literals the new words rename. An act that reaches a page of jig's reference UI goes with `Address::Jig`: the story keeps its name and its engine assertions and ends at temper's last page, as the adoption story ends at the outcome's sentence (ruling 396). Each test under
 20 ms (unit) or 0.5 s (world).
 
 Proof: 07.4's Proof (the one-process world's adoption story, and the
