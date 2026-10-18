@@ -1003,6 +1003,18 @@ run are appended after "For the user".
      Unchanged: ruling 152's items 1 to 5 and 7 (what you did is as it asks: `Throwaway::start` keeps the optional address,
      `gather_ms` is back); 11.1's Size (94 of the 3.5 times 30); the steers' points in force.
 
+154. **11.1 after the drain fix** (unblock, temper-11.1's block of 2026-10-18T14:01:33Z).
+     Ruling 154: the drain regression is fixed on `main`; 11.1 goes on as ruling 153 says for this case.
+
+     - client-api's temper-05.s2, 46796e8df ("Keep the accounts root close runnable during drain", 14:42Z), fixes 3262df8f9's
+       regression. Its body: "The six-story process proof passes, including the landing story's restart and four signal
+       drains … The whole process tier passes all 17 tests in 64.565 seconds with both Forgejo exports and no fail-fast".
+     - Rebase 2866288c8 on `main` (it merges cleanly onto eb8abb6aa), run the process tier once with `--no-fail-fast`,
+       and land if every story passes. A story still red then is a block, with its log: none may stay red any more (ruling
+       152's item 6 and ruling 153's list end here). Then 11.2, as ruling 144 gives it.
+
+     Unchanged: ruling 152's items 1 to 5 and 7; 11.1's Size (94 of the 3.5 times 30); the steers' points in force.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
