@@ -1,3 +1,4 @@
+pub mod acts;
 use crate::{Address, Event, Limits, Request, forge};
 use jig_client::contract::{self, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEvent};
 use jig_client_view::boundary::Offset;

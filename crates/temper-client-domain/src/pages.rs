@@ -13,18 +13,39 @@ pub struct Pages {
     project: Option<u32>,
     watching: bool,
     shown: u64,
-    inbox: Option<inbox::Inbox>,
+    pub(crate) inbox: Option<inbox::Inbox>,
     next: u64,
-    serial: u64,
+    pub(crate) serial: u64,
     seen: Option<(u64, jig_client::Key)>,
+    pub(crate) confirm: Option<crate::acts::Confirm>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
-    Project { project: u32 },
+    Project {
+        project: u32,
+    },
     SignOut,
-    Filter { filter: crate::address::Filter },
+    Filter {
+        filter: crate::address::Filter,
+    },
     Seen,
-    Go { address: Address },
+    Decide {
+        object: jig_client::contract::ObjectKey,
+        revision: Option<jig_client::contract::Revision>,
+        act: jig_client::contract::ActKind,
+    },
+    CardWords {
+        object: jig_client::contract::ObjectKey,
+        words: Box<[u8]>,
+    },
+    Again {
+        again: bool,
+    },
+    Confirm,
+    Cancel,
+    Go {
+        address: Address,
+    },
 }
 #[derive(Debug)]
 pub enum Event {
@@ -56,7 +77,12 @@ impl Pages {
             next: 1,
             serial: 0,
             seen: None,
+            confirm: None,
         }
+    }
+    #[must_use]
+    pub const fn confirmation(&self) -> Option<&crate::acts::Confirm> {
+        self.confirm.as_ref()
     }
     #[must_use]
     pub const fn inbox(&self) -> Option<&inbox::Inbox> {
@@ -107,6 +133,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                     pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
                 }
                 pages.seen = None;
+                pages.confirm = None;
             }
             pages.address = address;
         }
@@ -130,6 +157,9 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 }));
             }
         }
+        Event::Act {
+            act: act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm | Act::Cancel),
+        } => crate::acts::step(pages, env, act, out),
         Event::Act { act: Act::Project { project } } => {
             if let Some(me) = pages.me(client) {
                 for row in &me.projects {
@@ -169,6 +199,10 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Told { told } => {
+            if crate::acts::told(pages, &told) {
+                pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
+                return;
+            }
             if !match &mut pages.inbox {
                 Some(inbox) => inbox.told(client, told, out),
                 None => false,

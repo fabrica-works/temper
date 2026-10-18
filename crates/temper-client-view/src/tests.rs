@@ -1,3 +1,4 @@
+mod confirm;
 mod fixtures;
 mod forge_page;
 mod frame;

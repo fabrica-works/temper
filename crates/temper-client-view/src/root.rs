@@ -63,7 +63,14 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     crate::frame::navigation(&mut builder, root, &view.forge_words, &mut view.pages);
     if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
-        crate::pages::inbox::main(&mut builder, root, &view.forge_words, &view.jig_words, &mut view.pages);
+        crate::pages::inbox::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &view.jig_words,
+            &mut view.pages,
+            &mut view.jig,
+        );
     } else if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
         && let Some(form) = root.forge().form()
     {

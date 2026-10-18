@@ -10,7 +10,7 @@ use jig_client::{
     contract::{self, Delivery, InboxGroup, InboxReadGroup, ObjectKey, Read, ReadResult, ReadValue},
 };
 use skein_lib::{List, Queue};
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Card {
     pub object: ObjectKey,
     pub group: InboxGroup,
@@ -18,12 +18,17 @@ pub struct Card {
     pub position: Option<u64>,
     pub handle: Handle,
     pub page: Option<ReadValue>,
+    pub words: Option<contract::Text>,
+    pub key: Option<jig_client::Key>,
+    pub outcome: Option<jig_client::Outcome>,
 }
 #[derive(Debug)]
+#[expect(clippy::partial_pub_fields, reason = "refresh bookkeeping is private to the page")]
 pub struct Inbox {
     pub filter: Filter,
     pub entries: Handle,
     pub cards: List<Card>,
+    previous: List<Card>,
     pub queries: [Handle; 2],
     pub next: u64,
     pub window: u32,
@@ -43,6 +48,7 @@ impl Inbox {
             next: first.checked_add(3).expect("inbox handles fit"),
             window: limits.jig.rows.min((limits.jig.objects / 2).max(1)),
             cards: List::with_capacity(limits.jig.objects),
+            previous: List::with_capacity(limits.jig.objects),
         };
         client(
             out,
@@ -67,7 +73,15 @@ impl Inbox {
         for card in &self.cards {
             client(out, jig_client::Event::Unwatch { handle: card.handle });
         }
-        self.cards.clear();
+        self.previous.clear();
+        core::mem::swap(&mut self.cards, &mut self.previous);
+        for index in 0..self.previous.len() {
+            let old = self.previous.get_mut(index).expect("bounded card");
+            if old.key.is_some() {
+                self.cards.push(old.clone()).expect("previous cards fit");
+            }
+            old.page = None;
+        }
         if self.filter.goal.is_some() {
             for (handle, group) in self.queries.into_iter().zip([InboxReadGroup::Needs, InboxReadGroup::Updates]) {
                 if self.filter.kind.is_some() && group == InboxReadGroup::Updates {
@@ -145,7 +159,20 @@ impl Inbox {
         };
         let handle = Handle { asker: Owner::Pages.asker(), number: self.next };
         self.next = self.next.checked_add(1).expect("inbox handles fit");
-        self.cards.push(Card { object, group, project, position, handle, page: None }).expect("inbox cards bounded");
+        self.cards
+            .push(Card { object, group, project, position, handle, page: None, words: None, key: None, outcome: None })
+            .expect("inbox cards bounded");
+        for index in 0..self.previous.len() {
+            let old = self.previous.get_mut(index).expect("bounded card");
+            if old.object == object {
+                let index = self.cards.len().checked_sub(1).expect("new card");
+                let card = self.cards.get_mut(index).expect("new card");
+                card.words = old.words.take();
+                card.key = old.key;
+                card.outcome = old.outcome.take();
+                break;
+            }
+        }
         client(out, jig_client::Event::Read { handle, read: Readable::Jig(read) });
     }
     pub(super) fn told(&mut self, source: &Client, told: Told, out: &mut Queue<Request>) -> bool {
@@ -206,8 +233,11 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    List::<Card>::worst_case(limits.jig.objects)?
-        .checked_add(u64::from(limits.jig.objects).checked_mul(limits.jig.document_bytes)?)
+    List::<Card>::worst_case(limits.jig.objects)?.checked_mul(2)?.checked_add(
+        u64::from(limits.jig.objects).checked_mul(
+            limits.jig.document_bytes.checked_mul(2)?.checked_add(u64::from(limits.jig.text).checked_mul(2)?)?,
+        )?,
+    )
 }
 
 fn handle(number: u64) -> Handle {

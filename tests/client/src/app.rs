@@ -184,7 +184,11 @@ impl App for Temper {
                 domain::Event::Act { action: Action::Jig(act) }
                 | domain::Event::Jig(jig_client_view::Event::Act { action: act }),
             ) => observe::jig_window_changed(act),
-            Some(domain::Event::Act { action: Action::Forge(_) | Action::Pages(_) }) => true,
+            Some(domain::Event::Act { action: Action::Forge(_) }) => true,
+            Some(domain::Event::Act { action: Action::Pages(act) }) => matches!(
+                act,
+                domain::pages::Act::Project { .. } | domain::pages::Act::Filter { .. } | domain::pages::Act::Go { .. }
+            ),
             Some(
                 domain::Event::Start { .. }
                 | domain::Event::Went { .. }
@@ -246,7 +250,14 @@ impl App for Temper {
             jig_client::Ask::Family { .. } => {
                 Sent { attempt: *attempt, key: *key, card: Some(adoption_card()), revision: None, words: None }
             }
-            jig_client::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),
+            jig_client::Ask::Jig(ask) => {
+                let mut sent = observe::jig_sent(*attempt, *key, ask);
+                // temper's Release acts on the inbox escalation, not a reference task page.
+                if let jig_client::contract::Ask::Release { task, .. } = ask.as_ref() {
+                    sent.card = Some(observe::key(jig_client::contract::ObjectKey::Escalation(*task)));
+                }
+                sent
+            }
         })
     }
     fn decision(request: &Request) -> Option<&jig_client::contract::Ask> {

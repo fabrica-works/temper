@@ -11,6 +11,19 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    Accept,
+    Reject,
+    Answer,
+    Release,
+    LeaveHeld,
+    Take,
+    HandBack,
+    AnswerWords,
+    Reason,
+    Confirm,
+    Cancel,
+    Again,
+    DoNotRepeat,
     Brand,
     InboxTitle,
     NeedsYou,
@@ -63,7 +76,20 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 50] = [
+const ALL: [Word; 63] = [
+    Word::Accept,
+    Word::Reject,
+    Word::Answer,
+    Word::Release,
+    Word::LeaveHeld,
+    Word::Take,
+    Word::HandBack,
+    Word::AnswerWords,
+    Word::Reason,
+    Word::Confirm,
+    Word::Cancel,
+    Word::Again,
+    Word::DoNotRepeat,
     Word::Brand,
     Word::InboxTitle,
     Word::NeedsYou,
@@ -118,6 +144,19 @@ const ALL: [Word; 50] = [
 impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::Accept => 125,
+            Self::Reject => 126,
+            Self::Answer => 127,
+            Self::Release => 128,
+            Self::LeaveHeld => 129,
+            Self::Take => 130,
+            Self::HandBack => 131,
+            Self::AnswerWords => 132,
+            Self::Reason => 133,
+            Self::Confirm => 134,
+            Self::Cancel => 135,
+            Self::Again => 136,
+            Self::DoNotRepeat => 137,
             Self::Brand => 100,
             Self::InboxTitle => 110,
             Self::NeedsYou => 111,
@@ -211,8 +250,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(98);
-        let mut phrases = List::with_capacity(98);
+        let mut shapes = List::with_capacity(111);
+        let mut phrases = List::with_capacity(111);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -249,7 +288,7 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 98,
+            phrases: 111,
             holes: 3,
             segments: 686,
             text_bytes: 6144,
@@ -277,6 +316,19 @@ impl Words {
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::Accept => (&[b"Accept"], &[]),
+        Word::Reject => (&[b"Reject with reason"], &[]),
+        Word::Answer => (&[b"Answer"], &[]),
+        Word::Release => (&[b"Release task"], &[]),
+        Word::LeaveHeld => (&[b"Leave held"], &[]),
+        Word::Take => (&[b"Take"], &[]),
+        Word::HandBack => (&[b"Hand back"], &[]),
+        Word::AnswerWords => (&[b"Answer words"], &[]),
+        Word::Reason => (&[b"Reason"], &[]),
+        Word::Confirm => (&[b"Confirm"], &[]),
+        Word::Cancel => (&[b"Cancel"], &[]),
+        Word::Again => (&[b"Repeat the effect"], &[]),
+        Word::DoNotRepeat => (&[b"Do not repeat the effect"], &[]),
         Word::Brand => (&[b"temper"], &[]),
         Word::InboxTitle => (&[b"Inbox"], &[]),
         Word::NeedsYou => (&[b"Needs you"], &[]),

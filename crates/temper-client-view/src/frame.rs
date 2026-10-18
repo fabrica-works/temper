@@ -37,6 +37,9 @@ impl Bindings {
                         filter.goal = if value.is_empty() { None } else { Some(skein_ui::number(&value)?) };
                         Act::Filter { filter }
                     }
+                    (Act::CardWords { object, .. }, skein_ui::Act::Input { value }) => {
+                        Act::CardWords { object: *object, words: value }
+                    }
                     (meaning, skein_ui::Act::Press) => meaning.clone(),
                     _ => return None,
                 };

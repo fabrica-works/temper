@@ -334,6 +334,12 @@ pub fn inbox_root() -> temper_client_domain::Domain {
     inbox_root_filtered(temper_client_domain::address::Filter::ALL)
 }
 pub fn inbox_root_filtered(filter: temper_client_domain::address::Filter) -> temper_client_domain::Domain {
+    inbox_with_document(filter, None)
+}
+pub fn inbox_with_document(
+    filter: temper_client_domain::address::Filter,
+    document: Option<(jig_client::contract::Read, jig_client::contract::ReadValue)>,
+) -> temper_client_domain::Domain {
     use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
     let mut limits = domain_limits();
     limits.jig.objects = 6;
@@ -391,5 +397,30 @@ pub fn inbox_root_filtered(filter: temper_client_domain::address::Filter) -> tem
         },
         &mut out,
     );
+    if let Some((read, page)) = document {
+        while let Some(request) = out.pop() {
+            if let temper_client_domain::Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read: token, what: jig_client::Readable::Jig(what) },
+                    },
+            } = request
+                && what == read
+            {
+                root_event(
+                    &mut root,
+                    temper_client_domain::Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::ReadDone {
+                                read: token,
+                                result: jig_client::Readout::Jig(contract::ReadResult::Value(page)),
+                            },
+                        },
+                    },
+                );
+                break;
+            }
+        }
+    }
     root
 }

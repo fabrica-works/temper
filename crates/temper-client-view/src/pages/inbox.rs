@@ -1,4 +1,4 @@
-//! Home: needs first, updates afterwards, without deciding controls (06.2).
+//! Home: needs first, updates afterwards, and deciding controls (06.3).
 use crate::{
     frame::Bindings,
     words::{Word, Words},
@@ -29,6 +29,7 @@ pub(crate) fn main(
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
+    jig_bindings: &mut jig_client_view::JigBindings,
 ) {
     b.open(Role::Main);
     text(b, Role::Heading { level: 1 }, &words.say(Word::InboxTitle, &[]));
@@ -53,7 +54,7 @@ pub(crate) fn main(
         for group in groups.into_iter().flatten() {
             for card in &inbox.cards {
                 if card.group == group {
-                    entry(b, card, words, jig, bindings);
+                    entry(b, root, card, words, jig, bindings, jig_bindings);
                 }
             }
         }
@@ -61,6 +62,7 @@ pub(crate) fn main(
     if inbox.results_through().is_some() {
         control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
     }
+    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
     b.close();
 }
 #[expect(clippy::manual_map, reason = "view code spells out the optional goal")]
@@ -120,8 +122,17 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
     b.bind(bindings.insert(Act::Filter { filter }));
     b.close();
 }
-fn entry(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::words::Words, bindings: &mut Bindings) {
+fn entry(
+    b: &mut Builder,
+    root: &Domain,
+    card: &Card,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+    jig_bindings: &mut jig_client_view::JigBindings,
+) {
     b.open(Role::Item);
+    b.key(card_key(card.object));
     let kind = match card.group {
         InboxGroup::Proposals => Word::Proposal,
         InboxGroup::Questions => Word::Question,
@@ -157,6 +168,7 @@ fn entry(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::wor
     }
     if let Some(page) = &card.page {
         body(b, page, jig);
+        crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
     }
     b.close();
 }
@@ -218,4 +230,20 @@ fn body(b: &mut Builder, page: &ReadValue, jig: &jig_client_view::words::Words) 
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => {}
     }
+}
+
+fn card_key(object: ObjectKey) -> skein_ui::Key {
+    let (kind, a, b) = match object {
+        ObjectKey::Task(task) => (0, task, 0),
+        ObjectKey::Proposal(key) => match key.proposer {
+            Proposer::Task(task) => (1, task, key.number),
+            Proposer::Party(party) => (29, party, key.number),
+        },
+        ObjectKey::Escalation(task) => (2, task, 0),
+        ObjectKey::Question { task, message } => (3, task, message),
+        ObjectKey::PersonTask(task) => (4, task, 0),
+        ObjectKey::Result(task) => (5, task, 0),
+        ObjectKey::Note { project, note } => (6, u64::from(project), note),
+    };
+    skein_ui::Key { owner: jig_client_view::Owner::Jig.opaque(), kind, a, b }
 }

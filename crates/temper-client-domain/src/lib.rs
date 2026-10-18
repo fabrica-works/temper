@@ -6,6 +6,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod acts;
 pub mod address;
 pub mod boundary;
 pub mod domain;
