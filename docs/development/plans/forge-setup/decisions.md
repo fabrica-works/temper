@@ -930,6 +930,23 @@ run are appended after "For the user".
      - Unchanged: checks (a) to (h), the 420 s wall, the script's own timeouts, ruling 147's forms rule (the pages that held
        no `_csrf` are named in the landing report, one line each), 14.2's Files, Size and Don't.
 
+151. **14.2's CI branch and runs** (plan defect, temper-14.2's block of 2026-10-18T13:16:26Z).
+     Ruling 151, two plan defects in 14.2.
+
+     1. **Check (e) left a branch that check (f)'s adoption refuses.** (e) pushes "a new branch `temper/guide`"; adoption
+        refuses a branch under the deployment's prefix that it does not own (`temper-engine-domain-forge`'s `adoption.rs`,
+        the `Branches` stage: `branch.starts_with(&pending.request.prefix) && !owns_branch(..)` → `Error::Refused`). (e) now
+        ends: "and the branch is then deleted (`DELETE /api/v1/repos/acme/widget/branches/temper/guide`, 204), since
+        adoption refuses a branch under the deployment's prefix that it does not own (…; ruling 151)": as your script
+        now does.
+     2. **The Bound is ten runs.** It now reads "at most ten runs, each after the last one's cause, a new one, was found by
+        a focused probe and handled in the script (rulings 150 and 151)"; the rest of it stands ("a failure with a cause
+        seen before, or a fault in temper or the example rather than the script, is a question"). You have four more full
+        runs, each under 420 s. Before each, `heavy cargo build -p temper --bin temper` once, as the script now checks.
+
+     Unchanged: checks (a) to (d) and (f) to (h), the guide's text (the person's walk pushes no `temper/` branch), 14.2's
+     Files, Size and Don't; ruling 147's forms rule, and the landing report's lines for the pages with no `_csrf`.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
