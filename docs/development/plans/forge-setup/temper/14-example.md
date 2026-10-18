@@ -123,8 +123,9 @@ Shape:
    two templates (`application.charter` 2), `engine.limits` `small` with its three authority overrides (8),
    `deployment.directory` `state`. `llm`: the endpoint `codex`, TLS to `{"host": "chatgpt.com", "port": 443}`, the model
    `gpt-6-luna`, one account `{"number": 1, "source": {"handed_in": {"file": "accounts/llm.json"}}}`, `records`
-   `accounts/records`. `memory_bytes` and each other number are the least the start's checks accept (one run reports
-   every problem: at most three reruns). If T4 finds the documents past the client's, the engine names `documents.rows`,
+   `accounts/records`. `memory_bytes` and each other number are the least the start's checks accept: take each from
+   the check that refuses it, and rerun the focused tests until T3's start passes (each stage of configuration.md 2's
+   "Reading" reports its problems and stops, `startup.rs`'s `return Err(problems)`; ruling 143). If T4 finds the documents past the client's, the engine names `documents.rows`,
    `lines` and `text_bytes` as the tier does (`support/configuration.rs:31-33`).
 2. `owned/agent.json`: the endpoint, account and model of `engine.llm` under the same names (configuration.md 5), the
    real provider's members as `support/live.rs:46-69` sets them: TLS to `chatgpt.com:443`, the machine's roots, the

@@ -761,6 +761,24 @@ run are appended after "For the user".
         `"charters": [{"number": 1, ...}, {"number": 2, ...}]` and the owned block has `"charter": 2`. The whole example
         therefore starts with charter 2. Only the tier's `owned::application` sets 1.
 
+143. **14.1's startup reruns** (plan defect, temper-14.1's block of 2026-10-18T12:00:49Z).
+     Ruling 143, a plan defect in temper 14.1's Shape 1. Yes: rerun the focused startup tests until T3's start passes.
+
+     - Shape 1 said: "`memory_bytes` and each other number are the least the start's checks accept (one run reports every
+       problem: at most three reruns)". Its premise is wrong on `main`: configuration.md 2 reads the file "in this order"
+       (stages 1 to 5), and `crates/temper-service/src/startup.rs` ends each stage with `if !problems.is_empty() { return
+       Err(problems); }`, so one run reports one stage's problems. "Every problem found is reported" holds within a stage.
+     - The parenthesis now reads: "take each from the check that refuses it, and rerun the focused tests until T3's start
+       passes (each stage of configuration.md 2's "Reading" reports its problems and stops, `startup.rs`'s `return
+       Err(problems)`; ruling 143)". The three-rerun limit is gone; no count replaces it.
+     - Rule: each number is the least its check accepts, derived from that check's source calculation, as you did for
+       `checkout.name_bytes` 539 and `largest_output`; never a round number above it. If one field is refused again after you
+       set its derived least, block with both refusals.
+     - Unchanged: the Test shape's ceilings (T1 20 ms, T2 0.5 s, T3 1 s, T4 50 ms), the designer's `engine.limits` literal
+       (ruling 142), `application.limits` as `small` with the fewest overrides T3 finds, each named in the landing report;
+       Size (151 of 140 support lines is within the README's 3.5 times), Proof and Done when. The startup code's stages stay
+       as they are: 14.1 changes no `startup.rs`.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
