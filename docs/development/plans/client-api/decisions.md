@@ -2226,6 +2226,17 @@ choice would have been the user's (development.md, 10.4).
      2. The landing report gives 510 and this ruling's number on its Size line; nothing else is wanted for the size.
      3. Unchanged: 17.2's Scope, Files, Shape, Proof and Don't; 17.3's to 17.5's Sizes; rulings 302 and 307.
 
+313. **temper's engine names its own watch room** (cross-session scope, temper-04.3's block of 2026-10-18T05:21:08Z).
+     Ruling 313: yes to your first repair, the watch room aligned with the client: temper's engine names its own room, 16 watches a party and 16 in all, the client's own budget. Not the second: a busy watch's end is the design's (jig `client/domain/client.md`: `Ended` is "for what opening again would not mend: the engine refused it (unknown, not allowed, busy)"), and a close-before-reopen wait changes jig's client.
+
+     temper's design leaves the number to temper: the numbers jig's core added "take jig's small profile's values until temper's configuration names its own" (`domain/engine.md`, 13), and such a constant "cites jig's small profile's" (`configuration.md`, 7). `limits.rs:100-101` keeps jig's smallest profile "until its clients watch more": they do, `me` and two pages at once, more while a reopen's closes are in flight, against the client's budget of 16 (`temper-client-shell-terminal/src/limits.rs:29`). The process tiers already override both to 16.
+
+     1. 04.3's Files gain `crates/temper-engine-domain/src/limits.rs:100-105`: `VIEWS`'s `watchers` and `watchers_per_party` become 16, and its doc comment says they are the client's own budget and cites jig's small profile's 4. `runs` and the other fields stay.
+     2. What derives from them grows with them: the root's `max_out` (`domain.rs:362-363`; jig's views `max_out` is `watchers + 2`, so 10 becomes 22) and what is sized from it (`limits.rs:86`'s `journal.now`, `limits.rs:362`'s worst case, temper-service's queues). Refresh any test or golden that pins one of these numbers, or counts on a party's fifth watch being refused, to the new room, and list each in the commit body.
+     3. The process tiers' overrides (`crates/temper/tests/support/configuration.rs:35-36`, `tests/one-process/src/fixtures.rs:93-94`) stay: they now equal the default.
+     4. Ruling 229 holds: run the focused replay of seed 5 with the new room, then the gate once. A failure at the same point is a block with the logs.
+     5. Whether a party's room counts the watches whose close is in flight, and what the client does when its own `me` is refused busy, go to the designer (`question.md`). This ruling does not rest on the answer, and 04.3 goes on with it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

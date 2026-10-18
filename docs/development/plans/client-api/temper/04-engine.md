@@ -144,6 +144,15 @@ path's segments apart from its rows (`configuration.md`, 7).
   durable. Follow jig 16.1's diff of `tests/channel/src/world/store.rs`;
   refresh any further copy, and list it in the commit body.
 
+## Corrections after temper 04.3's block of 2026-10-18T05:21:08Z (ruling 313)
+
+- **04.3, Files** gain `crates/temper-engine-domain/src/limits.rs:100-105`:
+  `VIEWS`'s `watchers` and `watchers_per_party` become 16, the client's
+  own watch budget (`crates/temper-client-shell-terminal/src/limits.rs:29`),
+  and its doc comment cites jig's small profile's 4 (configuration.md, 7).
+  The root's `max_out` (`domain.rs:362-363`) and what is sized from it
+  grow with them; the process tiers' overrides to 16 stay.
+
 ## Increments
 
 ### 04.1 `templates` in temper's configurations, in place of `chats`
