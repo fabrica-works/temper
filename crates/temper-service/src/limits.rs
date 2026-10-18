@@ -101,12 +101,12 @@ const FORGE: forge::Limits = forge::Limits {
     changes: 8,
     // Live issue projections, from the engine forge world fixture.
     issues: 8,
-    // Resources held by one task, from the engine forge world fixture.
-    resources_per_task: 4,
+    // Held to the agent's two checkout repositories.
+    resources_per_task: 2,
     // Paths retained by one subscription, from the engine forge world fixture.
     paths_per_subscription: 4,
-    // Bytes in a forge name or branch: the small profile's 256-byte ceiling.
-    name_bytes: 256,
+    // Leaves 122 bytes for a git base within the checkout's 256 bytes.
+    name_bytes: 64,
     // Output records reserved per forge step, from the engine forge world fixture.
     output: 80,
     // Facts awaiting drain, from the engine forge world fixture.
@@ -163,12 +163,12 @@ const FORGE: forge::Limits = forge::Limits {
 const CHECKOUT: checkout::Limits = checkout::Limits {
     // Cached or held checkout workspaces, from the checkout world fixture.
     workspaces: 3,
-    // Repositories retained, from the checkout world fixture.
-    repositories: 3,
+    // Held to the agent's two repository directories.
+    repositories: 2,
     // Bytes in a checkout key, name, remote or branch: the 256-byte ceiling.
     name_bytes: 256,
-    // Bytes in a commit message, from the checkout world fixture.
-    message_bytes: 256,
+    // Holds the agent's largest commit-message argument.
+    message_bytes: 4096,
     // Conflicted paths per repository, from the checkout merges world.
     conflicts: 4,
     // Bytes per conflicted path: four NUL-terminated paths fit stdout_bytes 1,024.

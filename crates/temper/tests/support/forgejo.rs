@@ -141,18 +141,21 @@ impl Throwaway {
 
 pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     let Forge::Throwaway { api, forgejo, .. } = forge else { return };
-    let (_, runner) = owned::binaries();
-    owned::document(
-        value,
-        &owned::Names {
-            forgejo,
-            runner: Some(&runner),
-            port: api.port(),
-            bot: "temper-bot",
-            person: "ada",
-            orgs: &["acme"],
-        },
-    );
+    let mut owned = owned::Owned::tier();
+    owned.forgejo = *api;
+    owned.forgejo_binary = forgejo.into();
+    let path = directory.join("config.json");
+    if let Ok(bytes) = fs::read(&path) {
+        let previous: Value = serde_json::from_slice(&bytes).expect("previous configuration");
+        for (name, listener) in [("clients", &mut owned.clients), ("webhooks", &mut owned.webhooks)] {
+            if let Some(address) = previous["application"][name]["listener"]["socket"].as_str() {
+                *listener = address.parse().expect("listener address");
+            }
+        }
+    }
+    let limits = value["application"]["limits"].take();
+    value["application"] = owned::application(&owned);
+    value["application"]["limits"] = limits;
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",api.to_string()],"last":"open","value":"acme"}});
     let grants =
         json!([grant(1), grant(2), grant(3), grant(4), grant(7), grant(8), grant(10), grant(11), grant(12), grant(13)]);
@@ -163,8 +166,6 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     value["engine"]["projects"][0]["policy"]["roles"][0]["authority"] = authority;
     value["engine"]["projects"][0]["policy"]["roles"][0]["authority"]["budget"]["spend"] = 40.into();
     value["engine"]["projects"][0]["policy"]["projections"] = grants;
-    value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{"connector":1,"kind":4,"enforce":true,"pattern":{"segments":["forge",api.to_string(),"acme","widget","branch"],"last":"exact","value":"main"},"ci":true,"up_to_date":true,"gates":[],"approvals":[]}]}]);
-    value["application"]["limits"]["overrides"]["root.brief.gather_ms"] = 5000.into();
     let limits = value["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides");
     for (name, size) in [
         ("people.operations", 5),

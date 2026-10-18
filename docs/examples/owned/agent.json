@@ -1,0 +1,64 @@
+{
+  "profile": {
+    "name": "standard",
+    "declared": {
+      "memory": 2147483648,
+      "tool_payload": 600,
+      "read_window": 256,
+      "conversations": 1,
+      "calls_per_response": 1
+    },
+    "policy": {
+      "max_turns": 5,
+      "group_stop": 10,
+      "inbox": 8,
+      "unacknowledged": 8
+    }
+  },
+  "endpoints": [
+    {
+      "name": "codex",
+      "number": 1,
+      "dialect": 0,
+      "account": 1,
+      "provider": "codex",
+      "address": "chatgpt.com:443",
+      "transport": "tls",
+      "server_name": "chatgpt.com",
+      "identity": "plain",
+      "connect": 10000,
+      "handshake": 10000,
+      "headers": [
+        {
+          "name": "originator",
+          "value": "pi"
+        },
+        {
+          "name": "user-agent",
+          "value": "pi (linux; x86_64)"
+        },
+        {
+          "name": "OpenAI-Beta",
+          "value": "responses=experimental"
+        }
+      ],
+      "models": [
+        {
+          "name": "gpt-6-luna",
+          "prices": {
+            "input": 1,
+            "cached": 1,
+            "output": 1,
+            "unit": 1000000
+          },
+          "window": 1048576,
+          "output": 8192,
+          "reasoning_item": 2048,
+          "head": 60000,
+          "idle": 30000
+        }
+      ]
+    }
+  ],
+  "environment": []
+}

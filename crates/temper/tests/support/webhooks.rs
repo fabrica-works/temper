@@ -13,6 +13,10 @@ use std::{
 };
 
 pub const SECRET: &[u8] = b"fixture-hook-secret";
+// setup.md 8 gives forge 1 the listener path; forge 9 is not configured.
+pub const KNOWN_FORGE: &str = "/hooks/1";
+pub const UNKNOWN_FORGE: &str = "/hooks/9";
+const SOCKET_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 pub const PING: &[u8] = b"ping";
 
 #[must_use]
@@ -57,9 +61,9 @@ impl<'a> Post<'a> {
         Self { path, body, event, signed: false }
     }
     fn send(&self, listener: SocketAddr) -> u16 {
-        let mut stream = TcpStream::connect_timeout(&listener, std::time::Duration::from_secs(5)).expect("listener");
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).expect("read deadline");
-        stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).expect("write deadline");
+        let mut stream = TcpStream::connect_timeout(&listener, SOCKET_DEADLINE).expect("listener");
+        stream.set_read_timeout(Some(SOCKET_DEADLINE)).expect("read deadline");
+        stream.set_write_timeout(Some(SOCKET_DEADLINE)).expect("write deadline");
         write!(stream, "POST {} HTTP/1.1\r\nHost: {listener}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nX-Forgejo-Event: {}\r\n",
             self.path, self.body.len(), std::str::from_utf8(self.event).expect("event")).expect("request head");
         if self.signed {
@@ -136,4 +140,11 @@ pub fn served(directory: &Path, listener: SocketAddr, posts: &[Post<'_>]) -> End
     assert!(outcome.procs.iter().all(Host::is_empty), "all io settles");
     let Process::Binary(binary) = &outcome.procs[0] else { panic!("binary") };
     Ended { statuses, exit: binary.exit_status(), stderr: binary.stderr().to_vec() }
+}
+
+/// One delivery through the complete startup and shutdown of the listener.
+#[must_use]
+pub fn delivered(scratch: &super::Scratch, post: Post<'_>) -> Ended {
+    let listener = configuration(scratch.path());
+    served(scratch.path(), listener, &[post])
 }

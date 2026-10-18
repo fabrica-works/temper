@@ -40,7 +40,7 @@ fn a_remote_past_the_checkouts_names_refuses_the_start() {
     let document = fixtures::with(
         &fixtures::document(),
         b"application.limits.overrides",
-        br#"{"checkout.name_bytes":300,"checkout.repositories":4}"#,
+        br#"{"checkout.name_bytes":300,"checkout.repositories":4,"forge.name_bytes":256,"forge.resources_per_task":4}"#,
     );
     let found = crate::named(&document).unwrap_err();
     assert_eq!(

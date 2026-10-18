@@ -2,6 +2,7 @@
 use skein_lib::Duration;
 use std::{
     fs,
+    net::SocketAddr,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Output},
@@ -16,18 +17,28 @@ pub struct Names<'a> {
     pub orgs: &'a [&'a str],
 }
 pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
-    let api = format!("127.0.0.1:{}", names.port);
-    value["application"]["forges"][0] = serde_json::json!({"number":1,"kind":"forgejo","api":{"socket":api},
-        "transport":"plaintext","git":format!("http://{api}"),"webhook_secret":null,"api_token":"forge-1/api_token",
-        "user":{"file":"forge-1/user"},"identity":1});
-    value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
-    value["application"]["identities"][0]["login"] = names.bot.into();
-    value["application"]["setup"] = serde_json::json!([{"forge":1,"directory":"forge-1",
-        "bot":{"login":names.bot,"email":format!("{}@example.invalid", names.bot)},"orgs":names.orgs,
-        "mode":{"owned":{"forgejo":names.forgejo,"runner":names.runner.map(|binary| serde_json::json!({"binary":binary,
-            "labels":["temper-host:host"],"capacity":1,"path":"/usr/bin:/bin"})),
-            "listen":{"socket":api},"person":{"login":names.person,"email":format!("{}@example.invalid", names.person)}}}}]);
+    let mut owned = Owned::example();
+    owned.forgejo = ([127, 0, 0, 1], names.port).into();
+    owned.forgejo_binary = names.forgejo.into();
+    let mut members = application(&owned);
+    members["forges"][0]["webhook_secret"] = serde_json::Value::Null;
+    members["webhooks"] = serde_json::Value::Null;
+    members["identities"][0]["login"] = names.bot.into();
+    let setup = &mut members["setup"][0];
+    setup["bot"] = serde_json::json!({"login":names.bot,"email":format!("{}@example.invalid", names.bot)});
+    setup["orgs"] = serde_json::json!(names.orgs);
+    let mode = &mut setup["mode"]["owned"];
+    mode["person"] = serde_json::json!({"login":names.person,"email":format!("{}@example.invalid", names.person)});
+    if let Some(binary) = names.runner {
+        mode["runner"]["binary"] = serde_json::json!(binary);
+    } else {
+        mode["runner"] = serde_json::Value::Null;
+    }
+    for name in ["forges", "identities", "setup"] {
+        value["application"][name] = members[name].take();
+    }
 }
+
 pub fn configuration(directory: &Path, names: &Names<'_>) {
     super::configuration(directory, &super::Forge::Unreached);
     let path = directory.join("config.json");
@@ -114,9 +125,9 @@ esac
             forgejo: &directory.join("forgejo"),
             runner: Some(&directory.join("runner")),
             port: 3000,
-            bot: "temper-bot",
+            bot: "temper",
             person: "ada",
-            orgs: &["workshop"],
+            orgs: &["acme"],
         },
     );
     Programs { directory: directory.into() }
@@ -284,9 +295,9 @@ pub fn prepared_processes(directory: &Path) -> u16 {
             forgejo: Path::new(&forgejo),
             runner: Some(Path::new(&runner)),
             port,
-            bot: "temper-bot",
+            bot: "temper",
             person: "ada",
-            orgs: &["workshop"],
+            orgs: &["acme"],
         },
     );
     let prepared = prepare(directory, 1);
@@ -399,11 +410,11 @@ pub fn assert_converged(directory: &Path, instance: &temper_throwaway_forgejo::I
     let response = instance.exchange(&Outgoing::get("/api/v1/user", Some(&token))).expect("bot answers");
     assert_eq!(response.status, 200);
     let bot: serde_json::Value = serde_json::from_slice(&response.body).expect("bot JSON");
-    assert_eq!(bot["login"], "temper-bot");
+    assert_eq!(bot["login"], "temper");
     let id = fs::read_to_string(directory.join("forge-1/user")).expect("user").trim().parse::<u64>().expect("id");
     assert_eq!(bot["id"], id);
     let admin = &instance.admin().token;
-    let account = instance.exchange(&Outgoing::get("/api/v1/users/temper-bot", Some(admin))).expect("account answers");
+    let account = instance.exchange(&Outgoing::get("/api/v1/users/temper", Some(admin))).expect("account answers");
     let account: serde_json::Value = serde_json::from_slice(&account.body).expect("account JSON");
     assert_eq!(account["is_admin"], false);
     assert!(account["full_name"].as_str().expect("full name").contains("temper:bot"));
@@ -412,7 +423,7 @@ pub fn assert_converged(directory: &Path, instance: &temper_throwaway_forgejo::I
     assert_eq!(org["visibility"], "private");
     let teams = instance.exchange(&Outgoing::get("/api/v1/orgs/acme/teams", Some(admin))).expect("teams answer");
     let teams: serde_json::Value = serde_json::from_slice(&teams.body).expect("teams JSON");
-    assert!(teams.as_array().expect("teams").iter().any(|team| team["name"] == "temper-bot"));
+    assert!(teams.as_array().expect("teams").iter().any(|team| team["name"] == "temper"));
 }
 /// A managed forge whose directory reconcile must make itself.
 pub fn managed(directory: &Path) {
@@ -422,7 +433,7 @@ pub fn managed(directory: &Path) {
             forgejo: Path::new("/usr/bin/false"),
             runner: None,
             port: 9,
-            bot: "temper-bot",
+            bot: "temper",
             person: "ada",
             orgs: &["acme"],
         },
@@ -450,7 +461,7 @@ pub fn reconcile_configuration(directory: &Path) -> u16 {
     let port = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address").port();
     configuration(
         directory,
-        &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper-bot", person: "ada", orgs: &["acme"] },
+        &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper", person: "ada", orgs: &["acme"] },
     );
     port
 }
@@ -465,8 +476,118 @@ pub fn binaries() -> (PathBuf, PathBuf) {
 /// Writes the process tier's owned setup and engine configuration without starting a process.
 #[must_use]
 pub fn tier_configuration(directory: &Path) -> std::net::SocketAddr {
-    let (forgejo, _) = binaries();
-    let api = std::net::TcpListener::bind("127.0.0.1:0").expect("free port").local_addr().expect("address");
-    super::configuration(directory, &super::Forge::Throwaway { forgejo: &forgejo, api, git: format!("http://{api}") });
-    api
+    let owned = Owned::tier();
+    super::configuration(
+        directory,
+        &super::Forge::Throwaway {
+            forgejo: &owned.forgejo_binary,
+            api: owned.forgejo,
+            git: format!("http://{}", owned.forgejo),
+        },
+    );
+    owned.forgejo
+}
+
+/// The complete owned deployment and its non-secret files, kept with the guide.
+pub const EXAMPLE: &[u8] = include_bytes!("../../../../docs/examples/owned.json");
+pub const SHIPPED: [(&str, &[u8]); 3] = [
+    ("owned/agent.json", include_bytes!("../../../../docs/examples/owned/agent.json")),
+    ("owned/charters/chat.txt", include_bytes!("../../../../docs/examples/owned/charters/chat.txt")),
+    ("owned/charters/coding.txt", include_bytes!("../../../../docs/examples/owned/charters/coding.txt")),
+];
+/// The example's three listeners, provider, binaries and optional agent review.
+pub struct Owned {
+    pub forgejo: SocketAddr,
+    pub clients: SocketAddr,
+    pub webhooks: SocketAddr,
+    pub llm: SocketAddr,
+    pub forgejo_binary: PathBuf,
+    pub runner_binary: PathBuf,
+    pub review: bool,
+}
+impl Owned {
+    #[must_use]
+    pub fn example() -> Self {
+        Self {
+            forgejo: "127.0.0.1:3000".parse().expect("example Forgejo"),
+            clients: "127.0.0.1:7100".parse().expect("example clients"),
+            webhooks: "127.0.0.1:7101".parse().expect("example webhooks"),
+            llm: "127.0.0.1:34443".parse().expect("fake peer"),
+            forgejo_binary: "/opt/forgejo/forgejo".into(),
+            runner_binary: "/opt/forgejo/forgejo-runner".into(),
+            review: true,
+        }
+    }
+    #[must_use]
+    pub fn tier() -> Self {
+        let (forgejo_binary, runner_binary) = binaries();
+        Self {
+            forgejo: super::webhooks::free_address(),
+            clients: super::webhooks::free_address(),
+            webhooks: super::webhooks::free_address(),
+            forgejo_binary,
+            runner_binary,
+            review: false,
+            ..Self::example()
+        }
+    }
+}
+fn edited(bytes: &[u8], owned: &Owned) -> String {
+    std::str::from_utf8(bytes)
+        .expect("example UTF-8")
+        .replace("127.0.0.1:3000", &owned.forgejo.to_string())
+        .replace("127.0.0.1:7100", &owned.clients.to_string())
+        .replace("127.0.0.1:7101", &owned.webhooks.to_string())
+        .replace("chatgpt.com:443", &owned.llm.to_string())
+        .replace("/opt/forgejo/forgejo-runner", owned.runner_binary.to_str().expect("runner path"))
+        .replace("/opt/forgejo/forgejo", owned.forgejo_binary.to_str().expect("Forgejo path"))
+}
+fn example_value(owned: &Owned) -> serde_json::Value {
+    let mut value: serde_json::Value = serde_json::from_str(&edited(EXAMPLE, owned)).expect("owned JSON");
+    value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":owned.llm.to_string()});
+    if !owned.review {
+        value["application"]["landing"]["projects"][0]["rules"][0]["gates"] = serde_json::json!([]);
+    }
+    value
+}
+#[must_use]
+pub fn application(owned: &Owned) -> serde_json::Value {
+    let mut value = example_value(owned)["application"].take();
+    value["charter"] = 1.into();
+    value
+}
+#[must_use]
+pub fn example_document(directory: &Path, owned: &Owned) -> Vec<u8> {
+    serde_json::to_string(&example_value(owned))
+        .expect("example JSON")
+        .replace("/home/me/temper", directory.to_str().expect("deployment path"))
+        .replace("/usr/local/bin/temper", env!("CARGO_BIN_EXE_temper"))
+        .into_bytes()
+}
+/// The guide's copied files and private credentials, with the fake peer's account.
+pub fn lay(directory: &Path, owned: &Owned) {
+    for name in ["owned/charters", "secrets", "accounts/records"] {
+        let path = directory.join(name);
+        fs::create_dir_all(&path).expect("example directory");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private directory");
+    }
+    for (name, bytes) in SHIPPED {
+        let text = edited(bytes, owned).replace("/home/me/temper", directory.to_str().expect("deployment path"));
+        fs::write(directory.join(name), text).expect("shipped file");
+    }
+    let path = directory.join("owned/agent.json");
+    let mut agent: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("agent")).expect("agent JSON");
+    agent["endpoints"][0]["server_name"] = "skein.test".into();
+    agent["endpoints"][0]["trust_der"] = serde_json::json!(directory.join("root.der"));
+    fs::write(path, serde_json::to_vec(&agent).expect("agent JSON")).expect("fake agent");
+    super::write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
+    super::write_private(&directory.join("secrets/worker.secret"), b"worker-secret\n");
+    super::write_private(
+        &directory.join("secrets/worker.digest"),
+        b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf\n",
+    );
+    super::write_private(
+        &directory.join("accounts/llm.json"),
+        br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
+    );
 }

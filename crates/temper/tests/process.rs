@@ -3,6 +3,9 @@ pub mod support;
 use skein_io::kernel::{Exit, Signal};
 use skein_lib::Duration;
 
+// Session 14.1 bounds each whole-example box story at 120 seconds.
+const BOX_DEADLINE: Duration = Duration::from_secs(120);
+
 #[test]
 fn temper_serve_prints_its_link_and_drains_on_a_signal() {
     let scratch = support::Scratch::new("drain");
@@ -253,10 +256,11 @@ fn reconcile_converges_an_owned_forgejo_and_a_second_run_writes_nothing() {
 }
 
 #[test]
-fn temper_box_prints_the_link_and_a_stop_leaves_no_process() {
+fn temper_box_prints_its_link_and_stops_its_processes() {
     let scratch = support::Scratch::new("box_stop");
-    let forgejo = support::owned::tier_configuration(scratch.path());
-    let ended = support::boxed::run(scratch.path(), forgejo, support::boxed::Plan::Stop, Duration::from_secs(120));
+    let owned = boxed_example(&scratch);
+    let forgejo = owned.forgejo;
+    let ended = support::boxed::run(scratch.path(), forgejo, support::boxed::Plan::Stop, BOX_DEADLINE);
     assert_box_streams(&ended);
     assert_eq!(ended.forgejo_at_link, Some(200), "Forgejo answered its version when the link came");
     assert_eq!(ended.exit, Some(Exit::Code(0)), "stopped as asked: {}", String::from_utf8_lossy(&ended.stderr));
@@ -264,8 +268,17 @@ fn temper_box_prints_the_link_and_a_stop_leaves_no_process() {
     assert_eq!(support::boxed::status(forgejo, "/api/v1/version"), None, "Forgejo is gone");
     scratch.remove();
 }
+fn boxed_example(scratch: &support::Scratch) -> support::owned::Owned {
+    let owned = support::owned::Owned::tier();
+    support::owned::lay(scratch.path(), &owned);
+    std::fs::write(scratch.path().join("config.json"), support::owned::example_document(scratch.path(), &owned))
+        .expect("box example");
+    owned
+}
 fn assert_box_streams(ended: &support::boxed::Outcome) {
-    let link = support::printed_link(&ended.stdout).expect("the box's stdout carries the link");
+    let link = support::printed_link(&ended.stdout).unwrap_or_else(|| {
+        panic!("the box's stdout carries the link: {}", String::from_utf8_lossy(&ended.stderr));
+    });
     assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some(), "the sign-in link");
     let alone = |line: &[u8]| line.is_empty() || line.starts_with(b"http://127.0.0.1:");
     assert!(ended.stdout.split(|byte| *byte == b'\n').all(alone), "stdout holds links alone");
@@ -278,10 +291,13 @@ fn assert_box_streams(ended: &support::boxed::Outcome) {
 #[test]
 fn temper_box_restarts_a_killed_forgejo_while_the_engine_serves() {
     let scratch = support::Scratch::new("box_kill");
-    let forgejo = support::owned::tier_configuration(scratch.path());
+    let owned = boxed_example(&scratch);
+    let forgejo = owned.forgejo;
     let kill = support::boxed::Plan::KillForgejo;
-    let ended = support::boxed::run(scratch.path(), forgejo, kill, Duration::from_secs(120));
-    let (killed, restarted) = ended.forgejo_pids.expect("Forgejo was killed and came back");
+    let ended = support::boxed::run(scratch.path(), forgejo, kill, BOX_DEADLINE);
+    let (killed, restarted) = ended.forgejo_pids.unwrap_or_else(|| {
+        panic!("Forgejo was killed and came back: {}", String::from_utf8_lossy(&ended.stderr));
+    });
     assert_ne!(killed, restarted, "another Forgejo process answers");
     assert_eq!(ended.engine_served, Some(true), "the same engine process answered while Forgejo was back");
     assert_eq!(ended.exit, Some(Exit::Code(0)), "stopped as asked: {}", String::from_utf8_lossy(&ended.stderr));
@@ -291,30 +307,27 @@ fn temper_box_restarts_a_killed_forgejo_while_the_engine_serves() {
 
 #[test]
 fn temper_serve_answers_a_signed_delivery_204() {
-    use support::webhooks::{self, PING, Post};
+    use support::webhooks::{self, KNOWN_FORGE, PING, Post};
     let scratch = support::Scratch::new("signed_hook");
-    let listener = webhooks::configuration(scratch.path());
-    let ended = webhooks::served(scratch.path(), listener, &[Post::signed("/hooks/1", b"ping", PING)]);
+    let ended = webhooks::delivered(&scratch, Post::signed(KNOWN_FORGE, b"ping", PING));
     assert_eq!(ended.statuses, [204]);
     assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
     scratch.remove();
 }
 #[test]
 fn temper_serve_answers_an_unsigned_delivery_403() {
-    use support::webhooks::{self, PING, Post};
+    use support::webhooks::{self, KNOWN_FORGE, PING, Post};
     let scratch = support::Scratch::new("unsigned_hook");
-    let listener = webhooks::configuration(scratch.path());
-    let ended = webhooks::served(scratch.path(), listener, &[Post::unsigned("/hooks/1", b"ping", PING)]);
+    let ended = webhooks::delivered(&scratch, Post::unsigned(KNOWN_FORGE, b"ping", PING));
     assert_eq!(ended.statuses, [403]);
     assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
     scratch.remove();
 }
 #[test]
 fn temper_serve_answers_an_unknown_forge_404() {
-    use support::webhooks::{self, PING, Post};
+    use support::webhooks::{self, PING, Post, UNKNOWN_FORGE};
     let scratch = support::Scratch::new("unknown_hook");
-    let listener = webhooks::configuration(scratch.path());
-    let ended = webhooks::served(scratch.path(), listener, &[Post::signed("/hooks/9", b"ping", PING)]);
+    let ended = webhooks::delivered(&scratch, Post::signed(UNKNOWN_FORGE, b"ping", PING));
     assert_eq!(ended.statuses, [404]);
     assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
     scratch.remove();

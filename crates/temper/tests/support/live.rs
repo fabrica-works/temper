@@ -128,7 +128,7 @@ fn pushed(directory: &Path, forge: &Throwaway, baseline: &[u8]) -> Option<Push> 
         return None;
     }
     let mut paths = Vec::new();
-    files(&directory.join("worker-root"), &mut paths);
+    files(&directory.join("workspaces"), &mut paths);
     for path in paths {
         if path.file_name().is_none_or(|name| name != "HEAD") {
             continue;

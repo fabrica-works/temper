@@ -289,3 +289,63 @@ fn a_webhook_secret_readable_by_others_refuses_startup() {
     );
     scratch.remove();
 }
+
+fn owned_example(case: &str) -> support::Scratch {
+    let scratch = support::Scratch::startup(case);
+    let owned = support::owned::Owned::example();
+    support::owned::lay(scratch.path(), &owned);
+    fs::write(scratch.path().join("config.json"), support::owned::example_document(scratch.path(), &owned))
+        .expect("example configuration");
+    scratch
+}
+#[test]
+fn the_owned_example_asks_for_reconciles_files() {
+    let scratch = owned_example("owned-example-refused");
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("start refused"),
+        "temper serve: application.forges[0].api_token: forge-1/api_token: absent\n\
+         temper serve: application.forges[0].user.file: forge-1/user: absent\n\
+         temper serve: application.forges[0].webhook_secret: forge-1/webhook_secret: absent\n\
+         temper serve: application.identities[0].token: forge-1/git_token: absent\n"
+    );
+    scratch.remove();
+}
+#[test]
+fn serve_prepares_once_on_the_owned_example() {
+    let scratch = owned_example("owned-example-prepared");
+    let forge = scratch.path().join("forge-1");
+    fs::create_dir(&forge).expect("forge directory");
+    fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("private forge");
+    for (name, bytes) in [
+        ("api_token", b"api-token".as_slice()),
+        ("user", b"42"),
+        ("webhook_secret", b"webhook-secret"),
+        ("git_token", b"git-token"),
+    ] {
+        support::write_private(&forge.join(name), bytes);
+    }
+    let prepared = temper::prepare_in(scratch.path());
+    assert!(prepared.is_ok(), "{}", prepared.err().unwrap_or_default());
+    scratch.remove();
+}
+
+#[test]
+fn the_owned_example_is_named_without_a_problem() {
+    let named = temper_service::named(support::owned::EXAMPLE).expect("owned example named");
+    assert_eq!(named.agent.as_ref(), b"/home/me/temper/owned/agent.json");
+    assert_eq!(named.worker_root.as_ref(), b"workspaces");
+    assert_eq!(named.deployment.as_ref(), b"state");
+    for path in [
+        b"forge-1/api_token".as_slice(),
+        b"forge-1/user",
+        b"forge-1/webhook_secret",
+        b"forge-1/git_token",
+        b"accounts/llm.json",
+    ] {
+        assert_eq!(
+            named.files.iter().find(|file| file.path.as_ref() == path).map(|file| file.private),
+            Some(true),
+            "{path:?}"
+        );
+    }
+}
