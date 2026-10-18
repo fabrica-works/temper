@@ -575,6 +575,53 @@ every deadline and lifetime.
 Size: about 150 lines more than 19.5's 40; past 250, report.
 Removes: the refusal of a second stream for one sign-in.
 
+The designer's answer of 2026-10-18T16:11Z (skein `f7a4e7022`): "**A
+button, a tab or a menu item takes its words one way:** as its name,
+holding no node, or, with no name, as the text nodes it holds. A browser
+shows a name as the element's text (ui-web.md, section 6), so a text
+node inside a named one shows its words twice" (`ui.md`, 3). jig's
+controls take the first form; skein's click on the second waits
+(`later.md`). This part comes before the two stories, and replaces
+ruling 358, point 2's stop for the files it names; the rest of 19.5
+holds.
+Files, added, each site a named button, tab or menu item holding a node:
+- `crates/jig-client-view/src/frame.rs`: `control` (`:150-170`) calls
+  `b.text` only when `role == Role::Link` (a link's words are its text:
+  ui-web.md, 6, names it by `aria-label`); `membership` (`:180-182`);
+- `crates/jig-client-view/src/`: `confirmation.rs:92-95`,
+  `pages/work.rs:30-32` and `:48-50`, `sections/project/owner.rs:615-618`,
+  `:1109-1112` and `:1169-1173`, `turns/call.rs:42-44` and `:108-110`;
+- `crates/jig-client-view/src/sections/project/notes.rs:90-95`: the
+  button holds no node, and `owner_authority::pattern`'s nodes follow
+  it, after its `close`;
+- `examples/ops/client-view/src/infrastructure.rs:150-152`, `:185-187`;
+  `examples/ops/client-view/src/root.rs:126-129`;
+- `testing/jig-client-test-view/src/family.rs:289-291`,
+  `proposal.rs:79-81`, `root.rs:244-247`;
+- each count of nodes that a test asserts equal to a built tree and that
+  counts a dropped node (`crates/jig-client-view/src/sizes.rs`,
+  `sizes/`, a fragment's `*_nodes`): one fewer for each.
+Shape: at each site, the `text` call (`b.text`, `fragment.text`,
+`words.text`) after `name` goes; the name, states, styles and binding
+stay.
+Tests, added, aim for under 20 ms each: in
+`crates/jig-client-view/src/tests/pages.rs`, `whole_page` asserts, for
+each node of the tree it builds, that a button, a tab or a menu item
+with a name has `size == 1`, so `each_of_jigs_pages_keeps_the_outline`
+checks each page it builds; in `tests/frame_facts.rs`,
+`a_named_control_holds_no_node` (`control` with `Role::Button`: size 1,
+its name the label; with `Role::Link`: its text the label).
+Don't: change skein, or jig's skein pin (README, "Pins"); drop a name;
+give a link no text; change a test's words or the text shell's goldens
+(the text shell prints a control's name when it holds no text:
+skein-ui-text's `render.rs`, `content`).
+Unchanged: the stories' assertions; a test finding a button by role and
+name. A test finding one by `Find::text` finds it by role and name, with
+the same words.
+Size: about 60 lines more; past 120, report.
+Removes: the text node of the name inside jig's buttons, tabs and menu
+items.
+
 ## One test of the browser suite
 
 The README's section of that name holds the commands, built on 19.4's
