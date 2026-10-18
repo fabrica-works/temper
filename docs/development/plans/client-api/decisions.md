@@ -2485,6 +2485,24 @@ choice would have been the user's (development.md, 10.4).
      Refresh any further literal of `Bounds`, or list it admits, that the
      compiler or a suite finds, by this rule, and list it in the commit body.
 
+334. **btrfs balance at 75%** (infrastructure, the coordinator's block of 2026-10-18T09:02:17Z).
+     Infrastructure. `-dusage=40` finds no data chunk to move: data is 90%
+     used across its chunks, so none is 40% used or less. The supervisor ran
+     `sudo -n btrfs balance start -dusage=75,limit=10 /srv` twice, between
+     09:03:15Z and 09:04:30Z: each pass moved 10 chunks in about 30 s, and
+     unallocated went from 4.20 to 8.20, then 13.20 GiB. Metadata is 3.96 of
+     5.32 GiB. `df` shows 49 GB available, above the 40 GB floor (section
+     11.4), so starts may go on, at most six sessions at once (below 60 GB).
+
+     Ruling 309, point 3, amended again: at each disk check, when unallocated
+     is below 10 GiB, the coordinator runs `sudo -n btrfs balance start
+     -dusage=75,limit=10 /srv`, then the usage line, up to three times while
+     it stays below 10 GiB, and logs each output in `log.md`. It blocks
+     (infrastructure) only if unallocated is still below 10 GiB after the
+     third pass, with every output. It runs no other btrfs command.
+     Unchanged: section 11.4's `df` floors, `kache gc` and the removal of
+     `target/` of sessions not running.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
