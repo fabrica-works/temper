@@ -226,6 +226,36 @@ Removes: nothing.
 Also (ruling 135): `crates/temper/src/forge.rs:255` sets reconcile's `hook_secret_bytes` from
 `profile.forge_component.hook_secret_bytes`, not `token_bytes`, beside `listener` (10-reconcile.md, Choice 8).
 
+**Corrections against main (ruling 138, at temper 62ca62ade, after client-api's temper 05.1 3f8b3df6f and 05.2
+3c0936cd0; they take precedence over the text below):**
+- 07.1, 07.3, 08.1 and 10.1 are on main: 05.3 adds the setup's view and the wiring. `Named.forges[].webhook_secret`
+  already carries each secret's path; only `Named.webhooks` is new.
+- Files gain `crates/temper/tests/support/owned.rs:20-22` (a whole forge object: without `"webhook_secret": null`, 22 of
+  the `forge` and `startup` binaries' 43 tests fail on `application.forges[0].webhook_secret: missing`),
+  `crates/temper-service/src/tests/fixtures/forge.rs:134` (calls `forge::settings`),
+  `crates/temper-forge-setup/src/tests/fixtures.rs:28,38` (two `check::Forge` literals), and
+  `crates/temper-service/src/tests/fixtures/startup.rs:41` (`fixtures::files()`'s `with_capacity(8)` becomes 9).
+  `git grep -l '"forges"' -- '*.rs'` lists 11 files, not 8: give each whole forge object `"webhook_secret": null`, and
+  list in the commit body each further copy you change.
+- `application::parse` (`application.rs:393`) is 99 lines, against clippy's bound of 100: move its workers loop into a
+  function of its own before adding the members.
+- Clippy's `manual_map` meets the disallowed `Option::map` in the `Option` reads: write them as `if let` assignments.
+- An in-process name as `application.webhooks.listener` is refused by the address reader, as the clients' listener's is
+  (`application.clients.listener: invalid form`, `src/tests/startup.rs:34`): configuration.md's row says "a socket
+  address on loopback (in `127.0.0.0/8`, or `::1`), as the clients' listener's in standalone". `What::Loopback` is for a
+  socket address off loopback; the Shape's "or an in-process name" goes.
+- The reference test: `Post` is `support::webhooks`' request (path, body, event); `Post::signed` signs with
+  `support::webhooks::SECRET`, the secret `webhooks::configuration` writes; `PING` is the event header's value `ping` (an
+  event of no row); `Exit` is `skein_io::kernel::Exit`, as `support/mod.rs:75` imports it.
+- Line references now: `application.rs` `Members` :11, `Forge` :43, `forge` :240, its literal :289, `parse` :393 with the
+  `NotBuilt` push at :415, `files` :492, `resolve` :567, the `trust` read :147-156, `config::secret` :615; `checks.rs`
+  `sockets` :254, `socket_count` :272, `process_io` :298; `startup.rs` `all_files` :126, `settings::Engine` :230, the
+  `process_io` call :244; `problems.rs` the `NotBuilt` arm :179; `limits.rs` `profile` :249; `forge.rs` `problems` :205,
+  `tag` :269, `indexed` :277; `src/tests/startup.rs` the test :78, `NotBuilt` at :88, 151, 154, 156; `src/tests/checks.rs`
+  the sockets test near :157; `tests/fixtures.rs` the `settings::Engine` literal :84; `tests/one-process/src/fixtures.rs`
+  :124-130; `support/mod.rs` `configuration` :21, `run_signal` :307-336; `forgejo.rs` edits the configuration at :142.
+  `settings.rs:71`, `crates/temper/src/forge.rs:255`, `host.rs:57` and `names.rs` near :208 hold.
+
 Scope: configuration.md 3, 6, 7: the two members read and checked (`null` for none, never missing), the secrets read at
 start and handed to the component, the five limits' names and the listener's cross-checks, the listener's io tagged and
 routed, and the shipped binary answering a delivery.

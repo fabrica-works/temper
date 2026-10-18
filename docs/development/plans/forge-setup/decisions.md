@@ -675,6 +675,23 @@ run are appended after "For the user".
      - Unchanged: the rest of the steer's point 1 (names of about eight words; `owned_example` kept in 14.1's names; its Pass
        on text, word for word) and the coordinator's other report checks.
 
+138. **05.3's Shapes against main** (ready check of temper-05.3).
+     Ruling 138, the ready check of temper-05.3 at temper 62ca62ade and skein 867095d1, after client-api's temper 05.1
+     (3f8b3df6f) and 05.2 (3c0936cd0) and design commit 405924109. Amends `temper/05-webhooks.md` (05.3's "Corrections against
+     main", which take precedence over its Files, Shape and Test shape):
+
+     - 05.3 adds the setup's view and the wiring, 07.x, 08.1 and 10.1 being on main; only `Named.webhooks` is new.
+     - Files gain `support/owned.rs:20-22`, `src/tests/fixtures/forge.rs:134`, `temper-forge-setup/src/tests/fixtures.rs:28,38`
+       and `fixtures::files()`'s capacity (`fixtures/startup.rs:41`); `"forges"` is in 11 files, not 8.
+     - `application::parse` (99 lines) gives up its workers loop first; `if let` in place of `manual_map`.
+     - An in-process `application.webhooks.listener` is refused by the address reader (`invalid form`), as the clients'
+       listener's is: configuration.md's row, "a socket address on loopback ..., as the clients' listener's in standalone".
+     - The reference test's `Post`, `PING`, `SECRET` and `Exit` are named; about 40 line references are moved.
+     - The check's scratch worktree, with 05.3 sketched in it (about 219 lines of 250): clippy `-D warnings` and fmt pass;
+       default 1745 passed, fuzzy 50 passed, Done when 6's filter 54 passed, the process test 204/403/404 passed. The 9 process
+       tests that need `TEMPER_FORGEJO` were not run there.
+     - Unchanged: Size (250), the tests, the Proof and Done when.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
