@@ -425,12 +425,30 @@ top-level `workers`, in the same order; standalone has one. Each:
   `client/domain/contract.md`, 5.3), so a party who may amend a task
   reads its document whatever `documents.lines` is. temper's client
   takes an authority's entries, 12, apart from its rows (jig's
-  `client/domain/client.md`, section 14): the most the process tier
-  admits in a list, its `authority.grants` and `tasks.authority_grants`
-  of 12; the example admits at most the small profile's 8, its
-  `authority.implications`. A long authority shows in part, with jig's
-  mark (client.md, 5.4). The test above holds the engine's bounds on an
-  authority's lists to temper's client's.
+  `client/domain/client.md`, section 14): the most the process tier and
+  the owned example admit in a list, their `authority.grants` and
+  `tasks.authority_grants` of 12. A long authority shows in part, with
+  jig's mark (client.md, 5.4). The test above holds the engine's bounds
+  on an authority's lists to temper's client's.
+- **The owned example's `engine.limits`** (section 10) are the small
+  profile with the overrides the bullets above ask, and those its
+  owner's grants need, and no other:
+  - `authority.segments`, `tasks.hold_segments` and
+    `tasks.authority_segments`, 8: a name's segments;
+  - `documents.rows` 2, `documents.lines` 2 and `documents.text_bytes`
+    128: temper's client's rows and text;
+  - `views.watchers` and `views.watchers_per_party`, 16: the watch room;
+  - `authority.grants` and `tasks.authority_grants`, 12: its owner
+    holds a grant for each of the forge's kinds its work uses, 10
+    (section 10), and small's 4 hold none of that work; with
+    `notes.scopes` 15, since jig's core admits an authority's grants
+    only with 3 notes' scopes more, and refuses every override of the
+    core's otherwise (`jig-domain-core`'s `worst_case`);
+  - `tasks.authority_bytes` 512 and `tasks.batch` 1, the process
+    tier's: the bounds above widen a task's stored row past the small
+    profile's store, whose bounds no override changes, so the start is
+    refused (jig's `protocol/store.md`, 5.4); these two bring the row
+    back within.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
@@ -627,7 +645,13 @@ not itself valid JSON):
     "llm": ...,
     "clients": {"link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {"authority.segments": 8, "tasks.hold_segments": 8, "tasks.authority_segments": 8}},
+    "limits": {"profile": "small", "overrides": {
+      "authority.segments": 8, "tasks.hold_segments": 8, "tasks.authority_segments": 8,
+      "documents.rows": 2, "documents.lines": 2, "documents.text_bytes": 128,
+      "views.watchers": 16, "views.watchers_per_party": 16,
+      "authority.grants": 12, "tasks.authority_grants": 12, "notes.scopes": 15,
+      "tasks.authority_bytes": 512, "tasks.batch": 1
+    }},
     "memory_bytes": ...
   },
   "workers": [{
@@ -666,6 +690,14 @@ and the process tier's test of `temper box` runs one (setup.md, 13.4).
 - **Its landing rule asks for CI,** Actions on the owned runner, and an
   agent's review; `acme/widget` is a repository the person makes in the
   org on Forgejo's web, with Actions, then adopts (setup.md, 6.5).
+- **Its owner may do the forge's work in the org,** and no more: the
+  rules' ceiling, the project's ceiling, its role's authority and its
+  projections each hold one grant on the org, `acme`, for each kind a
+  change and its goal's issue use (forge.md, section 6): read, push,
+  open a pull request, merge, comment, create an issue, edit a pull
+  request, update it from its base, close or reopen it, and edit, close
+  or reopen an issue; 10, as the process tier's owner holds them. Its
+  `engine.limits` admit them (section 7).
 - **Three loopback addresses,** Forgejo's (`listen`), the clients'
   listener's and the webhooks' listener's, are what a host changes to run
   several boxes on one machine, with each box's directories.

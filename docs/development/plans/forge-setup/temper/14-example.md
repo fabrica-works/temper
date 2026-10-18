@@ -55,8 +55,29 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 
 ### 14.1 The owned example as a tested file
 
+**Corrections after the designer's answer of 2026-10-18T11:40:51Z (the question of ruling 139; configuration.md 7 and
+10). They take precedence over the text below and over ruling 139's T4 line:**
+- Shape 1, `engine.limits`: `small` with configuration.md 10's 13 overrides, as its skeleton writes them: the three
+  segment bounds 8; `documents.rows` 2, `documents.lines` 2, `documents.text_bytes` 128; `views.watchers` and
+  `views.watchers_per_party` 16; `authority.grants` and `tasks.authority_grants` 12, `notes.scopes` 15;
+  `tasks.authority_bytes` 512, `tasks.batch` 1. No other `engine` override. "If T4 finds the documents past the
+  client's, …" goes: the file names them.
+- The grants stay the 10 `support/forgejo.rs:156-165` writes (kinds 1, 2, 3, 4, 7, 8, 10, 11, 12, 13), each on
+  `["forge", "127.0.0.1:3000"]` open `acme`, in `rules.ceiling`, `projects[0].policy.ceiling`, its `roles[0].authority`
+  and `projections`; the spends as the tier writes them.
+- The designer's probe (temper dbc5b4da7; no code changed to d09271b57), the tier's engine with these limits and the 10
+  grants: `temper::prepare_in` is `Ok`. Without `tasks.batch` 1 it is refused `engine.limits: past its bound` (jig's
+  `sizes::check`: `Value { needs: 4758343, has: 1303199 }`); without `notes.scopes` each core override is `invalid
+  override`. T3 is the example's own check of it.
+- T4 `the_owned_example_fits_the_native_client`, in place of the text below, over `owned::EXAMPLE`'s `engine` member
+  parsed as `tests/configuration.rs:9-15` do: (1) the four assertions of `:16-33` (rows, lines, paths, text); (2)
+  `assert_eq!` of the JSON's `engine.limits` with configuration.md 10's literal, a `json!`; (3) the authority's entries:
+  if `main` at 14.1's start holds client-api's temper-04.s1 (`native()`'s `authority` bound and its three assertions
+  after the paths'), the same three over the example's engine; else `authority.grants` and `tasks.authority_grants`
+  each at most 12 (client.md 5.4), a literal. The commit body says which. Size: +10.
+
 **Corrections against main (ruling 139, at temper 64f610ae6, before 05.3 landed; they take precedence over the text
-below; the example's authority limits wait for the designer's answer, question of ruling 139):**
+below; the example's authority limits: the designer's answer, above):**
 - T2's second line reads `application.forges[0].user.file: forge-1/user: absent` (`application.rs:514`,
   `tests/startup.rs:90`).
 - The DNS lookup (Rules that bind it) is `address()`, `lib.rs:210-219` (`to_socket_addrs` at :214), not :146-147.
