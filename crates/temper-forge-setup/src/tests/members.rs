@@ -6,7 +6,7 @@ use crate::{
 use alloc::boxed::Box;
 use core::net::{Ipv4Addr, SocketAddr};
 fn refused(bytes: &[u8], members: &Members, expected: &[u8]) {
-    let problems = check::checked(&fixtures::document(bytes), 0, members, &[]).unwrap_err();
+    let problems = check::checked(&fixtures::document(bytes), 0, members, false, &[]).unwrap_err();
     assert_eq!(&*problem::lines(&problems), expected);
 }
 #[test]
@@ -57,7 +57,7 @@ fn an_entry_at_odds_with_itself_or_its_forge_is_refused_naming_its_path() {
             &mut problems,
         )
         .unwrap();
-        check::members(&setup, &fixtures::members(), &mut problems);
+        check::members(&setup, &fixtures::members(), false, &mut problems);
         assert!(skein_lib::bytes::find(&problem::lines(&problems), expected).is_some(), "case {from:?}");
     }
     for field in [b"token".as_slice(), b"login", b"git", b"transport"] {
@@ -83,4 +83,22 @@ fn an_entry_at_odds_with_itself_or_its_forge_is_refused_naming_its_path() {
         };
         refused(fixtures::TWO, &members, expected);
     }
+}
+
+#[test]
+fn a_webhook_secret_off_the_forge_directory_is_refused() {
+    let mut members = fixtures::hooked_members();
+    members.forges[0].webhook_secret = Some(b"elsewhere".as_slice().into());
+    refused_webhooks(&members, b"application.forges[0].webhook_secret: invalid form\n");
+}
+
+fn refused_webhooks(members: &Members, expected: &[u8]) {
+    let problems = check::checked(&fixtures::document(fixtures::TWO), 0, members, true, &[]).unwrap_err();
+    assert_eq!(&*problem::lines(&problems), expected);
+}
+#[test]
+fn a_set_up_forge_without_a_webhook_secret_is_refused() {
+    let mut members = fixtures::hooked_members();
+    members.forges[0].webhook_secret = None;
+    refused_webhooks(&members, b"application.forges[0].webhook_secret: invalid form\n");
 }

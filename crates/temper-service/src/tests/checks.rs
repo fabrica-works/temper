@@ -160,9 +160,9 @@ fn a_channel_limit_past_a_ceiling_names_the_limit() {
 }
 #[test]
 fn one_ios_entities_hold_both_services_and_their_children() {
-    let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":5}"#);
+    let document = fixtures::with(&fixtures::document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"git_component.operations":9}"#);
     let found = crate::named(&document).unwrap_err();
-    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 33 bytes, past its bound of 32\n".as_slice());
+    assert_eq!(&*lines(&found), b"engine.limits.io.sockets: 49 bytes, past its bound of 48\n".as_slice());
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -241,4 +241,67 @@ fn standalone_shapes() -> [(Shape, Path, What); 8] {
             What::Absolute,
         ),
     ]
+}
+
+#[test]
+fn a_webhook_secret_without_a_listener_is_refused() {
+    let document = fixtures::with(&fixtures::webhook_document(), b"application.webhooks", b"null");
+    assert_eq!(
+        &*lines(&crate::named(&document).unwrap_err()),
+        b"application.forges[0].webhook_secret: needs application.webhooks\n"
+    );
+}
+#[test]
+fn a_webhook_listener_off_loopback_is_refused() {
+    let document = fixtures::with(
+        &fixtures::webhook_document(),
+        b"application.webhooks.listener",
+        br#"{"socket":"192.0.2.1:7200"}"#,
+    );
+    assert_eq!(
+        &*lines(&crate::named(&document).unwrap_err()),
+        b"application.webhooks.listener: must be a socket address on loopback\n"
+    );
+}
+#[test]
+fn a_webhook_listener_equal_to_clients_is_refused() {
+    let document = fixtures::with(
+        &fixtures::webhook_document(),
+        b"application.webhooks.listener",
+        br#"{"socket":"127.0.0.1:7100"}"#,
+    );
+    assert_eq!(&*lines(&crate::named(&document).unwrap_err()), b"application.webhooks.listener: must be unique\n");
+}
+#[test]
+fn webhook_listeners_on_port_zero_do_not_clash() {
+    let document =
+        fixtures::with(&fixtures::webhook_document(), b"application.webhooks.listener", br#"{"socket":"127.0.0.1:0"}"#);
+    let document = fixtures::with(&document, b"application.clients.listener", br#"{"socket":"127.0.0.1:0"}"#);
+    let named = crate::named(&document).unwrap();
+    assert_eq!(named.webhooks.unwrap().listener, named.clients);
+}
+#[test]
+fn a_webhook_secret_past_its_bound_is_refused() {
+    let mut files = fixtures::files();
+    files.entries = fixtures::without(files.entries, b"secrets/forge-1.webhook-secret");
+    files
+        .entries
+        .push((b"secrets/forge-1.webhook-secret".as_slice().into(), skein_lib::Secret::new(Box::new([b'x'; 129]))))
+        .unwrap();
+    let found = started(&fixtures::webhook_document(), &files, &fixtures::startup_agent());
+    assert_eq!(&*lines(&found), b"application.forges[0].webhook_secret: past its bound\n");
+}
+#[test]
+fn hook_connections_past_the_process_sockets_are_refused() {
+    let document =
+        fixtures::with(&fixtures::webhook_document(), b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge_component.hooks":40}"#);
+    assert_eq!(
+        &*lines(&crate::named(&document).unwrap_err()),
+        b"engine.limits.io.sockets: 66 bytes, past its bound of 48\n"
+    );
+}
+#[test]
+fn the_shipped_profile_admits_a_webhook_listener() {
+    let found = started(&fixtures::webhook_document(), &fixtures::files(), &fixtures::startup_agent());
+    assert_eq!(&*lines(&found), b"");
 }

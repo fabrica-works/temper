@@ -24,6 +24,7 @@ pub struct Forge {
     pub git: Box<[u8]>,
     pub user: User,
     pub api_token: Box<[u8]>,
+    pub webhook_secret: Option<Box<[u8]>>,
     pub identity_token: Box<[u8]>,
     pub identity_login: Box<[u8]>,
 }
@@ -56,7 +57,7 @@ pub(crate) fn joined(parts: &[&[u8]]) -> Box<[u8]> {
     w.finish()
 }
 /// Checks each entry against its forge, and listener and entry uniqueness.
-pub fn members(setup: &Setup, members: &Members, ps: &mut Problems) {
+pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Problems) {
     for (i, e) in setup.entries.iter().enumerate() {
         let p = Path::root()
             .member(b"application")
@@ -84,6 +85,13 @@ pub fn members(setup: &Setup, members: &Members, ps: &mut Problems) {
             }
         }
         let fp = fp.child(Segment::Index(fi));
+        if webhooks {
+            require(
+                f.webhook_secret == Some(joined(&[&e.directory, b"/webhook_secret"])),
+                fp.member(b"webhook_secret"),
+                ps,
+            );
+        }
         require(f.api_token == joined(&[&e.directory, b"/api_token"]), fp.member(b"api_token"), ps);
         require(f.user == User::File(joined(&[&e.directory, b"/user"])), fp.member(b"user"), ps);
         require(f.identity_token == joined(&[&e.directory, b"/git_token"]), p.member(b"forge"), ps);
@@ -126,6 +134,7 @@ pub fn checked(
     document: &Document,
     at: u32,
     members_value: &Members,
+    webhooks: bool,
     overrides: &[(Box<[u8]>, u64)],
 ) -> Result<Checked, Problems> {
     let mut ps = Problems::empty();
@@ -147,7 +156,7 @@ pub fn checked(
     }
     let setup = Setup::read(document, at, &limits, &mut ps);
     if let Some(setup) = &setup {
-        members(setup, members_value, &mut ps);
+        members(setup, members_value, webhooks, &mut ps);
     }
     if ps.is_empty() { Ok(Checked { setup: setup.expect("clean parse"), limits }) } else { Err(ps) }
 }

@@ -129,3 +129,20 @@ fn each_git_component_limit_has_its_dotted_override() {
 fn the_small_profile_gives_settle_thirty_seconds() {
     assert_eq!(limits::profile(limits::Profile::Small).forge.client.settle, Duration::from_secs(30));
 }
+
+#[test]
+fn the_hook_limits_have_dotted_overrides() {
+    type Row = (&'static [u8], u64, u64, fn(&limits::Limits) -> u64);
+    let mut own = limits::profile(limits::Profile::Small);
+    let rows: [Row; 5] = [
+        (b"forge_component.hooks", 3, 3, |l| u64::from(l.forge_component.hooks)),
+        (b"forge_component.hook_head_bytes", 4096, 4096, |l| u64::from(l.forge_component.hook_head_bytes)),
+        (b"forge_component.hook_body_bytes", 8192, 8192, |l| u64::from(l.forge_component.hook_body_bytes)),
+        (b"forge_component.hook_secret_bytes", 64, 64, |l| u64::from(l.forge_component.hook_secret_bytes)),
+        (b"forge_component.hook_deadline_ms", 7000, 7_000_000_000, |l| l.forge_component.hook_deadline.as_nanos()),
+    ];
+    for (name, input, expected, read) in rows {
+        assert_eq!(limits::apply(&mut own, name, input), Ok(()), "{name:?}");
+        assert_eq!(read(&own), expected, "{name:?}");
+    }
+}

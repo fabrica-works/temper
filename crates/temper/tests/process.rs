@@ -288,3 +288,34 @@ fn temper_box_restarts_a_killed_forgejo_while_the_engine_serves() {
     assert_eq!(ended.left, Some(Vec::new()), "no process the box started outlived it");
     scratch.remove();
 }
+
+#[test]
+fn temper_serve_answers_a_signed_delivery_204() {
+    use support::webhooks::{self, PING, Post};
+    let scratch = support::Scratch::new("signed_hook");
+    let listener = webhooks::configuration(scratch.path());
+    let ended = webhooks::served(scratch.path(), listener, &[Post::signed("/hooks/1", b"ping", PING)]);
+    assert_eq!(ended.statuses, [204]);
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
+    scratch.remove();
+}
+#[test]
+fn temper_serve_answers_an_unsigned_delivery_403() {
+    use support::webhooks::{self, PING, Post};
+    let scratch = support::Scratch::new("unsigned_hook");
+    let listener = webhooks::configuration(scratch.path());
+    let ended = webhooks::served(scratch.path(), listener, &[Post::unsigned("/hooks/1", b"ping", PING)]);
+    assert_eq!(ended.statuses, [403]);
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
+    scratch.remove();
+}
+#[test]
+fn temper_serve_answers_an_unknown_forge_404() {
+    use support::webhooks::{self, PING, Post};
+    let scratch = support::Scratch::new("unknown_hook");
+    let listener = webhooks::configuration(scratch.path());
+    let ended = webhooks::served(scratch.path(), listener, &[Post::signed("/hooks/9", b"ping", PING)]);
+    assert_eq!(ended.statuses, [404]);
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
+    scratch.remove();
+}

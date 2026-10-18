@@ -64,6 +64,28 @@ pub fn standalone(
         }
     }
 }
+/// Check the optional listener and the secret paths that require it.
+pub fn webhooks(members: &super::application::Members, problems: &mut Problems) {
+    let path = Path::root().member(b"application");
+    if let Some(webhooks) = &members.webhooks {
+        match &webhooks.listener {
+            config::Address::Addr(Addr::Ip(socket)) if socket.ip().is_loopback() => {
+                if socket.port() != 0 && webhooks.listener == members.clients.listener {
+                    problems.push(path.member(b"webhooks").member(b"listener"), What::Jig(config::What::Unique));
+                }
+            }
+            config::Address::Addr(_) | config::Address::Host { .. } => {
+                problems.push(path.member(b"webhooks").member(b"listener"), What::Loopback);
+            }
+        }
+    } else {
+        for (index, forge) in members.forges.iter().enumerate() {
+            if forge.webhook_secret.is_some() {
+                problems.push(at(index, path.member(b"forges")).member(b"webhook_secret"), What::NoWebhooks);
+            }
+        }
+    }
+}
 /// Every git rule is checked independently, so one start reports them all.
 pub fn limits(limits: &limits::Limits, git: &temper_worker_protocol_git::Limits, problems: &mut Problems) {
     use temper_worker_protocol_git::{Unfit, check};
@@ -255,9 +277,10 @@ pub(super) fn sockets(
     engine: &config::Engine,
     worker: &config::Worker,
     git: &temper_worker_protocol_git::Limits,
+    members: &super::application::Members,
     problems: &mut Problems,
 ) {
-    match (socket_count(engine, worker, git), process_io(&engine.limits.io, Some(&worker.limits.io))) {
+    match (socket_count(engine, worker, git, members), process_io(&engine.limits.io, Some(&worker.limits.io))) {
         (Some(bytes), Some(io)) if bytes <= u64::from(io.sockets) => {}
         (Some(bytes), Some(io)) => problems.push(
             Path::root().member(b"engine").member(b"limits").member(b"io").member(b"sockets"),
@@ -273,8 +296,12 @@ fn socket_count(
     engine: &config::Engine,
     worker: &config::Worker,
     git: &temper_worker_protocol_git::Limits,
+    members: &super::application::Members,
 ) -> Option<u64> {
     let mut required = u64::from(limits::server(&engine.limits).connections).checked_add(1)?.checked_add(2)?;
+    if members.webhooks.is_some() {
+        required = required.checked_add(1)?.checked_add(u64::from(members.limits.forge_component.hooks))?;
+    }
     if !engine.llm.accounts.is_empty() {
         required = required.checked_add(u64::try_from(engine.llm.accounts.len()).ok()?)?;
         for account in &engine.llm.accounts {
@@ -298,13 +325,13 @@ fn socket_count(
 pub(crate) fn process_io(engine: &skein_io::Limits, worker: Option<&skein_io::Limits>) -> Option<skein_io::Limits> {
     let mut io = *engine;
     if let Some(worker) = worker {
-        io.sockets = io.sockets.checked_add(worker.sockets)?;
         io.names = io.names.checked_add(worker.names)?;
         io.intake = io.intake.max(worker.intake);
         io.receive = io.receive.max(worker.receive);
         io.output = io.output.max(worker.output);
         io.sends = io.sends.max(worker.sends);
     }
+    io.sockets = limits::SOCKETS;
     Some(io)
 }
 /// Each service's sum is checked against its own memory admission.

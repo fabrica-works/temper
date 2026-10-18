@@ -244,6 +244,9 @@ const ROOT: Root = Root {
         gather: Duration::from_secs(1),
     },
 };
+/// The standalone process's socket admission.
+pub const SOCKETS: u32 = 48;
+
 /// Constant small-profile values in each owner's limits.
 #[must_use]
 pub fn profile(profile: Profile) -> Limits {

@@ -124,9 +124,10 @@ pub(crate) fn document() -> Vec<u8> {
         value["engine"]["limits"]["overrides"][name] = count.into();
     }
     value["application"] = serde_json::json!({
-        "clients":{"listener":{"socket":CLIENTS.to_string()}},
+        "webhooks":null,
+"clients":{"listener":{"socket":CLIENTS.to_string()}},
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:3000"},"transport":"plaintext",
-            "git":"http://127.0.0.1:3000","api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
+            "git":"http://127.0.0.1:3000","webhook_secret":null,"api_token":"secrets/forge.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge.git-token","login":"worker","author":{"name":"Worker","email":"worker@example.invalid"}}],
         "setup":[],"landing":{"deployment":[],"projects":[]},"charter":1,
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,"checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},

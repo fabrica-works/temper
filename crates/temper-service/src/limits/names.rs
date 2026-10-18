@@ -206,6 +206,17 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"forge_component.tls.records" => {
             limits.forge_component.tls.records = u32::try_from(value).or(Err(Refused::Range))?;
         }
+        b"forge_component.hooks" => limits.forge_component.hooks = u32::try_from(value).or(Err(Refused::Range))?,
+        b"forge_component.hook_head_bytes" => {
+            limits.forge_component.hook_head_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.hook_body_bytes" => {
+            limits.forge_component.hook_body_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.hook_secret_bytes" => {
+            limits.forge_component.hook_secret_bytes = u32::try_from(value).or(Err(Refused::Range))?;
+        }
+        b"forge_component.hook_deadline_ms" => limits.forge_component.hook_deadline = duration(value)?,
         b"forge_component.deadline_ms" => limits.forge_component.deadline = duration(value)?,
         b"forge_component.idle_ms" => limits.forge_component.idle = duration(value)?,
         b"forge_component.start_backoff_ms" => limits.forge_component.start_backoff = duration(value)?,

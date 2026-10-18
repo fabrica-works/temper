@@ -21,6 +21,7 @@ pub struct Named {
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub clients: config::Address,
+    pub webhooks: Option<application::Webhooks>,
     pub overrides: Box<[(Box<[u8]>, u64)]>,
 }
 #[derive(Debug)]
@@ -104,6 +105,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     if workers.len() != application.workers.len() {
         problems.push(root.member(b"application").member(b"workers"), What::Jig(config::What::Bound));
     }
+    checks::webhooks(&application, &mut problems);
     checks::limits(&application.limits, &application.limits.git_component, &mut problems);
     let mut base = 0;
     for forge in &application.forges {
@@ -115,6 +117,7 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
             engine.as_ref().expect("required engine checked"),
             worker,
             &application.limits.git_component,
+            &application,
             &mut problems,
         );
     }
@@ -155,6 +158,7 @@ pub fn named(document: &[u8]) -> Result<Named, Problems> {
     Ok(Named {
         files,
         clients: parsed.application.clients.listener,
+        webhooks: parsed.application.webhooks,
         forges: parsed.application.forges,
         identities: parsed.application.identities,
         overrides: parsed.application.overrides,
@@ -230,6 +234,7 @@ pub fn startup(
     let engine = settings::Engine {
         jig: parsed.engine,
         clients: parsed.application.clients,
+        webhooks: resolved.webhooks,
         files: settings::Files { entries: files.entries.clone() },
         forges: resolved.forges,
         identities: resolved.identities,

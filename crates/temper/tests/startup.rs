@@ -276,3 +276,16 @@ fn a_box_limit_within_its_check_is_accepted_by_temper_serve() {
     assert!(temper::prepare_in(scratch.path()).is_ok());
     scratch.remove();
 }
+
+#[test]
+fn a_webhook_secret_readable_by_others_refuses_startup() {
+    let scratch = support::Scratch::startup("public-hook-secret");
+    let _ = support::webhooks::configuration(scratch.path());
+    fs::set_permissions(scratch.path().join("secrets/forge-1.webhook-secret"), fs::Permissions::from_mode(0o644))
+        .expect("public permissions");
+    assert_eq!(
+        temper::prepare_in(scratch.path()).err().expect("configuration refused"),
+        "temper serve: application.forges[0].webhook_secret: secrets/forge-1.webhook-secret: readable by others or reached through a link\n"
+    );
+    scratch.remove();
+}

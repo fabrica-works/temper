@@ -143,3 +143,23 @@ fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
     }
     assert_eq!(service.end(), Some(&End::Stopped(Stop::Hooks)));
 }
+
+#[test]
+fn a_hook_secret_bound_names_its_limit() {
+    let mut found = jig_protocol_config::Problems::empty();
+    forge::problems(kit::Unusable::SecretBytes { bytes: 16 }, &mut found);
+    assert_eq!(
+        crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())).as_ref(),
+        b"application.limits.overrides.forge_component.hook_secret_bytes: past its bound\n"
+    );
+}
+#[test]
+fn a_hook_server_over_io_names_both_limits() {
+    let mut found = jig_protocol_config::Problems::empty();
+    forge::problems(
+        kit::Unusable::Stack { stacked: kit::limits::Stacked::ServerOverIo, demand: 8192, cap: 4096 },
+        &mut found,
+    );
+    assert_eq!(crate::startup::lines(&crate::startup::Problems::jig(found, &jig_protocol_config::Path::root())).as_ref(),
+        b"application.limits.overrides.forge_component.hook_head_bytes: past its bound\napplication.limits.overrides.io.intake: past its bound\napplication.limits.overrides.io.output: past its bound\n");
+}

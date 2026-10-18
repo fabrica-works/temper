@@ -18,7 +18,7 @@ pub struct Names<'a> {
 pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
     let api = format!("127.0.0.1:{}", names.port);
     value["application"]["forges"][0] = serde_json::json!({"number":1,"kind":"forgejo","api":{"socket":api},
-        "transport":"plaintext","git":format!("http://{api}"),"api_token":"forge-1/api_token",
+        "transport":"plaintext","git":format!("http://{api}"),"webhook_secret":null,"api_token":"forge-1/api_token",
         "user":{"file":"forge-1/user"},"identity":1});
     value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
     value["application"]["identities"][0]["login"] = names.bot.into();

@@ -7,8 +7,9 @@ use crate::settings;
 use skein_lib::{List, Secret};
 
 pub const APPLICATION: &[u8] = br#"{
+"webhooks":null,
 "clients":{"listener":{"socket":"127.0.0.1:7100"}},
-"forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:9"},"transport":"plaintext","git":"http://127.0.0.1:9","api_token":"secrets/forge-1.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
+"forges":[{"number":1,"kind":"forgejo","api":{"socket":"127.0.0.1:9"},"transport":"plaintext","git":"http://127.0.0.1:9","webhook_secret":null,"api_token":"secrets/forge-1.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
 "identities":[{"number":1,"token":"secrets/forge-1.git-token","login":"temper","author":{"name":"Temper","email":"temper@example.test"}}],
 "landing":{"deployment":[],"projects":[{"project":1,"rules":[{"connector":1,"kind":4,"pattern":{"segments":["forge","127.0.0.1:9","acme","app"],"last":"open","value":"main"},"enforce":true,"ci":false,"up_to_date":true,"gates":[{"number":3,"blocking":true,"freshness":"exact"}],"approvals":[{"role":0,"people":1,"freshness":"clean"}]}]}]},
 "setup":[],"charter":1,"limits":{"profile":"small","overrides":{}},"workers":[{"root":"worker-root","git":"/usr/bin/git"}]
@@ -37,8 +38,9 @@ pub fn parsed() -> skein_json::Document {
     .unwrap()
 }
 pub fn files() -> settings::Files {
-    let mut entries = List::with_capacity(8);
+    let mut entries = List::with_capacity(9);
     for (path, value) in [
+        (b"secrets/forge-1.webhook-secret".as_slice(), b"fixture-hook-secret\n".as_slice()),
         (b"secrets/forge-1.user".as_slice(), b"42\n".as_slice()),
         (b"secrets/forge-1.api-token".as_slice(), b"api-token\n".as_slice()),
         (b"secrets/forge-1.git-token".as_slice(), b"git-token\n".as_slice()),
@@ -141,4 +143,14 @@ pub fn with(input: &[u8], path: &[u8], json: &[u8]) -> Box<[u8]> {
     result.extend_from_slice(json);
     result.extend_from_slice(&input[end.unwrap_or(input.len())..]);
     result.into_boxed_slice()
+}
+
+/// One webhook listener and its private secret path, on the shipped profile.
+pub fn webhook_document() -> Box<[u8]> {
+    core::str::from_utf8(&document())
+        .unwrap()
+        .replace("\"webhooks\":null", "\"webhooks\":{\"listener\":{\"socket\":\"127.0.0.1:7200\"}}")
+        .replace("\"webhook_secret\":null", "\"webhook_secret\":\"secrets/forge-1.webhook-secret\"")
+        .into_bytes()
+        .into_boxed_slice()
 }

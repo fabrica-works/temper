@@ -11,6 +11,7 @@ use skein_lib::{List, bytes};
 #[derive(Debug)]
 pub struct Members {
     pub clients: Clients,
+    pub webhooks: Option<Webhooks>,
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
@@ -23,6 +24,11 @@ pub struct Members {
 #[derive(Debug)]
 pub struct Clients {
     /// The socket address used for the listener, Host guard and printed links.
+    pub listener: config::Address,
+}
+/// The optional webhook listener (configuration.md, section 3).
+#[derive(Debug)]
+pub struct Webhooks {
     pub listener: config::Address,
 }
 /// Read the listener with jig's address reader, refusing non-socket forms.
@@ -51,6 +57,7 @@ pub struct Forge {
     pub transport: Transport,
     pub git: Box<[u8]>,
     pub api_token: Box<[u8]>,
+    pub webhook_secret: Option<Box<[u8]>>,
     pub user: User,
     pub identity: u32,
 }
@@ -255,6 +262,16 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
     };
     let git = read::text(&mut object, document, b"git", path, problems);
     let api_token = read::text(&mut object, document, b"api_token", path, problems);
+    let at = read::required(&mut object, document, b"webhook_secret", path, problems);
+    let mut webhook_secret = None;
+    if let Some(at) = at
+        && document.token(at)?.kind != Kind::Null
+    {
+        match config::read::text(document, at, 1_048_576) {
+            Ok(value) => webhook_secret = Some(value),
+            Err(what) => problems.push(path.member(b"webhook_secret"), What::Jig(what)),
+        }
+    }
     let at = read::required(&mut object, document, b"user", path, problems);
     let user = match at {
         Some(at) => user(document, at, &path.member(b"user"), problems),
@@ -293,6 +310,7 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         transport,
         git: git?,
         api_token: api_token?,
+        webhook_secret,
         user: user?,
         identity: identity?,
     })
@@ -390,6 +408,33 @@ fn references(
         }
     }
 }
+fn workers(
+    document: &Document,
+    ats: Option<List<u32>>,
+    count: u32,
+    path: &Path,
+    problems: &mut Problems,
+) -> List<Worker> {
+    let mut workers = List::with_capacity(count);
+    if let Some(ats) = ats {
+        for (index, at) in ats.iter().enumerate() {
+            let path = read::index(&path.member(b"workers"), index);
+            let Some(mut object) = read::object(document, *at, &path, problems) else { continue };
+            let root = read::text(&mut object, document, b"root", &path, problems);
+            let git = read::text(&mut object, document, b"git", &path, problems);
+            read::finish(object, document, &path, problems);
+            if let Some(git) = git
+                && let Some(root) = root
+            {
+                if !git.starts_with(b"/") {
+                    problems.push(path.member(b"git"), What::Absolute);
+                }
+                workers.push(Worker { root, git }).expect("bounded workers");
+            }
+        }
+    }
+    workers
+}
 pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut Problems) -> Option<Members> {
     let path = Path::root().member(b"application");
     let mut object = read::object(document, at, &path, problems)?;
@@ -412,8 +457,13 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
         None => None,
     };
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
-    if object.member(document, b"webhooks").is_some() {
-        problems.push(path.member(b"webhooks"), What::NotBuilt);
+    let at = read::required(&mut object, document, b"webhooks", &path, problems);
+    let mut webhooks = None;
+    if let Some(at) = at
+        && document.token(at)?.kind != Kind::Null
+        && let Some(value) = self::clients(document, at, &path.member(b"webhooks"), problems)
+    {
+        webhooks = Some(Webhooks { listener: value.listener });
     }
     read::finish(object, document, &path, problems);
     let forge_count = match &forge_ats {
@@ -447,24 +497,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
             }
         }
     }
-    let mut workers = List::with_capacity(jig.limits.core.fleet.workers);
-    if let Some(ats) = workers_ats {
-        for (index, at) in ats.iter().enumerate() {
-            let path = read::index(&path.member(b"workers"), index);
-            let Some(mut object) = read::object(document, *at, &path, problems) else { continue };
-            let root = read::text(&mut object, document, b"root", &path, problems);
-            let git = read::text(&mut object, document, b"git", &path, problems);
-            read::finish(object, document, &path, problems);
-            if let Some(git) = git
-                && let Some(root) = root
-            {
-                if !git.starts_with(b"/") {
-                    problems.push(path.member(b"git"), What::Absolute);
-                }
-                workers.push(Worker { root, git }).expect("bounded workers");
-            }
-        }
-    }
+    let workers = workers(document, workers_ats, jig.limits.core.fleet.workers, &path, problems);
     if let Some(charter) = charter
         && forges.len() == forge_count
         && identities.len() == identity_count
@@ -480,6 +513,7 @@ pub fn parse(document: &Document, at: u32, jig: &config::Engine, problems: &mut 
     }
     Some(Members {
         clients: clients?,
+        webhooks,
         forges: forges.into_boxed(),
         identities: identities.into_boxed(),
         workers: workers.into_boxed(),
@@ -493,7 +527,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
     let count = members
         .forges
         .len()
-        .checked_mul(3)
+        .checked_mul(4)
         .expect("bounded forges")
         .checked_add(members.identities.len())
         .expect("bounded files");
@@ -514,6 +548,16 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
                     at: path.member(b"user").member(b"file"),
                     path: name.clone(),
                     max: USER_BYTES,
+                    private: true,
+                })
+                .expect("bounded files");
+        }
+        if let Some(name) = &forge.webhook_secret {
+            files
+                .push(config::File {
+                    at: path.member(b"webhook_secret"),
+                    path: name.clone(),
+                    max: members.limits.forge_component.hook_secret_bytes,
                     private: true,
                 })
                 .expect("bounded files");
@@ -548,6 +592,7 @@ pub fn files(members: &Members, api_token_bytes: u32, token_bytes: u32) -> Box<[
 }
 #[derive(Debug)]
 pub struct Resolved {
+    pub webhooks: Option<settings::Webhooks>,
     pub forges: Box<[settings::Forge]>,
     pub identities: Box<[settings::Identity]>,
 }
@@ -566,10 +611,22 @@ fn contents(files: &settings::Files, name: &[u8], max: u32, at: Path, problems: 
 }
 pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Problems) -> Option<Resolved> {
     let mut forges = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
+    let mut secrets = List::with_capacity(u32::try_from(members.forges.len()).expect("bounded forges"));
     let mut identities = List::with_capacity(u32::try_from(members.identities.len()).expect("bounded identities"));
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let token = contents(files, &forge.api_token, super::API_TOKEN_BYTES, path.member(b"api_token"), problems);
+        if let Some(name) = &forge.webhook_secret
+            && let Some(value) = contents(
+                files,
+                name,
+                members.limits.forge_component.hook_secret_bytes,
+                path.member(b"webhook_secret"),
+                problems,
+            )
+        {
+            secrets.push((forge.number, config::secret(value))).expect("bounded secrets");
+        }
         let transport = match &forge.transport {
             Transport::Plaintext => settings::Transport::Plaintext,
             Transport::Tls { server_name, trust } => {
@@ -637,5 +694,11 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     if !problems.is_empty() {
         return None;
     }
-    Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed() })
+    let mut webhooks = None;
+    if let Some(value) = &members.webhooks
+        && let config::Address::Addr(listener) = &value.listener
+    {
+        webhooks = Some(settings::Webhooks { listener: *listener, secrets });
+    }
+    Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed(), webhooks })
 }

@@ -11,7 +11,7 @@ pub enum What {
     Loopback,
     Connectors,
     Absolute,
-    NotBuilt,
+    NoWebhooks,
     Profile,
     Override(limits::Refused),
     Against { other: &'static [u8] },
@@ -71,7 +71,7 @@ fn words(what: What) -> &'static [u8] {
         What::Loopback => b"must be a socket address on loopback",
         What::Connectors => b"must be [1], the forge connector",
         What::Absolute => b"must be an absolute path",
-        What::NotBuilt => b"reserved: not built yet",
+        What::NoWebhooks => b"needs application.webhooks",
         What::Profile => b"the only profile is \"small\"",
         What::Override(limits::Refused::Unknown) => b"no limit of temper's has this name",
         What::Override(limits::Refused::Range) => b"outside its type",
@@ -176,7 +176,7 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::Loopback
             | What::Connectors
             | What::Absolute
-            | What::NotBuilt
+            | What::NoWebhooks
             | What::Profile
             | What::Override(_)
             | What::Agent => {}

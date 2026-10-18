@@ -74,24 +74,32 @@ fn a_chats_member_is_refused_as_unknown_naming_its_path() {
     let problems = crate::named(input.as_bytes()).unwrap_err();
     assert_eq!(&*lines(&problems), b"engine.templates: missing\nengine.chats: unknown member\n");
 }
+fn refused(input: &[u8]) -> Box<[u8]> {
+    let (members, problems) = application(input, &fixtures::engine().jig);
+    assert!(members.is_none());
+    lines(&problems)
+}
 #[test]
-fn an_unknown_missing_or_reserved_member_is_named_by_its_path() {
-    let jig = fixtures::engine().jig;
-    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
-    for (from, to, expected) in [
-        (
-            "\"user\":{\"file\":\"secrets/forge-1.user\"}",
-            "\"usr\":42",
-            "application.forges[0].user: missing\napplication.forges[0].usr: unknown member\n",
-        ),
-        (",\"user\":{\"file\":\"secrets/forge-1.user\"}", "", "application.forges[0].user: missing\n"),
-        ("\"charter\":1", "\"webhooks\":null,\"charter\":1", "application.webhooks: reserved: not built yet\n"),
-        ("\"small\"", "\"large\"", "application.limits.profile: the only profile is \"small\"\n"),
-    ] {
-        let (members, problems) = application(input.replace(from, to).as_bytes(), &jig);
-        assert!(members.is_none(), "refused {from}");
-        assert_eq!(&*lines(&problems), expected.as_bytes(), "row {from}");
-    }
+fn an_unknown_user_member_is_named_by_its_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace("\"user\":{\"file\":\"secrets/forge-1.user\"}", "\"usr\":42");
+    assert_eq!(
+        &*refused(input.as_bytes()),
+        b"application.forges[0].user: missing\napplication.forges[0].usr: unknown member\n"
+    );
+}
+#[test]
+fn a_missing_user_member_is_named_by_its_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace(",\"user\":{\"file\":\"secrets/forge-1.user\"}", "");
+    assert_eq!(&*refused(input.as_bytes()), b"application.forges[0].user: missing\n");
+}
+#[test]
+fn an_unknown_profile_is_refused_naming_its_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("\"small\"", "\"large\"");
+    assert_eq!(&*refused(input.as_bytes()), b"application.limits.profile: the only profile is \"small\"\n");
 }
 #[test]
 fn an_override_by_dotted_name_is_set_or_refused() {
@@ -148,12 +156,12 @@ fn problems_print_one_line_each_with_their_path() {
     let mut problems = Problems::empty();
     let forge = Path::root().member(b"application").member(b"forges").child(Segment::Index(0));
     problems.push(forge.member(b"user"), What::Jig(config::What::Missing));
-    problems.push(Path::root().member(b"application").member(b"webhooks"), What::NotBuilt);
+    problems.push(Path::root().member(b"application").member(b"webhooks"), What::NoWebhooks);
     problems
         .push(Path::root().member(b"engine").member(b"memory_bytes"), What::Jig(config::What::Memory { over: 4096 }));
-    assert_eq!(&*lines(&problems), b"application.forges[0].user: missing\napplication.webhooks: reserved: not built yet\nengine.memory_bytes: the worst case passes memory_bytes by 4096 bytes\n".as_slice());
+    assert_eq!(&*lines(&problems), b"application.forges[0].user: missing\napplication.webhooks: needs application.webhooks\nengine.memory_bytes: the worst case passes memory_bytes by 4096 bytes\n".as_slice());
     for _ in 0..config::PROBLEMS {
-        problems.push(Path::root(), What::NotBuilt);
+        problems.push(Path::root(), What::NoWebhooks);
     }
     assert_eq!(problems.past, 3);
     assert!(lines(&problems).ends_with(b"and 3 more\n"), "capped diagnostics name overflow");
@@ -451,4 +459,52 @@ fn a_setup_or_box_override_is_handed_on_with_its_value() {
         &*members.unwrap().overrides,
         &[(b"setup.orgs".as_slice().into(), 2), (b"box.steps".as_slice().into(), 3)]
     );
+}
+
+#[test]
+fn the_webhook_listener_and_secret_file_are_read() {
+    let named = crate::named(&fixtures::webhook_document()).unwrap();
+    let webhooks = named.webhooks.unwrap();
+    let config::Address::Addr(listener) = webhooks.listener else { panic!("socket") };
+    assert_eq!(listener.socket().unwrap(), "127.0.0.1:7200".parse().unwrap());
+    let file = named.files.iter().find(|file| file.path.as_ref() == b"secrets/forge-1.webhook-secret").unwrap();
+    assert_eq!(file.max, 128);
+    assert!(file.private);
+    let mut problems = Problems::empty();
+    problems.push(file.at.clone(), What::Jig(config::What::Missing));
+    assert_eq!(&*lines(&problems), b"application.forges[0].webhook_secret: missing\n");
+}
+#[test]
+fn null_webhook_members_are_read_as_none() {
+    let (members, problems) = application(fixtures::APPLICATION, &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    let members = members.unwrap();
+    assert!(members.webhooks.is_none());
+    assert!(members.forges[0].webhook_secret.is_none());
+}
+#[test]
+fn a_missing_webhooks_member_is_refused_by_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("\"webhooks\":null,", "");
+    assert_eq!(&*refused(input.as_bytes()), b"application.webhooks: missing\n");
+}
+#[test]
+fn a_missing_webhook_secret_is_refused_by_path() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap().replace("\"webhook_secret\":null,", "");
+    assert_eq!(&*refused(input.as_bytes()), b"application.forges[0].webhook_secret: missing\n");
+}
+#[test]
+fn an_in_process_webhook_listener_is_refused() {
+    let input =
+        fixtures::with(&fixtures::document(), b"application.webhooks", br#"{"listener":{"in_process":"hooks"}}"#);
+    assert_eq!(&*lines(&crate::named(&input).unwrap_err()), b"application.webhooks.listener: invalid form\n");
+}
+#[test]
+fn the_webhook_secret_excludes_its_final_newline() {
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace("\"webhooks\":null", "\"webhooks\":{\"listener\":{\"socket\":\"127.0.0.1:7200\"}}")
+        .replace("\"webhook_secret\":null", "\"webhook_secret\":\"secrets/forge-1.webhook-secret\"");
+    let (members, _) = application(input.as_bytes(), &fixtures::engine().jig);
+    let resolved = application::resolve(&members.unwrap(), &fixtures::files(), &mut Problems::empty()).unwrap();
+    assert_eq!(resolved.webhooks.unwrap().secrets.get(0).unwrap().1.expose(), b"fixture-hook-secret");
 }

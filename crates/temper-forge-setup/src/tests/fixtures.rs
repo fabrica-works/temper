@@ -31,6 +31,7 @@ pub fn members() -> Members {
                 plaintext: false,
                 git: bytes::copy_of(b"https://forge.example"),
                 user: User::File(bytes::copy_of(b"forge-1/user")),
+                webhook_secret: None,
                 api_token: bytes::copy_of(b"forge-1/api_token"),
                 identity_token: bytes::copy_of(b"forge-1/git_token"),
                 identity_login: bytes::copy_of(b"temper"),
@@ -41,6 +42,7 @@ pub fn members() -> Members {
                 plaintext: true,
                 git: bytes::copy_of(b"http://127.0.0.1:3000"),
                 user: User::File(bytes::copy_of(b"forge-2/user")),
+                webhook_secret: None,
                 api_token: bytes::copy_of(b"forge-2/api_token"),
                 identity_token: bytes::copy_of(b"forge-2/git_token"),
                 identity_login: bytes::copy_of(b"temper"),
@@ -368,4 +370,11 @@ pub fn subscribed() -> Box<[Box<[u8]>]> {
         events.push(event.into()).expect("events");
     }
     events.into_boxed()
+}
+
+pub fn hooked_members() -> Members {
+    let mut members = members();
+    members.forges[0].webhook_secret = Some(bytes::copy_of(b"forge-1/webhook_secret"));
+    members.forges[1].webhook_secret = Some(bytes::copy_of(b"forge-2/webhook_secret"));
+    members
 }

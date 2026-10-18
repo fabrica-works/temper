@@ -21,6 +21,7 @@ pub struct ForgeRuntime {
 pub fn settings(
     forges: &[settings::Forge],
     runtime: List<ForgeRuntime>,
+    webhooks: Option<settings::Webhooks>,
     found: &mut Problems,
 ) -> Option<kit::settings::Settings> {
     let mut endpoints = List::with_capacity(runtime.len());
@@ -73,7 +74,7 @@ pub fn settings(
             found.push(forge_path(u32::try_from(index).expect("runtime index")).member(b"api"), What::Refers);
         }
     }
-    if found.is_empty() { Some(kit::settings::Settings { forges: configured, webhooks: None }) } else { None }
+    if found.is_empty() { Some(kit::settings::Settings { forges: configured, webhooks }) } else { None }
 }
 fn forge_path(index: u32) -> Path {
     Path::root().member(b"application").member(b"forges").child(Segment::Index(index))
@@ -267,7 +268,10 @@ pub fn problems(unusable: kit::Unusable, found: &mut Problems) {
     }
 }
 pub(crate) fn tag(mut request: skein_io::Request) -> skein_io::Request {
-    if let skein_io::Request::Connect { owner, .. } = &mut request {
+    if let skein_io::Request::Connect { owner, .. }
+    | skein_io::Request::Listen { owner, .. }
+    | skein_io::Request::Bind { owner, .. } = &mut request
+    {
         assert!(owner.raw() < (1_u64 << 60_u32), "forge token fits its prefix");
         *owner = skein_lib::Token::new(owner.raw() | crate::tokens::FORGE);
     }
@@ -304,7 +308,7 @@ pub(crate) fn prepare(
             0
         }
     };
-    let prepared = settings(&config.forges, runtime, &mut found).ok_or(found)?;
+    let prepared = settings(&config.forges, runtime, config.webhooks.clone(), &mut found).ok_or(found)?;
     if let Err(why) =
         kit::limits::check(&config.limits.forge_component, &shared(&config.limits, &config.jig.limits.io), &prepared)
     {

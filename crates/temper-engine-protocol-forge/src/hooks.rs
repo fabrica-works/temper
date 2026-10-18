@@ -7,7 +7,7 @@ mod connection;
 pub(crate) mod hint;
 use connection::{Closing, Hooked};
 /// The listener and the secrets it alone owns.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Webhooks {
     pub listener: Addr,
     pub secrets: List<(u16, Secret)>,

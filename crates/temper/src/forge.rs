@@ -198,8 +198,16 @@ pub(crate) fn start(arguments: &[OsString]) -> Result<u8, Refused> {
         let launch = run::launch(owned, &place, which).map_err(|_| refused("the setup has no runner".into()))?;
         return Err(refused(run_failure(host::run(&limits, &launch), &launch, number)));
     }
-    prepare::run(&limits, &place, Prepare::new(owned.clone(), place.clone(), None))
-        .map_err(|why| refused(failure(why, &place)))?;
+    prepare::run(
+        &limits,
+        &place,
+        Prepare::new(
+            owned.clone(),
+            place.clone(),
+            webhook_listener(&named).map_err(refused)?.map(|socket| socket.ip()),
+        ),
+    )
+    .map_err(|why| refused(failure(why, &place)))?;
     Ok(0)
 }
 #[must_use]
@@ -252,7 +260,7 @@ pub fn reconcile_settings(
         directory,
         admin_token,
         token_bytes: profile.forge_component.token_bytes,
-        hook_secret_bytes: profile.forge_component.token_bytes,
+        hook_secret_bytes: profile.forge_component.hook_secret_bytes,
         deadline: checked.limits.deadline,
         backoff: checked.limits.backoff,
         backoff_max: checked.limits.backoff_max,
@@ -260,6 +268,13 @@ pub fn reconcile_settings(
         documents: limits::documents(&profile.forge_component),
         io,
         entry: entry.clone(),
-        listener: None,
+        listener: webhook_listener(named)?,
     })
+}
+
+fn webhook_listener(named: &temper_service::startup::Named) -> Result<Option<core::net::SocketAddr>, String> {
+    match &named.webhooks {
+        Some(webhooks) => super::address(&webhooks.listener).map(Some),
+        None => Ok(None),
+    }
 }

@@ -83,6 +83,7 @@ pub fn engine() -> settings::Engine {
     .expect("engine document");
     settings::Engine {
         jig: jig_protocol_config::engine(&document, 0).expect("typed jig engine"),
+        webhooks: None,
         clients: crate::startup::application::Clients { listener: jig_protocol_config::Address::Addr(http::address()) },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: Box::new([settings::Forge {
@@ -750,7 +751,9 @@ pub fn clients() -> crate::clients::Clients {
         .unwrap()
 }
 mod startup;
-pub use startup::{APPLICATION, document, files, parsed, startup_agent, with, without, worker_runtime};
+pub use startup::{
+    APPLICATION, document, files, parsed, startup_agent, webhook_document, with, without, worker_runtime,
+};
 pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
     let mut runtime = skein_lib::List::with_capacity(1);
     runtime
