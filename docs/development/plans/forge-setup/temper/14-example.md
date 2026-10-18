@@ -55,6 +55,30 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 
 ### 14.1 The owned example as a tested file
 
+**Corrections after the designer's answer of 2026-10-18T16:47:23Z (the question of 2026-10-18T16:33:07Z; configuration.md
+7, "The owned example's `memory_bytes`", and 10), for the step that follows it and each landing after it, in this run
+and in client-api's. On `memory_bytes` they take precedence over Shape 1's "`memory_bytes` and each other number are the
+least the start's checks accept", over the 12:25:44Z block's "Ruling 143's rule … stays for `memory_bytes`" and over
+ruling 143's rule; for each other number ruling 143 stays:**
+- `engine.memory_bytes` and `workers[0].memory_bytes` are each the least T3 accepts as it lays the example below, with
+  the strings the worst cases count at their bounds; never the least at one checkout's directory. The designer's probe
+  on temper 0601176ab: 78,669,036,604,974 and 1,989,738,112,203 start; one less each is refused "the worst case passes
+  memory_bytes by 1 bytes", from scratch directories of 78 and 83 bytes. `main` states 78,669,036,604,496 and
+  1,989,738,096,213: 478 and 15,990 short.
+- T3 `serve_prepares_once_on_the_owned_example` (`crates/temper/tests/startup.rs:314`) lays the example at those bounds
+  in place of its `owned_example` call: `Owned { forgejo: "127.255.255.254:65535".parse()…, ..Owned::example() }` for
+  `lay` and `example_document`; in the parsed document, `workers[0].agent.program` and `workers[0].agent.arguments[1]`
+  each `"/"` and 4,095 `p`s (`prepare_in` neither runs the program nor opens the argument; `configuration` stays the
+  laid file); `forge-1/api_token` 512 bytes, the other three files as they are. One comment line cites configuration.md
+  7. T2, T4 and the box's tests are unchanged. Size: about +10 lines.
+- The step sets the two numbers from T3's refusal: with them as `main` states them, T3 is refused "the worst case passes
+  memory_bytes by N bytes" for each; raise each by its N, and no more. Nothing else in `owned.json` changes.
+- From then on, a landing that raises either worst case raises its number by the N T3's refusal names; a landing that
+  lowers one leaves the number, and nothing checks a lowering. No other file copies either number (`git grep -n
+  '78669036604\|1989738096'` names `owned.json` and client-api's ruling 363 alone).
+- Don't: price these strings at their bounds in `worker_worst_case` or `workers::worst_case`, which count them as
+  written and stay; add room past the bounds; change T3's ceiling (1 s; the probe's start took 43 ms).
+
 **Corrections after the designer's answer of 2026-10-18T12:25:44Z (the question of ruling 145; configuration.md 7 and
 10). They take precedence over the text below, over the corrections below and over ruling 145's provisional eight:**
 - `application.limits` is `{"profile": "small", "overrides": {}}`; `workers[0].limits` is `{"profile": "small",

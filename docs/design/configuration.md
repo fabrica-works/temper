@@ -495,6 +495,22 @@ top-level `workers`, in the same order; standalone has one. Each:
   `engine.memory_bytes` for the engine's service and `memory_bytes` of
   the worker's part for the worker's, or the start is refused, saying by
   how much.
+- **The owned example's `memory_bytes`** hold its worst cases wherever a
+  person lays it and whatever its forge's files hold: each start passes
+  with each string its service's worst case counts, and a person's copy
+  changes, at its bound. The engine's counts the forge's `api_token` and
+  its `git` base, a byte for each of theirs: the token at `small`'s
+  `forge_component.token_bytes`, 512, past which the start is refused,
+  and the base at an owned forge's longest, `http://` with a loopback
+  address and a port, `http://127.255.255.254:65535`, 28 bytes. The
+  worker's counts its agent's `program` and the configuration's path
+  among its `arguments`, two bytes for each of theirs with the example's
+  one slot: each at Linux's `PATH_MAX`, 4,096 bytes. Nothing else a copy
+  changes moves either: its directory but for that path, its other
+  addresses and secrets, its logins, emails, binaries and charters, the
+  account handed in. A test starts the example with those strings at
+  their bounds, so that the example starts from a person's directory,
+  with Forgejo's tokens, on the ports a host picks.
 
 ## 8. First start and every start
 
@@ -747,6 +763,9 @@ and the process tier's test of `temper box` runs one (setup.md, 13.4).
   its worker's `limits` follow from them (section 7). smith's standard
   sizes with nothing declared refuse the example's model declaration at
   start.
+- **Its `memory_bytes`** hold its worst cases with the strings a copy
+  changes at their bounds (section 7), never its least for one
+  directory.
 - **Three loopback addresses,** Forgejo's (`listen`), the clients'
   listener's and the webhooks' listener's, are what a host changes to run
   several boxes on one machine, with each box's directories.
