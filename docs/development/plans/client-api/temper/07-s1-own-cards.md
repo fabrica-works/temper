@@ -19,7 +19,8 @@ Files:
   - `git grep -l -w jig_client_view -- '*.rs'` prints 32 files, in `crates/temper-client-{domain,view,shell-terminal}` and `tests/client/src/{app,fixtures,translate}.rs`;
   - `git grep -l jig-client-view -- '*Cargo.toml'` prints the workspace's, the three client crates', `crates/temper`'s, `tests/client`'s and `tests/one-process`'s;
 - `Cargo.lock`;
-- the goldens that show a card.
+- the goldens that show a card;
+- `tests/one-process/src/referee/client/cache.rs`: the private cache's observer skips the record jig keeps at `jig_client::STREAM_KEY`, as ruling 216 fixed it for temper 03.s2; its checks unchanged (ruling 397).
 
 Shape:
 1. **The first commit** moves temper's jig pin alone, to jig-15.s1's landing. Past 60 lines of repairs, counted with `git diff --numstat`, block with the count.

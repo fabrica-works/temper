@@ -3185,6 +3185,16 @@ choice would have been the user's (development.md, 10.4).
      5. **A further act or link that reaches a page of jig's reference UI** goes the same way. The story keeps its name and its engine assertions, and ends at temper's last page. List each one in the report.
      6. **Size:** these are removals, not counted against the aim.
 
+397. **temper-07.s1: the cache observer skips jig's stream record** (process, temper 07.s1's block of 2026-10-18T21:23:54Z).
+     Ruling 397, kind: process. The repair is yours, in temper-07.s1, as ruling 216 (point 3) gave temper 03.s2 the cache observer's fix in the same file. It changes how the observer reads jig's private store, not what the referee checks, so ruling 229's "never changed to pass" holds.
+
+     1. **The observer reads the stream record.** In `tests/one-process/src/referee/client/cache.rs`'s `tables` (`:133`), a record whose key is `jig_client::STREAM_KEY` (`b"stream"`, jig `08430b948`, `jig-client-protocol-link/src/lib.rs:15`, re-exported at `jig-client/src/lib.rs:18`) decodes as a `Kept` and is skipped: it is not a table entry. Name jig's constant; copy no literal.
+     2. **Everything else stays as it is.** Any other record that is not a `TableEntry`, or a key that differs from its entry's, still discards the snapshot. The referee's and the judges' checks are unchanged: the pending window (`world.rs:552`), "answer adoptions once", and the conformance rules.
+     3. **The focused test:** `an_adoption_saves_a_pending_window_before_the_engine_commit` (`world.rs`'s test module, 0.214 s) is the repair's reproduction (implementer.md, 8.8). It lands with the fix if it holds one behaviour within the world tier's 0.5 s.
+     4. **Then, under ruling 229:** run the gate once, the fuzzy profile included. The two fuzzy stories, `drawn_kills_keep_the_conformance_rules_and_answer_adoptions_once` and `drawn_power_losses_keep_the_conformance_rules`, count from this run. A failure at the same point again, or a new cause outside Files, is a block with its logs.
+     5. **The commit body** names the file, the cause (`logs/temper-07-s1/gate-cause.md`) and this ruling. It is a test-support line count, not production.
+     6. **Further readers:** another observer or judge in `tests/` that decodes every private record as a `TableEntry` takes the same skip. List each one in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
