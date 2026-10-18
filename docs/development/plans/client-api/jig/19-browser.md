@@ -137,6 +137,53 @@ story is a person who opens the printed link and sees their inbox
   <the session's jig worktree> grep -n -i -w temper -- crates testing tests
   examples scripts` prints nothing at each jig increment's end".
 
+## Corrections after the ready check (ruling 329)
+
+The ready check (skein 0be1255e7, jig 7d3becac7, temper 9ea74ad40)
+found these, against the increments below; they replace what differs.
+- **19.1, a lint unfulfilled on wasm32:**
+  `crates/jig-client-domain/src/contract/documents.rs:786-789`'s
+  `#[expect(clippy::large_enum_variant, ..)]` on `HistoryChange` fails
+  the new wasm32 clippy ("this lint expectation is unfulfilled"). It
+  becomes `#[cfg_attr(target_pointer_width = "64",
+  expect(clippy::large_enum_variant, reason = ".."))]`, its reason
+  kept, and the file joins 19.1's Files. With it, the wasm32 clippy and
+  jig's whole gate passed. Any further expectation unfulfilled on
+  wasm32 takes the same form; the commit body lists it.
+- **19.1 and 19.4, the gate's documents:** `docs/development/workflow.md`
+  section 1 (`:12-17`, the gate's commands) takes 19.1's wasm32 clippy
+  line, and joins 19.1's Files; 19.4 renames section 2 ("The two test
+  suites", `:30`) for three, and the header comments of
+  `scripts/check.sh` and `.config/nextest.toml`, which name two suites,
+  name three.
+- **19.2:** `crates/jig-client-view/src/tests.rs` registers the test
+  modules (`mod ..;`), and joins the Files for `mod address;`. The
+  crate is `no_std`: the sketch's `Box<[u8]>` needs `use
+  alloc::boxed::Box;`, and
+  `random_bytes_parse_to_a_place_without_a_panic` draws each path into
+  a `[u8; 64]` and parses a slice of it, with no `Vec` and no
+  `map`/`collect`, which the crate's `clippy.toml` disallows.
+- **19.3 and 19.4, the boundary test:** `tests/boundary/src/tests/graph.rs`
+  is in their Files, not only "if a role list names client crates":
+  `client_engine_breaches` (`:459`) names `jig-client-shell-native`
+  (`:469`), and names the new shell crates beside it;
+  `smith_breaches` (`:412`) holds them already by its prefix
+  (`:419`, `jig-client-shell-`); `application_breaches` (`:390`) is
+  checked for them.
+- **19.3, the browser header is the adapter's:** the mapping's client
+  end, `jig-client-protocol-http`, sets no `Jig-Client` header; the
+  mount reads it (`jig-protocol-engine-clients-http/src/lib.rs:59`,
+  `jig-client: browser`). The adapter's pure half,
+  `adapter::requests`, adds it to each exchange and stream, as 19.3's
+  test asserts, and 19.4's test shell takes it from the adapter.
+- **19.4:** the harness's `Setup` also has `server`, `chromium`,
+  `expected` and `origins`, as the `Tier::setup` sketch has them;
+  `restart` with `{address}` is what serves `127.0.0.1:0`.
+- **Held:** `cargo update -p skein-lib --precise 0f093bb7..` leaves one
+  skein in `Cargo.lock`, as "Choices" says; temper's `address.rs` wraps
+  jig's `Address`, so 19.2 only adds to it, and temper uses no `web`
+  profile, wasm32 or `browser_`.
+
 ## Increments
 
 ### 19.1 The client crates on the browser's target, and the `web` profile
