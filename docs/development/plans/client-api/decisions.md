@@ -2312,6 +2312,41 @@ choice would have been the user's (development.md, 10.4).
 
      `a_sign_in_answer_with_no_token_leaves_none_held` starts with a credential held, as your stronger test does, and asserts `credential()` is `None` and the generation advanced. Nothing else in 17.4 changes; the proof is not run again. Refresh any further copy of the guard's old line, and list it in the commit body.
 
+319. **temper-04.4's question: an authority crosses whole; the steps for it and for ruling 316** (design gap, temper-04.4's block of 2026-10-18T05:51:17Z, the designer's answer of 2026-10-18T06:20:06Z).
+     The designer's answer (jig `35ab18732`, temper `405924109`), below; its steps are jig-17.s1 and `temper-04.s1`, and ruling 316's are jig-17.s2 and `temper-04.s1`'s stream room, each Shape its file's.
+
+
+     1. **Served, and the offer bounded whole.** contract.md, 5.3: "**An
+        authority crosses whole.** ... A document carries each list whole,
+        with as many entries as the engine admits there ... The engine never
+        cuts one, nor refuses a document or an offer for one, nor marks one
+        cut. A document's bound on its short lists is not an authority's."
+        It sits beside "**A path crosses whole.**" and under "**Bounded:**
+        ... never in rows sized for one client's screen".
+     2. **The engine's bounds are its authorities':** grants and notes'
+        scopes, "the most of its authority's and its tasks' bounds on an
+        authority's grants"; executors, "the most of its authority's bound on
+        executors and its tasks' on executor kinds"; implications, "its
+        authority's bound on them". Derived, never configured.
+     3. **The client's bound is its own:** client.md, 14, "an authority's
+        entries ... a bound of its own, never a window's rows; the
+        application sets it at least the most its engine admits in each of
+        them"; 16, "An authority is held whole, ... and a draft is made from
+        it whole: only the view cuts what it shows". temper's is 12
+        (configuration.md, 7; client.md, 5.4).
+     4. **The view shows part:** view.md, 7, "shows its first entries, in
+        the document's order, at most the view's rows per window (18.9), and,
+        when the client holds more, the mark ... ("More are held than
+        shown")"; 10: it "adds nothing to" the tree's limits.
+     5. **What the client hears:** the document. The busy answer for a
+        document the engine cannot make is a `later.md` row, with `me`'s
+        creating executors and a window over a long authority.
+     6. **For the run:** ruling 317's reader stays. A jig step, then a temper
+        step that repins to it, which the supervisor adds and names (default:
+        a jig supplement after the newest landed jig step, then
+        `temper-04.s1`); `temper/04-engine.md`'s new corrections give both
+        shapes. No temper code works around the refusal.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

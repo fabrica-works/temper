@@ -80,6 +80,8 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15.1 to 15.3, jig 21 | 16.3: 15.6; 16.5: every jig 15 step (ruling 248) |
 | `jig/16-s1-read-positions.md` | jig-16.s1 (ruling 305): a conversation's read position named for no shape | nothing (lands before temper 04.3) | |
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
+| `jig/17-s1-authority-whole.md` | jig-17.s1 (ruling 319): an authority crosses whole in the engine's documents, the link and the view | nothing (not part of jig 17's last increment, 17.5) | |
+| `jig/17-s2-busy-watches.md` | jig-17.s2 (ruling 319): the client opens a busy watch and `me` again, closes a watch once its opening is answered, keeps one watch for `me` | nothing (not part of jig 17's last increment, 17.5) | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
 | `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s2 |
 | `jig/20-attack-stories.md` | jig 20: jig's stories for a browser shell, and its attack stories | jig 19 | |
@@ -104,6 +106,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/03-client.md` | temper 03: temper's client on `jig-client` | temper 02 | 03.1: skein-01.s1, skein-01.s2, forgejo-17's skein step; 03.2: jig 10, temper-03.s1; 03.3: jig 11; 03.4: jig 13.2; 03.5: jig 21.2, jig-12.s1; 03.6: jig 21.4 |
 | `temper/03-s1-engine-revisions.md` | temper-03.s1 (ruling 153): the repin onto jig 10.3, with jig 06's revisions and answers in temper's engine tools | jig 10.3 | |
 | `temper/04-engine.md` | temper 04: the engine and the forge's family on templates and the collapsed wire | jig 09, temper 03 | 04.1: temper 03.4 (ruling 231); 04.2: jig 22; 04.3: jig 16; 04.4: jig-13.s1 |
+| `temper/04-s1-repin-rooms.md` | temper-04.s1 (ruling 319): the repin onto jig-17.s1 and jig-17.s2; a stream's watch room 16 | jig-17.s1, jig-17.s2, temper 04 | |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
 | `temper/07-task-pages.md` | temper 07: the task's page, adoption, the confirmations; `jig-client-view` dropped | temper 06 | |
