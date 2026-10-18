@@ -130,26 +130,21 @@ fn sign_in(driver: &mut Driver, user: u64, reply: u64) -> (u64, u64) {
 }
 
 /// A goal the person asks for under the deployment's charter.
-fn goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
-    people::Ask::SetGoal {
-        project: 1,
-        spec: spec.into(),
-        executor: people::GoalExecutor::Charter(1),
-        budget,
-        priority,
-        deadline: None,
-    }
+fn goal(driver: &Driver, spec: &[u8], budget: u64, priority: u32) -> people::Ask {
+    temper_engine_domain_world::walking::goal_from(
+        driver.chat_ask(1, spec),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget, priority, deadline: None },
+    )
 }
 
 fn proposed_goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
-    let mut ask = jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
-        project: 1,
-        spec: spec.into(),
-        executor: people::GoalExecutor::Charter(1),
-        budget,
-        priority,
-        deadline: None,
-    });
+    let mut ask = jig_core_world::fixtures::propose_goal(temper_engine_domain_world::walking::goal(
+        1,
+        spec,
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget, priority, deadline: None },
+    ));
     let people::Ask::Propose { action: people::Action::Batch(batch), .. } = &mut ask else { panic!("goal proposal") };
     batch[0].authority.tools = 3;
     batch[0].authority.delegation =
@@ -372,14 +367,18 @@ fn a_smith_coordinator_is_woken_once_by_a_burst() {
         reply_to: ReplyTo::new(Token::new(402)),
         sign_in: owner_session,
         key: [42; 16],
-        ask: goal(b"@burstplan Coordinate updates", 50, 1),
+        ask: goal(&driver, b"@burstplan Coordinate updates", 50, 1),
     }));
     driver.settle();
     let coordinator = driver
         .delivered
         .iter()
         .find_map(|delivery| match delivery {
-            Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::GoalStarted { task }), .. } => {
+            Delivery::WebReply {
+                reply: people::Reply::Outcome(people::Outcome::Created { first: task, last, given: None }),
+                ..
+            } => {
+                assert_eq!(task, last, "one template task");
                 Some(*task)
             }
             _ => None,

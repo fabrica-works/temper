@@ -62,6 +62,7 @@ pub(crate) fn worker_event(peers: &mut Peers, up: workers::Up) -> engine::Event 
                 .collect();
             protocol::hello_slots(Token::new(channel), slots, hosting)
         }
+        workers::Up::Writing { .. } => panic!("conformance scripts report no provisional writing"),
         workers::Up::Lost { channel } => protocol::lost(Token::new(channel)),
         workers::Up::Turn { channel, task, attempt, turn, spent, read, body, opens_window, refused } => {
             assert!(refused.is_empty(), "conformance scripts refuse no message");

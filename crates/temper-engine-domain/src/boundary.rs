@@ -583,7 +583,7 @@ pub(crate) enum Payload {
 /// An ended owner row the core asked the root to load.
 #[derive(Debug)]
 pub(crate) enum EndedRead {
-    SeenChat { request: Token, task: u64 },
+    SeenConversation { request: Token, task: u64 },
     Position { request: Token, task: u64, party: u64 },
     PartyInput { request: Token, task: u64 },
     PersonTask { request: Token, person: u64, project: u32, task: u64 },

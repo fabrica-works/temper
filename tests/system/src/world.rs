@@ -112,7 +112,7 @@ pub fn chat(words: &[u8], job: Job) -> World {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: root.session(),
         key: [41; 16],
-        ask: people::Ask::StartChat { project: 1, words: words.into() },
+        ask: temper_engine_domain_world::walking::chat(1, words),
     }));
     root.settle();
     let assignment = root.last_assignment();

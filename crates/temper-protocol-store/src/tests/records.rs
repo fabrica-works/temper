@@ -417,9 +417,6 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
     use jig_domain_people as p;
     let mut rows = skein_lib::List::with_capacity(192);
     for row in [
-        p::Refusal::Disposal { task: u64::MAX, issue: p::DisposalIssue::Missing },
-        p::Refusal::Disposal { task: 7, issue: p::DisposalIssue::Unknown },
-        p::Refusal::Disposal { task: 8, issue: p::DisposalIssue::Repeated },
         p::Refusal::Role { held: None },
         p::Refusal::Taken { by: u64::MAX },
         p::Refusal::NotWaiting,

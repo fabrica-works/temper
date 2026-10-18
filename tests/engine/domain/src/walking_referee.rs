@@ -171,8 +171,13 @@ impl WalkingReferee {
         else {
             return Err("chat reply before keyed answer commit");
         };
-        if ask.as_ref() != &(people::Ask::StartChat { project: 1, words: QUESTION.into() })
-            || *outcome != (people::Outcome::Started { task })
+        if ask.as_ref() != &(crate::walking::chat(1, QUESTION))
+            || *outcome
+                != (people::Outcome::Created {
+                    first: task,
+                    last: task,
+                    given: Some(people::Given { task, amount: 500 }),
+                })
         {
             return Err("keyed answer differs from person request");
         }

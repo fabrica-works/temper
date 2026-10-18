@@ -574,23 +574,17 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                     }
                     Some(bytes)
                 }
-                jig_domain_people::Ask::SetGoal { spec, .. } => u64::try_from(spec.len()).ok(),
                 jig_domain_people::Ask::SetRoles { holdings, .. } => u64::try_from(holdings.len())
                     .ok()?
                     .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
-                jig_domain_people::Ask::Prioritise { goals, .. } => {
-                    u64::try_from(goals.len()).ok()?.checked_mul(u64::try_from(size_of::<(u64, u32)>()).ok()?)
-                }
                 jig_domain_people::Ask::Amend { amendment, .. } => jig_domain_people::amendment_bytes(amendment),
                 jig_domain_people::Ask::ChangePolicy { change, .. } => jig_domain_people::policy_change_bytes(change),
-                jig_domain_people::Ask::StartChat { words, .. }
-                | jig_domain_people::Ask::Say { words, .. }
-                | jig_domain_people::Ask::AnswerQuestion { words, .. } => u64::try_from(words.len()).ok(),
+                jig_domain_people::Ask::Say { words, .. } | jig_domain_people::Ask::AnswerQuestion { words, .. } => {
+                    u64::try_from(words.len()).ok()
+                }
                 jig_domain_people::Ask::Move { reason, .. } | jig_domain_people::Ask::Cancel { reason, .. } => {
                     u64::try_from(reason.len()).ok()
                 }
-                jig_domain_people::Ask::Close { disposals, .. } => u64::from(disposals.len())
-                    .checked_mul(u64::try_from(size_of::<jig_domain_people::Disposal>()).ok()?),
                 jig_domain_people::Ask::Withdraw { .. }
                 | jig_domain_people::Ask::MarkSeen { .. }
                 | jig_domain_people::Ask::Application { .. }
@@ -619,7 +613,7 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             jig_domain_people::Stored::SignIn { .. }
             | jig_domain_people::Stored::ReadResults { .. }
             | jig_domain_people::Stored::EndedRead { .. }
-            | jig_domain_people::Stored::ReadChat { .. } => Some(0),
+            | jig_domain_people::Stored::ReadConversation { .. } => Some(0),
             jig_domain_people::Stored::Policy { value, .. } => jig_domain_people::policy_bytes(value),
         },
     }

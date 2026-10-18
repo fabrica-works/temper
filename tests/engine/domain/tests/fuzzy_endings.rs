@@ -11,6 +11,9 @@ use temper_engine_domain_world::direct::Driver;
 use temper_engine_domain_world::store::Store;
 use temper_engine_domain_world::walking::{config, limits};
 
+const WORKER: Token = Token::new(7);
+const DELEGATE: u64 = 90;
+
 #[expect(clippy::wildcard_enum_match_arm, reason = "the script selects one delivery from the closed vocabulary")]
 fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
     let mut bounds = limits();
@@ -54,7 +57,7 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [5; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"root sweep".as_slice().into() },
+        ask: driver.chat_ask(1, b"root sweep"),
     }));
     driver.settle();
     let assignment = driver
@@ -68,10 +71,49 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
     (driver, assignment)
 }
 
+fn delegate_child(driver: &mut Driver, assignment: &engine::Assignment) {
+    let child = engine::Delegate {
+        executor: tasks::Executor::Agent { charter: 1 },
+        spec: tasks::Spec { words: b"child".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
+        contract: tasks::Contract::Report { words: 128 },
+        authority: tasks::Authority {
+            tools: tasks::Tools(0),
+            grants: Box::new([]),
+            delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            budget: tasks::Budget { spend: 10, deadline: None },
+            notes: tasks::Scopes(0),
+            note_resources: Box::new([]),
+        },
+        symbolic_grants: Box::new([]),
+        dependencies: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+        ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
+    };
+    let body = engine::Call { completion: 1, position: 1, tool: engine::Tool::Delegate { batch: Box::new([child]) } };
+    driver.call(WORKER, assignment.task, assignment.attempt, DELEGATE, body);
+    for _ in 0..30 {
+        driver.advance(true);
+    }
+}
+
+#[test]
+fn a_chat_in_the_ending_sweep_can_delegate_a_child() {
+    let mut rng = Rng::new(8332);
+    let (mut driver, assignment) = chat(8332, true);
+    if rng.below(2) == 0 {
+        driver.advance(true);
+    }
+    delegate_child(&mut driver, &assignment);
+    let answer = driver.answered(DELEGATE);
+    let Some(engine::CallAnswer::Delegated(numbers)) = answer else {
+        panic!("child was made atomically: {answer:?}");
+    };
+    assert_eq!(numbers.len(), 1);
+}
+
 #[test]
 #[expect(
     clippy::wildcard_enum_match_arm,
-    clippy::too_many_lines,
     reason = "one seeded root story selects its concrete route and durable outcome"
 )]
 fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
@@ -109,37 +151,8 @@ fn drawn_root_stories_reach_every_durable_ending_and_held_route() {
                 }
             }
             2 => {
-                let child = engine::Delegate {
-                    executor: tasks::Executor::Agent { charter: 1 },
-                    spec: tasks::Spec {
-                        words: b"child".as_slice().into(),
-                        parameters: Box::new([]),
-                        inputs: Box::new([]),
-                    },
-                    contract: tasks::Contract::Report { words: 128 },
-                    authority: tasks::Authority {
-                        tools: tasks::Tools(0),
-                        grants: Box::new([]),
-                        delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
-                        budget: tasks::Budget { spend: 10, deadline: None },
-                        notes: tasks::Scopes(0),
-                        note_resources: Box::new([]),
-                    },
-                    symbolic_grants: Box::new([]),
-                    dependencies: Box::new([]),
-                    wake: tasks::WakePolicy::DEFAULT,
-                    ..temper_engine_domain_world::fixtures::report_delegate(b"fixture", Box::new([]))
-                };
-                let body = engine::Call {
-                    completion: 1,
-                    position: 1,
-                    tool: engine::Tool::Delegate { batch: Box::new([child]) },
-                };
-                driver.call(Token::new(7), assignment.task, assignment.attempt, 90, body);
-                for _ in 0..30 {
-                    driver.advance(true);
-                }
-                let Some(temper_engine_domain::CallAnswer::Delegated(numbers)) = driver.answered(90) else {
+                delegate_child(&mut driver, &assignment);
+                let Some(temper_engine_domain::CallAnswer::Delegated(numbers)) = driver.answered(DELEGATE) else {
                     panic!("child was made atomically, seed {seed}");
                 };
                 let child = numbers[0].task;

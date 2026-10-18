@@ -12,7 +12,7 @@ fn a_chat_ask_reaches_the_root_as_a_party_ask() {
         reply_to: REPLY,
         sign_in: 3,
         key: [5; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
+        ask: super::fixtures::chat(1, b"question"),
     });
     let Ok(root::PartyInput::Ask { reply_to, sign_in, key, ask }) = translation::to_root(ask) else {
         panic!("party ask")
@@ -20,7 +20,7 @@ fn a_chat_ask_reaches_the_root_as_a_party_ask() {
     assert_eq!(reply_to, REPLY);
     assert_eq!(sign_in, 3);
     assert_eq!(key, [5; 16]);
-    assert_eq!(ask, people::Ask::StartChat { project: 1, words: b"question".as_slice().into() });
+    assert_eq!(ask, super::fixtures::chat(1, b"question"));
 }
 #[test]
 fn sign_out_preserves_its_reply_right_and_sign_in() {
@@ -45,7 +45,7 @@ fn not_ready_uses_the_clients_reply_vocabulary() {
                 reply_to: REPLY,
                 sign_in: 3,
                 key: [5; 16],
-                ask: people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
+                ask: super::fixtures::chat(1, b"question"),
             },
             people::Reply::Again(people::Again::NotReady),
         ),

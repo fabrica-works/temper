@@ -261,7 +261,7 @@ impl Referee {
         if record.requester != tasks::Party::Person(person) || record.spec.words.as_ref() != QUESTION {
             return Err("start differs from requester script");
         }
-        if !matches!(rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey { person, key: [5; 16] })))), Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome, .. }))) if ask.as_ref() == &(people::Ask::StartChat { project: 1, words: QUESTION.into() }) && *outcome == (people::Outcome::Started { task: number }))
+        if !matches!(rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Answer(people::RequestKey { person, key: [5; 16] })))), Some(Record::Core(jig_domain_core::Record::People(people::Stored::Answer { ask, outcome, .. }))) if ask.as_ref() == &(crate::walking::chat(1, QUESTION)) && *outcome == (people::Outcome::Created { first: number, last: number, given: Some(people::Given { task: number, amount: 500 }) }))
         {
             return Err("start without its atomic keyed answer");
         }

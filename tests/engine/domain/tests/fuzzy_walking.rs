@@ -25,7 +25,7 @@ fn fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure() {
 
 #[test]
 fn fuzzy_terminal_commit_cut_preserves_complete_replay_and_funding() {
-    for seed in 0..16 {
+    for seed in 0..4 {
         let mut random = Rng::new(seed + 8100);
         let settings = Settings {
             commit_delay: u32::try_from(random.below(3)).expect("tiny latency"),

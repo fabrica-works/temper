@@ -27,7 +27,6 @@ pub fn limits() -> Limits {
             drafts: 1,
             projects: 2,
             roles: 2,
-            charters: 2,
             text: 32,
             rows: 2,
             conversation_words: 2,
@@ -210,7 +209,6 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             name: Some(DocumentText::complete(contract::Text::new(Box::from(*b"Shop"), 32).expect("name fits"))),
             role: HeldRole::Policy { role: 1 },
             pool: None,
-            chat_budget: 0,
             templates: List::with_capacity(0),
             creating: None,
         })
@@ -238,7 +236,6 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
                         needs_total: 0,
                         updates: contract::Count { value: 0, limited: false },
                         results_seen: 0,
-                        charters: List::with_capacity(0),
                         cut: false,
                         retention: Duration::from_secs(1000),
                         deployment_role: None,

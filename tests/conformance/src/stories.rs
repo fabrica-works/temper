@@ -275,14 +275,11 @@ fn goal_issue(world: &mut World) -> Result<(), Violation> {
     scenarios::ask(
         world,
         82,
-        people::Ask::SetGoal {
-            project: 1,
-            spec: b"Fix the small bug through a milestone".as_slice().into(),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 100,
-            priority: 3,
-            deadline: None,
-        },
+        temper_engine_domain_world::walking::goal_from(
+            crate::chat(&world.peers, &world.store, 1, b"Fix the small bug through a milestone"),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 100, priority: 3, deadline: None },
+        ),
     );
     wait(world, |world| issue_row(world).is_some_and(|issue| issue.number.is_some() && issue.pending.is_none()))?;
     let issue = issue_row(world).expect("goal issue");

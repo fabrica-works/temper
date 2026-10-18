@@ -16,6 +16,7 @@ use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
 
 struct World {
+    creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,
     env: Env<engine::Limits>,
     out: Queue<engine::Request>,
@@ -46,6 +47,9 @@ enum Until {
 }
 
 impl World {
+    fn chat(&self, project: u32, words: &[u8]) -> people::Ask {
+        walking::configured_chat(&self.creating, &self.store.rows, self.env.limits.tasks.tree_tasks, project, words)
+    }
     #[expect(
         clippy::too_many_lines,
         reason = "one fixture configures the policy, fake, and bounds for root forge stories"
@@ -58,6 +62,8 @@ impl World {
         approval: Option<engine::Freshness>,
     ) -> Self {
         let mut limits = walking::limits();
+        limits.people.amendment_bytes =
+            jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.amendment_bytes;
         limits.people.people = 4;
         limits.people.holdings = 4;
         limits.journal.writes += (people::max_out(&limits.people) - people::max_out(&walking::limits().people)) * 4;
@@ -245,6 +251,7 @@ impl World {
         fake::grant(&mut fake, b"org/repo", 7, raw::Permission::Read);
         let fake_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fake_config };
         Self {
+            creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),

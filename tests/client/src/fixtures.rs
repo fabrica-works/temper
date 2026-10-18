@@ -42,7 +42,6 @@ pub fn domain_limits() -> Limits {
             drafts: 1,
             projects: 4,
             roles: 2,
-            charters: 4,
             text: 64,
             rows: 4,
             conversation_words: 2,
@@ -193,7 +192,7 @@ pub fn held_chat(front: &mut Joint) -> u64 {
         reply_to: skein_lib::ReplyTo::new(Token::new(1001)),
         sign_in: driver.session(),
         key: [31; 16],
-        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"Held chat".as_slice().into() },
+        ask: temper_engine_domain_world::walking::chat(1, b"Held chat"),
     }));
     driver.settle();
     let first = driver.last_assignment();

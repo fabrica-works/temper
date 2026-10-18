@@ -302,9 +302,7 @@ fn populate_page(
                     Subject::Tree { .. }
                     | Subject::Chips { .. }
                     | Subject::Inbox { .. }
-                    | Subject::Goals { .. }
                     | Subject::Tasks { .. }
-                    | Subject::Conversations
                     | Subject::Run { .. } => None,
                 };
                 if let Some(delivery) = delivery {
@@ -614,8 +612,6 @@ fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
         | Read::Result { .. }
         | Read::Ended { .. }
         | Read::History { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Tasks { .. }
         | Read::Notes { .. } => None,

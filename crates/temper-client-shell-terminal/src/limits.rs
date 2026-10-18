@@ -45,7 +45,6 @@ pub fn native() -> Limits {
                 // Ops's 2 stays below the receiving wire's frame_projects ceiling of 7.
                 projects: 2,
                 roles: 16,             // Visible role names.
-                charters: 16,          // Charter choices.
                 text: 128,             // Ops's 32 raised to 128; 256 is refused by Limits::compose.
                 rows: 2,               // Ops's 2; 4 is refused by Limits::compose.
                 conversation_words: 8, // Pending conversation snapshots.

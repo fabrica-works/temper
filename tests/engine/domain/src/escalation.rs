@@ -697,13 +697,19 @@ impl World {
                             reply_to: ReplyTo::new(Token::new(103)),
                             sign_in: self.sessions[0].expect("requester signed in"),
                             key: [5; 16],
-                            ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+                            ask: crate::walking::chat(1, QUESTION),
                         }),
                         0,
                     );
                 }
             }
-            Delivery::WebReply { to, reply: people::Reply::Outcome(people::Outcome::Started { task }), .. } => {
+            Delivery::WebReply {
+                to,
+                reply: people::Reply::Outcome(people::Outcome::Created { first: task, last, given }),
+                ..
+            } => {
+                assert_eq!(task, last, "one template task");
+                assert_eq!(given, Some(people::Given { task, amount: 500 }), "template funding receipt");
                 assert_eq!(to.into_token(), Token::new(103), "sole chat-start right");
                 self.referee.started(&self.store.rows, task).expect("atomic actual chat start");
                 self.task = Some(task);

@@ -3,7 +3,6 @@ use super::{World, ask, check};
 use crate::{Peers, observations::Store};
 use jig_conformance::{referee::Violation, scenarios::Action};
 use jig_domain_core::{self as core, documents, reads};
-use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{ReplyTo, Token};
 use temper_engine_domain as root;
@@ -54,7 +53,7 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
                 ask(
                     world,
                     if *phase == INITIAL { FIRST_QUERY_CHAT } else { SECOND_QUERY_CHAT },
-                    people::Ask::StartChat { project: 1, words: b"query task".as_slice().into() },
+                    crate::chat(&world.peers, &world.store, 1, b"query task"),
                 );
                 *phase += 1;
                 return Ok(true);

@@ -72,7 +72,7 @@ pub(super) fn action(world: &mut World, action: Action) {
                 ask(
                     world,
                     if index == 0 { MARK_KEPT } else { MARK_RELEASED },
-                    people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+                    people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
                 );
             }
         }
@@ -149,16 +149,14 @@ pub(super) fn check_ending(world: &World) -> Result<(), Violation> {
             root::Key::Core(
                 core::Key::Tasks(
                     tasks::Key::Ended(task)
-                    | tasks::Key::ConversationOldest { task, .. }
                     | tasks::Key::EndedByParty { task, .. }
                     | tasks::Key::EndedByProject { task, .. },
                 )
-                | core::Key::People(people::Key::ReadChat { task, .. } | people::Key::EndedRead { task, .. }),
+                | core::Key::People(people::Key::ReadConversation { task, .. } | people::Key::EndedRead { task, .. }),
             ) => *task != forgotten,
-            root::Key::Core(core::Key::Tasks(
-                tasks::Key::Update { task, object: tasks::UpdateObject::Result, .. }
-                | tasks::Key::ConversationNewest { task, .. },
-            )) => task.value() != forgotten,
+            root::Key::Core(core::Key::Tasks(tasks::Key::Update {
+                task, object: tasks::UpdateObject::Result, ..
+            })) => task.value() != forgotten,
             root::Key::Core(_) | root::Key::Forge { .. } => true,
         }),
         "forgettable conversation left an owner, result update, index or read position",

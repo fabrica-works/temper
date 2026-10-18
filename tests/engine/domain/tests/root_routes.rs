@@ -119,14 +119,12 @@ fn amend(driver: &Driver, task: u64, amendment: people::Amendment) -> people::As
 
 /// A tracked goal a person asks for under the deployment's charter.
 fn goal(spec: &[u8], budget: u64, priority: u32) -> people::Ask {
-    people::Ask::SetGoal {
-        project: 1,
-        spec: spec.into(),
-        executor: people::GoalExecutor::Charter(1),
-        budget,
-        priority,
-        deadline: None,
-    }
+    temper_engine_domain_world::walking::goal(
+        1,
+        spec,
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget, priority, deadline: None },
+    )
 }
 
 /// The goal a person's ask started, from its reply.
@@ -135,9 +133,12 @@ fn started_goal(driver: &Driver) -> u64 {
         .delivered
         .iter()
         .find_map(|delivery| {
-            if let Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::GoalStarted { task }), .. } =
-                delivery
+            if let Delivery::WebReply {
+                reply: people::Reply::Outcome(people::Outcome::Created { first: task, last, given: None }),
+                ..
+            } = delivery
             {
+                assert_eq!(task, last, "one template task");
                 Some(*task)
             } else {
                 None
@@ -172,25 +173,6 @@ fn replied(driver: &Driver, outcome: &people::Outcome) -> bool {
     driver.delivered.iter().any(
         |delivery| matches!(delivery, Delivery::WebReply { reply: people::Reply::Outcome(found), .. } if found == outcome),
     )
-}
-
-/// The tracked goals the store holds.
-/// The tracked goals the store holds.
-fn goals(driver: &Driver) -> Vec<u64> {
-    driver
-        .store
-        .rows
-        .values()
-        .filter_map(|row| {
-            if let Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(task))) = row
-                && task.tracked.is_some()
-            {
-                Some(task.number)
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 
 /// Rebuild the configuration's authority with project one's policy changed.
@@ -346,7 +328,7 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
         reply_to: ReplyTo::new(Token::new(2033)),
         sign_in: observer_session,
         key: [209; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
+        ask: driver.chat_ask(1, b"hello"),
     }));
     driver.settle();
     // Role refusals carry the role held (jig b7bdd9e8).
@@ -359,14 +341,14 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
         reply_to: ReplyTo::new(Token::new(2032)),
         sign_in: member_session,
         key: [208; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
+        ask: driver.chat_ask(1, b"hello"),
     }));
     for _ in 0..20 {
         driver.advance(true);
         if driver.delivered.iter().any(|delivery| {
             matches!(
                 delivery,
-                Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Started { .. }), .. }
+                Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Created { .. }), .. }
             )
         }) {
             break;
@@ -374,7 +356,7 @@ fn a_member_starts_a_chat_and_an_observer_is_refused() {
     }
     assert!(driver.delivered.iter().any(|delivery| matches!(
         delivery,
-        Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Started { .. }), .. }
+        Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Created { .. }), .. }
     )));
 }
 
@@ -411,46 +393,6 @@ fn a_person_answers_a_numbered_question_from_their_task() {
             .iter()
             .any(|word| word.kind == (tasks::MessageKind::Answer { question }) && word.from == tasks::Party::Person(1))
     );
-}
-
-#[test]
-fn a_maintainer_prioritises_project_goals_and_a_member_cannot() {
-    let (mut driver, _, _, maintainer_session, _, member_session) = people_roles_driver();
-    driver.send(hello_with(Token::new(7), 2, Duration::from_secs(1), Box::new([])));
-    driver.settle();
-    for index in 0..2 {
-        driver.send(engine::Event::Party(engine::PartyInput::Ask {
-            reply_to: ReplyTo::new(Token::new(2040 + index)),
-            sign_in: member_session,
-            key: [u8::try_from(211 + index).expect("small key"); 16],
-            ask: goal(b"goal", 20, 1),
-        }));
-        driver.settle();
-    }
-    let goals = goals(&driver);
-    assert_eq!(goals.len(), 2);
-    let priorities: Box<[(u64, u32)]> = Box::new([(goals[0], 4), (goals[1], 9)]);
-    driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2042)),
-        sign_in: member_session,
-        key: [213; 16],
-        ask: people::Ask::Prioritise { project: 1, goals: priorities.clone() },
-    }));
-    driver.settle();
-    // Role refusals carry the role held (jig b7bdd9e8).
-    let refused = people::Refusal::Role { held: Some(people::Role::Member) };
-    assert!(replied(&driver, &people::Outcome::Refused(refused)));
-    driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(2043)),
-        sign_in: maintainer_session,
-        key: [214; 16],
-        ask: people::Ask::Prioritise { project: 1, goals: priorities.clone() },
-    }));
-    driver.settle();
-    assert!(replied(&driver, &people::Outcome::Prioritised { project: 1 }));
-    for (number, priority) in priorities {
-        assert_eq!(live(&driver, number).tracked, Some(priority));
-    }
 }
 
 #[test]
@@ -701,7 +643,7 @@ fn durable_start_turn_and_answer_callbacks_survive_full_journal_pressure() {
         reply_to: ReplyTo::new(Token::new(201)),
         sign_in: driver.session(),
         key: [8; 16],
-        ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+        ask: driver.chat_ask(1, QUESTION),
     }));
     driver.pressure();
     assert!(!driver.delivered.iter().any(|delivery| matches!(delivery, Delivery::Assigned { .. })));
@@ -834,7 +776,7 @@ fn chat(driver: &mut Driver, key: u8) {
         reply_to: ReplyTo::new(Token::new(401)),
         sign_in: driver.session(),
         key: [key; 16],
-        ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+        ask: driver.chat_ask(1, QUESTION),
     }));
 }
 
@@ -2913,7 +2855,7 @@ fn restored_unreported_claim_spends_no_try_without_committed_work() {
             reply_to: ReplyTo::new(Token::new(501)),
             sign_in: original.session(),
             key: [18; 16],
-            ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+            ask: original.chat_ask(1, QUESTION),
         }));
         original.settle();
         let assignment = original
@@ -3012,88 +2954,6 @@ fn administration_config(seed: u64) -> engine::Config {
     config
 }
 
-#[test]
-fn an_owner_makes_a_service_once_and_the_service_cannot_start_a_chat() {
-    let mut driver = Driver::configured(Store::new(), administration_config(9501), &limits());
-    driver.settle();
-    driver.sign_in();
-    driver.settle();
-    let owner_session = driver.session();
-    let ask = people::Ask::MakeService { project: 1, name: b"builder".as_slice().into(), role: people::Role::Owner };
-    driver.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(9502)),
-        sign_in: owner_session,
-        key: [95; 16],
-        ask: ask.clone(),
-    }));
-    driver.settle();
-    let service = driver
-        .delivered
-        .iter()
-        .find_map(|delivery| {
-            if let Delivery::WebReply {
-                reply: people::Reply::Outcome(people::Outcome::ServiceMade { person }), ..
-            } = delivery
-            {
-                Some(*person)
-            } else {
-                None
-            }
-        })
-        .expect("service creation answered after commit");
-    assert!(driver.store.rows.values().any(|row| matches!(row,
-        Record::Core(jig_domain_core::Record::People(people::Stored::Person { number, identity }))
-            if *number == service && identity.key.provider == 1 && identity.key.subject.as_ref() == service.to_be_bytes()
-    )));
-    let created = driver.store.header().people;
-    let mut restarted = Driver::configured(driver.store, administration_config(9501), &limits());
-    restarted.settle();
-    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(9503)),
-        sign_in: owner_session,
-        key: [95; 16],
-        ask,
-    }));
-    restarted.settle();
-    assert_eq!(restarted.store.header().people, created);
-    assert!(restarted.delivered.iter().any(|delivery| matches!(delivery,
-        Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::ServiceMade { person }), .. }
-            if *person == service
-    )));
-    restarted.send(engine::Event::Party(engine::PartyInput::SignedIn {
-        reply_to: ReplyTo::new(Token::new(9504)),
-        identity: people::Identity {
-            key: people::IdentityKey { provider: 1, subject: service.to_be_bytes().into() },
-            login: Box::new([]),
-            name: b"builder".as_slice().into(),
-        },
-    }));
-    restarted.settle();
-    let service_session = restarted
-        .delivered
-        .iter()
-        .find_map(|delivery| {
-            if let Delivery::WebReply { reply: people::Reply::SignedIn { person, sign_in, .. }, .. } = delivery
-                && *person == service
-            {
-                Some(*sign_in)
-            } else {
-                None
-            }
-        })
-        .expect("service sign-in uses its existing party");
-    restarted.send(engine::Event::Party(engine::PartyInput::Ask {
-        reply_to: ReplyTo::new(Token::new(9505)),
-        sign_in: service_session,
-        key: [96; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::new([]) },
-    }));
-    restarted.settle();
-    // Role refusals carry the role held (jig b7bdd9e8).
-    let refused = people::Refusal::Role { held: Some(people::Role::Owner) };
-    assert!(replied(&restarted, &people::Outcome::Refused(refused)));
-}
-
 // A chat's authority is its role's at the time it starts (jig a2616181): a
 // later chat takes the changed role's tools, an earlier one keeps its grant.
 #[test]
@@ -3103,8 +2963,11 @@ fn a_policy_change_applies_to_later_decisions_only() {
     driver.sign_in();
     driver.settle();
     let session = driver.session();
-    let start = |key: u8, reply: u64, words: &[u8]| {
-        let ask = people::Ask::StartChat { project: 1, words: words.into() };
+    let start = |driver: &Driver, key: u8, reply: u64, words: &[u8]| {
+        let people::Ask::Create { project, mut batch } = driver.chat_ask(1, words) else { unreachable!() };
+        batch[0].budget = people::Budget::Named;
+        batch[0].authority.spend = 25;
+        let ask = people::Ask::Create { project, batch };
         engine::Event::Party(engine::PartyInput::Ask {
             reply_to: ReplyTo::new(Token::new(reply)),
             sign_in: session,
@@ -3112,7 +2975,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
             ask,
         })
     };
-    driver.send(start(41, 9402, b"first"));
+    driver.send(start(&driver, 41, 9402, b"first"));
     for _ in 0..30 {
         driver.advance(true);
     }
@@ -3150,11 +3013,16 @@ fn a_policy_change_applies_to_later_decisions_only() {
     for _ in 0..30 {
         restarted.advance(true);
     }
-    restarted.send(start(43, 9404, b"later"));
+    restarted.send(engine::Event::Party(engine::PartyInput::Period { project: 1, period: 2, budget: 50, next: None }));
+    restarted.send(start(&restarted, 43, 9404, b"later"));
     for _ in 0..30 {
         restarted.advance(true);
     }
-    assert!(replied(&restarted, &people::Outcome::Started { task: 2 }));
+    assert!(
+        replied(&restarted, &people::Outcome::Created { first: 2, last: 2, given: None }),
+        "later decision: {:?}",
+        restarted.delivered
+    );
     assert_eq!(live(&restarted, 2).authority.tools, tasks::Tools(0), "restored policy governs later decisions");
     assert_eq!(first.tools, tasks::Tools(1023));
 }
@@ -3209,7 +3077,7 @@ fn a_policy_change_survives_a_restart() {
         reply_to: ReplyTo::new(Token::new(9415)),
         sign_in: session,
         key: [46; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"later".as_slice().into() },
+        ask: restarted.chat_ask(1, b"later"),
     }));
     restarted.settle();
     // Authority refusals carry what is lacking (jig b7bdd9e8): the period's
@@ -3278,11 +3146,13 @@ fn held_cohort() -> (Driver, [u64; 2], [u64; 2], Vec<tasks::TaskRecord>) {
     driver.settle();
     // The held chat took its person's whole pool, so a second chat of theirs
     // is held at its start and waits at them too (jig a2616181).
+    let people::Ask::Create { project, mut batch } = driver.chat_ask(1, QUESTION) else { unreachable!() };
+    batch[0].budget = people::Budget::Named;
     driver.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(1200)),
         sign_in: sessions[0],
         key: [120; 16],
-        ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+        ask: people::Ask::Create { project, batch },
     }));
     driver.settle();
     let original: Vec<_> = driver
@@ -4205,3 +4075,23 @@ mod ended_read;
 
 #[path = "root_routes/proposal_archive.rs"]
 mod proposal_archive;
+
+const TEMPLATE_CHAT_REPLY: Token = Token::new(6001);
+const TEMPLATE_CHAT_KEY: [u8; 16] = [201; 16];
+#[test]
+fn a_chat_made_from_the_chat_template_is_a_conversation_task() {
+    let mut driver = Driver::configured(Store::new(), config(91), &limits());
+    hello(&mut driver);
+    driver.settle();
+    driver.sign_in();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: ReplyTo::new(TEMPLATE_CHAT_REPLY),
+        sign_in: driver.session(),
+        key: TEMPLATE_CHAT_KEY,
+        ask: driver.chat_ask(1, b"hello"),
+    }));
+    driver.settle();
+    let task = driver.task(1).expect("the chat's task");
+    assert_eq!((task.label, task.flags.conversation), (1, true), "the chat template's label and flag");
+}

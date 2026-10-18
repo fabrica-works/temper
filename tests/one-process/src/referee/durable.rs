@@ -1,4 +1,7 @@
 //! Durability observations from real file completions, independent of the service.
+mod snapshots;
+#[cfg(test)]
+mod tests;
 use jig_domain_core as core;
 use jig_protocol_store::{codec, keys, transcripts};
 use skein_io::kernel::{Complete, Done, Fd, Op};
@@ -29,6 +32,7 @@ pub enum Observed {
     Bytes { path: Vec<u8>, at: usize, bytes: Vec<u8> },
     Sync(Vec<u8>),
     Recovered(Vec<u8>),
+    Snapshot(Vec<u8>),
     Pending(Vec<u8>),
 }
 #[derive(Default)]
@@ -73,8 +77,10 @@ impl Capture {
                         at: usize::try_from(*at).expect("fixture file offset"),
                         bytes: buf[..*count as usize].to_vec(),
                     });
-                    if path.starts_with(b"store/") {
+                    if is_log(&path) {
                         self.events.push(Observed::Recovered(path.clone()));
+                    } else if path == b"store/snapshot" {
+                        self.events.push(Observed::Snapshot(path.clone()));
                     }
                 }
             }
@@ -91,7 +97,7 @@ impl Capture {
     }
     pub fn pending(&mut self, op: &Op) {
         if let Op::Write { fd, bytes, from: 0, .. } = op
-            && self.path(*fd).is_some_and(|path| path.starts_with(b"store/"))
+            && self.path(*fd).is_some_and(is_log)
         {
             self.events.push(Observed::Pending(bytes.to_vec()));
         }
@@ -140,13 +146,24 @@ impl Store {
                         .map(|(number, ops)| self.commit(number, ops, limits, connector))
                         .collect();
                 }
-                Observed::Recovered(path) => {
+                Observed::Recovered(path) if is_log(&path) => {
                     if let Some(bytes) = self.files.get(&path) {
                         self.recovered.extend(frames(bytes, 0).0.into_iter().map(|(number, _)| number));
                     }
                     committed.extend(self.durable(&path, limits, connector));
                 }
-                Observed::Sync(path) if path.starts_with(b"store/") => {
+                Observed::Snapshot(path) => {
+                    if let Some(bytes) = self.files.get(&path)
+                        && let Some((number, ops)) = snapshots::read(bytes)
+                        && self.applied < number
+                    {
+                        let commit = self.commit(number, ops, limits, connector);
+                        self.apply(&commit, limits);
+                        self.recovered.extend(1..=number);
+                        committed.push(commit);
+                    }
+                }
+                Observed::Sync(path) if is_log(&path) => {
                     committed.extend(self.durable(&path, limits, connector));
                 }
                 Observed::Sync(path) if path == b"store" && self.restoring => {
@@ -155,7 +172,7 @@ impl Store {
                     self.restored = Some(self.rows.clone());
                     self.restoring = false;
                 }
-                Observed::Sync(_) => {}
+                Observed::Sync(_) | Observed::Recovered(_) => {}
             }
         }
         committed
@@ -176,26 +193,28 @@ impl Store {
                 continue;
             }
             let commit = self.commit(number, ops, limits, connector);
-            for write in &commit.writes {
-                match write {
-                    root::Write::Save(row) => {
-                        self.rows.insert(row.key(), row.clone());
-                        if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {
-                            let len =
-                                transcripts::frame::encode(turn, limits).expect("observed frame bounds").len() as u64;
-                            *self.lengths.entry(turn.task).or_default() += len;
-                        }
-                    }
-                    root::Write::Erase(key) => {
-                        self.rows.remove(key);
-                    }
-                }
-            }
-            self.applied = number;
+            self.apply(&commit, limits);
             self.pending.retain(|pending| pending.number > number);
             committed.push(commit);
         }
         committed
+    }
+    fn apply(&mut self, commit: &Commit, limits: &codec::Limits) {
+        for write in &commit.writes {
+            match write {
+                root::Write::Save(row) => {
+                    self.rows.insert(row.key(), row.clone());
+                    if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {
+                        let len = transcripts::frame::encode(turn, limits).expect("observed frame bounds").len() as u64;
+                        *self.lengths.entry(turn.task).or_default() += len;
+                    }
+                }
+                root::Write::Erase(key) => {
+                    self.rows.remove(key);
+                }
+            }
+        }
+        self.applied = commit.number;
     }
     fn commit(
         &self,
@@ -292,4 +311,8 @@ fn frames(bytes: &[u8], after: u64) -> (Frames, usize) {
         }
     }
     (frames, used)
+}
+
+fn is_log(path: &[u8]) -> bool {
+    path.strip_prefix(b"store/log-").is_some_and(|number| number.len() == 20 && number.iter().all(u8::is_ascii_digit))
 }

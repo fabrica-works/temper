@@ -507,8 +507,8 @@ fn client_receipts(event: &client::Received, store: &Store, party: Option<u64>) 
         }
         client::Received::Answer { key, answer } => {
             let mut receipts = vec![rules::Receipt::Party(party.expect("signed-in request"), *key)];
-            if let c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Started { task })) = answer {
-                receipts.push(rules::Receipt::Task(*task));
+            if let c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Created { first, last, .. })) = answer {
+                receipts.extend((*first..=*last).map(rules::Receipt::Task));
             }
             receipts
         }

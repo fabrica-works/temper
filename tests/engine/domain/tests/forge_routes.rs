@@ -16,6 +16,7 @@ use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
 
 struct World {
+    creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,
     env: Env<engine::Limits>,
     out: Queue<engine::Request>,
@@ -85,6 +86,8 @@ impl World {
         owner_gate: bool,
     ) -> Self {
         let mut limits = walking::limits();
+        limits.people.amendment_bytes =
+            jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.amendment_bytes;
         limits.people.people = 4;
         limits.people.holdings = 4;
         if owner_gate {
@@ -287,6 +290,7 @@ impl World {
         fake::grant(&mut fake, b"org/repo", 7, raw::Permission::Read);
         let fake_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fake_config };
         Self {
+            creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(engine::max_out(&limits)),
@@ -308,6 +312,10 @@ impl World {
             slow_brief_reads: false,
             owner_gate,
         }
+    }
+
+    fn chat(&self, project: u32, words: &[u8]) -> people::Ask {
+        walking::configured_chat(&self.creating, &self.store.rows, self.env.limits.tasks.tree_tasks, project, words)
     }
 
     fn send(&mut self, event: engine::Event) {
@@ -722,16 +730,13 @@ fn change_world_with_policy(
     }
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     let ask = if tracked {
-        people::Ask::SetGoal {
-            project: 1,
-            spec: Box::from(&b"make the fix"[..]),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 100,
-            priority: 3,
-            deadline: None,
-        }
+        walking::goal_from(
+            world.chat(1, b"make the fix"),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 100, priority: 3, deadline: None },
+        )
     } else {
-        people::Ask::StartChat { project: 1, words: Box::from(&b"make the fix"[..]) }
+        world.chat(1, &b"make the fix"[..])
     };
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         reply_to: ReplyTo::new(Token::new(92)),
@@ -2049,7 +2054,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         reply_to: ReplyTo::new(Token::new(99)),
         sign_in: world.signed_in.expect("owner session"),
         key: [99; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"Work in two repositories"[..]) },
+        ask: world.chat(1, &b"Work in two repositories"[..]),
     }));
     world.until(Until::Assigned);
     let first = world.assigned[0].clone();
@@ -2093,14 +2098,11 @@ fn a_goal_ending_while_its_issue_is_opening_eventually_closes_that_issue() {
         reply_to: ReplyTo::new(Token::new(94)),
         sign_in: world.signed_in.expect("owner session"),
         key: [94; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: Box::from(&b"Finish the goal"[..]),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 50,
-            priority: 3,
-            deadline: None,
-        },
+        ask: walking::goal_from(
+            world.chat(1, b"Finish the goal"),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 50, priority: 3, deadline: None },
+        ),
     }));
     world.until(Until::Assigned);
     let goal = world.assigned[0].clone();
@@ -2139,7 +2141,7 @@ fn a_goal_subscription_receives_the_connectors_landing_news() {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"watch the landing"[..]) },
+        ask: world.chat(1, &b"watch the landing"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
@@ -2191,7 +2193,7 @@ fn subscribe_chat(world: &mut World, topic: forge_top::Topic, key: u8) -> u64 {
         reply_to: ReplyTo::new(Token::new(u64::from(key))),
         sign_in: world.signed_in.expect("owner session"),
         key: [key; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"watch the forge"[..]) },
+        ask: world.chat(1, &b"watch the forge"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
@@ -2382,7 +2384,7 @@ fn an_authorized_forge_read_returns_a_bounded_typed_answer() {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"read forge"[..]) },
+        ask: world.chat(1, &b"read forge"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
@@ -2456,7 +2458,7 @@ fn a_named_forge_effect_is_committed_before_its_write_and_made_once() {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"create an issue"[..]) },
+        ask: world.chat(1, &b"create an issue"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
@@ -2536,7 +2538,7 @@ fn an_explicit_forge_effect_proposal_is_retained_until_its_holder_accepts() {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"propose an issue"[..]) },
+        ask: world.chat(1, &b"propose an issue"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();
@@ -2636,7 +2638,7 @@ fn pending_issue_effect() -> (World, engine::Assignment) {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"create an issue"[..]) },
+        ask: world.chat(1, &b"create an issue"[..]),
     }));
     world.until(Until::Assigned);
     let assignment = world.assigned[0].clone();

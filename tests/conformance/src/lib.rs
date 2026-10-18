@@ -596,7 +596,7 @@ impl Application for Temper {
                         reply_to: ReplyTo::new(Token::new(92)),
                         sign_in,
                         key: [92; 16],
-                        ask: people::Ask::StartChat { project: 1, words: b"work".as_slice().into() },
+                        ask: chat(peers, store, 1, b"work"),
                     }));
                 }
             }
@@ -741,4 +741,16 @@ fn destination(to: &mut ReplyTo) -> u64 {
     let token = std::mem::replace(to, ReplyTo::new(Token::new(0))).into_token();
     *to = ReplyTo::new(token);
     token.raw()
+}
+
+pub(crate) fn chat(peers: &Peers, store: &Store, project: u32, words: &[u8]) -> people::Ask {
+    let (configuration, limits) = config::root(peers.seed, peers.scenario, peers.story);
+    let creating = jig_core_world::fixtures::Creating::new(&configuration.core, limits.tasks.tree_tasks);
+    temper_engine_domain_world::walking::configured_chat(
+        &creating,
+        &store.rows,
+        limits.tasks.tree_tasks,
+        project,
+        words,
+    )
 }

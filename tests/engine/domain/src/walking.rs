@@ -84,7 +84,6 @@ pub fn limits() -> engine::Limits {
         sign_ins: 2,
         projects: 1,
         holdings: 2,
-        goals: 4,
         initial_owners: 1,
         requests: 4,
         pending: 2,
@@ -262,10 +261,8 @@ pub fn config(seed: u64) -> engine::Config {
             authority: domain,
             settings: jig_domain_core::Settings {
                 templates: crate::fixtures::templates(),
-                close_grace: Duration::from_secs(5),
                 deployment_provider: 1,
                 charters: Box::new([charter()]),
-                chat: 1,
                 resume_bytes: 256,
                 tools: jig_domain_core::ToolFamilies::JIG,
             },
@@ -700,12 +697,17 @@ impl World {
                         reply_to: ReplyTo::new(Token::new(102)),
                         sign_in,
                         key: [5; 16],
-                        ask: people::Ask::StartChat { project: 1, words: QUESTION.into() },
+                        ask: crate::walking::chat(1, QUESTION),
                     }),
                     0,
                 );
             }
-            Delivery::WebReply { reply: people::Reply::Outcome(people::Outcome::Started { task }), .. } => {
+            Delivery::WebReply {
+                reply: people::Reply::Outcome(people::Outcome::Created { first: task, last, given }),
+                ..
+            } => {
+                assert_eq!(task, last, "one template task");
+                assert_eq!(given, Some(people::Given { task, amount: 500 }), "template funding receipt");
                 self.referee.started(&self.store.rows, task).expect("atomic chat task and answer");
             }
             Delivery::Assigned { channel, assignment } => {
@@ -856,3 +858,6 @@ mod tests {
         world.run();
     }
 }
+
+mod creating;
+pub use creating::{chat, configured_chat, goal, goal_from};

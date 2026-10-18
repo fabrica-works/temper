@@ -729,7 +729,7 @@ pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
         reply_to: skein_lib::ReplyTo::new(Token::new(101)),
         sign_in: 1,
         key: [31; 16],
-        ask: jig_domain_people::Ask::StartChat { project: 1, words: b"question".as_slice().into() },
+        ask: chat(1, b"question"),
     }));
     let run = settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32)).expect("chat assigned");
     (service, run)
@@ -783,4 +783,51 @@ pub fn withdrawn_history(task: u64, proposal: u64) -> jig_domain_core::Record {
             state: tasks::ProposalState::Withdrawn,
         })),
     }))
+}
+
+pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
+    use jig_domain_people as people;
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 1 },
+        words: words.into(),
+        parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: people::Budget::Named,
+        named: Box::new([]),
+        contract: people::Contract::Report { words: 16 },
+        authority: people::Authority {
+            tools: 0,
+            grants: Box::new([]),
+            delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            spend,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        wake: people::WakePolicy {
+            words: people::WakeRule::Immediate,
+            notices: people::WakeRule::Never,
+            news: people::WakeRule::Never,
+            results: people::ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        dependencies: Box::new([]),
+        tracked: None,
+        label: 0,
+        flags: people::Flags::PLAIN,
+    }
+}
+
+pub fn chat(project: u32, words: &[u8]) -> jig_domain_people::Ask {
+    use jig_domain_people as people;
+    let mut member = people_member(words, 0);
+    member.budget = people::Budget::AsAllowed { cap: None };
+    member.authority.tools = 1023;
+    member.authority.notes = 7;
+    member.contract = people::Contract::Report { words: 32 };
+    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.label = 1;
+    people::Ask::Create { project, batch: Box::new([member]) }
 }

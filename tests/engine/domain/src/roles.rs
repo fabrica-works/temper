@@ -218,7 +218,7 @@ impl World {
                     jig_domain_core::Record::People(
                         people::Stored::SignIn { .. }
                         | people::Stored::ReadResults { .. }
-                        | people::Stored::ReadChat { .. }
+                        | people::Stored::ReadConversation { .. }
                         | people::Stored::EndedRead { .. }
                         | people::Stored::Roles { .. }
                         | people::Stored::Policy { .. }
@@ -235,9 +235,6 @@ impl World {
                         | tasks::Stored::PersonProposal(_)
                         | tasks::Stored::Update(_)
                         | tasks::Stored::Result(_)
-                        | tasks::Stored::ConversationNewest(_)
-                        | tasks::Stored::ConversationOldest(_)
-                        | tasks::Stored::Goal(_)
                         | tasks::Stored::EndedByParty(_)
                         | tasks::Stored::EndedByProject(_)
                         | tasks::Stored::EndedDelegate(_)

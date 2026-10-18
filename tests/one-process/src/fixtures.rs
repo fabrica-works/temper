@@ -1,4 +1,6 @@
 //! Configuration bytes, private files and scripts shared by the stories.
+#[cfg(test)]
+pub(crate) mod durable;
 use crate::world::Settings;
 use jig_channel_world::fixtures as channel;
 use skein_lib::{Duration, List, Secret};

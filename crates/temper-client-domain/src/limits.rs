@@ -68,7 +68,6 @@ pub fn client(
             rows: jig.rows,
             text: jig.text,
             projects: jig.projects,
-            charters: jig.charters,
             fields: jig.fields,
             delegates: jig.delegates,
             records: jig.records,

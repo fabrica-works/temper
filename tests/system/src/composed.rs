@@ -74,6 +74,7 @@ enum Adoption {
 /// A composed deployment: all roots retain their own state, with IO outside.
 pub struct World {
     seed: u64,
+    creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,
     env: Env<engine::Limits>,
     root_out: Queue<engine::Request>,
@@ -225,6 +226,7 @@ impl World {
         assert!(worker::worst_case(&worker_limits).is_some());
         Self {
             seed,
+            creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             root_out: Queue::with_capacity(engine::max_out(&limits)),
@@ -437,7 +439,13 @@ impl World {
             }),
             parties::Up::Request { to, sign_in, project, key, ask } => {
                 let ask = match ask {
-                    parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
+                    parties::Ask::Chat { words } => walking::configured_chat(
+                        &self.creating,
+                        &self.store.rows,
+                        self.env.limits.tasks.tree_tasks,
+                        project,
+                        &words,
+                    ),
                     parties::Ask::Say { task: parties::Task::Number(task), words, release } => {
                         say(project, task, words, release)
                     }
@@ -445,7 +453,7 @@ impl World {
                     other @ (parties::Ask::Close { .. }
                     | parties::Ask::Cancel { .. }
                     | parties::Ask::SeeResults { .. }
-                    | parties::Ask::SeeChat { .. }
+                    | parties::Ask::SeeConversation { .. }
                     | parties::Ask::Goal { .. }
                     | parties::Ask::Say { .. }
                     | parties::Ask::Stop { .. }
@@ -618,7 +626,11 @@ impl World {
         let signed_in = matches!(reply, people::Reply::SignedIn { .. });
         let reply = match reply {
             people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
-            people::Reply::Outcome(people::Outcome::Started { task }) => parties::Reply::Started { task },
+            people::Reply::Outcome(people::Outcome::Created { first: task, last, given }) => {
+                assert_eq!(task, last, "one template task");
+                assert_eq!(given, Some(people::Given { task, amount: 500 }), "template funding receipt");
+                parties::Reply::Started { task }
+            }
             people::Reply::Outcome(people::Outcome::Said { task, message }) => parties::Reply::Said { task, message },
             people::Reply::Outcome(people::Outcome::Stopped { task }) => parties::Reply::Changed { task },
             other @ (people::Reply::Outcome(_)

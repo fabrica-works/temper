@@ -67,7 +67,7 @@ fn start_change_world(passes: u32) -> (World, engine::Assignment) {
         reply_to: ReplyTo::new(Token::new(92)),
         sign_in: world.signed_in.expect("owner session"),
         key: [92; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"@forge_chat".as_slice().into() },
+        ask: world.chat(1, b"@forge_chat"),
     }));
     world.until(Until::Assigned);
     let chat = world.assigned[0].clone();

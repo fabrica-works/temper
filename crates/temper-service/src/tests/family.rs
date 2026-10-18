@@ -285,9 +285,9 @@ fn a_request_under_the_pages_owner_is_answered_undecodable() {
     assert_eq!(to, REPLY);
 }
 
-const NOT_OFFERED_RECORD: &[u8] = &[11];
-const NO_ESCALATION_RECORD: &[u8] = &[13];
-const PROPOSABLE_WRITER_RECORD: &[u8] = &[6, 13, 1, 1];
+const NOT_OFFERED_RECORD: &[u8] = &[10];
+const NO_ESCALATION_RECORD: &[u8] = &[12];
+const PROPOSABLE_WRITER_RECORD: &[u8] = &[5, 13, 1, 1];
 const MALFORMED_POSITION: u32 = 3;
 const MALFORMED_RECORD: &[u8] = &[0, 0, 0, 0, 3, 3];
 fn refusal_bytes(refusal: people::Refusal) -> Box<[u8]> {

@@ -436,9 +436,6 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
                 tasks::Stored::Live(task) => escalation::supported(domain, task),
                 tasks::Stored::Update(_)
                 | tasks::Stored::Result(_)
-                | tasks::Stored::ConversationNewest(_)
-                | tasks::Stored::ConversationOldest(_)
-                | tasks::Stored::Goal(_)
                 | tasks::Stored::EndedByParty(_)
                 | tasks::Stored::EndedByProject(_)
                 | tasks::Stored::EndedDelegate(_)

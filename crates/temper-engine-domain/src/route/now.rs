@@ -138,7 +138,9 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
         core::Now::StartPreparation { task, transcript_waiter, from } => {
             start_preparation(domain, env, decision, task, transcript_waiter, from);
         }
-        core::Now::SeenChat { request, task } => ended(domain, env, decision, EndedRead::SeenChat { request, task }),
+        core::Now::SeenConversation { request, task } => {
+            ended(domain, env, decision, EndedRead::SeenConversation { request, task });
+        }
         core::Now::LoadEndedRead { request, task, party } => {
             ended(domain, env, decision, EndedRead::Position { request, task, party });
         }
@@ -238,9 +240,9 @@ fn start_preparation(
 fn ended(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, read: EndedRead) {
     let range = match &read {
         EndedRead::Position { task, party, .. } => crate::CoreRange::EndedRead { task: *task, party: *party },
-        EndedRead::SeenChat { task, .. } | EndedRead::PartyInput { task, .. } | EndedRead::PersonTask { task, .. } => {
-            crate::CoreRange::TaskResult { task: *task }
-        }
+        EndedRead::SeenConversation { task, .. }
+        | EndedRead::PartyInput { task, .. }
+        | EndedRead::PersonTask { task, .. } => crate::CoreRange::TaskResult { task: *task },
     };
     match domain.archive_reads.insert(Some(Read::Ended(read))) {
         Ok(waiter) => emit(

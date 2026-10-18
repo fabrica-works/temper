@@ -12,6 +12,7 @@ use crate::store::Store;
 use crate::walking::{config, limits};
 
 pub struct Driver {
+    creating: jig_core_world::fixtures::Creating,
     pub forge: Option<crate::forge_stand::ForgeStand>,
     pub root: engine::Domain,
     pub env: Env<engine::Limits>,
@@ -52,6 +53,7 @@ impl Driver {
     #[must_use]
     pub fn configured(store: Store, config: engine::Config, limits: &engine::Limits) -> Driver {
         Driver {
+            creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             forge: None,
             root: engine::Domain::new(config, limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
@@ -260,11 +262,22 @@ impl Driver {
             reply_to: ReplyTo::new(Token::new(1001)),
             sign_in: driver.session(),
             key: [31; 16],
-            ask: people::Ask::StartChat { project: 1, words: crate::walking_referee::QUESTION.into() },
+            ask: driver.chat_ask(1, crate::walking_referee::QUESTION),
         }));
         driver.settle();
         let assignment = driver.last_assignment();
         (driver, assignment)
+    }
+
+    #[must_use]
+    pub fn chat_ask(&self, project: u32, words: &[u8]) -> people::Ask {
+        crate::walking::configured_chat(
+            &self.creating,
+            &self.store.rows,
+            self.env.limits.tasks.tree_tasks,
+            project,
+            words,
+        )
     }
 
     /// `task`'s durable live row, if it is live.

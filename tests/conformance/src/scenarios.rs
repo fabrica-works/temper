@@ -14,6 +14,8 @@ use temper_engine_domain::{self as root};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client::api;
 type World = Harness<Temper>;
+const COMMITTED_CALLER: u8 = 47;
+const NEW_DECISION_CALLER: u8 = 46;
 mod conversations;
 pub(crate) mod lifecycle;
 pub(crate) mod queries;
@@ -199,8 +201,8 @@ impl ScenarioApplication for Temper {
                 if world.peers.scenario == Some(Scenario::NarrowingPolicy) {
                     ask(
                         world,
-                        47,
-                        people::Ask::StartChat { project: 1, words: b"committed flight caller".as_slice().into() },
+                        COMMITTED_CALLER,
+                        crate::chat(&world.peers, &world.store, 1, b"committed flight caller"),
                     );
                     world.drain()?;
                     if world.peers.assignments.len() == 1 {
@@ -256,11 +258,7 @@ impl ScenarioApplication for Temper {
                     let flight = &world.peers.assignments[1];
                     world.peers.worker.cancel(flight.task, flight.attempt);
                     world.drain()?;
-                    ask(
-                        world,
-                        46,
-                        people::Ask::StartChat { project: 1, words: b"new decision caller".as_slice().into() },
-                    );
+                    ask(world, NEW_DECISION_CALLER, crate::chat(&world.peers, &world.store, 1, b"new decision caller"));
                     world.drain()?;
                     if world.peers.assignments.len() < 3 {
                         world.advance(7_000_000_000);

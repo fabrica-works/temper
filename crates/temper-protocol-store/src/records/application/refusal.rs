@@ -2,20 +2,6 @@
 use jig_domain_people as p;
 use jig_protocol_store::people_v3 as w;
 use skein_lib::Wall;
-pub(super) fn encode_disposal_issue(value: p::DisposalIssue, _l: &w::Limits) -> w::DisposalIssue {
-    match value {
-        p::DisposalIssue::Missing => w::DisposalIssue::Missing,
-        p::DisposalIssue::Unknown => w::DisposalIssue::Unknown,
-        p::DisposalIssue::Repeated => w::DisposalIssue::Repeated,
-    }
-}
-pub(super) fn decode_disposal_issue(value: w::DisposalIssue) -> p::DisposalIssue {
-    match value {
-        w::DisposalIssue::Missing => p::DisposalIssue::Missing,
-        w::DisposalIssue::Unknown => p::DisposalIssue::Unknown,
-        w::DisposalIssue::Repeated => p::DisposalIssue::Repeated,
-    }
-}
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
         p::FailureClass::Transient => w::FailureClass::Transient,
@@ -318,10 +304,6 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
                 },
             },
         )?),
-        p::Refusal::Disposal { task, issue } => w::Refusal::Disposal(w::RefusalDisposal::new(
-            l,
-            w::RefusalDisposalParts { task: *task, issue: encode_disposal_issue(*issue, l) },
-        )?),
         p::Refusal::Role { held } => w::Refusal::Role(w::RefusalRole::new(
             l,
             w::RefusalRoleParts {
@@ -373,9 +355,6 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
                 w::Malformed::Conversation => p::Malformed::Conversation,
             },
         },
-        w::Refusal::Disposal(value) => {
-            p::Refusal::Disposal { task: value.task(), issue: decode_disposal_issue(value.issue().clone()) }
-        }
         w::Refusal::Role(value) => p::Refusal::Role {
             held: match value.into_parts().held {
                 Some(value) => {

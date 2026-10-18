@@ -16,14 +16,6 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
                 },
             },
         )?),
-        p::Refusal::Disposal { task, issue } => {
-            let issue = match issue {
-                p::DisposalIssue::Missing => w::DisposalIssue::Missing,
-                p::DisposalIssue::Unknown => w::DisposalIssue::Unknown,
-                p::DisposalIssue::Repeated => w::DisposalIssue::Repeated,
-            };
-            w::Refusal::Disposal(w::RefusalDisposal::new(limits, w::RefusalDisposalParts { task, issue })?)
-        }
         p::Refusal::Role { held } => {
             let held = match held {
                 Some(value) => Some(role(value, limits)?),

@@ -8,12 +8,15 @@ use jig_protocol_engine_clients as kit;
 use skein_io as io;
 use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
 use temper_engine_domain as root;
+mod printed;
 pub mod translation;
 const PREFIX: u64 = crate::tokens::CLIENTS;
 
 #[derive(Debug)]
 pub struct Clients {
     component: kit::Component,
+    listener: Option<::core::net::SocketAddr>,
+    secret: Option<skein_lib::Secret>,
     pub(crate) env: Env<kit::Limits>,
     out: Queue<kit::Request>,
     pub(crate) io: Queue<io::Request>,
@@ -51,13 +54,16 @@ impl Clients {
         let config::Address::Addr(listener) = config.clients.listener else {
             return Err(invalid(What::Form));
         };
+        let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
         let mut link_provider = None;
         let mut deployment_provider = 0;
         for provider in &config.providers {
             match provider.kind {
                 config::ProviderKind::Link => link_provider = Some(provider.number),
                 config::ProviderKind::Deployment => deployment_provider = provider.number,
-                config::ProviderKind::Application => {}
+                config::ProviderKind::Application => {
+                    providers.push(provider.number).expect("provider count");
+                }
             }
         }
         let link = if config.clients.link {
@@ -99,7 +105,7 @@ impl Clients {
             heartbeat: config.clients.heartbeat,
             rows: config.limits.core.documents.rows,
             served,
-            providers: List::with_capacity(0),
+            providers,
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
         };
@@ -108,6 +114,8 @@ impl Clients {
         let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             component,
+            listener: None,
+            secret: None,
             env,
             out,
             io: Queue::with_capacity(room),
@@ -125,6 +133,13 @@ impl Clients {
             durable: 0,
             writes: journal.writes,
         })
+    }
+    fn print_link(&mut self) {
+        if let Some(listener) = self.listener
+            && let Some(secret) = self.secret.take()
+        {
+            self.links.push(printed::link(listener, &secret));
+        }
     }
     #[must_use]
     pub fn room(&self, batch: u32) -> bool {
@@ -174,7 +189,11 @@ impl Clients {
     pub fn up(&mut self, event: io::Event) -> bool {
         let event = untag(event);
         match &event {
-            io::Event::Listening { .. } => self.opened = true,
+            io::Event::Listening { addr, .. } => {
+                self.opened = true;
+                self.listener = addr.socket();
+                self.print_link();
+            }
             io::Event::Failed { owner, .. } | io::Event::Closed { owner }
                 if *owner == Token::new(0) && self.closing.is_none() =>
             {
@@ -216,7 +235,10 @@ impl Clients {
             }
             match self.out.pop().expect("client requests") {
                 kit::Request::Io(value) => self.io.push(tag(value)),
-                kit::Request::Link { link } => self.links.push(link),
+                kit::Request::Link { secret } => {
+                    self.secret = Some(secret);
+                    self.print_link();
+                }
                 kit::Request::Secrets(value) => self.secrets.push(value),
                 kit::Request::Core(value) => match translation::to_root(*value) {
                     Ok(value) => self.root(root::Event::Party(value), events),
@@ -228,8 +250,8 @@ impl Clients {
                         Err(value) => self.down(*value),
                     }
                 }
-                kit::Request::Provider { exchange, .. } => {
-                    self.down(kit::Event::Provider { exchange, verdict: kit::Verdict::Refused });
+                kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
+                    unreachable!("temper mints no application sign-ins");
                 }
                 kit::Request::Closed => self.closed = true,
             }
