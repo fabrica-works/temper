@@ -269,7 +269,7 @@ fn socket_count(
     worker: &config::Worker,
     git: &temper_worker_protocol_git::Limits,
 ) -> Option<u64> {
-    let mut required = u64::from(engine.limits.clients.connections).checked_add(1)?.checked_add(2)?;
+    let mut required = u64::from(limits::server(&engine.limits).connections).checked_add(1)?.checked_add(2)?;
     if !engine.llm.accounts.is_empty() {
         required = required.checked_add(u64::try_from(engine.llm.accounts.len()).ok()?)?;
         for account in &engine.llm.accounts {

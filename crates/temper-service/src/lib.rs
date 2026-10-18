@@ -20,6 +20,7 @@ pub mod assignment;
 pub mod clients;
 pub mod family;
 pub mod identities;
+pub mod server;
 pub mod translate;
 pub mod values;
 mod worker;

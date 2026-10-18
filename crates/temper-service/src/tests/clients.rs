@@ -5,7 +5,25 @@ use jig_protocol_engine_clients as kit;
 use skein_lib::{ReplyTo, Token};
 use temper_engine_domain as root;
 
+const LISTENER: Token = Token::new(77);
+const STARTING_LISTENER: Token = Token::new(99);
 const REPLY: ReplyTo = ReplyTo::new(Token::new(9));
+const PROCESS_UPTIME: skein_lib::Time = skein_lib::Time::from_nanos(600_000_000_000);
+
+#[test]
+fn a_link_printed_on_the_first_clock_tick_is_live() {
+    let mut service = super::fixtures::started();
+    let engine = &mut service.engine;
+    engine.clients.iterate(PROCESS_UPTIME, skein_lib::Wall::EPOCH, &mut engine.events, &[]);
+    let Some(skein_io::Request::Listen { owner, addr }) = engine.clients.io.pop() else { panic!("listen") };
+    assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
+    engine.clients.iterate(PROCESS_UPTIME, skein_lib::Wall::EPOCH, &mut engine.events, &[]);
+    let link = engine.clients.links.pop().expect("printed link");
+    let body = peer::link_body(engine, &link);
+    let mut peer = peer::Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    peer.pump_at(engine, false, PROCESS_UPTIME, skein_lib::Wall::EPOCH);
+    assert_eq!(engine.clients.early.len(), 1, "the printed link reaches the root");
+}
 #[test]
 fn a_chat_ask_reaches_the_root_as_a_party_ask() {
     let ask = core::Event::People(people::Event::Ask {
@@ -69,9 +87,9 @@ fn a_released_reply_keeps_its_terminal_and_destination() {
 fn the_component_prints_one_sign_in_link_at_start() {
     let mut clients = super::fixtures::clients();
     let mut events = skein_lib::Queue::with_capacity(64);
-    clients.advance(&mut events, &[]);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     let Some(skein_io::Request::Listen { owner, addr }) = clients.io.pop() else { panic!("listen") };
-    assert!(clients.up(skein_io::Event::Listening { owner, listener: Token::new(77), addr }));
+    assert!(clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
     clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     let link = clients.links.pop().unwrap();
     assert!(link.starts_with(b"http://127.0.0.1:7100/jig/v1/sign-in/link?secret="));
@@ -83,13 +101,13 @@ fn the_component_prints_one_sign_in_link_at_start() {
 fn closing_a_listener_during_start_closes_the_component() {
     let mut clients = super::fixtures::clients();
     let mut events = skein_lib::Queue::with_capacity(64);
-    clients.advance(&mut events, &[]);
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     let Some(skein_io::Request::Listen { owner, addr }) = clients.io.pop() else { panic!("listen") };
     clients.down(kit::Event::Close);
-    assert!(clients.up(skein_io::Event::Listening { owner, listener: Token::new(77), addr }));
-    clients.advance(&mut events, &[]);
+    assert!(clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
+    clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     let Some(skein_io::Request::Close { entity }) = clients.io.pop() else { panic!("late listener close") };
-    assert_eq!(entity, Token::new(77));
+    assert_eq!(entity, LISTENER);
     assert!(clients.up(skein_io::Event::Closed { owner }));
     clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut events, &[]);
     assert!(clients.closed);
@@ -135,7 +153,7 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
     assert!(clients.commit_room());
 }
 
-mod peer;
+use super::fixtures::http as peer;
 #[test]
 fn the_engine_prints_one_sign_in_link_at_start() {
     let mut service = super::fixtures::ready();
@@ -165,7 +183,7 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
         panic!("digest durable in real secrets store")
     };
     assert_eq!(secret.expose().len(), 40);
-    let bearer = peer::bearer(answer.token().expose());
+    let bearer = peer::bearer(answer.token().as_ref().expect("native credential").expose());
     let mut stream = peer::Peer::new(engine, b"GET", b"/jig/v1/stream", &[], Some(&bearer));
     stream.pump(engine, true);
     assert!(stream.streaming(), "the issued bearer authenticates through the stored digest");
@@ -175,9 +193,9 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
 fn a_request_before_decisions_open_is_answered_not_ready() {
     let mut service = super::fixtures::started();
     let engine = &mut service.engine;
-    engine.clients.advance(&mut engine.events, &engine.workers.forges);
+    engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events, &engine.workers.forges);
     let Some(skein_io::Request::Listen { owner, addr }) = engine.clients.io.pop() else { panic!("listener") };
-    assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: Token::new(99), addr }));
+    assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: STARTING_LISTENER, addr }));
     engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events, &engine.workers.forges);
     let link = engine.clients.links.pop().unwrap();
     let body = peer::link_body(engine, &link);
@@ -192,7 +210,7 @@ fn a_request_before_decisions_open_is_answered_not_ready() {
 #[test]
 fn a_clients_listener_failure_stops_the_engine() {
     let mut service = super::fixtures::started();
-    service.told.push(skein_io::Event::Closed { owner: Token::new(crate::tokens::CLIENTS) });
+    service.told.push(skein_io::Event::Closed { owner: Token::new(crate::tokens::SERVER) });
     super::fixtures::turn(&mut service);
     assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Listener)));
 }

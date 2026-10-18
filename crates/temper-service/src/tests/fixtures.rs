@@ -431,7 +431,6 @@ fn start_with_worker(
     settings.limits.root.journal.deliveries = 128;
     settings.limits.root.journal.held = 384;
     settings.limits.root.journal.writes = 8192;
-    settings.jig.limits.clients.connections = 2;
     settings.jig.limits.clients.streams = 2;
     settings.jig.limits.clients.watches_per_stream = 4;
     settings.jig.limits.clients.exchanges = 4;
@@ -482,7 +481,10 @@ fn start_with_worker(
 }
 mod agent;
 mod clients;
+pub mod http;
+mod server;
 pub use agent::agent;
+pub use server::{answered, header, listening, request, server, server_head};
 pub(super) mod system;
 pub use system::{Kernel, hello, one_process, until_hosting};
 pub fn turn(service: &mut crate::Service) {

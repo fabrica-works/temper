@@ -21,7 +21,9 @@ fn the_worker_iterates_only_once_the_engine_listens() {
     stand.service.engine.store.opened = true;
     crate::iterate(&mut stand.service, Time::ZERO, Wall::EPOCH);
     assert!(!stand.service.worker.as_ref().unwrap().started, "listener still opening");
-    stand.turn();
+    for _ in 0_u8..4 {
+        stand.turn();
+    }
     assert!(stand.service.engine.workers.opened());
     assert!(stand.service.worker.as_ref().unwrap().started);
 }
@@ -63,7 +65,7 @@ fn io_events_and_completions_reach_the_layer_whose_tokens_they_carry() {
     fixtures::until_hosting(&mut stand);
     assert!(stand.service.worker.as_ref().unwrap().git.ready, "git completions reached the worker");
     assert_eq!(stand.kernel.files, 6);
-    stand.service.told.push(skein_io::Event::Closed { owner: Token::new(crate::tokens::CLIENTS) });
+    stand.service.told.push(skein_io::Event::Closed { owner: Token::new(crate::tokens::SERVER) });
     crate::iterate(&mut stand.service, Time::ZERO, Wall::EPOCH);
     assert_eq!(stand.service.end(), Some(&End::Stopped(Stop::Listener)), "clients event reached engine");
     assert!(stand.service.worker.as_ref().unwrap().aborted.is_some());

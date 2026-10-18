@@ -1,9 +1,9 @@
 //! Print the sign-in URL after the listener address is known.
 use alloc::boxed::Box;
-pub(super) fn link(address: ::core::net::SocketAddr, secret: &skein_lib::Secret) -> Box<[u8]> {
+pub(crate) fn link(address: ::core::net::SocketAddr, secret: &skein_lib::Secret) -> Box<[u8]> {
     let host = address_text(address).expect("bound listener address");
-    let encoded = url(secret.expose());
-    let parts: [&[u8]; 4] = [b"http://", &host, b"/jig/v1/sign-in/link?secret=", &encoded];
+    let path = jig_protocol_engine_clients_http::link_path(&super::http_settings(), secret);
+    let parts: [&[u8]; 3] = [b"http://", &host, &path];
     let mut length = 0_usize;
     for part in parts {
         length = length.checked_add(part.len()).expect("short printed URL");
@@ -15,7 +15,7 @@ pub(super) fn link(address: ::core::net::SocketAddr, secret: &skein_lib::Secret)
     out.finish()
 }
 
-fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
+pub(super) fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     use ::core;
     let mut text = skein_lib::Intake::with_capacity(64);
     match address.ip() {
@@ -37,15 +37,4 @@ fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     text.append(b":").ok()?;
     text.append(skein_lib::Decimal::of(u64::from(address.port())).as_bytes()).ok()?;
     text.meet(skein_lib::stream::Read::Fill(text.len()))
-}
-
-fn url(bytes: &[u8]) -> Box<[u8]> {
-    let length = skein_lib::base64::encoded_len(
-        skein_lib::base64::Alphabet::Url,
-        u32::try_from(bytes.len()).expect("short secret"),
-    )
-    .expect("encoded secret");
-    let mut out = skein_lib::Writer::new(usize::try_from(length).expect("u32 fits"));
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, bytes, &mut out).expect("short secret");
-    out.finish()
 }

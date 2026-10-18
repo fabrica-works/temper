@@ -303,3 +303,20 @@ const GIT: temper_worker_protocol_git::Limits = temper_worker_protocol_git::Limi
 pub fn handed_on(name: &[u8]) -> bool {
     name.starts_with(b"setup.") || name.starts_with(b"box.")
 }
+
+/// Server bounds follow jig's shipped small profile, with its HTTP intake bounds.
+#[must_use]
+pub fn server(jig: &jig_protocol_config::Limits) -> crate::server::Limits {
+    crate::server::Limits {
+        connections: 4,
+        http: skein_http::server::Limits {
+            head: 4096,
+            headers: 32,
+            body: u64::from(jig.clients_http.body),
+            read: jig.clients_http.read,
+            response: 1024,
+            send: jig.clients_http.send,
+        },
+        stall: Duration::from_secs(30),
+    }
+}

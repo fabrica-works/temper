@@ -9,6 +9,7 @@ fn no_two_component_prefixes_meet() {
         tokens::WORKER_CONNECTIONS,
         tokens::ACCOUNTS,
         tokens::CLIENTS,
+        tokens::SERVER,
         tokens::FORGE,
         tokens::GIT,
         tokens::STORE[0],

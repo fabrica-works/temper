@@ -168,7 +168,8 @@ impl Service {
     #[must_use]
     pub fn work_pending(&self, now: Time) -> bool {
         self.engine.work_pending(now)
-            || (self.engine.end.is_some() || self.engine.store.opened && self.engine.workers.opened())
+            || (self.engine.end.is_some()
+                || self.engine.store.opened && self.engine.workers.opened() && self.engine.clients.opened())
                 && match &self.worker {
                     Some(worker) => worker.work_pending(now),
                     None => false,
@@ -409,7 +410,8 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
         if service.engine.end.is_some() {
             worker.abort();
         }
-        if (service.engine.end.is_some() || service.engine.store.opened && service.engine.workers.opened())
+        if (service.engine.end.is_some()
+            || service.engine.store.opened && service.engine.workers.opened() && service.engine.clients.opened())
             && worker.room()
         {
             worker.iterate(now, wall);
@@ -575,6 +577,8 @@ fn memory(
     )?)?;
     bytes = bytes.checked_add(clients::worst_case(
         &settings.jig.limits.clients,
+        &limits::server(&settings.jig.limits),
+        &settings.jig.limits.clients_http,
         temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         &root.journal,
     )?)?;
