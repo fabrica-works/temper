@@ -2806,6 +2806,14 @@ choice would have been the user's (development.md, 10.4).
      2. **Then:** compile and run the clippy fixes, the changed crates' focused tests, and the gate; land. The 13:34Z steer's points 2 and 3 apply at the gate (a `SLOW` test made cheaper first; the owned example's startup test if the change can raise a worst case).
      3. **Unchanged:** ruling 357, point 4; the regression's assertions; no trimming of tests or docs to meet the count (ruling 330).
 
+366. **jig-19.5 diagnoses the stream after navigation** (process, jig-19's block of 2026-10-18T13:45:29Z).
+     Ruling 366, process, under ruling 229: yes, as the report proposes, bounded. Ruling 362's root story passed; the gate's prefix story now fails on a `409` after navigation.
+
+     1. **Diagnose:** at most three focused runs, 30 minutes from this unblock, at the lowest layer that shows it (implementer.md, 8.8): first jig-test-service's server, whether a peer's close of an open stream connection reaches the clients component as that stream's end, and when; then the minimal navigation, whether the old page's stream connection is closed before the new page opens its stream. Write the cause line, with its file:line, in `logs/jig-19/failure-19.5-prefix-navigation.md`.
+     2. **If the server misses or delays the close** (a cause in `testing/jig-test-service/` or `tests/client-browser/`), repair it under ruling 358, point 2, then the canonical prefix story once, then the gate.
+     3. **If the close arrives, but after the new page's stream opens, or the cause is the refusal itself** (`crates/jig-protocol-engine-clients/src/watches.rs:123-132`, a second stream for one sign-in answered `Conflict`), stop with the cause line: that rule's reading against `protocol/client.md:203` and `:696-697` goes to the designer.
+     4. **Unchanged:** ruling 358, point 4; the refusal at `watches.rs:123-132`; the stories' assertions; every deadline and lifetime.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
