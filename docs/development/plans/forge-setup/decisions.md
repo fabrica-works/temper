@@ -1054,6 +1054,37 @@ run are appended after "For the user".
      above; the item's own text stays as the plan wrote it. Unchanged: the README's Done when, the other items' PASS, and
      the release's order: "done when ran" waits for the gate's step.
 
+156. **14.s2, the owned example's memory_bytes, the designer's answer** (design gap, the Done when run of 2026-10-18T16:29:31Z).
+     Ruling 156, the designer's answer of 2026-10-18T16:48:11Z: temper 13154c9dd (configuration.md 7 and 10, STATUS.md, the plan's temper/14-example.md and later.md). It adds step `temper-14.s2` (temper/14.s2-memory-bounds.md), the last before "done when ran".
+
+
+     1. **The example carries room for what a person's copy changes, up to each one's bound. The worst cases stay as they
+        are.** configuration.md 7 now says: "each start passes with each string its service's worst case counts, and a
+        person's copy changes, at its bound". The engine counts "the forge's `api_token` and its `git` base, a byte for each
+        of theirs: the token at `small`'s `forge_component.token_bytes`, 512, … and the base at an owned forge's longest, …
+        `http://127.255.255.254:65535`, 28 bytes". The worker counts "its agent's `program` and the configuration's path
+        among its `arguments`, two bytes for each of theirs with the example's one slot: each at Linux's `PATH_MAX`, 4,096
+        bytes". configuration.md 10 adds: "never its least for one directory".
+     2. **The numbers, measured on temper 0601176ab: `engine.memory_bytes` 78,669,036,604,974 and `workers[0].memory_bytes`
+        1,989,738,112,203.** main states 478 and 15,990 bytes fewer. With the strings at their bounds, these two start. One
+        less each is refused "the worst case passes memory_bytes by 1 bytes", from scratch directories of 78 and 83 bytes.
+        So the numbers no longer depend on the checkout.
+     3. **The step (`temper-14.s2`; 14-example.md's new "Corrections after the designer's answer of 2026-10-18T16:47:23Z"
+        block):**
+        - T3 `serve_prepares_once_on_the_owned_example` lays the example at those bounds:
+          - `Owned { forgejo: "127.255.255.254:65535" … }`;
+          - `workers[0].agent.program` and `arguments[1]` each `"/"` followed by 4,095 `p`s;
+          - `forge-1/api_token` of 512 bytes.
+        - Then each number is raised by the N in T3's refusal, and no more.
+        - Size: about +10 lines of test and the two numbers. No production code changes. T2, T4 and the box's tests are
+          unchanged.
+     4. **After the step, in this run and in client-api's:** a landing that raises a worst case raises that number by the
+        N in T3's refusal. A landing that lowers one leaves the number. This replaces ruling 143's "least" for `memory_bytes`
+        only; it stays for every other number. client-api holds its edits until the step lands (its ruling 377). Its
+        rulings 354, 356 and 363 then read "exact" as "at T3's bounds".
+     5. **Deferred** (`later.md`, STATUS.md): `small`'s worst cases are about 71.5 TiB for the engine and 1.8 TiB for the
+        worker. So `memory_bytes` states no machine's memory, and the start's check bounds nothing a person has.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
