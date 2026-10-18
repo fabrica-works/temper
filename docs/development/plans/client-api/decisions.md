@@ -3035,6 +3035,12 @@ choice would have been the user's (development.md, 10.4).
      3. **Otherwise,** trace from the service's due Tasks timer back to what that commit changed, and repair it there. A repair in 19.5's Files is the step's. A repair in production outside them (the engine's clients component, the Tasks timer's settling) is authorized here: at most 40 production lines, in the crate the trace names, as its design says, one commit, with a focused test at the lowest layer that shows it (ruling 229), named in the report.
      4. **Stop** with the cause line past 40 lines, or for a change to a deadline, the core timer's value, the iteration bound, `cut128`, the proof's expected values or any referee check.
 
+381. **jig 19.5's service projection leaves out the core's paused timers** (process, jig 19.5's block of 2026-10-18T17:04:45Z).
+     Ruling 381, kind: process. Authorized, as proposed: the service's projected deadline and its fire selection leave out a core timer the core pauses while it stops; every core timer's value stays as it is.
+     - The bisect names `73335dab7` (base `5b5f92c99` passes in 0.201 s). Its restart reaches the core's stopping with `Timer::Tasks` due; the core does not fire it while stopping (`jig-domain-core/src/stopping.rs:145`, `waits`), and the service still selects it ahead of the components' close deadlines (`testing/jig-test-service/src/engine.rs:137-200`, `next_deadline`): the spin. The projection is wrong in itself, so this repairs the cause, not the referee.
+     - **One rule, the core's.** `stopping::waits` is `pub(crate)`: the projection asks the core which timers wait (a public function or method beside `waits`), and keeps no second list of paused timers in the service. Its lines count in ruling 380's 40, across both crates.
+     - **Focused test first** (ruling 229), at the lowest layer that shows it: a service, or the core's projection, stopping with a due paused timer: its next deadline is the next live one, not the paused one. Then the power-loss story alone.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
