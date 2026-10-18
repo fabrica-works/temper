@@ -462,6 +462,23 @@ pub fn run(
 ) -> Seen {
     run_story(directory, script, peer, deadline, None)
 }
+/// setup.md 13.4 bounds each landing story at 180 seconds.
+pub const LANDING: Duration = Duration::from_secs(180);
+/// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
+pub const RAISED_MS: u64 = 600_000;
+const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
+
+/// Raises the three keep paces and the change's stall, retaining a private configuration.
+pub fn raise_paces(directory: &Path) {
+    let path = directory.join("config.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    for name in
+        ["forge.client.poll_ms", "forge.client.poll_max_ms", "forge.client.slow_ms", "forge.change_policy.stall_ms"]
+    {
+        value["application"]["limits"]["overrides"][name] = RAISED_MS.into();
+    }
+    write_private(&path, &serde_json::to_vec(&value).expect("configuration JSON"));
+}
 #[must_use]
 pub fn run_until_landed(
     directory: &Path,
@@ -469,7 +486,7 @@ pub fn run_until_landed(
     peer: skein_fake_peers::llm::Peer,
     forge: &forgejo::Throwaway,
 ) -> Seen {
-    run_story(directory, script, Some(peer), Duration::from_secs(180), Some(forge))
+    run_story(directory, script, Some(peer), LANDING, Some(forge))
 }
 fn run_story(
     directory: &Path,

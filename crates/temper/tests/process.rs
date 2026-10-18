@@ -89,9 +89,25 @@ fn a_push_is_delivered_signed_with_the_secret_reconcile_drew() {
 
 #[test]
 fn a_persons_change_lands_on_the_forge_and_is_found_after_a_restart() {
-    let scratch = support::Scratch::new("landed");
+    landing("landed", false);
+}
+
+#[test]
+fn a_change_lands_by_deliveries_with_every_poll_raised() {
+    landing("hinted", true);
+}
+
+/// The landing story; the hinted case raises four limits and pushes the slow job marker.
+fn landing(case: &str, raised: bool) {
+    let scratch = support::Scratch::new(case);
     let forgejo = support::forgejo::Throwaway::start(&scratch);
+    if raised {
+        forgejo.push("slow");
+    }
     support::configuration(scratch.path(), &forgejo.forge());
+    if raised {
+        support::raise_paces(scratch.path());
+    }
     let peer = support::fake_llm(support::landing_scripts(support::ANSWER, &forgejo));
     let clock = skein_shell::Clock::new();
     let began = clock.now().now;
