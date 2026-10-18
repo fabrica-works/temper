@@ -133,6 +133,20 @@ pub(crate) fn document() -> Vec<u8> {
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,"checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker","git":"/usr/bin/git"}]});
     crate::stories::configure(&mut value);
+    for (name, count) in [
+        ("people.amendment_bytes", 512),
+        ("tasks.hold_bytes", 256),
+        ("tasks.funders", 2),
+        ("tasks.dependencies", 2),
+        ("tasks.charters", 2),
+        ("notes.entries_per_scope", 2),
+        ("notes.recalled", 2),
+        ("people.holdings", 2),
+        ("people.pending", 2),
+        ("people.waiters", 2),
+    ] {
+        value["engine"]["limits"]["overrides"][name] = count.into();
+    }
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
