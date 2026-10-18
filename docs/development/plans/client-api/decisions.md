@@ -2734,6 +2734,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Then the gate,** and land. temper-06.4 edits the same file's worker `memory_bytes` under ruling 354; whichever lands second reruns the startup test on the rebased tree.
      4. **Unchanged:** the teardown repairs and their logs; ruling 339's 200 lines (the example's number counts apart); the landing story's turn, which comes after temper-05.s1 (ruling 352).
 
+357. **temper-06.5 diagnoses the missing answer** (process, temper-06's block of 2026-10-18T13:09:21Z).
+     Ruling 357, process, under ruling 229 (the same point failing twice is a block): yes, as the report proposes.
+
+     1. **Diagnose:** at most three focused runs and 30 minutes from this unblock, at the lowest layer that shows the missing answer (implementer.md, 8.8): the prepared real-chat fixture, the assignment's answering, and where the run's answer stops between the fake LLM, the engine and the view. Log the cause line, with its file:line, in `logs/temper-06/chat-proof.md`.
+     2. **Repair** only what that log names, within 06.5's Files and Size; a cause outside them, or in jig, stops the step with the cause line.
+     3. **Then one** run of the joint proof; if it fails at step 4 again, report with the log, no further run.
+     4. **Unchanged:** the proof's assertions and limits, the fake LLM's scripts, every referee and judge, every deadline; the Owner-activity repair already proved stays.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
