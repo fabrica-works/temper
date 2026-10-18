@@ -2129,6 +2129,52 @@ choice would have been the user's (development.md, 10.4).
      - `git grep -n 'pub mod sha256' ca5b75ef7 -- crates/skein-lib/src` (skein) → nothing; at origin/main → `lib.rs:37`.
      - The sketches compiled under clippy `-D warnings` in a scratch crate after the listed derives, attributes and alias (the check's sub-agent).
 
+303. **jig-16.5's board move offer: Reorder, the project's** (design, jig-16.5's block of 2026-10-18T01:53:07Z, the designer's answer of 2026-10-18T02:07:46Z).
+     Ruling 303 (design, the designer's answer of 2026-10-18T02:07:46Z, jig `ad465272b`, temper `baa38bb0a`): the designer's decision, below; ruling 301's hold ends, and jig-16.5 lands with the rename once its gate passes.
+
+
+     Landed: jig `ad465272b` (contract.md, 5.3 and 9; pages.md, 6.2 and
+     12.5; objects.md, 11; STATUS.md); temper `baa38bb0a` (jig/16-shed.md,
+     16.5's table and "Corrections after the designer's answer of
+     2026-10-18"; later.md, one row).
+
+
+     (b): the project's document keeps the board's offer, renamed
+     `Reorder`. Neither (a) nor (c).
+
+     - **The rule is per project and role.** people.md, 5.1, `Amend`:
+       "maintainer, for tracked or priority". contract.md, 5.3 now says:
+       "**Reordering,** in a project's document: ... It is judged by the
+       party's role in the project alone, as a change of priority is ...
+       made or refused, never proposable, and never bounded, since a
+       priority asks no authority and names no revision (5.2)".
+     - **The name:** `ActKind::Prioritise` becomes `ActKind::Reorder`, the
+       wire's `prioritise` becomes `reorder`, and the engine's
+       `Act::Prioritise` becomes `Act::Reorder`. contract.md, 3.4 calls the
+       act "reordering several tracked tasks at once". The third "Done when"
+       grep refuses `\bPrioritise\b`.
+     - **The engine:** `priorities_allowed` (`roles.rs:288`) stays. It may
+       be renamed, keeps its role check and the policy's Amend check, and
+       loses its `goals` and `task_capacity` arguments. `prioritise` goes
+       with `Ask::Prioritise`. `standing.rs:14` keeps its owner-or-maintainer
+       arm under the new name; `bounds.rs:322` judges a compound's `tracked`
+       amendment by it.
+     - **The board:** pages.md, 6.2 now says "The board shows its arrows
+       where the project's document offers reordering (contract.md, 5.3),
+       read beside the board's one query: it watches no goal's document,
+       and its lines carry no acts." `moving.rs:13, :34` take the new name.
+       `TaskLine` is unchanged.
+     - **The checks:** `tests/acts.rs:502` (the owner's offer `Allowed`)
+       under the new name, with its `core.prioritise` lines (:503-507) gone;
+       jig 16.2's proof
+       `moving_a_goal_up_reorders_the_board_in_one_compound_request`; the
+       third "Done when" grep prints nothing.
+     - **Size:** the rename touches 47 lines in 28 files at `5b4e287f0`.
+       Those lines count apart from 16.5's 150, as one count in the report.
+     - **Deferred** (later.md): the board offering no move that changes a
+       closing goal's priority. tasks.md, 7: "An amendment is refused once a
+       task is closing."
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
