@@ -362,9 +362,12 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   checks' gates; a person task for the project's maintainers for a
   person's gate. Its parameters name the repository, its base and the
   change's branch, and a resolution's base commit or a gate's number and
-  head; its contract is a change, or a gate's verdict; its authority is
-  the change's, its budget what the change has left, with no delegation
-  of its own.
+  head, each commit as text: its id in lowercase hexadecimal, 40 digits
+  for a SHA-1 id and 64 for a SHA-256 one, as the forge's ids are
+  written (`../protocol/forge.md`, section 3), since a task's parameters
+  are text (jig's `client/domain/contract.md`, 5.3); its contract is a
+  change, or a gate's verdict; its authority is the change's, its budget
+  what the change has left, with no delegation of its own.
 - **A collaborator's permission** on the forge (read, write, admin)
   becomes the role its project's configured mapping names, as a
   repository is adopted (forge.md, section 4).

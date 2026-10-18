@@ -378,6 +378,13 @@ per session are in each file.
     `connections: 4`, "jig's shipped small profile") to jig's `Profile::Small`, 8
     (ruling 362), and refreshes each value derived from it, a forge-setup
     file in a commit of its own (rulings 354, 356).
+    Step 1 also spells a change's delegates' commits as text (temper's
+    `domain/root.md`, 6; the designer's answer of 2026-10-18T22:06Z), in
+    a commit of its own before the gate runs: `change_delegate`'s
+    Resolve (name 6) and Gate (name 8) parameters
+    (`crates/temper-engine-domain/src/route/forge_route.rs:1712`,
+    `:1725`) take the commit's lowercase hexadecimal digits, 40 when its
+    last 12 bytes are zero (a SHA-1 id's padding) and 64 otherwise.
   - **skein's cap** (ruling 296, the director's request of
     2026-10-17T23:46Z): no skein move of this plan, the closing repin's
     included, takes jig's or temper's skein past skein `2733882` ("Mark
