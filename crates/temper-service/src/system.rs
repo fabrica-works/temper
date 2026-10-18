@@ -408,7 +408,12 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     route_events(service);
     engine::iterate(&mut service.engine, now, wall);
     if let Some(worker) = &mut service.worker {
-        if service.engine.end.is_some() {
+        if service.engine.end.is_some()
+            || match &service.engine.drain {
+                Some(drain) => drain.closing,
+                None => false,
+            }
+        {
             worker.abort();
         }
         if (service.engine.end.is_some()

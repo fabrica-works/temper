@@ -41,7 +41,13 @@ fn facts(
             jig_client_view::owner_proposal::render(b, &root.jig().borrow(root.client()), value, words, jig);
         }
         ReadValue::Proposal(value) => {
-            jig_client_view::cards::proposal::action(b, &value.action, words, jig);
+            jig_client_view::cards::proposal::action(
+                b,
+                &value.action,
+                words,
+                jig,
+                root.jig().object_rows().rows.capacity(),
+            );
             jig_client_view::cards::common::authority(b, &value.needs, words, jig);
             jig_client_view::cards::common::funding(b, &value.funding, value.needs.budget, words);
         }

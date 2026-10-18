@@ -1,11 +1,11 @@
 use super::fixtures;
-use skein_lib::{Queue, Token};
+use skein_lib::{Queue, Time, Token};
 const LISTENER: Token = Token::new(70);
 const SOCKET: Token = Token::new(71);
 const OWNER: Token = Token::new(0);
+const STALL_AT: Time = Time::from_nanos(30_000_000_000);
 
-#[test]
-fn an_accepted_connection_hands_its_call_to_the_mount() {
+fn accepted() -> (crate::server::Server, Queue<crate::server::Routed>) {
     let mut server = fixtures::server();
     let mut out = Queue::with_capacity(16);
     assert!(server.advance(&mut out));
@@ -21,6 +21,11 @@ fn an_accepted_connection_hands_its_call_to_the_mount() {
     };
     assert_eq!(socket, SOCKET);
     assert_eq!(server.listening(), fixtures::http::address().socket());
+    (server, out)
+}
+#[test]
+fn an_accepted_connection_hands_its_call_to_the_mount() {
+    let (mut server, mut out) = accepted();
     let head = fixtures::server_head(&mut server, &mut out);
     assert_eq!(head.method, skein_http::Method::Post);
     assert_eq!(&*head.target, b"/jig/v1/sign-in/link");
@@ -77,4 +82,66 @@ fn the_printed_link_names_the_bound_address_and_the_secret() {
         &*crate::clients::printed::link(fixtures::http::address().socket().unwrap(), &secret),
         b"http://127.0.0.1:7100/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     );
+}
+
+#[test]
+fn closing_ends_a_held_call_after_its_component_finishes() {
+    let (mut server, mut out) = accepted();
+    fixtures::server_head(&mut server, &mut out);
+    while server.advance(&mut out) {
+        while out.pop().is_some() {}
+    }
+    server.close(&mut out);
+    while out.pop().is_some() {}
+    // The component has closed and no response is queued for the held call.
+    server.finish();
+    while server.advance(&mut out) {}
+    assert_eq!(server.next_deadline(), None);
+    let Some(crate::server::Routed::Io(skein_io::Request::Close { entity })) = out.pop() else {
+        panic!("held connection closed")
+    };
+    assert_eq!(entity, SOCKET);
+}
+
+#[test]
+fn closing_sends_a_queued_response_before_ending_its_call() {
+    let (mut server, mut out) = accepted();
+    let (call, _) = fixtures::server_call(&mut server, &mut out);
+    while server.advance(&mut out) {
+        while out.pop().is_some() {}
+    }
+    server.answer(
+        call,
+        skein_http::server::Request::Respond(skein_http::server::Response {
+            status: 204,
+            headers: Box::new([]),
+            body: skein_http::server::Body::None,
+            close: true,
+        }),
+        &mut out,
+    );
+    server.close(&mut out);
+    server.finish();
+    while out.pop().is_some() {}
+    assert!(server.advance(&mut out));
+    assert!(server.advance(&mut out));
+    let Some(crate::server::Routed::Io(skein_io::Request::Stream { stream, .. })) = out.pop() else {
+        panic!("queued response sent before closing")
+    };
+    assert_eq!(stream, SOCKET);
+    while server.advance(&mut out) {}
+    assert_eq!(server.next_deadline(), None);
+}
+
+#[test]
+fn closing_waits_for_the_component_before_ending_its_call() {
+    let (mut server, mut out) = accepted();
+    fixtures::server_head(&mut server, &mut out);
+    while server.advance(&mut out) {
+        while out.pop().is_some() {}
+    }
+    server.close(&mut out);
+    while out.pop().is_some() {}
+    assert!(!server.advance(&mut out));
+    assert_eq!(server.next_deadline(), Some(STALL_AT));
 }

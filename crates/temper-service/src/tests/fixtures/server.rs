@@ -6,6 +6,12 @@ pub fn server() -> Server {
     Server::new(super::http::address(), &crate::limits::server(&jig))
 }
 pub fn server_head(server: &mut Server, out: &mut skein_lib::Queue<crate::server::Routed>) -> skein_http::server::Call {
+    server_call(server, out).1
+}
+pub fn server_call(
+    server: &mut Server,
+    out: &mut skein_lib::Queue<crate::server::Routed>,
+) -> (skein_lib::Token, skein_http::server::Call) {
     let mut wire = skein_world::stream::Wire::new(7);
     wire.write(b"POST /jig/v1/sign-in/link HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nContent-Length: 0\r\n\r\n");
     for _ in 0_u8..64 {
@@ -13,7 +19,7 @@ pub fn server_head(server: &mut Server, out: &mut skein_lib::Queue<crate::server
         while let Some(request) = out.pop() {
             match request {
                 crate::server::Routed::Io(skein_io::Request::Stream { down, .. }) => wire.take(down),
-                crate::server::Routed::Call { head, .. } => return head,
+                crate::server::Routed::Call { call, head } => return (call, head),
                 crate::server::Routed::Io(_) | crate::server::Routed::Http { .. } => {
                     panic!("HTTP call or stream request")
                 }

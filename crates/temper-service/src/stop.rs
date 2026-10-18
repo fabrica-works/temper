@@ -4,7 +4,7 @@ use jig_protocol_config::{Path, Problems, What};
 use temper_engine_domain as root;
 
 pub(crate) struct Drain {
-    closing: bool,
+    pub(crate) closing: bool,
     stopped: Option<Stop>,
 }
 pub(crate) fn shutdown(engine: &mut Engine) {

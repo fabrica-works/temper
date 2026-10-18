@@ -362,7 +362,12 @@ impl Clients {
         }
         self.advance(events, forges);
         self.pending = server_pending || !self.server_out.is_empty();
-        self.pending |= self.mount.up(&self.mount_env, &mut self.mount_out);
+        let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
+        self.pending |= mount_pending;
+        if self.component_closed && !mount_pending && self.mount_out.is_empty() && self.out.is_empty() {
+            self.server.finish();
+            self.pending = true;
+        }
         if let Some(request) = self.mount_out.pop() {
             self.pending = true;
             match request {

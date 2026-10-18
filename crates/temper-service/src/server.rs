@@ -44,6 +44,7 @@ pub struct Server {
     listening: bool,
     starting: bool,
     phase: Phase,
+    finished: bool,
     connections: Map<Token, Connection>,
     next: u64,
     env: Env<Limits>,
@@ -57,6 +58,7 @@ impl Server {
             listening: true,
             starting: true,
             phase: Phase::Active,
+            finished: false,
             connections: Map::with_capacity(limits.connections),
             next: 1,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
@@ -213,6 +215,10 @@ impl Server {
             self.phase = Phase::Closing;
         }
     }
+    /// The clients component and its mount have no more responses to supply.
+    pub fn finish(&mut self) {
+        self.finished = true;
+    }
     pub fn abort(&mut self, out: &mut Queue<Routed>) {
         self.phase = Phase::Aborting;
         self.end_listener(out);
@@ -257,7 +263,7 @@ impl Server {
         let mut selected = None;
         for (owner, connection) in &self.connections {
             if (self.phase == Phase::Aborting && (!connection.closing || connection.draining))
-                || (self.phase >= Phase::Closing && !connection.closing && connection.call.is_none())
+                || (self.phase >= Phase::Closing && !connection.closing && (connection.call.is_none() || self.finished))
                 || !connection.below.is_empty()
                 || !connection.requests.is_empty()
                 || !connection.events.is_empty()
@@ -269,7 +275,14 @@ impl Server {
         let Some(owner) = selected else { return false };
         let call = self.name();
         let connection = self.connections.get_mut(&owner).expect("selected connection");
-        if self.phase == Phase::Aborting || (self.phase >= Phase::Closing && connection.call.is_none()) {
+        if self.phase == Phase::Aborting
+            || (self.phase >= Phase::Closing
+                && (connection.call.is_none()
+                    || (self.finished
+                        && connection.below.is_empty()
+                        && connection.requests.is_empty()
+                        && connection.events.is_empty())))
+        {
             end(connection, self.phase != Phase::Aborting, out);
         } else if let Some(down) = connection.below.pop() {
             out.push(Routed::Io(io::Request::Stream { stream: connection.socket, down }));
