@@ -3,7 +3,7 @@ pub mod support;
 use skein_io::kernel::{Exit, Signal};
 use skein_lib::Duration;
 
-// Session 14.1 bounds each whole-example box story at 120 seconds.
+// setup.md 13.3 bounds each whole-example box story at 120 seconds.
 const BOX_DEADLINE: Duration = Duration::from_secs(120);
 
 #[test]
@@ -64,6 +64,25 @@ fn temper_open_adopts_a_repository_by_commands() {
     typist.wait_for(b"Adopted acme/widget on forge 1 as owned.", support::WITHIN);
     typist.type_line(b"q");
     assert_eq!(typist.exit(support::WITHIN), 0, "stderr: {}", typist.stderr());
+    forgejo.stop();
+    scratch.remove();
+}
+
+#[test]
+fn a_push_is_delivered_signed_with_the_secret_reconcile_drew() {
+    let scratch = support::Scratch::new("hook_delivery");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    let listener = std::net::TcpListener::bind(forgejo.webhooks()).expect("nothing holds the address");
+    forgejo.push("hook.txt");
+    let delivery = loop {
+        let delivery = support::webhooks::receive(&listener, support::WITHIN);
+        if skein_lib::bytes::find(&delivery.body, b"Add hook.txt").is_some() {
+            break delivery;
+        }
+    };
+    assert_eq!(delivery.event, "push", "Forgejo names the event");
+    assert!(skein_lib::bytes::find(&delivery.body, b"refs/heads/main").is_some(), "a push to main");
+    assert_eq!(delivery.signature, support::webhooks::signature(&forgejo.secret(), &delivery.body));
     forgejo.stop();
     scratch.remove();
 }

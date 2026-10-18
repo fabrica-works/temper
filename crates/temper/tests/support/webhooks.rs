@@ -7,7 +7,7 @@ use skein_world::{Referee, end_to_end::Streams, real};
 use std::fmt::Write as _;
 use std::{
     fs,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     path::Path,
 };
@@ -16,6 +16,7 @@ pub const SECRET: &[u8] = b"fixture-hook-secret";
 // setup.md 8 gives forge 1 the listener path; forge 9 is not configured.
 pub const KNOWN_FORGE: &str = "/hooks/1";
 pub const UNKNOWN_FORGE: &str = "/hooks/9";
+// The listener stories allow five seconds for each socket operation.
 const SOCKET_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 pub const PING: &[u8] = b"ping";
 
@@ -147,4 +148,56 @@ pub fn served(directory: &Path, listener: SocketAddr, posts: &[Post<'_>]) -> End
 pub fn delivered(scratch: &super::Scratch, post: Post<'_>) -> Ended {
     let listener = configuration(scratch.path());
     served(scratch.path(), listener, &[post])
+}
+
+/// One complete delivery, independent of the service's decoder.
+pub struct Delivery {
+    pub event: String,
+    pub signature: String,
+    pub body: Vec<u8>,
+}
+/// Receives one request within the deadline and acknowledges its complete body.
+#[must_use]
+pub fn receive(listener: &TcpListener, within: Duration) -> Delivery {
+    listener.set_nonblocking(true).expect("nonblocking listener");
+    let clock = Clock::new();
+    let deadline = clock.now().now.saturating_add(within);
+    let (stream, _) = loop {
+        match listener.accept() {
+            Ok(connection) => break connection,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                assert!(clock.now().now < deadline, "no webhook arrived within its bound");
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(error) => panic!("listener accept: {error}"),
+        }
+    };
+    let remaining = std::time::Duration::from_nanos(deadline.saturating_since(clock.now().now).as_nanos());
+    stream.set_read_timeout(Some(remaining)).expect("request deadline");
+    stream.set_write_timeout(Some(remaining)).expect("answer deadline");
+    let mut reader = BufReader::new(stream);
+    let mut delivery = Delivery { event: String::new(), signature: String::new(), body: Vec::new() };
+    let mut length = None;
+    loop {
+        let mut line = String::new();
+        assert_ne!(reader.read_line(&mut line).expect("request head"), 0, "head is complete");
+        if line == "\r\n" {
+            break;
+        }
+        if let Some((name, value)) = line.split_once(':') {
+            match name.to_ascii_lowercase().as_str() {
+                "x-forgejo-event" => delivery.event = value.trim().into(),
+                "x-forgejo-signature" => delivery.signature = value.trim().into(),
+                "content-length" => length = Some(value.trim().parse::<usize>().expect("body length")),
+                _ => {}
+            }
+        }
+    }
+    delivery.body.resize(length.expect("Content-Length"), 0);
+    reader.read_exact(&mut delivery.body).expect("complete delivery body");
+    reader
+        .get_mut()
+        .write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .expect("answer");
+    delivery
 }

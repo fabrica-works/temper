@@ -10,6 +10,8 @@ use temper_throwaway_forgejo::{Instance, Outgoing, Token};
 pub type BranchHead = (Box<[u8]>, Box<[u8]>);
 // A created member owns all ten grants, their segment boxes and executor kinds.
 const MEMBER_BYTES: u32 = 2048;
+// The landing story gathers its agent's brief before the person's next command.
+const BRIEF_GATHER_MS: u64 = 5000;
 
 pub struct Throwaway {
     instance: Instance,
@@ -17,6 +19,8 @@ pub struct Throwaway {
     runner: owned::Running,
     person: Token,
     repository: u64,
+    directory: PathBuf,
+    webhooks: Option<SocketAddr>,
 }
 impl Throwaway {
     #[must_use]
@@ -40,7 +44,21 @@ impl Throwaway {
         stage("reconcile", began);
         let person = person_token(&instance);
         let repository = repository(&instance, &person);
-        Self { instance, forgejo: owned::binaries().0, runner, person, repository }
+        let config: Value =
+            serde_json::from_slice(&fs::read(scratch.path().join("config.json")).expect("configuration"))
+                .expect("JSON");
+        let webhooks = config["application"]["webhooks"]["listener"]["socket"]
+            .as_str()
+            .map(|address| address.parse().expect("webhooks address"));
+        Self {
+            instance,
+            forgejo: owned::binaries().0,
+            runner,
+            person,
+            repository,
+            directory: scratch.path().into(),
+            webhooks,
+        }
     }
 
     #[must_use]
@@ -139,6 +157,26 @@ impl Throwaway {
     pub fn repository(&self) -> u64 {
         self.repository
     }
+    /// The configured address, held only by the test or the running service.
+    #[must_use]
+    pub fn webhooks(&self) -> SocketAddr {
+        self.webhooks.expect("webhooks configured")
+    }
+    /// The reconciled secret, without its optional final line feed.
+    #[must_use]
+    pub fn secret(&self) -> Vec<u8> {
+        let secret = fs::read(self.directory.join("forge-1/webhook_secret")).expect("webhook secret");
+        secret.strip_suffix(b"\n").unwrap_or(&secret).to_vec()
+    }
+    /// Commits one file to main through the person's contents API.
+    pub fn push(&self, file: &str) {
+        let path = format!("/api/v1/repos/acme/widget/contents/{file}");
+        let body = serde_json::to_vec(&json!({"branch":"main","message":format!("Add {file}"),"content":"aG9vawo="}))
+            .expect("contents JSON");
+        let response =
+            self.instance.exchange(&Outgoing::json("POST", &path, Some(&self.person), &body)).expect("contents answer");
+        assert_eq!(response.status, 201, "contents commit");
+    }
 }
 
 pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
@@ -158,6 +196,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     let limits = value["application"]["limits"].take();
     value["application"] = owned::application(&owned);
     value["application"]["limits"] = limits;
+    value["application"]["limits"]["overrides"]["root.brief.gather_ms"] = BRIEF_GATHER_MS.into();
     let grant = |kind| json!({"connector":1,"kind":kind,"pattern":{"segments":["forge",api.to_string()],"last":"open","value":"acme"}});
     let grants =
         json!([grant(1), grant(2), grant(3), grant(4), grant(7), grant(8), grant(10), grant(11), grant(12), grant(13)]);
