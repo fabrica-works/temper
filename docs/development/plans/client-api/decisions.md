@@ -2210,6 +2210,15 @@ choice would have been the user's (development.md, 10.4).
      2. kit-batch's decided proposals do not reach this run: its kit stays at skein `841f487` (ruling 295) and its process at `15ddb75` (supervision.md's Process line), until a steer moves either.
      3. Unchanged: every other line of `plan check` binds as before.
 
+311. **the 04:10:43Z steer's points 2 and 3: said already, nothing lands** (process, the coordinator's block of 2026-10-18T04:12:18Z).
+     Ruling 311: the 04:10:43Z steer's points 2 and 3 land nothing, and their Pass on texts go to no session: texts every session reads say them already. The README's rule "The run's steers" (ruling 167) holds "each 'Pass on' text of the run's steers that holds until the run's end and that no rule above says"; no prompt exception was meant.
+
+     - Point 2: the README's "The run's steers", "2026-10-17 15:00Z, point 1 (every session)", says it: "Your landing report names only what your commit changed: each test over 40 lines that it adds or lengthens (name, base, now), each file over 800 lines that it grows (base, now) … The complete lists go in `logs/<session>/audit-<step>.md`; give its path in one line. Do not list a test or a file whose length your commit leaves as it was."
+     - Point 3: implementer.md says "Use it as `~/src/rust/AGENTS.md` says", and on this machine that file is the link to skein's checkout, at `c0662b5`, which gives the graph project's name with `realpath ~/src/rust/<repository> | sed 's|^/||; s|/|-|g'`. The steer's "Seen" ("The workspace file the sessions read is at `841f487`") was wrong: the kit's copy is not the one the sessions read.
+
+     1. Log the 04:10:43Z steer's points 2 and 3 as done, under this ruling; give neither Pass on text in a prompt or a message.
+     2. Unchanged: point 1, as you sent it to w130 and w131; README 2026-10-17 15:00Z point 1; ruling 167's rule that a later run-end Pass on text lands in the README before its steer is sent.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
