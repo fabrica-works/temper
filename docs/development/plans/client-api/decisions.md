@@ -2823,6 +2823,17 @@ choice would have been the user's (development.md, 10.4).
      4. **Proof:** the landing story alone, then the whole tier once, `heavy --gate scripts/proof-one-process.sh`, within 180 s.
      5. **Unchanged:** 05.s1's Don't list (no assertion, referee check, timeout, fake LLM script or ignore changed to pass; no other Forgejo or runner; jig unchanged); ruling 229; ruling 347 point 3 (each temper increment runs the landing story once before landing).
 
+368. **temper-06.5 traces the chat-wait deadline** (process, temper-06's block of 2026-10-18T13:57:06Z).
+     Ruling 368, kind: process, as the report proposes (implementer.md, 8.8: the same symptom a third time). `a_chat_reads_then_replies_and_waits` (`tests/one-process/tests/fuzzy_one_process.rs:31`) passed in 06.4's gate and fails at seed 7 with the candidate, so the cause is in 06.5's diff until a log says otherwise.
+
+     1. **Focused, ruling 229:** seed 7 alone, the reproduction the report already has (0.388 s). The trace names which of temper's components holds the deadline at 31 s, and the call it guards. The trace's tail shows the client shutting its write half at 1 s (`pid 1 … Shutdown { fd: Fd(24) }`) and temper reading the end (`pid 0 … Recv { fd: Fd(50) … } … Count(0)`). 31 s is 1 s plus the 30 s `stall` that `crates/temper-service/src/server.rs:120` gives each admitted connection. So the first thing to establish is whether a connection whose client has gone keeps a held call (a stream or a watch that the chat page opened) until its stall.
+     2. **Then by the log:**
+        - if the chat page leaves open what it opened (a stream, a watch, a held read) when the person's client ends, which 06.4's pages did not, repair it within 06.5's Files, as the other pages end theirs, and keep the focused test as the step's test;
+        - if the log names temper-service's server (a held call that outlives its peer's end: `server.rs`, temper-04.s1's `finished`, `Server::finish`, `server.rs:219`), or skein-http's held response, stop and report the cause line. temper-05.s2 is tracing the same server for its signed delivery (ruling 367), and jig 19.5 found that a read half-end does not retire an unfinished response (skein `crates/skein-http/src/server.rs:886-903`); the supervisor then routes that cause to one step.
+     3. **Bound:** three focused runs and 30 minutes from this unblock. Past that bound, the report gives what the trace shows.
+     4. **The adoption test (ruling 364, point 2):** `an_adopted_repository_gets_its_change_pushed_through_git` (`tests/one-process/tests/one_process.rs:43`), timed alone at 3.336 s and made cheaper to 0.947 s alone and 1.015 s among the eight focused tests, meets point 2 for 06.5. Its commit lands as made, counted apart from the Size. The gate's SLOW under load (3.140 s) goes in the report, and 06.5 does no more on it.
+     5. **Unchanged:** the teardown check (skein `testing/skein-world/src/world.rs:448-465`, `check_teardown`); every production deadline, `stall` included; the seeds, assertions, fake LLM scripts, judges and referees; ruling 365's 700; the regression and joint proofs already passed; ruling 347 point 3 (the landing story once before landing, already passed at 29.070 s).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
