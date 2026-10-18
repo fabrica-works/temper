@@ -4,8 +4,9 @@ The process tier's owned Forgejo (temper 10.2: provisioned by reconcile, with th
 setup.md 10 promises: the configuration names the listener and the forge's secret file, `app.ini` allows the listener,
 reconcile's org hook carries the secret, and Forgejo's deliveries reach `temper serve`. 11.1 turns webhooks on for every
 owned story and shows a real delivery leave the box signed; 11.2 adds the hinted story (setup.md 13.4): the landing story
-with `poll`, `poll_max` and `slow` raised past its budget, which lands only if every wait ends by a delivery. A wait no
-delivery ends is a question (below), not a fix here. Test code alone.
+with `poll`, `poll_max`, `slow` and the change's `stall` raised past its budget and its CI's job outlasting `settle`,
+which lands only if the job's end is delivered. A wait no delivery ends is a question (below), not a fix here. Test code
+alone.
 
 ## Read first
 
@@ -22,8 +23,10 @@ delivery ends is a question (below), not a fix here. Test code alone.
 ## What the design asks
 
 - **setup.md 10, 13.4, testing.md 2.6:** "Checked" is the hinted story: a test of its own on the owned Forgejo with CI
-  and webhooks on, `poll`, `poll_max` and `slow` raised past its budget, no conflict resolved. It names the table's first
-  three rows; the other rows are checked from hints in the worlds. The tier aims at 3 minutes (Q1).
+  and webhooks on, `poll`, `poll_max`, `slow` and `stall` raised past its budget, its job outlasting `settle`, no
+  conflict resolved. It checks the table's third row, CI on a head; the landing's other waits end on temper's own writes,
+  and the other rows are checked from hints in the worlds (the designer's answer to Q2, 2026-10-18). The tier aims at 3
+  minutes (Q1).
 - **forge.md 5, 7:** a delivery is signed with HMAC-SHA256 in `X-Forgejo-Signature` and named by `X-Forgejo-Event`; 11.1
   checks both on a real one. Past `hooks` connections a delivery waits and none is refused: the cap raises no question.
 
@@ -31,9 +34,9 @@ delivery ends is a question (below), not a fix here. Test code alone.
 
 - **Webhooks are on for every owned story** (`Throwaway::start`'s users: process.rs:36, :73, live.rs:8): one
   provisioning, no flag to forget. The live test gets them too and is not run by this plan (decision 16).
-- **The hinted story is the landing story's function called with three overrides** (`forge.client.poll_ms`,
-  `poll_max_ms`, `slow_ms` = 600 000), no second scenario. `hinted_ms` (1 s), `settle_ms` (30 s) and the hooks' limits
-  stay the profile's.
+- **The hinted story is the landing story's function called with four overrides** (`forge.client.poll_ms`,
+  `poll_max_ms`, `slow_ms` and `forge.change_policy.stall_ms` = 600 000) and a slow job (the person's `slow` on `main`),
+  no second scenario. `hinted_ms` (1 s), `settle_ms` (30 s) and the hooks' limits stay the profile's.
 - **11.1's receiver is std's** and the signature is checked with skein's `Hmac` (05.3's `webhooks::signature`), so neither
   the engine's listener nor temper's decoder reads Forgejo's delivery. The push is a contents-API commit, not git.
 - **`application.webhooks` reaches reconcile and Forgejo by 05.3's wiring** (05's file: whichever of 05.3 and 10.1, and of
@@ -150,17 +153,30 @@ Size: 30 lines of support code; the receiver, the three methods and the members 
 Removes: nothing.
 
 ### 11.2 The hinted story
-Scope: setup.md 13.4's hinted story, the fourth test of testing.md 2.6: the landing story with `poll`, `poll_max` and
-`slow` raised past its budget, so it lands within the budget only if every wait it meets ends by a delivery and the
-reads after it. Its changes never conflict (one edit of `README.md` on an untouched `main`), so none is resolved (Q3).
-Needs: 11.1, and 06.2's `settle` (a hinted pull read before Forgejo settles its mergeability is not taken as conflicted).
+Amended by the designer's answer to Q2 (2026-10-18; setup.md 10, "Checked"): the fourth limit, `stall`, and the slow job.
+Scope: setup.md 13.4's hinted story, the fourth test of testing.md 2.6: the landing story with `poll`, `poll_max`, `slow`
+and the change's `stall` raised past its budget, and its CI's job outlasting `settle`, so it lands within the budget only
+if the job's end is delivered and the reads after it: CI on its head is the one wait it meets that the forge ends. Its
+changes never conflict (one edit of `README.md`; the person's `slow` lands on `main` before the goal), so none is
+resolved (Q3).
+Needs: 11.1 (`Throwaway::push`), and 06.2's `settle` (a hinted pull read before Forgejo settles its mergeability is not
+taken as conflicted; a job's hint whose CI reads pending is read again within `settle`).
 Files: `crates/temper/tests/process.rs` (the story's body moves into `fn landing`; hotspot), `support/mod.rs`
-(`LANDING`, `RAISED_MS`, `raise_paces`; `run_until_landed` :462-469 uses `LANDING` for its literal at :468).
-Shape: sketches below. `raise_paces` runs after `support::configuration`: it reads `config.json`, inserts the three
+(`LANDING`, `RAISED_MS`, `raise_paces`; `run_until_landed` :462-469 uses `LANDING` for its literal at :468),
+`support/forgejo.rs` (`repository`'s `check.sh`, :353).
+Shape: sketches below. `raise_paces` runs after `support::configuration`: it reads `config.json`, inserts the four
 names into `application.limits.overrides` and writes the file private (`write_private`, mod.rs:15). The names
-(names.rs:105-108) sit beside the profile's 5 s, 30 s and 40 s (limits.rs:75, :77, :81) at `RAISED_MS` = 600 000, because
-the story's budget is 180 s (`LANDING`; a compile-time assertion keeps the relation); `poll <= poll_max` holds
-(forge-client `src/limits.rs`:66). They act in the keep's `rest_resource` (keep.rs:1193-1209).
+(names.rs:105-108 and :120, `forge.change_policy.stall_ms`) sit beside the profile's 5 s, 30 s, 40 s and 30 s
+(temper-service `src/limits.rs`:75, :77, :81, :154) at `RAISED_MS` = 600 000, because the story's budget is 180 s
+(`LANDING`; a compile-time assertion keeps the relation); `poll <= poll_max` holds (forge-client `src/limits.rs`:66).
+The paces act in the keep's `rest_resource` (keep.rs:1193-1209); `stall` in the change's `waiting`
+(temper-engine-domain-forge-change `src/domain.rs`:174-181), whose wake reads the pull and CI afresh.
+The slow job: `repository` writes `check.sh` as `test ! -e slow || sleep 60` and then `test -s README.md`, so a job on
+a tree holding `slow` sleeps 60 s: twice `settle` (30 s, `src/limits.rs`:83). The settle window a not-mergeable read
+opens ends `settle` after the change enters `Checking` (temper-engine-domain-forge `src/settle.rs`:21-44), within a few
+seconds of its push, which starts the job; so the window's last read comes before the job ends. In the hinted case,
+`landing` calls `forgejo.push("slow")` (11.1's) after `Throwaway::start` and before `temper serve` starts; the landed
+case never does, and its job stays as it is.
 Test shape: `process.rs`, one new test calling the existing story's function. Reuse `landing_scripts` (forgejo.rs:218),
 `person::adopt_and_change` (person.rs:233), `person::found` (:266), `ANSWER` and `EDIT` (mod.rs:339-340),
 `run_until_landed`, `merged_pull`, `main_readme`. `landing`'s body is the story's (process.rs:72-85) as 10.2 leaves it.
@@ -177,14 +193,15 @@ fn a_change_lands_by_deliveries_with_every_poll_raised() {
     landing("hinted", true);
 }
 
-/// The landing story; `raised` sets the three paces to `RAISED_MS` before `temper serve` starts.
+/// The landing story; `raised` pushes `slow` and sets the four limits to `RAISED_MS` before `temper serve` starts.
 fn landing(case: &str, raised: bool) { todo!() }
 ```
 
 Ceiling: `LANDING` (180 s; the judge's deadline is 175 s, mod.rs:492-494).
 Proof: process, `a_change_lands_by_deliveries_with_every_poll_raised`, by the exports, then `heavy --gate cargo nextest
 run -p temper --profile process -E 'test(=a_change_lands_by_deliveries_with_every_poll_raised)'`, shows the change
-merged on the owned Forgejo after its CI passed, found again after the restart, with every poll at 600 s; within 180 s.
+merged on the owned Forgejo after its CI passed, found again after the restart, with every poll and the stall at 600 s
+and its job sleeping 60 s; within 180 s.
 Once, by hand, before landing, the control, a hinted story that could pass without deliveries proving nothing:
 `owned::tier_configuration` writes `application.webhooks` and `forges[0].webhook_secret` as `null` (the handle's
 `webhooks` is `None`; `forgejo::configuration` follows), committed on its own (`heavy --gate` takes a committed tree) and
@@ -192,10 +209,13 @@ dropped after (`git reset --hard HEAD~1`). With the exports and `mkdir -p ~/src/
 done, the same command with `--tail 400` after `--gate` and `2>&1 | tee
 ~/src/rust/tmp/temper/forge-setup/logs/temper-11/control.log` at its end exits non-zero (the pipe's status is tee's) and
 the log holds `native chat did not settle` (mod.rs:432-436) or `native person's chat did not finish and settle` (:446),
-the judge's deadline. If the story lands, it proves nothing: raise Q2. The landing report quotes the matching line.
-Don't: change `hinted_ms`, a hook limit, `LANDING` or the story's scripts to make it pass; add a sleep or a poll to the
-test; give the hinted story a scenario of its own; make a conflict.
-Size: 10 lines of support code; `LANDING` and its guard take it to about 16, inside the tolerance.
+the judge's deadline. With no deliveries, nothing reads the change's CI within the budget: the settle window's reads
+end before the job does, and the stall's wake comes 600 s after the change enters `Checking`. If the story lands, it
+proves nothing: raise Q2. The landing report quotes the matching line.
+Don't: change `hinted_ms`, `settle_ms`, a hook limit, `LANDING` or the story's scripts to make it pass; shorten the
+job's 60 s; push `slow` in the landed story; add a sleep or a poll to the test; give the hinted story a scenario of its
+own; make a conflict.
+Size: 12 lines of support code; `LANDING` and its guard take it to about 18, inside the tolerance.
 Removes: nothing (the story's body moves to `landing`).
 
 ## Interface sketches
@@ -238,11 +258,11 @@ use std::path::Path;
 
 /// The landing story's deadline: `run_until_landed`'s (a literal at :468 today).
 pub const LANDING: Duration = Duration::from_secs(180);
-/// The keep's `poll`, `poll_max` and `slow` in the hinted story, in milliseconds: past `LANDING`.
+/// The keep's `poll`, `poll_max` and `slow` and the change's `stall` in the hinted story, in milliseconds: past `LANDING`.
 pub const RAISED_MS: u64 = 600_000;
 const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
 
-/// Sets the three paces to `RAISED_MS` in `directory/config.json`, which stays private.
+/// Sets the three paces and the stall to `RAISED_MS` in `directory/config.json`, which stays private.
 pub fn raise_paces(directory: &Path) { todo!() }
 ```
 
@@ -253,8 +273,10 @@ pub fn raise_paces(directory: &Path) { todo!() }
   report README Done when 4's `Summary [ t ]` time; change neither number. Recommended: nothing.
 - **Q2, a wait that no delivery ends.** If the hinted story misses its deadline, or the control lands, name the wait
   (setup.md 10's table) and the event from the run's log; do not raise a limit or lower a pace. Candidates: a job-end
-  event missing from the hook's list; a hint dropped before the domain was ready (forge.md 5); a connection closed at
-  `hook_deadline` (forge.md 8) or kept waiting behind `hooks` past Forgejo's own timeout.
+  event missing from the hook's list; a job's hint that wakes no change; a hint dropped before the domain was ready
+  (forge.md 5); a connection closed at `hook_deadline` (forge.md 8) or kept waiting behind `hooks` past Forgejo's own
+  timeout. Raised once, at 11.2's ready check (2026-10-18): the control landed in 52 s, its CI read at the change's
+  `stall`; the designer's answer added the fourth limit and the slow job above.
 - **Q3, "no conflict resolved".** Read as a property of the scenario: the story asserts nothing about resolution. If the
   design wants an assertion, which observable: the pull's commit count, or the fake LLM's queries?
 
@@ -265,8 +287,9 @@ pub fn raise_paces(directory: &Path) { todo!() }
   `Summary [ t ]` line gives the time, reported (Q1 if over 180 s).
 - Both tests exist: `grep -c -e 'fn a_push_is_delivered_signed_with_the_secret_reconcile_drew'
   -e 'fn a_change_lands_by_deliveries_with_every_poll_raised' crates/temper/tests/process.rs` prints 2.
-- The three paces are named once each: `grep -rho -e 'forge\.client\.poll_ms' -e 'forge\.client\.poll_max_ms'
-  -e 'forge\.client\.slow_ms' crates/temper/tests | wc -l` prints 3.
+- The four limits are named once each: `grep -rho -e 'forge\.client\.poll_ms' -e 'forge\.client\.poll_max_ms'
+  -e 'forge\.client\.slow_ms' -e 'forge\.change_policy\.stall_ms' crates/temper/tests | wc -l` prints 4.
+- The job is slow only on `slow`: `grep -c 'test ! -e slow || sleep 60' crates/temper/tests/support/forgejo.rs` prints 1.
 - They stay out of the gate: `grep -cF 'not binary(/^(process' .config/nextest.toml` prints 2.
 - No forbidden word: `! grep -rn -e actual -e genuine -e legacy -e compat -e workaround
   crates/temper/tests/process.rs crates/temper/tests/support` prints nothing.

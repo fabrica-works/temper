@@ -595,12 +595,21 @@ engine on a box, and that they cover what its work waits on.
   paces and the slow pass are what they are with no webhook. A delivery
   lost while `temper serve` is down, refused for its size, or never sent
   is found by them; Forgejo does not send a failed delivery again.
-- **Checked:** the process tier's hinted story (13.4) runs with the
-  keep's paces raised past its budget, so it lands only if the waits it
-  meets, the table's first three rows (a landing branch's tip, a pull
-  request's head, base and state, CI on a head), each end by a
-  delivery. The others, comments, reviews, issues and drift, are
-  checked from hints in the worlds (testing.md, 2.2 and 6.3).
+- **Checked:** the process tier's hinted story (13.4) checks the
+  table's third row, CI on a head: the one wait of its landing that the
+  forge ends. Its other waits end on temper's own writes, its push, its
+  pull request and its merge, whose deliveries are echoes. Within its
+  budget, only the job's end delivery brings a read of its CI:
+  - the keep's `poll`, `poll_max` and `slow` are raised past the budget
+    (configuration.md, section 7);
+  - so is the change's `stall`, whose end reads its pull request afresh
+    before it holds the change (`domain/forge.md`, 5.3 and 8.4);
+  - its job outlasts `settle` from its change's push, so the settle
+    window's reads end before CI does (`domain/forge.md`, 5.2).
+
+  The first two rows, moved by someone else's push or edit, and the
+  others, comments, reviews, issues and drift, are checked from hints
+  in the worlds (testing.md, 2.2 and 6.3).
 
 ## 11. The crates
 
@@ -745,10 +754,13 @@ before a machine relies on each:
   at 3 minutes; if CI takes it past, the CI story becomes a test of its
   own.
 - **The hinted story:** the same story with the keep's `poll`,
-  `poll_max` and `slow` raised past the story's budget (configuration.md,
-  section 7), so that it lands within its budget only if every wait ends
-  by a delivery and the reads that follow it; and with no conflict
-  resolved, since its changes never conflict.
+  `poll_max` and `slow` and the change's `stall` raised past the story's
+  budget (configuration.md, section 7; `domain/forge.md`, 8.4), and its
+  CI's job outlasting `settle` from the change's push, so that it lands
+  within its budget only if the job's end is delivered and the reads
+  that follow it (section 10, "Checked"); and with no conflict resolved,
+  since its changes never conflict. With no webhooks, the same story
+  misses its budget.
 - **`temper box`,** a test of its own on a scratch directory: the sign-in
   link on its stdout; Forgejo killed and restarted, with the engine still
   serving; a stop leaving no process it started.

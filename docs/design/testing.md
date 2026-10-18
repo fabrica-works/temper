@@ -254,9 +254,10 @@ and 10).
   made. The cross-site request and the framed page need a browser, and
   wait for temper's browser tier (section 9).
 - **The hinted story,** a fourth test (setup.md, 13.4): the story with
-  the keep's `poll`, `poll_max` and `slow` raised past the story's budget
-  (configuration.md, section 7), so that it lands within its budget only
-  if every wait ends by a delivery (setup.md, section 10).
+  the keep's `poll`, `poll_max` and `slow` and the change's `stall`
+  raised past the story's budget (configuration.md, section 7), and its
+  CI's job outlasting `settle`, so that it lands within its budget only
+  if its job's end is delivered (setup.md, section 10, "Checked").
 - **`temper box`,** a fifth test, on a scratch directory of its own
   (setup.md, 13.4): `temper box` on the owned example prints the sign-in
   link on its stdout; Forgejo killed is restarted by the box, with the
