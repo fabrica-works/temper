@@ -2219,6 +2219,13 @@ choice would have been the user's (development.md, 10.4).
      1. Log the 04:10:43Z steer's points 2 and 3 as done, under this ruling; give neither Pass on text in a prompt or a message.
      2. Unchanged: point 1, as you sent it to w130 and w131; README 2026-10-17 15:00Z point 1; ruling 167's rule that a later run-end Pass on text lands in the README before its steer is sent.
 
+312. **jig 17.2: lands at 510; Size stop 560** (plan defect, jig-17.2's block of 2026-10-18T04:53:56Z).
+     Ruling 312: yes, your proposal: jig-17.2 lands at 510 production lines. The miss is the plan's estimate, not the increment's growth: 17.2's Scope moves code ("the clients' listener and each connection's skein-http server leave the component for `jig_test_service::server`"), and the same count removes 255 lines (`component.rs` 143, `clients.rs` 36, `closing.rs` 28, `connection.rs` 25), which `-M` does not follow into the new `server.rs`. 17.2's Size now reads "at most 250 lines; stop 560".
+
+     1. Run the gate and land da9157229's work as it is, under the repository's lock; trim nothing to fit (implementer.md 8.6: "Never trim a doc comment, a test or the formatting to meet a Size").
+     2. The landing report gives 510 and this ruling's number on its Size line; nothing else is wanted for the size.
+     3. Unchanged: 17.2's Scope, Files, Shape, Proof and Don't; 17.3's to 17.5's Sizes; rulings 302 and 307.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

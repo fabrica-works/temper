@@ -446,7 +446,7 @@ once (0.32 s at the base; or the name jig 16 gave it, if it renamed a
 chat's test). Nothing else is run for the proof.
 Don't: serve anything but the component's calls; change a status the
 component answers; change the limits' numbers.
-Size: at most 250 lines.
+Size: at most 250 lines; stop 560 (ruling 312: the listener and the sockets leave `component.rs`, 255 lines removed).
 Removes: the component's listener, its sockets, `Event::Io`,
 `Request::Io`, `Unusable::Listener`.
 
