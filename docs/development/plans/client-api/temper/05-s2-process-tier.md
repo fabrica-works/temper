@@ -66,6 +66,29 @@ webhook delivery in flight.
 - Its focused test (ruling 229) is a delivery in flight when the drain
   begins, at the lowest layer that shows it.
 
+**Ruling 370 (temper-06.5's block of 2026-10-18T14:04:08Z): a second
+cause in the same server.** With 06.5's candidate (`0650656cc`),
+`a_chat_reads_then_replies_and_waits`
+(`tests/one-process/tests/fuzzy_one_process.rs:31`) fails at seed 7:
+"process 0 requires policy deadline 31000000000 ns after the last word".
+06.5's trace (`logs/temper-06/chat-proof.md`, `server-trace-368.rs`): at
+1 s, `POST /jig/v1/unwatch` (owner 395, call 425) has its whole body
+received, its response awaited, and its peer's End. The server keeps it,
+with `closing` and `finished` false and the 31 s stall as its deadline
+(`server.rs:132`, refreshed on the End; `:229-235`; `:264-284`, closing
+waits for the call or `finished`). Its stream, `GET /jig/v1/stream`, ends
+on `BrokenPipe` at 1 s, and no `Server::finish` comes (`clients.rs:367-368`).
+- First, at the lowest layer (a `temper-service` server or clients test),
+  find who owes the unwatch's answer once its peer has ended and its
+  stream has closed. If jig's clients component never answers it, that is
+  a jig cause: stop with the cause line. If temper's server or mount
+  holds it, repair it here with the drain's repair, so that a call whose
+  peer has gone holds no deadline past the last word.
+- Skein's HTTP server keeps an unfinished response across a read half-end
+  (`crates/skein-http/src/server.rs:886-903`), and that stays.
+- The bound gains 30 minutes for this cause. Its focused test stays as a
+  test of the step. 06.5 proves seed 7 once this step has landed.
+
 Proof (ruling 369), in the process profile with both exports: the five
 stories, the signed delivery, `temper_serve_answers_an_unknown_forge_404`
 (`process.rs:327`), `temper_serve_answers_an_unsigned_delivery_403`

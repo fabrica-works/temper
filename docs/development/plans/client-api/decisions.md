@@ -2844,6 +2844,21 @@ choice would have been the user's (development.md, 10.4).
      5. **Ruling 368 stands:** a server cause that 06.5's trace names is 05.s2's, and 06.5 reports it with its cause line.
      6. **Unchanged:** 05.s1's Don't list; every production deadline; ruling 229; ruling 367's bound and Size.
 
+370. **temper-05.s2 takes the peer-ended unwatch; 06.5 waits for it** (plan order, temper-06's block of 2026-10-18T14:04:08Z).
+     Ruling 370, kind: plan order, as the report proposes. 06.5's trace names temper-service's server, not the chat page. The page sends its unwatch; the server keeps the unwatch call after its peer's End, with its response awaited and the 31 s stall as its deadline. That is the server temper-05.s2 is already repairing for 3262df8f9's drain (rulings 367 and 369). So the cause goes to one owner, 05.s2, and 06.5 waits for it.
+
+     1. **temper-05.s2 takes the cause** (temper/05-s2-process-tier.md, "Ruling 370"). At the lowest layer (a `temper-service` server or clients test), it finds who owes the unwatch's answer once its peer has ended and its stream has closed.
+        - If jig's clients component never answers it, that is a jig cause, and 05.s2 stops with the cause line.
+        - If temper's server or mount holds it, 05.s2 repairs it with the drain's repair, so that a call whose peer has gone holds no deadline past the last word.
+        - Its bound gains 30 minutes, and the focused test stays.
+     2. **temper-06.5 waits for temper-05.s2's landing,** with its candidate (`0650656cc`) unchanged for this cause. Once 05.s2 has landed, 06.5:
+        - rebases;
+        - runs `a_chat_reads_then_replies_and_waits` at seed 7 once, then its gate, then the whole process tier (README, 14:05Z point 1, ruling 369);
+        - lands at up to ruling 365's 700.
+
+        If seed 7 still fails after 05.s2's repair, it blocks with the trace.
+     3. **Unchanged:** ruling 368's points 4 and 5 (the adoption test done at 0.947 s alone, its commit counted apart; the teardown check, every production deadline, the seeds and assertions); skein's held response across a read half-end (`crates/skein-http/src/server.rs:886-903`); 06.5's regression and joint proofs, already passed.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
