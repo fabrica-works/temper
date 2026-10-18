@@ -3195,6 +3195,14 @@ choice would have been the user's (development.md, 10.4).
      5. **The commit body** names the file, the cause (`logs/temper-07-s1/gate-cause.md`) and this ruling. It is a test-support line count, not production.
      6. **Further readers:** another observer or judge in `tests/` that decodes every private record as a `TableEntry` takes the same skip. List each one in the commit body.
 
+398. **temper repin: ruling 377's hold ended with forge-setup's temper-14.s2; raise engine.memory_bytes by the shortfall** (process, temper repin's block of 2026-10-18T21:41:53Z).
+     Ruling 398, kind: process. Ruling 377 held both `memory_bytes` values "until that step lands". forge-setup's `temper-14.s2` landed at 16:57Z, as temper `ab4c62884` ("Bound the owned example memory values by copyable strings"), and forge-setup's run has ended (its retrospective, `8f81b24d4`). This run did not mark the hold's end. The supervisor marks it now.
+
+     1. **Raise `engine.memory_bytes`** in `docs/examples/owned.json` by the 208,552 bytes that `serve_prepares_once_on_the_owned_example` names (`crates/temper/tests/startup.rs:343`). That test is 14.s2's: it lays the longest owned forge base, a 512-byte token and two PATH_MAX agent paths, so the shortfall is not your worktree's path. Do it in a commit of its own that names `temper-14.1`, `temper-14.s2` and rulings 354, 356 and 362 (the server's eight connections, its cause), with the refusal's line. List any further copy of the value.
+     2. **`workers[0].memory_bytes` stays,** unless a start refuses it. Your change adds nothing to `worker_worst_case`.
+     3. **Then:** the focused startup test, the process tier with both exports, and `land`, as your Next says. A refusal of another kind, or a shortfall this one repair does not close, is a block.
+     4. **Unchanged:** the worst-case accounting, 14.s2's test, and the README's 13:34Z point 3 otherwise.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
