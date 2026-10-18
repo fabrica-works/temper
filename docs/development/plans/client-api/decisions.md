@@ -2976,6 +2976,44 @@ choice would have been the user's (development.md, 10.4).
      - This changes no referee check (ruling 229): `Referee::stored` (`:39-43`) records a request's key and scope for `keyed`, and no exchange is keyed by the stream's name. Ruling 373's part says it already: "a 16-byte key is a request; the stream's name warns of nothing", and `start_store` takes "that one record beside at most `requests.requests` of the table's".
      - No designer: the design's stream name (`protocol/client.md`, 4) is unchanged; this is the fixture's routing, which ruling 373's Files missed.
 
+376. **temper 06.6 shows the chat's waiting proposals after its conversation** (design gap answered, temper 06.6's block of 2026-10-18T15:08:54Z).
+     Ruling 376, kind: design gap answered, the designer's answer of 2026-10-18T16:33Z: jig `3150da02d` (`domain/engine.md`, 7.2; `client.md`, 10; `objects.md`, 10; `view.md`, 9; `STATUS.md`) and temper `ffa4c1a20` (temper's `client.md`, 3.5; 06.6 amended; one `later.md` row; `STATUS.md`).
+
+     temper 06.6, 2026-10-18T15:08:54Z. Landed: jig `3150da02d` (design),
+     temper `ffa4c1a20` (temper's `client.md`, 3.5, 06.6, `later.md`, STATUS).
+
+     - **What fills a call's `objects` is the core's own record, not the
+       answer's words.** jig's `domain/engine.md`, 7.2, now: "As it commits a
+       turn, the core writes beside it, from the parts of the answers it
+       committed for the turn's calls (7.3), what each call made, under the
+       call's name … No layer reads what a call made from its answer's words".
+       It rests on 7.3: "The core keeps a task's records, by attempt and name,
+       until a turn of the task that carries their answers commits". client.md,
+       10, says the decoded call carries it. Not planned in this plan: jig's
+       core, store, wire and decoder (a `later.md` row; jig's STATUS).
+     - **06.6 shows the chat's waiting proposals after its conversation,**
+       without a turn anchor, from the `task` document it already watches:
+       contract.md, 5.1, gives a task "the proposals waiting in its subtree".
+       objects.md, 10, now: "the proposals waiting in its subtree … that no
+       call or decision of it shows, as their cards after its lines". This is
+       jig's reference UI's form (`sections/task.rs:343-351`), and it stays
+       for a delegate's proposals.
+     - **06.6, as amended:** each `ProposalKey` in the watched `task`
+       document's `proposals`, in its order, read once by `Read::Proposal`
+       under the chat page's handle when first named, dropped (card and
+       handle) when no longer named; 06.3's card with the acts its document
+       offers. Test `a_proposal_named_by_a_turn_is_shown_in_place` becomes
+       `a_proposal_waiting_in_the_chat_is_shown_after_its_conversation`.
+     - **Don't:** read what a call made from its outcome's words; filter by
+       proposer; drop a card by `Thread::shows`.
+     - **Unchanged:** the story and Proof
+       (`a_goal_proposed_in_a_chat_accepted_in_the_inbox_leaves_the_chat`),
+       Close, the Size and ruling 364's bound, "Removes: nothing", jig's pin.
+       No jig step and no temper repin. Live calls (contract.md, 7.3) are
+       unchanged.
+     - **Scope and end:** 06.6 only, from now. temper's `client.md`, 3.5,
+       names the call's place for `client-pages`, after a jig plan.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
