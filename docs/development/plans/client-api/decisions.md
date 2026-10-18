@@ -3041,6 +3041,12 @@ choice would have been the user's (development.md, 10.4).
      - **One rule, the core's.** `stopping::waits` is `pub(crate)`: the projection asks the core which timers wait (a public function or method beside `waits`), and keeps no second list of paused timers in the service. Its lines count in ruling 380's 40, across both crates.
      - **Focused test first** (ruling 229), at the lowest layer that shows it: a service, or the core's projection, stopping with a due paused timer: its next deadline is the next live one, not the paused one. Then the power-loss story alone.
 
+382. **jig 19.5's HTTP mapping finishes an empty response** (process, jig 19.5's block of 2026-10-18T17:11:27Z).
+     Ruling 382, kind: process. Authorized, as proposed: `respond_with_cookie` (`crates/jig-protocol-engine-clients-http/src/call.rs:60-89`) finishes an empty response's reply, as `send` (`:105`) finishes a full one.
+     - The cause is plain in the code: with an empty body it pushes `Respond` with `Length(0)` and nothing after (`:86-88`: `room` only when the body is not empty), so no `Reply(Down::Finish)` comes, and the call stays `Sending` with nothing left. Ruling 373's `StreamGone` at a restart is the first empty answer the stories send.
+     - `an_empty_response_finishes_its_http_reply` is the focused test (ruling 229), failing at 0.002 s before the repair, as the report gives it.
+     - **From here, no stop for each new cause on this story.** A further cause that the power-loss story or the gate names in production outside 19.5's Files is repaired the same way, under ruling 380's points 3 and 4: the trace names it; its focused test fails first; one commit for each; each named in the report. All of them, ruling 381's 15 lines included, stay within 40 production lines; past 40, or a cause whose repair the trace does not name, stop with the count and the cause line.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
