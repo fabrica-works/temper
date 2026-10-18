@@ -55,3 +55,20 @@ fn an_account_whose_file_is_missing_is_refused_by_number() {
     assert!(stand.values.accounts.value(1, 1, Time::ZERO).is_none());
     assert!(stand.accounts.io.is_empty());
 }
+
+#[test]
+fn a_closed_account_keeps_its_private_root_close_runnable() {
+    let mut stand = fixtures::missing_account();
+    let mut events = Queue::with_capacity(8);
+    stand.accounts.request(accounts::Request::Component(accounts::ToComponent::Close));
+    stand.accounts.iterate(Time::ZERO, Wall::EPOCH, &mut stand.values, &mut events);
+    assert!(!stand.accounts.is_empty());
+    assert!(stand.accounts.work_pending(Time::ZERO), "the private root still needs closing");
+    stand.accounts.iterate(Time::ZERO, Wall::EPOCH, &mut stand.values, &mut events);
+    let submit = stand.accounts.submitted.pop().expect("private root close");
+    assert_eq!(submit.kind, Op::Close { fd: skein_io::kernel::Fd::new(10) });
+    stand.accounts.complete(Complete { op: submit.op, kind: submit.kind, result: Ok(skein_io::kernel::Done::Nothing) });
+    stand.accounts.iterate(Time::ZERO, Wall::EPOCH, &mut stand.values, &mut events);
+    assert!(stand.accounts.is_empty());
+    assert!(!stand.accounts.work_pending(Time::ZERO));
+}

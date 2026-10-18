@@ -274,7 +274,7 @@ impl Accounts {
             || (match &self.keeper {
                 Some(keeper) => keeper.takes(),
                 None => false,
-            } && !self.pending.is_empty())
+            } && (!self.pending.is_empty() || self.closed && self.root.is_some()))
             || match self.next_deadline() {
                 Some(deadline) => deadline <= now,
                 None => false,
