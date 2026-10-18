@@ -939,6 +939,21 @@ per session are in each file.
     named for what it stands for; expected values are literals. Split a
     test that asserts several behaviours under one name (development.md
     14.3, Shape).
+  - 2026-10-18 18:44Z, point 1 (the coordinator and every session,
+    until the run's end; ruling 387): File one landing report per
+    landing. To correct it, say so in one line of your next report; do
+    not repeat the Gate and Proof lines.
+  - 2026-10-18 18:44Z, point 2 (every temper session, until the run's
+    end; ruling 387): One behaviour per test (README, 16:47Z point 1).
+    Keep a setup that two tests share in `tests/fixtures.rs`. If you
+    change `crates/temper-client-view/src/tests/chat.rs`, split its four
+    two-behaviour tests in place, assertions kept, and name them in your
+    report.
+  - 2026-10-18 18:44Z, point 3 (every temper session, until the run's
+    end; ruling 387): Before you define a test helper, search the
+    crate's tests with `rg -n 'fn <name>'` and for what it builds
+    (README, "A test's helpers once"). Use the shared one, or move it
+    into `tests/fixtures.rs` and use it from there; add no further copy.
   - 2026-10-18 16:47Z, point 1 (every temper and jig session, in the
     tests it has not yet written, until the run's end; rulings 378 and
     379): One behaviour per test, named in about eight words, every

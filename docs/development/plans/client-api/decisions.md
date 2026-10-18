@@ -3075,6 +3075,9 @@ choice would have been the user's (development.md, 10.4).
      3. **The focused test** (ruling 384, point 2) goes where jig-test's root is built (`testing/jig-client-test-domain/src/tests/root/`), at most 40 lines, in place of the reproduction in `jig-client-view`'s `tests/cards.rs`: it renders jig-test's inbox, presses its Conversations link with no server document delivered, and finds the script's controls (`First words`, `Start a conversation`). The script presses that link, then those controls. If the form needs a server answer there, stop with the rendered names (a block).
      4. **Ruling 384, points 4 to 7 hold:** one browser run of the pending-request story alone; then the three stories, the gate, and land. The entry and its test count within 20.2's Size; stop 240.
 
+387. **The check of 18:43Z: one report per landing, test shape, helpers once** (steer of 2026-10-18T18:44Z).
+     The check of 2026-10-18T18:43Z, three points, in the README's "The run's steers" (2026-10-18 18:44Z, points 1 to 3). 1: one landing report per landing (07.2 and 19.5 filed three each, 06.6 two). 2: the 16:47Z point 1 again, not followed by 06.6 (`crates/temper-client-view/src/tests/chat.rs`, temper `689d89cf5`: four tests of two behaviours, two shared roots of about 55 and 60 lines inline); its landed tests are split when an increment next changes that file. 3: "A test's helpers once" again, for temper (`tree` defined in 14 test files, `document` and `page` in 9); copies in place are folded when an increment next touches their file.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
