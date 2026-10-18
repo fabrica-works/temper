@@ -43,7 +43,35 @@ Shape:
 Bound: three focused runs and 40 minutes from the unblock; past it, the
 report gives what the trace shows.
 
-Proof: 05.s1's: the landing story alone, then the whole tier once, `heavy
---gate scripts/proof-one-process.sh`, within 180 s.
+**Ruling 369 (the director's request of 2026-10-18T14:02Z):** forge-setup's
+bisect on x1 names the cause, so point 3's bisect is not run. At temper-04.s1's
+`3262df8f9` ("Finish held HTTP calls once their clients component
+closes"), the signed delivery and `temper_serve_answers_an_unknown_forge_404`
+fail every run, and `temper_serve_prints_its_link_and_drains_on_a_signal`
+passes 2 of 4 ("exit: None" after 55 s). The same commit with
+`crates/temper-service` as at `63f6174dc`, the jig pin and
+`temper-client-view/src/confirm.rs` kept, passes them, the signal story 3
+of 3. Its change: `Server`'s `finished` and `Server::finish`
+(`server.rs:219`), called from `Clients` (`clients.rs:368`); the embedded
+worker aborted once `drain.closing` is set (`system.rs:413`); held calls
+ended through that path; `stop.rs`'s closing phase made public. It ends a
+webhook delivery in flight.
+- The repair keeps what rulings 349, 351 and 353 asked of the drain (the
+  embedded worker stopped; a held call ended once its clients component
+  has closed), and ends no delivery in flight: 04.s1's
+  `closing_ends_a_held_call_after_its_component_finishes`
+  (`crates/temper-service/src/tests/server.rs:88`) and
+  `a_signal_mid_run_drains_and_the_next_start_settles_the_claims`
+  (`tests/one-process/tests/one_process.rs:5`) pass with it.
+- Its focused test (ruling 229) is a delivery in flight when the drain
+  begins, at the lowest layer that shows it.
+
+Proof (ruling 369), in the process profile with both exports: the five
+stories, the signed delivery, `temper_serve_answers_an_unknown_forge_404`
+(`process.rs:327`), `temper_serve_answers_an_unsigned_delivery_403`
+(`process.rs:318`), `temper_serve_prints_its_link_and_drains_on_a_signal`
+(`process.rs:10`) four times, and the landing story with its restart; then
+the whole tier once, `heavy --gate scripts/proof-one-process.sh`, within
+180 s.
 
 Size: about 100 production lines. Past 200, it asks.

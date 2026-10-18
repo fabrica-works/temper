@@ -938,11 +938,20 @@ per session are in each file.
     named for what it stands for; expected values are literals. Split a
     test that asserts several behaviours under one name (development.md
     14.3, Shape).
-  - 2026-10-18 12:20Z, point 2 (every temper increment that lands
-    after temper-05.s1; ruling 352 moved 04.s1's run to 05.s1): The landing story: before
-    landing, run `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`
-    once, as temper/05-s1-landing-story.md's Proof runs it, with both
-    exports. A failure there is the increment's, under ruling 229.
+  - 2026-10-18 14:05Z, point 1 (every temper increment that lands from
+    now, until the run's end; ruling 369, the director's request; it
+    replaces the 12:20Z point 2, ruling 347): The whole process tier:
+    before landing, run it once, with both exports
+    (temper/05-s1-landing-story.md's Proof): `heavy --gate sh -c 'export
+    NEXTEST_DOUBLE_SPAWN=0 && cargo build -p temper --bin temper && cargo
+    nextest run -p temper --profile process --no-fail-fast'`. A failing
+    test is the increment's, under ruling 229, except, until temper-05.s2
+    lands, the four that fail on `main` too:
+    `temper_serve_answers_a_signed_delivery_204`,
+    `temper_serve_answers_an_unknown_forge_404`,
+    `temper_serve_answers_an_unsigned_delivery_403` and
+    `temper_serve_prints_its_link_and_drains_on_a_signal`. Name each in
+    your report with its first failure line.
   - 2026-10-18 13:34Z, point 3 (every temper session, until the run's
     end; ruling 363): The owned example: `docs/examples/owned.json` is
     exact (forge-setup `temper-14.1`, `configuration.md` 7). If your
