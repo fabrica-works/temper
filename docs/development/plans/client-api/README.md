@@ -109,6 +109,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/04-s1-repin-rooms.md` | temper-04.s1 (ruling 319): the repin onto jig-17.s1 and jig-17.s2; a stream's watch room 16 | jig-17.s1, jig-17.s2, temper 04 | |
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/05-s1-landing-story.md` | temper-05.s1 (ruling 347): the process tier's landing story passes again, past the regressions of 03.5, 04.3 and 05.1 | temper-04.s1 (ruling 352) | |
+| `temper/05-s2-process-tier.md` | temper-05.s2 (ruling 367): the whole process tier passes, past the signed delivery's stop and each test the 13:49Z run did not reach | temper-05.s1 | |
 | `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
 | `temper/07-task-pages.md` | temper 07: the task's page, adoption, the confirmations; `jig-client-view` dropped | temper 06 | |
 

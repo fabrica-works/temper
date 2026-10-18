@@ -2814,6 +2814,15 @@ choice would have been the user's (development.md, 10.4).
      3. **If the close arrives, but after the new page's stream opens, or the cause is the refusal itself** (`crates/jig-protocol-engine-clients/src/watches.rs:123-132`, a second stream for one sign-in answered `Conflict`), stop with the cause line: that rule's reading against `protocol/client.md:203` and `:696-697` goes to the designer.
      4. **Unchanged:** ruling 358, point 4; the refusal at `watches.rs:123-132`; the stories' assertions; every deadline and lifetime.
 
+367. **temper-05.s2: the whole process tier passes** (plan scope, temper-05's block of 2026-10-18T13:49:51Z).
+     Ruling 367, kind: plan scope (the director's request of 2026-10-18T11:55Z, under ruling 347). forge-setup's Done when 4 runs the whole process tier, not only the landing story, so this run repairs what stops the tier too. 05.s1 has landed; the signed delivery's stop is a new step, not more of 05.s1.
+
+     1. **temper-05.s2** (`temper/05-s2-process-tier.md`, supplement: 2026-10-18T13:49:51Z): `temper_serve_answers_a_signed_delivery_204` passes again, and so does each test that the 13:49Z run did not reach. Needs: nothing; it runs off jig's chain, beside temper 06 and jig 19. It goes to 05.s1's implementer if that session still runs, and otherwise to a new one.
+     2. **Its order:** first the whole tier once with `--no-fail-fast`, so that every failing test is known before any repair; then the signed delivery alone, traced at the lowest layer (ruling 229): the link, the POST's status, and which of serve's components has not closed after the `SIGTERM`. If two traced runs do not name it, it runs the test alone at each first-parent commit from `7f5ce036f` (the referee's last change) to `origin/main` that touches `crates/`; `3262df8f9` (temper-04.s1's held-call drain) and `63f6174dc` come first.
+     3. **Repair** where the log names it, in temper, one commit for each cause. A cause in jig stops the step, with the log's cause line. Bound: three focused runs and 40 minutes from this unblock; past that bound, it reports what the trace shows. Size: about 100 production lines; past 200, it asks.
+     4. **Proof:** the landing story alone, then the whole tier once, `heavy --gate scripts/proof-one-process.sh`, within 180 s.
+     5. **Unchanged:** 05.s1's Don't list (no assertion, referee check, timeout, fake LLM script or ignore changed to pass; no other Forgejo or runner; jig unchanged); ruling 229; ruling 347 point 3 (each temper increment runs the landing story once before landing).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
