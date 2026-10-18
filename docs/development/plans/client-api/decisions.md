@@ -2616,6 +2616,15 @@ choice would have been the user's (development.md, 10.4).
      2. No split: the work is built and checked, and a second increment would add a gate and a session for the same lines.
      3. The report gives the per-file count again at landing; a file past these counts is named with why.
 
+343. **temper-04.s1's bisect on a diagnostic tree** (process, temper-04's block of 2026-10-18T11:56:37Z).
+     Ruling 343, process, within ruling 339 and ruling 229. The proposal stands. The split showed that the stream room does not own the failure: the story fails the same way at `0c89bb52e`. Ruling 339's bisect could not run, because jig's six commits before `38ae1ba17` lack what that commit adds (`jig_client::DomainLimits.authority`; `DocumentLimits.grants`, `.executors`, `.implications`), and the repin `0c89bb52e` sets those fields. Because a commit that does not build is skipped, no candidate was left to run.
+
+     1. **The diagnostic tree:** this applies at each jig commit before `38ae1ba17`, in a scratch tree of `0c89bb52e`, never committed. Undo only the lines of `0c89bb52e` that name a field or a function that `38ae1ba17` adds, and only those the compiler names: `crates/temper-client-domain/src/limits.rs` (`authority: u32` and `authority,`), `crates/temper/tests/configuration.rs`'s derived document bounds, and `tests/engine/domain/src/walking.rs` and `forge_routes/paths.rs`' authority lines. Everything else in the repin stays. Skein stays at `8a51e10b` and smith at `29fa97c9`. The candidate's two commits stay as they are.
+     2. **The bisect:** test the middle commit first, as `git bisect` would. The base `e0c7b18bd` passes (temper's main), and `38ae1ba17` fails (the split). In order, the six commits are `7d3becac7`, `d2c05819b`, `8ce834ffa`, `899bd8e68`, `21f9d4a8f` and `7d156bd81`, so the first run is at `8ce834ffa`. Run the story alone at seed 7 at each, as `s1-gate-signal-focused.log` did. A commit that still does not build after point 1 is skipped and named, along with the compiler's first error line.
+     3. **The owner:** it is the first commit at which the story fails, with ruling 339's point 3 deciding what follows. If every earlier commit passes, the owner is `38ae1ba17` together with the repin's repairs for it. In that case, look for the cause in the derived bounds that the repin sets (`authority`, and the overrides `authority.grants` and `tasks.authority_grants` = 12): compare them with jig's own reference at `38ae1ba17` (`jig-test-service`, `ops`), as README "Pins" says. Report the commit, its subject, and the cause line from the focused log.
+     4. **Bound:** at most four further focused runs, and 30 minutes from this unblock. Past that bound, report what the runs show.
+     5. **Unchanged:** ruling 339's points 2, 3 and 5; the referee's check; every production deadline; ruling 229 for the gate and the proof. No undo from point 1 reaches a commit.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
