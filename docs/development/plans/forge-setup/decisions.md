@@ -947,6 +947,43 @@ run are appended after "For the user".
      Unchanged: checks (a) to (d) and (f) to (h), the guide's text (the person's walk pushes no `temper/` branch), 14.2's
      Files, Size and Don't; ruling 147's forms rule, and the landing report's lines for the pages with no `_csrf`.
 
+152. **11.1 against main after client-api's fix** (re-check, temper-11.1's block of 2026-10-18T11:20:58Z).
+     Ruling 152, the re-check of temper 11 against `main` after client-api's fix of the landing story (its temper-04.s1
+     and temper-05.s1; fe4978f22 and acc7496e2), at temper fe4978f22, with the process tier run once.
+
+     1. **11.1 goes on, restarted from `main`** in a fresh thread from `sessions/temper-11.md` (11:34Z's point 4). Ruling
+        139's wait is over: `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart` passes on `main` (22.4 s).
+     2. **What 14.1 already did** (7f5ce036f): `support::owned::application` holds the example's `webhooks` listener and
+        `forge-1/webhook_secret`, `Owned::tier()` picks the address, and `forgejo::configuration` keeps them. So:
+        - `Forge::Throwaway` gains no `webhooks` field; `owned::tier_configuration` stays as it is; `forgejo::configuration`
+          sets no `application.webhooks`. Ruling 141's "after `owned::document`" text is void.
+        - `Throwaway::start` adds `directory: PathBuf` and `webhooks: Option<SocketAddr>`, read from the scratch's
+          `config.json`, `application.webhooks.listener.socket` (`None` when `application.webhooks` is `null`, as 11.2's
+          control writes it).
+        - `Throwaway::start`'s users are `process.rs`'s `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`,
+          its adopt story, `a_native_chat_reaches_the_model` (new), and `live.rs`'s; ruling 139's "Users gain the box's
+          tests … which call `tier_configuration`" is stale: they call `boxed_example`.
+     3. **From the branch `forge-setup/temper-11-1` (2edde3617), keep** its test, `Delivery` and `receive` (with the `Read`
+        import), and `forgejo.rs`'s fields and three methods; **drop** its `mod.rs`, `owned.rs` and `configuration` hunks.
+        The re-check applied exactly that on `main`: clippy `-D warnings` clean, and
+        `a_push_is_delivered_signed_with_the_secret_reconcile_drew` passed in 4.99 s. Start from `main`, and take those
+        parts from the branch with `git checkout 2edde3617 -- <file>` and an edit, not a rebase.
+     4. **Put back the tier's `root.brief.gather_ms` 5000** in `forgejo::configuration` (the steer of 12:49Z, point 1).
+     5. **Size:** the corrected 11.1 adds about 92 support lines against its Size of 30 (within the README's 3.5 times);
+        11.2 about 22 against "about 18".
+     6. **Red on `main`, not 11.1's:** at fe4978f22, `temper_serve_answers_a_signed_delivery_204`,
+        `temper_serve_answers_an_unknown_forge_404` ("the referee failed the real loop: webhook delivery or drain did not
+        finish", at 30 s) and `temper_serve_prints_its_link_and_drains_on_a_signal` ("signal sent: true … exit: None").
+        All three passed at 13:03Z on 14.s1's run (`logs/20261018T130310-45.log`), at 0.04 s each; between that base and
+        fe4978f22 only client-api's code landed. They go to client-api's owner, through the director. 11.1 runs the process
+        tier once with `--no-fail-fast` before landing (ruling 148's rule, as ruling 149 amends it): these three may stay
+        red, each named in the commit body with this cause; any other red story is a block.
+     7. Ruling 148 said "temper has no `scripts/check.sh` yet"; it has had one since 796d50279, and every landing runs it.
+        The gate check of b1d2276's point 6 is still not added: two steps are left.
+
+     Unchanged: 11.1's Proof and Done when; 11.2 as ruling 144 gives it; the steers' points in force (12:49Z's 1-3,
+     11:34Z's 9).
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
