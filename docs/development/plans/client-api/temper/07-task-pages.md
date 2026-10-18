@@ -436,6 +436,10 @@ them alone, stay until the step the answer gives, which meets Done
 when's two greps. Ruling 391: the reference UI's
 child stays with them, and what names it, since the renderers borrow it
 (`Ui::borrow`); 07.4 lands now only what compiles with the child kept.
+Ruling 392: so does any other use of `jig-client-view` that 07.4 cannot
+drop without the child, the renderers or a change in jig (the test
+transport of `jig-client-world` takes `jig_client_view::Limits`),
+listed in the report; the answer's step drops them.
 Removes: the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,

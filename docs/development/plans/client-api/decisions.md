@@ -3133,6 +3133,13 @@ choice would have been the user's (development.md, 10.4).
         Today's tree and words stay (ruling 388, point 3).
      5. **If nothing of 07.4 is left to land** once the child stays, say so in the report and wait, with the draft on its branch.
 
+392. **temper 07.4 keeps the test transport's view Limits until the answer's step** (cross-session scope, temper 07.4's block of 2026-10-18T19:18:31Z).
+     Ruling 392, kind: cross-session scope. Keep the test-only dependency for now: `temper-client-world` keeps passing `&jig_client_view::Limits` to `jig-client-world`'s transport, as on `origin/main`, until the step the designer's answer gives. No jig change before that answer.
+
+     1. **Why not jig now:** jig's test transport takes the reference UI's limits. At temper's jig pin, `tests/client/src/joint/packets.rs:13` and `joint/read_packets.rs:11` import `jig_client_view::Limits`, which `document`, `stream`, `people_reply` and `read_with_codec` take (Checked). Fixing that is a change in jig. It goes with the step the answer gives, so that jig's chain is not lengthened twice. The fact goes to the designer with `question.md`.
+     2. **The rule for a further one:** a use of `jig-client-view` that 07.4 cannot drop without the child, the renderers or a change in jig stays as on `origin/main`. List each in the report (file, line, the jig item it needs), and go on with no block. The answer's step drops them all: Done when's two greps wait for it.
+     3. Rulings 388 (point 3), 389 and 391 stand: today's tree and words stay; land what compiles with the child kept, at up to 400 production lines added.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
