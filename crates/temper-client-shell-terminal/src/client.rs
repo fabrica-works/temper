@@ -322,6 +322,7 @@ impl NativeClient {
     fn outputs(&mut self) {
         while let Some(request) = self.out.pop() {
             match route::down(request) {
+                Down::Shell(jig_client::Request::ServiceCredential { .. }) => {}
                 Down::Shell(request) => {
                     if let jig_client::Request::Exchange { exchange, message, .. } = &request {
                         let kind = match message {

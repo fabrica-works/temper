@@ -158,6 +158,7 @@ impl App for Temper {
                     | jig_client::Request::CloseStream
                     | jig_client::Request::Told { .. }
                     | jig_client::Request::SignOut
+                    | jig_client::Request::ServiceCredential { .. }
                     | jig_client::Request::Down { down: jig_client::Down::Save { .. } | jig_client::Down::Erase { .. } },
             }
             | Request::Show { .. }
