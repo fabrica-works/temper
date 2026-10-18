@@ -735,7 +735,8 @@ Each command runs once, after the session's last increment lands.
   '^jig-19\.' | sort -u | wc -l` prints 5.
 - `git -C ~/src/rust/jig show origin/main:Cargo.lock | grep -o
   'skein.git#[0-9a-f]*' | sort -u` prints one line, the commit of jig
-  12.2's move, and with `<skein-01.s2>` the commit of "Choices"'
+  17.3's move (`0f093bb74`, for `skein_lib::sha256`; ruling 302, as
+  ruling 383 reads it), and with `<skein-01.s2>` the commit of "Choices"'
   command, `git -C ~/src/rust/skein merge-base --is-ancestor
   <skein-01.s2> <that commit>` succeeds.
 - `git -C ~/src/rust/jig grep -n -e wasm32-unknown-unknown -e 'profile

@@ -3047,6 +3047,9 @@ choice would have been the user's (development.md, 10.4).
      - `an_empty_response_finishes_its_http_reply` is the focused test (ruling 229), failing at 0.002 s before the repair, as the report gives it.
      - **From here, no stop for each new cause on this story.** A further cause that the power-loss story or the gate names in production outside 19.5's Files is repaired the same way, under ruling 380's points 3 and 4: the trace names it; its focused test fails first; one commit for each; each named in the report. All of them, ruling 381's 15 lines included, stay within 40 production lines; past 40, or a cause whose repair the trace does not name, stop with the count and the cause line.
 
+383. **jig 19's Done when names jig 17.3's skein pin** (plan defect, jig 19's block of 2026-10-18T17:29:05Z).
+     Ruling 383, kind: plan defect. Accepted, as proposed: jig 19's Done when names the skein pin jig 17.3 set, `0f093bb74` (jig `82c201d29`, Step `jig-17.3`, for `skein_lib::sha256`, under ruling 302), in place of "the commit of jig 12.2's move". Its other half stands: skein-01.s2's landing is an ancestor of that pin. jig 19 moved skein in no commit, as its "No repin" says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
