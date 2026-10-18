@@ -565,7 +565,7 @@ another host polls alone (setup.md, section 15).
   address}` (configuration.md, section 3): a socket address on loopback
   (in `127.0.0.0/8`, or `::1`), plaintext HTTP on skein's HTTP server, a
   listener of the forge component's own, apart from the clients'
-  listener (`../client.md`, section 8). It takes `POST` on one path per
+  listener (`../client/README.md`, section 8). It takes `POST` on one path per
   forge, `/hooks/<number>`, the forge's `number`, one request at a time
   per connection, kept alive.
 - **Each forge's secret,** its `webhook_secret`: a member of its

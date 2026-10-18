@@ -168,8 +168,8 @@ Not cut now. A later extraction separates the following in
 
 - **The routing's start values.** The component reads no file in
   skein. Default: temper's routing reads the token's and the secret's
-  files, as configuration.md, section 6 reads a secret's file, and hands
-  over their values.
+  files, as `protocol/configuration.md`, section 6 reads a secret's
+  file, and hands over their values.
 - **A temper word other than `temper`.** Default: none. A deployment
   that shares a forge with another temper deployment is told apart by
   its keys' namespace, as now.

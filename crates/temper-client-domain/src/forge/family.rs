@@ -1,4 +1,4 @@
-//! Forge records and the bounded attempts owned by their routing (client.md, 4.6).
+//! Forge records and the bounded attempts owned by their routing (client/README.md, 4.6).
 #![deny(
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,

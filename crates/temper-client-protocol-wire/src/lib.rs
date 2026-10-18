@@ -1,4 +1,4 @@
-//! The forge family's client records (client.md, sections 4.6 and 8).
+//! The forge family's client records (client/README.md, sections 4.6 and 8).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
@@ -10,9 +10,9 @@ pub mod v1;
 use alloc::boxed::Box;
 use skein_lib::Writer;
 
-/// The forge connector's number on jig's client wire (client.md, 4.6).
+/// The forge connector's number on jig's client wire (client/README.md, 4.6).
 pub const FORGE: u16 = 1;
-/// The application's stable owners on jig's client wire (client.md, 4.6).
+/// The application's stable owners on jig's client wire (client/README.md, 4.6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
     /// The forge's requests and records.
@@ -37,10 +37,10 @@ pub const fn owner(number: u16) -> Option<Owner> {
         _ => None,
     }
 }
-/// Every record's version, served by both ends (client.md, 4.6).
+/// Every record's version, served by both ends (client/README.md, 4.6).
 pub const CLIENT_VERSION: u32 = 1;
 
-/// A side's bounds on the forge family's fields (client.md, 4.4 and 4.6).
+/// A side's bounds on the forge family's fields (client/README.md, 4.4 and 4.6).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Bounds {
     pub field_bytes: u32,

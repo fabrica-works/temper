@@ -1,4 +1,4 @@
-//! The clients child and secret-free root handoffs (client.md, 2 and 8; jig's
+//! The clients child and secret-free root handoffs (client/README.md, 2 and 8; jig's
 //! protocol/service.md, 3).
 use crate::settings::Seeds;
 use alloc::boxed::Box;

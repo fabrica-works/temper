@@ -81,7 +81,7 @@ section 7).
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
-  client parts but the adoption form (`../client.md`, section 4).
+  client parts but the adoption form (`../client/README.md`, section 4).
 - **Written** in the root's decisions, as the forge asks: its `Save` and
   `Erase` become the root's `Write::Save(Record::Forge { row })` and
   `Write::Erase(Key::Forge(key))`, which the routing encodes into jig's
@@ -233,6 +233,6 @@ Within the suites' budgets (`../testing.md`, section 2):
   release. Default: jig's (jig's `protocol/store.md`, section 16), a store
   of another version refused.
 - **Indexes for the forge's client parts,** once panels are served
-  (`../client.md`, section 4): a family of small rows per view, as jig's
+  (`../client/README.md`, section 4): a family of small rows per view, as jig's
   indexes are (jig's `protocol/store.md`, 7.4). Default: none until
   they are served.

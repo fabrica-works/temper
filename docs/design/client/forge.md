@@ -6,14 +6,16 @@ project's landing queues, approvals at a head, the forge's holds in
 words, repositories with their health and landing rules, goals,
 findings and landings as the forge shows them, and the forge's part of
 the deployment. jig's pages and cards (jig's `client/domain/pages.md`
-and `client/domain/objects.md`) leave a slot for each part a connector
-shows (jig's `client/domain/root.md`, section 6); this document says
-what the forge shows in those slots and on temper's own pages, `Changes`
-and `Adopt` (`../../client.md`, 3.5), in temper's words. The forge's
-client family, its words for resources and kinds, and its adoption form
-are `../../client.md`, section 4. Each part shows what
-`../../domain/forge.md` keeps or reads, and links to the forge for code.
-What is still open is listed in section 10.
+and jig's `client/domain/objects.md`) leave a slot for each part a
+connector shows (jig's `client/domain/root.md`, section 6), and
+temper's pages and cards, its own after them, show the same parts
+(`README.md`, section 1); this document says what the forge shows in
+those slots and on the pages only temper has, `Changes` and `Adopt`
+(`README.md`, 3.5), in temper's words. The forge's client family, its
+words for resources and kinds, and its adoption form are `README.md`,
+section 4. Each part shows what `../domain/forge.md` keeps or reads,
+and links to the forge for code. What is still open is listed in
+section 10.
 
 ## 1. In one page
 
@@ -22,9 +24,9 @@ What is still open is listed in section 10.
   result, an effect, an outbox entry, a hold, a project's part, the
   deployment's part) on a task's page, in a chat, in the inbox, on a
   project's pages and on the deployment's (section 9). A part the
-  engine does not serve says "Shown on the forge." (`../../client.md`,
+  forge's side does not read says "Shown on the forge." (`README.md`,
   4.2).
-- **The first milestone needs two of them** (`../../README.md`, section
+- **The first milestone needs two of them** (`../README.md`, section
   2): a change's result and its hold, in the forge's words, with a link
   to each on the forge (2.5).
 - **A change is shown as its way to landing,** one step at a time, each
@@ -57,7 +59,7 @@ plan, the inbox, the `Changes` page.
 
 ### 2.1 Its way to landing
 
-The steps of `../../domain/forge.md`, 8.2, with the one it is at and
+The steps of `../domain/forge.md`, 8.2, with the one it is at and
 why:
 
 ```
@@ -84,12 +86,12 @@ producing ─ opening ─ checking ─ gating ─ queued ─ first ─ landing �
 
 - **Its pull request:** number, title, head and base, state,
   mergeability, or that it is not known yet while the forge settles it
-  (`../../domain/forge.md`, 5.2); links to it, its diff and its files on
+  (`../domain/forge.md`, 5.2); links to it, its diff and its files on
   the forge.
 - **CI on its head:** the combined state and each context's, with a link
   to a failing job, and the failed step and the end of its log a repair
-  was given, cut as the repair got it (`../../domain/forge.md`, 8.4).
-- **Its gates** (`../../domain/forge.md`, 8.3): each with its kind (a
+  was given, cut as the repair got it (`../domain/forge.md`, 8.4).
+- **Its gates** (`../domain/forge.md`, 8.3): each with its kind (a
   review by a lens, a person's approval, checks), blocking or advisory,
   who asked for it (the change, the project's landing rule, its plan),
   its verdict and the head it was given at, and whether it carries over
@@ -98,7 +100,7 @@ producing ─ opening ─ checking ─ gating ─ queued ─ first ─ landing �
 - **Its requirements:** the landing rule's, each met, waiting (and for
   what) or refused at the current head: CI at the head, up to date with
   the branch, its blocking gates, approvals on the forge by so many
-  people of a role (section 4; `../../domain/forge.md`, 8.7).
+  people of a role (section 4; `../domain/forge.md`, 8.7).
 - **Its heads,** in order, each with what made it (produced, a repair, a
   clean update, a resolution) and its CI and verdicts, so the person can
   see why a gate is asked again: a repair's head asks every gate again,
@@ -123,13 +125,13 @@ producing ─ opening ─ checking ─ gating ─ queued ─ first ─ landing �
   panel says what the forge will do: its pull request closed with a
   comment saying why, its branch deleted, its commits still readable
   under the closed pull request; a merge already sent may still land,
-  and then it ends landed (`../../domain/forge.md`, 8.6).
+  and then it ends landed (`../domain/forge.md`, 8.6).
 
 ### 2.4 A chat's small change
 
 A chat that makes a small change itself delivers it to its run's own
 branch, and delegates a change task handed that branch
-(`../../domain/forge.md`, 8.1 and section 11). In the conversation the
+(`../domain/forge.md`, 8.1 and section 11). In the conversation the
 delegation shows as the change's chip (jig's `client/domain/objects.md`,
 section 10), its phase the panel's step in words, following it through
 CI, its gates and its queue to landing while the chat carries on. The
@@ -138,7 +140,7 @@ chat tells the person.
 
 ### 2.5 Its result, and why it stopped
 
-What the first milestone needs of the forge's parts (`../../README.md`,
+What the first milestone needs of the forge's parts (`../README.md`,
 section 2, steps 6 and 7):
 
 - **Its result,** a connector's result (jig's
@@ -154,7 +156,7 @@ section 2, steps 6 and 7):
   wherever it shows: the change's page, the chat, the inbox's
   escalation.
 - **A repository named by owner and name,** in place of its numbers
-  (`../../client.md`, 4.1), from the same reads.
+  (`README.md`, 4.1), from the same reads.
 
 Beyond it: the way to landing step by step (2.1 to 2.3), the queues
 (section 3), health (5.2), what each act on drift would do (6.2), the
@@ -162,8 +164,8 @@ outbox and the deployment's part (5.4).
 
 ## 3. Changes and landing queues
 
-temper's `Changes { project }` page (`../../client.md`, 3.5): a
-project's changes, by landing branch (`../../domain/forge.md`, section
+temper's `Changes { project }` page (`README.md`, 3.5): a
+project's changes, by landing branch (`../domain/forge.md`, section
 9):
 
 - **The queue:** the ready changes in order, each with its goal and
@@ -172,7 +174,7 @@ project's changes, by landing branch (`../../domain/forge.md`, section
   window is marked as going ahead of those ready after it.
 - **The order's rule,** in a line: "by goal priority, then by when each
   became ready; ready for over WINDOW goes first", WINDOW the forge's
-  queue window (`../../protocol/configuration.md`, section 7).
+  queue window (`../protocol/configuration.md`, section 7).
 - **Not ready yet,** by step: producing, checking, gating, repairing,
   resolving.
 - **Held,** each with its reason (section 6).
@@ -189,10 +191,10 @@ project's changes, by landing branch (`../../domain/forge.md`, section
 ## 4. Approvals
 
 A person approves a change in one of two ways, as its gates and its
-project's landing rule ask (`../../domain/forge.md`, 8.3 and 8.7).
+project's landing rule ask (`../domain/forge.md`, 8.3 and 8.7).
 Neither is temper's default: a person's approval is a gate a plan or a
 change is given when a person asks for it, or a project's rule
-(`../../README.md`, section 2).
+(`../README.md`, section 2).
 
 - **In the client:** a person task addressed to the project's
   maintainers, one of whom takes it, whose contract is an approval of
@@ -214,7 +216,7 @@ change is given when a person asks for it, or a project's rule
 
 If the change's head moves while the card is open, the card says so. A
 clean update temper made carries the approval where its gate counts
-clean updates (its freshness, `../../domain/forge.md`, 8.3); any other
+clean updates (its freshness, `../domain/forge.md`, 8.3); any other
 new head asks again, as a new person task at that head, and the old card
 says it has been replaced.
 
@@ -222,11 +224,11 @@ says it has been replaced.
 
 ### 5.1 Adopting one
 
-The adoption form is `../../client.md`, 4.4, on temper's `Adopt` page,
+The adoption form is `README.md`, 4.4, on temper's `Adopt` page,
 and its outcome 4.7. With the forge's documents served, the form chooses
 among the configured forges by name, says whether the project has a
 home, and, before the adoption is confirmed, shows what temper found
-there (`../../domain/forge.md`, section 4): temper's permission, the
+there (`../domain/forge.md`, section 4): temper's permission, the
 merge styles the repository allows and so whether it may merge, the
 protection on the landing branch (or that it could not read it), its
 webhooks or none, CI or none, the people it knows there with the role
@@ -259,22 +261,22 @@ deployment's page):
   the settings' resources (jig's `client/domain/pages.md`, 6.5): its
   role, whether it is the project's home, its landing branch, temper's
   branch prefix there, its merge style, CI or the checks that stand for
-  it, what temper may do there in `../../client.md`, 4.7's words, and its
+  it, what temper may do there in `README.md`, 4.7's words, and its
   health (5.2). Adopting one is the form of 5.1; where the form lives is
-  `../../client.md`, section 11's.
+  `README.md`, section 11's.
 - **The landing rules,** in the policy's requirements (jig's
   `client/domain/pages.md`, 6.5), per pattern of landing branches, the
   deployment's and the project's, in words: "into main in acme/shop: CI
   passed at the head; up to date with main; a review for memory safety,
   at the head or a clean update of it; two maintainers' approvals on the
-  forge" (`../../domain/forge.md`, 8.7).
+  forge" (`../domain/forge.md`, 8.7).
 
 ### 5.4 The deployment's page
 
 The forge's part of the deployment's connectors (jig's
 `client/domain/pages.md`, section 7), for each configured forge: its
 request budget and what uses it (fresh reads, writes, keeping up, the
-slow pass; `../../domain/forge.md`, 5.4); a pause for its rate, and
+slow pass; `../domain/forge.md`, 5.4); a pause for its rate, and
 until when; its outbox, the effects waiting and those uncertain, being
 looked for; and when each repository's webhooks were last heard.
 
@@ -286,7 +288,7 @@ is about, by whom and when where another hand did it, a link to each on
 the forge, and what each act will do. A release resets the change's
 repairs, resolutions and updates, and counts its stall from the release.
 Nothing on the forge is written over until the person decides
-(`../../domain/forge.md`, 8.4 and 8.5).
+(`../domain/forge.md`, 8.4 and 8.5).
 
 ### 6.1 The change's own
 
@@ -297,13 +299,13 @@ Nothing on the forge is written over until the person decides
 | resolutions spent | the conflicts resolved of their limit, and the base it conflicts with | takes it back, its resolutions counted again |
 | updates spent | the updates made of their limit | takes it back, its updates counted again |
 | an approval declined | who declined it, at which head, and why | amended to drop the approval and released, in one request; released alone, it is held again at the same head |
-| a requirement refused at the merge (`../../domain/forge.md`, 8.7) | which of its landing rule's requirements refused, at which head: CI failed, a gate asked for changes, a person's review on the forge asked for changes, by whom | takes it back, judged again at its next merge: held again while the refusal stands |
+| a requirement refused at the merge (`../domain/forge.md`, 8.7) | which of its landing rule's requirements refused, at which head: CI failed, a gate asked for changes, a person's review on the forge asked for changes, by whom | takes it back, judged again at its next merge: held again while the refusal stands |
 | a delegate or a write failed for good | which: its producing task's failure, or the forge's refusal of a write (a protected branch, a forbidden write) | takes it back, to decide afresh |
-| a write uncertain, of a kind that cannot be recovered (`../../domain/forge.md`, section 6) | the write, that it may or may not have been made, and where to look on the forge: the branch, the pull request's reviews or comments, the issue | makes it again, or goes on without it, as the person says (jig's `client/domain/objects.md`, section 5) |
+| a write uncertain, of a kind that cannot be recovered (`../domain/forge.md`, section 6) | the write, that it may or may not have been made, and where to look on the forge: the branch, the pull request's reviews or comments, the issue | makes it again, or goes on without it, as the person says (jig's `client/domain/objects.md`, section 5) |
 
 ### 6.2 Drift
 
-A held change's card for drift (`../../domain/forge.md`, 8.5; jig's
+A held change's card for drift (`../domain/forge.md`, 8.5; jig's
 `domain/connectors.md`, section 11): what changed on the forge, by whom
 and when, and a link to it there.
 
@@ -319,7 +321,7 @@ and when, and a link to it there.
 
 ### 7.1 A goal's issue
 
-- **In its project's home repository** (`../../domain/forge.md`, section
+- **In its project's home repository** (`../domain/forge.md`, section
   12): the goal's page links to it, says when it was last written, and
   that it is a projection: what people write there is not read, and the
   client is where temper is reached.
@@ -332,11 +334,11 @@ On a goal's page, with what it hears (jig's `client/domain/pages.md`,
 5.2): each landing in its repositories, marked as its own, overlapping
 its work (it woke the goal), not overlapping (kept), or unknown, as for
 a landing too large to compare (it woke the goal)
-(`../../domain/forge.md`, 7.3).
+(`../domain/forge.md`, 7.3).
 
 ### 7.3 Findings
 
-The issues agents filed (`../../domain/forge.md`, section 12): a bug
+The issues agents filed (`../domain/forge.md`, section 12): a bug
 found while exploring, a follow-up a review raised, a flaky test. They
 are the forge's part of a project's page (jig's
 `client/domain/pages.md`, 6.1):
@@ -354,7 +356,7 @@ are the forge's part of a project's page (jig's
 ## 8. Taking part
 
 What the forge shows of work on what others own
-(`../../domain/forge.md`, sections 13 and 14), possible with the parts
+(`../domain/forge.md`, sections 13 and 14), possible with the parts
 above:
 
 - **A participating object** (an outside contribution, an issue others
@@ -369,35 +371,35 @@ above:
 
 ## 9. What each part is served from
 
-Each part is the forge's family's (`../../client.md`, section 4): read
+Each part is the forge's family's (`README.md`, section 4): read
 or watched by the forge's client side through the family's own reads
 and subjects, under the forge's owner number, each naming its scope, a
 project or the deployment (jig's `client/domain/contract.md`, 7.5; jig's
 `client/domain/root.md`, section 7), their records in
-`temper-client-protocol-wire` beside `Adopt` (`../../client.md`, 4.6).
+`temper-client-protocol-wire` beside `Adopt` (`README.md`, 4.6).
 The first are a change's result and its hold (2.5).
 
 | The client | jig's part and slot | The domain |
 |---|---|---|
-| a change's way to landing, its gates, requirements and heads | a panel, on its task's page | `../../domain/forge.md`, section 8 |
-| a change's result | a result, on its task's page, in a chat, in an update | `../../domain/forge.md`, 8.2 and 8.6 |
-| its holds | a hold, on the held card | `../../domain/forge.md`, 8.4 and 8.5; jig's `domain/connectors.md`, 4.3 and section 11 |
-| what a proposed write would do; the outbox | an effect, on a proposal card; an outbox entry | `../../domain/forge.md`, section 6 |
-| queues, paused and held | temper's `Changes` page | `../../domain/forge.md`, section 9 |
-| approvals | a person task's card; a panel | `../../domain/forge.md`, 8.3 and 8.7; jig's `domain/people.md`, section 8 |
-| adoption, repositories, health, landing rules | temper's `Adopt` page; a project's part | `../../domain/forge.md`, sections 4 and 5, and 8.7; jig's `domain/connectors.md`, section 12; jig's `domain/authority.md`, section 10 |
-| goals' issues, landings as news, findings | a project's part; a goal's page | `../../domain/forge.md`, sections 7 and 12 |
-| the forge itself | the deployment's part | `../../domain/forge.md`, 5.4 |
+| a change's way to landing, its gates, requirements and heads | a panel, on its task's page | `../domain/forge.md`, section 8 |
+| a change's result | a result, on its task's page, in a chat, in an update | `../domain/forge.md`, 8.2 and 8.6 |
+| its holds | a hold, on the held card | `../domain/forge.md`, 8.4 and 8.5; jig's `domain/connectors.md`, 4.3 and section 11 |
+| what a proposed write would do; the outbox | an effect, on a proposal card; an outbox entry | `../domain/forge.md`, section 6 |
+| queues, paused and held | temper's `Changes` page | `../domain/forge.md`, section 9 |
+| approvals | a person task's card; a panel | `../domain/forge.md`, 8.3 and 8.7; jig's `domain/people.md`, section 8 |
+| adoption, repositories, health, landing rules | temper's `Adopt` page; a project's part | `../domain/forge.md`, sections 4 and 5, and 8.7; jig's `domain/connectors.md`, section 12; jig's `domain/authority.md`, section 10 |
+| goals' issues, landings as news, findings | a project's part; a goal's page | `../domain/forge.md`, sections 7 and 12 |
+| the forge itself | the deployment's part | `../domain/forge.md`, 5.4 |
 
 ## 10. Open questions
 
 - **A change's files in the client:** whether the panel lists the files a
   change touches, from the connector's read, short of showing the diff.
-- **Conflicts seen early** (`../../domain/forge.md`, section 20):
+- **Conflicts seen early** (`../domain/forge.md`, section 20):
   warning two goals whose open changes conflict before either lands, as
   a panel on both.
 - **A queue's throughput:** if landings are ever batched, how a batch and
   its bisection show.
 - **A person's approval as a rule,** posted on the forge as the person
-  (`../../README.md`, section 8), which the approval's card would then
+  (`../README.md`, section 8), which the approval's card would then
   say.

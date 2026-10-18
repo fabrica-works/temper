@@ -1,4 +1,4 @@
-//! Exhaustive child askers (client.md, 3.3).
+//! Exhaustive child askers (client/README.md, 3.3).
 /// A child owning every handle and request it gives the shared client.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {

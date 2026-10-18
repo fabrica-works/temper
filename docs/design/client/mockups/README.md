@@ -1,4 +1,6 @@
-# Temper web mockups
+# Mockups of temper's client
+
+These mockups are reference material for temper's client (`../README.md`): its look and the order of its pages' parts, not its contract. Where they and the client's documents differ, the documents hold.
 
 Open [chats.html](chats.html) for the chat entry screen, or [index.html](index.html) for a conversation. The other views are [inbox.html](inbox.html), [board.html](board.html), [task.html](task.html), and [changes.html](changes.html). On the goal page, agent subtasks open [agent-task.html](agent-task.html) with their individual transcripts. Each file opens directly in a browser; no build step is needed.
 
@@ -13,11 +15,9 @@ Forge change links from the goal page point to illustrative GitHub pull request 
 For state to carry reliably between pages, serve this directory locally and open `http://localhost:8765/chats.html`:
 
 ```sh
-python3 -m http.server 8765 --directory docs/design/web/mockups
+python3 -m http.server 8765 --directory docs/design/client/mockups
 ```
 
 Several sample tasks and chats have no mockup page of their own.
-
-The layout follows temper's client (`../../client.md`) on jig's pages: the inbox is home, a chat is a task with its conversation first, the same pending proposal appears in the chat and inbox, goals are ordered on a board, and the forge contributes a changes view.
 
 The only external asset is the optional Google Fonts stylesheet. System fonts are used if it cannot load.

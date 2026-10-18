@@ -74,7 +74,7 @@ document says what temper adds. What is open is listed in section 11.
     `engine.hosts.workers` names that one worker;
   - `engine.connectors` is exactly `[1]`: the forge connector, temper's
     one connector, whose number both ends of the client's wire fix as
-    `temper-client-protocol-wire`'s `FORGE` (`../client.md`, 4.6);
+    `temper-client-protocol-wire`'s `FORGE` (`../client/README.md`, 4.6);
   - the worker's `agent` paths are absolute (section 5).
 
   The worker's `agent` names temper's own binary (section 5), which no
@@ -88,7 +88,7 @@ document says what temper adds. What is open is listed in section 11.
   goal (template 2, label 2), as jig's `protocol/configuration.md`,
   3.1 gives them, the chat's executor the charter chats run under;
   temper defines no template of its own. Its client's lists filter on
-  those labels (`../client.md`, 3.5), and a project's policy may override
+  those labels (`../client/README.md`, 3.5), and a project's policy may override
   their defaults as jig's allows.
 - **A project's permission mapping,** jig's `roles` of each of
   `engine.projects` (jig's `domain/people.md`, section 4), names the
@@ -195,11 +195,11 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 `Config.forge_charter`.
 
 **`clients`:** the clients' listener, which `temper-service` owns
-(`../client.md`, section 8):
+(`../client/README.md`, section 8):
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
-| `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (`../client.md`, section 7) |
+| `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (`../client/README.md`, section 7) |
 
 **`limits`:** temper's profile and overrides (section 7).
 
@@ -436,7 +436,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   must be within what temper's client takes: its client takes
   `jig-client`'s limits from jig's small profile with the same
   `documents.` overrides the owned example's `engine.limits` names
-  (`../client.md`, section 2; setup.md, 8.1). The engine cuts each
+  (`../client/README.md`, section 2; setup.md, 8.1). The engine cuts each
   text to its bound and says so (jig's `client/domain/contract.md`,
   5.3). It checks none of this at start: it serves whatever client the
   deployment lets in, whose limits are the client's. A test holds the
@@ -465,7 +465,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   name them. temper's client takes a path's segments, 9, apart from its
   rows (jig's `client/domain/client.md`, section 14), so a page of the
   forge's work is never refused for a path, and a long path shows cut,
-  with jig's mark (`../client.md`, 5.4).
+  with jig's mark (`../client/README.md`, 5.4).
 - **The forge's authorities fit a document.** jig's documents carry an
   authority's lists whole, with as many entries as the engine admits in
   each, and neither cut nor refuse a document or an offer for one (jig's
@@ -475,7 +475,7 @@ top-level `workers`, in the same order; standalone has one. Each:
   `client/domain/client.md`, section 14): the most the process tier and
   the owned example admit in a list, their `authority.grants` and
   `tasks.authority_grants` (setup.md, 8.1). A long authority shows
-  in part, with jig's mark (`../client.md`, 5.4). The test above holds
+  in part, with jig's mark (`../client/README.md`, 5.4). The test above holds
   the engine's bounds on an authority's lists to temper's client's.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
@@ -531,7 +531,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **Repositories are never configured.** A person adopts each at runtime
   through the client, by the forge's number, the owner and the name, and
   the store keeps it (jig's `protocol/configuration.md`, section 3;
-  `../client.md`, section 4).
+  `../client/README.md`, section 4).
 - **What a change reaches,** after its restart: a forge's `git`, every
   remote from the next assignment on; a forge's `api_token` and `user`,
   checked again; a forge's `webhook_secret`, and the webhooks' listener,
@@ -542,8 +542,8 @@ top-level `workers`, in the same order; standalone has one. Each:
 ## 9. The client's arguments
 
 - **`temper open DIRECTORY LINK_OR_ADDRESS`** takes no configuration
-  file: its two arguments are `../client.md`, 6.1's, and its limits are
-  constants of temper's client (`../client.md`, section 2).
+  file: its two arguments are `../client/README.md`, 6.1's, and its limits are
+  constants of temper's client (`../client/README.md`, section 2).
 - **`temper ctl DIRECTORY ...`** takes none either (`../tools.md`,
   section 8).
 - **`temper sign-in CONFIG.json ACCOUNT`** reads the same document as

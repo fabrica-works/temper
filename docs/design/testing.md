@@ -66,7 +66,7 @@ world to drive.
 
 The tiers in the two suites keep the budgets of 6.1; the process and the
 live tiers, outside them, keep their own (2.6, 2.7). A browser tier
-comes with temper's browser shell (section 9; web/architecture.md).
+comes with temper's browser shell (section 9; client/browser.md).
 
 ### 2.1 System worlds
 
@@ -82,7 +82,7 @@ temper's client joined to the engine's root, `tests/client`
 (`temper-client-world`), is a system world too: temper's client root
 and view, skein's fake person reading the view's tree, jig's client
 worlds' faults and jig's check, and temper's engine root on the engine world's
-store, hosts and forge (client.md, section 10). Section 6.3 says why it
+store, hosts and forge (client/README.md, section 10). Section 6.3 says why it
 is joined from the first increment.
 
 ### 2.2 Protocol worlds
@@ -211,7 +211,7 @@ and 10).
   - the fake forge as a service, its protocol layer over its domain
     (4.2);
   - people: skein's fake person in front of temper's terminal client,
-    its domain, view and jig's native transport (client.md, section 2;
+    its domain, view and jig's native transport (client/README.md, section 2;
     4.4).
 - **Stories:**
   - a person signs in by the link `temper serve` prints, and a chat is
@@ -261,8 +261,8 @@ and 10).
   - real git, the machine's, at the absolute path configuration gives it
     (protocol/configuration.md, section 4; protocol/git.md, section 3);
   - the person: skein's fake person in front of temper's client, over
-    jig's native transport (client.md, section 2); and, in a test of its
-    own, `temper open` itself with stdin and stdout piped (client.md,
+    jig's native transport (client/README.md, section 2); and, in a test of its
+    own, `temper open` itself with stdin and stdout piped (client/README.md,
     sections 6 and 10).
 - **Its Forgejo is owned,** provisioned by the setup's commands
   (protocol/setup.md, 13.4): the configuration's one forge is owned (protocol/setup.md,
@@ -653,9 +653,9 @@ drawn from the seed.
   (skein's `ui.md`, 17.1), reading the tree temper's view makes and
   acting on it, with jig's client test kit's faults and check (jig's
   `client/domain/testing.md`), in `tests/client`; and the same person in
-  front of temper's terminal client (client.md, section 2), in the
-  one-process world and the process tier (client.md, section 10).
-  temper has no fake person of its own (client.md, section 9).
+  front of temper's terminal client (client/README.md, section 2), in the
+  one-process world and the process tier (client/README.md, section 10).
+  temper has no fake person of its own (client/README.md, section 2).
 
 In the engine's worlds people are scripted, ordinary Rust rather than a
 domain: each story's person looks at the forge as observed, never at its
@@ -835,7 +835,7 @@ where either side has drifted from their contract (jig's
 `docs/development/tech-debt.md`, section 9). So temper's client is
 joined to its engine from its first increment, and `tests/client` is
 that joint world itself: there is no client world of temper's on a
-scripted engine before it or beside it (client.md, section 10).
+scripted engine before it or beside it (client/README.md, section 10).
 
 - **The translation** between the client's vocabulary and the engine's
   is written with the first types on both sides, exhaustive both ways.
@@ -859,7 +859,7 @@ scripted engine before it or beside it (client.md, section 10).
 crates/*/src/tests.rs               step tests
 crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`; nextest profile process
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
-crates/temper-client-shell-terminal/tests  the terminal's machine world (client.md, section 10)
+crates/temper-client-shell-terminal/tests  the terminal's machine world (client/README.md, section 10)
 testing/temper-fake-forge-domain    the fake forge's domain (4.2)
 testing/temper-fake-forge-protocol  the fake forge's protocol layer: Forgejo's API over skein's HTTP server
 testing/temper-fake-git             the fake git program, on skein's fake machine (4.3)
@@ -896,14 +896,12 @@ scripts/proof-live.sh               the live tier
   in `tests/engine/protocol-forge`'s crate, beside its protocol world
   (protocol/forge.md, section 10); the git component's in
   `tests/worker/protocol-git` (protocol/git.md, section 9); the terminal's in
-  `temper-client-shell-terminal`'s own tests (client.md, section 10).
+  `temper-client-shell-terminal`'s own tests (client/README.md, section 10).
 - **The setup's crates** test as step code does: `temper-forge-setup`'s
   machines, files, specs and steps, and `temper-box`'s machine, by their
   step tests (protocol/setup.md, 13.1); reconcile's machine by its world; the
   hosts, `temper-forge-setup-shell` and `temper-box`'s own, by the
   process tier (2.6), as the binary's are.
-- **No web crates:** neither `testing/temper-fake-person` nor any
-  `tests/web/*` is temper's (client.md, section 9).
 
 ## 9. Not built yet
 
@@ -939,7 +937,7 @@ By tier:
   13.1 and 13.2).
 - **The browser tier,** with temper's browser shell: temper's bundle,
   its pages and signing in, in Chromium, a suite of its own outside the
-  focused and fuzzy suites (web/architecture.md, section 4).
+  focused and fuzzy suites (client/browser.md, section 4).
 - **Containment's checks,** which wait for skein's contained process
   trees.
 - **The referee** in the worlds that still check their scenarios inline,

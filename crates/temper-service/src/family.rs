@@ -1,4 +1,4 @@
-//! The forge family's records at the clients' boundary (client.md, 8).
+//! The forge family's records at the clients' boundary (client/README.md, 8).
 use alloc::boxed::Box;
 use jig_protocol_engine_clients as kit;
 use skein_lib::{List, Reader, Writer};

@@ -1,4 +1,4 @@
-//! temper's addresses and the inbox's filters (client.md, 3.5).
+//! temper's addresses and the inbox's filters (client/README.md, 3.5).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
     Inbox { filter: Filter },

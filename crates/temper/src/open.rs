@@ -1,4 +1,4 @@
-//! The terminal's arguments and startup (client.md, 6.1).
+//! The terminal's arguments and startup (client/README.md, 6.1).
 use skein_io::kernel::{Exit, Fd};
 use skein_lib::{
     Secret,

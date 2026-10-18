@@ -1,4 +1,4 @@
-//! One bounded table for the last tree, with typed form input (client.md, 5.2).
+//! One bounded table for the last tree, with typed form input (client/README.md, 5.2).
 use alloc::boxed::Box;
 use skein_lib::{List, Token};
 use skein_ui::{Act, Binding};

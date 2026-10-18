@@ -108,7 +108,7 @@ open is listed in section 20.
   temper's client shows of the forge, made from the connector's records
   and working set: a change's way to landing, its result and its hold,
   the queues, the repositories and their landing rules, goals' issues,
-  findings and the forge itself (`../web/ux/forge.md`, section 9).
+  findings and the forge itself (`../client/forge.md`, section 9).
 - **What temper owns there** (jig's `domain/core.md`, 8.1): what it
   creates, recorded in the store by key. On the forge, ownership shows
   as authorship, by temper's own user, and as temper's branch prefix,
@@ -140,7 +140,7 @@ temper-engine-domain-forge              the connector's top: resources and holds
   6.1): *owned*, where temper pushes its branches, opens pull requests
   and lands; a *fork* of an upstream (section 14); or *context*, read
   only. An owner of the project adopts it in the client, through the
-  adoption form (`../client.md`, 4.4). A repository temper writes
+  adoption form (`../client/README.md`, 4.4). A repository temper writes
   belongs to one project; others may adopt it as context.
 - **A repository is named by its owner and name, and kept by the forge's
   id for it.** The adoption names the forge, the repository's owner and
@@ -150,7 +150,7 @@ temper-engine-domain-forge              the connector's top: resources and holds
   transfer on the forge keeps it the same repository. A repository the
   forge does not have refuses the adoption as not found.
 - **The adoption request is the forge's own,** keyed as any party's
-  request (`../client.md`, 4.4): the root takes it from the protocol
+  request (`../client/README.md`, 4.4): the root takes it from the protocol
   layer typed, and the connector refuses a forge the deployment does not
   configure; then locates the repository (`Read::Locate { owner, name }`,
   answered `Answer::Located { repository }`); then the root makes jig's
@@ -807,7 +807,7 @@ history they keep if temper is unplugged. Issues are projections (jig's
   review raised, a flaky test, created by an agent's `effect_forge` tool
   (`agent.md`, 4.3; jig's `domain/connectors.md`, 4.5), keyed. Their
   state (open, taken up by a goal, dropped) is the store's, shown in the
-  client (`../web/ux/forge.md`, 7.3); taking one up is a goal that
+  client (`../client/forge.md`, 7.3); taking one up is a goal that
   names it.
 - **A projection, not a procedure** (jig's `domain/connectors.md`,
   section 8). The `issues` child domain is fed each goal's state, its

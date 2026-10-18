@@ -1,4 +1,4 @@
-//! temper's banner and navigation, in the mockups' order (client.md, 5).
+//! temper's banner and navigation, in the mockups' order (client/README.md, 5).
 use skein_lib::{List, Token};
 use skein_ui::{Binding, Builder, Region, Role};
 use temper_client_domain::{Address, Domain, pages::Act};

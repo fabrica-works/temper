@@ -1,4 +1,4 @@
-//! Inbox acts retain the document revision that the person acted on (client.md, 3.6).
+//! Inbox acts retain the document revision that the person acted on (client/README.md, 3.6).
 use crate::{
     Limits,
     owner::Owner,

@@ -268,7 +268,7 @@ forge's number:
 | a subscription made or dropped | makes or drops the forge's subscription under the core's number, and answers the call |
 | start a procedure | starts the forge's change procedure (5.4) |
 | a step made or refused; a delegate or a repair refused | records the change's delegate, or holds the change |
-| a document or a read of the forge's; a document dropped | gives it to the forge, which makes it from its records and working set, within the scope the party named (forge.md, section 2; `../web/ux/forge.md`, section 9) |
+| a document or a read of the forge's; a document dropped | gives it to the forge, which makes it from its records and working set, within the scope the party named (forge.md, section 2; `../client/forge.md`, section 9) |
 
 ### 5.4 The forge's routes
 

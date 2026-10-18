@@ -109,7 +109,7 @@ to settle, and shows what a person writes:
 
 1. **Start and open,** as `temper box CONFIG.json` and `temper open
    DIRECTORY LINK` do (`../protocol/setup.md`, section 7;
-   `../client.md`, section 7).
+   `../client/README.md`, section 7).
 2. **The banner,** on every page while no account is usable:
 
    > Agents need an LLM account to run.
@@ -326,7 +326,7 @@ deployment's:
   `claude` beside skein's fake LLM peer and fake issuer.
 - **`../tools.md`,** sections 5 and 9: the accounts' tools; the agent's
   account no longer handed in by configuration.
-- **`../client.md`,** on jig's pages (jig's `client/domain/pages.md`,
+- **`../client/README.md`,** on jig's pages (jig's `client/domain/pages.md`,
   sections 4 to 7): the screens of sections 3 to 7, in the browser and
   the terminal.
 - **`../README.md`,** section 2: the first milestone's account.

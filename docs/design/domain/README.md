@@ -61,7 +61,7 @@ temper-worker-domain                       the worker's root (worker.md)
 
 - **A bare file name** names a document of this directory: `forge.md`
   is `domain/forge.md`. temper's other documents are named by their
-  relative path: `../protocol/forge.md`, `../client.md`,
+  relative path: `../protocol/forge.md`, `../client/README.md`,
   `../testing.md`, `../README.md`.
 - **jig's documents** are named with jig's name and their path from
   jig's `docs/design/`, with jig's section numbers: jig's
@@ -149,7 +149,7 @@ What temper decides within jig's design, with where each is answered:
   prefix, saved work on a branch of its own (forge.md, section 11).
 - **What people write on temper's pull requests is not read,** but their
   approvals; people act in temper's client (forge.md, sections 8.7 and
-  13; `../client.md`).
+  13; `../client/README.md`).
 - **Only LLMs are counted.** A forge request is load, within the forge's
   request budget, never spend (root.md, 5.5; forge.md, 5.4).
 - **A run's workspace:** its change's repository, or the project's home

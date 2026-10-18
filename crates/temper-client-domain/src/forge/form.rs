@@ -1,4 +1,4 @@
-//! One bounded adoption draft, with typed values supplied by the view (client.md, 4.4).
+//! One bounded adoption draft, with typed values supplied by the view (client/README.md, 4.4).
 use super::{Address, Adoption, Answer, Role, Served};
 use alloc::boxed::Box;
 use skein_lib::{RequestProgress, Token};

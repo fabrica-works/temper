@@ -75,9 +75,9 @@ One story:
    The forge is connected, managed, or owned on a box
    (`protocol/setup.md`).
 2. `temper open DIRECTORY LINK` signs the person in by the printed link
-   and shows their inbox (`client.md`, sections 6 and 7).
+   and shows their inbox (`client/README.md`, sections 6 and 7).
 3. The person adopts a repository into the configured project, through
-   the adoption form (`client.md`, 4.4).
+   the adoption form (`client/README.md`, 4.4).
 4. The person starts a chat and asks for a change; the chat makes a
    small one itself and hands its branch to a change task, or delegates
    the change whole (`domain/forge.md`, 8.1).
@@ -87,10 +87,10 @@ One story:
    fails, and landed. No person acts on it.
 6. The person follows it from the chat: its delegates and their phases
    in words, and, if the change is held, why, with what may be done
-   (`web/ux/forge.md`, 2.4 and 2.5).
+   (`client/forge.md`, 2.4 and 2.5).
 7. The person sees what landed: the pull request and the merge commit,
    in the forge's words, with a link to each on the forge
-   (`web/ux/forge.md`, 2.5).
+   (`client/forge.md`, 2.5).
 8. `temper serve` is stopped and started again; nothing the person saw
    is lost, and work in flight goes on.
 
@@ -101,7 +101,7 @@ live text, the forge's panels in full, GitHub, several people.
 ## 3. The system
 
 ```
-person    temper open: temper's terminal, its pages around jig's client (client.md)
+person    temper open: temper's terminal, its pages around jig's client (client/README.md)
 engine    temper serve: temper's root around jig's core and the forge connector (domain/root.md)
 store     jig's store in the engine's process: jig's records and temper's, committed together (protocol/store.md)
 worker    standalone, in the engine's process: temper's worker root on jig's hub, the checkout (domain/worker.md)
@@ -117,7 +117,7 @@ forge     Forgejo and its runner: polled, hinted by its webhooks (domain/forge.m
   `domain/hosts.md`).
 - **People reach temper through its client:** temper's pages on jig's
   client, `jig-client`, in a terminal, and later in a browser
-  (`client.md`; `web/architecture.md`).
+  (`client/README.md`; `client/browser.md`).
 - **Standalone first.** Hosts apart, webhooks from another host, TLS on
   the engine's listeners and contained process trees come with a
   deployment beyond one person's machine (`protocol/README.md`,
@@ -168,11 +168,11 @@ forge, temper adds:
   workers' channel, its families in the store, the host tools and LLM
   accounts, the forge's protocol, git, and the forge's setup. Its
   `README.md` gives the reading order and the names.
-- **`client.md`:** temper's client on `jig-client`: its client root and
-  pages, the forge's client family, its view, the terminal, signing in,
-  and the clients' listener. The forge's part of the client is
-  `web/ux/forge.md`, the browser `web/architecture.md`, the pages' look
-  the mockups (`web/mockups/`, reference material, not contract).
+- **`client/`:** temper's client on `jig-client`. Its `README.md` is the
+  client: its client root and pages, the forge's client family, its view,
+  the terminal, signing in, and the clients' listener; `forge.md` is the
+  forge's part of the client, `browser.md` the later browser shell, and
+  `mockups/` the pages' look (reference material, not contract).
 - **`tools.md`:** `temper ctl`, temper for agents: reads, jig's
   operations and waits, from a command line.
 - **`testing.md`:** temper's tiers, its fakes, its scenarios and its
@@ -186,11 +186,11 @@ forge, temper adds:
 - **A bare file name** names a document of the same directory: in
   `domain/`, `forge.md` is `domain/forge.md`; in `protocol/`, it is
   `protocol/forge.md`. temper's other documents are named by their path
-  from there: `../protocol/forge.md`, `../client.md`; from this directory,
-  `domain/root.md`.
+  from there: `../protocol/forge.md`, `../client/README.md`; from this
+  directory, `domain/root.md`.
 - **Code cites a section** by the document's path from this directory,
   at module or type level: `domain/forge.md`, 8.2; `protocol/forge.md`,
-  3.2; `client.md`, 3.5.
+  3.2; `client/README.md`, 3.5.
 - **jig's documents** are named with jig's name and their path in jig's
   `docs/design/`: jig's `domain/connectors.md`, jig's
   `protocol/channel.md`, jig's `client/domain/client.md`. jig has two
@@ -239,7 +239,7 @@ temper's side before the layer:
   which the forge component and the setup share; its setup, outside
   the services, `temper-forge-setup`, `temper-forge-setup-shell` and
   `temper-box`;
-- the client's, under `temper-client` (`client.md`, section 2);
+- the client's, under `temper-client` (`client/README.md`, section 2);
 - the services, `temper-service`, and the binary, `temper`.
 
 `protocol/README.md`, section 5 says what each holds and depends on. Test

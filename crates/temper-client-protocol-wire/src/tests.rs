@@ -1,4 +1,4 @@
-//! Version, bounds and total outcome round trips (client.md, 4.6).
+//! Version, bounds and total outcome round trips (client/README.md, 4.6).
 mod fixtures;
 use crate::v1;
 use alloc::boxed::Box;

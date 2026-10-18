@@ -1,4 +1,4 @@
-//! The ordered adoption form in temper's frame (client.md, 4.4 and 5.2).
+//! The ordered adoption form in temper's frame (client/README.md, 4.4 and 5.2).
 use super::{
     bindings::{Bindings, Meaning},
     words::{self, Word},

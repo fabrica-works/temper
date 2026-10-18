@@ -1,7 +1,7 @@
-//! The forge family in domain words, independent of its wire (client.md, 4.6).
+//! The forge family in domain words, independent of its wire (client/README.md, 4.6).
 use alloc::boxed::Box;
 use jig_client::contract::{EntranceRefusal, Refusal};
-/// The forge's one address: the adoption page for a project (client.md,
+/// The forge's one address: the adoption page for a project (client/README.md,
 /// 4.5); reached from the navigation's link.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
@@ -79,7 +79,7 @@ pub struct Adopted {
     pub protection: Protection,
 }
 
-/// The forge connector's reasons (03.2's `ForgeReason`; client.md, 4.7).
+/// The forge connector's reasons (03.2's `ForgeReason`; client/README.md, 4.7).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Reason {
     NoSuchForge,

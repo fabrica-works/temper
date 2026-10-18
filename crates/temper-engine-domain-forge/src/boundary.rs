@@ -152,7 +152,7 @@ pub enum ApplicationOutcome {
     CoreRefused(jig_domain_people::Refusal),
     ForgeRefused(AdoptionRefusal),
 }
-/// The repository facts shown by the adoption's terminal (client.md, 4.6).
+/// The repository facts shown by the adoption's terminal (client/README.md, 4.6).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AdoptedRepository {
     pub repository: client::api::Repository,
@@ -163,7 +163,7 @@ pub struct AdoptedRepository {
     pub kinds: Kinds,
     pub protection: Protection,
 }
-/// A forge refusal stated in the adoption form's vocabulary (client.md, 8).
+/// A forge refusal stated in the adoption form's vocabulary (client/README.md, 8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AdoptionRefusal {
     NoSuchForge,

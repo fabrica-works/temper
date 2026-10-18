@@ -216,7 +216,7 @@ granted with each assignment and pushed to every live attempt (jig's
   link at start, `temper open` signs in by it; its client holds the
   bearer token it is given and sends it with every exchange, and the
   terminal keeps it in its private directory, to sign in with it again
-  (`../client.md`, section 7). Every other way of signing in is open
+  (`../client/README.md`, section 7). Every other way of signing in is open
   (section 8).
 - **No TLS key** in standalone: nothing temper serves leaves the machine.
 
@@ -271,7 +271,7 @@ granted with each assignment and pushed to every live attempt (jig's
   forge's OAuth flow, read who the person is, and ask jig's clients'
   component to mint a credential for that identity, with a `Mint` from
   temper's server code alone (jig's `protocol/client.md`, section 8;
-  jig's `protocol/service.md`, section 2; `../client.md`, section 11).
+  jig's `protocol/service.md`, section 2; `../client/README.md`, section 11).
   The forge's OAuth client secret is then temper's, a private file read
   at start. Default: the printed link signs in the deployment's one
   owner.

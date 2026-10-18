@@ -1,4 +1,4 @@
-//! Documented native-client constants and checked memory sums (client.md, 2).
+//! Documented native-client constants and checked memory sums (client/README.md, 2).
 #![deny(
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
