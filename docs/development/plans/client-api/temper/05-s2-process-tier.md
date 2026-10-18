@@ -108,6 +108,26 @@ then ruling 370's cause, with its 30 minutes.
   ("sign-in world deadline; stopped: false") and passed alone. It is the
   same drain, and joins the proof below.
 
+**Ruling 372 (05.s2's block of 2026-10-18T14:23:16Z): two causes, one
+here.**
+- **Ruling 370's cause is jig's** (`logs/temper-05/s2-unwatch-cause.md`):
+  jig-17.s3 answers the unwatch, and temper-06.5 takes it with its repin.
+  Its 30 minutes are dropped here. Save the public-component test as
+  `logs/temper-05/s2-clients-unwatch.rs` and leave it out of this step's
+  commits, with its `views` dev-dependency and `Cargo.lock` change.
+- **The drain's cause is temper's**, and the repair is this step's
+  (`logs/temper-05/s2-drain-cause.md`). `Accounts::work_pending`
+  (`crates/temper-service/src/accounts.rs`) omits the root-close
+  continuation that `Accounts::iterate` consumes after `drive_files`. The
+  candidate adds it, and the accounts test that names it is the step's
+  focused test (ruling 229). No delivery-in-flight test is asked: ruling
+  369's "a delivery in flight" was the symptom, not the cause.
+- **From here, no more diagnosis.** In one focused run, the signed
+  delivery up to five times, stopping at its first failure, then the
+  sign-in story. If either fails with the candidate, report its trace.
+  Otherwise go to clippy, then the Proof below, the gate, and land.
+  Bound: 60 minutes from the unblock.
+
 Proof (ruling 369), in the process profile with both exports: the six
 stories, the signed delivery, `temper_serve_answers_an_unknown_forge_404`
 (`process.rs:327`), `temper_serve_answers_an_unsigned_delivery_403`

@@ -2877,6 +2877,18 @@ choice would have been the user's (development.md, 10.4).
         - It joins the README's exceptions until 05.s2 lands (14:05Z point 1, now five).
      6. **Unchanged:** rulings 369 and 370; 05.s1's Don't list; every production deadline; ruling 367's Size.
 
+372. **the unwatch routed to jig-17.s3; 05.s2 lands the drain** (plan scope, temper-05's block of 2026-10-18T14:23:16Z).
+     Ruling 372, kind: plan scope. As ruling 370 says, the unwatch's cause is routed to jig in a step of its own. 05.s2 repairs the drain, which is temper's, and lands.
+
+     1. **jig-17.s3, added** (`jig/17-s3-unwatch-answered.md`): `jig-protocol-engine-clients` answers an unwatch of an ended watch `Closed`, once its ending is released, and at the latest when its stream goes, as an opening is. The design asks it: `protocol/client.md`, 7, "closing it by an exchange, answered once the engine has ended it. A stream that ends ends its watches." It needs nothing, and runs now, beside jig 19.5 and jig 20.
+     2. **temper-05.s2** continues from its worktree's accounts candidate, as "Ruling 372" in its file says.
+        - The accounts test is its focused test.
+        - In one focused run: the signed delivery up to five times, then the sign-in story. If either fails, report.
+        - Then clippy, the six-story Proof, the gate, and land. Bound: 60 minutes from this unblock.
+        - The public-component unwatch test is saved as `logs/temper-05/s2-clients-unwatch.rs`, and left out of 05.s2's commits.
+     3. **temper-06.5** needs temper-05.s2 and jig-17.s3. It rebases its candidate on 05.s2's landing. Its first commit is the repin onto jig-17.s3's landing, by the README's "Pins", with that saved test. Then seed 7, its gate and the whole tier (ruling 370).
+     4. **Unchanged:** rulings 368, 369 (but its point 2's focused test) and 371's flaky-repeat rule; the README's five exceptions until 05.s2 lands (14:05Z point 1); 05.s1's Don't list; every deadline; skein's read half-end.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -82,6 +82,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
 | `jig/17-s1-authority-whole.md` | jig-17.s1 (ruling 319): an authority crosses whole in the engine's documents, the link and the view | nothing (not part of jig 17's last increment, 17.5) | |
 | `jig/17-s2-busy-watches.md` | jig-17.s2 (ruling 319): the client opens a busy watch and `me` again, closes a watch once its opening is answered, keeps one watch for `me` | nothing (not part of jig 17's last increment, 17.5) | |
+| `jig/17-s3-unwatch-answered.md` | jig-17.s3 (ruling 372): an unwatch of an ended watch is answered | nothing (beside jig 19.5 and jig 20) | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
 | `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s2 |
 | `jig/20-attack-stories.md` | jig 20: jig's stories for a browser shell, and its attack stories | jig 19 | |
@@ -110,7 +111,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/05-server.md` | temper 05: `temper-service` owns the clients' listener and mounts jig's component | jig 17, temper 04 | 05.2: jig 18.1 |
 | `temper/05-s1-landing-story.md` | temper-05.s1 (ruling 347): the process tier's landing story passes again, past the regressions of 03.5, 04.3 and 05.1 | temper-04.s1 (ruling 352) | |
 | `temper/05-s2-process-tier.md` | temper-05.s2 (ruling 367): the whole process tier passes, past the signed delivery's stop and each test the 13:49Z run did not reach | temper-05.s1 | |
-| `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | |
+| `temper/06-pages.md` | temper 06: the frame, the inbox and the chats, temper's own | temper 04 (its repin past jig 16 brings jig 15) | 06.5: temper-05.s2, jig-17.s3 (ruling 372) |
 | `temper/07-task-pages.md` | temper 07: the task's page, adoption, the confirmations; `jig-client-view` dropped | temper 06 | |
 
 The closing repin, `temper-repin` (development.md, 5.7), has no file:

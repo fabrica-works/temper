@@ -506,6 +506,14 @@ Removes: jig's conversations page at temper's `Chats`.
 
 ### 06.5 A chat: its conversation, the composer, Stop
 
+**Ruling 372:** 06.5 needs temper-05.s2 and jig-17.s3 too. Its candidate
+(`0650656cc`) is rebased on 05.s2's landing; then its first commit is the
+repin onto jig-17.s3's landing (README, "Pins"; "What a temper repin
+repairs"), with 05.s2's public-component test
+(`logs/temper-05/s2-clients-unwatch.rs`, failing at jig `38ae1ba17`), which
+passes with it. Then seed 7 of `a_chat_reads_then_replies_and_waits`, its
+gate and the whole process tier, as ruling 370 says.
+
 Scope: `Chat { task }`: the conversation from jig's `thread` (committed
 turns, the person's words, work summaries, provisional text), its status
 and spend; `task` watched, `activity` read a page at a time, `run`
