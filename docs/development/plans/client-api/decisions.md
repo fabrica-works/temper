@@ -2089,6 +2089,17 @@ choice would have been the user's (development.md, 10.4).
      - jig `docs/design/domain/core.md`, 7.3: "| budget | `AsAllowed` | the creator's to give, within their allotment |", "| deadline | none | the creator's to give, or none |", "| executor | an agent, under the project's chat charter | a charter or a procedure the role may create with |".
      - `tests/client/src/stories.rs:746: pub fn procedure_goal_world`: `procedures: list([CreateProcedure { connector: 2, code: 7 }])`, `budget: 1`, rule `Ask::SetGoal { … executor: GoalExecutor::Procedure { connector: 2, code: 7 }, budget: 2 … }`; `tests/client/tests/stories.rs:283: fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once`.
 
+299. **jig 16.5's Shapes against main** (ready check of jig-16.5).
+     Ruling 299 (plan defect, the ready check of jig 16.5 at jig `4fad1fcc8`): corrected in `jig/16-shed.md`, under "Corrections at jig `4fad1fcc8` (ruling 299…)". 16.5's users are a widened grep's 259 files (the third "Done when" grep's 223, and the engine's outcomes and settings and the contract's record forms it misses), with `Settings.chat`'s seven readers; the `Bounds::Goal` and `GoalProcedure` renames reach 13 files; the four schemas join Files, edited in place, their generated code and goldens written by the drift tests' write mode; `goal_decide` and the person proposals stay, deciding every party's `Propose`; line numbers refreshed; temper's users are temper 04.3's.
+
+     Checked:
+     - jig `git fetch; git log -1 origin/main`: `4fad1fcc8`. The third grep: 223 files; the widened grep (in the section): 259; `git grep -l -E '\bBounds::Goal\b|\bGoalProcedure\b' -- '*.rs' ':!*/generated/*'`: 13.
+     - `git grep -n -E 'settings\.chat\b'`: `charters.rs:56`, `documents/small.rs:147`, `roles.rs:114`, `routing/parties.rs:233`, `tests.rs:1054`, `tests/frame_facts.rs:42`, `jig-protocol-config/src/tests/domain.rs:100`.
+     - `git grep -l -E <the widened names> -- '*.schema'`: `client-v8.schema`, `people-v3.schema`, `test-client-v1.schema`, `test-connector-v1.schema`. `tests/client-wire/tests/drift.rs:35`: "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift"; `test_client_wire.rs:13` likewise; `tests/store-codecs/tests/drift.rs:16` reads `SKEIN_CODEGEN_WRITE` (package `jig-store-codecs-world`). `git log -3 -- client-v8.schema`: `73de61fc8`, `533dee685`, `0ecf49254`, each in place.
+     - `party_decisions.rs:483-485`: `people::Proposer::Party(number) => { if core.tasks.person_proposal(number, proposal).is_some() { goal_decide(…)`; `routing/propose.rs:119, :213`: `work.push(Event::Tasks(tasks::Event::ProposePerson {`.
+     - `roles.rs:98: pub fn chat_admit(`, `:288: pub(crate) fn priorities_allowed(`, `:312: pub fn prioritise(`; `jig-fake-parties/src/lib.rs:401: Ask::Close { task, disposals } => {`; `templates.rs:51: pub(crate) fn chat(`; `git grep -c -i chat -- jig-protocol-config/src/{lib,charters}.rs`: nothing.
+     - temper `temper/04-engine.md:336`: "### 04.3 The engine's shapes of work gone, with jig's", :339 "the store's `Disposal` refusal, gone with jig 16's", :347 `crates/temper-engine-domain/src/store.rs`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

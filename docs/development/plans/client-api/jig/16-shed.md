@@ -429,6 +429,75 @@ they differ; its other points stand.
   (`tests/client/tests/stories.rs:283`): it keeps its name and expected
   values, as the two stories named there do.
 
+## Corrections at jig `4fad1fcc8` (ruling 299, the ready check of 16.5, 2026-10-18)
+
+These take precedence over 16.5's Files and Shape, and over ruling 284's
+16.5 points, where they differ. Refresh any further copy, and list it in
+the commit body.
+
+- **16.5, the users:** the third "Done when" grep names neither the
+  engine's outcomes and settings that 16.5 removes nor the contract's
+  forms of the records. Its users are what this grep lists at the
+  increment's start, in place of the third grep (259 files at jig
+  `4fad1fcc8`: the third grep's 223, and 36 more, among them
+  `jig-domain-core/src/{documents/small.rs, funding.rs, lib.rs,
+  routing/application_routes.rs, routing/tasks.rs, sibling_routes.rs}`,
+  `jig-protocol-store/src/codec/people/outcomes.rs`, the component's
+  `translate/{answers.rs, history.rs}`, the reference UI's
+  `{outcome, owner_history, owner_outcome}.rs`, `testing/jig-test-domain`
+  and the worlds):
+
+  ```
+  git grep -l -E '\b(StartChat|SetGoal|Prioritise|GoalExecutor|Disposal|DisposalIssue|TakeOver|ConversationLine|GoalLine|OfferedCharters|BoundsGoal|GoalProcedure|ReplyPosition|MadeChat|MadeGoal|RefusalDisposal|LimitConversationWords|ReadConversations|ReadGoals|SubjectGoals|NoteScopeGoal|OwnerHistoryChangePrioritised|close_grace|chat_authority|chat_admit)\b|\b(Owner)?Outcome(::)?(Closing|GoalStarted|GoalProposed|Prioritised)\b|\bOutcome::Started\b|\bOwnerHistoryChange::Prioritised\b|\bAct::Close\b|\bBounds::Goal\b' -- '*.rs' ':!*/generated/*'
+  ```
+
+  `Settings.chat`'s readers, which no name finds, join them:
+  `jig-domain-core/src/{charters.rs:56, documents/small.rs:147,
+  roles.rs:114, routing/parties.rs:233, tests.rs:1054,
+  tests/frame_facts.rs:42}` and `jig-protocol-config/src/tests/domain.rs:100`.
+  The tasks child's `Ask::Close` (`routing/tasks.rs:1370`) and the ops
+  example's (`examples/ops/domain/src/route.rs:573`) are other children's,
+  and stay.
+- **16.5, `Bounds::Goal` and `GoalProcedure`:** the renames to
+  `Bounds::Create` and `CreateProcedure` reach the 13 files `git grep -l
+  -E '\bBounds::Goal\b|\bGoalProcedure\b' -- '*.rs' ':!*/generated/*'`
+  lists, ruling 284's eight and `jig-protocol-engine-clients/src/tests/documents.rs`
+  and `tests/client/src/joint/wire/me.rs` among them. The check applied
+  both renames: the workspace is clean under clippy, and the default and
+  fuzzy suites of the four crates they touch passed.
+- **16.5, the schemas:** Files gain the schemas whose records go:
+  `crates/jig-client-protocol-wire/schema/client-v8.schema`,
+  `crates/jig-protocol-store/schema/people-v3.schema`,
+  `testing/jig-client-test-protocol-wire/schema/test-client-v1.schema` and
+  `testing/jig-test-store/schema/test-connector-v1.schema`. Each is edited
+  in place, under its version, as "Choices" says and jig `73de61fc8` did;
+  then `SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p
+  jig-client-wire-world --test drift --test test_client_wire` and
+  `SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p
+  jig-store-codecs-world --test drift` write their `src/generated/` code
+  and `golden/` bytes, which land with the schemas.
+- **16.5, the party's proposals stay:** `goal_decide`
+  (`jig-domain-core/src/routing/party_decisions.rs:16`) decides every
+  `Proposer::Party` proposal (`proposal_request`, :483-485), and the
+  `Propose` route makes them (`routing/propose.rs:119, :213`,
+  `tasks::Event::ProposePerson`): it, the tasks child's person proposals
+  and the store's `PersonProposal` codec stay, which the Shape's "the goal
+  decision" and "`PersonProposal` where jig 03 left it" become. Only what
+  in them serves `SetGoal` alone goes.
+- **16.5, lines at jig `4fad1fcc8`:** `roles.rs`'s `chat_admit` is at
+  :98, the prioritising at :288-335 (`priorities_allowed`,
+  `prioritise`); `jig-fake-parties/src/lib.rs`'s `Ask::Close` at :401-406;
+  `templates::chat` at `jig-protocol-config/src/templates.rs:51`, read at
+  `core.rs:49`. `jig-protocol-config/src/{lib.rs, charters.rs}` name no
+  chat item, and leave Files. Ruling 284's `jig-test-service` paths name
+  no 16.5 name: its users are those the grep lists.
+- **16.5, temper:** temper's users of these (`temper-engine-domain/src/store.rs`,
+  `temper-service/src/family/refusals.rs`, the store's `Disposal`
+  refusal and their tests) break at temper's repin past jig 16: temper
+  04.3 removes them (`temper/04-engine.md`, 04.3). 16.5 changes nothing
+  in temper.
+- **Done when:** the third grep lists 223 files at jig `4fad1fcc8`.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
