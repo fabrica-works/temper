@@ -1,4 +1,4 @@
-== Adopt a repository into Project: Shop == Live
+== Adopt a repository into shop == Live
 temper
 [1] Shop (selected)
 * Pat

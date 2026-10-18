@@ -1,11 +1,10 @@
-//! The ordered adoption form after jig's frame (client.md, 4.4 and 5.2).
+//! The ordered adoption form in temper's frame (client.md, 4.4 and 5.2).
 use super::{
     bindings::{Bindings, Meaning},
     words::{self, Word},
 };
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_client_view::phrases::jig::JigPhrase;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, State, phrases::Hole};
 use temper_client_domain::forge;
@@ -15,23 +14,6 @@ fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bind
     words::text(words, builder, word, &[]);
     builder.link(bindings.insert(meaning));
     builder.close();
-}
-#[must_use]
-pub fn project_name(
-    jig: &jig_client_view::ui::Borrowed<'_>,
-    project: u32,
-    words: &jig_client_view::words::Words,
-) -> Box<[u8]> {
-    if let Some(frame) = jig.frame().document {
-        for row in &frame.projects {
-            if row.project == project
-                && let Some(name) = &row.name
-            {
-                return words.say(JigPhrase::Project, &[Hole::Name(copy_of(name.bytes()))]);
-            }
-        }
-    }
-    words.say(JigPhrase::FrameProjectNumber, &[Hole::Number(u64::from(project))])
 }
 pub fn page(
     builder: &mut Builder,
@@ -43,7 +25,9 @@ pub fn page(
     text_limit: u32,
 ) {
     builder.open(Role::Heading { level: 1 });
-    words::text(words, builder, Word::Title, &[Hole::Name(copy_of(project_name))]);
+    let title = words::say(words, Word::Title, &[Hole::Name(copy_of(project_name))]);
+    builder.name(&title);
+    builder.text(skein_ui::Run::Plain, &title);
     builder.close();
     for (field, word) in
         [(forge::Text::Forge, Word::Forge), (forge::Text::Owner, Word::Owner), (forge::Text::Name, Word::Name)]

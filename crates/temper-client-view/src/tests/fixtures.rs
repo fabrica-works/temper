@@ -191,6 +191,13 @@ pub(super) fn root_at_with_tree(
     address: temper_client_domain::Address,
     limits: &Limits,
 ) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>, Option<skein_lib::Token>) {
+    root_at_with_tree_named(address, limits, b"Shop")
+}
+fn root_at_with_tree_named(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+    project_name: &[u8],
+) -> (temper_client_domain::Domain, skein_lib::Token, Option<skein_lib::Token>, Option<skein_lib::Token>) {
     use jig_client::contract::{
         self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
@@ -239,7 +246,9 @@ pub(super) fn root_at_with_tree(
     projects
         .push(MeProject {
             project: PROJECT,
-            name: Some(DocumentText::complete(contract::Text::new(Box::from(*b"Shop"), 32).expect("name fits"))),
+            name: Some(DocumentText::complete(
+                contract::Text::new(skein_lib::bytes::copy_of(project_name), 32).expect("name fits"),
+            )),
             role: HeldRole::Policy { role: 1 },
             pool: None,
             templates: List::with_capacity(0),
@@ -285,14 +294,10 @@ pub(super) fn root_at_with_tree(
     (root, watch.expect("me opened"), inbox_watch, tree_watch)
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
-    let mut root = root_in_project(Some(PROJECT));
-    root_event(
-        &mut root,
-        temper_client_domain::Event::Went {
-            place: temper_client_domain::Place::Address(temper_client_domain::Address::Adopt { project: PROJECT }),
-        },
-    );
-    root
+    adoption_page(PROJECT, b"shop")
+}
+pub fn adoption_page(project: u32, name: &[u8]) -> temper_client_domain::Domain {
+    root_at_with_tree_named(temper_client_domain::Address::Adopt { project }, &domain_limits(), name).0
 }
 pub fn root_event(root: &mut temper_client_domain::Domain, event: temper_client_domain::Event) {
     let limits = domain_limits();

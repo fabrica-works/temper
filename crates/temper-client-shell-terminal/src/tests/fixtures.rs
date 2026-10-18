@@ -127,15 +127,7 @@ pub fn adoption_page(
     synthetic_header(&mut builder, None, false);
     let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
     builder.open(skein_ui::Role::Main);
-    temper_client_view::forge::page::page(
-        &mut builder,
-        form,
-        b"Project: Shop",
-        forge,
-        jig,
-        &mut bindings,
-        limits.text_per_node,
-    );
+    temper_client_view::forge::page::page(&mut builder, form, b"shop", forge, jig, &mut bindings, limits.text_per_node);
     builder.close();
     builder.close();
     visible(builder.finish())

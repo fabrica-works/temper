@@ -28,7 +28,7 @@ fn the_page_names_every_field_a_person_acts_on() {
     for (role, name) in rows {
         assert!(fixtures::find(tree, role, name).is_some(), "node {role:?}: {name:?}");
     }
-    assert!(has_text(tree, b"Adopt a repository into Project: Shop"), "heading uses the frame's name");
+    assert!(has_text(tree, b"Adopt a repository into shop"), "heading uses me's name");
 }
 #[test]
 fn a_check_takes_a_toggle_and_refuses_a_press() {
@@ -318,4 +318,13 @@ fn full_bound_repository_names_fit_the_outcome_phrase() {
     form.outcome = Some(forge::Answer::Adopted(adopted));
     let rendered = tree(&form);
     assert!(has_text(&rendered, b" on forge 1 as owned."));
+}
+
+#[test]
+fn the_adoption_page_is_titled_with_the_project_me_names() {
+    let mut view = fixtures::view();
+    let root = fixtures::adoption_page(fixtures::PROJECT, b"shop");
+    let tree = fixtures::build(&mut view, &root);
+    let title = fixtures::find(tree, Role::Heading { level: 1 }, b"Adopt a repository into shop");
+    assert!(title.is_some(), "the title names the project as me names it");
 }

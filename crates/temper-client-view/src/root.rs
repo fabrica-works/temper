@@ -43,6 +43,31 @@ impl View {
     fn task_main(&mut self, b: &mut Builder, root: &Domain) {
         crate::pages::task::main(b, root, &self.forge_words, &self.jig_words, &mut self.pages, &mut self.jig);
     }
+    fn adoption_main(&mut self, b: &mut Builder, root: &Domain) {
+        let Some(form) = root.forge().form() else { return };
+        let fallback;
+        let project = match crate::pages::project_name(root.pages(), root.client(), form.project) {
+            Some(name) => name,
+            None => {
+                fallback = self.jig_words.say(
+                    jig_client_view::phrases::jig::JigPhrase::FrameProjectNumber,
+                    &[skein_ui::phrases::Hole::Number(u64::from(form.project))],
+                );
+                &fallback
+            }
+        };
+        b.open(Role::Main);
+        forge::page::page(
+            b,
+            form,
+            project,
+            &self.forge_words,
+            &self.jig_words,
+            &mut self.forge,
+            self.limits.tree.text_per_node,
+        );
+        b.close();
+    }
     #[must_use]
     pub fn tree(&self) -> &Tree {
         self.render.tree()
@@ -94,23 +119,15 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         );
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root);
-    } else if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
-        && let Some(form) = root.forge().form()
-    {
-        let project = forge::page::project_name(&jig, form.project, &view.jig_words);
-        builder.open(Role::Main);
-        forge::page::page(
-            &mut builder,
-            form,
-            &project,
-            &view.forge_words,
-            &view.jig_words,
-            &mut view.forge,
-            view.limits.tree.text_per_node,
-        );
-        builder.close();
+    } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
+        view.adoption_main(&mut builder, root);
+    } else {
+        jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig);
     }
-    jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
+    if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
+    } else {
+        jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
+    }
     builder.close();
     for pass in 0..2 {
         for slot in builder.slots(pass) {
