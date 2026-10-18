@@ -2799,6 +2799,13 @@ choice would have been the user's (development.md, 10.4).
      3. **Size, temper 06.6 and 07.1:** 06.6 lands whole at up to 550 production lines, 07.1 at up to 650, with no question; past the stop, block with the count by file (their Size lines). Four steps landed whole by ruling at 2.0 to 2.5 times their Size (330, 342, 345, 359).
      4. **The README's 12:20Z point 2** no longer names temper-04.s1: ruling 352 moved 04.s1's run of the landing story to 05.s1.
 
+365. **temper-06.5 lands at up to 700** (plan defect, temper-06's block of 2026-10-18T13:38:03Z).
+     Ruling 365, plan defect: yes, as the report proposes. The regression and the joint proof pass; the historical-task repair (632) and the clippy fixes it needs (668) are the step's own.
+
+     1. **Size:** 06.5 lands whole at up to 700 production lines, the same Files, no split; past 700, stop and report with the count by file.
+     2. **Then:** compile and run the clippy fixes, the changed crates' focused tests, and the gate; land. The 13:34Z steer's points 2 and 3 apply at the gate (a `SLOW` test made cheaper first; the owned example's startup test if the change can raise a worst case).
+     3. **Unchanged:** ruling 357, point 4; the regression's assertions; no trimming of tests or docs to meet the count (ruling 330).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
