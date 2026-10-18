@@ -2111,6 +2111,9 @@ choice would have been the user's (development.md, 10.4).
      - `git grep -l -E 'NoteScope::Goal\b' -- '*.rs' ':!*/generated/*' | wc -l`: 30; "Choices": "`NoteScopeGoal` becomes `NoteScopeTask { project, task }`, the scope of a tracked task, which the notes child keeps under its own name".
      - `git grep -n GoalProcedure`: `documents.rs:404`, `offers.rs:233, :291`; ruling 299's grep: 216 files; on `inbox_deployment.rs`, `task_tree.rs`, `inbox.rs`, `reads/indexed.rs`: no match.
 
+301. **jig-16.5's board move offer: interim** (design gap, interim, jig-16.5's block of 2026-10-18T01:53:07Z).
+     Ruling 301, interim: a design gap, gone to the designer (question.md, "jig-16.5: the goals board's move offer once `ActKind::Prioritise` goes"). contract.md, 5.3 offers amending "in a task's document", pages.md, 6.2 makes the board "one task query", and objects.md's Prioritise is "priority-only amendments in one compound request": none says which offer gates moving a goal once the project's `Prioritise` offer goes. Until the answer amends `jig/16-shed.md`, jig-16.5 goes on with its engine, wire, schema and test migrations, and leaves the board's move offer (`page/project/moving.rs`, the arrows' gate and their confirmation) on whatever keeps it building, unchanged in behaviour; it opens no task watches for the board, and does not land before the answer.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
