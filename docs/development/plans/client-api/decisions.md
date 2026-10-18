@@ -2435,6 +2435,15 @@ choice would have been the user's (development.md, 10.4).
      - The commit body gives the count by file. A count past 650 at land, after the rebase, is a new question.
      - Unchanged: 06.2's Proof, run once; ruling 325 (no further process Proof by 06); ruling 326 (the `SLOW` rule and 80% of a budget); the gate.
 
+331. **Process from the check of 08:16Z, and ruling 309's trigger** (steer of 2026-10-18T08:16:25Z).
+     Process, from the hourly check of 2026-10-18T08:16:25Z: the run takes skein `b1d2276`'s points 2, 3, 8, 10 and 12 (the render retrospective's decisions), and ruling 309's balance trigger moves to 10 GiB. 
+     - Point 2: the coordinator releases the run only on the supervisor's "done when ran", once each "Done when" command has passed or has its ruling.
+     - Point 3: every role reads development.md, its card and testing-strategy.md in the run's `kit/docs/foundation/`, not in skein's checkout (README, "Rules of this plan").
+     - Point 8: no session uses the code graph, whose indexes of skein, smith, jig and temper date from 2026-10-11 to 10-14, until a steer says they are current (README, "Rules of this plan").
+     - Point 10, the supervisor's own: no count of compactions makes the supervisor hand over; it hands over only when confused, and its sub-agents run on across a handover.
+     - Point 12: the coordinator hands an implementer over when it ends a turn past 100,000 tokens, between increments (development.md 7.3, step 4).
+     - Ruling 309, point 3, amended: at each disk check, when `sudo -n btrfs filesystem usage /srv` shows unallocated below 10 GiB (not 5), the coordinator runs `sudo -n btrfs balance start -dusage=40,limit=10 /srv` once, then the usage line again, and logs both; it blocks (infrastructure) if it is still below 10 GiB. Seen: 11.20 GiB at 06:53:57Z, 1.20 GiB at 06:58:44Z, a cargo build taking 10 GiB in under five minutes.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

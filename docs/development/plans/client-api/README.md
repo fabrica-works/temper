@@ -171,12 +171,15 @@ per session are in each file.
   `AGENTS.md` and `docs/development/workflow.md`, this README,
   `code-organization.md`, and the rulings of `decisions.md` that name its
   session. Nothing else is read whole.
-- **The code graph:** the codebase-memory projects
-  `home-free-src-rust-jig`, `-temper`, `-skein`, as implementer.md, 8.1,
-  says: never call `list_projects`, `index_status`,
-  `check_index_coverage` or `index_repository`. The graph indexes each
-  repository's `main`, never the session's worktree: check each name it
-  gives with `rg` in the worktree before relying on it.
+- **The process is read in the run's kit** (ruling 331): development.md,
+  implementer.md and testing-strategy.md in
+  `/srv/data/git/runner/src/tmp/temper/client-api/kit/docs/foundation/`,
+  not in skein's checkout, which has moved since the run's claim.
+- **No code graph** (ruling 331): its indexes of skein, smith, jig and
+  temper are older than their `origin/main`. Search with `rg` in the
+  worktree, and never call the graph's index tools (`list_projects`,
+  `index_status`, `check_index_coverage`, `index_repository`), until a
+  steer says the indexes are current.
 - **jig never names temper:** jig's session files say "the repository
   downstream of jig", and no file of jig's code names it: `git -C <the
   session's jig worktree> grep -n -i -w temper -- crates testing tests
