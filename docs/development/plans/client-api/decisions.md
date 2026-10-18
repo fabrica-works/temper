@@ -2447,6 +2447,44 @@ choice would have been the user's (development.md, 10.4).
 332. **jig-20's Shapes against main** (ready check of jig-20.1).
      The ready check of jig-20 (skein 867095d14, jig 899bd8e68, temper 5cbbc1c0a; clippy on its sketches and skein's `skein-ui-web-tests`, and 20.2's and 20.3's pages in real Chromium under the `browser` profile; no whole-repository suite) found its file off main, corrected in `jig/20-attack-stories.md`, "Corrections after the ready check": the harness's `ServerAction::Stop` and the example's expected errors cited by symbol; `signed_out` is jig's "Sign in"; jig's stories give `expected` as the application's list plus `Failed to load resource`, since skein's replace it; the forging page's `fetch` calls end in `.catch`, without which it failed in Chromium; 20.5's stories take `Shown` pairs and `/test/panic`'s address; the sketches' functions take `#[must_use]`.
 
+333. **jig-17.s1's scripted-engine authority bound** (plan defect, jig 17's block of 2026-10-18T08:56:47Z).
+     Plan defect: the supplement's Shape missed the scripted engine, whose
+     `List<T>` admission (`payload.rs:80`) bounds every list by `rows`. The
+     proposal is authorized, as the scripted engine gained `segments` before
+     (decisions.md:1175).
+     - `jig_client_scripted_engine::Bounds` (`testing/jig-client-scripted-engine/src/lib.rs:38`)
+       gains `pub authority: u32`, beside `rows`. Its `Default` is 32, as
+       `rows`, so each literal that spreads `..Bounds::default()` admits what
+       it admits now.
+     - The scripted engine admits by `authority`, in place of `rows`, the
+       lists that 17.s1's link bounds by `client.authority`, and nothing else:
+       `OwnerAuthority`'s `grants` and `note_resources` and `OwnerDelegation`'s
+       `kinds` (`owner_authority.rs:38-50`); the Amend bounds' `grants`,
+       `implications` and `authority` (`payload.rs:502-506`); a policy edit's
+       `Projections { grants }` (`policy_edit.rs:29`), as the link's
+       `documents_part7.rs:172` does. It does so as `path` (`payload.rs:91`)
+       admits a path by `segments`: a helper that sets `rows: bounds.authority`
+       for that one list. `owner_authority::worst_case` (`:79-90`) prices the
+       grants, scopes, executors and their nested patterns by `authority`.
+       Every other list stays on `rows`.
+     - The joint builders that set `rows: limits.rows` set `authority:
+       limits.authority` too: `tests/client/src/joint/packets.rs:43`, and in
+       `tests/client/src/joint/wire/`, `activity.rs:16`, `documents.rs:19`,
+       `historical.rs:128`, `ledger_pages.rs:39`, `pages.rs:18`,
+       `person_tasks.rs:149`, `proposals.rs:293`, `queries.rs:132`. The whole
+       literals take `authority: 8`: `tests/client/src/stories.rs:76`,
+       `tests/client/src/stories/client_construction.rs:39`,
+       `tests/ops/src/client/stories.rs:324`.
+       `tests/client/tests/owner_authority.rs:47`'s `bounds()` sets
+       `authority: 3` beside `rows: 3`, and its tests that vary `rows` for an
+       authority's lists (`:98`, `:176`) vary `authority` with it.
+     - These files join 17.s1's, and their production lines count toward its
+       aim of 150; past it, the report says why, and that is no block. temper
+       has no code user (only its Cargo.lock and plan docs name the crate).
+
+     Refresh any further literal of `Bounds`, or list it admits, that the
+     compiler or a suite finds, by this rule, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

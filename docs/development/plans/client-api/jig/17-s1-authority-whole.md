@@ -128,6 +128,9 @@ where they differ.
   report says why, and that is no block. The Cut arm is at
   `owner_authority_words.rs:142`, now "Authority document is cut"; its
   English becomes "More are held than shown".
+- **Scripted engine** (ruling 333): `jig_client_scripted_engine::Bounds`
+  gains `authority`; its admission and pricing of an authority's lists,
+  and the joint fixtures' builders, join the Files.
 - **Downstream:** skein has no user. temper's breaks at its repin
   (`temper-client-domain/src/limits.rs:58-68`,
   `tests/engine/domain/src/walking.rs:124-126`,
