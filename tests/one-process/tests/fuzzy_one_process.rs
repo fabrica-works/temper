@@ -36,7 +36,6 @@ fn a_chat_reads_then_replies_and_waits() {
 }
 
 #[test]
-#[ignore = "a forge branch's eight segments need jig 13.s1's segments, temper 04.4 (ruling 216)"]
 fn a_merge_in_progress_is_pushed_with_both_parents() {
     let outcome = world::run(fixtures::calm(fixtures::SEED), world::Story::Merge);
     assert_eq!(outcome.verdict, Verdict::Passed);

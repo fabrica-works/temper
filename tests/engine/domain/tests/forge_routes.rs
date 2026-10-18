@@ -15,6 +15,9 @@ use temper_engine_domain_world::{store::Store, walking};
 use temper_engine_forge_world::{self as forge_world, translate};
 use temper_fake_forge_domain::{self as fake, api as raw};
 
+#[path = "forge_routes/paths.rs"]
+mod paths;
+
 struct World {
     creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,
@@ -31,6 +34,7 @@ struct World {
     signed_in: Option<u64>,
     assigned: Vec<engine::Assignment>,
     answers: Vec<temper_engine_domain::CallAnswer>,
+    reads: Vec<(ReplyTo, jig_domain_core::reads::Answer)>,
     protocol: Protocol,
     immediate: VecDeque<engine::Event>,
     /// The funding period sent to this process's root, once it is ready.
@@ -68,23 +72,22 @@ impl World {
     }
 
     fn configured_checks(with_read: bool, with_change: bool, silent_ci: bool, passes: u32) -> Self {
-        Self::configured_policy(with_read, with_change, silent_ci, passes, None, false, false)
+        Self::configured_policy(with_read, with_change, silent_ci, passes, paths::Gate::default(), None)
     }
 
     #[expect(
         clippy::too_many_lines,
         reason = "one fixture configures the policy, fake, and bounds for root forge stories"
     )]
-    #[expect(clippy::fn_params_excessive_bools, reason = "the fixture varies independent forge and gate conditions")]
     fn configured_policy(
         with_read: bool,
         with_change: bool,
         silent_ci: bool,
         passes: u32,
-        approval: Option<engine::Freshness>,
-        agent_gate: bool,
-        owner_gate: bool,
+        gate: paths::Gate,
+        documents: Option<jig_domain_core::documents::DocumentLimits>,
     ) -> Self {
+        let paths::Gate { approval, agent: agent_gate, owner: owner_gate } = gate;
         let mut limits = walking::limits();
         limits.people.amendment_bytes =
             jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.amendment_bytes;
@@ -97,6 +100,9 @@ impl World {
         let mut config = walking::config(71);
         if approval.is_some() || agent_gate || owner_gate {
             limits.authority.roles = 3;
+        }
+        if documents.is_some() {
+            limits.authority.roles = 2;
         }
         if with_change {
             limits.authority.requirements = 8;
@@ -252,6 +258,9 @@ impl World {
                 policy.ceiling.delegation = rules.ceiling.delegation.clone();
                 policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
             }
+            if documents.is_some() {
+                paths::add_reader(&mut policy);
+            }
             let mut domain = authority::Domain::new(rules, limits.authority).expect("read authority rules");
             let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
@@ -289,6 +298,9 @@ impl World {
         fake::grant(&mut fake, b"org/repo", 2, raw::Permission::Write);
         fake::grant(&mut fake, b"org/repo", 7, raw::Permission::Read);
         let fake_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fake_config };
+        if let Some(documents) = documents {
+            limits.documents = paths::document_limits(documents, &limits);
+        }
         Self {
             creating: jig_core_world::fixtures::Creating::new(&config.core, limits.tasks.tree_tasks),
             root: engine::Domain::new(config, &limits),
@@ -305,6 +317,7 @@ impl World {
             signed_in: None,
             assigned: Vec::new(),
             answers: Vec::new(),
+            reads: Vec::new(),
             protocol: Protocol::default(),
             immediate: VecDeque::new(),
             period: None,
@@ -343,7 +356,14 @@ impl World {
         assert!(self.store.pending.is_empty(), "the chosen cut resolves store uncertainty first");
         assert!(self.pending.is_empty(), "old API terminals are drained at this cut");
         let mut fresh = if self.owner_gate {
-            Self::configured_policy(with_read, with_change, false, 0, None, false, true)
+            Self::configured_policy(
+                with_read,
+                with_change,
+                false,
+                0,
+                paths::Gate { owner: true, ..paths::Gate::default() },
+                None,
+            )
         } else {
             Self::configured(with_read, with_change)
         };
@@ -400,7 +420,9 @@ impl World {
     #[expect(clippy::wildcard_enum_match_arm, reason = "the world records only its scripted root deliveries")]
     fn collect(&mut self) {
         for _ in 0..self.out.len() {
-            let request = match self.protocol.play(self.out.pop().expect("counted root output")) {
+            let request = self.out.pop().expect("counted root output");
+            let Some(request) = self.stored_read(request) else { continue };
+            let request = match self.protocol.play(request) {
                 // The protocol layer answers at once (testing-strategy.md, 4).
                 Ok(events) => {
                     self.immediate.extend(events);
@@ -469,6 +491,7 @@ impl World {
                         self.signed_in = Some(sign_in);
                     }
                     Delivery::Assigned { assignment, .. } => self.assigned.push(assignment),
+                    Delivery::Read { reply, answer } => self.reads.push((reply, answer)),
                     // The run has its answer once the hub relays it down; the
                     // world renders an answer as its first call's name, and a
                     // replayed call carries that same text.
@@ -656,7 +679,6 @@ fn change_world_with_gate(
     change_world_with_policy(silent_ci, passes, approval, agent_gate, false, false, false)
 }
 
-#[expect(clippy::too_many_lines, reason = "the root change fixture builds both producer and review routes")]
 #[expect(clippy::fn_params_excessive_bools, reason = "independent CI, gate and policy settings select test worlds")]
 fn change_world_with_policy(
     silent_ci: bool,
@@ -667,7 +689,23 @@ fn change_world_with_policy(
     owner_gate: bool,
     tracked: bool,
 ) -> (World, engine::Assignment, engine::Assignment, Box<[u8]>) {
-    let mut world = World::configured_policy(true, true, silent_ci, passes, approval, agent_gate, owner_gate);
+    let world = World::configured_policy(
+        true,
+        true,
+        silent_ci,
+        passes,
+        paths::Gate { approval, agent: agent_gate, owner: owner_gate },
+        None,
+    );
+    change_world_in(world, paths::Change { no_ci, owner_gate, tracked })
+}
+
+#[expect(clippy::too_many_lines, reason = "the root change fixture builds both producer and review routes")]
+fn change_world_in(
+    mut world: World,
+    policy: paths::Change,
+) -> (World, engine::Assignment, engine::Assignment, Box<[u8]>) {
+    let paths::Change { no_ci, owner_gate, tracked } = policy;
     if no_ci {
         world.adopt_with_checks(false, Box::new([1]));
     } else {

@@ -36,6 +36,8 @@ pub(crate) const PRODUCER_SPEND: u64 = 40;
 pub(crate) const PRODUCER_NOTES: u32 = 0;
 pub(crate) const CALL_TOKENS: u64 = 1;
 pub(crate) const PERSON_WAIT: Duration = Duration::from_secs(5);
+// crates/temper/tests/support/configuration.rs: the process tier's short lists.
+pub(crate) const DOCUMENT_LINES: u32 = 2;
 pub(crate) const CHAT_WAIT_MS: u32 = 1000;
 pub(crate) const GOAL_BUDGET: &[u8] = b"100";
 pub(crate) const FORGE_STATUSES: u32 = 8;
@@ -90,6 +92,7 @@ pub(crate) fn document() -> Vec<u8> {
     for (name, count) in [
         ("core.load_slots", 8),
         ("documents.rows", 2),
+        ("documents.lines", DOCUMENT_LINES),
         ("documents.text_bytes", 128),
         ("people.sign_ins", 2),
         ("views.watchers", 16),

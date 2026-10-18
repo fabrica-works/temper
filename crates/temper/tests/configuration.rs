@@ -15,7 +15,18 @@ fn the_process_configurations_documents_fit_the_native_client() {
     let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
     let native = temper_client_shell_terminal::limits::native().client.jig;
     assert!(engine.limits.core.documents.rows <= native.rows, "the native client can receive every document row");
-    assert!(engine.limits.core.documents.lines <= native.rows, "the native client can receive every document path");
+    assert!(
+        engine.limits.core.documents.lines <= native.rows,
+        "the native client can receive every document's short list"
+    );
+    let paths = engine
+        .limits
+        .core
+        .authority
+        .segments
+        .max(engine.limits.core.tasks.hold_segments)
+        .max(engine.limits.core.tasks.authority_segments);
+    assert!(paths <= native.segments, "the native client can receive every document path");
     assert!(
         engine.limits.core.documents.text_bytes <= native.text,
         "the native client can receive every document text"
