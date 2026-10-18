@@ -363,3 +363,5 @@ pub fn inbox_entry(
         at: Wall::EPOCH,
     }
 }
+
+pub mod chats;

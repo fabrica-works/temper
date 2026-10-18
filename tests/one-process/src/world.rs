@@ -205,22 +205,16 @@ pub(crate) struct Person {
     pub(crate) life: u32,
     cutting: bool,
 }
+const CHAT_WITHIN: Duration = Duration::from_secs(5);
 impl Person {
     fn new(root: Fd, scenario: Story) -> Self {
         let steps = match scenario {
             Story::Chat { words } | Story::ChatReadThenWait { words } => vec![
-                Step::Go {
-                    address: temper_client_domain::Address::Jig(jig_client_view::address::Address::Conversations {
-                        project: None,
-                    }),
-                },
-                Step::See {
-                    find: Find::named(skein_ui::Role::TextArea, b"First words"),
-                    within: Duration::from_secs(5),
-                },
-                Step::Type { find: Find::named(skein_ui::Role::TextArea, b"First words"), words: words.into() },
-                Step::Press { find: Find::named(skein_ui::Role::Button, b"Start a conversation") },
-                Step::See { find: Find::text(fixtures::ANSWER), within: Duration::from_secs(5) },
+                Step::Go { address: temper_client_domain::Address::Chats },
+                Step::See { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), within: CHAT_WITHIN },
+                Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
+                Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },
+                Step::See { find: Find::text(fixtures::ANSWER), within: CHAT_WITHIN },
             ],
             Story::Adoption => stories::adoption_person(),
             Story::Adopt | Story::Merge => stories::person(),

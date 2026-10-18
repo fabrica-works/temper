@@ -11,6 +11,14 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    StartChat,
+    Start,
+    LiveChats,
+    ClosedChats,
+    MoreClosedChats,
+    Chat,
+    ChatSpend,
+    ChatDelegates,
     Accept,
     Reject,
     Answer,
@@ -76,7 +84,15 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 63] = [
+const ALL: [Word; 71] = [
+    Word::StartChat,
+    Word::Start,
+    Word::LiveChats,
+    Word::ClosedChats,
+    Word::MoreClosedChats,
+    Word::Chat,
+    Word::ChatSpend,
+    Word::ChatDelegates,
     Word::Accept,
     Word::Reject,
     Word::Answer,
@@ -144,6 +160,14 @@ const ALL: [Word; 63] = [
 impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::StartChat => 138,
+            Self::Start => 139,
+            Self::LiveChats => 140,
+            Self::ClosedChats => 141,
+            Self::MoreClosedChats => 142,
+            Self::Chat => 143,
+            Self::ChatSpend => 144,
+            Self::ChatDelegates => 145,
             Self::Accept => 125,
             Self::Reject => 126,
             Self::Answer => 127,
@@ -250,8 +274,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(111);
-        let mut phrases = List::with_capacity(111);
+        let mut shapes = List::with_capacity(177);
+        let mut phrases = List::with_capacity(177);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -279,6 +303,24 @@ impl Words {
                 })
                 .expect("closed phrases fit");
         }
+        for word in jig_client::words::ALL {
+            shapes.push(word.shape(text)).expect("jig word shapes fit");
+        }
+        for mut phrase in jig_client::words::english().phrases {
+            use jig_client::words::{StatusWord, Word as JigWord};
+            let literal = if phrase.id == JigWord::Status(StatusWord::WaitingForYou).id() {
+                Some(b"Waiting for you".as_slice())
+            } else if phrase.id == JigWord::Status(StatusWord::Parked).id() {
+                Some(b"Parked".as_slice())
+            } else {
+                None
+            };
+            if let Some(literal) = literal {
+                phrase.forms.first_mut().expect("English word has a form").segments =
+                    Box::new([Segment::Text(copy_of(literal))]);
+            }
+            phrases.push(phrase).expect("jig words fit");
+        }
         crate::forge::words::extend(connector, text, &mut shapes, &mut phrases);
         let language = Language {
             plural: PluralRule::English,
@@ -288,7 +330,7 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 111,
+            phrases: 177,
             holes: 3,
             segments: 686,
             text_bytes: 6144,
@@ -301,6 +343,10 @@ impl Words {
     pub fn say(&self, word: Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(self.connector), holes).expect("checked forge phrase").text
     }
+    #[must_use]
+    pub fn say_word(&self, word: jig_client::words::Word, holes: &[Hole]) -> Box<[u8]> {
+        self.book.say(self.language, word.id(), holes).expect("checked jig word").text
+    }
     pub fn text(&self, builder: &mut Builder, word: Word, holes: &[Hole]) {
         builder.text(Run::Plain, &self.say(word, holes));
     }
@@ -310,12 +356,23 @@ impl Words {
         for word in ALL {
             most = most.max(self.book.capacity(word.id(self.connector))?);
         }
+        for word in jig_client::words::ALL {
+            most = most.max(self.book.capacity(word.id())?);
+        }
         Some(most.max(crate::forge::words::capacity(self)?))
     }
 }
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::StartChat => (&[b"Start a chat"], &[]),
+        Word::Start => (&[b"Start"], &[]),
+        Word::LiveChats => (&[b"Live chats"], &[]),
+        Word::ClosedChats => (&[b"Closed"], &[]),
+        Word::MoreClosedChats => (&[b"More closed chats"], &[]),
+        Word::Chat => (&[b"Chat ", b""], &[Number]),
+        Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
+        Word::ChatDelegates => (&[b"Live delegates ", b""], &[Number]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::Reject => (&[b"Reject with reason"], &[]),
         Word::Answer => (&[b"Answer"], &[]),

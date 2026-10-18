@@ -7,7 +7,7 @@ fn random_people_and_faults_make_each_request_once() {
     for seed in 1..=8 {
         let mut world = fixtures::world(seed);
         world.randomness(12, 0, 0);
-        let person = world.client(fixtures::PARTY, fixtures::conversations());
+        let person = world.client(fixtures::PARTY, fixtures::chats_page());
         world.random_person(person);
         for (at, fault) in fixtures::faults(seed) {
             world.fault_at(at, fault);

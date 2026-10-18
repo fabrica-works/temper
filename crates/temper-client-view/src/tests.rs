@@ -1,3 +1,4 @@
+mod chats;
 mod confirm;
 mod fixtures;
 mod forge_page;

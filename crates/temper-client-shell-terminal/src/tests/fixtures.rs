@@ -751,3 +751,52 @@ pub fn service_answer() -> Box<[u8]> {
     answer.encode(&mut bytes).expect("measured answer");
     bytes.finish()
 }
+
+pub fn chats_page() -> skein_ui::Tree {
+    use skein_ui::{Role, Run};
+    let mut b = skein_ui::Builder::new(&tree_limits());
+    synthetic_frame(&mut b, false);
+    b.open(Role::Main);
+    b.open(Role::Heading { level: 1 });
+    b.text(Run::Plain, b"Chats");
+    b.close();
+    b.open(Role::TextArea);
+    b.name(b"Start a chat");
+    b.bind(binding());
+    b.close();
+    b.open(Role::Button);
+    b.name(b"Start");
+    b.bind(binding());
+    b.close();
+    for (heading, number, title, status, spend, delegates) in [
+        (
+            b"Live chats".as_slice(),
+            b"Chat 9".as_slice(),
+            b"Hello".as_slice(),
+            b"Writing".as_slice(),
+            b"Spent 7; delegates spent 2".as_slice(),
+            b"Live delegates 1".as_slice(),
+        ),
+        (b"Closed", b"Chat 8", b"Earlier", b"Ended", b"Spent 4; delegates spent 0", b"Live delegates 0"),
+    ] {
+        b.open(Role::Heading { level: 2 });
+        b.text(Run::Plain, heading);
+        b.close();
+        b.open(Role::Item);
+        b.open(Role::Link);
+        b.name(number);
+        b.bind(binding());
+        b.close();
+        for (role, value) in
+            [(Role::Paragraph, title), (Role::Status, status), (Role::Paragraph, spend), (Role::Paragraph, delegates)]
+        {
+            b.open(role);
+            b.text(Run::Plain, value);
+            b.close();
+        }
+        b.close();
+    }
+    b.close();
+    b.close();
+    b.finish()
+}

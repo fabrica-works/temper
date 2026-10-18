@@ -142,7 +142,7 @@ pub fn codec() -> jig_protocol_transcript::Limits {
 }
 
 #[must_use]
-pub fn conversations() -> temper_client_domain::Address {
+pub fn chats_page() -> temper_client_domain::Address {
     temper_client_domain::Address::Chats
 }
 #[must_use]

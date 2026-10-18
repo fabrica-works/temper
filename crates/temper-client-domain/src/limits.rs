@@ -26,6 +26,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     let mut total = jig_client_view::worst_case(&limits.jig)?;
     total = total.checked_add(crate::pages::inbox::worst_case(limits)?)?;
+    total = total.checked_add(crate::pages::chats::worst_case(limits)?)?;
     total = total.checked_add(Queue::<crate::pages::Request>::worst_case(crate::pages::inbox::max_out(limits))?)?;
     total = total.checked_add(forge::worst_case(&limits.forge)?)?;
     // A shown outcome may carry a protection rule or a whole core refusal.

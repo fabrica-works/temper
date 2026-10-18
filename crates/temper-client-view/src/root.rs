@@ -71,6 +71,15 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             &mut view.pages,
             &mut view.jig,
         );
+    } else if *root.pages().address() == temper_client_domain::Address::Chats {
+        crate::pages::chats::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &view.jig_words,
+            &mut view.pages,
+            view.jig.text_limit(),
+        );
     } else if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
         && let Some(form) = root.forge().form()
     {

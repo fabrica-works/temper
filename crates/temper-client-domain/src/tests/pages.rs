@@ -1,3 +1,4 @@
+mod chats;
 mod inbox;
 use super::fixtures;
 use crate::{

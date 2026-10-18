@@ -7,7 +7,7 @@ use temper_client_world::fixtures;
 fn seed_five_recovers_online_after_the_four_faults() {
     let mut world = fixtures::world(5);
     world.randomness(12, 0, 0);
-    let person = world.client(fixtures::PARTY, fixtures::conversations());
+    let person = world.client(fixtures::PARTY, fixtures::chats_page());
     world.random_person(person);
     for (at, fault) in fixtures::faults(5) {
         world.fault_at(at, fault);

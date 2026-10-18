@@ -40,6 +40,7 @@ fn each_adoption_form_state_prints_as_its_golden_file() {
 fn each_fixture_page_prints_as_its_golden_file() {
     for (name, tree) in [
         ("inbox", fixtures::inbox_page()),
+        ("chats", fixtures::chats_page()),
         ("task", fixtures::task_page()),
         ("project", fixtures::project_page()),
         ("deployment", fixtures::deployment_page()),

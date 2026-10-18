@@ -1,0 +1,22 @@
+== Chats == Live
+temper
+[1] Shop (selected)
+* Pat
+[2] Sign out
+[3] Inbox 0
+[4] Chats
+[5] Adopt a repository
+[6] Start a chat: (empty)
+[7] Start
+## Live chats
+- [8] Chat 9
+  Hello
+  * Writing
+  Spent 7; delegates spent 2
+  Live delegates 1
+## Closed
+- [9] Chat 8
+  Earlier
+  * Ended
+  Spent 4; delegates spent 0
+  Live delegates 0

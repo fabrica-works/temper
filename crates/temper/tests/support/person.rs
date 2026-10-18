@@ -1,10 +1,11 @@
 //! A real native client driven by jig's finite semantic-tree script.
 use skein_fake_person::{Doing, Find, Next, Step, Target, TreeFace};
 use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
-use skein_lib::{Duration, Queue, Time, Token, Wall};
+use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
 use temper_client_domain::Address;
 use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
+const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(20);
 const PIPE: Token = Token::new(u64::MAX);
 const CLOSE: Token = Token::new(u64::MAX - 1);
 /// The script is separate from the client's production composition.
@@ -17,11 +18,11 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     Script {
         resume: false,
         steps: Box::new([
-            Step::Go { address: Address::Jig(jig_client_view::address::Address::Conversations { project: None }) },
-            Step::See { find: Find::named(skein_ui::Role::TextArea, b"First words"), within: Duration::from_secs(20) },
-            Step::Type { find: Find::named(skein_ui::Role::TextArea, b"First words"), words: words.into() },
-            Step::Press { find: Find::named(skein_ui::Role::Button, b"Start a conversation") },
-            Step::See { find: Find::text(answer), within: Duration::from_secs(20) },
+            Step::Go { address: Address::Chats },
+            Step::See { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), within: START_WITHIN },
+            Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
+            Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },
+            Step::See { find: Find::text(answer), within: START_WITHIN },
         ]),
     }
 }
@@ -245,13 +246,13 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         Step::See { find: Find::text(b"Adopted acme/widget on forge 1 as owned."), within: super::WITHIN },
     ]);
     steps.extend([
-        Step::Go { address: Address::Jig(jig_client_view::address::Address::Conversations { project: None }) },
-        Step::See { find: Find::named(Role::TextArea, b"First words"), within: super::WITHIN },
+        Step::Go { address: Address::Chats },
+        Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: super::WITHIN },
         Step::Type {
-            find: Find::named(Role::TextArea, b"First words"),
+            find: Find::named(Role::TextArea, b"Start a chat"),
             words: b"@forge_chat Land a small change".as_slice().into(),
         },
-        Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+        Step::Press { find: Find::named(Role::Button, b"Start") },
         Step::Go { address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }) },
         inbox_reply(b"Task 2:"),
     ]);

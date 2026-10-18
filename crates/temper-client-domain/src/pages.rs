@@ -6,6 +6,7 @@ use jig_client::{
     contract::{Delivery, Me, Subject},
 };
 use skein_lib::{Env, Queue, Time};
+pub mod chats;
 pub mod inbox;
 #[derive(Debug)]
 pub struct Pages {
@@ -14,6 +15,7 @@ pub struct Pages {
     watching: bool,
     shown: u64,
     pub(crate) inbox: Option<inbox::Inbox>,
+    chats: Option<chats::Chats>,
     next: u64,
     pub(crate) serial: u64,
     seen: Option<(u64, jig_client::Key)>,
@@ -25,6 +27,11 @@ pub enum Act {
         project: u32,
     },
     SignOut,
+    ChatWords {
+        words: Box<[u8]>,
+    },
+    StartChat,
+    ClosedChats,
     Filter {
         filter: crate::address::Filter,
     },
@@ -74,6 +81,7 @@ impl Pages {
             watching: false,
             shown: 0,
             inbox: None,
+            chats: None,
             next: 1,
             serial: 0,
             seen: None,
@@ -87,6 +95,10 @@ impl Pages {
     #[must_use]
     pub const fn inbox(&self) -> Option<&inbox::Inbox> {
         self.inbox.as_ref()
+    }
+    #[must_use]
+    pub const fn chats(&self) -> Option<&chats::Chats> {
+        self.chats.as_ref()
     }
     pub(crate) fn seeded(seed: u64) -> Self {
         Self { serial: skein_lib::Rng::new(seed).next_u64(), ..Self::new() }
@@ -124,39 +136,25 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 }));
             }
         }
-        Event::Went { address } => {
-            if pages.inbox.is_none() || pages.address != address {
-                if let Some(inbox) = pages.inbox.take() {
-                    pages.next = inbox.leave(out);
-                }
-                if let Address::Inbox { filter } = address {
-                    pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
-                }
-                pages.seen = None;
-                pages.confirm = None;
+        Event::Went { address } => went(pages, env, address, out),
+        Event::Act { act: Act::ChatWords { words } } => {
+            if let Some(chats) = &mut pages.chats {
+                chats.write(words, &env.limits);
             }
-            pages.address = address;
+        }
+        Event::Act { act: Act::StartChat } => {
+            let me = pages.me(client);
+            if let Some(chats) = &mut pages.chats {
+                chats.start(env, me, pages.project, &mut pages.serial, out);
+            }
+        }
+        Event::Act { act: Act::ClosedChats } => {
+            if let Some(chats) = &pages.chats {
+                chats.older(out);
+            }
         }
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
-        Event::Act { act: Act::Seen } => {
-            if let Some(through) = match &pages.inbox {
-                Some(inbox) => inbox.results_through(),
-                None => None,
-            } && match pages.seen {
-                Some((old, _)) => old < through,
-                None => true,
-            } {
-                pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
-                let key = jig_client::Key { asker: Owner::Pages.asker(), number: pages.serial };
-                pages.seen = Some((through, key));
-                out.push(Request::Client(jig_client::Event::Send {
-                    key,
-                    request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Seen {
-                        through: jig_client::contract::SeenThrough::Results { through },
-                    })),
-                }));
-            }
-        }
+        Event::Act { act: Act::Seen } => seen(pages, out),
         Event::Act {
             act: act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm | Act::Cancel),
         } => crate::acts::step(pages, env, act, out),
@@ -203,13 +201,21 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
                 return;
             }
-            if !match &mut pages.inbox {
+            if let Some(chats) = &mut pages.chats {
+                if !chats.told(told, out) {
+                    return;
+                }
+            } else if !match &mut pages.inbox {
                 Some(inbox) => inbox.told(client, told, out),
                 None => false,
             } {
                 return;
             }
         }
+    }
+    let me = pages.me(client);
+    if let Some(chats) = &mut pages.chats {
+        chats.configure(me, pages.project, &env.limits, out);
     }
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
 }
@@ -230,4 +236,44 @@ fn contains(me: &Me, project: Option<u32>) -> bool {
         }
     }
     false
+}
+
+fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<Request>) {
+    if (pages.inbox.is_none() && pages.chats.is_none()) || pages.address != address {
+        if let Some(inbox) = pages.inbox.take() {
+            pages.next = inbox.leave(out);
+        }
+        if let Some(chats) = pages.chats.take() {
+            pages.next = chats.leave(out);
+        }
+        if address == Address::Chats {
+            pages.chats = Some(chats::Chats::new(pages.next));
+        }
+        if let Address::Inbox { filter } = address {
+            pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
+        }
+        pages.seen = None;
+        pages.confirm = None;
+    }
+    pages.address = address;
+}
+
+fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
+    if let Some(through) = match &pages.inbox {
+        Some(inbox) => inbox.results_through(),
+        None => None,
+    } && match pages.seen {
+        Some((old, _)) => old < through,
+        None => true,
+    } {
+        pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
+        let key = jig_client::Key { asker: Owner::Pages.asker(), number: pages.serial };
+        pages.seen = Some((through, key));
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Seen {
+                through: jig_client::contract::SeenThrough::Results { through },
+            })),
+        }));
+    }
 }
