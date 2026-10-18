@@ -3,6 +3,7 @@ use skein_lib::{Queue, Time, Token};
 const LISTENER: Token = Token::new(70);
 const SOCKET: Token = Token::new(71);
 const OWNER: Token = Token::new(0);
+const CONNECTION: Token = Token::new(1);
 const STALL_AT: Time = Time::from_nanos(30_000_000_000);
 
 fn accepted() -> (crate::server::Server, Queue<crate::server::Routed>) {
@@ -110,16 +111,7 @@ fn closing_sends_a_queued_response_before_ending_its_call() {
     while server.advance(&mut out) {
         while out.pop().is_some() {}
     }
-    server.answer(
-        call,
-        skein_http::server::Request::Respond(skein_http::server::Response {
-            status: 204,
-            headers: Box::new([]),
-            body: skein_http::server::Body::None,
-            close: true,
-        }),
-        &mut out,
-    );
+    fixtures::server_response(&mut server, call, &mut out);
     server.close(&mut out);
     server.finish();
     while out.pop().is_some() {}
@@ -131,6 +123,43 @@ fn closing_sends_a_queued_response_before_ending_its_call() {
     assert_eq!(stream, SOCKET);
     while server.advance(&mut out) {}
     assert_eq!(server.next_deadline(), None);
+}
+
+#[test]
+fn a_completed_closing_response_drains_while_the_server_serves() {
+    let (mut server, mut out) = accepted();
+    let (call, _) = fixtures::server_call(&mut server, &mut out);
+    while server.advance(&mut out) {
+        while out.pop().is_some() {}
+    }
+    server.answer(call, skein_http::server::Request::Discard, &mut out);
+    fixtures::server_response(&mut server, call, &mut out);
+    let mut completed = false;
+    while server.advance(&mut out) {
+        while let Some(event) = out.pop() {
+            match event {
+                crate::server::Routed::Io(skein_io::Request::Stream {
+                    down: skein_lib::stream::Down::Demand { room, .. },
+                    ..
+                }) if room > 0 => {
+                    server.up(skein_io::Event::Stream { owner: CONNECTION, up: skein_lib::stream::Up::Room }, &mut out);
+                }
+                crate::server::Routed::Http { event: skein_http::server::Event::Done(reuse), .. } => {
+                    assert_eq!(reuse, skein_http::server::Reuse::Close);
+                    completed = true;
+                }
+                crate::server::Routed::Io(_)
+                | crate::server::Routed::Call { .. }
+                | crate::server::Routed::Http { .. } => {}
+            }
+        }
+    }
+    assert!(completed, "response completed");
+    server.done(call, &mut out);
+    let Some(crate::server::Routed::Io(skein_io::Request::Close { entity })) = out.pop() else {
+        panic!("completed response drains")
+    };
+    assert_eq!(entity, SOCKET);
 }
 
 #[test]

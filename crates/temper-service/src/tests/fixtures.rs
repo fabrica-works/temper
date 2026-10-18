@@ -485,7 +485,7 @@ mod clients;
 pub mod http;
 mod server;
 pub use agent::agent;
-pub use server::{answered, header, listening, request, server, server_call, server_head};
+pub use server::{answered, header, listening, request, server, server_call, server_head, server_response};
 pub(super) mod system;
 pub use system::{Kernel, hello, one_process, until_hosting};
 pub fn turn(service: &mut crate::Service) {

@@ -80,3 +80,17 @@ pub fn header<'a>(headers: &'a [skein_http::Header], name: &[u8]) -> Option<&'a 
     }
     None
 }
+
+const RESPONSE_STATUS: u16 = 204;
+pub fn server_response(server: &mut Server, call: skein_lib::Token, out: &mut skein_lib::Queue<crate::server::Routed>) {
+    server.answer(
+        call,
+        skein_http::server::Request::Respond(skein_http::server::Response {
+            status: RESPONSE_STATUS,
+            headers: Box::new([]),
+            body: skein_http::server::Body::None,
+            close: true,
+        }),
+        out,
+    );
+}
