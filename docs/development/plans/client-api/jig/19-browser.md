@@ -487,7 +487,9 @@ says.
 Don't: write a page of jig's own; carry a JavaScript snippet (`browser.md`,
 17: none by default); give the tier a world's seed or a fixed sleep;
 raise a profile's budget; move skein in any commit.
-Size: at most 250 lines (the shell's; `tests/` is not counted).
+Size: at most 250 lines (the shell's; `tests/` is not counted). Ruling
+342: 581 with the host, its limits and records, the manifests and ruling
+337's forwarding, which the Scope holds; stop at 650.
 Removes: nothing.
 
 ### 19.5 The test shell's steps of 3.5: a root file, and the codec under a prefix

@@ -2609,6 +2609,13 @@ choice would have been the user's (development.md, 10.4).
      1. Forward points 1 and 3's Pass on texts now, as the 11:42:02Z steer says; context.md names only the steer's time and its points, as ruling 167, point 6, says.
      2. A later steer's run-end Pass on text lands in "The run's steers" first, as ruling 167 says; one sent without it gets the same answer.
 
+342. **jig-19.4's Size holds its host** (plan defect, jig-19's block of 2026-10-18T11:45:31Z).
+     Ruling 342, plan defect in 19.4's Size. Its Scope holds more than its Size counts: "`jig-client-test-shell-web` (`browser.md`, 3.1: start, the turn of 5.2, the client host's functions of 3.2, the sign-in part at start, history through the codec)", while its Size says "at most 250 lines (the shell's; `tests/` is not counted)" and its Shape "About 200 lines beside its host (a guide)". The shell is 157 lines, inside its guide; the rest is the host and what it carries, which the Scope asks for, and ruling 337's forwarding, which the plan added after the Size.
+
+     1. 19.4's Size is 581 production lines (the shell 157, the host 202, its small limits 90, its records 59, manifests and assets 44, ruling 337's client variant and forwarding 29), and it stops at 650 for the proof's repairs.
+     2. No split: the work is built and checked, and a second increment would add a gate and a session for the same lines.
+     3. The report gives the per-file count again at landing; a file past these counts is named with why.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
