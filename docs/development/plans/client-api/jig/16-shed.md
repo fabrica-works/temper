@@ -498,6 +498,57 @@ the commit body.
   in temper.
 - **Done when:** the third grep lists 223 files at jig `4fad1fcc8`.
 
+## Corrections at jig `5b4e287f0` (ruling 300, the re-check of 16.5 after 16.3 and 16.4)
+
+These take precedence over 16.5's Shape and rulings 284 and 299 where
+they differ. Refresh any further copy or derived value, and list it in
+the commit body.
+
+- **16.5, the creating bounds stay:** `acts::bounds::goal`
+  (`jig-domain-core/src/acts/bounds.rs:22`) builds the `Bounds::Create`
+  that `me` carries (`documents/small.rs:118`), through `goal_charter`
+  (:200), `goal_start` (:223) and `Core::chat_authority`
+  (`funding.rs:40`, the most a person's next task can take, read at
+  `bounds.rs:69`). They stay, and may take creation's names (for example
+  `bounds::create`, `create_authority`); `Act::SetGoal`'s arm
+  (`acts/objects.rs:80`), the core's goal creation
+  (`routing/parties.rs:134`, `goals.rs:170`) and what is then left with
+  no caller go. The Shape's "`chat_authority`" and "the goal bounds
+  (`acts/bounds.rs:22-91, 187-300`)" read so.
+- **16.5, users that no name finds:** they go with their asks or with
+  `Settings.chat`:
+  - the people child's `Limits.goals` (`jig-domain-people/src/limits.rs:33`,
+    `Prioritise`'s bound, filled at `jig-protocol-config/src/domain.rs:172`)
+    and `disposal_capacity` (`jig-domain-core/src/memory.rs:99`,
+    `jig-domain-people/src/domain.rs:1037`), with the wire's and the
+    store's limit fields derived from the removed records' lists and
+    words;
+  - the engine frame's `OfferedCharter` (`documents.rs:233`, the
+    `Frame.charters` list at :272, its worst case at :411) and
+    `FrameProjectRole.chat_budget` (:248), with their writers
+    (`documents/small.rs:127, :147`) and tests (`tests.rs:423`,
+    `tests/frame_facts.rs:26`, `tests/frame_deployment_role.rs:70`): no
+    translation reads them since 16.3;
+  - the derived memory pin `jig-protocol-config/src/tests/domain.rs:197`
+    (`What::Memory { over: 18_576_833_503 }`), which moves with them.
+- **16.5, the note scope:** the wire's `NoteScopeGoal` and the
+  contract's `NoteScope::Goal` (`jig-client-domain/src/contract/common.rs:233`)
+  become `Task { project, task }`, with their translations at both ends;
+  the engine's scopes (`notes::Scope::Goal`, and the people child's and
+  the authority's `NoteScope::Goal`) keep their names, as "Choices" says,
+  and the component maps between them. Their users are the 30 files
+  `git grep -l -E 'NoteScope::Goal\b' -- '*.rs' ':!*/generated/*'`
+  lists at jig `5b4e287f0`.
+- **16.5, lines at jig `5b4e287f0`:** `GoalProcedure` at `documents.rs:404`
+  and `documents/offers.rs:233, :291`; `tests.rs:972` (ruling 299's
+  :1054); the tasks child's `Ask::Close` at `routing/tasks.rs:1355`.
+  `documents/{inbox_deployment.rs, task_tree.rs}`, `inbox.rs` and
+  `reads/indexed.rs` hold none of 16.5's names since 16.4, and leave
+  Files. Ruling 299's grep lists 216 files, `crates/jig-client-view/src/tests/shapes.rs`
+  and `testing/jig-client-scripted-engine/src/requests/creating.rs` among
+  them. The re-check applied both renames at `5b4e287f0`: clippy clean,
+  1087 default and 44 fuzzy tests passed in the five suites they reach.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query

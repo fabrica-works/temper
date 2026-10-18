@@ -2100,6 +2100,17 @@ choice would have been the user's (development.md, 10.4).
      - `roles.rs:98: pub fn chat_admit(`, `:288: pub(crate) fn priorities_allowed(`, `:312: pub fn prioritise(`; `jig-fake-parties/src/lib.rs:401: Ask::Close { task, disposals } => {`; `templates.rs:51: pub(crate) fn chat(`; `git grep -c -i chat -- jig-protocol-config/src/{lib,charters}.rs`: nothing.
      - temper `temper/04-engine.md:336`: "### 04.3 The engine's shapes of work gone, with jig's", :339 "the store's `Disposal` refusal, gone with jig 16's", :347 `crates/temper-engine-domain/src/store.rs`.
 
+300. **jig 16.5's Shapes after 16.3 and 16.4** (re-check of jig-16.5).
+     Ruling 300 (plan defect, the re-check of jig 16.5 after 16.3 and 16.4, at jig `5b4e287f0`): corrected in `jig/16-shed.md`, under "Corrections at jig `5b4e287f0` (ruling 300…)". The creating bounds `me` carries stay, with `bounds::goal`, `goal_charter`, `goal_start` and `chat_authority`, which build them; only `Act::SetGoal`'s arm and the core's goal creation go. Users no name finds join 16.5: the people child's `Limits.goals` and `disposal_capacity`, the engine frame's `OfferedCharter` and `chat_budget`, and the memory pin they move. The wire's and contract's note scope becomes `Task`, the engine's keep `Goal`. Lines refreshed.
+
+     Checked:
+     - jig `git log -1 origin/main`: `5b4e287f0` (16.3), after `e1552c979` (16.4).
+     - `documents/small.rs:118: creating: match crate::acts::bounds::goal(`; `acts/objects.rs:80: Act::SetGoal => bounds::goal(`; `bounds.rs:46: if goal_charter(`, `:57: goal_start(`, `:69: let given = crate::task_authority(&core.chat_authority(project, party, held, …`; `funding.rs:39-40: /// The most a person's next task can take … pub(crate) fn chat_authority(`.
+     - `limits.rs:33: pub goals: u32,`; `jig-protocol-config/src/domain.rs:172: goals: limits.tasks.project_goals,`; `memory.rs:99: || people::disposal_capacity(&limits.people) < …`; `tests/domain.rs:197: What::Memory { over: 18_576_833_503 }`.
+     - `git grep -n -E '\bOfferedCharter\b|\bchat_budget\b'`: only `jig-domain-core` (`documents.rs:233, :248, :272, :411`, `small.rs:127, :147`, `tests.rs:423`, `frame_facts.rs:26`, `frame_deployment_role.rs:70`).
+     - `git grep -l -E 'NoteScope::Goal\b' -- '*.rs' ':!*/generated/*' | wc -l`: 30; "Choices": "`NoteScopeGoal` becomes `NoteScopeTask { project, task }`, the scope of a tracked task, which the notes child keeps under its own name".
+     - `git grep -n GoalProcedure`: `documents.rs:404`, `offers.rs:233, :291`; ruling 299's grep: 216 files; on `inbox_deployment.rs`, `task_tree.rs`, `inbox.rs`, `reads/indexed.rs`: no match.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
