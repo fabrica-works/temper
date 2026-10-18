@@ -2603,6 +2603,12 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** about 45 minutes from now; past it, report what the log shows.
      5. **Unchanged:** the referee's and the judge's checks; the design's rule that a deciding act names the revision of the document its card showed (`client.md`, 1000: "no deciding act is made on a tree that did not show its facts"); ruling 229's count (two runs of this proof so far).
 
+341. **The 11:42Z steer's run-end texts in the README** (process, the coordinator's block of 2026-10-18T11:43:00Z).
+     Ruling 341, process. The block is right: ruling 167, point 6, says "a steer's Pass on text that holds until the run's end lands in 'The run's steers' before the steer is sent", and the 11:42:02Z steer was sent without it. Its points 1 and 3, whose Until is the run's end, now land there, each as the steer gave it, with the sessions it applies to. Point 2's text is the README's lint rule already, as the block says.
+
+     1. Forward points 1 and 3's Pass on texts now, as the 11:42:02Z steer says; context.md names only the steer's time and its points, as ruling 167, point 6, says.
+     2. A later steer's run-end Pass on text lands in "The run's steers" first, as ruling 167 says; one sent without it gets the same answer.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

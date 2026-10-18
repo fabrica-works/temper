@@ -918,6 +918,20 @@ per session are in each file.
     or a budget that matters (`831`, `10`) as a constant.
     `a_scripted_chat_question_waits_for_its_requester` (49 lines) is the
     example to bring to 40 or fewer.
+  - 2026-10-18 11:42Z, point 1 (every session, from its next report):
+    In your report's Evidence, give each suite's time from the
+    Gate-Result line beside its aim and budget as numbers (jig: focused
+    aim 13.3 s, budget 30 s; fuzzy aim 24.91 s, budget 60 s. temper:
+    focused aim 6.0 s, budget 15 s; fuzzy aim 19.36 s, budget 60 s), and
+    say 'over' or 'below' only as those numbers say.
+  - 2026-10-18 11:42Z, point 3 (jig 19.4, 19.5 and every later
+    increment's new tests; jig 19.3's two landed tests at the first
+    increment that edits `crates/jig-client-shell-web/src/tests.rs`,
+    split in place, assertions kept): Tests: one behaviour per test,
+    named for it in about eight words; every number in a test is a const
+    named for what it stands for; expected values are literals. Split a
+    test that asserts several behaviours under one name (development.md
+    14.3, Shape).
 
 ## Prerequisites the run checks at its start
 
