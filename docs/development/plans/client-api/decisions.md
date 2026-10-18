@@ -2350,6 +2350,41 @@ choice would have been the user's (development.md, 10.4).
 320. **temper 07's Shapes against main** (ready check of temper-07.1).
      The ready check of temper-07.1 (skein 0be1255e7, jig 35ab18732, temper 107aff571; main since moved by docs alone) found temper 07's Shapes off main in ten places, corrected in `temper/07-task-pages.md`: lines that moved (`held_chat` :185, `project()` :262, `forge/page.rs` 269 lines, `forge_page.rs` 343); the view tests on the view's own fixtures (`view`, `build`, `find`, `text`), temper-client-view not depending on skein-fake-person; 07.1's `Task { number, .., shape }` (clippy's `struct_field_names`), its kind of page from the task document's `priority` and `chip.executor`, and `forge::drawn` split out of `part` for a page with no slot; 07.3's title naming the project as `me` names it ("Adopt a repository into shop", `client.md`, 4.4), so line 1 of the 7 `adopt_*.txt` goldens, `forge_page.rs:31` and the shell's `tests/fixtures.rs:133` change, and `page` keeps its `jig` words and `text_limit` for `outcome`; 07.4's Files gain the users its own grep finds, and `skein_ui_text::Settings` is the shell's (`terminal.rs:59`, `tests.rs:93`), not `open.rs`'s. "Signed out." is temper's words (`client.md`, 6.6): `jig-client`'s `words` has no phrase for a link state. What temper's main says out of date, and the adoption title for a project `me` does not name, are design questions, asked of the designer at 06:36:20Z: 07.1 to 07.3 go on, 07.3 keeping today's number fallback, and 07.4 takes both from the answer. The process tier's `Tree(Other(16))` the check saw, on unmodified main too, is decisions.md's E (ruling 111): the check ran outside pueued's cgroup.
 
+321. **temper 07's question: temper's out-of-date main, an unnamed project's title, dropped work** (design gap, temper 07's ready-check question of 2026-10-18T06:36:20Z).
+     The designer's answer (session ef358d17), landed as temper `872fda7aa`, below; 07.1 to 07.3 go on as ruling 320 has them, and 07.4 follows its amended text in `temper/07-task-pages.md`.
+
+
+     1. **Out of date is temper's own sentence: no jig step and no repin.**
+        The main says "This temper is out of date: run the temper the engine
+        runs." (`client.md`, 5.1, "The pages not about the work"). jig's
+        pages.md, 8 asks "the page says so, and how to update"; temper
+        "arranges no page of jig's" (`client.md`, 9).
+     2. **Both mains are one paragraph, with no heading.** The terminal's
+        first line reads `== temper == Signed out` or `== temper == Out of
+        date` (skein's `ui-text.md`, 5: "TITLE is ... the shell's name when
+        there is none"). The banner's link state has one word per `Link`
+        state: "Signed out", "Connecting", "Live", "Offline", "Out of date".
+        While signed out or out of date, "`me` ends only with the sign-in, or
+        when jig's version is not served" (jig's `client.md`, 8.2), so the
+        banner is temper's name and the state alone, with no navigation. Out
+        of date, temper prints no line of its own.
+     3. **The title for a project `me` does not name** is "Adopt a
+        repository into project N", N the address's number, until `me` names
+        it (`client.md`, 4.4). It is a row of the forge's words with a number
+        hole, in place of `JigPhrase::FrameProjectNumber`. The form is
+        unchanged: "the engine judges it, and a refusal says why" (5.3).
+     4. **Found and decided: the dropped count.** At the base,
+        `Told::Dropped { count }` goes to the reference UI (`route.rs:154`),
+        which 07.4 removes. jig's root.md, 8 gives it to "the presentation
+        the application chooses". temper's domain hands it to the shell,
+        which prints `temper: N requests kept in DIRECTORY were not sent:
+        another version of temper made them` once (`client.md`, 3.4, 6.6).
+     5. **For the run:** 07.1 to 07.3 go on unchanged, and 07.3 keeps
+        today's number. 07.4 takes points 1 to 4, as its amended Shape says.
+        Its test `an_engine_not_serving_jigs_version_says_temper_is_out_of_date`
+        replaces `..._says_jigs_out_of_date_words`, and it gains two tests,
+        for the title and the line. Its Size is 140 lines, from 120.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
