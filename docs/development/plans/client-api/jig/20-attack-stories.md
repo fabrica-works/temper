@@ -361,7 +361,11 @@ Test shape: two stories in `browser_skein_stories.rs`, each about 4 s:
 Proof: `land`'s gate runs both.
 Don't: keep `/test/panic` in a `web` build; call skein's two-person
 stories (`later.md`).
-Size: at most 30 lines.
+Size: at most 30 lines. Ruling 393: the back-and-forward story waits
+(`later.md`): skein's `back_and_forward` goes to its first address at
+once, before jig's sign-in by the printed link is ready (401), and
+jig's skein moves past its cap (ruling 296) only in temper's `tools`.
+20.5 lands the panic story and `/test/panic` alone.
 Removes: nothing.
 
 ## Interface sketches

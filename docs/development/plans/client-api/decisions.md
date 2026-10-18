@@ -3140,6 +3140,14 @@ choice would have been the user's (development.md, 10.4).
      2. **The rule for a further one:** a use of `jig-client-view` that 07.4 cannot drop without the child, the renderers or a change in jig stays as on `origin/main`. List each in the report (file, line, the jig item it needs), and go on with no block. The answer's step drops them all: Done when's two greps wait for it.
      3. Rulings 388 (point 3), 389 and 391 stand: today's tree and words stay; land what compiles with the child kept, at up to 400 production lines added.
 
+393. **jig 20.5's back-and-forward story waits for skein past its cap** (cross-session scope, jig 20.5's block of 2026-10-18T19:51:10Z).
+     Ruling 393, kind: cross-session scope. Neither a skein change nor a hook now: the back-and-forward story waits, with a `later.md` row, and 20.5 lands the panic story and `/test/panic` alone.
+
+     1. **A skein change cannot reach jig in this run.** The story's script starts with `Go(first.address)` (Checked), and its `harness` takes no step before it, so the fix is skein's: a ready `Find` seen before the first `Go`. But jig's skein stays at most `2733882` for every repin of this run (ruling 296; README, Rules, Pins, "skein's cap"). The row moves the story to temper's `tools`, beside the cap's own row.
+     2. **No copy of the story in jig:** the design has jig's tier call skein's stories (`browser.md`, 15). A jig-side script would be a second referee for the same story.
+     3. **Drop `back_and_forward_move_between_the_inbox_and_a_task` and its `make_task` fixture from the candidate.** The panic story, the dev build's `/test/panic` and the rest of 20.5 stay. Give the browser count after the drop (rulings 378 and 379) in the report.
+     4. **The rule for a further one:** a shared skein story that fails for a cause in skein's kit, and needs a skein change, moves to the same `later.md` row's kind, by ruling, with its failure. It is not repaired in jig.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
