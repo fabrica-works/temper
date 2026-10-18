@@ -692,6 +692,26 @@ run are appended after "For the user".
        tests that need `TEMPER_FORGEJO` were not run there.
      - Unchanged: Size (250), the tests, the Proof and Done when.
 
+139. **11's and 14's Shapes against main** (ready checks of temper-11.1 and temper-14.1).
+     Ruling 139, the ready checks of temper-11.1 and temper-14.1 at temper 64f610ae6 and skein 867095d1, before 05.3
+     landed (5ee2677e9). Amends `temper/11-hinted.md` and `temper/14-example.md` (each's "Corrections against main", which
+     take precedence over their Files, Shapes and Test shapes): sketches' duplicate imports, stale line references (about 45),
+     users the Files miss (the box's tests and `live.rs` through `tier_configuration`; the `setup` member's copies), T2's
+     `user.file` line, the `llm` address that text replacement misses, T4's four assertions.
+
+     - **The process tier fails on main:** `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart` passes at
+       d4fe894a9 (51.8 s) and fails at 64f610ae6 (person step 4 sees no "Process answer" within 20 s; the fake LLM gets no
+       query). No forge-setup code landed between them; the supervisor has it bisected and routes the fix. Interim: 11.1
+       goes on with its own work. A proof of 11.1 that runs the landing story and fails as above is reported with its log, and
+       waits: do not change the story, the person or the engine for it.
+     - **14.1 waits for the designer:** with `small`, three authority overrides at 8 and the 10 grants `forgejo.rs:156-165`
+       writes, the start refuses `engine.rules.ceiling.grants`, `projects[0].policy.ceiling.grants`,
+       `projects[0].policy.projections` and `roles[0].authority.grants`, each past its bound; design commit 405924109 moved
+       configuration.md 7's authorities. Which limits the example states is the question of this ruling's time.
+     - **11.2's control** landed without deliveries in the check (paces at 600 s, at d4fe894a9): 11-hinted.md's Q2 fires
+       before 11.2 starts; it goes to the designer with the wait named.
+     - Unchanged: Sizes, tests, Proofs and Done when.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

@@ -55,6 +55,28 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 
 ### 14.1 The owned example as a tested file
 
+**Corrections against main (ruling 139, at temper 64f610ae6, before 05.3 landed; they take precedence over the text
+below; the example's authority limits wait for the designer's answer, question of ruling 139):**
+- T2's second line reads `application.forges[0].user.file: forge-1/user: absent` (`application.rs:514`,
+  `tests/startup.rs:90`).
+- The DNS lookup (Rules that bind it) is `address()`, `lib.rs:210-219` (`to_socket_addrs` at :214), not :146-147.
+- Shape 3: the engine's `llm` address is `{"host":"chatgpt.com","port":443}`, which no text replacement reaches:
+  `example_document` sets that member itself.
+- `support/forgejo.rs` holds no `"owned"`: its owned members come through `owned::document` and `owned::Names`
+  (`forgejo.rs:145-155`) and the landing rule (:166); the org is already `acme` (`owned.rs:119` and :289 say `workshop`);
+  only `bot: "temper-bot"` (`forgejo.rs:151`) changes.
+- T4: `tests/configuration.rs`'s test spans :3-34 and has four assertions (rows, lines, paths, text).
+- Users the Files miss: `support/live.rs:131` reads `worker-root` (the example's `workers[0].root` is `workspaces`),
+  through `Throwaway::start` (`forgejo.rs:22`), which `process.rs:36,71` and `live.rs:8` use; copies of the `setup`
+  member outside Done when 3 and 4's grep: `tests/forge-setup/reconcile/src/fixtures.rs:9`,
+  `crates/temper-forge-setup/src/tests/fixtures.rs:13` and `read.rs:27,62,67`. Change each copy that the example's
+  values reach, and list each in the commit body.
+- The sketch's `use std::{…path::{Path, PathBuf}}` clashes with `owned.rs:6` (E0252): merge `net::SocketAddr` into the
+  existing `use std::{…}`.
+- Line references now: `support/forgejo.rs:122-131` is :156-165; `support/mod.rs` 15-18 is 13-16, 15 is 17, 19-41 is
+  21-43, 28-31 is 30-33, 52 is 55; `support/configuration.rs` 14-36 is 14-35, 29 is 28, 31-33 is 30-32;
+  `fixtures.rs:738` is :753; `process.rs:33-68` is 33-66.
+
 Scope: `docs/examples/owned.json` and the files beside it; `support::owned`'s example functions; the tier's owned
 configuration, and the box's two tests, taken from them; four tests of the file (setup.md 8; configuration.md 7).
 Needs: temper 05.3 (`application.webhooks`, `forges[].webhook_secret`) and 13.1 (`temper box`), which bring 07.3 (`user`

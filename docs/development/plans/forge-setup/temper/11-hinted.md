@@ -59,6 +59,24 @@ delivery ends is a question (below), not a fix here. Test code alone.
 ## Increments
 
 ### 11.1 The tier's owned Forgejo delivers, signed, to a listener
+
+**Corrections against main (ruling 139, at temper 64f610ae6, before 05.3 landed; they take precedence over the text
+below):**
+- 11.2's `mod.rs` sketch: delete its `use skein_lib::Duration;` and `use std::path::Path;`, which `support/mod.rs:11` and
+  `:76` already import (E0252); without them it passes clippy.
+- 06.2 has landed: `settle::window` is at `domain.rs:2025`, the `settle` limit at `limits.rs:79-80` (:68 and :131 read
+  "taken as conflicted today"). `poll <= poll_max` is at `limits.rs:68`; the process profile's 10 m is
+  `.config/nextest.toml:34-37`.
+- Users gain the box's tests, `process.rs:258` and `:281`, which call `tier_configuration` and run with webhooks on after
+  11.1; `assert_box_streams` wants each stderr line to start with a step name.
+- The three paces also act at `keep.rs:702`, `:777`, `:870` (`poll`) and `:962` (`slow`), besides `rest_resource`
+  (`:1193-1213`).
+- Line references now: `process.rs` the story :69-83, `Throwaway::start`'s users :36 and :71; `forgejo.rs` start :21, stop
+  :132, configuration :142, `landing_scripts` :253; `mod.rs` `WITHIN` :7, `Scratch::new` :51, `ANSWER`/`EDIT` :342-343,
+  the judge's messages :437 and :449, `run_until_landed` :465-472 (its literal :471), the judge's deadline :494-497;
+  `person.rs:261` `found`, `limits.rs:249` `profile`, `forge.rs:115` `small`, `lib.rs:102` `Outgoing::json`,
+  `instance.rs:110` the nap.
+- `temper_open_adopts_a_repository_by_commands` took 5.07 s in the check (the file says 13.1 s): the ceiling stands.
 Scope: the tier's owned document names the webhooks' listener and the forge's `webhook_secret` (setup.md 8), which 05.3's
 wiring hands to the preparation (`app.ini`'s `ALLOWED_HOST_LIST`, setup.md 6.2) and to reconcile (the org hook, setup.md 5
 step 6); one test shows the box's Forgejo deliver a push to that address, signed with the secret reconcile drew (decision
