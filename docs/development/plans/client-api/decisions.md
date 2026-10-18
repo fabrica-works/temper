@@ -3020,6 +3020,14 @@ choice would have been the user's (development.md, 10.4).
 378. **The check of 16:35Z: test shape again, the adoption SLOW named, the channel SLOW to jig 20.1** (steer of 2026-10-18T16:48Z).
      The check of 2026-10-18T16:35:16Z, three points. 1: the 11:42Z point 3 (one behaviour per test, every number a named const) said again, with 06.5's two two-behaviour chat tests and `clients_unwatch.rs`'s bare numbers seen; temper's sessions are among its "every later increment". 2: the README's 13:34Z point 2 gains one exception, `an_adopted_repository_gets_its_change_pushed_through_git`, already made 0.947 s alone by ruling 368, point 4, which a gate under load flags at 3.031 s: it is named, not repaired again. 3: jig-channel-world's `a_resumed_run_is_sent_only_its_current_window`, flagged SLOW by jig's gates since 11:53Z (0.693 to 0.941 s), is repaired under the 13:34Z point 1 by jig 20.1, the next jig increment to start; jig 19.5 lands with it named, as ruling 375, instruction 3, says, so that 19.5's chain is not delayed.
 
+379. **Ruling 378's run-end Pass on texts in the README** (process, the coordinator's block of 2026-10-18T16:50:55Z).
+     Ruling 379, kind: process. Yes: the steer of 16:47:34Z's points 1 and 2 hold until the run's end, so their Pass on texts belong in the README before the steer is sent (ruling 167), and they were not. They land now, as given:
+     - "2026-10-18 16:47Z, point 1" (every temper and jig session, in the tests it has not yet written, until the run's end): the point 1 Pass on text, word for word.
+     - "2026-10-18 16:47Z, point 2" (temper 06.6, 07.1 and every later temper increment, until the run's end): the point 2 Pass on text, word for word.
+     - The 13:34Z point 2 keeps its own words and its Until; its exception now reads "and except the test the 16:47Z point 2 names", in place of ruling 378's other wording.
+     - The 11:42Z point 3 is unchanged: the 16:47Z point 1 names temper's sessions with it.
+     - Point 3 of the steer holds until a jig gate shows the test not SLOW, so it stays out of the README and is given to jig 20.1 as the steer says.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

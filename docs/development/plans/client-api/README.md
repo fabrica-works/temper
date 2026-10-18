@@ -939,6 +939,19 @@ per session are in each file.
     named for what it stands for; expected values are literals. Split a
     test that asserts several behaviours under one name (development.md
     14.3, Shape).
+  - 2026-10-18 16:47Z, point 1 (every temper and jig session, in the
+    tests it has not yet written, until the run's end; rulings 378 and
+    379): One behaviour per test, named in about eight words, every
+    number a named const (README, 11:42Z point 3). Where the plan names
+    one test for two behaviours, write two that share a helper, and name
+    both in your report.
+  - 2026-10-18 16:47Z, point 2 (temper 06.6, temper 07.1 and every later
+    temper increment, until the run's end; rulings 378 and 379):
+    an_adopted_repository_gets_its_change_pushed_through_git is repaired
+    already (0.947 s alone, ruling 368, point 4). If your gate flags it
+    SLOW under load, do not repair it again: name it in your report with
+    the gate's time and its time alone. Repair every other test your gate
+    flags SLOW (README, 13:34Z point 2).
   - 2026-10-18 14:05Z, point 1 (every temper increment that lands from
     now, until the run's end; ruling 369, the director's request; it
     replaces the 12:20Z point 2, ruling 347): The whole process tier:
@@ -986,12 +999,8 @@ per session are in each file.
     increment lands (README, Test time), whether or not your change made
     it slow. Time the test alone, cut the cost where the time goes, and
     give the before and after times in the report. Name each SLOW test of
-    your gate, except ruling 122's fuzzy walking sweep. Except too
-    (ruling 378, the check of 16:35Z):
-    `an_adopted_repository_gets_its_change_pushed_through_git`, made
-    0.947 s alone by ruling 368, point 4, is not repaired again; a gate
-    that flags it under load is named in the report with its gate time
-    and its time alone.
+    your gate, except ruling 122's fuzzy walking sweep, and except the
+    test the 16:47Z point 2 names.
   - 2026-10-18 13:34Z, point 4 (temper-06.6 and temper-07.1, until each
     lands; ruling 364): Size, temper 06.6 and 07.1: four steps of this
     part of the plan landed at 2.0 to 2.5 times their Size by ruling (330,
