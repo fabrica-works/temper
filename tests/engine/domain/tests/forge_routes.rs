@@ -18,6 +18,9 @@ use temper_fake_forge_domain::{self as fake, api as raw};
 #[path = "forge_routes/paths.rs"]
 mod paths;
 
+#[path = "forge_routes/delegates.rs"]
+mod delegates;
+
 struct World {
     creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,

@@ -10,6 +10,9 @@ use alloc::boxed::Box;
 use jig_domain_brief as brief;
 use jig_domain_core::connector::{EffectDescription, EffectForm, Recovery};
 
+#[cfg(test)]
+mod tests;
+
 /// Translate the worker's connector-specific saved tags at the root boundary.
 pub(crate) fn saved_resources(connector: u16, tags: &[u32]) -> Option<Box<[tasks::SavedResource]>> {
     let mut resources = List::with_capacity(u32::try_from(tags.len()).ok()?);
@@ -110,6 +113,19 @@ fn append_hex(out: &mut List<u8>, bytes: &[u8]) {
         let low = *b"0123456789abcdef".get(usize::from(byte & 15_u8)).expect("low nibble is hexadecimal");
         append(out, &[high, low]);
     }
+}
+
+fn commit_text(commit: &forge_client::api::Commit) -> Box<[u8]> {
+    let mut length = 20;
+    for byte in &commit[20..] {
+        if *byte != 0 {
+            length = 32;
+            break;
+        }
+    }
+    let mut out = List::with_capacity(64);
+    append_hex(&mut out, commit.get(..length).expect("a commit has 20 or 32 bytes"));
+    out.into_boxed()
 }
 
 fn news_words(news: &forge::News, limit: u32) -> Box<[u8]> {
@@ -1709,7 +1725,7 @@ fn change_delegate(
             )
         }
         forge_change::Delegate::Resolve { base } => {
-            parameters.push(tasks::Parameter::Bytes { name: 6, value: Box::from(&base[..]) }).ok()?;
+            parameters.push(tasks::Parameter::Bytes { name: 6, value: commit_text(&base) }).ok()?;
             (
                 tasks::Executor::Agent { charter: domain.config.forge_charter },
                 Box::from(&b"Resolve the merge conflict and push the merge commit"[..]),
@@ -1722,7 +1738,7 @@ fn change_delegate(
         }
         forge_change::Delegate::Gate { number, head } => {
             parameters.push(tasks::Parameter::Number { name: 7, value: number }).ok()?;
-            parameters.push(tasks::Parameter::Bytes { name: 8, value: Box::from(&head[..]) }).ok()?;
+            parameters.push(tasks::Parameter::Bytes { name: 8, value: commit_text(&head) }).ok()?;
             let mut found = None;
             for gate in &row.change.gates {
                 if gate.number == number {
