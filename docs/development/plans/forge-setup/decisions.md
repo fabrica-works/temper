@@ -712,6 +712,13 @@ run are appended after "For the user".
        before 11.2 starts; it goes to the designer with the wait named.
      - Unchanged: Sizes, tests, Proofs and Done when.
 
+140. **Two standing rules for tests** (hourly check of 2026-10-18T11:19Z).
+     Ruling 140, two standing rules in the README's "Rules of this plan", from the hourly check of 2026-10-18T11:19Z,
+     each the third sighting of its finding (development.md, section 14.4): one behaviour per test with a literal
+     expectation; named sizes, and both sides of a bound. They bind temper 11 and 14 from their next increment; landed tests
+     that no increment touches stay. The steer of this time passes them on, with the process changes of skein b30cc95 and
+     b1d2276 that this run takes.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

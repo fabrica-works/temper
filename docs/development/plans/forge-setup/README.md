@@ -173,6 +173,14 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   most 1.0 s to the first and 3.0 s to the second. skein's default suite
   takes at most 0.5 s more. No session has a share.
 
+- **One behaviour per test, and a literal expectation (ruling 140; seen at 23:03Z, 02:28Z and 11:19Z).** A test
+  asserts one behaviour, and its expected value is a literal or a named size, never one the code under test returns.
+  The hourly check reads each landing's new tests for it.
+- **Named sizes, and both sides of a bound (ruling 140; seen at 00:30Z, 02:28Z and 11:19Z).** A size, a count, a
+  limit or an id in a test is a named constant with its derivation beside it (the code's constant, the fixture's
+  content, or the design's section). A limit is tested at the bound, which holds, and one past it, which does not, each
+  in a test or row of its own. Landed tests that no increment touches stay.
+
 ## Prerequisites the run checks at its start
 
 The coordinator runs each once, before the first session, and writes
