@@ -2678,6 +2678,13 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** three focused runs and 30 minutes from this unblock; past that, report what the log shows.
      5. **Unchanged:** the referee's check; every production deadline; the link's backoff; ruling 229; ruling 339's point 5; the `Server::stop` patch stays out.
 
+350. **jig-19.4's deferred constructor refusal** (plan defect, jig-19's block of 2026-10-18T12:24:35Z).
+     Ruling 350, a plan defect in ruling 348, which did not say where a refusal of the deferred constructor goes: yes, as the report proposes.
+
+     1. `startup` returns the prepared service; the first `iterate` builds the clients component at its `now` and `wall`, and a refusal of `kit::Component::new` ends the service with `End::Stopped(Stop::Start(problems))`, with the same `Problems` that `Clients::new` gives now (`engine.clients`, `What::Bound`). Every check of `Component::new` runs, unchanged, once, before anything is served; none is copied, skipped or weakened.
+     2. A test that expects that refusal from `startup` moves its expectation to the first `iterate`'s end, with the same problems; its commit body names it and this ruling.
+     3. Unchanged: ruling 348's other points; `jig-protocol-engine-clients`; `startup`'s signature.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
