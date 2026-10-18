@@ -722,6 +722,45 @@ run are appended after "For the user".
 141. **11.1 against 05.3** (re-check of temper-11.1).
      Ruling 141, the re-check of temper-11.1 after 05.3 landed (5ee2677e9), at temper 01e467afc. Amends `temper/11-hinted.md` (its "Corrections against main"): the `webhooks.rs` sketch's two duplicate imports; `support/mod.rs`'s references moved by one line, `limits.rs:252`, `forge.rs:116`; `owned::document` takes no webhooks input, so `forgejo::configuration` sets them after it, or `owned::Names` gains a field. With these, in a scratch worktree: clippy `-D warnings` passes; the default 54 of 54; the process tier 16 of 17, `a_push_is_delivered_signed_with_the_secret_reconcile_drew` in 4.9 s; the landing story fails as ruling 139 says, with 11.1's changes and without them.
 
+142. **14.1's example limits, the designer's answer** (design gap, ready check of temper-14.1).
+     Ruling 142, the designer's answer to the question of 2026-10-18T09:22Z (temper 14.1, the owned example's authority limits): temper a975025ad (configuration.md 7 and 10; 14-example.md's "Corrections after the designer's answer"). T3 (report item 5, the plan's call): `example_document` keeps the file's `charter` 2.
+
+
+     1. **The example keeps the owner's 10 grants and raises small's bounds to hold them.** configuration.md 10 now says:
+        "the rules' ceiling, the project's ceiling, its role's authority and its projections each hold one grant on the org,
+        `acme`, for each kind a change and its goal's issue use … 10, as the process tier's owner holds them". So the grants
+        are the ones `support/forgejo.rs:156-165` writes (kinds 1, 2, 3, 4, 7, 8, 10, 11, 12, 13). None is cut.
+     2. **Its `engine.limits` is `small` with 13 overrides, and no others.** configuration.md 10's skeleton:
+        ```
+        "authority.segments": 8, "tasks.hold_segments": 8, "tasks.authority_segments": 8,
+        "documents.rows": 2, "documents.lines": 2, "documents.text_bytes": 128,
+        "views.watchers": 16, "views.watchers_per_party": 16,
+        "authority.grants": 12, "tasks.authority_grants": 12, "notes.scopes": 15,
+        "tasks.authority_bytes": 512, "tasks.batch": 1
+        ```
+        configuration.md 7 gives each override's reason. The two that matter here: `notes.scopes` 15 is needed "since jig's
+        core admits an authority's grants only with 3 notes' scopes more". `tasks.authority_bytes` 512 and `tasks.batch` 1
+        are needed because "the bounds above widen a task's stored row past the small profile's store, whose bounds no
+        override changes". The old text, "the example admits at most the small profile's 8", is replaced by "the most the
+        process tier and the owned example admit in a list, their `authority.grants` and `tasks.authority_grants` of 12".
+     3. **Measured.** The probe ran the tier's engine document with these limits and the 10 grants on temper dbc5b4da7 (no
+        code changed through d09271b57). `temper::prepare_in` returned `Ok`. With grants 10 and `notes.scopes` 13 it also
+        returned `Ok`. Without `tasks.batch` 1 the start is refused with `engine.limits: past its bound` (jig `sizes::check`:
+        `Value { needs: 4758343, has: 1303199 }`). With the design's old three overrides and 4 grants, the store also refuses
+        it (needs 2,097,799). So the old example could not start whatever its grants were.
+     4. **T4 `the_owned_example_fits_the_native_client`** (14-example.md, the new "Corrections after the designer's answer"
+        block, which takes precedence over ruling 139's T4 line). It works on `owned::EXAMPLE`'s `engine`, parsed as
+        `tests/configuration.rs:9-15` does, and checks three things:
+        (1) the four assertions of `:16-33`: rows, lines, paths and text;
+        (2) `assert_eq!` of the JSON's `engine.limits` with configuration.md 10's literal;
+        (3) the authority's entries. If client-api's temper-04.s1 is on `main` when 14.1 starts, use its three assertions
+        over the example. Otherwise assert that `authority.grants` and `tasks.authority_grants` are each at most 12, the
+        literal from client.md 5.4. The commit body says which.
+        Size: +10.
+     5. **Report item 5 (charter) is the plan's call, not design.** The design text: the skeleton has
+        `"charters": [{"number": 1, ...}, {"number": 2, ...}]` and the owned block has `"charter": 2`. The whole example
+        therefore starts with charter 2. Only the tier's `owned::application` sets 1.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.

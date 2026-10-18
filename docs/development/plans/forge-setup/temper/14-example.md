@@ -75,6 +75,7 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
   if `main` at 14.1's start holds client-api's temper-04.s1 (`native()`'s `authority` bound and its three assertions
   after the paths'), the same three over the example's engine; else `authority.grants` and `tasks.authority_grants`
   each at most 12 (client.md 5.4), a literal. The commit body says which. Size: +10.
+- T3 (ruling 142): `example_document` keeps the file's `charter` 2, so T3 starts the example's own charter; only the tier's `owned::application` sets 1.
 
 **Corrections against main (ruling 139, at temper 64f610ae6, before 05.3 landed; they take precedence over the text
 below; the example's authority limits: the designer's answer, above):**
