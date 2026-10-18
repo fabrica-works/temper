@@ -493,6 +493,15 @@ per session are in each file.
     before its increment lands.
   - temper: focused median 4.00 s, fuzzy 14.36 s. The run may add at
     most 2.0 s to the focused suite and 5 s to the fuzzy suite.
+    From ruling 326 (2026-10-18), temper's aims stay guides, and a temper
+    session no longer starts an increment with a repair of a suite that
+    missed its aim: each landing reports both suites' times, and a repair
+    comes first only when a suite's time passes 80% of its budget (12 s
+    of the focused suite's 15 s, 48 s of the fuzzy suite's 60 s). A test
+    the gate flags `SLOW` is made cheaper before its increment lands, as
+    below. At temper 06.2's second repair, 6.580 s and 26.785 s were 44%
+    and 45% of the budgets. Unchanged: temper's budgets, jig's rules, the
+    measure commands, and the "Never" below.
   - Each landing's report names its suites' times from its
     `Gate-Result` line, and nothing else is measured. An aim exceeded is
     a guide missed: the landing stands, and the session's next increment

@@ -2405,6 +2405,13 @@ choice would have been the user's (development.md, 10.4).
      - temper 06 does not touch `clients.rs`, and runs no further process Proof for this: 05.1's Proof run, after the repair, is the same test on the same main.
      - jig's copy, `testing/jig-test-service/src/clients.rs:136`, has the same `Time::ZERO`, but that crate has no binary and runs only in simulated worlds, whose clocks start at zero: it stays as it is.
 
+326. **temper's test time: repair past 80% of a budget only** (process, temper 06's block of 2026-10-18T07:39:12Z).
+     Process: temper 06's test-time repair ends here, and 06.2's inbox proceeds now, with both suites' times reported.
+     - The README's rule ("the session's next increment first makes the slowest tests cheaper … until its own gate is back under the aim") no longer binds temper: from now, temper's aims stay guides, and a temper session repairs first only when a suite's time passes 80% of its budget (12 s of the focused 15 s, 48 s of the fuzzy 60 s). After two repairs, 6.580 s and 26.785 s are 44% and 45% of those budgets, and no test is `SLOW`.
+     - The fuzzy miss is ruling 122's: "The fuzzy suite's aim stays missed while this test is its time". The walking sweep alone takes 19.219 s of the 19.36 s aim, and starts 7.566 s into the suite.
+     - One scheduling change, no test changed: in temper's `.config/nextest.toml`, a `[[profile.fuzzy.overrides]]` with `filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"` and `priority = 20`, above the default profile's `kind(test)` priority 10, so that the sweep starts first. It is a commit of its own in 06.2's inbox landing, measured by that landing's gate alone; the report names the fuzzy time before and after. Nothing else is run for it, and no other setting of that file changes.
+     - Unchanged: temper's budgets and slow periods; the `SLOW` rule; the measure commands; ruling 122; jig's rules.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
