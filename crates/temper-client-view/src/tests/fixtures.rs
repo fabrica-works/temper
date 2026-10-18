@@ -48,6 +48,7 @@ pub fn limits() -> Limits {
             client: temper_client_domain::limits::client(
                 &jig,
                 requests,
+                12,
                 8,
                 jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
                 Duration::from_millis(100),

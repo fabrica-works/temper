@@ -102,7 +102,7 @@ fn leaving_a_page_unwatches_its_handles_and_drops_their_tells() {
     let watch = fixtures::start(&mut root, skein_lib::List::with_capacity(0));
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     fixtures::confirm(&mut root, watch, fixtures::PARTY, &mut out);
-    while out.pop().is_some() {}
+    fixtures::opened(&mut root, &mut out);
     crate::step(
         &mut root,
         &fixtures::env(&limits),

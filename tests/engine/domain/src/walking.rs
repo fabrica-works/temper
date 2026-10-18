@@ -124,6 +124,9 @@ pub fn limits() -> engine::Limits {
         documents: jig_domain_core::documents::DocumentLimits {
             roles: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.roles,
             segments: 9,
+            grants: authority_limits().grants.max(tasks.authority_grants),
+            executors: authority_limits().executors.max(tasks.executor_kinds),
+            implications: authority_limits().implications,
             rows: 4,
             text_bytes: 4_096,
             chips: 4,

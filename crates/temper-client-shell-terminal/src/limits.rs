@@ -65,6 +65,7 @@ pub fn native() -> Limits {
                 client: client::limits::client(
                     &jig,
                     requests,
+                    12, // Receive the process tier's whole authorities.
                     EXCHANGES,
                     jig_client::Backoff { first: Duration::from_secs(1), most: Duration::from_secs(30) },
                     Duration::from_secs(30),

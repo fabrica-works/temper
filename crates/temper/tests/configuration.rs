@@ -6,16 +6,27 @@ const DOCUMENT: jig_protocol_config::DocumentLimits =
 // client.md 5.4 admits twelve entries independently of document rows.
 const AUTHORITY_ENTRIES: u32 = 12;
 
-#[test]
-fn the_process_configurations_documents_fit_the_native_client() {
+fn process_engine() -> jig_protocol_config::Engine {
     let scratch = support::Scratch::startup("native-document-limits");
     support::configuration(scratch.path(), &support::Forge::Unreached);
     let bytes = std::fs::read(scratch.path().join("config.json")).expect("process configuration");
-    let value: serde_json::Value = serde_json::from_slice(&bytes).expect("deployment JSON");
+    let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("deployment JSON");
+    // Forge::Unreached omits Forgejo's overrides; include its whole-authority bounds here.
+    value["engine"]["limits"]["overrides"]["authority.grants"] = 12.into();
+    value["engine"]["limits"]["overrides"]["tasks.authority_grants"] = 12.into();
+    value["engine"]["limits"]["overrides"]["notes.scopes"] = 15.into();
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
     let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
-    let native = temper_client_shell_terminal::limits::native().client.jig;
+    scratch.remove();
+    engine
+}
+
+#[test]
+fn the_process_configurations_documents_fit_the_native_client() {
+    let engine = process_engine();
+    let client = temper_client_shell_terminal::limits::native().client;
+    let native = client.jig;
     assert!(engine.limits.core.documents.rows <= native.rows, "the native client can receive every document row");
     assert!(
         engine.limits.core.documents.lines <= native.rows,
@@ -33,7 +44,9 @@ fn the_process_configurations_documents_fit_the_native_client() {
         engine.limits.core.documents.text_bytes <= native.text,
         "the native client can receive every document text"
     );
-    scratch.remove();
+    assert!(engine.limits.core.documents.grants <= client.client.domain.authority, "every grant fits");
+    assert!(engine.limits.core.documents.executors <= client.client.domain.authority, "every executor fits");
+    assert!(engine.limits.core.documents.implications <= client.client.domain.authority, "every implication fits");
 }
 
 #[test]

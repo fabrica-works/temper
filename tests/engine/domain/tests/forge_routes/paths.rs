@@ -1,6 +1,9 @@
 //! The forge's deepest path fits both shipped document profiles.
 use super::*;
-use jig_domain_core::{documents, reads};
+use jig_domain_core::{
+    acts::{Act, Admission},
+    documents, reads,
+};
 
 const READ: Token = Token::new(901);
 const SIGN_IN_READER: Token = Token::new(902);
@@ -88,6 +91,9 @@ pub(super) fn document_limits(
 ) -> documents::DocumentLimits {
     // jig-protocol-config's overrides::read derives this after all name overrides.
     documents.segments = limits.authority.segments.max(limits.tasks.hold_segments).max(limits.tasks.authority_segments);
+    documents.grants = limits.authority.grants.max(limits.tasks.authority_grants);
+    documents.executors = limits.authority.executors.max(limits.tasks.executor_kinds);
+    documents.implications = limits.authority.implications;
     documents
 }
 
@@ -135,6 +141,11 @@ fn a_change_on_the_forges_deepest_branch_is_listed_in_a_task_query() {
 fn a_change_on_the_forges_deepest_branch_is_served_in_its_task_document() {
     for &(source, lines) in LINES {
         let (mut world, _chat, producer, _branch) = change_world_with_lines(lines);
+        let answer = read(&mut world, reads::Read::Task { task: producer.task });
+        let Some(reads::Answer::Document(document)) = answer else { panic!("{source}: owner task: {answer:?}") };
+        let documents::Document::Task(task) = *document else { panic!("{source}: owner task document") };
+        let offer = task.acts.iter().find(|offer| offer.act == Act::Amend).expect("Amend offer");
+        assert!(matches!(offer.admission, Admission::Bounded { .. }), "{source}: bounded Amend offer");
         sign_in_reader(&mut world);
         let answer = read(&mut world, reads::Read::Task { task: producer.task });
         let Some(reads::Answer::Document(document)) = answer else { panic!("{source}: task document: {answer:?}") };

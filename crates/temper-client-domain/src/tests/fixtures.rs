@@ -51,6 +51,7 @@ pub fn limits() -> Limits {
             client: crate::limits::client(
                 &jig,
                 requests,
+                12,
                 8,
                 jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
                 Duration::from_millis(100),
@@ -365,3 +366,27 @@ pub fn inbox_entry(
 }
 
 pub mod chats;
+
+/// Answer each opening before a page leaves, as the engine does.
+pub fn opened(root: &mut crate::Domain, out: &mut Queue<Request>) {
+    let mut watches = List::with_capacity(limits().client.domain.watches);
+    while let Some(request) = out.pop() {
+        if let Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, .. } } } =
+            request
+        {
+            watches.push(watch).expect("bounded openings");
+        }
+    }
+    for watch in &watches {
+        crate::step(
+            root,
+            &env(&limits()),
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched { watch: *watch, event: WatchEvent::Opened },
+                },
+            },
+            out,
+        );
+    }
+}
