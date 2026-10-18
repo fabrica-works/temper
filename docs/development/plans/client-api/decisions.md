@@ -2594,6 +2594,15 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** at most six focused runs and 45 minutes; past it, report what they show.
      5. **Unchanged:** the referee's check (skein-world `world.rs:470`), every production deadline until the log names its owner, ruling 229 for the gate and the proof, the candidate's two commits. The `Server::stop` experiment (`s1-server-stop-reproduction.patch`) stays out unless the split or the bisect leads to it.
 
+340. **temper-06.3's Release: log the referee's operands** (process, temper-06's block of 2026-10-18T11:39:09Z).
+     Ruling 340, process, within ruling 229's rule (README: "reproduce each new failure point in a focused test first (implementer.md, 8.8), log its cause there, and change only what that log names; then run the proof once … A referee's or a judge's check is never changed to pass"). The proposal stands: a focused investigation, then one proof run. Its reproduction must fail where the proof fails: the observer test reproduced one mismatch (`Task` against `Escalation`) and passed, while the proof failed again at the same send, so the proof's own operands were not reproduced.
+
+     1. **What the referee compares at that send** (jig's `tests/client/src/harness/referee.rs:168-181`, at temper's jig pin): the send's `card` and `(kind, revision)`; whether `visible` holds `(client, card)`; the revision `visible` holds for it, or else `documents[(client, card, kind)]`. Log these four for `a_held_chats_escalation_released_from_the_inbox` at 0.105655568 s, seed 1101, from the proof's own world, in a focused test or a trace of that run kept out of the commit.
+     2. **Repair what differs, where the log names it:** temper's adapter (`App::sent`, or what reports the inbox's card as shown), within 06.3's Files, each file outside them named in the commit body. If the log names jig's generic observer or referee (`tests/client/src/harness/**`), stop and report it with the log: a jig supplement, or a question to the designer, then repairs it.
+     3. **Then the proof once.** It passes, or fails at a later point (go on under ruling 229), or fails at the same point: a block with both logs.
+     4. **Bound:** about 45 minutes from now; past it, report what the log shows.
+     5. **Unchanged:** the referee's and the judge's checks; the design's rule that a deciding act names the revision of the document its card showed (`client.md`, 1000: "no deciding act is made on a tree that did not show its facts"); ruling 229's count (two runs of this proof so far).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
