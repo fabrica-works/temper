@@ -8,6 +8,8 @@ use std::{
 };
 use temper_throwaway_forgejo::{Instance, Outgoing, Token};
 pub type BranchHead = (Box<[u8]>, Box<[u8]>);
+// A created member owns all ten grants, their segment boxes and executor kinds.
+const MEMBER_BYTES: u32 = 2048;
 
 pub struct Throwaway {
     instance: Instance,
@@ -199,7 +201,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
         ("people.inbox_tasks", 16),
         ("people.pending", 4),
         ("people.waiters", 4),
-        ("people.amendment_bytes", 1024),
+        ("people.amendment_bytes", MEMBER_BYTES),
         ("core.policy_bytes", 4096),
     ] {
         limits.insert(name.into(), size.into());

@@ -332,3 +332,20 @@ fn temper_serve_answers_an_unknown_forge_404() {
     assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
     scratch.remove();
 }
+
+#[test]
+fn a_native_chat_reaches_the_model() {
+    let scratch = support::Scratch::new("native-chat");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    support::configuration(scratch.path(), &forgejo.forge());
+    let peer = support::fake_llm(vec![support::chat_script(support::ANSWER)].into_boxed_slice());
+    let seen = support::run(
+        scratch.path(),
+        support::person::answered_chat(b"Hello", support::ANSWER),
+        Some(peer),
+        support::WITHIN,
+    );
+    assert!(seen.finished);
+    forgejo.stop();
+    scratch.remove();
+}
