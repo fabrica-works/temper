@@ -89,11 +89,31 @@ on `BrokenPipe` at 1 s, and no `Server::finish` comes (`clients.rs:367-368`).
 - The bound gains 30 minutes for this cause. Its focused test stays as a
   test of the step. 06.5 proves seed 7 once this step has landed.
 
-Proof (ruling 369), in the process profile with both exports: the five
+**Ruling 371 (05.s2's block of 2026-10-18T14:05:22Z): the bound renewed.**
+Three more focused runs and 40 minutes from its unblock for the drain;
+then ruling 370's cause, with its 30 minutes.
+- Start from `git diff 63f6174dc 3262df8f9 -- crates/temper-service`. The
+  first session's trace (`logs/temper-05/s2-diagnosis.md`,
+  `s2-trace.patch`) shows the webhooks listener, the clients' HTTP and the
+  engine's workers closed, but no end: the drain closing, the store idle
+  and not closed, the embedded worker not empty.
+- The focused test is a deterministic one, at the lowest layer: a drain
+  begun while a delivery is in flight or just answered, traced at
+  the drain's accounts check (`stop.rs:46`, `accounts.is_empty()`), the engine's scheduling and the embedded worker's
+  abort once `drain.closing` is set (`system.rs:413`).
+- A test that fails one run in two may be repeated up to five times in
+  one focused run, stopping at its first failure.
+- `a_running_engine_lends_the_record_temper_sign_in_kept`
+  (`process.rs:106`) failed in the first whole-tier run at 30.142 s
+  ("sign-in world deadline; stopped: false") and passed alone. It is the
+  same drain, and joins the proof below.
+
+Proof (ruling 369), in the process profile with both exports: the six
 stories, the signed delivery, `temper_serve_answers_an_unknown_forge_404`
 (`process.rs:327`), `temper_serve_answers_an_unsigned_delivery_403`
 (`process.rs:318`), `temper_serve_prints_its_link_and_drains_on_a_signal`
-(`process.rs:10`) four times, and the landing story with its restart; then
+(`process.rs:10`) four times, the sign-in story (`process.rs:106`, ruling
+371), and the landing story with its restart; then
 the whole tier once, `heavy --gate scripts/proof-one-process.sh`, within
 180 s.
 

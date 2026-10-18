@@ -2859,6 +2859,24 @@ choice would have been the user's (development.md, 10.4).
         If seed 7 still fails after 05.s2's repair, it blocks with the trace.
      3. **Unchanged:** ruling 368's points 4 and 5 (the adoption test done at 0.947 s alone, its commit counted apart; the teardown check, every production deadline, the seeds and assertions); skein's held response across a read half-end (`crates/skein-http/src/server.rs:886-903`); 06.5's regression and joint proofs, already passed.
 
+371. **temper-05.s2's bound renewed, from 3262df8f9's diff** (process, temper-05's block of 2026-10-18T14:05:22Z).
+     Ruling 371, kind: process, as the report proposes. The report was written before rulings 369 and 370 reached the session, and they stand: 369 names the cause, temper-04.s1's `3262df8f9`, and 370 adds the peer-ended unwatch. With `crates/temper-service` as at `63f6174dc`, the stories pass.
+
+     1. **The bound, renewed:** three more focused runs and 40 minutes from this unblock, for the drain. Then ruling 370's cause, with its 30 minutes.
+     2. **Start from the diff:** `git diff 63f6174dc 3262df8f9 -- crates/temper-service` (7 files, 106 insertions, 10 deletions). The first session's trace (`logs/temper-05/s2-diagnosis.md`, `s2-trace.patch`):
+        - closed: the webhooks listener, the clients' HTTP and the engine's workers;
+        - still open: no end, the drain closing, the store idle and not closed, the embedded worker not empty.
+     3. **The focused test** is a deterministic one, at the lowest layer: a drain begun while a delivery is in flight or just answered. It is traced at:
+        - the drain's accounts check (`stop.rs:46`, `accounts.is_empty()`);
+        - the engine's scheduling;
+        - the embedded worker's abort once `drain.closing` is set (`system.rs:413`).
+        The repair keeps rulings 349, 351 and 353 (ruling 369, point 2).
+     4. **A flaky test in one run:** a test that fails one run in two (the signed delivery: 0.145 s passed, then 30.068 s failed) may be repeated up to five times in one focused run, stopping at its first failure.
+     5. **A fifth story of the same drain:** `a_running_engine_lends_the_record_temper_sign_in_kept` (`crates/temper/tests/process.rs:106`) failed in the first whole-tier run at 30.142 s ("sign-in world deadline; stopped: false"), and passed alone.
+        - It joins 05.s2's proof (temper/05-s2-process-tier.md, "Ruling 371").
+        - It joins the README's exceptions until 05.s2 lands (14:05Z point 1, now five).
+     6. **Unchanged:** rulings 369 and 370; 05.s1's Don't list; every production deadline; ruling 367's Size.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

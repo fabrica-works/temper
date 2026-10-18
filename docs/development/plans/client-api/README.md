@@ -946,11 +946,12 @@ per session are in each file.
     NEXTEST_DOUBLE_SPAWN=0 && cargo build -p temper --bin temper && cargo
     nextest run -p temper --profile process --no-fail-fast'`. A failing
     test is the increment's, under ruling 229, except, until temper-05.s2
-    lands, the four that fail on `main` too:
+    lands, the five that fail on `main` too (ruling 371 adds the fifth):
     `temper_serve_answers_a_signed_delivery_204`,
     `temper_serve_answers_an_unknown_forge_404`,
-    `temper_serve_answers_an_unsigned_delivery_403` and
-    `temper_serve_prints_its_link_and_drains_on_a_signal`. Name each in
+    `temper_serve_answers_an_unsigned_delivery_403`,
+    `temper_serve_prints_its_link_and_drains_on_a_signal` and
+    `a_running_engine_lends_the_record_temper_sign_in_kept`. Name each in
     your report with its first failure line.
   - 2026-10-18 13:34Z, point 3 (every temper session, until the run's
     end; ruling 363): The owned example: `docs/examples/owned.json` is
