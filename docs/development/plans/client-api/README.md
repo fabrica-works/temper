@@ -937,8 +937,8 @@ per session are in each file.
     named for what it stands for; expected values are literals. Split a
     test that asserts several behaviours under one name (development.md
     14.3, Shape).
-  - 2026-10-18 12:20Z, point 2 (temper-04.s1, and every temper
-    increment that lands after temper-05.s1): The landing story: before
+  - 2026-10-18 12:20Z, point 2 (every temper increment that lands
+    after temper-05.s1; ruling 352 moved 04.s1's run to 05.s1): The landing story: before
     landing, run `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`
     once, as temper/05-s1-landing-story.md's Proof runs it, with both
     exports. A failure there is the increment's, under ruling 229.
@@ -953,6 +953,27 @@ per session are in each file.
     354 and 356, and list any further copy of the value. That is no block
     and no failure outside your Files. A refusal of another kind, or a
     shortfall one repair does not close, is a block.
+  - 2026-10-18 13:34Z, point 1 (jig-19.5, jig-20.1 and every later jig
+    increment, until the run's end; ruling 364): Test time, jig: the
+    fuzzy aim of 24.91 s is a guide, as the focused aim is (ruling 275).
+    Make no test-cost repair for an aim, and report each suite's
+    Gate-Result time. Repair first only a test the gate flags `SLOW`, or
+    when the fuzzy suite passes 48 s. Leave out of your commit a speed
+    change that no gate time shows.
+  - 2026-10-18 13:34Z, point 2 (temper-06.5, temper-07.1 and every later
+    temper increment, until a landing gate shows no focused `SLOW`;
+    ruling 364): A test the gate flags `SLOW` is made cheaper before your
+    increment lands (README, Test time), whether or not your change made
+    it slow. Time the test alone, cut the cost where the time goes, and
+    give the before and after times in the report. Name each SLOW test of
+    your gate, except ruling 122's fuzzy walking sweep.
+  - 2026-10-18 13:34Z, point 4 (temper-06.6 and temper-07.1, until each
+    lands; ruling 364): Size, temper 06.6 and 07.1: four steps of this
+    part of the plan landed at 2.0 to 2.5 times their Size by ruling (330,
+    342, 345, 359). Yours lands whole at up to 550 (06.6) or 650 (07.1)
+    production lines with no question. Give the count by file in the
+    commit and the report, name files outside Files and each lint
+    exception with its reason. Past the stop, block with the count.
 
 ## Prerequisites the run checks at its start
 

@@ -628,7 +628,8 @@ it in the inbox, and the chat's card leaves, the engine root holding the
 goal.
 Don't: chain requests for one act (contract.md, 3.4); choose a
 delegate's fate the confirmation did not show.
-Size: at most 250 lines.
+Size: at most 250 lines. Ruling 364: it lands whole at up to 550 production
+lines with no question; past 550, it blocks with the count by file.
 Removes: nothing.
 
 ## Interface sketches

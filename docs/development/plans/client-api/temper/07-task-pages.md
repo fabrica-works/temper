@@ -193,7 +193,8 @@ engine root, its held delegate marked.
 Don't: offer Amend, Stop or Cancel (`later.md`); show an agent's task's
 transcript (`later.md`); compute a task's phase in words other than by
 jig's `words` and temper's phrasebook.
-Size: at most 300 lines.
+Size: at most 300 lines. Ruling 364: it lands whole at up to 650 production
+lines with no question; past 650, it blocks with the count by file.
 Removes: jig's task page at temper's `Task` addresses.
 
 ### 07.2 A held task of the plan released

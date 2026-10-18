@@ -2791,6 +2791,14 @@ choice would have been the user's (development.md, 10.4).
      2. **Then** `serve_prepares_once_on_the_owned_example` once, and the whole tier once, `heavy --gate scripts/proof-one-process.sh`, with both exports, as 05.s1's Proof runs it; land with `land`'s gate. The landing counts to 05.s1 (as ruling 335 counted 06.3's repairs).
      3. **A test of the tier that still fails,** other than by a memory this rule closes, goes in the report with its first failure line, not repaired here (05.s1, Proof).
 
+364. **The 13:34Z check's steer** (steer of 2026-10-18T13:34:00Z).
+     Ruling 364, steer basis, the check of 2026-10-18T13:34:00Z: points 1, 2 and 4 of the steer of 2026-10-18T13:34Z (point 3 is ruling 363), their Pass-on texts in the README's "The run's steers".
+
+     1. **jig's fuzzy aim is a guide:** no test-cost repair for an aim; repair first only a test the gate flags `SLOW`, or a fuzzy suite past 48 s (80% of 60 s), as ruling 326 does for temper; 19.5's untimed `tests/client-protocol/src/net.rs` change leaves its candidate at its next amendment unless a gate's own times show it.
+     2. **A `SLOW` test is made cheaper before the increment lands:** `an_adopted_repository_gets_its_change_pushed_through_git` (`tests/one-process/tests/one_process.rs:43`), flagged in the gates of 06.3, 06.4 and 04.s1 (3.175 to 3.379 s), is timed alone and made cheaper by the first temper increment whose gate flags it, in a commit of its own whose lines count apart from the Size.
+     3. **Size, temper 06.6 and 07.1:** 06.6 lands whole at up to 550 production lines, 07.1 at up to 650, with no question; past the stop, block with the count by file (their Size lines). Four steps landed whole by ruling at 2.0 to 2.5 times their Size (330, 342, 345, 359).
+     4. **The README's 12:20Z point 2** no longer names temper-04.s1: ruling 352 moved 04.s1's run of the landing story to 05.s1.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
