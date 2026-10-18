@@ -2175,6 +2175,9 @@ choice would have been the user's (development.md, 10.4).
        closing goal's priority. tasks.md, 7: "An amendment is refused once a
        task is closing."
 
+304. **jig-16.5's capacity actions of the operations** (plan defect, jig-16.5's block of 2026-10-18T02:32:27Z).
+     Ruling 304 (plan defect, jig-16.5's block of 2026-10-18T02:32:27Z): the implementer's proposal holds, and joins 16.5. pages.md, 7 shows "what was refused for want of room, recently", and the people child's `CapacityAction::{Compound, Create}` (`jig-domain-people/src/capacity.rs:12-13`) are the refusals of the asks v8 sends, but 16.5's table removed `OwnerPersonCapacityAction`'s `close`, `chat`, `goal` and `priority` without the wire's and the client's forms of the operations' actions. So `OwnerPersonCapacityAction` gains `create` and `compound`, content-free, in `client-v8.schema:791` (regenerated) and `jig-client-domain/src/contract/owner_deployment.rs:224`, mapped one to one in the engine's `translate/deployment.rs:111` (in place of its `Reason::Tag` refusal), the link's `translate/documents_part6.rs:131`, the view's `owner_deployment.rs:202` (two phrases in `owner_deployment_words.rs`, as its other actions' are), the scripted engine's `owner_deployment.rs:128`, and the joint wire's `deployment.rs:196` (in place of its `unreachable!`) with its coverage cases (`deployment/tests.rs:398-412`). No role rule and no bound changes. These lines count apart from 16.5's 150, as one count in the report, beside the rename's. Refresh any further match that `git grep -l -w OwnerPersonCapacityAction -- '*.rs' ':!*/generated/*'` lists, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

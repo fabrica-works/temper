@@ -599,6 +599,36 @@ differ.
 - **Later:** the board offering no move that would amend a closing goal
   is a row of `later.md`.
 
+## Corrections after jig 16.5's block of 2026-10-18T02:32:27Z (ruling 304)
+
+pages.md, 7: "**Capacity:** live tasks against their limits, for the
+deployment and each project; pending proposals; what was refused for
+want of room, recently." The people child's `CapacityAction` has
+`Compound` and `Create` (`jig-domain-people/src/capacity.rs:12-13`, from
+`Ask::Compound` at :62 and `Ask::Create | Ask::Propose` at :72), which
+v8 sends; the wire's and the client's `OwnerPersonCapacityAction` have
+neither: the engine's translation refuses them
+(`jig-protocol-engine-clients/src/translate/deployment.rs:111-113`,
+`Reason::Tag`), and the joint wire calls them unreachable
+(`tests/client/src/joint/wire/deployment.rs:198`).
+
+- **16.5, the operations' capacity actions:** `OwnerPersonCapacityAction`
+  gains `create` and `compound`, content-free, as the people child's, in
+  the wire (`client-v8.schema:791`, then `generated/v8.rs` regenerated)
+  and the client (`jig-client-domain/src/contract/owner_deployment.rs:224`).
+  They map one to one in each match: the engine's
+  `translate/deployment.rs:111`; the link's
+  `translate/documents_part6.rs:131`; the view's
+  `owner_deployment.rs:202`, with two phrases in
+  `owner_deployment_words.rs`, as its other actions' are; the scripted
+  engine's `owner_deployment.rs:128`; the joint wire's
+  `deployment.rs:196` and its coverage cases (`deployment/tests.rs:398-412`).
+  No role rule and no bound changes. Refresh any further match that
+  `git grep -l -w OwnerPersonCapacityAction -- '*.rs' ':!*/generated/*'`
+  lists (11 files at jig `ad465272b`), and list it in the commit body.
+- **16.5, Size:** these lines count apart from the 150, as one count in
+  the report, beside the rename's.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
@@ -906,7 +936,7 @@ Shape: the records that go, or are renamed in place:
 | `BoundsGoal`, `GoalProcedure` | renamed `BoundsCreate`, `CreateProcedure` in jig 22.1; nothing here |
 | `ActKind`'s `close`, `set_goal` | gone: `cancel`, `move_task`, `amend` offered, and `create` bounded in `me` |
 | `ActKind`'s `prioritise` | renamed `reorder`: the project's offer of a compound of priority-only amendments (the designer's answer of 2026-10-18, above) |
-| `OwnerPersonCapacityAction`'s `close`, `chat`, `goal`, `priority` | gone with their asks (the people child's capacity actions of the operations are jig 03's and jig 04's) |
+| `OwnerPersonCapacityAction`'s `close`, `chat`, `goal`, `priority` | gone with their asks; `create` and `compound` added, content-free, the people child's capacity actions of the operations (jig 03's and jig 04's), on the wire and the client (ruling 304, above) |
 
 and in the engine: `people::Ask::{StartChat, SetGoal, Prioritise,
 Close}`, `people::{Disposal, Keep, GoalExecutor}`,
