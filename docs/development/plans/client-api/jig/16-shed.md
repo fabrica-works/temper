@@ -320,6 +320,86 @@ where they differ.
   (`tests/one-process/src/referee/durable.rs:76, :94, :149`, the check at
   `:256`); temper 04.3 takes the same repair (`temper/04-engine.md`).
 
+## Corrections at jig `3b58a775f` (ruling 297, the ready check of 16.3 and 16.4, 2026-10-18)
+
+After jig 16.1, with 16.2 running. These take precedence over the
+corrections above and the Shapes below where they differ. The reference
+UI is `crates/jig-client-view/src/` (`acts.rs`, `intents.rs`, `page/`):
+`crates/jig-domain-client` and `crates/jig-view` do not exist.
+
+- **16.3, the shapes' arguments** (`crates/jig-client/src/shapes.rs:71,
+  :77, :101`): `shapes::chat(me, project, words, now)`,
+  `shapes::close_chat(me, project, chat, &delegates, reason)` and
+  `shapes::set_goal(me, project, draft, reason, now)`. `now` is
+  `client.wall()`, as `cards/chip.rs:145` reads it; `reason` is
+  `words(fields, Purpose::Reason)`, as `acts.rs:247` gives `Ask::Cancel`
+  its reason.
+- **16.3, the stories' `me`:** `shapes::chat` and `shapes::set_goal`
+  answer `NotOffered::Creating` while `MeProject.creating` is `None`, and
+  `NotOffered::Template` without the template (`shapes.rs:63-70`,
+  `:106-108`). In `tests/client/src/stories.rs`:
+  - `frame()` (`:31`, `creating: None`) gets `creating: Some(Creating {
+    within, beyond })`, with the `CreateBounds` and `Beyond` that
+    `goal_world` gives its project's `SetGoal` offer (`:697-713`: budget
+    1, maximum 100, charters `[1]`, `Beyond::Proposed` to role 1);
+  - `stories/conversations.rs`'s `templates()` gains the goal template:
+    `number: jig_client::shapes::GOAL`, `TemplateExecutor::Charter(1)`,
+    `TaskContractDocument::Report { words: 32 }`, `TemplateBudget::Given`,
+    `TemplateDeadline::Given`, label 2 (ruling 288);
+  - `goal_world`'s scripted rule (`:719-741`) asks what
+    `shapes::set_goal` gives for the story's draft, `Ask::Propose {
+    project: 1, action: ProposeAction::Batch { .. }, reason }`, in place
+    of `Ask::SetGoal`, or goes where the scripted engine models `Propose`
+    itself. Its answer, `Outcome::Proposed { proposal }`, and the story's
+    expected values (`tests/client/tests/stories.rs:239`) stay.
+- **16.3, users of what goes:** `Me.charters`, `MeProject.chat_budget`
+  and `OfferedCharters` have users the Files do not name; they join Files:
+  `tests/client/src/stories.rs:44-55`; `tests/client/src/joint/wire/owner.rs:80,
+  :89, :813, :869` and `joint/wire/deployment/tests.rs:648`;
+  `tests/client-wire/tests/fuzzy_client_wire/documents.rs:10`;
+  `testing/jig-client-test-records/src/owner.rs:14-60`; the scripted
+  engine's `payload.rs:394-395`, `requests.rs:357`, `tests.rs:51-56` and
+  `tests/frame_facts.rs:16-35`. At the increment's start, `git grep -n -w
+  -e chat_budget -e OfferedCharters -- crates testing tests` lists them;
+  refresh any further user it lists, and the `charters` field of any
+  further `Me` value, and name each in the commit body.
+- **16.3, the chat counters:** both count `Outcome::Started`, which a
+  `Create` does not give (it gives `Created { first, last, given }`,
+  `jig-domain-people/src/boundary.rs:403`): the front's
+  (`tests/client-protocol/src/engine.rs:232-245`, through `front.rs:95`)
+  and the native client's (`tests/client-protocol/src/native.rs:156-159`,
+  asserted at `tests/client-protocol/tests/native.rs:6`). The front's
+  counts the tasks made under the chat template's label, as the Files
+  say; the native client's counts each `OwnerOutcome::Created` that
+  answers the `Ask::Create` `shapes::chat` gave. Both assertions keep 1;
+  `native.rs` joins Files.
+- **16.4, users the start grep misses:** the Files' `rg` searches three
+  crates' `src`. The list names have users in `tests/`, `testing/` and
+  other crates: at jig `3b58a775f`, the `rg` below lists 105 files, among
+  them `tests/tasks/tests/{activity,person,restart,funding}.rs`,
+  `tests/tasks/tests/lifecycle/goals.rs`,
+  `tests/tasks/src/{world,accounting_referee}.rs`,
+  `tests/core/tests/effects.rs`,
+  `tests/conformance/src/scenarios/conversations.rs`,
+  `tests/ops/src/joint/reads.rs`, `tests/ops/src/joint/reads/goals.rs`,
+  `tests/client/src/scripted.rs`, `crates/jig-protocol-engine-clients/src/`
+  and `crates/jig-protocol-store/src/{historical,reads,reads/paged}.rs`.
+  At the increment's start, after 16.2 has landed, run the Files' `rg`
+  over `crates testing tests`, with `-e 'Key::Goal' -e
+  'Subject::Conversations' -e 'Subject::Goals'` added: each file it lists
+  joins Files, and the commit body names those the Files do not.
+- **16.4, the store's files:** its tests are
+  `crates/jig-protocol-store/src/tests/{reads/indexed.rs, intervals.rs}`.
+  Tags 14 to 16's codecs are `codec/tasks.rs:142-172` and
+  `codec/tasks/index.rs` (`goal_row` and `read_goal_row` at `:65-75`,
+  `conversation` and `read_conversation` at `:135-148`), on the wire of
+  `generated/tasks_v3.rs`: these join Files.
+- **16.4, the owner's inbox:** `OwnerInboxEntry.reply: option
+  ConversationLine` (`client-v8.schema:629`) holds a `TaskLine`, as
+  ruling 284 says of `InboxEntry` (`:600`).
+- **16.4, Proof:** its second test is 16.2's: the filter runs both once
+  16.2 has landed, which 16.4 needs.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
