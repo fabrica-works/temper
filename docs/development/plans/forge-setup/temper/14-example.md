@@ -55,6 +55,36 @@ and follows it on x1 by a script, up to an adopted repository: no person's login
 
 ### 14.1 The owned example as a tested file
 
+**Corrections after the designer's answer of 2026-10-18T12:25:44Z (the question of ruling 145; configuration.md 7 and
+10). They take precedence over the text below, over the corrections below and over ruling 145's provisional eight:**
+- `application.limits` is `{"profile": "small", "overrides": {}}`; `workers[0].limits` is `{"profile": "small",
+  "overrides": {"hub.accounts": 4, "hub.event_bytes": 598}}`, as configuration.md 10's skeleton writes them. No other
+  override. This replaces the Test shape's "`small` with the fewest overrides T3 finds". The tier keeps its own
+  (`support/configuration.rs:24-25, 43-45`), unchanged.
+- `small` changes in `crates/temper-service/src/limits.rs` (configuration.md 7, "`small` starts as it stands"):
+  `CHECKOUT.repositories` 3 to 2, `CHECKOUT.message_bytes` 256 to 4096, `FORGE.resources_per_task` 4 to 2,
+  `FORGE.name_bytes` 256 to 64, each comment saying in a line what it is held to. `CHECKOUT.name_bytes` 256 and
+  `GIT.stdout_bytes` 1024 stay; no other constant moves. Files gain `limits.rs`, `src/tests/checks.rs` and
+  `src/tests/fixtures/startup.rs`.
+- Two temper-service tests rest on small's old forge values. Each override list gains
+  `"forge.name_bytes":256,"forge.resources_per_task":4`: `tests/checks.rs:43`
+  (`a_remote_past_the_checkouts_names_refuses_the_start`) and `tests/fixtures/startup.rs:29`, which
+  `startup_makes_the_one_process_from_the_example` reads. With 2 resources against that fixture's 4 repositories, its
+  hello never reaches the engine; this is `later.md`'s, not 14.1's.
+- Shape 2: `owned/agent.json`'s `profile` is the tier's (`support/configuration.rs:5-7`), written out as
+  configuration.md 10's "Its agent's configuration" lists it. Its endpoint is as Shape 2 says. `hub.event_bytes` 598
+  rests on its `message_bytes`, 600.
+- The designer's probe: temper f6cb29f5c, the tier's document (`support::configuration`) with the example's 13 engine
+  overrides, `git` `http://127.0.0.1:3000` and the tier's agent. With the four constants changed, `{}` and the worker's
+  two overrides, `temper::prepare_in` is `Ok`. One past each is refused: `hub.event_bytes` 597 and 599, `hub.accounts`
+  5, `checkout.message_bytes` 4095, `checkout.repositories` 3 and `checkout.name_bytes` 257 (`workers[0].limits: past
+  its bound`); `forge.resources_per_task` 3 (`must agree with checkout.repositories and checkout.name_bytes`);
+  `forge.name_bytes` 115 (`must agree with the longest remote`; 114 starts). Then `heavy cargo nextest run -p
+  temper-service -p temper` ran 260 tests, 260 passed. T3 checks the example's start; no test is added for it.
+- Ruling 143's rule (each number the least its check accepts) stays for `memory_bytes` and each number the design does
+  not give. The numbers above are given. Ruling 145's "Change no `startup.rs`, `worker_settings.rs` or smith code"
+  stays. Size: about +8 lines (the four constants and the two fixture lines).
+
 **Corrections after the designer's answer of 2026-10-18T11:40:51Z (the question of ruling 139; configuration.md 7 and
 10). They take precedence over the text below and over ruling 139's T4 line:**
 - Shape 1, `engine.limits`: `small` with configuration.md 10's 13 overrides, as its skeleton writes them: the three

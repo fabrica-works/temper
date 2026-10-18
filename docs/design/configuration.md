@@ -321,6 +321,29 @@ top-level `workers`, in the same order; standalone has one. Each:
   with what it bounds. Where a limit of temper's is a quantity jig's
   profile also sets, its constant cites jig's small profile's (jig's
   `protocol/configuration.md`, section 6).
+- **`small` starts as it stands,** with no override, against the agent
+  temper runs: smith's, whose run bounds are smith's own and no
+  configuration changes (smith's `smith-domain-run`, `derive`: 2
+  directories, a directory's name of 256 bytes; `smith-agent-service`'s
+  4 accounts), and whose largest call, under the owned example's agent
+  configuration (section 10), is 4096 bytes (its `outcome_bytes`). Each
+  constant is held to the checks below:
+  - `checkout.repositories` 2 and `forge.resources_per_task` 2: a task's
+    resources are its workspace's repositories, each one of the agent's
+    directories;
+  - `checkout.name_bytes` 256, the agent's directory names;
+  - `checkout.message_bytes` 4096: a run's push message, which smith
+    bounds as a call, the agent's largest;
+  - `forge.name_bytes` 64: the longest remote, an owner and a name of 64
+    bytes, two `/` and `.git`, leaves 122 bytes of a `git` base within
+    the checkout's 256;
+  - `git_component.stdout_bytes` 1024: the checkout's 4 conflicts of 255
+    bytes with their NULs, and a push's report, two names and 256.
+
+  So an `application.limits` of `small` with no override starts a
+  document whose forges' `git` bases are at most 122 bytes, as the owned
+  example's and the standalone one's are, 21 each (section 10). A test
+  whose agent has other bounds states the overrides it needs.
 - **Overrides by dotted name:** the path of the field in its owner's
   `Limits` type, a duration's last segment with `_ms`. A name temper does
   not know, or a value outside its type, refuses the start, naming it.
@@ -381,7 +404,17 @@ top-level `workers`, in the same order; standalone has one. Each:
     longest remote the routing can make (the longest `git` base, an
     owner and a name of the forge's `name_bytes`, two `/` and `.git`),
     and the forge's names and branches, within the checkout's
-    `name_bytes`.
+    `name_bytes`;
+  - the worker's, against the agent's configuration
+    (`temper-worker-domain`'s `worst_case`), among its rules: the
+    checkout's repositories, names, conflicts and paths within the
+    agent's directories, their names, conflicts and paths; the agent's
+    largest call within the checkout's commit message; and, of the hub's
+    (jig's, in the worker's `limits`), its accounts within the agent's,
+    its largest event with smith's 2-byte separator within the agent's
+    message, and the agent's message less that separator within the
+    hub's event. So `hub.event_bytes` is the agent's `message_bytes` less
+    2, and no other value starts.
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
 - **The engine's documents fit temper's client.** A document past the
@@ -449,6 +482,13 @@ top-level `workers`, in the same order; standalone has one. Each:
     profile's store, whose bounds no override changes, so the start is
     refused (jig's `protocol/store.md`, 5.4); these two bring the row
     back within.
+- **The owned example's worker `limits`** are jig's small profile with
+  the two of the hub's that jig's small, sized for any agent, sets past
+  smith's agent (the worker's check above), and no other: `hub.accounts`
+  4, the agent's accounts, where jig's small has 8; and `hub.event_bytes`
+  598, the example's agent's `message_bytes`, 600, less the separator,
+  where jig's small has 65,536. Its `application.limits` is `small` with
+  no override.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
@@ -664,7 +704,7 @@ not itself valid JSON):
       "configuration": "/home/me/temper/agent.json",
       "arguments": ["agent", "/home/me/temper/agent.json"]
     },
-    "limits": {"profile": "small", "overrides": {}},
+    "limits": {"profile": "small", "overrides": {"hub.accounts": 4, "hub.event_bytes": 598}},
     "memory_bytes": ...
   }],
   "application": { ... as above ... }
@@ -698,6 +738,15 @@ and the process tier's test of `temper box` runs one (setup.md, 13.4).
   request, update it from its base, close or reopen it, and edit, close
   or reopen an issue; 10, as the process tier's owner holds them. Its
   `engine.limits` admit them (section 7).
+- **Its agent's configuration** (section 5), `owned/agent.json`, takes
+  the process tier's profile, the sizes its live tier runs a real model
+  with: smith's `standard`, with `declared` `memory` 2,147,483,648,
+  `tool_payload` 600, `read_window` 256, `conversations` 1 and
+  `calls_per_response` 1, and `policy` `max_turns` 5, `group_stop` 10,
+  `inbox` 8 and `unacknowledged` 8. Its messages are then 600 bytes, and
+  its worker's `limits` follow from them (section 7). smith's standard
+  sizes with nothing declared refuse the example's model declaration at
+  start.
 - **Three loopback addresses,** Forgejo's (`listen`), the clients'
   listener's and the webhooks' listener's, are what a host changes to run
   several boxes on one machine, with each box's directories.
