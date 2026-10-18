@@ -82,13 +82,23 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   of temper's words: `jig-client`'s `words` has none for the link's
   states (its `Word` is `Phase`, `Hold`, `Refusal`, `Waiting` and
   `Status`, `crates/jig-client/src/words.rs:15-21`), and jig's are
-  `jig_client_view`'s (`crates/jig-client-view/src/words.rs:67-68`), which 07.4 removes. What the
-  main says when the engine does not serve this client's version of
-  jig's records is the designer's (asked at this session's ready check,
-  ruling 320): 07.4 takes it from the answer's amendment of this line.
-  The banner keeps saying "Connecting" before `me`'s first delivery
-  (5.1). The link's states are `jig-client`'s `link()` (jig's
-  `client.md`, 8.2).
+  `jig_client_view`'s (`crates/jig-client-view/src/words.rs:67-68`), which 07.4 removes. When
+  the engine does not serve this client's version of jig's records, the
+  main says "This temper is out of date: run the temper the engine
+  runs.", also temper's words, with no jig step and no repin (the
+  designer's answer to ruling 320; `client.md`, 5.1). Both mains are one
+  paragraph with no heading, so the terminal's first line reads `==
+  temper == Signed out` or `== temper == Out of date` (`client.md`,
+  6.6); while the link is signed out or out of date the banner is
+  temper's name and the link's state alone, and no navigation is
+  offered (5.1). The banner keeps saying "Connecting" before `me`'s
+  first delivery (5.1). The link's states are `jig-client`'s `link()`
+  (jig's `client.md`, 8.2).
+- **Kept work dropped** (the same answer; `client.md`, 3.4, 6.6):
+  `jig-client`'s `Told::Dropped { count }`, which `route.rs:154` gives
+  the reference UI's child at the base, goes to the shell in 07.4, and
+  the terminal prints `temper: N requests kept in DIRECTORY were not
+  sent: another version of temper made them` once.
 
 ## Rules that bind it
 
@@ -261,9 +271,9 @@ Shape: `temper_client_view::forge::page::page(builder, form, project:
 child (`pages::project_name(pages, client, project) -> Option<&[u8]>`),
 not from jig's reference UI. For a project `me` does not name (before
 its first delivery), the title keeps today's number
-(`JigPhrase::FrameProjectNumber`, `forge/page.rs:39`) in this increment:
-what it says once 07.4 removes jig's words is the designer's (ruling
-320).
+(`JigPhrase::FrameProjectNumber`, `forge/page.rs:39`) in this increment;
+07.4 replaces it with temper's "Adopt a repository into project N"
+(`client.md`, 4.4).
 Test shape: the base's form and page tests
 (`crates/temper-client-view/src/tests/forge_page.rs`, 343 lines) keep
 their names and expected values but the frame's lines and the title;
@@ -303,7 +313,9 @@ Scope: the reference UI's child of temper's root (asker 65536), its
 records, places and slots, `Address::Jig`, `ShowPart` and `PartsLeft`
 and the forge side's held parts, and `jig-client-view` in temper's
 manifests, removed; temper's main for the pages not about the work
-(signed out, out of date); the stories that still visit
+(signed out, out of date), the adoption's title for a project `me` does
+not name, and the kept work dropped said by the terminal (`client.md`,
+3.4, 4.4, 5.1, 6.6); the stories that still visit
 jig's pages moved to temper's; the goldens of jig's pages removed or
 recorded again by hand (`client.md`, 9; README, Done when, 8).
 Needs: 07.1, 07.3 (and 06.2 to 06.6, by the session's start).
@@ -320,14 +332,16 @@ Files:
   `src/tests/fixtures.rs:118-135`: they draw through 07.1's `drawn`, and
   the test of a part not held goes with the held parts), `Cargo.toml`;
 - `crates/temper-client-shell-terminal/src/{limits.rs, terminal.rs,
-  client.rs, tests.rs}` (the status region given to
+  client.rs, route.rs, terminal/native.rs, client/tests.rs, tests.rs}`
+  (the status region given to
   `skein_ui_text::Settings`, `terminal.rs:59` and `tests.rs:93` at the
   base, wherever 06.1 left them, names temper's region alone, no region
   of jig's), `src/tests/fixtures.rs` (`:18`, `:439`, `:564`),
   `src/tests/render.rs:40-52`, `tests/support/mod.rs`, `Cargo.toml`,
   and the goldens of jig's pages: `project.txt` and `deployment.txt` go
   with their tests; `signed_out.txt` recorded again on temper's main
-  (by hand);
+  (by hand), its first line `== temper == Signed out` (`client.md`,
+  6.6);
 - `tests/client/src/fixtures.rs:262` (`project()`, an address of jig's,
   becomes `Address::Inbox`, the stories pressing the navigation's
   "Adopt a repository" there) and its other users of jig's reference
@@ -344,10 +358,25 @@ Files:
 Users found by `git grep -n -w -e jig_client_view -e 'Address::Jig' -e
 ShowPart -e PartsLeft -- '*.rs'` and `git grep -n jig-client-view --
 '*Cargo.toml'` in temper.
-Shape: no new type but temper's main for the link's states: `pages`
-shows "Signed out." (temper's words) or the out-of-date main (Choices:
-the designer's answer, ruling 320) when `jig-client`'s `link()` says
-so, in place of the page at the address.
+Shape: no new type but temper's main for the link's states, and one
+variant for the dropped count:
+- `pages` shows "Signed out." or "This temper is out of date: run the
+  temper the engine runs." (temper's words, one paragraph, no heading)
+  when `jig-client`'s `link()` says signed out or out of date, in place
+  of the page at the address; the banner then holds temper's name and
+  the link's state ("Signed out", "Out of date") alone, with no
+  navigation (`client.md`, 5.1).
+- The adoption's title for a project `me` does not name is a row of the
+  forge's words beside `Word::Title` (`forge/words.rs:65`): "Adopt a
+  repository into project " and a number hole, in place of
+  `JigPhrase::FrameProjectNumber` (`client.md`, 4.4).
+- `Told::Dropped { count }` leaves the domain as a request of its own
+  (`Request::Dropped { count }`, `boundary.rs`), which the terminal's
+  `route::down` passes on (its `route::Notice::Dropped`, `route.rs:12`,
+  is made nowhere at the base), and the host says as one of temper's
+  lines, beside `OtherPartyKept` (`terminal.rs:31`, `:175`): `temper: N
+  requests kept in DIRECTORY were not sent: another version of temper
+  made them` (`client.md`, 6.6).
 Each match on the root's children loses the reference UI's
 arm; `Address` loses `Jig`.
 Test shape: the view tests of the two mains in
@@ -366,7 +395,14 @@ fn signed_out_the_main_says_so_and_nothing_else() {
 `src/tests/fixtures.rs:94`, are new; `fixtures::built` takes no root.)
 Tests, each under 20 ms (unit) or 0.5 s (world):
 `signed_out_the_main_says_so_and_nothing_else`,
-`an_engine_not_serving_jigs_version_says_jigs_out_of_date_words`,
+`an_engine_not_serving_jigs_version_says_temper_is_out_of_date` (the
+main's text is "This temper is out of date: run the temper the engine
+runs.", and the banner offers no "Sign out" and no navigation),
+`the_adoption_page_for_a_project_me_does_not_name_is_titled_by_its_number`
+(view: "Adopt a repository into project 7"),
+`kept_work_of_another_version_prints_its_line_once` (the terminal's
+host, beside `another_partys_kept_work_prints_its_line_once`,
+`src/client/tests.rs:10`),
 `a_client_closed_on_a_tasks_page_opens_at_the_inbox_again` (world:
 reloaded with nothing of the page kept, `client.md`, 3.4). The stories
 moved keep their names and expected values, but the addresses and node
@@ -382,7 +418,9 @@ filter `test(temper_open_signs_in_prints_the_inbox_and_exits_on_q)`:
 minute). Nothing else is run.
 Don't: keep an alias, a re-export or a feature flag of the reference
 UI; keep a golden of a page temper no longer has.
-Size: at most 120 lines added (the removals are not counted).
+Size: at most 140 lines added (the removals are not counted): 120,
+and 20 for the title's row and the dropped count's line (the designer's
+answer to ruling 320).
 Removes: the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,

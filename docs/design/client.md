@@ -213,7 +213,13 @@ the credential. Once signed in, the domain watches `me` and opens
 home, the inbox. Kept requests are parked until `me` confirms their
 party (jig's `client/domain/client.md`, section 11); another party's
 stay parked and are not shown, and the terminal says so in a line of
-its own (6.6).
+its own (6.6). Kept requests in a version this client does not speak,
+jig's or the forge's (4.6), are dropped by `jig-client` at start and
+told only by how many, `Dropped { count }`, under no asker (jig's
+`client/domain/client.md`, section 11). jig's root gives the count to
+"the presentation the application chooses" (jig's
+`client/domain/root.md`, section 8): temper's domain hands it to the
+shell, and the terminal says so in a line of its own (6.6).
 temper's pages keep no record of their own: a client closed on any page
 opens at the inbox, and a composer's words not sent, or a form's values,
 are not kept across a restart (section 11).
@@ -362,8 +368,13 @@ sentence (4.7) is what tells the person (section 11).
 ### 4.4 The adoption form
 
 The page's title is "Adopt a repository into PROJECT", PROJECT as `me`
-names the project. Its fields are `forge::Adoption`'s
-(`temper-engine-domain-forge`) but the repository's id, which the forge
+names the project. For a project `me` does not name (before `me`'s
+first delivery, or one no longer among the party's projects), it is
+"Adopt a repository into project N", N the address's project number,
+until `me` names it. The form is the same either way: the engine
+judges the adoption, and a refusal at admission (the party's role in
+the project) is shown in jig's words (4.6). Its fields are
+`forge::Adoption`'s (`temper-engine-domain-forge`) but the repository's id, which the forge
 connector locates by owner and name (`domain/forge.md`, section 4), and
 the forge's host, which temper's server fills from the forge's
 configuration (section 8). In order:
@@ -519,14 +530,35 @@ connector's errors to these reasons (section 8).
 - **`build`:** when the domain's shown count moved, it builds the page
   after its mockup, in one outline (skein's `ui.md`, section 14):
   - *a banner:* temper's name; the project the person is in, and the
-    others to choose from; the link's state ("Connecting", "Live",
-    "Offline"), and "Behind" while a page's watch reopens; the person's
-    name and "Sign out";
+    others to choose from; the link's state, one word for each of
+    `jig-client`'s `Link` states ("Signed out", "Connecting" while
+    starting, "Live", "Offline", "Out of date"), and "Behind" while a
+    page's watch reopens; the person's name and "Sign out";
   - *the navigation* (5.3);
   - *the main:* the page at the address (3.5), its title its level-1
     heading.
 
   Then skein-ui diffs it and keeps the tree.
+- **The pages not about the work** (jig's `client/domain/pages.md`,
+  section 8). While the link is signed out or out of date, `me` has
+  ended ("`me` ends only with the sign-in, or when jig's version is not
+  served", jig's `client/domain/client.md`, 8.2). The banner is then
+  temper's name and the link's state alone, no navigation is offered,
+  and the main, in place of the page at the address, is one paragraph
+  of temper's words with no heading:
+  - *signed out:* "Signed out." (6.6);
+  - *out of date,* the engine serving no version of jig's records that
+    this client speaks: "This temper is out of date: run the temper the
+    engine runs." The client "sends nothing, and keeps every request"
+    (jig's `client/domain/client.md`, 8.2), so what is pending stays in
+    the small store.
+
+  Both are phrases of temper's phrasebook: `jig-client`'s `words` has
+  none for the link's states, and temper arranges no page of jig's
+  (section 9). The page at the address is shown again once the link is
+  starting, live or offline. When jig's records are served and the
+  forge's are not, the link stays live, and the form says its own out
+  of date (4.4).
 - **`act`:** a shell's act on a node is resolved by skein-ui in the
   last tree to its binding, and decoded by temper's bindings into the
   domain's action. A node gone, or a token of an older tree, decodes to
@@ -541,8 +573,9 @@ connector's errors to these reasons (section 8).
 
 - **Words:** the forge's phrases in temper's phrasebook: the connector,
   resources, patterns and kinds (4.1); "Shown on the forge." (4.2);
-  the form's title, field names, roles, rules and button (4.4); the
-  outcome (4.7); the out-of-date sentence; the navigation entry. Names
+  the form's title, field names, roles, rules and button (4.4), its
+  title by the project's number included; the outcome (4.7); the form's
+  out-of-date sentence (4.4); the navigation entry. Names
   (owners, repositories, branches) are copied in, never translated.
 - **The parts:** a connector, resource, pattern or kind is one text
   node of its words; every other part is the paragraph of 4.2. Neither
@@ -725,7 +758,9 @@ command.
 - **Signing out** is the banner's "Sign out". The domain gives
   `jig-client` `SignOut`, which sends jig's sign-out. Signed out: the
   host has the native shell keep none, which erases DIRECTORY's token;
-  the main says "Signed out.", and temper prints `temper: signed out;
+  the main says "Signed out." (5.1), the first line reads `== temper ==
+  Signed out` (skein's `ui-text.md`, section 5: TITLE is "the shell's
+  name when there is none"), and temper prints `temper: signed out;
   to sign in again, run temper open DIRECTORY LINK with a link temper
   serve printed`. A sign-out that did not reach the engine leaves the
   person signed in; the banner says so and offers it again (jig's
@@ -733,6 +768,13 @@ command.
 - **Another party's kept work:** while the small store holds requests
   of a party other than the one `me` confirms, temper prints `temper:
   work of another party is kept in DIRECTORY, and waits for them` once.
+- **Out of date** (5.1): the first line reads `== temper == Out of
+  date`, and the main says "This temper is out of date: run the temper
+  the engine runs."; temper prints no line of its own. What is pending
+  stays in DIRECTORY's small store, closed as below.
+- **Kept work dropped** (3.4): when `jig-client` drops kept requests at
+  start, temper prints `temper: N requests kept in DIRECTORY were not
+  sent: another version of temper made them` once, N the count it told.
 - **Closing:** `q`, the end of stdin, SIGINT or SIGTERM. The client does
   not sign out. skein's text shell closes (`temper: closed`); no new
   exchange starts; `jig-client-shell-native` finishes the small store's
