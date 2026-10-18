@@ -12,11 +12,12 @@ pub mod domain;
 pub mod forge;
 pub mod limits;
 pub mod owner;
+pub mod pages;
 mod parts;
 mod route;
 pub use address::{Address, Place};
 pub use boundary::{Action, Event, Fact, Request};
-pub use domain::{Domain, configure_navigation, fire, navigation, new, next_deadline, shown, step, take, unlinked};
+pub use domain::{Domain, fire, new, next_deadline, shown, step, take, unlinked};
 pub use limits::{Limits, max_out, worst_case};
 #[cfg(test)]
 mod tests;

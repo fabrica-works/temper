@@ -121,7 +121,7 @@ pub fn view_bounds(limits: &Limits, jig: &jig_client_view::words::Words, forge: 
 }
 #[must_use]
 pub fn inbox() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None })
+    temper_client_domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL }
 }
 #[must_use]
 pub fn world(seed: u64) -> World<Temper, Joint> {
@@ -143,7 +143,7 @@ pub fn codec() -> jig_protocol_transcript::Limits {
 
 #[must_use]
 pub fn conversations() -> temper_client_domain::Address {
-    temper_client_domain::Address::Jig(jig_client_view::address::Address::Conversations { project: None })
+    temper_client_domain::Address::Chats
 }
 #[must_use]
 pub fn chats(driver: &Driver) -> u32 {

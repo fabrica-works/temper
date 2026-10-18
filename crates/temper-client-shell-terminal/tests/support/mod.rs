@@ -23,13 +23,13 @@ pub fn tree_limits() -> skein_ui::Limits {
         markdown_depth: 2,
     }
 }
-fn tree(revision: u64) -> Tree {
+fn tree(revision: u64, link: &'static [u8]) -> Tree {
     let mut builder = Builder::new(&tree_limits());
     builder.open(Role::Page);
     builder.open(Role::Region);
-    builder.region(jig_client_view::regions::JigRegion::Link.region());
+    builder.region(temper_client_view::frame::link_region());
     builder.open(Role::Status);
-    builder.text(skein_ui::Run::Plain, b"Live");
+    builder.text(skein_ui::Run::Plain, link);
     builder.close();
     builder.close();
     builder.open(Role::Main);
@@ -51,6 +51,7 @@ fn tree(revision: u64) -> Tree {
 pub struct Script {
     tree: Tree,
     built: u64,
+    link: &'static [u8],
     next_id: u32,
     changes: VecDeque<Time>,
     notices: VecDeque<Notice>,
@@ -65,6 +66,7 @@ impl Script {
         let mut script = Self {
             tree: Tree::new(tree_limits().nodes),
             built: 0,
+            link: b"Live",
             next_id: 0,
             changes: VecDeque::new(),
             notices: VecDeque::new(),
@@ -81,9 +83,13 @@ impl Script {
     }
     fn rebuild(&mut self) {
         self.built += 1;
-        let mut next = tree(self.built);
+        let mut next = tree(self.built, self.link);
         skein_ui::diff(&self.tree, &mut next, &tree_limits(), &mut self.next_id, &mut Queue::with_capacity(320));
         self.tree = next;
+    }
+    pub fn change_link(&mut self, link: &'static [u8]) {
+        self.link = link;
+        self.rebuild();
     }
     pub fn change_at(&mut self, at: Duration) {
         self.changes.push_back(Time::ZERO.saturating_add(at));
@@ -121,12 +127,7 @@ impl Client for Script {
             return false;
         }
         let mut print = skein_ui_text::Print::new(&tree_limits()).expect("world print envelope");
-        skein_ui_text::render(
-            &self.tree,
-            b"temper",
-            Some(jig_client_view::regions::JigRegion::Link.region()),
-            &mut print,
-        );
+        skein_ui_text::render(&self.tree, b"temper", Some(temper_client_view::frame::link_region()), &mut print);
         let number =
             print.numbers.iter().position(|id| *id == node).map(|index| u32::try_from(index).expect("number fits") + 1);
         let Some(number) = number else {
@@ -259,7 +260,11 @@ impl World {
             .collect()
     }
     pub fn shown_last(&self) -> bool {
-        let expected = format!("== Revision {} == Live\n", self.client.built());
+        let expected = format!(
+            "== Revision {} == {}\n",
+            self.client.built(),
+            std::str::from_utf8(self.client.link).expect("script link is UTF-8")
+        );
         self.output.split_inclusive(|b| *b == b'\n').rfind(|line| line.starts_with(b"== ")) == Some(expected.as_bytes())
     }
     pub fn typed(&self) -> &[u32] {

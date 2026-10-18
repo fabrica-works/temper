@@ -1,5 +1,11 @@
 == Every role == Live
-* Signed in as Pat
+temper
+[1] Shop (selected)
+* Pat
+[2] Sign out
+[3] Inbox 0
+[4] Chats
+[5] Adopt a repository
 Region:
   child
 Figure:
@@ -35,15 +41,15 @@ Text
 - item
   continued
 one | two
-[1] Button
-[2] Tab
-[3] Link
-[4] Field: value (enter sends)
-[5] Area: (empty)
-[6] ( ) Choice
-[7] [ ] Check
-[8] (*) Chosen
-[9] [x] Checked
+[6] Button
+[7] Tab
+[8] Link
+[9] Field: value (enter sends)
+[10] Area: (empty)
+[11] ( ) Choice
+[12] [ ] Check
+[13] (*) Chosen
+[14] [x] Checked
 [-] All states (disabled) (expanded) (busy) (current) (invalid) (pressed) (selected)
 [-] Unbound
 Outside <https://example.test/>

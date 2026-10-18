@@ -96,7 +96,7 @@ pub fn tree_limits() -> skein_ui::Limits {
 }
 pub(crate) fn print(tree: &skein_ui::Tree) -> skein_ui_text::Print {
     let mut print = skein_ui_text::Print::new(&tree_limits()).expect("fixture print bounds");
-    skein_ui_text::render(tree, b"temper", Some(jig_client_view::regions::JigRegion::Link.region()), &mut print);
+    skein_ui_text::render(tree, b"temper", Some(temper_client_view::frame::link_region()), &mut print);
     print
 }
 pub fn golden(name: &str) -> std::path::PathBuf {
@@ -204,7 +204,6 @@ pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> ske
     let mut view =
         temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, jig, forge, 1);
     let mut root = client::unlinked(&limits, 16);
-    root_navigation(&mut root, &limits);
     let mut out = Queue::with_capacity(client::max_out(&limits));
     client::step(
         &mut root,
@@ -327,9 +326,7 @@ fn populate_page(
         }
     }
 }
-fn root_navigation(root: &mut client::Domain, limits: &client::Limits) {
-    client::configure_navigation(root, client::navigation(limits)).expect("fixture navigation");
-}
+
 pub fn page_words() -> (jig_client_view::words::Words, temper_client_view::words::Words) {
     static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, temper_client_view::words::Words)> =
         std::sync::OnceLock::new();
@@ -406,9 +403,17 @@ pub fn signed_out_page() -> skein_ui::Tree {
 pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, behind: bool) {
     use skein_ui::{Role, Run};
     builder.open(Role::Page);
+    builder.open(Role::Banner);
+    builder.open(Role::Paragraph);
+    builder.text(Run::Plain, b"temper");
+    builder.close();
+    builder.open(Role::Button);
+    builder.name(b"Shop");
+    builder.state(skein_ui::State::Selected);
+    builder.bind(binding());
+    builder.close();
     builder.open(Role::Region);
-    builder.name(b"Me");
-    builder.region(jig_client_view::regions::JigRegion::Link.region());
+    builder.region(temper_client_view::frame::link_region());
     builder.open(Role::Status);
     builder.text(Run::Plain, b"Live");
     builder.close();
@@ -419,7 +424,20 @@ pub fn synthetic_header(builder: &mut skein_ui::Builder, title: Option<&[u8]>, b
     }
     builder.close();
     builder.open(Role::Status);
-    builder.text(Run::Plain, b"Signed in as Pat");
+    builder.text(Run::Plain, b"Pat");
+    builder.close();
+    builder.open(Role::Button);
+    builder.name(b"Sign out");
+    builder.bind(binding());
+    builder.close();
+    builder.close();
+    builder.open(Role::Navigation);
+    for name in [b"Inbox 0".as_slice(), b"Chats", b"Adopt a repository"] {
+        builder.open(Role::Link);
+        builder.name(name);
+        builder.link(binding());
+        builder.close();
+    }
     builder.close();
     builder.open(Role::Main);
     if let Some(title) = title {

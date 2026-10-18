@@ -41,8 +41,6 @@ fn temper_open_adopts_a_repository_by_commands() {
     let mut typist = support::terminal::Typist::new(open, serve, link);
     typist.wait_for(b"== Inbox == Live", support::WITHIN);
     typist.wait_for(b"All goals\n", support::WITHIN);
-    typist.wait_for(b"[4] Project 1\n", support::WITHIN);
-    typist.type_line(b"4");
     typist.type_on(b"Adopt a repository", b"");
     for (control, words, printed) in [
         (b"Owner: (empty)".as_slice(), b"acme".as_slice(), b"Owner: acme".as_slice()),

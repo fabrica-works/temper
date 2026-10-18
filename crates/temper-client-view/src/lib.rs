@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod forge;
+pub mod frame;
 pub mod limits;
 mod root;
 pub mod words;

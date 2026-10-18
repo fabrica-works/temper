@@ -106,8 +106,7 @@ impl NativeClient {
             Start::Token => None,
         };
         shell.adopt(directory, user, seed);
-        let mut root = domain::new(&bounds.client, seed);
-        domain::configure_navigation(&mut root, domain::navigation(&bounds.client)).expect("native navigation fits");
+        let root = domain::new(&bounds.client, seed);
         Ok(Self {
             shell,
             root,
@@ -125,7 +124,7 @@ impl NativeClient {
             with,
             authentication: skein_lib::Map::with_capacity(limits::EXCHANGES),
             kept_keys: skein_lib::Set::with_capacity(bounds.client.client.domain.requests.requests),
-            address: domain::Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
+            address: domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
             phase: Phase::WaitingToken,
             dirty: false,
             signing_out: false,

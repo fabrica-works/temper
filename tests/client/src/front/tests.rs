@@ -22,7 +22,7 @@ fn an_authenticated_reload_routes_the_restored_person_frame() {
     assert_eq!(restored.client().link().party, Some(fixtures::PARTY));
     let mut patches = Queue::with_capacity(Temper::patch_limit(&view));
     Temper::build(&mut view, &restored, &mut patches);
-    assert!(Temper::tree(&view).nodes().iter().any(|node| node.name.as_deref() == Some(b"Signed in as Person")));
+    assert!(Temper::tree(&view).nodes().iter().any(|node| node.name.as_deref() == Some(b"Person")));
 }
 
 fn settle_root(
@@ -80,13 +80,13 @@ fn pending_adoption(
     root: &mut client::Domain,
     limits: &client::Limits,
 ) -> Vec<skein_lib::RequestRecord<jig_client::Held>> {
-    use client::forge::{Act, Address, Text, Typed};
+    use client::forge::{Act, Text, Typed};
     let env = Env { now: front.now, wall: WALL, limits: *limits };
     let mut out = Queue::with_capacity(Temper::max_out(limits));
     Temper::step(
         root,
         &env,
-        RootEvent::Went { place: client::Place::Address(client::Address::Forge(Address::Adopt { project: 1 })) }.into(),
+        RootEvent::Went { place: client::Place::Address(client::Address::Adopt { project: 1 }) }.into(),
         &mut out,
     );
     for (field, text) in [(Text::Owner, b"acme".as_slice()), (Text::Name, b"shop"), (Text::Landing, b"main")] {
@@ -132,4 +132,16 @@ fn a_real_sign_out_records_the_engine_receipt_before_the_callback() {
         )),
         "the real engine's sign-out answer must precede the callback"
     );
+}
+
+#[test]
+fn the_referee_reads_live_from_tempers_link_region() {
+    let limits = fixtures::domain_limits();
+    let mut front = Joint::new(fixtures::SEED, limits);
+    front.bind(CLIENT, fixtures::PARTY);
+    let (mut root, mut view) = Temper::new(fixtures::SEED);
+    settle_root(&mut front, &mut root, &limits, Vec::new());
+    let mut patches = Queue::with_capacity(Temper::patch_limit(&view));
+    Temper::build(&mut view, &root, &mut patches);
+    assert!(Temper::seen(Temper::tree(&view)).contains(&jig_client_world::harness::Seen::Link { live: true }));
 }

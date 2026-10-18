@@ -60,7 +60,7 @@ impl Loop {
             name: Box::from(*b"temper"),
             longest: limits.line,
             interval: limits.interval,
-            status: Some(jig_client_view::regions::JigRegion::Link.region()),
+            status: Some(temper_client_view::frame::link_region()),
             lines: limits.lines,
             line_bytes: u32::try_from(directory.len().checked_add(160).expect("line bytes fit"))
                 .expect("line bytes fit"),

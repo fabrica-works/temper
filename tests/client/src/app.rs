@@ -55,8 +55,7 @@ impl App for Temper {
         let limits = limits();
         let (jig, forge) = fixtures::phrasebooks(&limits);
         let bounds = fixtures::view_bounds(&limits, &jig, &forge);
-        let mut root = domain::unlinked(&limits, seed);
-        domain::configure_navigation(&mut root, domain::navigation(&limits)).expect("navigation fits");
+        let root = domain::unlinked(&limits, seed);
         (root, view::View::new(&bounds, &limits, jig, forge, fixtures::FORGE))
     }
     fn view_limits(view: &Self::View) -> skein_ui::Limits {
@@ -185,7 +184,7 @@ impl App for Temper {
                 domain::Event::Act { action: Action::Jig(act) }
                 | domain::Event::Jig(jig_client_view::Event::Act { action: act }),
             ) => observe::jig_window_changed(act),
-            Some(domain::Event::Act { action: Action::Forge(_) }) => true,
+            Some(domain::Event::Act { action: Action::Forge(_) | Action::Pages(_) }) => true,
             Some(
                 domain::Event::Start { .. }
                 | domain::Event::Went { .. }
@@ -199,6 +198,21 @@ impl App for Temper {
     }
     fn seen(tree: &Tree) -> Vec<Seen> {
         let mut seen = observe::jig_seen(tree);
+        if let Some((index, region)) =
+            tree.nodes().iter().enumerate().find(|(_, node)| node.region == Some(view::frame::link_region()))
+        {
+            let end =
+                index.checked_add(usize::try_from(region.size).expect("tree region fits")).expect("tree indices fit");
+            for node in &tree.nodes()[index..end] {
+                if node.role == skein_ui::Role::Status {
+                    match node.name.as_deref() {
+                        Some(b"Live") => seen.push(Seen::Link { live: true }),
+                        Some(b"Offline") => seen.push(Seen::Link { live: false }),
+                        _ => {}
+                    }
+                }
+            }
+        }
         if adoption_page(tree) {
             let mut state = jig_client_world::harness::CardSeen::Waiting;
             for node in tree.nodes() {
@@ -234,6 +248,15 @@ impl App for Temper {
             }
             jig_client::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),
         })
+    }
+    fn decision(request: &Request) -> Option<&jig_client::contract::Ask> {
+        match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Jig(ask), .. } },
+            } => Some(ask),
+            Request::Client { .. } | Request::Show { .. } | Request::SignOut | Request::Fact { .. } => None,
+        }
     }
     fn received(event: &Event) -> Vec<Receipt> {
         let Some(event) = event.root() else { return vec![Receipt::Started] };

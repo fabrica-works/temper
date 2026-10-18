@@ -3,8 +3,8 @@
 use crate::words::{Word, Words};
 use alloc::boxed::Box;
 use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
-use skein_lib::{Reader, Token, Writer, bytes::copy_of};
-use skein_ui::{Builder, Role, SlotRef, phrases::Hole};
+use skein_lib::{Reader, Writer, bytes::copy_of};
+use skein_ui::{Builder, Role, phrases::Hole};
 pub mod bindings;
 pub mod page;
 pub mod words;
@@ -16,10 +16,6 @@ pub enum Resource<'a> {
     Issue { host: &'a [u8], owner: &'a [u8], name: &'a [u8], number: &'a [u8] },
     Adopted { forge: u16, repository: u32 },
     Other,
-}
-#[must_use]
-pub const fn nav(forge: u16) -> SlotRef {
-    SlotRef { owner: (jig_client_view::Owner::Application { number: forge }).opaque(), token: Token::new(0) }
 }
 #[must_use]
 pub fn resource(path: &[Box<[u8]>]) -> Resource<'_> {

@@ -98,7 +98,7 @@ pub fn on_adoption_page() -> crate::Domain {
     crate::step(
         &mut root,
         &env(&limits),
-        Event::Went { place: crate::Place::Address(Address::Forge(forge::Address::Adopt { project: PROJECT })) },
+        Event::Went { place: crate::Place::Address(Address::Adopt { project: PROJECT }) },
         &mut out,
     );
     root

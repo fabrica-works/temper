@@ -21,10 +21,11 @@ fn checked_max_out(limits: &Limits) -> Option<u32> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.jig.kept < limits.client.domain.requests.requests || limits.jig.navigation_entries < 3 {
+    if limits.jig.kept < limits.client.domain.requests.requests {
         return None;
     }
     let mut total = jig_client_view::worst_case(&limits.jig)?;
+    total = total.checked_add(Queue::<crate::pages::Request>::worst_case(2)?)?;
     total = total.checked_add(forge::worst_case(&limits.forge)?)?;
     // A shown outcome may carry a protection rule or a whole core refusal.
     total = total.checked_add(limits.jig.document_bytes)?;

@@ -9,11 +9,6 @@ use jig_client_view::phrases::jig::JigPhrase;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, State, phrases::Hole};
 use temper_client_domain::forge;
-pub fn navigation(builder: &mut Builder, project: Option<u32>, words: &Words, bindings: &mut Bindings) {
-    if let Some(project) = project {
-        link(builder, Word::Navigation, Meaning::Navigate { project }, words, bindings);
-    }
-}
 fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bindings: &mut Bindings) {
     builder.open(Role::Link);
     builder.name(&words::say(words, word, &[]));

@@ -1,14 +1,44 @@
-//! Keep: the child/table routing shape and exhaustive owner variants.
-//! Replace: Ops connector sides with the forge's side and temper's navigation.
-/// An application destination tagged with its owning child.
+//! temper's addresses and the inbox's filters (client.md, 3.5).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
-    Forge(crate::forge::Address),
+    Inbox { filter: Filter },
+    Chats,
+    Chat { task: u64 },
+    Adopt { project: u32 },
     Jig(jig_client_view::address::Address),
 }
-/// A decoded location or a missing address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Filter {
+    pub project: Option<u32>,
+    pub kind: Option<Kind>,
+    pub goal: Option<u64>,
+}
+impl Filter {
+    pub const ALL: Self = Self { project: None, kind: None, goal: None };
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Proposal,
+    Question,
+    Held,
+    PersonTask,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Place {
     Address(Address),
     Missing,
+}
+impl Address {
+    /// Reference content inside temper's frame until its own pages land.
+    #[must_use]
+    pub fn reference(&self) -> Option<jig_client_view::address::Address> {
+        use jig_client_view::address::Address as Jig;
+        match self {
+            Self::Inbox { filter } => Some(Jig::Inbox { project: filter.project }),
+            Self::Chats => Some(Jig::Conversations { project: None }),
+            Self::Chat { task } => Some(Jig::task(*task)),
+            Self::Jig(address) => Some(*address),
+            Self::Adopt { .. } => None,
+        }
+    }
 }

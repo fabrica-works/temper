@@ -16,7 +16,7 @@ pub struct View {
     forge_words: Words,
     jig: JigBindings,
     forge: forge::bindings::Bindings,
-    nav: skein_ui::SlotRef,
+    pages: crate::frame::Bindings,
     limits: Limits,
 }
 impl View {
@@ -34,7 +34,7 @@ impl View {
             render: skein_ui::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
-            nav: forge::nav(forge),
+            pages: crate::frame::Bindings::new(limits.tree.bindings),
             jig_words,
             forge_words,
             limits: *limits,
@@ -56,26 +56,29 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.jig.begin();
     view.forge.begin();
+    view.pages.begin();
     let jig = root.jig().borrow(root.client());
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if !jig_client_view::jig(&mut builder, &jig, view.nav, &view.jig_words, &mut view.jig) {
-        if let Some(form) = root.forge().form() {
-            let project = forge::page::project_name(&jig, form.project, &view.jig_words);
-            builder.open(Role::Main);
-            forge::page::page(
-                &mut builder,
-                form,
-                &project,
-                &view.forge_words,
-                &view.jig_words,
-                &mut view.forge,
-                view.limits.tree.text_per_node,
-            );
-            builder.close();
-        }
-        jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
+    crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
+    crate::frame::navigation(&mut builder, root, &view.forge_words, &mut view.pages);
+    if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
+        && let Some(form) = root.forge().form()
+    {
+        let project = forge::page::project_name(&jig, form.project, &view.jig_words);
+        builder.open(Role::Main);
+        forge::page::page(
+            &mut builder,
+            form,
+            &project,
+            &view.forge_words,
+            &view.jig_words,
+            &mut view.forge,
+            view.limits.tree.text_per_node,
+        );
+        builder.close();
     }
+    jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
     builder.close();
     for pass in 0..2 {
         for slot in builder.slots(pass) {
@@ -87,17 +90,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             let filled = match Owner::from_opaque(slot.reference.owner) {
                 Some(Owner::Jig) | None => false,
                 Some(Owner::Application { number: connector }) => {
-                    if connector != root.forge_number() {
-                        false
-                    } else if slot.reference == view.nav {
-                        forge::page::navigation(
-                            &mut fragment,
-                            jig.frame_summary().project,
-                            &view.forge_words,
-                            &mut view.forge,
-                        );
-                        true
-                    } else {
+                    if connector == root.forge_number() {
                         match view.jig.part(slot.reference.token) {
                             Some(part) => {
                                 forge::part(&mut fragment, root.forge(), part, &view.forge_words);
@@ -111,6 +104,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                 None => false,
                             },
                         }
+                    } else {
+                        false
                     }
                 }
             };
@@ -127,6 +122,9 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
 #[expect(clippy::manual_map, reason = "step code explicitly wraps the owner action")]
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
+    if bound.binding.owner == crate::frame::owner() {
+        return view.pages.decode(bound.binding.token, bound.act);
+    }
     match Owner::from_opaque(bound.binding.owner) {
         Some(Owner::Jig) => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(action) => Some(Action::Jig(action)),

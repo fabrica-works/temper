@@ -94,7 +94,7 @@ fn the_native_limits_make_the_terminal() {
         name: Box::from(*b"temper"),
         longest: bounds.line,
         interval: bounds.interval,
-        status: Some(jig_client_view::regions::JigRegion::Link.region()),
+        status: Some(temper_client_view::frame::link_region()),
         lines: bounds.lines,
         line_bytes: 166,
     };

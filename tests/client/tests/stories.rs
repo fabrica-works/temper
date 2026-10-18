@@ -12,7 +12,7 @@ fn signing_in_shows_the_inbox_from_the_engine_root() {
         person,
         vec![
             Step::See { find: Find::named(Role::Status, b"Live"), within: fixtures::WITHIN },
-            Step::See { find: Find::named(Role::Status, b"Signed in as Person"), within: fixtures::WITHIN },
+            Step::See { find: Find::named(Role::Status, b"Person"), within: fixtures::WITHIN },
             Step::See { find: Find::named(Role::Heading { level: 1 }, b"Inbox"), within: fixtures::WITHIN },
         ],
     );

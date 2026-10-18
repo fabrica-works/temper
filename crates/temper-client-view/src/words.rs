@@ -1,4 +1,4 @@
-//! The forge's English phrasebook, copied as checked data from ops's pattern.
+//! temper's frame and forge words as checked English data.
 use alloc::boxed::Box;
 use jig_client_view::Owner;
 use skein_lib::{List, bytes::copy_of};
@@ -11,6 +11,16 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    Brand,
+    Inbox,
+    Chats,
+    Adoption,
+    Live,
+    Offline,
+    Connecting,
+    Behind,
+    SignOut,
+    SignOutLost,
     Connector,
     Repository,
     Branch,
@@ -37,7 +47,17 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 25] = [
+const ALL: [Word; 35] = [
+    Word::Brand,
+    Word::Inbox,
+    Word::Chats,
+    Word::Adoption,
+    Word::Live,
+    Word::Offline,
+    Word::Connecting,
+    Word::Behind,
+    Word::SignOut,
+    Word::SignOutLost,
     Word::Connector,
     Word::Repository,
     Word::Branch,
@@ -67,6 +87,16 @@ const ALL: [Word; 25] = [
 impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::Brand => 100,
+            Self::Inbox => 101,
+            Self::Chats => 102,
+            Self::Adoption => 103,
+            Self::Live => 104,
+            Self::Offline => 105,
+            Self::Connecting => 106,
+            Self::Behind => 107,
+            Self::SignOut => 108,
+            Self::SignOutLost => 109,
             Self::Connector => 0,
             Self::Repository => 1,
             Self::Branch => 2,
@@ -93,7 +123,44 @@ impl Word {
             Self::Shown => 23,
             Self::Unshowable => 24,
         };
-        PhraseId { owner: (Owner::Application { number: connector }).opaque(), number }
+        let owner = match self {
+            Self::Brand
+            | Self::Inbox
+            | Self::Chats
+            | Self::Adoption
+            | Self::Live
+            | Self::Offline
+            | Self::Connecting
+            | Self::Behind
+            | Self::SignOut
+            | Self::SignOutLost => crate::frame::owner(),
+            Self::Connector
+            | Self::Repository
+            | Self::Branch
+            | Self::Pull
+            | Self::Issue
+            | Self::Adopted
+            | Self::Path
+            | Self::Read
+            | Self::Push
+            | Self::OpenPull
+            | Self::MergePull
+            | Self::Review
+            | Self::Status
+            | Self::Comment
+            | Self::CreateIssue
+            | Self::CreateBranch
+            | Self::EditPull
+            | Self::UpdatePull
+            | Self::ClosePull
+            | Self::EditIssue
+            | Self::Reviewers
+            | Self::DeleteBranch
+            | Self::OtherKind
+            | Self::Shown
+            | Self::Unshowable => (Owner::Application { number: connector }).opaque(),
+        };
+        PhraseId { owner, number }
     }
 }
 #[must_use]
@@ -132,8 +199,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(74);
-        let mut phrases = List::with_capacity(74);
+        let mut shapes = List::with_capacity(83);
+        let mut phrases = List::with_capacity(83);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -170,9 +237,9 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 74,
+            phrases: 83,
             holes: 3,
-            segments: 518,
+            segments: 581,
             text_bytes: 6144,
             hole_bytes: joined.max(513),
         };
@@ -198,6 +265,16 @@ impl Words {
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::Brand => (&[b"temper"], &[]),
+        Word::Inbox => (&[b"Inbox ", b""], &[Number]),
+        Word::Chats => (&[b"Chats"], &[]),
+        Word::Adoption => (&[b"Adopt a repository"], &[]),
+        Word::Live => (&[b"Live"], &[]),
+        Word::Offline => (&[b"Offline"], &[]),
+        Word::Connecting => (&[b"Connecting"], &[]),
+        Word::Behind => (&[b"Behind"], &[]),
+        Word::SignOut => (&[b"Sign out"], &[]),
+        Word::SignOutLost => (&[b"Sign out did not reach the engine."], &[]),
         Word::Connector => (&[b"forge"], &[]),
         Word::Repository => (&[b"", b" on ", b""], &[Name, Name]),
         Word::Branch => (&[b"branch ", b" of ", b" on ", b""], &[Name, Name, Name]),

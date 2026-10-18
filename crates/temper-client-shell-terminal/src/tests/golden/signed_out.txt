@@ -1,11 +1,5 @@
-== Sign in == Signed out
-Work:
-  What needs you:
-    * Nothing known yet
-  Who is signed in:
-    * Signed out
-  Projects:
-  Go to a task:
-    [1] Go to task number: (empty) (enter sends)
-Navigation:
+== Sign in == Connecting
+temper
+[1] Inbox 0
+[2] Chats
 Sign in:

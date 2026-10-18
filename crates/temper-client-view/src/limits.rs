@@ -21,6 +21,8 @@ impl Limits {
             fragments,
             2,
         )?;
+        tree.nodes = tree.nodes.checked_add(domain.jig.projects.checked_add(12)?)?;
+        tree.bindings = tree.bindings.checked_add(domain.jig.projects.checked_add(4)?)?;
         tree.text_per_node = tree.text_per_node.max(forge.capacity()?).max(domain.forge.field_bytes.checked_add(64)?);
         tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
         let limits = Limits { tree };
@@ -38,6 +40,7 @@ pub fn worst_case(
     skein_ui::worst_case(&limits.tree)?
         .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
+        .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
         .checked_add(skein_ui::phrases::worst_case(forge.book.limits())?)?
         .checked_add(u64::from(forge.capacity()?))

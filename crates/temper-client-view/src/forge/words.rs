@@ -23,7 +23,6 @@ pub enum Word {
     Ci,
     Checks,
     Adopt,
-    Navigation,
     Resources,
     Required,
     ForgeNumber,
@@ -61,7 +60,7 @@ pub enum Word {
 }
 use HoleKind::{Name, Number};
 type Row = (Word, &'static [&'static [u8]], &'static [HoleKind]);
-const ROWS: [Row; 49] = [
+const ROWS: [Row; 48] = [
     (Word::Title, &[b"Adopt a repository into ", b""], &[Name]),
     (Word::Forge, &[b"Forge number"], &[]),
     (Word::Owner, &[b"Owner"], &[]),
@@ -76,7 +75,6 @@ const ROWS: [Row; 49] = [
     (Word::Ci, &[b"It runs CI"], &[]),
     (Word::Checks, &[b"Checks: gate numbers, separated by spaces or commas"], &[]),
     (Word::Adopt, &[b"Adopt"], &[]),
-    (Word::Navigation, &[b"Adopt a repository"], &[]),
     (Word::Resources, &[b"See the project's resources"], &[]),
     (Word::Required, &[b"Required."], &[]),
     (Word::ForgeNumber, &[b"A forge number is from 1 to 65535."], &[]),
@@ -181,7 +179,6 @@ fn name_bytes(word: Word, index: usize, text: u32) -> u32 {
         | Word::Ci
         | Word::Checks
         | Word::Adopt
-        | Word::Navigation
         | Word::Resources
         | Word::Required
         | Word::ForgeNumber

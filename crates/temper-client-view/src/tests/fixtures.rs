@@ -3,6 +3,7 @@ use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall, Writer};
 use temper_client_domain::{Limits, forge};
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
 pub const PROJECT: u32 = 1;
+pub const SECOND_PROJECT: u32 = 2;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
     {
@@ -149,7 +150,7 @@ pub fn view() -> crate::View {
     let domain = domain_limits();
     let jig = jig_words();
     let words = words();
-    let limits = crate::Limits::of(&domain, &jig, &words).expect("view envelope fits");
+    let limits = crate::Limits { tree: tree_limits() };
     crate::View::new(&limits, &domain, jig, words, FORGE)
 }
 pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a skein_ui::Tree {
@@ -165,6 +166,9 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
     None
 }
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
+    root_with_watch(project).0
+}
+pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, skein_lib::Token) {
     use jig_client::contract::{
         self, Delivery, DocumentText, HeldRole, Me, MeParty, MeProject, Needs, PartyKind, Subject, WatchEvent,
     };
@@ -202,7 +206,7 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             watch = Some(token);
         }
     }
-    let mut projects = List::with_capacity(1);
+    let mut projects = List::with_capacity(2);
     projects
         .push(MeProject {
             project: PROJECT,
@@ -213,6 +217,10 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
             creating: None,
         })
         .expect("one project");
+    let mut second = projects.as_slice()[0].clone();
+    second.project = SECOND_PROJECT;
+    second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
+    projects.push(second).expect("second project");
     temper_client_domain::step(
         &mut root,
         &env,
@@ -245,16 +253,14 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
         },
         &mut out,
     );
-    root
+    (root, watch.expect("me opened"))
 }
 pub fn adoption_root() -> temper_client_domain::Domain {
     let mut root = root_in_project(Some(PROJECT));
     root_event(
         &mut root,
         temper_client_domain::Event::Went {
-            place: temper_client_domain::Place::Address(temper_client_domain::Address::Forge(forge::Address::Adopt {
-                project: PROJECT,
-            })),
+            place: temper_client_domain::Place::Address(temper_client_domain::Address::Adopt { project: PROJECT }),
         },
     );
     root
@@ -267,4 +273,37 @@ pub fn root_event(root: &mut temper_client_domain::Domain, event: temper_client_
         event,
         &mut Queue::with_capacity(temper_client_domain::max_out(&limits)),
     );
+}
+
+pub fn signed_in_with_project() -> crate::View {
+    let mut view = view();
+    build(&mut view, &root_in_project(Some(PROJECT)));
+    view
+}
+pub fn link_names(view: &crate::View) -> Box<[Box<[u8]>]> {
+    let mut names = List::with_capacity(view.limits().tree.nodes);
+    for node in view.tree().nodes() {
+        if node.role == skein_ui::Role::Link
+            && let Some(name) = &node.name
+        {
+            names.push(skein_lib::bytes::copy_of(name)).expect("tree bounds link names");
+        }
+    }
+    names.into_boxed()
+}
+pub fn banner_statuses(tree: &skein_ui::Tree) -> Box<[Box<[u8]>]> {
+    let mut names = List::with_capacity(tree.len());
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == skein_ui::Role::Banner {
+            let end = index.checked_add(usize::try_from(node.size).expect("banner fits")).expect("banner end fits");
+            for child in &tree.nodes()[index..end] {
+                if child.role == skein_ui::Role::Status
+                    && let Some(name) = &child.name
+                {
+                    names.push(skein_lib::bytes::copy_of(name)).expect("tree bounds statuses");
+                }
+            }
+        }
+    }
+    names.into_boxed()
 }

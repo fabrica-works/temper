@@ -1,50 +1,27 @@
 == Task 9 == Live
-Work:
-  What needs you:
-    Questions: 0; proposals: 0; escalations: 0; person tasks: 0
-    Results read through 0
-    [1] 0 updates not read
-    [2] 0 need you
-  Who is signed in:
-    * Signed in as Pat
-    Person
-    Login: fixture-login
-    [3] Sign out
-  Projects:
-    [4] Project: First (current)
-    Held policy role 1
-    Ledger source:
-      Budget: 100
-      Spent directly: 0
-      Settled spend below: 0
-      Reserved for funded work: 0
-      Left: 100
-      Ledger source
-      Funded by pool in project 1, person 1, period 1
-      Ledger is open
-  Go to a task:
-    [5] Go to task number: (empty) (enter sends)
-Navigation:
-  [6] Inbox
-  [7] Conversations
-  [8] Deployment
-  [9] Adopt a repository
+temper
+[1] First (selected)
+* Pat
+[2] Sign out
+[3] Inbox 0
+[4] Chats
+[5] Adopt a repository
 Task 9:
   - Task 9: Chat nine:
       ## Task 9: Chat nine
       * Open
       Task 9: Chat nine:
-        [10] Task 9: Chat nine
+        [6] Task 9: Chat nine
         Agent
         * Cannot show this part.
-      [11] Write
+      [7] Write
   In project 1
   Priority 1
 Task 9:
-  [12] Overview
-  [13] Activity (current)
-  [14] History
-  [15] Budget and authority
+  [8] Overview
+  [9] Activity (current)
+  [10] History
+  [11] Budget and authority
 Activity:
   ## Activity
   Waiting for news

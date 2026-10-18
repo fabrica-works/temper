@@ -3,6 +3,7 @@ use crate::{Event, Limits, Request, forge, route};
 use skein_lib::{Env, Queue, Rng, Time};
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) pages: crate::pages::Pages,
     pub(crate) jig: jig_client_view::Ui,
     pub(crate) forge: forge::Side,
     pub(crate) client: jig_client::Client,
@@ -27,9 +28,10 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     }
     .expect("checked client limits");
     Domain {
+        pages: crate::pages::Pages::new(),
         jig: jig_client_view::Ui::new(
             &limits.jig,
-            navigation(limits),
+            jig_client_view::page::navigation::Navigation::new(0),
             jig_client_view::address::Address::Inbox { project: None },
             jig_client_view::page::Arrangement::none(),
         )
@@ -41,6 +43,10 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     }
 }
 impl Domain {
+    #[must_use]
+    pub const fn pages(&self) -> &crate::pages::Pages {
+        &self.pages
+    }
     #[must_use]
     pub const fn client(&self) -> &jig_client::Client {
         &self.client
@@ -84,26 +90,6 @@ pub fn take(root: &mut Domain, _env: &Env<Limits>, _out: &mut Queue<Request>) {
 }
 #[must_use]
 pub fn shown(root: &Domain) -> u64 {
-    root.jig.shown().checked_add(forge::shown(&root.forge)).expect("forge shown count fits")
-}
-/// Installs the application's navigation before Start; the jig child validates its bound.
-pub fn configure_navigation(
-    root: &mut Domain,
-    navigation: jig_client_view::page::navigation::Navigation,
-) -> Result<(), jig_client_view::page::navigation::Navigation> {
-    root.jig.configure_navigation(navigation)
-}
-
-/// temper starts at the inbox and offers jig's three destinations.
-#[must_use]
-pub fn navigation(limits: &Limits) -> jig_client_view::page::navigation::Navigation {
-    use jig_client_view::{
-        address::Address,
-        page::navigation::{Destination, Navigation},
-    };
-    let mut navigation = Navigation::new(limits.jig.navigation_entries);
-    for address in [Address::Inbox { project: None }, Address::Conversations { project: None }, Address::Deployment] {
-        navigation.entries.push(Destination::Jig(address)).expect("navigation holds temper's three entries");
-    }
-    navigation
+    let count = root.jig.shown().checked_add(crate::pages::shown(&root.pages)).expect("pages shown count fits");
+    count.checked_add(forge::shown(&root.forge)).expect("forge shown count fits")
 }

@@ -212,3 +212,15 @@ fn temper_lines_are_said_before_the_next_print() {
     let page = skein_lib::bytes::find_from(output, b"== ", first).expect("a print");
     assert!(line < page, "temper's line before the next print");
 }
+
+#[test]
+fn a_link_state_change_prints_the_page_again() {
+    const AFTER_LINK_CHANGE: Duration = Duration::from_secs(1);
+    let mut world = support::World::signed_in();
+    world.client.change_link(b"Offline");
+    world.run_until(AFTER_LINK_CHANGE);
+    assert!(
+        world.all_output().windows(b"== Revision 2 == Offline".len()).any(|words| words == b"== Revision 2 == Offline")
+    );
+    assert!(world.shown_last());
+}

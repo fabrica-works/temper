@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use jig_client::contract::{EntranceRefusal, Refusal};
 /// The forge's one address: the adoption page for a project (client.md,
-/// 4.5); reached from the navigation slot's link.
+/// 4.5); reached from the navigation's link.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Address {
     Adopt { project: u32 },

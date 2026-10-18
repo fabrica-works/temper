@@ -10,7 +10,6 @@ pub enum Meaning {
     Home,
     Ci,
     Adopt,
-    Navigate { project: u32 },
     Resources { project: u32 },
 }
 #[derive(Debug)]
@@ -63,9 +62,6 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Home => Action::Forge(forge::Act::Home),
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
-                Meaning::Navigate { project } => {
-                    Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project } })
-                }
                 Meaning::Resources { project } => Action::Jig(jig_client_view::action::Act::Go {
                     address: jig_client_view::address::Address::Project {
                         project,

@@ -31,28 +31,6 @@ fn the_page_names_every_field_a_person_acts_on() {
     assert!(has_text(tree, b"Adopt a repository into Project: Shop"), "heading uses the frame's name");
 }
 #[test]
-fn the_navigation_slot_links_the_frames_project_or_holds_nothing() {
-    let mut view = fixtures::view();
-    let mut root = fixtures::root_in_project(Some(1));
-    let tree = fixtures::build(&mut view, &root);
-    let link = fixtures::find(tree, Role::Link, b"Adopt a repository").expect("the link for project 1");
-    assert_eq!(
-        crate::act(&mut view, link, Act::Press),
-        Some(Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project: 1 } }))
-    );
-    fixtures::root_event(
-        &mut root,
-        temper_client_domain::Event::Went {
-            place: temper_client_domain::Place::Address(temper_client_domain::Address::Jig(
-                jig_client_view::address::Address::Inbox { project: None },
-            )),
-        },
-    );
-    let tree = fixtures::build(&mut view, &root);
-    assert_eq!(fixtures::find(tree, Role::Link, b"Adopt a repository"), None, "no project, no link");
-    assert_eq!(crate::act(&mut view, link, Act::Press), None, "old link is gone");
-}
-#[test]
 fn a_check_takes_a_toggle_and_refuses_a_press() {
     let mut view = fixtures::view();
     fixtures::build(&mut view, &fixtures::adoption_root());

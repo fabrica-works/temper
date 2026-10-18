@@ -229,9 +229,7 @@ fn a_kept_adoption_of_another_version_is_dropped_and_its_form_shows_none_pending
     crate::step(
         &mut restarted,
         &fixtures::env(&limits),
-        Event::Went {
-            place: crate::Place::Address(crate::Address::Forge(forge::Address::Adopt { project: fixtures::PROJECT })),
-        },
+        Event::Went { place: crate::Place::Address(crate::Address::Adopt { project: fixtures::PROJECT }) },
         &mut out,
     );
     assert_eq!(restarted.client().pending(key), None);

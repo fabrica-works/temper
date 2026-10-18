@@ -1,16 +1,22 @@
 == Adopt a repository into Project: Shop == Live
-* Signed in as Pat
-[1] Forge number: 1
-[2] Owner: acme
-[3] Name: shop
+temper
+[1] Shop (selected)
+* Pat
+[2] Sign out
+[3] Inbox 0
+[4] Chats
+[5] Adopt a repository
+[6] Forge number: 1
+[7] Owner: acme
+[8] Name: shop
 Role:
-  [4] (*) Owned: temper pushes, opens pull requests and lands
-  [5] ( ) Fork: temper contributes through a fork
-  [6] ( ) Context: temper only reads
-[7] [x] Make it the project's home
-[8] Branch prefix: temper/
-[9] Landing branch: main
-[10] [x] It runs CI
-[11] Checks: gate numbers, separated by spaces or commas: (empty)
+  [9] (*) Owned: temper pushes, opens pull requests and lands
+  [10] ( ) Fork: temper contributes through a fork
+  [11] ( ) Context: temper only reads
+[12] [x] Make it the project's home
+[13] Branch prefix: temper/
+[14] Landing branch: main
+[15] [x] It runs CI
+[16] Checks: gate numbers, separated by spaces or commas: (empty)
 [-] Adopt (disabled)
 * This temper is out of date for adopting repositories: run the temper the engine runs.

@@ -1,6 +1,12 @@
 == Text checked == Live
-* Signed in as Pat
-[1] Label
+temper
+[1] Shop (selected)
+* Pat
+[2] Sign out
+[3] Inbox 0
+[4] Chats
+[5] Adopt a repository
+[6] Label
 a  b
 next���������
 café `x y

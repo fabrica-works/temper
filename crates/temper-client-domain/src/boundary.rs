@@ -6,6 +6,7 @@ use skein_lib::List;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
     Forge(crate::forge::Act),
+    Pages(crate::pages::Act),
     Jig(jig_client_view::action::Act),
 }
 /// One external fact or act for the root to route.

@@ -1869,6 +1869,7 @@ dependencies = [
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-test-domain",
+ "jig-client-test-kit",
  "jig-client-view",
  "jig-client-world",
  "jig-core-world",

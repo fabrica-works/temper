@@ -86,6 +86,7 @@ skein-tls = { git = "https://github.com/forgetic/skein.git" }
 skein-http = { git = "https://github.com/forgetic/skein.git" }
 temper-engine-protocol-forge = { path = "crates/temper-engine-protocol-forge" }
 jig-protocol-transcript = { git = "https://github.com/forgetic/jig.git" }
+jig-client-test-kit = { git = "https://github.com/forgetic/jig.git" }
 jig-client-world = { git = "https://github.com/forgetic/jig.git" }
 skein-fake-person = { git = "https://github.com/forgetic/skein.git" }
 skein-ui = { git = "https://github.com/forgetic/skein.git" }

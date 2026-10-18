@@ -47,11 +47,7 @@ pub(crate) fn person() -> Vec<Step<temper_client_domain::Address>> {
     steps
 }
 pub(crate) fn adoption_person() -> Vec<Step<temper_client_domain::Address>> {
-    let mut steps = vec![Step::Go {
-        address: temper_client_domain::Address::Forge(temper_client_domain::forge::Address::Adopt {
-            project: fixtures::PROJECT,
-        }),
-    }];
+    let mut steps = vec![Step::Go { address: temper_client_domain::Address::Adopt { project: fixtures::PROJECT } }];
     steps.extend(person().into_iter().skip(fixtures::ADOPTION_FORM_START).take(fixtures::ADOPTION_FORM_STEPS));
     steps
 }

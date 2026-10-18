@@ -1,8 +1,8 @@
 mod fixtures;
 mod form;
+mod pages;
 use crate::{Address, Event, Fact, Request, forge};
 use jig_client::contract::{self, Part, PartScope};
-use jig_client_view::page::navigation::Destination;
 use skein_lib::{List, Queue};
 
 #[test]
@@ -15,7 +15,13 @@ fn the_forge_address_goes_to_the_forge_side() {
     crate::step(
         &mut root,
         &fixtures::env(&limits),
-        Event::Went { place: crate::Place::Address(Address::Forge(address)) },
+        Event::Went {
+            place: crate::Place::Address(Address::Adopt {
+                project: match address {
+                    forge::Address::Adopt { project } => project,
+                },
+            }),
+        },
         &mut out,
     );
     assert_eq!(root.forge().address(), Some(address));
@@ -97,23 +103,6 @@ fn a_part_past_the_sides_bound_is_reported_parts_full() {
     assert!(out.is_empty());
     assert!(!root.forge().contains(&fixtures::resource()));
     assert_eq!(forge::shown(root.forge()), 1);
-}
-#[test]
-fn temper_navigation_is_the_inbox_conversations_and_deployment() {
-    use jig_client_view::address::Address as JigAddress;
-    let limits = fixtures::limits();
-    let navigation = crate::navigation(&limits);
-    assert_eq!(navigation.home, Destination::Jig(JigAddress::Inbox { project: None }));
-    assert_eq!(
-        navigation.entries.as_slice(),
-        &[
-            Destination::Jig(JigAddress::Inbox { project: None }),
-            Destination::Jig(JigAddress::Conversations { project: None }),
-            Destination::Jig(JigAddress::Deployment),
-        ]
-    );
-    let mut root = crate::unlinked(&limits, fixtures::SEED);
-    assert_eq!(crate::configure_navigation(&mut root, navigation), Ok(()));
 }
 
 #[test]
