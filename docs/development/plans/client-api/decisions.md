@@ -2583,6 +2583,17 @@ choice would have been the user's (development.md, 10.4).
 
      The plan's 19.4 bullet now says so. A further place in 19.4's work that reads `restart` as carrying the address takes `args` again; list it in the commit body.
 
+339. **temper-04.s1's deadline: split, then bisect jig** (process, temper-04's block of 2026-10-18T11:33:42Z).
+     Ruling 339, process and scope, within ruling 229 and README, "Pins" ("What a temper repin repairs: the capability its increment's Needs name, by its Shape; and what else jig landed since temper's last repin, adapted the way jig adapted its own reference code (`jig-client-test-domain`, `jig-test-service`, `ops`), as the commit of that change shows, in at most 200 added lines outside the Shape's Files"). The failure's owner is found by the failing story at seed 7, run alone, not argued: temper's skein stays `8a51e10b` on both sides, so the change under the story is temper-04.s1's two commits and jig's seven between temper's pin and the candidate's.
+
+     1. **Split:** run `a_signal_mid_run_drains_and_the_next_start_settles_the_claims` alone, as `s1-gate-signal-focused.log` did, at `0c89bb52e` (the repin without `e14416f4b`'s stream room). A focused run of one story is a diagnosis, not a run of the gate or a proof under ruling 229.
+     2. **It passes there:** the stream room owns it, temper-04.s1's own Shape. Reproduce the deadline in a focused test (implementer.md, 8.8), log its cause, and repair what the log names, within s1's Size, each file outside its Files named in the commit body.
+     3. **It fails there:** bisect jig's seven commits `e0c7b18bd..38ae1ba1` on that tree, the story alone at each, jig moved with `cargo update -p <a jig crate> --precise <commit>`, skein left at `8a51e10b`; a commit that does not build so is skipped and named. The first commit at which the story fails owns it:
+        - if that commit adapted jig's reference (`jig-test-service`, `testing/jig-test`, `ops`) in the place the focused log names, adapt temper's the same way, as "Pins" says, within its 200 lines;
+        - otherwise, or if the cause the log names is in jig's production code, stop and report the commit, its subject and the log's cause line, with the candidate kept: a jig supplement then repairs it, and temper-04.s1 repins onto it.
+     4. **Bound:** at most six focused runs and 45 minutes; past it, report what they show.
+     5. **Unchanged:** the referee's check (skein-world `world.rs:470`), every production deadline until the log names its owner, ruling 229 for the gate and the proof, the candidate's two commits. The `Server::stop` experiment (`s1-server-stop-reproduction.patch`) stays out unless the split or the bisect leads to it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
