@@ -2776,6 +2776,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Then** the one joint run ruling 359, point 3 leaves, once the regression passes; if either still fails, report with the log, no further run.
      4. **Unchanged:** ruling 357, point 4; the regression's assertions.
 
+362. **jig-19.5's Small profile admits eight** (plan defect, jig-19's block of 2026-10-18T13:31:19Z).
+     Ruling 362, plan defect, not a design gap: the design names no server connection count, and says what one browser holds: skein's `docs/design/ui-web.md:720-721`, "A browser allows about six connections to one origin over HTTP/1.1, each tab's stream holding one." `Profile::Small`'s 4 is the implementation's (jig `caeae1b06`: "The service retains the small/standard connection counts (4/16)"), and leaves no room for one tab's connections and the story's own exchange.
+
+     1. **Repair:** `testing/jig-test-service/src/limits.rs:77-80`, `Profile::Small => 8` (one tab's about six, the story's exchange, one spare); `Profile::Standard` stays 16. Refresh each value derived from the count (the server's worst case, `server.rs:373-392`, and any configuration's `memory_bytes` that startup checks against it) and any test that fills Small's four, and list each in the commit body. 19.5's Files now name `limits.rs` and those users.
+     2. **Then** ruling 358, point 3's one canonical root-file story run; if it fails again, report with the log, no further run. Remove the temporary trace lines of ruling 360 before the gate.
+     3. **Downstream:** temper's own server, `crates/temper-service/src/limits.rs:314`, `connections: 4` ("Server bounds follow jig's shipped small profile"), has the same count: the closing repin's step 1 moves it to 8 (README, "Rules of this plan", the repin), not this step.
+     4. **Unchanged:** ruling 358, point 4; the admission's rejection at capacity (`server.rs:124-128`); the tier's small engine profile (`tests/client-browser/src/lib.rs:142-143`).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
