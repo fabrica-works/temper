@@ -843,6 +843,35 @@ run are appended after "For the user".
      Unchanged: ruling 143 (each number the least its check accepts; a field refused twice is a block), ruling 142's
      `engine.limits`, the Test shape's ceilings, Size, Proof and Done when.
 
+146. **14.1's application and worker limits, the designer's answer** (design gap, temper-14.1's block of 2026-10-18T12:10:04Z).
+     Ruling 146, the designer's answer to temper 14.1's question of 12:1xZ: temper 6545cb474 (configuration.md 7 and 10, STATUS.md, `temper/14-example.md`, `later.md`). It replaces ruling 145's interim; 14.1 may land once its Proof passes.
+
+
+     1. **`small` gives.** The example and the skeleton keep `"limits": {"profile": "small", "overrides": {}}` for
+        `application`. configuration.md 7 now says "`small` starts as it stands, with no override, against the agent temper
+        runs". The constants change in `crates/temper-service/src/limits.rs`: `checkout.repositories` 3 to 2,
+        `forge.resources_per_task` 4 to 2, `checkout.message_bytes` 256 to 4096, and `forge.name_bytes` 256 to 64, which
+        "leaves 122 bytes of a `git` base within the checkout's 256". `checkout.name_bytes` 256 and
+        `git_component.stdout_bytes` 1024 stay. Neither smith's bounds nor the example's application overrides change.
+     2. **`workers[0].limits` is `{"profile": "small", "overrides": {"hub.accounts": 4, "hub.event_bytes": 598}}`**
+        (configuration.md 10's skeleton). configuration.md 7 says these are "the two of the hub's that jig's small, sized for
+        any agent, sets past smith's agent". On `hub.event_bytes` it says: "`hub.event_bytes` is the agent's `message_bytes`
+        less 2, and no other value starts".
+     3. **`owned/agent.json`'s `profile` is the process tier's**, `support/configuration.rs:5-7`, written out
+        (configuration.md 10, "Its agent's configuration"). Its messages are 600 bytes, so 598.
+     4. **Two temper-service tests rest on small's old forge values.** In `tests/checks.rs:43` and
+        `tests/fixtures/startup.rs:29`, each override list gains `"forge.name_bytes":256,"forge.resources_per_task":4`.
+     5. **Measured** (temper f6cb29f5c: the tier's document with the example's 13 engine overrides, `git`
+        `http://127.0.0.1:3000`, the tier's agent). With the four constants changed, `{}` and the worker's two:
+        `temper::prepare_in` returned `Ok`. One past each bound was refused: `hub.event_bytes` 597 and 599, `hub.accounts` 5,
+        `checkout.message_bytes` 4095, `checkout.repositories` 3, `checkout.name_bytes` 257, `forge.resources_per_task` 3
+        and `forge.name_bytes` 115 (114 starts). Then `heavy cargo nextest run -p temper-service -p temper` ran 260 tests,
+        260 passed (258 before item 4's two lines).
+     6. **14.1's scope:** 14-example.md's new "Corrections after the designer's answer of 2026-10-18T12:25:44Z" block. It
+        takes precedence over ruling 145's provisional eight and over the Test shape's "the fewest overrides T3 finds". The
+        tier's own overrides stay. Ruling 145's "Change no `startup.rs`, `worker_settings.rs` or smith code" stays.
+        `limits.rs` is in scope. Size: about +8 lines. README's Done when is unchanged.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
