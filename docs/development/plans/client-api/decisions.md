@@ -2685,6 +2685,15 @@ choice would have been the user's (development.md, 10.4).
      2. A test that expects that refusal from `startup` moves its expectation to the first `iterate`'s end, with the same problems; its commit body names it and this ruling.
      3. Unchanged: ruling 348's other points; `jig-protocol-engine-clients`; `startup`'s signature.
 
+351. **temper-04.s1's drain ends its worker at once** (plan defect, temper-04.s1's block of 2026-10-18T12:31:06Z).
+     Ruling 351, a plan defect in ruling 349, whose point 1 chose the remote worker's stop for a worker in the engine's process. The design says it in its own words, `protocol/service.md`, 10, "Starting and ending together": "A signal drains the engine (section 5); once it has drained, the service ends the workers at once, with no grace, since no engine will come back while they live". A stopping worker keeps redialling while it keeps an unacknowledged turn or answer (`protocol/channel.md`, 10.1, "Shutting down"; `domain/hosts.md`, 6.7), and the drain leaves answers unacknowledged on purpose (`service.md`, 5, point 2), so `Worker::stop` cannot end it in time; that is the design's reason for "no grace".
+
+     1. **The repair:** once the engine has drained (`stop.rs`, `drained`, or its end), temper's service ends its embedded worker with `Worker::abort` (`crates/temper-service/src/worker.rs:145`), which sends the link `link::Event::Abort`; it replaces ruling 349's `Worker::stop` before the shutdown. Where, after the drain, is the implementer's choice, by the log; still within ruling 339's 200 lines, each file outside the Files named in the commit body.
+     2. **Prove it** as ruling 349, point 2 says.
+     3. **If a policy deadline remains** after the abort, report the log's line with its call site and stop, whichever repository it is in.
+     4. **Bound:** three focused runs and 30 minutes from this unblock.
+     5. **Unchanged:** ruling 349's points 4 and 5, and its Checked.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
