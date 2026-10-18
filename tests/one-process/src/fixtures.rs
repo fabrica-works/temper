@@ -84,18 +84,11 @@ pub fn calm(seed: u64) -> Settings {
 pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
     let mut limits = temper_client_shell_terminal::limits::native();
     limits.connections.body_bytes = 262_144;
-    limits.client.jig.document_bytes = 65_536;
-    limits.client.jig.objects = 4;
-    limits.client.jig.fields = 8;
-    limits.client.jig.parts = 4;
-    limits.client.jig.reads = 8;
-    limits.client.jig.text = 64;
-    limits.client.jig.notices = 2;
-    limits.client.client.domain.fields = limits.client.jig.fields;
-    limits.client.client.domain.parts = limits.client.jig.parts;
-    limits.client.client.domain.reads = limits.client.jig.reads;
-    limits.client.client.domain.text = limits.client.jig.text;
-    limits.client.client.domain.document_bytes = limits.client.jig.document_bytes;
+    limits.client.client.domain.fields = 8;
+    limits.client.client.domain.parts = 4;
+    limits.client.client.domain.reads = 8;
+    limits.client.client.domain.text = 64;
+    limits.client.client.domain.document_bytes = 65_536;
     limits.client.client.domain.requests.bytes = 262_144;
     limits.client.client.domain.ask_bytes = limits.client.client.domain.requests.bytes;
     limits

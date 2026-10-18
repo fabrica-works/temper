@@ -117,12 +117,9 @@ pub fn adoption_form(filled: bool) -> client::forge::Form {
     }
     form
 }
-pub fn adoption_page(
-    form: &client::forge::Form,
-    words: &(jig_client_view::words::Words, temper_client_view::words::Words),
-) -> skein_ui::Tree {
+pub fn adoption_page(form: &client::forge::Form, words: &temper_client_view::words::Words) -> skein_ui::Tree {
     let limits = tree_limits();
-    let (jig, forge) = words;
+    let forge = words;
     let mut builder = skein_ui::Builder::new(&limits);
     synthetic_header(&mut builder, None, false);
     let mut bindings = temper_client_view::forge::bindings::Bindings::new(limits.bindings, 8, 1);
@@ -132,7 +129,6 @@ pub fn adoption_page(
         form,
         Some(b"shop"),
         forge,
-        jig,
         &mut bindings,
         limits.text_per_node,
     );
@@ -191,28 +187,24 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
     }
     visible(builder.finish())
 }
-pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> skein_ui::Tree {
+pub fn page(address: &temper_client_domain::Address, signed_out: bool) -> skein_ui::Tree {
     use skein_lib::{Env, Queue, Wall};
     use temper_client_domain::Event;
     let mut limits = crate::limits::native().client;
-    limits.jig.text = 32;
-    limits.jig.rows = 8;
-    limits.jig.document_bytes = 16_384;
+    limits.client.domain.text = 32;
+    limits.client.domain.rows = 8;
+    limits.client.domain.document_bytes = 16_384;
     limits.client.domain.requests.bytes = 4096;
     let env = Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits };
-    let (jig, forge) = page_words();
+    let forge = page_words();
     let mut view =
-        temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, jig, forge, 1);
+        temper_client_view::View::new(&temper_client_view::Limits { tree: tree_limits() }, &limits, forge, 1);
     let mut root = client::unlinked(&limits, 16);
     let mut out = Queue::with_capacity(client::max_out(&limits));
     client::step(
         &mut root,
         &env,
-        Event::Start {
-            address: client::Address::Jig(address),
-            kept: skein_lib::List::with_capacity(0),
-            offset: jig_client_view::boundary::Offset { minutes: 0 },
-        },
+        Event::Start { address: address.clone(), kept: skein_lib::List::with_capacity(0) },
         &mut out,
     );
     for event in [
@@ -235,7 +227,7 @@ pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> ske
         populate_page(&mut root, &env, address, &mut out);
         assert!(out.is_empty(), "fixture settles within its step budget: {out:?}");
     }
-    let settled = Env { now: env.now.saturating_add(env.limits.jig.notice_life), ..env };
+    let settled = Env { now: env.now.saturating_add(skein_lib::Duration::ZERO), ..env };
     client::fire(&mut root, &settled, &mut out);
     temper_client_view::build(&mut view, &root, &mut Queue::with_capacity(tree_limits().patches));
     copy_tree(view.tree())
@@ -243,7 +235,7 @@ pub fn page(address: jig_client_view::address::Address, signed_out: bool) -> ske
 fn populate_page(
     root: &mut client::Domain,
     env: &skein_lib::Env<client::Limits>,
-    address: jig_client_view::address::Address,
+    address: &temper_client_domain::Address,
     out: &mut skein_lib::Queue<client::Request>,
 ) {
     use jig_client::contract::{Delivery, ReadResult, Subject, WatchEvent};
@@ -318,7 +310,7 @@ fn populate_page(
                 }
             }
             Request::Show { address: next, .. } => {
-                if next != client::Address::Jig(address) {
+                if &next != address {
                     client::step(root, env, Event::Went { place: client::Place::Address(next) }, out);
                 }
             }
@@ -327,22 +319,15 @@ fn populate_page(
     }
 }
 
-pub fn page_words() -> (jig_client_view::words::Words, temper_client_view::words::Words) {
-    static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, temper_client_view::words::Words)> =
-        std::sync::OnceLock::new();
+pub fn page_words() -> temper_client_view::words::Words {
+    static WORDS: std::sync::OnceLock<temper_client_view::words::Words> = std::sync::OnceLock::new();
     WORDS
         .get_or_init(|| {
-            (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(32).expect("fixture English"),
-                    language: 0,
-                    offset_minutes: 0,
-                },
-                temper_client_view::words::Words::english(1, 32).expect("fixture forge English"),
-            )
+            temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, 32).expect("temper words fit")
         })
         .clone()
 }
+
 pub fn inbox_document(group: contract::InboxReadGroup) -> contract::InboxPage {
     use contract::{InboxEntry, InboxGroup, ObjectKey};
     let mut rows = skein_lib::List::with_capacity(6);
@@ -423,6 +408,12 @@ pub fn inbox_page() -> skein_ui::Tree {
             builder.open(Role::Paragraph);
             builder.text(Run::Plain, body);
             builder.close();
+            if *kind == b"Proposal" {
+                golden_cards::proposal(&mut builder);
+            }
+            if *kind == b"Held" {
+                golden_cards::held(&mut builder);
+            }
             builder.close();
         }
     }
@@ -445,20 +436,8 @@ const INBOX_CARDS: [(&[u8], &[u8]); 6] = [
 pub fn task_page() -> skein_ui::Tree {
     task::page()
 }
-pub fn project_page() -> skein_ui::Tree {
-    page(
-        jig_client_view::address::Address::Project {
-            project: 1,
-            section: jig_client_view::address::ProjectSection::Overview,
-        },
-        false,
-    )
-}
-pub fn deployment_page() -> skein_ui::Tree {
-    page(jig_client_view::address::Address::Deployment, false)
-}
 pub fn signed_out_page() -> skein_ui::Tree {
-    page(jig_client_view::address::Address::Inbox { project: None }, true)
+    page(&temper_client_domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, true)
 }
 
 fn synthetic_frame(builder: &mut skein_ui::Builder, behind: bool) {
@@ -519,7 +498,7 @@ pub fn header_page(title: Option<&[u8]>, behind: bool) -> skein_ui::Tree {
     visible(builder.finish())
 }
 pub fn binding() -> skein_ui::Binding {
-    skein_ui::Binding { owner: jig_client_view::Owner::Jig.opaque(), token: Token::new(1) }
+    skein_ui::Binding { owner: temper_client_view::frame::owner(), token: Token::new(1) }
 }
 pub fn every_role() -> skein_ui::Tree {
     use skein_ui::{Role, Run};
@@ -644,7 +623,7 @@ fn role_controls(builder: &mut skein_ui::Builder) {
     builder.text(Run::Plain, b"Slot");
     builder.close();
     builder.drawing(
-        skein_ui::DrawingKind { owner: jig_client_view::Owner::Jig.opaque(), kind: 1 },
+        skein_ui::DrawingKind { owner: temper_client_view::frame::owner(), kind: 1 },
         b"Drawing",
         b"image",
         16,
@@ -801,3 +780,5 @@ pub fn chats_page() -> skein_ui::Tree {
 pub mod chat;
 
 mod task;
+
+pub mod golden_cards;

@@ -118,7 +118,7 @@ pub fn request(
     transport: &mut Transport,
     who: ClientId,
     request: &Request,
-    limits: &jig_client_view::Limits,
+    limits: &jig_client::DomainLimits,
 ) -> Vec<engine::Event> {
     let mut events = Vec::new();
     let Request::Client { request: jig_client::Request::Down { down } } = request else { panic!("typed wire request") };
@@ -175,7 +175,7 @@ pub fn request(
 pub fn incoming(
     transport: &mut Transport,
     request: engine::Request,
-    limits: &jig_client_view::Limits,
+    limits: &jig_client::DomainLimits,
 ) -> Option<packets::Incoming> {
     match request {
         engine::Request::Party(request) => match request {
@@ -207,7 +207,7 @@ pub fn incoming(
 fn delivery_packet(
     transport: &mut Transport,
     delivery: Delivery,
-    limits: &jig_client_view::Limits,
+    limits: &jig_client::DomainLimits,
 ) -> Option<packets::Incoming> {
     match delivery {
         Delivery::WebReply { to, reply } => {
@@ -256,7 +256,7 @@ fn delivery_packet(
 pub fn callback(event: jig_client_test_domain::Event) -> Event {
     match event {
         jig_client_test_domain::Event::Client { event } => Event::Client { event },
-        jig_client_test_domain::Event::Jig(event) => Event::Jig(event),
+        jig_client_test_domain::Event::Jig(_) => unreachable!("joint transport delivers client events"),
         jig_client_test_domain::Event::SignedOut => {
             Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } }
         }

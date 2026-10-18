@@ -107,9 +107,8 @@ fn a_plans_items_are_nested_under_their_supplied_parent() {
         &tree,
         &f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY)),
         &fixtures::words(),
-        &fixtures::jig_words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
-        &mut jig_client_view::JigBindings::new(fixtures::tree_limits().bindings, TEXT_BYTES),
+        fixtures::domain_limits().client.domain.rows,
     );
     let tree = b.finish();
     let parent = fixtures::find(&tree, Role::TreeItem, b"Task 9").expect("parent");
@@ -168,16 +167,14 @@ fn a_moved_hold_is_refused_and_the_card_asks_to_look_again() {
         &root,
         &card,
         &fixtures::words(),
-        &fixtures::jig_words(),
         &mut crate::frame::Bindings::new(limits.bindings),
-        &mut jig_client_view::JigBindings::new(limits.bindings, TEXT_BYTES),
+        fixtures::domain_limits().client.domain.rows,
     );
     let text = fixtures::text(&builder.finish());
-    assert!(skein_lib::bytes::find(&text, b"Inspect current object").is_some());
+    assert!(skein_lib::bytes::find(&text, b"Look again before deciding.").is_some());
 }
 const FIRST_CARD: u32 = 0;
 const NEW_HOLD_REVISION: c::Revision = c::Revision { value: 8 };
-const TEXT_BYTES: u32 = 32;
 
 #[test]
 fn a_held_plans_release_has_its_public_escalation_card_identity() {
@@ -189,7 +186,7 @@ fn a_held_plans_release_has_its_public_escalation_card_identity() {
 fn has_release_card(tree: &skein_ui::Tree) -> bool {
     for node in tree.nodes() {
         if node.role == Role::Item
-            && node.key == Some(skein_ui::Key { owner: jig_client_view::Owner::Jig.opaque(), kind: 2, a: TASK, b: 0 })
+            && node.key == Some(skein_ui::Key { owner: crate::frame::owner(), kind: 2, a: TASK, b: 0 })
         {
             return true;
         }
@@ -216,9 +213,8 @@ fn a_released_plans_item_keeps_its_decision_result_while_running() {
         &tree,
         &root,
         &fixtures::words(),
-        &fixtures::jig_words(),
         &mut crate::frame::Bindings::new(limits.bindings),
-        &mut jig_client_view::JigBindings::new(limits.bindings, TEXT_BYTES),
+        fixtures::domain_limits().client.domain.rows,
     );
     assert!(has_release_card(&builder.finish()));
 }

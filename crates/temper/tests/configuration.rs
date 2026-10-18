@@ -26,7 +26,7 @@ fn process_engine() -> jig_protocol_config::Engine {
 fn the_process_configurations_documents_fit_the_native_client() {
     let engine = process_engine();
     let client = temper_client_shell_terminal::limits::native().client;
-    let native = client.jig;
+    let native = client.client.domain;
     assert!(engine.limits.core.documents.rows <= native.rows, "the native client can receive every document row");
     assert!(
         engine.limits.core.documents.lines <= native.rows,
@@ -58,7 +58,7 @@ fn the_owned_example_fits_the_native_client() {
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(&bytes, &DOCUMENT).expect("engine document");
     let engine = jig_protocol_config::engine(&document, 0).expect("engine configuration");
-    let native = temper_client_shell_terminal::limits::native().client.jig;
+    let native = temper_client_shell_terminal::limits::native().client.client.domain;
     assert!(engine.limits.core.documents.rows <= native.rows);
     assert!(engine.limits.core.documents.lines <= native.rows);
     let paths = engine

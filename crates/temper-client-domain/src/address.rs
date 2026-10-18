@@ -6,7 +6,6 @@ pub enum Address {
     Chat { task: u64 },
     Task { task: u64 },
     Adopt { project: u32 },
-    Jig(jig_client_view::address::Address),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Filter {
@@ -28,14 +27,4 @@ pub enum Kind {
 pub enum Place {
     Address(Address),
     Missing,
-}
-impl Address {
-    /// Reference content inside temper's frame until its own pages land.
-    #[must_use]
-    pub fn reference(&self) -> Option<jig_client_view::address::Address> {
-        match self {
-            Self::Jig(address) => Some(*address),
-            Self::Inbox { .. } | Self::Adopt { .. } | Self::Chats | Self::Chat { .. } | Self::Task { .. } => None,
-        }
-    }
 }

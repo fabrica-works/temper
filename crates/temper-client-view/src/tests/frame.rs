@@ -104,23 +104,45 @@ fn a_page_behind_says_behind_after_the_links_state() {
 
 #[test]
 fn signed_out_the_main_says_so_and_nothing_else() {
-    let mut view = fixtures::view();
-    let tree = fixtures::build(&mut view, &fixtures::signed_out());
-    assert_eq!(&*fixtures::main_text(tree), b"Signed out.");
-    assert_eq!(fixtures::banner_statuses(tree).as_ref(), [Box::from(*b"Signed out")]);
-    assert!(fixtures::find(tree, Role::Button, b"Sign out").is_none());
-    for node in tree.nodes() {
+    let view = fixtures::page_view(&fixtures::signed_out());
+    assert_eq!(&*fixtures::main_text(view.tree()), b"Signed out.");
+}
+#[test]
+fn signed_out_the_banner_says_the_links_state_alone() {
+    let view = fixtures::page_view(&fixtures::signed_out());
+    assert_eq!(fixtures::banner_statuses(view.tree()).as_ref(), [Box::from(*b"Signed out")]);
+}
+#[test]
+fn signed_out_the_banner_offers_no_sign_out_button() {
+    let view = fixtures::page_view(&fixtures::signed_out());
+    assert!(fixtures::find(view.tree(), Role::Button, b"Sign out").is_none());
+}
+#[test]
+fn signed_out_the_page_offers_no_navigation() {
+    let view = fixtures::page_view(&fixtures::signed_out());
+    for node in view.tree().nodes() {
         assert_ne!(node.role, Role::Navigation);
     }
 }
 #[test]
 fn an_engine_not_serving_jigs_version_says_temper_is_out_of_date() {
-    let mut view = fixtures::view();
-    let tree = fixtures::build(&mut view, &fixtures::out_of_date());
-    assert_eq!(&*fixtures::main_text(tree), b"This temper is out of date: run the temper the engine runs.");
-    assert_eq!(fixtures::banner_statuses(tree).as_ref(), [Box::from(*b"Out of date")]);
-    assert!(fixtures::find(tree, Role::Button, b"Sign out").is_none());
-    for node in tree.nodes() {
+    let view = fixtures::page_view(&fixtures::out_of_date());
+    assert_eq!(&*fixtures::main_text(view.tree()), b"This temper is out of date: run the temper the engine runs.");
+}
+#[test]
+fn out_of_date_the_banner_says_the_links_state_alone() {
+    let view = fixtures::page_view(&fixtures::out_of_date());
+    assert_eq!(fixtures::banner_statuses(view.tree()).as_ref(), [Box::from(*b"Out of date")]);
+}
+#[test]
+fn out_of_date_the_banner_offers_no_sign_out_button() {
+    let view = fixtures::page_view(&fixtures::out_of_date());
+    assert!(fixtures::find(view.tree(), Role::Button, b"Sign out").is_none());
+}
+#[test]
+fn out_of_date_the_page_offers_no_navigation() {
+    let view = fixtures::page_view(&fixtures::out_of_date());
+    for node in view.tree().nodes() {
         assert_ne!(node.role, Role::Navigation);
     }
 }

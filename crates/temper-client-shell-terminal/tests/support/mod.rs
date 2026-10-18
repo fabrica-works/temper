@@ -41,7 +41,7 @@ fn tree(revision: u64, link: &'static [u8]) -> Tree {
     {
         builder.open(role);
         builder.name(label);
-        builder.bind(skein_ui::Binding { owner: jig_client_view::Owner::Jig.opaque(), token: Token::new(1) });
+        builder.bind(skein_ui::Binding { owner: temper_client_view::frame::owner(), token: Token::new(1) });
         builder.close();
     }
     builder.close();

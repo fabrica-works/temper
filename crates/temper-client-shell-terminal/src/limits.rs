@@ -24,33 +24,6 @@ pub struct Limits {
 pub fn native() -> Limits {
     Limits {
         client: {
-            let jig = jig_client_view::Limits {
-                segments: 9,
-                watches: 16,                            // Ops's 8 raised to the target 16 live watches.
-                notices: 8,                             // Notices retained for display.
-                notice_life: Duration::from_secs(5),    // Notice display lifetime.
-                linger: Duration::from_secs(30),        // Departed watch retention.
-                save_delay: Duration::from_millis(250), // Draft write debounce.
-                intents: 8,                             // In-flight user actions.
-                fields: 16,                             // Editable fields held on pages.
-                objects: 16,                            // Open object cards.
-                sources: 16,                            // Sources sharing watched objects.
-                reads: 16,                              // Concurrent page readouts.
-                parts: 16,                              // Connector parts held in slots.
-                delegates: 8,                           // Delegates in a close confirmation.
-                document_bytes: 1_048_576,              // Ops's 65,536 raised to the target 1,048,576 document bytes.
-                records: 16,                            // Jig records restored at start.
-                kept: 16,                               // Restored table scopes.
-                drafts: 8,                              // Conversation drafts retained across navigation.
-                // Ops's 2 stays below the receiving wire's frame_projects ceiling of 7.
-                projects: 2,
-                roles: 16,             // Visible role names.
-                text: 128,             // Ops's 32 raised to 128; 256 is refused by Limits::compose.
-                rows: 2,               // Ops's 2; 4 is refused by Limits::compose.
-                conversation_words: 8, // Pending conversation snapshots.
-                navigation_entries: 8, // Navigation destinations.
-                updates_count: 99,     // Unread counter before its lower-bound mark.
-            };
             let requests = RequestLimits {
                 requests: 16,                   // Durable keyed requests.
                 bytes: 16_777_216,              // Whole request-table payload bytes.
@@ -59,19 +32,36 @@ pub fn native() -> Limits {
                 most: Duration::from_secs(30),  // Longest request retry span.
                 margin: Duration::from_secs(1), // Retention's safety margin.
             };
-            client::Limits {
-                jig,
-                forge: client::forge::Limits { parts: 16, field_bytes: 256, checks: 8 },
-                client: client::limits::client(
-                    &jig,
+            let client = jig_client::Limits {
+                domain: jig_client::DomainLimits {
+                    owners: &[jig_client::Spoken {
+                        family: temper_client_protocol_wire::FORGE,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                    }],
                     requests,
-                    12, // Receive the process tier's whole authorities.
-                    EXCHANGES,
-                    jig_client::Backoff { first: Duration::from_secs(1), most: Duration::from_secs(30) },
-                    Duration::from_secs(30),
-                )
-                .expect("client profile fits"),
-            }
+                    ask_bytes: requests.bytes,
+                    handles: 17,
+                    watches: 16, // Includes the shared me watch.
+                    turn_bytes: 1_048_576,
+                    backoff: jig_client::Backoff { first: Duration::from_secs(1), most: Duration::from_secs(30) },
+                    authority: 12,
+                    heartbeat: Duration::from_secs(30),
+                    reads: 16,
+                    parts: 16,
+                    delegates: 8,
+                    document_bytes: 1_048_576,
+                    records: 16,
+                    kept: 16,
+                    projects: 2,
+                    text: 128,
+                    rows: 2,
+                    fields: 16,
+                    segments: 9,
+                },
+                exchanges: EXCHANGES,
+            };
+
+            client::Limits { forge: client::forge::Limits { field_bytes: 256, checks: 8 }, client }
         },
         connections: jig_client_shell_native::Limits {
             exchanges: EXCHANGES,
@@ -102,25 +92,19 @@ pub fn native() -> Limits {
 }
 /// Checked words and the view bounds used at construction and accounting.
 #[must_use]
-pub fn view(
-    limits: &Limits,
-) -> Option<(temper_client_view::Limits, jig_client_view::words::Words, temper_client_view::words::Words)> {
-    let jig = jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(limits.client.jig.text).ok()?,
-        language: 0,
-        offset_minutes: 0,
-    };
-    let forge =
-        temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, limits.client.jig.text).ok()?;
-    let view = temper_client_view::Limits::of(&limits.client, &jig, &forge)?;
-    Some((view, jig, forge))
+pub fn view(limits: &Limits) -> Option<(temper_client_view::Limits, temper_client_view::words::Words)> {
+    let words =
+        temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, limits.client.client.domain.text)
+            .ok()?;
+    let view = temper_client_view::Limits::of(&limits.client, &words)?;
+    Some((view, words))
 }
 /// Sum the root, view, link and shell, with overflow refusing the preset.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    let (view, jig, forge) = view(limits)?;
+    let (view, words) = view(limits)?;
     let root = client::worst_case(&limits.client)?;
-    let view = temper_client_view::worst_case(&view, &limits.client, &jig, &forge)?;
+    let view = temper_client_view::worst_case(&view, &limits.client, &words)?;
     root.checked_add(view)?.checked_add(shell(limits)?)
 }
 /// The published `Shell::worst_case` formula, with every operation checked.

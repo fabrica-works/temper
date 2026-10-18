@@ -34,3 +34,21 @@ fn confirming_preserves_the_inbox_cards_visible_revision() {
     });
     assert!(!Temper::window_changed(&event));
 }
+
+#[test]
+fn a_temper_hold_card_reports_the_revision_it_prints() {
+    use jig_client_world::harness::{Seen, Until};
+    use skein_fake_person::{Find, Step};
+    use skein_ui::Role;
+    use temper_client_world::fixtures;
+    let mut world = fixtures::world(fixtures::SEED);
+    let (goal, held) = fixtures::goal_with_held_delegate(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    world
+        .person(person, vec![Step::See { find: Find::named(Role::Button, b"Release task"), within: fixtures::WITHIN }]);
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    let visible = Temper::seen(world.tree(person));
+    assert!(visible.iter().any(|value| matches!(value,
+        Seen::Card { key, revision: Some(_), .. } if *key == observe::key(jig_client::contract::ObjectKey::Escalation(held))
+    )));
+}

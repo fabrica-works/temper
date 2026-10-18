@@ -21,33 +21,6 @@ pub const WITHIN: Duration = Duration::from_secs(1);
 #[must_use]
 pub fn domain_limits() -> Limits {
     {
-        let jig = jig_client_view::Limits {
-            segments: 9,
-            watches: 8,
-            notices: 2,
-            notice_life: Duration::from_secs(5),
-            // A finite fixture keeps the same before/after-linger behavior at a short scale.
-            linger: Duration::from_millis(250),
-            save_delay: Duration::from_millis(10),
-            intents: 2,
-            fields: 4,
-            objects: 3,
-            sources: 8,
-            reads: 8,
-            parts: 8,
-            delegates: 2,
-            document_bytes: 65536,
-            records: 2,
-            kept: 4,
-            drafts: 1,
-            projects: 4,
-            roles: 2,
-            text: 64,
-            rows: 4,
-            conversation_words: 2,
-            navigation_entries: 8,
-            updates_count: 99,
-        };
         let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
@@ -56,69 +29,51 @@ pub fn domain_limits() -> Limits {
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
         };
-        Limits {
-            jig,
-            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-            client: temper_client_domain::limits::client(
-                &jig,
+        let client = jig_client::Limits {
+            domain: jig_client::DomainLimits {
+                owners: &[jig_client::Spoken {
+                    family: temper_client_protocol_wire::FORGE,
+                    version: temper_client_protocol_wire::CLIENT_VERSION,
+                }],
                 requests,
-                12,
-                8,
-                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
-                Duration::from_millis(100),
-            )
-            .expect("client profile fits"),
-        }
+                ask_bytes: requests.bytes,
+                handles: 9,
+                watches: 9,
+                turn_bytes: 65536,
+                backoff: jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                authority: 12,
+                heartbeat: Duration::from_millis(100),
+                reads: 8,
+                parts: 8,
+                delegates: 2,
+                document_bytes: 65536,
+                records: 2,
+                kept: 4,
+                projects: 4,
+                text: 64,
+                rows: 4,
+                fields: 4,
+                segments: 9,
+            },
+            exchanges: 8,
+        };
+
+        Limits { forge: forge::Limits { field_bytes: 256, checks: 8 }, client }
     }
 }
 
-type Books = (jig_client_view::words::Words, view::words::Words);
+type Books = view::words::Words;
 static BOOKS: OnceLock<Mutex<BTreeMap<u32, Books>>> = OnceLock::new();
 pub fn phrasebooks(limits: &Limits) -> Books {
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
     books
-        .entry(limits.jig.text)
-        .or_insert_with(|| {
-            (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("jig English fits"),
-                    language: 0,
-                    offset_minutes: 0,
-                },
-                view::words::Words::english(FORGE, limits.jig.text).expect("forge English fits"),
-            )
-        })
+        .entry(limits.client.domain.text)
+        .or_insert_with(|| view::words::Words::english(FORGE, limits.client.domain.text).expect("temper words fit"))
         .clone()
 }
 #[must_use]
-pub fn view_bounds(limits: &Limits, jig: &jig_client_view::words::Words, forge: &view::words::Words) -> view::Limits {
-    // The world's storage profile is independent of the all-pages envelope.
-    // Builder and the world heap checks enforce these practical capacities.
-    let text = jig_client_view::phrases::jig_capacity(&jig.book)
-        .expect("jig phrase envelope")
-        .checked_mul(2)
-        .expect("fixture phrase size fits")
-        .checked_add(limits.jig.text.checked_mul(2).expect("fixture input size fits"))
-        .expect("fixture text fits")
-        .max(forge.capacity().expect("forge phrase envelope"));
-    let bounds = view::Limits {
-        tree: skein_ui::Limits {
-            nodes: 1024,
-            depth: limits.jig.rows + 34,
-            text_per_node: text,
-            text_bytes: 1024 * text,
-            drawing_bytes: 0,
-            scene_marks: 0,
-            scene_bytes: 0,
-            styles_per_node: 2,
-            patches: 5120,
-            bindings: 1024,
-            slots: 256,
-            markdown_depth: 3,
-        },
-    };
-    view::worst_case(&bounds, limits, jig, forge).expect("world view bound fits");
-    bounds
+pub fn view_bounds(limits: &Limits, words: &view::words::Words) -> view::Limits {
+    view::Limits::of(limits, words).expect("world view bound fits")
 }
 #[must_use]
 pub fn inbox() -> temper_client_domain::Address {
@@ -127,7 +82,13 @@ pub fn inbox() -> temper_client_domain::Address {
 #[must_use]
 pub fn world(seed: u64) -> World<Temper, Joint> {
     let mut world = World::new(
-        Settings { seed, heap_bytes_per_client: 64 * 1024 * 1024, iterations: 4096, ..Settings::default() },
+        Settings {
+            seed,
+            words: view::words::jig_language(),
+            heap_bytes_per_client: 64 * 1024 * 1024,
+            iterations: 4096,
+            ..Settings::default()
+        },
         Joint::new(seed, domain_limits()),
     );
     world.randomness(2, 0, 0);
@@ -278,18 +239,10 @@ pub fn adopt(owner: &[u8], name: &[u8]) -> Vec<skein_fake_person::Step<temper_cl
     ]
 }
 #[must_use]
-pub fn adopt_then_open_resources(
-    owner: &[u8],
-    name: &[u8],
-) -> Vec<skein_fake_person::Step<temper_client_domain::Address>> {
+pub fn adopt_and_see_outcome(owner: &[u8], name: &[u8]) -> Vec<skein_fake_person::Step<temper_client_domain::Address>> {
     use skein_fake_person::{Find, Step};
-    use skein_ui::Role;
     let mut steps = adopt(owner, name);
-    steps.extend([
-        Step::See { find: Find::text(b"Adopted acme/shop on forge 1 as owned."), within: WITHIN },
-        Step::Press { find: Find::named(Role::Link, b"See the project's resources") },
-        Step::See { find: Find::named(Role::Heading { level: 1 }, b"Project"), within: WITHIN },
-    ]);
+    steps.extend([Step::See { find: Find::text(b"Adopted acme/shop on forge 1 as owned."), within: WITHIN }]);
     steps
 }
 

@@ -12,7 +12,6 @@ skein-lib.workspace = true
 skein-io.workspace = true
 skein-http.workspace = true
 skein-shell.workspace = true
-jig-client-view.workspace = true
 skein-ui.workspace = true
 skein-ui-text.workspace = true
 jig-client-protocol-link.workspace = true

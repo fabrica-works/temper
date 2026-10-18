@@ -7,7 +7,7 @@ use temper_client_world::fixtures;
 fn a_repository_adopted_from_the_navigation_link_is_held_by_the_engine() {
     let mut world = fixtures::world(fixtures::SEED);
     let person = world.client(fixtures::PARTY, fixtures::project());
-    world.person(person, fixtures::adopt_then_open_resources(b"acme", b"shop"));
+    world.person(person, fixtures::adopt_and_see_outcome(b"acme", b"shop"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     assert_eq!(world.front().applications_admitted(), 1);

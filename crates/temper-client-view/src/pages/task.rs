@@ -21,14 +21,7 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
     b.name(&words.say(word, &[]));
     text(b, Role::Heading { level: 2 }, &words.say(word, &[]));
 }
-pub(crate) fn main(
-    b: &mut Builder,
-    root: &Domain,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
-) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Main);
     if let Some(page) = root.pages().task()
         && let Some(task) = page.document(root.client())
@@ -41,13 +34,13 @@ pub(crate) fn main(
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
-            plan(b, tree, root, words, jig, bindings, jig_bindings);
+            plan(b, tree, root, words, bindings, rows);
         }
         if page.shape == Shape::Tracked {
             latest(b, page.latest.as_deref(), words);
         }
     }
-    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
+    crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
 pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words) {
@@ -180,9 +173,8 @@ pub(crate) fn plan(
     tree: &c::Delivery,
     root: &Domain,
     words: &Words,
-    jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
+    rows: u32,
 ) {
     region(b, Word::Plan, words);
     b.open(Role::Tree);
@@ -191,13 +183,13 @@ pub(crate) fn plan(
         c::Delivery::OwnerTree(tree) => {
             let mut stack = List::with_capacity(tree.rows.len().checked_add(1).expect("tree stack fits"));
             chip(b, &tree.root, words, bindings);
-            controls(b, &tree.root, root, words, jig, bindings, jig_bindings);
+            controls(b, &tree.root, root, words, bindings, rows);
             stack.push(tree.root.task).expect("root fits");
             owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
-                controls(b, &row.chip, root, words, jig, bindings, jig_bindings);
+                controls(b, &row.chip, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
                 owner_folds(b, tree, row.chip.task, words);
             }
@@ -209,7 +201,7 @@ pub(crate) fn plan(
             for node in &tree.nodes {
                 parent(b, &mut stack, node.parent);
                 chip(b, &node.chip, words, bindings);
-                controls(b, &node.chip, root, words, jig, bindings, jig_bindings);
+                controls(b, &node.chip, root, words, bindings, rows);
                 stack.push(node.chip.task).expect("tree stack fits");
                 counts(b, node.folded, node.held_below, words);
             }
@@ -232,21 +224,13 @@ pub(crate) fn plan(
     b.close();
     b.close();
 }
-fn controls(
-    b: &mut Builder,
-    chip: &c::Chip,
-    root: &Domain,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
-) {
+fn controls(b: &mut Builder, chip: &c::Chip, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     if let Some(page) = root.pages().task() {
         for card in &page.cards {
             if card.object == c::ObjectKey::Task(chip.task) && (chip.phase == c::Phase::Held || card.key.is_some()) {
                 b.open(Role::Item);
                 b.key(super::inbox::card_key(c::ObjectKey::Escalation(chip.task)));
-                crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
+                crate::confirm::card(b, root, card, words, bindings, rows);
                 b.close();
             }
         }
@@ -355,7 +339,7 @@ fn activity(b: &mut Builder, event: &c::Activity, words: &Words) {
 fn text_node(b: &mut Builder, value: &[u8]) {
     skein_ui::markdown::read(value, 3, b);
 }
-fn owner_activity(b: &mut Builder, event: &c::OwnerActivity, words: &Words) {
+pub(crate) fn owner_activity(b: &mut Builder, event: &c::OwnerActivity, words: &Words) {
     match event {
         c::OwnerActivity::Words { words, .. } => text_node(b, words.bytes()),
         c::OwnerActivity::Heard(word) | c::OwnerActivity::Notified { word, .. } => text_node(b, word.words.bytes()),

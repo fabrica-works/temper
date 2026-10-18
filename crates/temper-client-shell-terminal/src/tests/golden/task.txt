@@ -30,6 +30,9 @@ Plan:
         Review the change
         Agent
         * Held
+        Held: out of tries
+        Hold revision 7
+        The next run resumes its conversation; tries count again from zero
     * Held below: 1
 Latest activity:
   ## Latest activity

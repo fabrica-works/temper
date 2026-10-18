@@ -1,61 +1,27 @@
 use super::fixtures;
+use fixtures::chat::{
+    ATTEMPT, BYTES, CLOSE_GRACE, COMMITTED, GRACES, LINES, MESSAGE, PARTY, TASK, TEXT, TURN, chat_header, chat_root,
+    closing, proposal_root, provisional, provisional_with_text, rejecting_chat, tree,
+};
 use jig_client::{contract as c, thread::Thread};
 use skein_lib::{List, Wall};
-use skein_ui::{Builder, Role};
-const TASK: u64 = 9;
-const ATTEMPT: u64 = 23;
-const TURN: u32 = 1;
-const RETRY: u32 = 0;
-const OFFSET: u32 = 0;
-const THROUGH: u32 = 5;
-const COMMITTED: u32 = 0;
-const LINES: u32 = 4;
-const BYTES: u64 = 65536;
-const TEXT: u32 = 32;
+use skein_ui::Role;
 
 #[test]
 fn a_chats_header_says_its_status_and_spend() {
-    let mut b = Builder::new(&fixtures::tree_limits());
-    let root = fixtures::root_in_project(Some(fixtures::PROJECT));
-    crate::pages::chat::header(&mut b, &fixtures::task::document(), root.pages().me(root.client()), &fixtures::words());
-    let tree = b.finish();
+    let tree = chat_header();
     assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
+}
+#[test]
+fn a_chats_header_says_its_spend_including_delegates() {
+    let tree = chat_header();
     assert!(fixtures::find(&tree, Role::Paragraph, b"Spent 7; delegates spent 2").is_some());
 }
-fn provisional() -> Thread {
-    let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
-    let text = c::RunText {
-        attempt: ATTEMPT,
-        began: Some(Wall::EPOCH),
-        turn: c::ProvisionalTurnName { attempt: ATTEMPT, number: TURN, retry: RETRY },
-        from: OFFSET,
-        through: THROUGH,
-        text: c::Text::new(Box::from(*b"Hello"), TEXT).expect("text"),
-        cut: false,
-        call: None,
-    };
-    thread.run(
-        &c::RunState { task: TASK, attempt: Some(ATTEMPT), committed_turn: COMMITTED, writing: None, call: None },
-        Some(&text),
-    );
-    thread
-}
-fn tree(thread: &Thread) -> skein_ui::Tree {
-    let mut b = Builder::new(&fixtures::tree_limits());
-    crate::pages::chat::conversation(
-        &mut b,
-        thread,
-        &fixtures::root_in_project(None),
-        &fixtures::words(),
-        &fixtures::jig_words(),
-        &mut jig_client_view::JigBindings::new(fixtures::tree_limits().bindings, TEXT),
-    );
-    b.finish()
-}
+
 #[test]
 fn provisional_text_is_marked_until_its_turn_commits() {
     let mut thread = provisional();
-    assert!(fixtures::find(&tree(&thread), Role::Status, b"Provisional").is_some());
+    assert!(fixtures::find(&tree(&thread), Role::Status, b"Writing...").is_some());
     thread.reading = Some(jig_client::thread::Reading::Latest { known: COMMITTED.into() });
     let mut rows = List::with_capacity(TURN);
     rows.push(c::ActivityLine {
@@ -68,11 +34,9 @@ fn provisional_text_is_marked_until_its_turn_commits() {
     })
     .expect("turn");
     thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
-    assert_eq!(fixtures::find(&tree(&thread), Role::Status, b"Provisional"), None);
+    assert_eq!(fixtures::find(&tree(&thread), Role::Status, b"Writing..."), None);
 }
 
-const MESSAGE: u64 = 3;
-const PARTY: u64 = 73;
 #[test]
 fn an_owner_activity_message_is_shown_in_the_chat() {
     let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
@@ -100,47 +64,20 @@ fn an_owner_activity_message_is_shown_in_the_chat() {
     thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
     assert!(skein_lib::bytes::find(&fixtures::text(&tree(&thread)), b"An owner message").is_some());
 }
-const DELEGATE: u64 = 12;
-const OTHER_DELEGATE: u64 = 13;
-const CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(5);
-const CLOSE_OPERATIONS: u32 = 3;
-fn closing(grace: Option<skein_lib::Duration>) -> skein_ui::Tree {
-    let mut operations = List::with_capacity(CLOSE_OPERATIONS);
-    let reason = c::Text::new(Box::from(*b"Chat closed"), TEXT).expect("reason");
-    operations
-        .push(c::Operation::Cancel { project: fixtures::PROJECT, task: DELEGATE, reason: reason.clone(), grace: None })
-        .expect("delegate cancel");
-    operations
-        .push(c::Operation::Move { project: fixtures::PROJECT, task: OTHER_DELEGATE, reason: reason.clone() })
-        .expect("delegate move");
-    operations
-        .push(c::Operation::Cancel { project: fixtures::PROJECT, task: TASK, reason, grace })
-        .expect("chat close");
-    let mut b = Builder::new(&fixtures::tree_limits());
-    crate::confirm::close_choices(
-        &mut b,
-        TASK,
-        &operations,
-        &fixtures::words(),
-        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
-    );
-    b.finish()
-}
+
 #[test]
 fn the_close_confirmation_names_each_live_delegates_fate() {
     let tree = closing(Some(CLOSE_GRACE));
     let text = fixtures::text(&tree);
     assert!(skein_lib::bytes::find(&text, b"Delegate 12 will be cancelled").is_some());
     assert!(skein_lib::bytes::find(&text, b"Delegate 13 will be moved to you").is_some());
+}
+#[test]
+fn the_close_confirmation_offers_each_live_delegates_choice() {
+    let tree = closing(Some(CLOSE_GRACE));
     assert!(fixtures::find(&tree, Role::Button, b"Cancel delegate 12").is_some());
     assert!(fixtures::find(&tree, Role::Button, b"Take delegate 13").is_some());
 }
-const FRACTIONAL_GRACE: skein_lib::Duration = skein_lib::Duration::from_millis(125);
-const GRACES: [(Option<skein_lib::Duration>, &[u8]); 3] = [
-    (Some(CLOSE_GRACE), b"allow 5 seconds to finish, then cancel"),
-    (Some(FRACTIONAL_GRACE), b"allow 125000000 nanoseconds to finish, then cancel"),
-    (None, b"Close chat now"),
-];
 #[test]
 fn the_close_confirmation_names_the_templates_grace() {
     for (grace, expected) in GRACES {
@@ -148,72 +85,6 @@ fn the_close_confirmation_names_the_templates_grace() {
     }
 }
 
-const CHAT_LABEL: u32 = 7;
-const CHAT_TEMPLATE: u32 = 1;
-const CHAT_CHARTER: u32 = 1;
-const SINGLE_TEMPLATE: u32 = 1;
-const EMPTY_PARAMETERS: u32 = 0;
-fn chat_root() -> temper_client_domain::Domain {
-    use temper_client_domain::{Address, Event};
-    let (mut root, me_watch, task_watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
-    let mut me = root.pages().me(root.client()).expect("me").clone();
-    let member = me.projects.get_mut(EMPTY_PARAMETERS).expect("project");
-    member.templates = List::with_capacity(SINGLE_TEMPLATE);
-    member
-        .templates
-        .push(c::Template {
-            number: CHAT_TEMPLATE,
-            name: c::DocumentText::complete(c::Text::new(Box::from(*b"Chat"), TEXT).expect("name")),
-            executor: c::TemplateExecutor::Charter(CHAT_CHARTER),
-            contract: c::TaskContractDocument::Report { words: TEXT },
-            shallower: SINGLE_TEMPLATE,
-            budget: c::TemplateBudget::AsAllowed { cap: None },
-            deadline: c::TemplateDeadline::None,
-            tracked: None,
-            flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
-            label: CHAT_LABEL,
-            grace: Some(CLOSE_GRACE),
-        })
-        .expect("template");
-    let mut task = fixtures::task::document();
-    task.chip.task = TASK;
-    task.project = fixtures::PROJECT;
-    task.acts = List::with_capacity(SINGLE_TEMPLATE);
-    task.acts
-        .push(c::Offered {
-            act: c::ActKind::Cancel,
-            admission: c::Admission::Allowed,
-            effect: Some(c::Effect::Cancel(c::Impact {
-                tasks: c::PhaseCounts {
-                    waiting: 0,
-                    running: 1,
-                    held: 0,
-                    closing: 0,
-                    ended: 0,
-                    done: 0,
-                    failed: 0,
-                    cancelled: 0,
-                },
-                live_runs: 1,
-                proposals: 0,
-            })),
-        })
-        .expect("close");
-    for (watch, document) in [
-        (me_watch, c::Delivery::Me(Box::new(me))),
-        (task_watch.expect("chat watch"), c::Delivery::Task(Box::new(task))),
-    ] {
-        fixtures::root_event(
-            &mut root,
-            Event::Client {
-                event: jig_client::Event::Up {
-                    up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(document) },
-                },
-            },
-        );
-    }
-    root
-}
 #[test]
 fn pressing_close_opens_the_chat_confirmation() {
     let mut root = chat_root();
@@ -239,85 +110,16 @@ fn the_close_confirmation_says_the_cancellations_facts() {
     );
     let mut view = fixtures::view();
     let said = fixtures::text(fixtures::build(&mut view, &root));
-    let dangerous = fixtures::jig_words().say(jig_client_view::phrases::jig::JigPhrase::Dangerous, &[]);
+    let dangerous =
+        fixtures::words().say_word(jig_client::words::Word::Decision(jig_client::words::DecisionWord::Dangerous), &[]);
     assert!(skein_lib::bytes::find(&said, &dangerous).is_some(), "irreversible cancellation");
-    let impact = fixtures::jig_words()
-        .say(jig_client_view::phrases::jig::JigPhrase::TasksRunning, &[skein_ui::phrases::Hole::Number(1)]);
+    let impact = fixtures::words().say_word(
+        jig_client::words::Word::Decision(jig_client::words::DecisionWord::TasksRunning),
+        &[skein_ui::phrases::Hole::Number(1)],
+    );
     assert!(skein_lib::bytes::find(&said, &impact).is_some(), "supplied running-task impact");
 }
 
-const PROPOSAL: c::ProposalKey = c::ProposalKey { proposer: c::Proposer::Task(DELEGATE), number: 3 };
-const PROPOSAL_OUTPUTS: u32 = 256;
-const PROPOSAL_NOW: skein_lib::Time = skein_lib::Time::ZERO;
-const PROPOSAL_OFFERS: u32 = 2;
-const EMPTY_BATCH: u32 = 0;
-fn proposal_root() -> temper_client_domain::Domain {
-    use temper_client_domain::Event;
-    let limits = fixtures::domain_limits();
-    let (mut root, _, watch) = fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &limits);
-    let mut task = fixtures::task::document();
-    task.chip.task = TASK;
-    task.proposals = List::with_capacity(SINGLE_TEMPLATE);
-    task.proposals.push(PROPOSAL).expect("one proposal");
-    let mut out = skein_lib::Queue::with_capacity(PROPOSAL_OUTPUTS);
-    temper_client_domain::step(
-        &mut root,
-        &skein_lib::Env { now: PROPOSAL_NOW, wall: Wall::EPOCH, limits },
-        Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch: watch.expect("task watch"),
-                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
-                },
-            },
-        },
-        &mut out,
-    );
-    let mut acts = List::with_capacity(PROPOSAL_OFFERS);
-    for act in [c::ActKind::Accept, c::ActKind::Reject] {
-        acts.push(c::Offered { act, admission: c::Admission::Allowed, effect: None }).expect("offer");
-    }
-    let page = c::ReadValue::OwnerProposal(Box::new(c::OwnerProposal {
-        key: PROPOSAL,
-        project: fixtures::PROJECT,
-        reason: c::DocumentText::complete(c::Text::new(Box::from(*b"Make a goal"), TEXT).expect("reason")),
-        action: c::OwnerProposalAction::Batch(List::with_capacity(EMPTY_BATCH)),
-        as_holder: true,
-        waiting: c::OwnerProposalWaiting { holder: c::OwnerHistoryHolder::Person(PARTY), since: Wall::EPOCH },
-        funding: List::with_capacity(EMPTY_BATCH),
-        acts,
-    }));
-    let mut answered = false;
-    while let Some(request) = out.pop() {
-        if let temper_client_domain::Request::Client {
-            request:
-                jig_client::Request::Down {
-                    down:
-                        jig_client::Down::Read {
-                            read,
-                            what: jig_client::Readable::Jig(c::Read::Proposal { proposal: PROPOSAL }),
-                        },
-                },
-        } = request
-        {
-            fixtures::root_event(
-                &mut root,
-                Event::Client {
-                    event: jig_client::Event::Up {
-                        up: jig_client::Up::ReadDone {
-                            read,
-                            result: jig_client::Readout::Jig(c::ReadResult::Value(page)),
-                        },
-                    },
-                },
-            );
-            answered = true;
-            break;
-        }
-    }
-    assert!(answered, "proposal read emitted");
-    root
-}
 #[test]
 fn a_proposal_waiting_in_the_chat_is_shown_after_its_conversation() {
     let root = proposal_root();
@@ -337,21 +139,34 @@ fn a_proposal_waiting_in_the_chat_is_shown_after_its_conversation() {
         accept.expect("proposal's accept act") >= conversation_end.expect("conversation"),
         "card after conversation"
     );
+}
+#[test]
+fn a_chat_proposal_offers_rejection_with_a_reason() {
+    let root = proposal_root();
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
     assert!(fixtures::find(tree, Role::Button, b"Reject with reason").is_some());
 }
 #[test]
 fn rejecting_in_the_chat_shows_the_reason_in_its_confirmation() {
-    use temper_client_domain::{Action, Event, pages::Act};
-    let mut root = proposal_root();
-    let object = c::ObjectKey::Proposal(PROPOSAL);
-    for act in [
-        Act::CardWords { object, words: Box::from(*b"Too costly") },
-        Act::Decide { object, act: c::ActKind::Reject, revision: None },
-    ] {
-        fixtures::root_event(&mut root, Event::Act { action: Action::Pages(act) });
-    }
+    let root = rejecting_chat();
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
     assert!(fixtures::find(tree, Role::Dialog, b"Reject with reason").is_some());
+}
+#[test]
+fn a_chat_rejection_confirmation_keeps_the_persons_reason() {
+    let root = rejecting_chat();
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
     assert!(skein_lib::bytes::find(&fixtures::text(tree), b"Too costly").is_some());
+}
+
+const LONG_PROVISIONAL: &[u8] = b"1234567890123456789012345678901\xc3\xa9 and more";
+#[test]
+fn long_provisional_text_says_that_earlier_text_was_omitted() {
+    let thread = provisional_with_text(LONG_PROVISIONAL);
+    let tree = tree(&thread);
+    assert!(fixtures::find(&tree, Role::Status, b"Earlier text omitted").is_some());
+    assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"\xc3\xa9 and more").is_some());
 }

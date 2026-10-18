@@ -19,4 +19,4 @@ Role:
 [15] [x] It runs CI
 [16] Checks: gate numbers, separated by spaces or commas: (empty)
 [-] Adopt (disabled)
-* Being decided: waiting for the engine connection or your sign-in
+* Waiting to send

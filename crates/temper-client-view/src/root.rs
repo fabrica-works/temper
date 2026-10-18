@@ -1,10 +1,8 @@
-//! Keep: frame, owner page and two slot passes (jig's client/domain/root.md, 9).
-//! Replace: Ops connector fragments and phrasebooks with the forge's.
+//! Temper's frame, pages, bindings and checked phrasebook.
 use crate::{
     Limits, forge,
     words::{Word, Words},
 };
-use jig_client_view::{JigBindings, Owner};
 use skein_lib::Queue;
 use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
 use temper_client_domain::{Action, Domain};
@@ -12,50 +10,36 @@ use temper_client_domain::{Action, Domain};
 #[derive(Debug)]
 pub struct View {
     render: skein_ui::View,
-    jig_words: jig_client_view::words::Words,
     forge_words: Words,
-    jig: JigBindings,
     forge: forge::bindings::Bindings,
     pages: crate::frame::Bindings,
     limits: Limits,
+    rows: u32,
+    text: u32,
 }
 impl View {
     #[must_use]
-    pub fn new(
-        limits: &Limits,
-        domain: &temper_client_domain::Limits,
-        jig_words: jig_client_view::words::Words,
-        forge_words: Words,
-        forge: u16,
-    ) -> View {
+    pub fn new(limits: &Limits, domain: &temper_client_domain::Limits, forge_words: Words, forge: u16) -> View {
         assert!(forge_words.connector == forge, "phrasebook belongs to its forge connector");
-        assert!(crate::worst_case(limits, domain, &jig_words, &forge_words).is_some(), "view capacities are checked");
+        assert!(crate::worst_case(limits, domain, &forge_words).is_some(), "view capacities are checked");
         View {
             render: skein_ui::View::new(&limits.tree),
-            jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             pages: crate::frame::Bindings::new(limits.tree.bindings),
-            jig_words,
             forge_words,
             limits: *limits,
+            rows: domain.client.domain.rows,
+            text: domain.client.domain.text,
         }
     }
     fn task_main(&mut self, b: &mut Builder, root: &Domain) {
-        crate::pages::task::main(b, root, &self.forge_words, &self.jig_words, &mut self.pages, &mut self.jig);
+        crate::pages::task::main(b, root, &self.forge_words, &mut self.pages, self.rows);
     }
     fn adoption_main(&mut self, b: &mut Builder, root: &Domain) {
         let Some(form) = root.forge().form() else { return };
         let project = crate::pages::project_name(root.pages(), root.client(), form.project);
         b.open(Role::Main);
-        forge::page::page(
-            b,
-            form,
-            project,
-            &self.forge_words,
-            &self.jig_words,
-            &mut self.forge,
-            self.limits.tree.text_per_node,
-        );
+        forge::page::page(b, form, project, &self.forge_words, &mut self.forge, self.limits.tree.text_per_node);
         b.close();
     }
     #[must_use]
@@ -72,10 +56,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     if !view.render.stale(shown) {
         return;
     }
-    view.jig.begin();
     view.forge.begin();
     view.pages.begin();
-    let jig = root.jig().borrow(root.client());
     let mut builder = view.render.builder();
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
@@ -91,101 +73,34 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         builder.close();
         builder.close();
     } else if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
-        crate::pages::inbox::main(
-            &mut builder,
-            root,
-            &view.forge_words,
-            &view.jig_words,
-            &mut view.pages,
-            &mut view.jig,
-        );
+        crate::pages::inbox::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows);
     } else if *root.pages().address() == temper_client_domain::Address::Chats {
         crate::pages::chats::main(
             &mut builder,
             root,
             &view.forge_words,
-            &view.jig_words,
             &mut view.pages,
-            view.jig.text_limit(),
+            view.limits.tree.text_per_node,
         );
     } else if let temper_client_domain::Address::Chat { .. } = root.pages().address() {
-        crate::pages::chat::main(
-            &mut builder,
-            root,
-            &view.forge_words,
-            &view.jig_words,
-            &mut view.pages,
-            &mut view.jig,
-        );
+        crate::pages::chat::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows, view.text);
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root);
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
-    } else {
-        jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig);
-    }
-    if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
-    } else if crate::frame::unavailable(root).is_none() {
-        jig_client_view::after_page(&mut builder, &jig, &view.jig_words, &mut view.jig);
     }
     builder.close();
-    for pass in 0..2 {
-        for slot in builder.slots(pass) {
-            let mut fragment = Builder::new(&view.limits.tree);
-            if slot.reference == jig_client_view::signin::SLOT {
-                builder.splice(slot.id, fragment);
-                continue;
-            }
-            let filled = match Owner::from_opaque(slot.reference.owner) {
-                Some(Owner::Jig) | None => false,
-                Some(Owner::Application { number: connector }) => {
-                    if connector == root.forge_number() {
-                        match view.jig.part(slot.reference.token) {
-                            Some(part) => {
-                                forge::part(&mut fragment, root.forge(), part, &view.forge_words);
-                                true
-                            }
-                            None => match view.jig.owner_part(slot.reference.token) {
-                                Some(part) => {
-                                    forge::owner_part(&mut fragment, part, &view.forge_words);
-                                    true
-                                }
-                                None => false,
-                            },
-                        }
-                    } else {
-                        false
-                    }
-                }
-            };
-            if filled {
-                builder.splice(slot.id, fragment);
-            } else {
-                builder.unshowable(slot.id, &view.forge_words.say(Word::Unshowable, &[]));
-            }
-        }
-    }
     view.render.finish(builder, shown, out);
 }
 #[must_use]
-#[expect(clippy::manual_map, reason = "step code explicitly wraps the owner action")]
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
     if bound.binding.owner == crate::frame::owner() {
         return view.pages.decode(bound.binding.token, bound.act);
     }
-    match Owner::from_opaque(bound.binding.owner) {
-        Some(Owner::Jig) => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
-            Some(action) => Some(Action::Jig(action)),
-            None => None,
-        },
-        Some(Owner::Application { number: connector }) => {
-            if connector == view.forge_words.connector {
-                forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
-            } else {
-                None
-            }
-        }
-        None => None,
+    if bound.binding.owner == forge::bindings::owner(view.forge_words.connector) {
+        forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
+    } else {
+        None
     }
 }

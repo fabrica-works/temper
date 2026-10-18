@@ -89,7 +89,7 @@ pub(crate) fn start(arguments: &[OsString], clock: &Clock) -> Result<u8, Refused
             }
         };
         let bounds = limits::native();
-        let (view, _, _) = limits::view(&bounds).expect("native view bounds");
+        let (view, _) = limits::view(&bounds).expect("native view bounds");
         let client = NativeClient::new(
             Settings { engine: skein_io::Addr::Ip(engine), directory: name.as_bytes().into(), limits: bounds },
             root,

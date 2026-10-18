@@ -8,19 +8,11 @@ use alloc::boxed::Box;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, State, phrases::Hole};
 use temper_client_domain::forge;
-fn link(builder: &mut Builder, word: Word, meaning: Meaning, words: &Words, bindings: &mut Bindings) {
-    builder.open(Role::Link);
-    builder.name(&words::say(words, word, &[]));
-    words::text(words, builder, word, &[]);
-    builder.link(bindings.insert(meaning));
-    builder.close();
-}
 pub fn page(
     builder: &mut Builder,
     form: &forge::Form,
     project_name: Option<&[u8]>,
     words: &Words,
-    jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
     text_limit: u32,
 ) {
@@ -69,18 +61,19 @@ pub fn page(
         status(builder, Word::OutOfDate, &[], words);
     }
     if let Some((_, progress)) = form.pending {
-        jig.progress(
+        crate::cards::progress(
             builder,
+            words,
             match progress {
-                RequestProgress::InFlight => jig_client_view::intents::Progress::InFlight,
-                RequestProgress::Retrying => jig_client_view::intents::Progress::Retrying,
-                RequestProgress::Parked => jig_client_view::intents::Progress::Parked,
-                RequestProgress::Unknown => jig_client_view::intents::Progress::Unknown,
+                RequestProgress::InFlight => jig_client::Progress::InFlight,
+                RequestProgress::Retrying => jig_client::Progress::Retrying { why: jig_client::Retry::Lost },
+                RequestProgress::Parked => jig_client::Progress::Parked,
+                RequestProgress::Unknown => jig_client::Progress::Unknown,
             },
         );
     }
     if let Some(answer) = &form.outcome {
-        outcome(builder, form, answer, words, jig, bindings, text_limit);
+        outcome(builder, form, answer, words, text_limit);
     }
 }
 fn text_field(
@@ -177,15 +170,7 @@ fn kinds(kinds: forge::Kinds, words: &Words) -> Box<[u8]> {
     }
     writer.finish()
 }
-fn outcome(
-    builder: &mut Builder,
-    form: &forge::Form,
-    answer: &forge::Answer,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    text_limit: u32,
-) {
+fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, words: &Words, text_limit: u32) {
     match answer {
         forge::Answer::Adopted(adopted) => {
             let role = match adopted.role {
@@ -212,16 +197,15 @@ fn outcome(
                 forge::Protection::Unknown => status(builder, Word::Protection, &[], words),
                 forge::Protection::Absent | forge::Protection::Rule(_) => {}
             }
-            link(builder, Word::Resources, Meaning::Resources { project: form.project }, words, bindings);
         }
         forge::Answer::CoreRefused(refusal) => {
             builder.open(Role::Alert);
-            jig.refusal(builder, refusal, text_limit);
+            words.refusal(builder, refusal, text_limit);
             builder.close();
         }
         forge::Answer::EntranceRefused(refusal) => {
             builder.open(Role::Alert);
-            jig.refusal(builder, refusal.refusal(), text_limit);
+            words.refusal(builder, refusal.refusal(), text_limit);
             builder.close();
         }
         forge::Answer::ForgeRefused(reason) => {

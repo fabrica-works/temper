@@ -31,7 +31,7 @@ impl Task {
         let activity = handle(first.checked_add(2).expect("task handles fit"));
         for (handle, subject) in [
             (document, c::Subject::Task { task: number }),
-            (tree, c::Subject::Tree { task: number, window: limits.jig.rows }),
+            (tree, c::Subject::Tree { task: number, window: limits.client.domain.rows }),
         ] {
             out.push(Request::Client(jig_client::Event::Watch { handle, subject: Watchable::Jig(subject) }));
         }
@@ -47,7 +47,7 @@ impl Task {
             final_task: None,
             next: first.checked_add(3).expect("task handles fit"),
             through: None,
-            cards: List::with_capacity(limits.jig.objects),
+            cards: List::with_capacity(limits.client.domain.reads),
         }
     }
     #[must_use]
@@ -242,9 +242,10 @@ fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Activity, the final task, and bounded held-task cards and their words.
     limits
-        .jig
+        .client
+        .domain
         .document_bytes
-        .checked_mul(u64::from(limits.jig.objects).checked_add(2)?)?
-        .checked_add(List::<Card>::worst_case(limits.jig.objects)?)?
-        .checked_add(u64::from(limits.jig.objects).checked_mul(u64::from(limits.jig.text))?)
+        .checked_mul(u64::from(limits.client.domain.reads).checked_add(2)?)?
+        .checked_add(List::<Card>::worst_case(limits.client.domain.reads)?)?
+        .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)
 }

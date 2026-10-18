@@ -23,4 +23,3 @@ Role:
 * It is the project's home.
 * temper may: read; open pull requests; review; comment; create and delete branches.
 * Branch protection could not be read.
-[18] See the project's resources

@@ -15,7 +15,7 @@ Conversation:
   * Read
   Agent
   I can help.
-  * Provisional
+  * Writing...
   Writing an answer
 [6] Message: (empty)
 [7] Send

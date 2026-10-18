@@ -79,6 +79,8 @@ fn signed_out_mid_request_is_made_once_after_signing_in() {
     world.reload(person);
     let now = world.now();
     world.front().sign_in(person, now, skein_lib::Wall::from_nanos(now.as_nanos()));
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    world.go(person, fixtures::chats_page());
     world.person(person, vec![Step::See { find: Find::text(b"Hello"), within: fixtures::WITHIN }]);
     assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
     assert_eq!(fixtures::chats(&world.front().engine), 1);

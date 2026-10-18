@@ -1,7 +1,6 @@
 //! Adoption phrases as checked English data (client.md, 4.4 and 4.7).
 use crate::words::Words;
 use alloc::boxed::Box;
-use jig_client_view::Owner;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{
     Builder, Run,
@@ -24,7 +23,6 @@ pub enum Word {
     Ci,
     Checks,
     Adopt,
-    Resources,
     Required,
     ForgeNumber,
     BadChecks,
@@ -61,7 +59,7 @@ pub enum Word {
 }
 use HoleKind::{Name, Number};
 type Row = (Word, &'static [&'static [u8]], &'static [HoleKind]);
-const ROWS: [Row; 49] = [
+const ROWS: [Row; 48] = [
     (Word::Title, &[b"Adopt a repository into ", b""], &[Name]),
     (Word::TitleNumber, &[b"Adopt a repository into project ", b""], &[Number]),
     (Word::Forge, &[b"Forge number"], &[]),
@@ -77,7 +75,6 @@ const ROWS: [Row; 49] = [
     (Word::Ci, &[b"It runs CI"], &[]),
     (Word::Checks, &[b"Checks: gate numbers, separated by spaces or commas"], &[]),
     (Word::Adopt, &[b"Adopt"], &[]),
-    (Word::Resources, &[b"See the project's resources"], &[]),
     (Word::Required, &[b"Required."], &[]),
     (Word::ForgeNumber, &[b"A forge number is from 1 to 65535."], &[]),
     (Word::BadChecks, &[b"Checks are numbers from 1, each once."], &[]),
@@ -109,7 +106,7 @@ const ROWS: [Row; 49] = [
     (Word::TooLarge, &[b"A field is past the forge's bounds, or the forge's repositories are full."], &[]),
     (Word::Unreachable, &[b"Forge ", b" did not answer; nothing was adopted. Try again."], &[Name]),
     (Word::InvalidAnswer, &[b"Forge ", b" answered what temper did not expect; nothing was adopted."], &[Name]),
-    (Word::Unknown, &[b"It is not known whether ", b" was adopted: see the project's resources."], &[Name]),
+    (Word::Unknown, &[b"It is not known whether ", b" was adopted."], &[Name]),
     (Word::Read, &[b"read"], &[]),
     (Word::Push, &[b"push"], &[]),
     (Word::Open, &[b"open pull requests"], &[]),
@@ -122,8 +119,8 @@ const ROWS: [Row; 49] = [
 ];
 fn id(connector: u16, index: usize) -> PhraseId {
     PhraseId {
-        owner: (Owner::Application { number: connector }).opaque(),
-        number: u16::try_from(index).expect("49 phrases").checked_add(1000).expect("phrase id fits"),
+        owner: crate::forge::bindings::owner(connector),
+        number: u16::try_from(index).expect("48 phrases").checked_add(1000).expect("phrase id fits"),
     }
 }
 pub fn extend(connector: u16, text: u32, shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>) {
@@ -182,7 +179,6 @@ fn name_bytes(word: Word, index: usize, text: u32) -> u32 {
         | Word::Ci
         | Word::Checks
         | Word::Adopt
-        | Word::Resources
         | Word::Required
         | Word::ForgeNumber
         | Word::BadChecks

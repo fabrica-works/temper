@@ -46,9 +46,9 @@ impl Inbox {
                 handle(first.checked_add(2).expect("inbox handles fit")),
             ],
             next: first.checked_add(3).expect("inbox handles fit"),
-            window: limits.jig.rows.min((limits.jig.objects / 2).max(1)),
-            cards: List::with_capacity(limits.jig.objects),
-            previous: List::with_capacity(limits.jig.objects),
+            window: limits.client.domain.rows.min((limits.client.domain.reads / 2).max(1)),
+            cards: List::with_capacity(limits.client.domain.reads),
+            previous: List::with_capacity(limits.client.domain.reads),
         };
         client(
             out,
@@ -229,13 +229,18 @@ pub const fn kind(kind: Kind) -> InboxGroup {
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    limits.jig.objects.checked_mul(2).expect("pages output fits").checked_add(8).expect("pages output fits")
+    limits.client.domain.reads.checked_mul(2).expect("pages output fits").checked_add(8).expect("pages output fits")
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    List::<Card>::worst_case(limits.jig.objects)?.checked_mul(2)?.checked_add(
-        u64::from(limits.jig.objects).checked_mul(
-            limits.jig.document_bytes.checked_mul(2)?.checked_add(u64::from(limits.jig.text).checked_mul(2)?)?,
+    List::<Card>::worst_case(limits.client.domain.reads)?.checked_mul(2)?.checked_add(
+        u64::from(limits.client.domain.reads).checked_mul(
+            limits
+                .client
+                .domain
+                .document_bytes
+                .checked_mul(2)?
+                .checked_add(u64::from(limits.client.domain.text).checked_mul(2)?)?,
         )?,
     )
 }

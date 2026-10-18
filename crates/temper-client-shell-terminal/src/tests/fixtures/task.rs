@@ -44,6 +44,7 @@ pub fn page() -> skein_ui::Tree {
     b.name(b"Plan");
     chip(&mut b, b"Task 9", b"Refresh token handling", b"Running");
     chip(&mut b, b"Task 12", b"Review the change", b"Held");
+    golden_cards::held(&mut b);
     b.close();
     b.close();
     text(&mut b, Role::Status, b"Held below: 1");

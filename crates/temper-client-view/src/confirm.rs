@@ -1,4 +1,5 @@
 //! The page's deciding controls, their supplied facts, and its one confirmation.
+use crate::cards::P;
 use crate::{
     frame::Bindings,
     words::{Word, Words},
@@ -8,7 +9,6 @@ use jig_client::{
     Answered, Outcome,
     contract::{ActKind, Admission, Answer, Effect, ReadValue, ReleaseEffect},
 };
-use jig_client_view::{JigBindings, phrases::jig::JigPhrase as P};
 use skein_ui::{Builder, Role, Run};
 use temper_client_domain::{
     Domain, acts,
@@ -29,83 +29,29 @@ fn button(b: &mut Builder, bindings: &mut Bindings, words: &Words, word: Word, a
     b.bind(bindings.insert(act));
     b.close();
 }
-fn facts(
-    b: &mut Builder,
-    root: &Domain,
-    page: &ReadValue,
-    words: &jig_client_view::words::Words,
-    jig: &mut JigBindings,
-) {
-    match page {
-        ReadValue::OwnerProposal(value) => {
-            jig_client_view::owner_proposal::render(b, &root.jig().borrow(root.client()), value, words, jig);
-        }
-        ReadValue::Proposal(value) => {
-            jig_client_view::cards::proposal::action(
-                b,
-                &value.action,
-                words,
-                jig,
-                root.jig().object_rows().rows.capacity(),
-            );
-            jig_client_view::cards::common::authority(b, &value.needs, words, jig);
-            jig_client_view::cards::common::funding(b, &value.funding, value.needs.budget, words);
-        }
-        ReadValue::Tasks(_)
-        | ReadValue::OwnerProject(_)
-        | ReadValue::Historical(_)
-        | ReadValue::Me(_)
-        | ReadValue::Task(_)
-        | ReadValue::Escalation(_)
-        | ReadValue::OwnerEscalation(_)
-        | ReadValue::Question(_)
-        | ReadValue::PersonTask(_)
-        | ReadValue::OwnerPersonTask(_)
-        | ReadValue::Result(_)
-        | ReadValue::Ended(_)
-        | ReadValue::OwnerEnded(_)
-        | ReadValue::History(_)
-        | ReadValue::Activity(_)
-        | ReadValue::Inbox(_)
-        | ReadValue::OwnerInbox(_)
-        | ReadValue::Spend(_)
-        | ReadValue::OwnerSpend(_)
-        | ReadValue::Project(_)
-        | ReadValue::Notes(_)
-        | ReadValue::Deployment(_)
-        | ReadValue::OwnerDeployment(_) => {}
-    }
-}
-pub(crate) fn card(
-    b: &mut Builder,
-    root: &Domain,
-    card: &Card,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut JigBindings,
-) {
+pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(page) = &card.page else { return };
-    facts(b, root, page, jig, jig_bindings);
+    crate::cards::proposal(b, page, words, rows);
+    crate::cards::decision(b, words, Some(page), ActKind::Accept);
     if let Some(outcome) = &card.outcome {
         match outcome {
-            Outcome::Answered(Answered::Jig(Answer::Done(outcome))) => jig.outcome(b, outcome),
+            Outcome::Answered(Answered::Jig(Answer::Done(outcome))) => words.outcome(b, outcome),
             Outcome::Answered(Answered::Jig(Answer::Refused { refusal, .. })) => {
-                jig.refusal(b, refusal, jig_bindings.text_limit());
+                words.refusal(b, refusal, 0);
                 if let jig_client::contract::Refusal::Moved { .. } = refusal {
-                    jig.text(b, P::LookAgain, &[]);
+                    words.card_text(b, P::LookAgain, &[]);
                 }
             }
-            Outcome::NotKept => jig.status(b, P::RequestNotKept, &[]),
-            Outcome::Unknown => jig.status(b, P::Unknown, &[]),
-            Outcome::Limit => jig.status(b, P::RequestsInFlight, &[]),
-            Outcome::Unconfirmed => jig.status(b, P::RequestUnconfirmed, &[]),
+            Outcome::NotKept => words.status(b, P::RequestNotKept, &[]),
+            Outcome::Unknown => words.status(b, P::Unknown, &[]),
+            Outcome::Limit => words.status(b, P::RequestsInFlight, &[]),
+            Outcome::Unconfirmed => words.status(b, P::RequestUnconfirmed, &[]),
             Outcome::Answered(Answered::Family(_)) => {}
         }
         return;
     }
     if let Some(progress) = acts::pending(card, root.client()) {
-        progress_text(b, jig, progress);
+        progress_text(b, words, progress);
         return;
     }
     if card.key.is_some() {
@@ -140,24 +86,17 @@ pub(crate) fn card(
                 );
             }
             Admission::Proposed { to } => {
-                jig.text(b, P::ProposeInstead, &[]);
-                jig_client_view::cards::common::recipient(b, to, jig);
+                words.card_text(b, P::ProposeInstead, &[]);
+                crate::cards::recipient(b, words, to);
             }
-            Admission::Refused(refusal) => jig.refusal(b, refusal, jig_bindings.text_limit()),
+            Admission::Refused(refusal) => words.refusal(b, refusal, 0),
         }
     }
 }
-pub(crate) fn main(
-    b: &mut Builder,
-    root: &Domain,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut JigBindings,
-) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(open) = root.pages().confirmation() else { return };
     if open.act == ActKind::Cancel {
-        close(b, root, words, jig, bindings);
+        close(b, root, words, bindings);
         return;
     }
     let Some(cards) = root.pages().cards() else { return };
@@ -176,49 +115,18 @@ pub(crate) fn main(
         b.open(Role::Dialog);
         b.name(&words.say(word, &[]));
         b.text(Run::Plain, &words.say(word, &[]));
-        facts(b, root, page, jig, jig_bindings);
-        if open.act == ActKind::Release
-            && let ReadValue::Task(task) = page
-        {
-            match &task.hold {
-                Some(jig_client::contract::TaskHold::Owner(hold)) => {
-                    b.text(Run::Plain, &words.say_word(jig_client::words::Word::hold(&hold.reason), &[]));
-                    jig.text(b, P::HoldRevision, &[skein_ui::phrases::Hole::Number(hold.revision)]);
-                }
-                Some(jig_client::contract::TaskHold::Document(hold)) => {
-                    jig_client_view::cards::escalation::held(
-                        b,
-                        &root.jig().borrow(root.client()),
-                        hold,
-                        jig,
-                        jig_bindings,
-                    );
-                }
-                None => {}
-            }
-        }
-        if jig_client::facts::dangerous(open.act) {
-            jig.status(b, P::Dangerous, &[]);
-        }
+        crate::cards::proposal(b, page, words, rows);
+        crate::cards::decision(b, words, Some(page), open.act);
         if let Some(reason) = &card.words {
             b.open(Role::Paragraph);
             b.text(Run::Plain, reason.bytes());
             b.close();
         }
-        if let Some(Effect::Release(effect)) = jig_client::facts::effect(acts::offers(page), open.act) {
-            jig.text(
-                b,
-                match effect {
-                    ReleaseEffect::Judged => P::ReleaseFresh,
-                    ReleaseEffect::RunAgain => P::ResumeRelease,
-                    ReleaseEffect::Uncertain => P::EngineFollowsChoice,
-                },
-                &[],
-            );
-            if *effect == ReleaseEffect::Uncertain {
-                button(b, bindings, words, Word::Again, Act::Again { again: true });
-                button(b, bindings, words, Word::DoNotRepeat, Act::Again { again: false });
-            }
+        if let Some(Effect::Release(effect)) = jig_client::facts::effect(acts::offers(page), open.act)
+            && *effect == ReleaseEffect::Uncertain
+        {
+            button(b, bindings, words, Word::Again, Act::Again { again: true });
+            button(b, bindings, words, Word::DoNotRepeat, Act::Again { again: false });
         }
         button(b, bindings, words, Word::Confirm, Act::Confirm);
         button(b, bindings, words, Word::Cancel, Act::Cancel);
@@ -227,31 +135,20 @@ pub(crate) fn main(
     }
 }
 
-pub(crate) fn progress_text(b: &mut Builder, jig: &jig_client_view::words::Words, progress: jig_client::Progress) {
-    jig.progress(
-        b,
-        match progress {
-            jig_client::Progress::InFlight => jig_client_view::intents::Progress::InFlight,
-            jig_client::Progress::Retrying { .. } => jig_client_view::intents::Progress::Retrying,
-            jig_client::Progress::Parked | jig_client::Progress::NotServed => {
-                jig_client_view::intents::Progress::Parked
-            }
-            jig_client::Progress::Unknown => jig_client_view::intents::Progress::Unknown,
-        },
-    );
+pub(crate) fn progress_text(b: &mut Builder, words: &Words, progress: jig_client::Progress) {
+    crate::cards::progress(b, words, progress);
 }
 
-fn close(b: &mut Builder, root: &Domain, words: &Words, jig: &jig_client_view::words::Words, bindings: &mut Bindings) {
+fn close(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
     use jig_client::contract::Ask;
     let Some(chat) = root.pages().chat() else { return };
     let Some(Ask::Compound { operations, .. }) = &chat.closing else { return };
     b.open(Role::Dialog);
     b.name(&words.say(Word::Close, &[]));
-    jig.status(b, P::Dangerous, &[]);
     if let Some(task) = chat.task(root.client())
-        && let Some(Effect::Cancel(impact)) = jig_client::facts::effect(task.acts.as_slice(), ActKind::Cancel)
+        && let Some(Effect::Cancel(_)) = jig_client::facts::effect(task.acts.as_slice(), ActKind::Cancel)
     {
-        jig_client_view::confirmation::impact_words(b, impact, jig);
+        crate::cards::decision(b, words, Some(&ReadValue::Task(Box::new(task.clone()))), ActKind::Cancel);
     }
     close_choices(b, chat.task, operations, words, bindings);
     b.close();

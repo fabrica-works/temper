@@ -23,14 +23,7 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     b.bind(bindings.insert(act));
     b.close();
 }
-pub(crate) fn main(
-    b: &mut Builder,
-    root: &Domain,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
-) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Main);
     text(b, Role::Heading { level: 1 }, &words.say(Word::InboxTitle, &[]));
     let Some(inbox) = root.pages().inbox() else {
@@ -54,7 +47,7 @@ pub(crate) fn main(
         for group in groups.into_iter().flatten() {
             for card in &inbox.cards {
                 if card.group == group {
-                    entry(b, root, card, words, jig, bindings, jig_bindings);
+                    entry(b, root, card, words, bindings, rows);
                 }
             }
         }
@@ -62,7 +55,7 @@ pub(crate) fn main(
     if inbox.results_through().is_some() {
         control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
     }
-    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
+    crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
 #[expect(clippy::manual_map, reason = "view code spells out the optional goal")]
@@ -122,15 +115,7 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
     b.bind(bindings.insert(Act::Filter { filter }));
     b.close();
 }
-fn entry(
-    b: &mut Builder,
-    root: &Domain,
-    card: &Card,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
-) {
+fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings, rows: u32) {
     b.open(Role::Item);
     b.key(card_key(card.object));
     let kind = match card.group {
@@ -167,34 +152,31 @@ fn entry(
         );
     }
     if let Some(page) = &card.page {
-        body(b, page, jig);
-        crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
+        body(b, page, words);
+        crate::confirm::card(b, root, card, words, bindings, rows);
     }
     b.close();
 }
-fn body(b: &mut Builder, page: &ReadValue, jig: &jig_client_view::words::Words) {
-    use jig_client_view::{document_text, specification};
+fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
     match page {
         ReadValue::Question(question) => {
             text(b, Role::Paragraph, question.task.title.bytes());
             text(b, Role::Paragraph, question.words.bytes());
         }
-        ReadValue::OwnerProposal(proposal) => document_text::markdown(b, &proposal.reason, jig),
-        ReadValue::Proposal(proposal) => text(b, Role::Paragraph, proposal.why.bytes()),
-        ReadValue::Escalation(held) => document_text::plain(b, &held.task.title, jig),
+        ReadValue::Escalation(held) => text(b, Role::Paragraph, held.task.title.bytes()),
         ReadValue::OwnerEscalation(held) => {
-            document_text::plain(b, &held.task.chip.title, jig);
-            specification::document(b, &held.task.spec, jig);
+            text(b, Role::Paragraph, held.task.chip.title.bytes());
+            crate::cards::specification(b, &held.task.spec, words);
         }
-        ReadValue::PersonTask(task) => specification::document(b, &task.spec, jig),
-        ReadValue::OwnerPersonTask(task) => specification::document(b, &task.spec, jig),
+        ReadValue::PersonTask(task) => crate::cards::specification(b, &task.spec, words),
+        ReadValue::OwnerPersonTask(task) => crate::cards::specification(b, &task.spec, words),
         ReadValue::Task(task) => {
-            document_text::plain(b, &task.chip.title, jig);
-            specification::document(b, &task.spec, jig);
+            text(b, Role::Paragraph, task.chip.title.bytes());
+            crate::cards::specification(b, &task.spec, words);
         }
         ReadValue::Result(result) => {
-            document_text::plain(b, &result.task.title, jig);
-            jig.ending(b, &result.ending);
+            text(b, Role::Paragraph, result.task.title.bytes());
+            words.ending(b, &result.ending);
             let value = match &result.value {
                 Some(
                     ResultValue::Report(text)
@@ -210,10 +192,12 @@ fn body(b: &mut Builder, page: &ReadValue, jig: &jig_client_view::words::Words) 
                 None => None,
             };
             if let Some(value) = value {
-                document_text::markdown(b, value, jig);
+                crate::cards::document(b, value);
             }
         }
-        ReadValue::Tasks(_)
+        ReadValue::OwnerProposal(_)
+        | ReadValue::Proposal(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)
@@ -245,5 +229,5 @@ pub(crate) fn card_key(object: ObjectKey) -> skein_ui::Key {
         ObjectKey::Result(task) => (5, task, 0),
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
-    skein_ui::Key { owner: jig_client_view::Owner::Jig.opaque(), kind, a, b }
+    skein_ui::Key { owner: crate::frame::owner(), kind, a, b }
 }

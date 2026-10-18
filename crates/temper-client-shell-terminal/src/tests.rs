@@ -57,9 +57,9 @@ fn a_table_record_saved_then_kept_comes_back_the_same() {
 #[test]
 fn the_native_limits_pass_each_worst_case() {
     let limits = limits::native();
-    let (view, jig, forge) = limits::view(&limits).expect("usable view");
+    let (view, forge) = limits::view(&limits).expect("usable view");
     let root = client::worst_case(&limits.client).expect("usable root");
-    let view = temper_client_view::worst_case(&view, &limits.client, &jig, &forge).expect("usable view");
+    let view = temper_client_view::worst_case(&view, &limits.client, &forge).expect("usable view");
     let shell = jig_client_shell_native::Shell::new(jig_client_shell_native::Settings {
         engine: skein_io::Addr::Ip("127.0.0.1:7100".parse().expect("loopback")),
         directory: Box::from(*b"client"),
@@ -88,7 +88,7 @@ fn an_equal_line_waits_once_in_the_order_it_came() {
 
 #[test]
 fn the_native_limits_make_the_terminal() {
-    let (view, _, _) = limits::view(&limits::native()).expect("native view limits");
+    let (view, _) = limits::view(&limits::native()).expect("native view limits");
     let bounds = limits::terminal();
     let settings = skein_ui_text::Settings {
         name: Box::from(*b"temper"),

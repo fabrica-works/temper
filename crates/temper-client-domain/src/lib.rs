@@ -14,7 +14,6 @@ pub mod forge;
 pub mod limits;
 pub mod owner;
 pub mod pages;
-mod parts;
 mod route;
 pub use address::{Address, Place};
 pub use boundary::{Action, Event, Fact, Request};

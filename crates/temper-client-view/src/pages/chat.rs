@@ -1,4 +1,5 @@
-//! The chat's chronological lines come from jig's thread, without reordering.
+//! The chat follows jig-client's thread in chronological order.
+use crate::cards::P;
 use crate::{
     frame::Bindings,
     words::{Word, Words},
@@ -8,7 +9,6 @@ use jig_client::{
     contract as c,
     thread::{Line, Thread, Words as WordState},
 };
-use jig_client_view::{phrases::jig::JigPhrase as P, words::Words as JigWords};
 use skein_ui::{Builder, Role, Run, phrases::Hole};
 use temper_client_domain::{
     Domain,
@@ -26,14 +26,7 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     b.bind(bindings.insert(act));
     b.close();
 }
-pub(crate) fn main(
-    b: &mut Builder,
-    root: &Domain,
-    words: &Words,
-    jig: &JigWords,
-    bindings: &mut Bindings,
-    jig_bindings: &mut jig_client_view::JigBindings,
-) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32, text_limit: u32) {
     b.open(Role::Main);
     if let Some(chat) = root.pages().chat()
         && let Some(task) = chat.task(root.client())
@@ -41,45 +34,47 @@ pub(crate) fn main(
         text(b, Role::Heading { level: 1 }, &words.say(Word::Chat, &[Hole::Number(chat.task)]));
         text(b, Role::Paragraph, task.chip.title.bytes());
         header(b, task, root.pages().me(root.client()), words);
-        conversation(b, &chat.thread, root, words, jig, jig_bindings);
+        conversation(b, &chat.thread, words, rows, text_limit);
         for card in &chat.cards {
-            crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
+            b.open(Role::Item);
+            b.key(super::inbox::card_key(card.object));
+            crate::confirm::card(b, root, card, words, bindings, rows);
+            b.close();
+        }
+        for object in chat.departures() {
+            b.open(Role::Item);
+            b.key(super::inbox::card_key(*object));
+            words.status(b, P::CardLeft, &[]);
+            b.close();
         }
         if let Some(result) = &task.result {
-            result_text(b, result, root, jig, jig_bindings);
+            result_text(b, result, words);
         }
         composer(b, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
         for (key, _) in &chat.pending {
             if let Some(pending) = root.client().pending(*key) {
-                crate::confirm::progress_text(b, jig, pending.progress);
+                crate::confirm::progress_text(b, words, pending.progress);
             }
         }
         if let Some(outcome) = &chat.outcome {
-            super::chats::outcome_text(b, jig, outcome, jig_bindings.text_limit());
+            super::chats::outcome_text(b, words, outcome, 0);
         }
     }
-    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
+    crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
-fn result_text(
-    b: &mut Builder,
-    result: &c::TaskResult,
-    root: &Domain,
-    words: &JigWords,
-    bindings: &mut jig_client_view::JigBindings,
-) {
-    let client = root.jig().borrow(root.client());
+fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words) {
     match result {
-        c::TaskResult::Document(result) => jig_client_view::cards::result::facts(b, &client, result, words, bindings),
+        c::TaskResult::Document(result) => crate::cards::result(b, result, words),
         c::TaskResult::Ending(ending) => match ending.as_ref() {
             c::OwnerChipEnding::Done(value) => {
-                jig_client_view::cards::result::value_nodes(b, &client, value, words, bindings);
+                crate::cards::value_nodes(b, value, words);
             }
             c::OwnerChipEnding::Failed(reason) => skein_ui::markdown::read(reason.bytes(), 2, b),
             c::OwnerChipEnding::Cancelled { reason, result, .. } => {
                 skein_ui::markdown::read(reason.bytes(), 2, b);
                 if let Some(value) = result {
-                    jig_client_view::cards::result::value_nodes(b, &client, value, words, bindings);
+                    crate::cards::value_nodes(b, value, words);
                 }
             }
         },
@@ -118,25 +113,18 @@ fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, binding
         control(b, bindings, Role::Button, &words.say(Word::Older, &[]), Act::Older);
     }
 }
-pub(crate) fn conversation(
-    b: &mut Builder,
-    thread: &Thread,
-    root: &Domain,
-    words: &Words,
-    jig: &JigWords,
-    bindings: &mut jig_client_view::JigBindings,
-) {
+pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows: u32, text_limit: u32) {
     b.open(Role::Log);
-    b.name(&jig.say(P::ConversationLog, &[]));
+    b.name(&words.say_card(P::ConversationLog, &[]));
     for line in thread.lines().into_boxed() {
         b.open(Role::Region);
         match line {
-            Line::Words { by, words, state } => {
+            Line::Words { by, words: message, state } => {
                 if let Some(by) = by {
                     text(b, Role::Paragraph, by.name.bytes());
                 }
-                text(b, Role::Paragraph, words);
-                jig.status(
+                text(b, Role::Paragraph, message);
+                words.status(
                     b,
                     match state {
                         WordState::BeingSent => P::WordsBeingSent,
@@ -146,20 +134,20 @@ pub(crate) fn conversation(
                     &[],
                 );
             }
-            Line::Turn { turn, .. } => committed(b, turn, jig),
+            Line::Turn { turn, .. } => committed(b, turn, words, rows, text_limit),
             Line::Provisional { text, cut, .. } => {
-                jig.status(b, P::Provisional, &[]);
-                skein_ui::markdown::read(text, 2, b);
+                words.status(b, P::Provisional, &[]);
+                markdown(b, text, words, text_limit);
                 if cut {
-                    jig.status(b, P::TurnCut, &[]);
+                    words.status(b, P::TurnCut, &[]);
                 }
             }
             Line::Undecoded { why, .. } => match why {
                 c::TurnProblem::Version { found } => {
-                    jig.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
+                    words.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
                 }
-                c::TurnProblem::Malformed => jig.status(b, P::TurnUnreadMalformed, &[]),
-                c::TurnProblem::TooLarge => jig.status(b, P::TurnUnreadTooLarge, &[]),
+                c::TurnProblem::Malformed => words.status(b, P::TurnUnreadMalformed, &[]),
+                c::TurnProblem::TooLarge => words.status(b, P::TurnUnreadTooLarge, &[]),
             },
             Line::RunBegan { attempt } => {
                 text(b, Role::Paragraph, &words.say(Word::RunBegan, &[Hole::Number(attempt)]));
@@ -171,14 +159,13 @@ pub(crate) fn conversation(
                 text(b, Role::Status, &words.say(Word::LinesLeft, &[Hole::Number(u64::from(lines))]));
             }
             Line::Activity { line } => match &line.event {
-                c::Activity::Owner { source, .. } => jig_client_view::owner_activity::render(b, source, jig),
+                c::Activity::Owner { source, .. } => super::task::owner_activity(b, &source.line, words),
                 c::Activity::Result { result } => {
-                    jig_client_view::cards::result::facts(b, &root.jig().borrow(root.client()), result, jig, bindings);
+                    crate::cards::result(b, result, words);
                 }
                 c::Activity::News { summary, .. } => text(b, Role::Paragraph, summary.bytes()),
-                c::Activity::Decision { by, how, .. } => {
-                    jig.actor(b, *by);
-                    jig.decision(b, how);
+                c::Activity::Decision { .. } => {
+                    words.text(b, Word::DecisionMade, &[]);
                 }
                 c::Activity::Words { .. }
                 | c::Activity::RunBegan { .. }
@@ -190,9 +177,9 @@ pub(crate) fn conversation(
     }
     b.close();
 }
-fn committed(b: &mut Builder, turn: &c::Turn, jig: &JigWords) {
-    for message in &turn.messages {
-        jig.text(
+fn committed(b: &mut Builder, turn: &c::Turn, words: &Words, rows: u32, text_limit: u32) {
+    for message in prefix(b, turn.messages.as_slice(), rows, words) {
+        words.card_text(
             b,
             match message.speaker {
                 c::Speaker::Person => P::Person,
@@ -202,9 +189,9 @@ fn committed(b: &mut Builder, turn: &c::Turn, jig: &JigWords) {
             },
             &[],
         );
-        for block in &message.blocks {
+        for block in prefix(b, message.blocks.as_slice(), rows, words) {
             match block {
-                c::Block::Text(words) => skein_ui::markdown::read(words.bytes(), 2, b),
+                c::Block::Text(value) => markdown(b, value.bytes(), words, text_limit),
                 c::Block::Call(call) => {
                     text(b, Role::Paragraph, call.tool.bytes());
                     if let Some(summary) = &call.outcome {
@@ -212,17 +199,43 @@ fn committed(b: &mut Builder, turn: &c::Turn, jig: &JigWords) {
                     }
                 }
                 c::Block::Result { summary, failed, .. } => {
-                    jig.text(b, if *failed { P::CallFailed } else { P::CallCompleted }, &[]);
+                    words.card_text(b, if *failed { P::CallFailed } else { P::CallCompleted }, &[]);
                     text(b, Role::Paragraph, summary.bytes());
                 }
                 c::Block::Opaque { dialect, size } => {
-                    jig.text(b, P::OpaqueDialect, &[jig_client_view::words::name(dialect.bytes())]);
-                    jig.text(b, P::OpaqueBytes, &[Hole::Number(*size)]);
+                    words.card_text(b, P::OpaqueDialect, &[crate::cards::name(dialect.bytes())]);
+                    words.card_text(b, P::OpaqueBytes, &[Hole::Number(*size)]);
                 }
             }
         }
     }
     if turn.cut {
-        jig.status(b, P::TurnCut, &[]);
+        words.status(b, P::TurnCut, &[]);
+    }
+}
+
+fn prefix<'a, T>(b: &mut Builder, values: &'a [T], most: u32, words: &Words) -> &'a [T] {
+    let end = values.len().min(usize::try_from(most).expect("window fits"));
+    if end < values.len() {
+        words.status(b, P::TurnCut, &[]);
+    }
+    values.get(..end).expect("bounded prefix")
+}
+fn markdown(b: &mut Builder, bytes: &[u8], words: &Words, most: u32) {
+    let most = bytes.len().min(usize::try_from(most).expect("text bound fits"));
+    let mut end = most;
+    if end < bytes.len() {
+        // The protocol validated UTF-8; align a display window to the preceding character.
+        for index in most.saturating_sub(3)..=most {
+            if let Some(byte) = bytes.get(index)
+                && byte & 0xc0 != 0x80
+            {
+                end = index;
+            }
+        }
+    }
+    skein_ui::markdown::read(bytes.get(..end).expect("UTF-8 prefix"), 2, b);
+    if end < bytes.len() {
+        words.status(b, P::TurnCut, &[]);
     }
 }

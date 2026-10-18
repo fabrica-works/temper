@@ -18,7 +18,6 @@ temper-forge-setup.workspace = true
 temper-forge-forgejo.workspace = true
 temper-forge-setup-shell.workspace = true
 temper-client-shell-terminal.workspace = true
-jig-client-view.workspace = true
 skein-ui.workspace = true
 temper-worker-domain.workspace = true
 temper-engine-protocol-forge.workspace = true

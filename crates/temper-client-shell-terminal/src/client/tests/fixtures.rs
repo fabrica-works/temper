@@ -8,11 +8,7 @@ pub(super) fn started_kept() -> (NativeClient, skein_lib::Token) {
     host.kept_keys.insert(record.request.key).expect("one key");
     let mut kept = List::with_capacity(1);
     kept.push(record).expect("one record");
-    host.event(domain::Event::Start {
-        address: host.address.clone(),
-        kept: List::with_capacity(0),
-        offset: jig_client_view::boundary::Offset { minutes: 0 },
-    });
+    host.event(domain::Event::Start { address: host.address.clone(), kept: List::with_capacity(0) });
     host.event(domain::Event::Client { event: jig_client::Event::StartUnlinked { kept } });
     host.event(domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } });
     host.event(domain::Event::Client {

@@ -1,8 +1,5 @@
-//! Keep: bounded parts held until their page leaves.
-//! Replace: Ops connector subjects with the forge's parts, which need no reads.
-//! `Show` retains a part; `PartsLeft` frees the old page's parts.
-use jig_client::contract::Part;
-use skein_lib::{Env, List, Queue, Time};
+//! The forge's adoption form, requests and receiving state.
+use skein_lib::{Env, Queue, Time};
 pub mod family;
 mod form;
 pub(crate) mod me;
@@ -12,7 +9,6 @@ pub use vocabulary::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub parts: u32,
     pub field_bytes: u32,
     pub checks: u32,
 }
@@ -24,19 +20,12 @@ pub enum Event {
     Went { address: Address },
     Left,
     Served { served: Served },
-    Show { part: Part },
-    PartsLeft,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Fact {
-    Full,
 }
 #[derive(Debug)]
 pub enum Request {
     Show { address: Address },
     Client { asked: jig_client::Event },
     Send { request: skein_lib::Token, ask: jig_client::Ask },
-    Fact { fact: Fact },
 }
 #[derive(Debug)]
 pub struct Side {
@@ -47,12 +36,11 @@ pub struct Side {
     party: Option<u64>,
     me: bool,
     link: jig_client::Link,
-    held: List<Part>,
     shown: u64,
 }
 impl Side {
     #[must_use]
-    pub fn new(limits: &Limits, seed: u64) -> Side {
+    pub fn new(_limits: &Limits, seed: u64) -> Side {
         Side {
             address: None,
             served: Served::Unknown,
@@ -61,7 +49,6 @@ impl Side {
             party: None,
             me: false,
             link: jig_client::Link::Starting,
-            held: List::with_capacity(limits.parts),
             shown: 0,
         }
     }
@@ -76,15 +63,6 @@ impl Side {
     #[must_use]
     pub const fn form(&self) -> Option<&Form> {
         self.form.as_ref()
-    }
-    #[must_use]
-    pub fn contains(&self, part: &Part) -> bool {
-        for held in &self.held {
-            if held == part {
-                return true;
-            }
-        }
-        false
     }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
@@ -108,7 +86,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
         }
         Event::Served { served: value } => served(side, value),
-        Event::Act { act } => act_on(side, &env.limits, act, out),
+        Event::Act { act } => act_on(side, env.limits, act, out),
         Event::Progress { request, progress } => {
             if let Some(draft) = &mut side.form
                 && let Some((pending, _)) = draft.pending
@@ -147,25 +125,9 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 side.changed();
             }
         }
-        Event::Show { part } => {
-            if side.contains(&part) {
-                return;
-            }
-            if side.held.push(part).is_err() {
-                out.push(Request::Fact { fact: Fact::Full });
-            } else {
-                side.changed();
-            }
-        }
-        Event::PartsLeft => {
-            if !side.held.is_empty() {
-                side.held.clear();
-                side.changed();
-            }
-        }
     }
 }
-fn act_on(side: &mut Side, limits: &Limits, act: Act, out: &mut Queue<Request>) {
+fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
         Act::Adopt => {
@@ -187,7 +149,7 @@ fn act_on(side: &mut Side, limits: &Limits, act: Act, out: &mut Queue<Request>) 
                 side.serial = side.serial.checked_add(1).expect("forge request serial fits u64");
                 let request = skein_lib::Token::new(side.serial);
                 draft.pending = Some((request, skein_lib::RequestProgress::Parked));
-                let bounds = wire_limits(limits).expect("forge bounds are checked");
+                let bounds = wire_limits(&limits).expect("forge bounds are checked");
                 let ask = family::request(&adoption, &bounds).expect("validated adoption fits wire");
                 out.push(Request::Send {
                     request,
@@ -248,9 +210,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.field_bytes < 7 {
         return None;
     }
-    List::<Part>::worst_case(limits.parts)?
-        .checked_add(u64::from(limits.field_bytes).checked_mul(6)?)?
-        .checked_add(u64::from(limits.checks).checked_mul(4)?)
+    u64::from(limits.field_bytes).checked_mul(6)?.checked_add(u64::from(limits.checks).checked_mul(4)?)
 }
 
 fn served(side: &mut Side, served: Served) {

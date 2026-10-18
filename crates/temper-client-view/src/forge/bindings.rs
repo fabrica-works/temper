@@ -10,7 +10,6 @@ pub enum Meaning {
     Home,
     Ci,
     Adopt,
-    Resources { project: u32 },
 }
 #[derive(Debug)]
 struct Entry {
@@ -37,7 +36,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("binding tokens fit");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("form bindings fit");
-        Binding { owner: (jig_client_view::Owner::Application { number: self.connector }).opaque(), token }
+        Binding { owner: owner(self.connector), token }
     }
 }
 #[must_use]
@@ -62,12 +61,6 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Home => Action::Forge(forge::Act::Home),
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
-                Meaning::Resources { project } => Action::Jig(jig_client_view::action::Act::Go {
-                    address: jig_client_view::address::Address::Project {
-                        project,
-                        section: jig_client_view::address::ProjectSection::Resources,
-                    },
-                }),
                 Meaning::Field(_) => return None,
             }),
             (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,
@@ -110,4 +103,9 @@ fn check(values: &mut List<u32>, text: &[u8]) -> Option<()> {
 #[must_use]
 pub fn worst_case(capacity: u32) -> Option<u64> {
     List::<Entry>::worst_case(capacity)
+}
+
+#[must_use]
+pub fn owner(connector: u16) -> skein_ui::Owner {
+    skein_ui::Owner { number: u32::from(connector) }
 }

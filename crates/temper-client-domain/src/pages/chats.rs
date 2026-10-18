@@ -68,7 +68,7 @@ impl Chats {
         self.query = Some(query);
         out.push(Request::Client(jig_client::Event::Watch {
             handle: self.live,
-            subject: Watchable::Jig(c::Subject::Tasks { query, window: limits.jig.rows }),
+            subject: Watchable::Jig(c::Subject::Tasks { query, window: limits.client.domain.rows }),
         }));
         self.read(None, out);
     }
@@ -92,7 +92,7 @@ impl Chats {
         }
     }
     pub(crate) fn write(&mut self, words: Box<[u8]>, limits: &Limits) {
-        if words.len() <= usize::try_from(limits.jig.text).expect("text bound fits") {
+        if words.len() <= usize::try_from(limits.client.domain.text).expect("text bound fits") {
             self.words = words;
         }
     }
@@ -108,7 +108,7 @@ impl Chats {
             return;
         }
         let (Some(me), Some(project)) = (me, project) else { return };
-        let Ok(words) = Text::new(self.words.clone(), env.limits.jig.text) else { return };
+        let Ok(words) = Text::new(self.words.clone(), env.limits.client.domain.text) else { return };
         match jig_client::shapes::chat(me, project, words, env.wall) {
             Ok(ask) => {
                 *serial = serial.checked_add(1).expect("page keys fit");
@@ -170,7 +170,7 @@ impl Chats {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    limits.jig.document_bytes.checked_mul(2)?.checked_add(u64::from(limits.jig.text))
+    limits.client.domain.document_bytes.checked_mul(2)?.checked_add(u64::from(limits.client.domain.text))
 }
 
 fn handle(number: u64) -> Handle {

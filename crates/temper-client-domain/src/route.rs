@@ -1,12 +1,6 @@
-//! Keep: the child/table routing shape and exhaustive owner variants.
-//! Replace: Ops connector sides with the forge's side and temper's navigation.
+//! Route the shared client's tells to temper's owning child.
 use crate::{Action, Address, Domain, Event, Fact, Limits, Place, Request, forge, owner::Owner};
-use skein_lib::{Env, List, Queue};
-pub(crate) fn jig(root: &mut Domain, env: &Env<Limits>, event: jig_client_view::Event, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-    root.jig.step(env.now, env.wall, &root.client, event, &mut child);
-    route_jig(root, env, &mut child, out);
-}
+use skein_lib::{Env, Queue};
 pub(crate) fn forge(root: &mut Domain, env: &Env<Limits>, event: forge::Event, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     forge::step(&mut root.forge, &Env { now: env.now, wall: env.wall, limits: env.limits.forge }, event, &mut child);
@@ -14,24 +8,10 @@ pub(crate) fn forge(root: &mut Domain, env: &Env<Limits>, event: forge::Event, o
 }
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { address, kept, offset: _ } => {
-            let jig_kept = List::with_capacity(0);
-            let jig_place = match address.reference() {
-                Some(address) => jig_client_view::address::Place::Jig(address),
-                None => jig_client_view::address::Place::Elsewhere,
-            };
-            let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-            root.jig.step(
-                env.now,
-                env.wall,
-                &root.client,
-                jig_client_view::Event::Start { place: jig_place, records: jig_kept, seed: root.salt },
-                &mut child,
-            );
+        Event::Start { address, kept } => {
             if !root.unlinked {
                 client(root, env, jig_client::Event::Start { kept }, out);
             }
-            route_jig(root, env, &mut child, out);
             told(root, env, jig_client::Told::Link { link: root.client.link().state }, out);
             pages(root, env, crate::pages::Event::Started, out);
             went(root, env, Place::Address(address), out);
@@ -40,10 +20,8 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         Event::Act { action } => match action {
             Action::Pages(act) => pages(root, env, crate::pages::Event::Act { act }, out),
             Action::Forge(act) => forge(root, env, forge::Event::Act { act }, out),
-            Action::Jig(act) => jig(root, env, jig_client_view::Event::Act { action: act }, out),
         },
         Event::Client { event } => client(root, env, event, out),
-        Event::Jig(event) => jig(root, env, event, out),
         Event::Forge(event) => forge(root, env, event, out),
         Event::SignedOut => client(root, env, jig_client::Event::Up { up: jig_client::Up::SignedOut }, out),
     }
@@ -51,31 +29,15 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
     match place {
         Place::Address(address) => {
-            let address = if let Address::Jig(jig_client_view::address::Address::Task { task, .. }) = address {
-                Address::Task { task }
-            } else {
-                address
-            };
             pages(root, env, crate::pages::Event::Went { address: address.clone() }, out);
-            if let Some(reference) = address.reference() {
-                forge(root, env, forge::Event::Left, out);
-                jig(
-                    root,
-                    env,
-                    jig_client_view::Event::Went { place: jig_client_view::address::Place::Jig(reference) },
-                    out,
-                );
-            } else if let Address::Adopt { project } = address {
-                jig(root, env, jig_client_view::Event::Left, out);
+            if let Address::Adopt { project } = address {
                 forge(root, env, forge::Event::Went { address: forge::Address::Adopt { project } }, out);
             } else {
-                jig(root, env, jig_client_view::Event::Left, out);
                 forge(root, env, forge::Event::Left, out);
             }
         }
         Place::Missing => {
             forge(root, env, forge::Event::Left, out);
-            jig(root, env, jig_client_view::Event::Went { place: jig_client_view::address::Place::Missing }, out);
         }
     }
 }
@@ -87,33 +49,6 @@ pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::E
             crate::pages::Request::Client(event) => client(root, env, event, out),
             crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
         }
-    }
-}
-
-pub(crate) fn route_jig(
-    root: &mut Domain,
-    env: &Env<Limits>,
-    child: &mut Queue<jig_client_view::Request>,
-    out: &mut Queue<Request>,
-) {
-    for _ in 0..child.len() {
-        let request = child.pop().expect("counted jig output");
-        match request {
-            jig_client_view::Request::Client { asked } => client(root, env, asked, out),
-            jig_client_view::Request::Show { place, how } => match place {
-                jig_client_view::address::Place::Jig(address) => out.push(Request::Show {
-                    address: Address::Jig(address),
-                    replace: how == jig_client_view::How::Replace,
-                }),
-                jig_client_view::address::Place::Elsewhere | jig_client_view::address::Place::Missing => {}
-            },
-            jig_client_view::Request::ShowPart { part, scope } => crate::parts::show(root, env, part, scope, out),
-            jig_client_view::Request::PartsLeft => forge(root, env, forge::Event::PartsLeft, out),
-            jig_client_view::Request::Save { .. } | jig_client_view::Request::Erase { .. } => {}
-        }
-    }
-    if let Some(address) = crate::pages::chat::from_reference(root) {
-        out.push(Request::Show { address, replace: true });
     }
 }
 
@@ -139,7 +74,6 @@ pub(crate) fn route_forge(
                 },
                 out,
             ),
-            forge::Request::Fact { fact: forge::Fact::Full } => out.push(Request::Fact { fact: Fact::PartsFull }),
         }
     }
 }
@@ -176,7 +110,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
             pages(root, env, crate::pages::Event::Link { link: *link }, out);
             forge_served(root, env, out);
             forge_me(root, env, &told, out);
-            Owner::Jig.asker()
+            return;
         }
         Told::Dropped { count } => {
             out.push(Request::Dropped { count: *count });
@@ -188,11 +122,6 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
         }
     };
     match Owner::of(asker) {
-        Some(Owner::Jig) => {
-            let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-            root.jig.step(env.now, env.wall, &root.client, jig_client_view::Event::Client { told }, &mut child);
-            route_jig(root, env, &mut child, out);
-        }
         Some(Owner::Pages) => pages(root, env, crate::pages::Event::Told { told }, out),
         Some(Owner::Forge) => {
             if forge_me(root, env, &told, out) {

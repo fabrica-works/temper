@@ -1,5 +1,4 @@
 //! The shell adapter observes requests and trees, never a domain's decisions.
-use jig_client_view::boundary::Offset;
 use jig_client_world::{
     harness::{App, CardKey, Duty, Receipt, Seen, Sent, StoreWrite},
     observe,
@@ -17,7 +16,7 @@ pub struct Temper;
 #[derive(Debug)]
 pub enum Event {
     Root(domain::Event),
-    Start { address: Address, kept: List<skein_lib::RequestRecord<jig_client::Held>>, offset: Offset },
+    Start { address: Address, kept: List<skein_lib::RequestRecord<jig_client::Held>> },
 }
 impl From<domain::Event> for Event {
     fn from(event: domain::Event) -> Self {
@@ -53,20 +52,20 @@ impl App for Temper {
     }
     fn new(seed: u64) -> (Self::Root, Self::View) {
         let limits = limits();
-        let (jig, forge) = fixtures::phrasebooks(&limits);
-        let bounds = fixtures::view_bounds(&limits, &jig, &forge);
+        let forge = fixtures::phrasebooks(&limits);
+        let bounds = fixtures::view_bounds(&limits, &forge);
         let root = domain::unlinked(&limits, seed);
-        (root, view::View::new(&bounds, &limits, jig, forge, fixtures::FORGE))
+        (root, view::View::new(&bounds, &limits, forge, fixtures::FORGE))
     }
     fn view_limits(view: &Self::View) -> skein_ui::Limits {
         view.limits().tree
     }
-    fn start(address: Address, kept: Vec<Self::Record>, offset: i32) -> Event {
+    fn start(address: Address, kept: Vec<Self::Record>, _offset: i32) -> Event {
         let mut records = List::with_capacity(u32::try_from(kept.len()).expect("small store count"));
         for record in kept {
             records.push(record).expect("kept count measured");
         }
-        Event::Start { address, kept: records, offset: Offset { minutes: offset } }
+        Event::Start { address, kept: records }
     }
     fn went(address: Address) -> Event {
         domain::Event::Went { place: domain::Place::Address(address) }.into()
@@ -74,7 +73,7 @@ impl App for Temper {
     fn step(root: &mut Self::Root, env: &Env<Self::Limits>, event: Event, out: &mut Queue<Request>) {
         match event {
             Event::Root(event) => domain::step(root, env, event, out),
-            Event::Start { address, kept, offset } => {
+            Event::Start { address, kept } => {
                 domain::step(
                     root,
                     env,
@@ -87,7 +86,7 @@ impl App for Temper {
                     domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
                     out,
                 );
-                domain::step(root, env, domain::Event::Start { address, kept: List::with_capacity(0), offset }, out);
+                domain::step(root, env, domain::Event::Start { address, kept: List::with_capacity(0) }, out);
             }
         }
     }
@@ -175,17 +174,13 @@ impl App for Temper {
         view.limits().tree.patches
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
-        let (jig, forge) = fixtures::phrasebooks(limits);
-        let bounds = fixtures::view_bounds(limits, &jig, &forge);
+        let forge = fixtures::phrasebooks(limits);
+        let bounds = fixtures::view_bounds(limits, &forge);
         domain::worst_case(limits).expect("root bound")
-            + 2 * view::worst_case(&bounds, limits, &jig, &forge).expect("shell model projection bound")
+            + 2 * view::worst_case(&bounds, limits, &forge).expect("shell model projection bound")
     }
     fn window_changed(event: &Event) -> bool {
         match event.root() {
-            Some(
-                domain::Event::Act { action: Action::Jig(act) }
-                | domain::Event::Jig(jig_client_view::Event::Act { action: act }),
-            ) => observe::jig_window_changed(act),
             Some(domain::Event::Act { action: Action::Forge(_) }) => true,
             Some(domain::Event::Act { action: Action::Pages(act) }) => matches!(
                 act,
@@ -195,7 +190,6 @@ impl App for Temper {
                 domain::Event::Start { .. }
                 | domain::Event::Went { .. }
                 | domain::Event::Client { .. }
-                | domain::Event::Jig(_)
                 | domain::Event::Forge(_)
                 | domain::Event::SignedOut,
             )
@@ -203,7 +197,7 @@ impl App for Temper {
         }
     }
     fn seen(tree: &Tree) -> Vec<Seen> {
-        let mut seen = observe::jig_seen(tree);
+        let mut seen = crate::cards::seen(tree);
         if let Some((index, region)) =
             tree.nodes().iter().enumerate().find(|(_, node)| node.region == Some(view::frame::link_region()))
         {
@@ -278,7 +272,6 @@ impl App for Temper {
     fn received(event: &Event) -> Vec<Receipt> {
         let Some(event) = event.root() else { return vec![Receipt::Started] };
         match event {
-            domain::Event::Jig(event) => observe::jig_received(event),
             domain::Event::Client { event: jig_client::Event::Up { up } } => {
                 let mut receipts = observe::up_received(up);
                 if let jig_client::Up::ReadDone {
@@ -309,14 +302,14 @@ impl App for Temper {
         if adoption_page(tree)
             && tree.nodes().iter().any(|value| {
                 value.id == node
-                    && value.binding.is_some_and(|binding| {
-                        binding.owner == (jig_client_view::Owner::Application { number: fixtures::FORGE }).opaque()
-                    })
+                    && value
+                        .binding
+                        .is_some_and(|binding| binding.owner == view::forge::bindings::owner(fixtures::FORGE))
             })
         {
             Some(adoption_card())
         } else {
-            observe::jig_card(tree, node)
+            crate::cards::enclosing(tree, node)
         }
     }
 }

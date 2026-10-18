@@ -50,7 +50,7 @@ fn press(root: &mut temper_client_domain::Domain, act: Act) {
 fn open(root: &mut temper_client_domain::Domain, act: ActKind) {
     press(root, Act::Decide { object: ObjectKey::Proposal(PROPOSAL), revision: None, act });
 }
-const ACCEPT_WORDS: [&[u8]; 4] = [b"Proposed batch", b"Funding needed: 5", b"Funding left: 20", b"Funding after: 15"];
+const ACCEPT_WORDS: [&[u8]; 4] = [b"Proposed tasks", b"Funding needed: 5", b"Funding left: 20", b"Funding after: 15"];
 #[test]
 fn the_accept_confirmation_says_what_it_grants_costs_and_leaves_in_the_pool() {
     let mut root = root(ActKind::Accept, Admission::Allowed);
@@ -79,7 +79,7 @@ fn an_act_only_proposable_says_so_and_to_whom() {
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
     assert!(fixtures::find(tree, Role::Button, b"Accept").is_none());
-    assert!(contains(&fixtures::text(tree), b"Propose"));
+    assert!(contains(&fixtures::text(tree), b"This needs a proposal to"));
 }
 
 fn contains(text: &[u8], expected: &[u8]) -> bool {
@@ -91,8 +91,8 @@ fn contains(text: &[u8], expected: &[u8]) -> bool {
     false
 }
 const OUTCOMES: [(jig_client::Outcome, &[u8]); 3] = [
-    (jig_client::Outcome::NotKept, b"Request not kept; it was not sent. Try again."),
-    (jig_client::Outcome::Unknown, b"Outcome unknown: inspect the current object before acting again"),
+    (jig_client::Outcome::NotKept, b"The request was not kept."),
+    (jig_client::Outcome::Unknown, b"The engine no longer knows this request."),
     (
         jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused {
             refusal: c::Refusal::NotOffered,
@@ -107,14 +107,19 @@ fn the_card_reports_client_outcomes_in_jigs_words() {
     let card = root.pages().inbox().expect("inbox").cards.get(PROPOSAL_INDEX).expect("proposal");
     let limits = fixtures::tree_limits();
     let words = fixtures::words();
-    let jig = fixtures::jig_words();
     for (outcome, expected) in OUTCOMES {
         let mut card = card.clone();
         card.outcome = Some(outcome);
         let mut builder = skein_ui::Builder::new(&limits);
         let mut bindings = crate::frame::Bindings::new(limits.bindings);
-        let mut jig_bindings = jig_client_view::JigBindings::new(limits.bindings, TEXT_BYTES);
-        crate::confirm::card(&mut builder, &root, &card, &words, &jig, &mut bindings, &mut jig_bindings);
+        crate::confirm::card(
+            &mut builder,
+            &root,
+            &card,
+            &words,
+            &mut bindings,
+            fixtures::domain_limits().client.domain.rows,
+        );
         assert!(contains(&fixtures::text(&builder.finish()), expected), "{expected:?}");
     }
 }

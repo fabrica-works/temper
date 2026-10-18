@@ -127,7 +127,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         },
         None => false,
     };
-    if root.jig().borrow(root.client()).frame_summary().behind || me_behind || page_behind {
+    if me_behind || page_behind {
         text(builder, Role::Status, &words.say(crate::words::Word::Behind, &[]));
     }
     builder.close();

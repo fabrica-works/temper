@@ -51,16 +51,15 @@ fn form() -> forge::Form {
 }
 fn tree(form: &forge::Form) -> skein_ui::Tree {
     let words = fixtures::words();
-    let jig = fixtures::jig_words();
-    page_tree(form, &words, &jig)
+    page_tree(form, &words)
 }
-fn page_tree(form: &forge::Form, words: &crate::words::Words, jig: &jig_client_view::words::Words) -> skein_ui::Tree {
+fn page_tree(form: &forge::Form, words: &crate::words::Words) -> skein_ui::Tree {
     let mut limits = fixtures::tree_limits();
     limits.text_per_node = 2048;
     limits.text_bytes = 262_144;
     let mut builder = skein_ui::Builder::new(&limits);
     let mut bindings = Bindings::new(limits.bindings, 8, 1);
-    page::page(&mut builder, form, Some(b"Shop"), words, jig, &mut bindings, fixtures::tree_limits().text_per_node);
+    page::page(&mut builder, form, Some(b"Shop"), words, &mut bindings, fixtures::tree_limits().text_per_node);
     builder.finish()
 }
 fn adopted() -> forge::Answer {
@@ -88,9 +87,8 @@ fn adopted() -> forge::Answer {
 #[test]
 fn each_outcome_reads_as_the_designs_sentence() {
     let words = fixtures::words();
-    let jig = fixtures::jig_words();
     let rows: [(forge::Answer, &[u8], bool); 10] = [
-        (adopted(), b"Adopted acme/shop on forge 1 as owned.It is the project's home.temper may: read; push; open pull requests; land; review; set statuses; comment; create issues; create and delete branches.Branch protection could not be read.See the project's resources", false),
+        (adopted(), b"Adopted acme/shop on forge 1 as owned.It is the project's home.temper may: read; push; open pull requests; land; review; set statuses; comment; create issues; create and delete branches.Branch protection could not be read.", false),
         (forge::Answer::ForgeRefused(forge::Reason::NoSuchForge), b"No forge 1 is configured.", true),
         (forge::Answer::ForgeRefused(forge::Reason::NotFound), b"No repository acme/shop on forge 1 that temper's forge user can see.", true),
         (forge::Answer::ForgeRefused(forge::Reason::NoAccess), b"temper's forge user may not read acme/shop on forge 1.", true),
@@ -99,12 +97,12 @@ fn each_outcome_reads_as_the_designs_sentence() {
         (forge::Answer::ForgeRefused(forge::Reason::TooLarge), b"A field is past the forge's bounds, or the forge's repositories are full.", true),
         (forge::Answer::ForgeRefused(forge::Reason::Unreachable), b"Forge 1 did not answer; nothing was adopted. Try again.", true),
         (forge::Answer::ForgeRefused(forge::Reason::InvalidAnswer), b"Forge 1 answered what temper did not expect; nothing was adopted.", true),
-        (forge::Answer::Unknown, b"It is not known whether acme/shop was adopted: see the project's resources.", false),
+        (forge::Answer::Unknown, b"It is not known whether acme/shop was adopted.", false),
     ];
     for (answer, said, alert) in rows {
         let mut form = form();
         form.outcome = Some(answer.clone());
-        let rendered = page_tree(&form, &words, &jig);
+        let rendered = page_tree(&form, &words);
         let text = fixtures::text(&rendered);
         assert_eq!(&text[b"Adopt a repository into Shop".len()..], said, "outcome {answer:?}");
         assert_eq!(has_role(&rendered, Role::Alert), alert, "refusal alert {answer:?}");
@@ -187,7 +185,7 @@ fn pending_or_out_of_date_disables_adopt() {
         (
             Some((skein_lib::Token::new(1), skein_lib::RequestProgress::Parked)),
             forge::Served::Yes,
-            b"Being decided: waiting for the engine connection or your sign-in".as_slice(),
+            b"Waiting to send".as_slice(),
         ),
         (
             None,
@@ -203,28 +201,6 @@ fn pending_or_out_of_date_disables_adopt() {
         assert!(button.states.as_slice().contains(&State::Disabled), "{served:?} {pending:?}");
         assert!(fixtures::find(&rendered, Role::Status, said).is_some(), "status {served:?} {pending:?}");
     }
-}
-#[test]
-fn the_outcomes_link_opens_the_projects_resources() {
-    let words = fixtures::words();
-    let jig = fixtures::jig_words();
-    let mut builder =
-        skein_ui::Builder::new(&crate::Limits::of(&fixtures::domain_limits(), &jig, &words).expect("limits").tree);
-    let mut bindings = Bindings::new(32, 8, 1);
-    let mut form = form();
-    form.outcome = Some(adopted());
-    page::page(&mut builder, &form, Some(b"Shop"), &words, &jig, &mut bindings, fixtures::tree_limits().text_per_node);
-    let tree = builder.finish();
-    let link = node_of_role(&tree, Role::Link);
-    assert_eq!(
-        bindings::decode(&bindings, link.link.expect("link bound").token, Act::Press),
-        Some(Action::Jig(jig_client_view::action::Act::Go {
-            address: jig_client_view::address::Address::Project {
-                project: 1,
-                section: jig_client_view::address::ProjectSection::Resources
-            }
-        }))
-    );
 }
 fn has_text(tree: &skein_ui::Tree, expected: &[u8]) -> bool {
     for text in fixtures::text(tree).windows(expected.len()) {
@@ -274,7 +250,6 @@ fn the_form_fields_carry_the_domains_values_and_write_counts() {
 #[test]
 fn each_broken_rule_is_an_invalid_field_with_its_status() {
     let words = fixtures::words();
-    let jig = fixtures::jig_words();
     let rows: [(forge::Broken, &[u8]); 6] = [
         (forge::Broken::Required, b"Required."),
         (forge::Broken::ForgeNumber, b"A forge number is from 1 to 65535."),
@@ -286,7 +261,7 @@ fn each_broken_rule_is_an_invalid_field_with_its_status() {
     for (broken, said) in rows {
         let mut form = form();
         form.texts[forge::Text::Owner.index()].broken = Some(broken);
-        let rendered = page_tree(&form, &words, &jig);
+        let rendered = page_tree(&form, &words);
         assert!(fixtures::find(&rendered, Role::Status, said).is_some(), "status {broken:?}");
         for node in rendered.nodes() {
             if node.role == Role::TextField && node.name.as_deref() == Some(b"Owner") {

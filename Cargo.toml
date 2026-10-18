@@ -95,7 +95,6 @@ skein-ui = { git = "https://github.com/forgetic/skein.git" }
 skein-ui-text = { git = "https://github.com/forgetic/skein.git" }
 jig-client-test-domain = { git = "https://github.com/forgetic/jig.git" }
 temper-client-view = { path = "crates/temper-client-view" }
-jig-client-view = { git = "https://github.com/forgetic/jig.git" }
 temper-client-domain = { path = "crates/temper-client-domain" }
 temper-service = { path = "crates/temper-service" }
 jig-protocol-config = { git = "https://github.com/forgetic/jig.git" }

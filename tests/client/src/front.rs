@@ -250,7 +250,7 @@ impl Joint {
             ));
             return;
         }
-        for event in translate::request(&mut self.transport, who, &request, &self.limits.jig) {
+        for event in translate::request(&mut self.transport, who, &request, &self.limits.client.domain) {
             self.send(event);
         }
     }
@@ -296,7 +296,7 @@ impl Joint {
             }
             Ok(None) => {}
             Err(request) => {
-                if let Some(packet) = translate::incoming(&mut self.transport, *request, &self.limits.jig) {
+                if let Some(packet) = translate::incoming(&mut self.transport, *request, &self.limits.client.domain) {
                     self.incoming(packet);
                 }
             }
@@ -490,6 +490,8 @@ impl Front<Temper> for Joint {
     fn reload(&mut self, who: ClientId, now: Time) {
         self.advance(now);
         self.detach(who);
+        // A terminal restart has no retained address, unlike a browser reload.
+        self.callbacks.push((who, RootEvent::Went { place: client::Place::Address(fixtures::inbox()) }.into()));
         if self.offline_until.is_none() {
             if self.transport.sign_in(who).is_some() {
                 self.callbacks.push((

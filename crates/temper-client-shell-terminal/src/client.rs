@@ -81,7 +81,7 @@ impl NativeClient {
     ) -> Result<Self, jig_client_protocol_http::Unlinked> {
         let bounds = settings.limits;
         let mut memory = limits::worst_case(&bounds).expect("native capacities are checked");
-        let (view_limits, jig_words, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
+        let (view_limits, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
         let notices = domain::max_out(&bounds.client);
         memory = memory
             .checked_add(Queue::<Shown>::worst_case(notices).expect("notice memory"))
@@ -93,7 +93,7 @@ impl NativeClient {
                 skein_lib::Set::<jig_client::Key>::worst_case(bounds.client.client.domain.requests.requests)
                     .expect("kept key slots"),
             )
-            .and_then(|n| n.checked_add(bounds.client.jig.document_bytes))
+            .and_then(|n| n.checked_add(bounds.client.client.domain.document_bytes))
             .expect("notice memory fits");
         let mut shell = Shell::new(jig_client_shell_native::Settings {
             engine: settings.engine,
@@ -110,13 +110,7 @@ impl NativeClient {
         Ok(Self {
             shell,
             root,
-            view: view::View::new(
-                &view_limits,
-                &bounds.client,
-                jig_words,
-                forge_words,
-                temper_client_protocol_wire::FORGE,
-            ),
+            view: view::View::new(&view_limits, &bounds.client, forge_words, temper_client_protocol_wire::FORGE),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: bounds.client },
             out: Queue::with_capacity(domain::max_out(&bounds.client)),
             patches: Queue::with_capacity(view_limits.tree.patches),
@@ -379,11 +373,7 @@ impl Host for NativeClient {
                 }
                 kept.push(record).expect("counted store");
             }
-            self.event(domain::Event::Start {
-                address: self.address.clone(),
-                kept,
-                offset: jig_client_view::boundary::Offset { minutes: 0 },
-            });
+            self.event(domain::Event::Start { address: self.address.clone(), kept });
             let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
             if let Some(with) = with {
                 self.event(domain::Event::Client { event: jig_client::Event::SignIn { with } });

@@ -104,6 +104,12 @@ fn leaving_a_page_unwatches_its_handles_and_drops_their_tells() {
     let watch = fixtures::start(&mut root, skein_lib::List::with_capacity(0));
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     fixtures::confirm(&mut root, watch, fixtures::PARTY, &mut out);
+    crate::step(
+        &mut root,
+        &fixtures::env(&limits),
+        crate::Event::Went { place: crate::Place::Address(Address::Inbox { filter: crate::address::Filter::ALL }) },
+        &mut out,
+    );
     fixtures::opened(&mut root, &mut out);
     crate::step(
         &mut root,
@@ -119,7 +125,7 @@ fn leaving_a_page_unwatches_its_handles_and_drops_their_tells() {
             closes += 1;
         }
     }
-    assert!(closes > 0, "the reference inbox's watch is closed on leaving");
+    assert!(closes > 0, "the inbox's watch is closed on leaving");
     let before = pages::shown(root.pages());
     crate::route::told(&mut root, &fixtures::env(&limits), Told::Changed { handle: LEFT }, &mut out);
     assert_eq!(pages::shown(root.pages()), before);

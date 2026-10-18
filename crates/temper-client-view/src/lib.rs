@@ -1,7 +1,8 @@
-//! temper's composed client tree, with jig's pages and the forge's fragments.
+//! Temper's own pages on skein-ui and jig-client's documents.
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod cards;
 mod confirm;
 pub mod forge;
 pub mod frame;

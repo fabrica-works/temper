@@ -21,6 +21,11 @@ temper
   Project 1
   [16] Task 9
   Add OAuth login
+  It touches sign-in.
+  ### Proposed tasks
+  May spend 40
+  May delegate 1 tasks, depth 1
+  Funds 40 from your pool · 120 left, 80 after
 - ### Question
   Project 1
   [17] Task 9
@@ -29,6 +34,9 @@ temper
   Project 1
   [18] Task 9
   Review needs attention
+  Held: out of tries
+  Hold revision 7
+  The next run resumes its conversation; tries count again from zero
 - ### Person task
   Project 1
   [19] Task 9

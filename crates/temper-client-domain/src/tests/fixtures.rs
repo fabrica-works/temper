@@ -1,42 +1,13 @@
 pub mod acts;
 use crate::{Address, Event, Limits, Request, forge};
 use jig_client::contract::{self, Delivery, DocumentText, HeldRole, Me, MeParty, Needs, PartyKind, WatchEvent};
-use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 pub const FORGE_ASKER: jig_client::Asker = jig_client::Asker(1);
 pub const FORGE: u16 = temper_client_protocol_wire::number(temper_client_protocol_wire::Owner::Forge);
-pub const OTHER: u16 = 2;
 pub const PROJECT: u32 = 1;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
     {
-        let jig = jig_client_view::Limits {
-            segments: 9,
-            watches: 8,
-            notices: 2,
-            notice_life: Duration::from_secs(5),
-            // A finite fixture keeps the same before/after-linger behavior at a short scale.
-            linger: Duration::from_millis(250),
-            save_delay: Duration::from_millis(10),
-            intents: 2,
-            fields: 4,
-            objects: 3,
-            sources: 8,
-            reads: 8,
-            parts: 8,
-            delegates: 2,
-            document_bytes: 65536,
-            records: 2,
-            kept: 4,
-            drafts: 1,
-            projects: 2,
-            roles: 2,
-            text: 32,
-            rows: 2,
-            conversation_words: 2,
-            navigation_entries: 8,
-            updates_count: 99,
-        };
         let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
@@ -45,32 +16,40 @@ pub fn limits() -> Limits {
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
         };
-        Limits {
-            jig,
-            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-            client: crate::limits::client(
-                &jig,
+        let client = jig_client::Limits {
+            domain: jig_client::DomainLimits {
+                owners: &[jig_client::Spoken {
+                    family: temper_client_protocol_wire::FORGE,
+                    version: temper_client_protocol_wire::CLIENT_VERSION,
+                }],
                 requests,
-                12,
-                8,
-                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
-                Duration::from_millis(100),
-            )
-            .expect("client profile fits"),
-        }
+                ask_bytes: requests.bytes,
+                handles: 9,
+                watches: 9,
+                turn_bytes: 65536,
+                backoff: jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                authority: 12,
+                heartbeat: Duration::from_millis(100),
+                reads: 8,
+                parts: 8,
+                delegates: 2,
+                document_bytes: 65536,
+                records: 2,
+                kept: 4,
+                projects: 2,
+                text: 32,
+                rows: 2,
+                fields: 4,
+                segments: 9,
+            },
+            exchanges: 8,
+        };
+
+        Limits { forge: forge::Limits { field_bytes: 256, checks: 8 }, client }
     }
 }
 pub fn env(limits: &Limits) -> Env<Limits> {
     Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits }
-}
-pub fn connector() -> contract::Part {
-    contract::Part::Connector { connector: FORGE }
-}
-pub fn resource() -> contract::Part {
-    let mut path = List::with_capacity(2);
-    path.push(Box::from(*b"acme")).expect("fixture path fits");
-    path.push(Box::from(*b"shop")).expect("fixture path fits");
-    contract::Part::Resource { connector: FORGE, path }
 }
 pub fn frame(party: u64) -> WatchEvent {
     WatchEvent::Delivered(Delivery::Me(Box::new(Me {
@@ -206,11 +185,7 @@ pub fn start(root: &mut crate::Domain, kept: List<skein_lib::RequestRecord<jig_c
     crate::step(
         root,
         &env(&limits),
-        Event::Start {
-            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
-            kept: List::with_capacity(0),
-            offset: Offset { minutes: 0 },
-        },
+        Event::Start { address: Address::Adopt { project: PROJECT }, kept: List::with_capacity(0) },
         &mut out,
     );
     crate::step(root, &env(&limits), Event::Client { event: jig_client::Event::StartUnlinked { kept } }, &mut out);
@@ -297,7 +272,6 @@ pub fn inbox_home(filter: crate::address::Filter) -> (crate::Domain, Token) {
     let frame = start(&mut root, List::with_capacity(0));
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     confirm(&mut root, frame, PARTY, &mut out);
-    while out.pop().is_some() {}
     crate::step(
         &mut root,
         &env(&limits),

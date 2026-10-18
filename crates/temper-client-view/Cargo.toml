@@ -9,7 +9,6 @@ publish.workspace = true
 [dependencies]
 jig-client.workspace = true
 skein-lib.workspace = true
-jig-client-view.workspace = true
 skein-ui.workspace = true
 temper-client-domain.workspace = true
 

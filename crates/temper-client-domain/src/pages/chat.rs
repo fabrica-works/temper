@@ -12,6 +12,7 @@ pub enum Sending {
     Close,
 }
 #[derive(Debug)]
+#[expect(clippy::partial_pub_fields, reason = "departures are private to the chat refresh and exposed as a slice")]
 pub struct Chat {
     pub task: u64,
     pub document: Handle,
@@ -24,6 +25,7 @@ pub struct Chat {
     pub outcome: Option<jig_client::Outcome>,
     pub seen: u64,
     pub cards: List<super::inbox::Card>,
+    departures: List<c::ObjectKey>,
     pub closing: Option<c::Ask>,
     pub final_task: Option<Box<c::Task>>,
 }
@@ -49,7 +51,8 @@ impl Chat {
             pending: List::with_capacity(4),
             outcome: None,
             seen: 0,
-            cards: List::with_capacity(limits.jig.objects),
+            cards: List::with_capacity(limits.client.domain.reads),
+            departures: List::with_capacity(limits.client.domain.reads),
             closing: None,
             final_task: None,
         }
@@ -183,6 +186,11 @@ impl Chat {
         }
         None
     }
+    /// Proposals the last task document removed from this chat.
+    #[must_use]
+    pub fn departures(&self) -> &[c::ObjectKey] {
+        self.departures.as_slice()
+    }
     fn sending(&self, kind: Sending) -> bool {
         for (_, pending) in &self.pending {
             if *pending == kind {
@@ -192,10 +200,12 @@ impl Chat {
         false
     }
     fn proposals(&mut self, task: &c::Task, out: &mut Queue<Request>) {
+        self.departures.clear();
         for card in &self.cards {
             let c::ObjectKey::Proposal(key) = card.object else { continue };
             if !task.proposals.as_slice().contains(&key) {
                 unwatch(card.handle, out);
+                self.departures.push(card.object).expect("removed cards fit their window");
             }
         }
         let mut ordered = List::with_capacity(self.cards.capacity());
@@ -323,7 +333,7 @@ impl Chat {
     ) {
         match act {
             Act::MessageWords { words } => {
-                if words.len() <= usize::try_from(env.limits.jig.text).expect("text bound fits") {
+                if words.len() <= usize::try_from(env.limits.client.domain.text).expect("text bound fits") {
                     self.words = words;
                 }
             }
@@ -353,7 +363,7 @@ impl Chat {
             Sending::Message if !self.words.is_empty() && allowed(task, c::ActKind::Message) => c::Ask::Message {
                 project: task.project,
                 task: self.task,
-                words: c::Text::new(self.words.clone(), env.limits.jig.text).expect("composer bounded"),
+                words: c::Text::new(self.words.clone(), env.limits.client.domain.text).expect("composer bounded"),
             },
             Sending::Stop if allowed(task, c::ActKind::Stop) => c::Ask::Stop { project: task.project, task: self.task },
             Sending::Seen if self.thread.loaded > self.seen => {
@@ -387,19 +397,28 @@ impl Chat {
 }
 #[must_use]
 pub fn thread_limits(limits: &Limits) -> jig_client::thread::Limits {
-    jig_client::thread::Limits { lines: limits.jig.rows, bytes: limits.jig.document_bytes, text: limits.jig.text }
+    jig_client::thread::Limits {
+        lines: limits.client.domain.rows,
+        bytes: limits.client.domain.document_bytes,
+        text: limits.client.domain.text,
+    }
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     jig_client::thread::worst_case(&thread_limits(limits))?
         .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
-        .checked_add(u64::from(limits.jig.text))?
-        .checked_add(limits.jig.document_bytes)?
+        .checked_add(u64::from(limits.client.domain.text))?
+        .checked_add(limits.client.domain.document_bytes)?
         // Refresh can briefly retain old cards beside their replacements.
         .checked_add(super::inbox::worst_case(limits)?)?
+        .checked_add(List::<c::ObjectKey>::worst_case(limits.client.domain.reads)?)?
         // A received task's delegate list is bounded by its document bytes.
-        .checked_add(List::<c::Operation>::worst_case(u32::try_from(limits.jig.document_bytes).ok()?.checked_add(1)?)?)?
-        .checked_add(u64::from(u32::try_from(limits.jig.document_bytes).ok()?.checked_add(1)?).checked_mul(11)?)
+        .checked_add(List::<c::Operation>::worst_case(
+            u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?,
+        )?)?
+        .checked_add(
+            u64::from(u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?).checked_mul(11)?,
+        )
 }
 fn handle(number: u64) -> Handle {
     Handle { asker: Owner::Pages.asker(), number }
@@ -412,19 +431,6 @@ fn read(handle: Handle, read: Option<c::Read>, out: &mut Queue<Request>) {
         out.push(Request::Client(jig_client::Event::Read { handle, read: Readable::Jig(read) }));
     }
 }
-pub(crate) fn from_reference(root: &crate::Domain) -> Option<crate::Address> {
-    let crate::Address::Jig(jig_client_view::address::Address::Task { task: number, .. }) = root.pages().address()
-    else {
-        return None;
-    };
-    let lent = root.jig().borrow(root.client());
-    let object = lent.objects().get(lent.task_page().header?)?;
-    let jig_client_view::objects::Body::Task(task) = object.body? else { return None };
-    let me = root.pages().me(root.client())?;
-    let template = jig_client::shapes::template(me, task.project, jig_client::shapes::CHAT)?;
-    if task.label == template.label { Some(crate::Address::Chat { task: *number }) } else { None }
-}
-
 #[must_use]
 pub fn allowed(task: &c::Task, act: c::ActKind) -> bool {
     match jig_client::facts::offer(task.acts.as_slice(), act) {

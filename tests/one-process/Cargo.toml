@@ -21,7 +21,6 @@ temper-fake-checkout.workspace = true
 temper-fake-forge-domain.workspace = true
 temper-fake-forge-protocol.workspace = true
 jig-channel-world.workspace = true
-jig-client-view.workspace = true
 jig-domain-core.workspace = true
 jig-domain-people.workspace = true
 jig-domain-tasks.workspace = true

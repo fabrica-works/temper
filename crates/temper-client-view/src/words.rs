@@ -1,6 +1,5 @@
 //! temper's frame and forge words as checked English data.
 use alloc::boxed::Box;
-use jig_client_view::Owner;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{
     Builder, Run,
@@ -350,8 +349,7 @@ impl Word {
             Self::Shown => 23,
             Self::Unshowable => 24,
         };
-        let owner =
-            if number >= 100 { crate::frame::owner() } else { (Owner::Application { number: connector }).opaque() };
+        let owner = if number >= 100 { crate::frame::owner() } else { crate::forge::bindings::owner(connector) };
         PhraseId { owner, number }
     }
 }
@@ -391,8 +389,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(256);
-        let mut phrases = List::with_capacity(256);
+        let mut shapes = List::with_capacity(320);
+        let mut phrases = List::with_capacity(320);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -423,21 +421,10 @@ impl Words {
         for word in jig_client::words::ALL {
             shapes.push(word.shape(text)).expect("jig word shapes fit");
         }
-        for mut phrase in jig_client::words::english().phrases {
-            use jig_client::words::{StatusWord, Word as JigWord};
-            let literal = if phrase.id == JigWord::Status(StatusWord::WaitingForYou).id() {
-                Some(b"Waiting for you".as_slice())
-            } else if phrase.id == JigWord::Status(StatusWord::Parked).id() {
-                Some(b"Parked".as_slice())
-            } else {
-                None
-            };
-            if let Some(literal) = literal {
-                phrase.forms.first_mut().expect("English word has a form").segments =
-                    Box::new([Segment::Text(copy_of(literal))]);
-            }
+        for phrase in jig_language().phrases {
             phrases.push(phrase).expect("jig words fit");
         }
+        crate::cards::words::extend(text, &mut shapes, &mut phrases);
         crate::forge::words::extend(connector, text, &mut shapes, &mut phrases);
         let language = Language {
             plural: PluralRule::English,
@@ -447,10 +434,10 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 256,
+            phrases: 320,
             holes: 3,
-            segments: 1024,
-            text_bytes: 8192,
+            segments: 1536,
+            text_bytes: 16384,
             hole_bytes: joined.max(513),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
@@ -466,6 +453,10 @@ impl Words {
     }
     pub fn text(&self, builder: &mut Builder, word: Word, holes: &[Hole]) {
         builder.text(Run::Plain, &self.say(word, holes));
+    }
+    #[must_use]
+    pub(crate) fn path_bytes(&self) -> u32 {
+        self.book.capacity(Word::Path.id(self.connector)).expect("checked path word")
     }
     #[must_use]
     pub fn capacity(&self) -> Option<u32> {
@@ -594,4 +585,36 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
         Word::Shown => (&[b"Shown on the forge."], &[]),
         Word::Unshowable => (&[b"Cannot show this part."], &[]),
     }
+}
+
+/// Public jig words with the overrides temper shows and its referee checks.
+#[must_use]
+pub fn jig_language() -> Language {
+    use jig_client::words::{StatusWord, Word as JigWord};
+    let mut language = jig_client::words::english();
+    for phrase in &mut language.phrases {
+        if phrase.id == jig_client::words::Word::Decision(jig_client::words::DecisionWord::Funds).id() {
+            phrase.forms.first_mut().expect("English word has a form").segments = Box::new([
+                Segment::Text(copy_of(b"Funds ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+                Segment::Text(copy_of(b" from your pool \xc2\xb7 ")),
+                Segment::Hole { index: 1, kind: HoleKind::Amount },
+                Segment::Text(copy_of(b" left, ")),
+                Segment::Hole { index: 2, kind: HoleKind::Amount },
+                Segment::Text(copy_of(b" after")),
+            ]);
+        }
+        let literal = if phrase.id == JigWord::Status(StatusWord::WaitingForYou).id() {
+            Some(b"Waiting for you".as_slice())
+        } else if phrase.id == JigWord::Status(StatusWord::Parked).id() {
+            Some(b"Parked".as_slice())
+        } else {
+            None
+        };
+        if let Some(literal) = literal {
+            phrase.forms.first_mut().expect("English word has a form").segments =
+                Box::new([Segment::Text(copy_of(literal))]);
+        }
+    }
+    language
 }

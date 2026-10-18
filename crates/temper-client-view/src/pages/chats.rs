@@ -19,14 +19,7 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
     b.bind(bindings.insert(act));
     b.close();
 }
-pub(crate) fn main(
-    b: &mut Builder,
-    root: &Domain,
-    words: &Words,
-    jig: &jig_client_view::words::Words,
-    bindings: &mut Bindings,
-    text_limit: u32,
-) {
+pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, text_limit: u32) {
     b.open(Role::Main);
     text(b, Role::Heading { level: 1 }, &words.say(Word::Chats, &[]));
     if let Some(chats) = root.pages().chats() {
@@ -39,10 +32,10 @@ pub(crate) fn main(
             control(b, bindings, Role::Button, &words.say(Word::Start, &[]), Act::StartChat);
         }
         if chats.refusal.is_some() {
-            jig.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
+            words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit);
         }
         if let Some(outcome) = &chats.outcome {
-            outcome_text(b, jig, outcome, text_limit);
+            outcome_text(b, words, outcome, text_limit);
         }
         text(b, Role::Heading { level: 2 }, &words.say(Word::LiveChats, &[]));
         if let Some(live) = chats.live(root.client()) {
@@ -92,23 +85,18 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     b.close();
 }
 
-pub(crate) fn outcome_text(
-    b: &mut Builder,
-    jig: &jig_client_view::words::Words,
-    outcome: &jig_client::Outcome,
-    text_limit: u32,
-) {
+pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client::Outcome, text_limit: u32) {
+    use crate::cards::P;
     use jig_client::{Answered, Outcome};
-    use jig_client_view::phrases::jig::JigPhrase as P;
     match outcome {
-        Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Done(value))) => jig.outcome(b, value),
+        Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Done(value))) => words.outcome(b, value),
         Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Refused { refusal, .. })) => {
-            jig.refusal(b, refusal, text_limit);
+            words.refusal(b, refusal, text_limit);
         }
-        Outcome::NotKept => jig.status(b, P::RequestNotKept, &[]),
-        Outcome::Unknown => jig.status(b, P::Unknown, &[]),
-        Outcome::Limit => jig.status(b, P::RequestsInFlight, &[]),
-        Outcome::Unconfirmed => jig.status(b, P::RequestUnconfirmed, &[]),
+        Outcome::NotKept => words.status(b, P::RequestNotKept, &[]),
+        Outcome::Unknown => words.status(b, P::Unknown, &[]),
+        Outcome::Limit => words.status(b, P::RequestsInFlight, &[]),
+        Outcome::Unconfirmed => words.status(b, P::RequestUnconfirmed, &[]),
         Outcome::Answered(Answered::Family(_)) => {}
     }
 }

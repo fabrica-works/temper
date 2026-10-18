@@ -43,8 +43,6 @@ fn each_fixture_page_prints_as_its_golden_file() {
         ("chats", fixtures::chats_page()),
         ("chat", fixtures::chat::page()),
         ("task", fixtures::task_page()),
-        ("project", fixtures::project_page()),
-        ("deployment", fixtures::deployment_page()),
         ("signed_out", fixtures::signed_out_page()),
         ("every_role", fixtures::every_role()),
         ("control_text", fixtures::control_text()),
@@ -74,12 +72,7 @@ fn a_behind_frame_adds_its_sentence_to_the_first_line() {
 fn the_largest_fixture_tree_prints_within_its_bounds() {
     let limits = fixtures::tree_limits();
     let (lines, bytes) = skein_ui_text::worst_case(&limits).expect("fixture print envelope");
-    for (name, tree) in [
-        ("roles", fixtures::every_role()),
-        ("task", fixtures::task_page()),
-        ("project", fixtures::project_page()),
-        ("deployment", fixtures::deployment_page()),
-    ] {
+    for (name, tree) in [("roles", fixtures::every_role()), ("task", fixtures::task_page())] {
         let print = fixtures::print(&tree);
         assert!(u64::from(print.text.len()) <= bytes, "{name}: bytes");
         assert!(skein_lib::bytes::count(print.text.as_slice(), b"\n", u32::MAX) <= lines, "{name}: lines");

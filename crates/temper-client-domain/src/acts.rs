@@ -97,7 +97,7 @@ fn find_card(pages: &mut Pages, object: ObjectKey) -> Option<&mut Card> {
 pub(super) fn step(pages: &mut Pages, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::CardWords { object, words } => {
-            if let Ok(words) = Text::new(words, env.limits.jig.text)
+            if let Ok(words) = Text::new(words, env.limits.client.domain.text)
                 && let Some(card) = find_card(pages, object)
             {
                 card.words = Some(words);

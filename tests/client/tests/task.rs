@@ -70,3 +70,20 @@ fn a_chat_reply_is_identified_by_its_task_in_the_native_inbox() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }
+
+#[test]
+fn a_client_closed_on_a_tasks_page_opens_at_the_inbox_again() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let (goal, _) = fixtures::goal_with_held_delegate(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Heading { level: 2 }, b"Plan"), within: fixtures::WITHIN },
+            Step::Reload,
+            Step::See { find: Find::named(Role::Heading { level: 1 }, b"Inbox"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}

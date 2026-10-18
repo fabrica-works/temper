@@ -30,7 +30,7 @@ fn each_resource_path_shape_says_its_words() {
     for (path, said) in rows {
         assert_eq!(&*fixtures::owner_part_text(&words, path), said, "path {path:?}");
         let part = Part::Resource { connector: fixtures::FORGE, path: fixtures::path(path) };
-        assert_eq!(&*fixtures::part_text(&words, part, true), said, "held path {path:?}");
+        assert_eq!(&*fixtures::part_text(&words, part), said, "held path {path:?}");
     }
 }
 #[test]
@@ -56,11 +56,7 @@ fn each_numbered_kind_says_its_words_and_others_kind_n() {
         (16, b"kind 16"),
     ];
     for (kind, said) in rows {
-        assert_eq!(
-            &*fixtures::part_text(&words, Part::Kind { connector: fixtures::FORGE, kind }, true),
-            said,
-            "kind {kind}"
-        );
+        assert_eq!(&*fixtures::part_text(&words, Part::Kind { connector: fixtures::FORGE, kind }), said, "kind {kind}");
     }
 }
 #[test]
@@ -82,19 +78,25 @@ fn a_part_needing_a_document_says_shown_on_the_forge() {
         Part::Deployment { connector },
     ];
     for part in parts {
-        let tree = fixtures::part_tree(&words, part.clone(), true);
+        let tree = fixtures::part_tree(&words, part.clone());
         assert_eq!(&*fixtures::text(&tree), b"Shown on the forge.", "part {part:?}");
         assert_eq!(tree.nodes().first().expect("paragraph present").role, Role::Paragraph, "part {part:?}");
     }
-}
-#[test]
-fn a_part_the_side_does_not_hold_says_it_cannot_be_shown() {
-    let words = fixtures::words();
-    let part = Part::Connector { connector: fixtures::FORGE };
-    assert_eq!(&*fixtures::part_text(&words, part.clone(), false), b"Cannot show this part.");
-    assert_eq!(&*fixtures::part_text(&words, part, true), b"forge");
 }
 
 mod chat;
 
 mod task;
+
+mod cards;
+
+const PATH_SEGMENT_BYTES: usize = 64;
+#[test]
+fn a_long_forge_path_shows_its_last_whole_segment() {
+    let words = fixtures::words();
+    let path = fixtures::path(&[&[b'a'; PATH_SEGMENT_BYTES], &[b'b'; PATH_SEGMENT_BYTES], b"last"]);
+    assert_eq!(
+        fixtures::part_text(&words, Part::Resource { connector: fixtures::FORGE, path }).as_ref(),
+        b"\xe2\x80\xa6/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/last"
+    );
+}

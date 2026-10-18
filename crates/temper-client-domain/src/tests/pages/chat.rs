@@ -211,3 +211,11 @@ fn rejecting_a_proposal_in_place_is_said_before_it_is_sent() {
         }]
     );
 }
+
+#[test]
+fn a_departed_proposal_keeps_its_identity_for_the_explanation() {
+    let mut f = f::opened();
+    proposals(&mut f, &[PROPOSAL]);
+    proposals(&mut f, &[]);
+    assert_eq!(f.chat.departures(), &[c::ObjectKey::Proposal(PROPOSAL)]);
+}

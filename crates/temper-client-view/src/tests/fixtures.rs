@@ -7,33 +7,6 @@ pub const SECOND_PROJECT: u32 = 2;
 pub const SEED: u64 = 11;
 pub fn limits() -> Limits {
     {
-        let jig = jig_client_view::Limits {
-            segments: 9,
-            watches: 8,
-            notices: 2,
-            notice_life: Duration::from_secs(5),
-            // A finite fixture keeps the same before/after-linger behavior at a short scale.
-            linger: Duration::from_millis(250),
-            save_delay: Duration::from_millis(10),
-            intents: 2,
-            fields: 4,
-            objects: 3,
-            sources: 8,
-            reads: 8,
-            parts: 8,
-            delegates: 2,
-            document_bytes: 65536,
-            records: 2,
-            kept: 4,
-            drafts: 1,
-            projects: 2,
-            roles: 2,
-            text: 32,
-            rows: 2,
-            conversation_words: 2,
-            navigation_entries: 8,
-            updates_count: 99,
-        };
         let requests = RequestLimits {
             requests: 4,
             bytes: 262_144,
@@ -42,35 +15,43 @@ pub fn limits() -> Limits {
             most: Duration::from_millis(80),
             margin: Duration::from_secs(1),
         };
-        Limits {
-            jig,
-            forge: forge::Limits { parts: 8, field_bytes: 256, checks: 8 },
-            client: temper_client_domain::limits::client(
-                &jig,
+        let client = jig_client::Limits {
+            domain: jig_client::DomainLimits {
+                owners: &[jig_client::Spoken {
+                    family: temper_client_protocol_wire::FORGE,
+                    version: temper_client_protocol_wire::CLIENT_VERSION,
+                }],
                 requests,
-                12,
-                8,
-                jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
-                Duration::from_millis(100),
-            )
-            .expect("client profile fits"),
-        }
+                ask_bytes: requests.bytes,
+                handles: 9,
+                watches: 9,
+                turn_bytes: 65536,
+                backoff: jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                authority: 12,
+                heartbeat: Duration::from_millis(100),
+                reads: 8,
+                parts: 8,
+                delegates: 2,
+                document_bytes: 65536,
+                records: 2,
+                kept: 4,
+                projects: 2,
+                text: 32,
+                rows: 2,
+                fields: 4,
+                segments: 9,
+            },
+            exchanges: 8,
+        };
+
+        Limits { forge: forge::Limits { field_bytes: 256, checks: 8 }, client }
     }
 }
 pub fn words() -> crate::words::Words {
     static WORDS: std::sync::OnceLock<crate::words::Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| crate::words::Words::english(FORGE, 64).expect("forge English fits")).clone()
 }
-pub fn jig_words() -> jig_client_view::words::Words {
-    static WORDS: std::sync::OnceLock<jig_client_view::words::Words> = std::sync::OnceLock::new();
-    WORDS
-        .get_or_init(|| jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(32).expect("jig English fits"),
-            language: 0,
-            offset_minutes: 0,
-        })
-        .clone()
-}
+
 pub fn tree_limits() -> skein_ui::Limits {
     skein_ui::Limits {
         nodes: 128,
@@ -121,23 +102,13 @@ pub fn owner_part_text(words: &crate::words::Words, segments: &[&[u8]]) -> Box<[
     );
     text(&builder.finish())
 }
-pub fn part_tree(words: &crate::words::Words, part: Part, held: bool) -> skein_ui::Tree {
-    let limits = forge::Limits { parts: 1, field_bytes: 256, checks: 8 };
-    let mut side = forge::Side::new(&limits, SEED);
-    if held {
-        forge::step(
-            &mut side,
-            &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            forge::Event::Show { part: part.clone() },
-            &mut Queue::with_capacity(1),
-        );
-    }
+pub fn part_tree(words: &crate::words::Words, part: Part) -> skein_ui::Tree {
     let mut builder = skein_ui::Builder::new(&tree_limits());
-    crate::forge::part(&mut builder, &side, &part, words);
+    crate::forge::drawn(&mut builder, &part, words);
     builder.finish()
 }
-pub fn part_text(words: &crate::words::Words, part: Part, held: bool) -> Box<[u8]> {
-    text(&part_tree(words, part, held))
+pub fn part_text(words: &crate::words::Words, part: Part) -> Box<[u8]> {
+    text(&part_tree(words, part))
 }
 pub fn built() -> crate::View {
     let domain = domain_limits();
@@ -146,21 +117,19 @@ pub fn built() -> crate::View {
         &mut root,
         temper_client_domain::Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Transport } },
     );
-    let jig = jig_words();
     let forge = words();
-    let envelope = crate::Limits::of(&domain, &jig, &forge).expect("composed envelope fits");
+    let envelope = crate::Limits::of(&domain, &forge).expect("composed envelope fits");
     assert!(envelope.tree.nodes >= 128);
     let limits = crate::Limits { tree: tree_limits() };
-    let mut view = crate::View::new(&limits, &domain, jig, forge, FORGE);
+    let mut view = crate::View::new(&limits, &domain, forge, FORGE);
     crate::build(&mut view, &root, &mut Queue::with_capacity(limits.tree.patches));
     view
 }
 pub fn view() -> crate::View {
     let domain = domain_limits();
-    let jig = jig_words();
     let words = words();
     let limits = crate::Limits { tree: tree_limits() };
-    crate::View::new(&limits, &domain, jig, words, FORGE)
+    crate::View::new(&limits, &domain, words, FORGE)
 }
 pub fn build<'a>(view: &'a mut crate::View, root: &temper_client_domain::Domain) -> &'a skein_ui::Tree {
     crate::build(view, root, &mut Queue::with_capacity(view.limits().tree.patches));
@@ -179,7 +148,9 @@ pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
 }
 pub fn root_with_watch(project: Option<u32>) -> (temper_client_domain::Domain, skein_lib::Token) {
     let (root, me, _) = root_at(
-        temper_client_domain::Address::Jig(jig_client_view::address::Address::Inbox { project }),
+        temper_client_domain::Address::Inbox {
+            filter: temper_client_domain::address::Filter { project, ..temper_client_domain::address::Filter::ALL },
+        },
         &domain_limits(),
     );
     (root, me)
@@ -209,16 +180,7 @@ fn root_at_with_tree_named(
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut root = temper_client_domain::unlinked(limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(limits));
-    temper_client_domain::step(
-        &mut root,
-        &env,
-        Event::Start {
-            address,
-            kept: List::with_capacity(0),
-            offset: jig_client_view::boundary::Offset { minutes: 0 },
-        },
-        &mut out,
-    );
+    temper_client_domain::step(&mut root, &env, Event::Start { address, kept: List::with_capacity(0) }, &mut out);
     for event in [
         jig_client::Event::StartUnlinked { kept: List::with_capacity(0) },
         jig_client::Event::SignIn { with: jig_client::With::Transport },
@@ -362,7 +324,7 @@ pub fn inbox_with_document(
 ) -> temper_client_domain::Domain {
     use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
     let mut limits = domain_limits();
-    limits.jig.objects = 6;
+    limits.client.domain.reads = 6;
     let (mut root, _, watch) = root_at(temper_client_domain::Address::Inbox { filter }, &limits);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
@@ -486,4 +448,256 @@ pub fn main_text(tree: &skein_ui::Tree) -> Box<[u8]> {
         }
     }
     writer.finish()
+}
+
+/// Shared chat setup for the focused view stories.
+pub mod chat {
+    use super as fixtures;
+    use jig_client::{contract as c, thread::Thread};
+    use skein_lib::{List, Wall};
+    use skein_ui::Builder;
+    pub const TASK: u64 = 9;
+    pub const ATTEMPT: u64 = 23;
+    pub const TURN: u32 = 1;
+    pub const RETRY: u32 = 0;
+    pub const OFFSET: u32 = 0;
+    pub const COMMITTED: u32 = 0;
+    pub const LINES: u32 = 4;
+    pub const BYTES: u64 = 65536;
+    pub const TEXT: u32 = 32;
+    pub const MESSAGE: u64 = 3;
+    pub const PARTY: u64 = 73;
+    pub const DELEGATE: u64 = 12;
+    pub const OTHER_DELEGATE: u64 = 13;
+    pub const CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(5);
+    pub const CLOSE_OPERATIONS: u32 = 3;
+    pub const FRACTIONAL_GRACE: skein_lib::Duration = skein_lib::Duration::from_millis(125);
+    pub const GRACES: [(Option<skein_lib::Duration>, &[u8]); 3] = [
+        (Some(CLOSE_GRACE), b"allow 5 seconds to finish, then cancel"),
+        (Some(FRACTIONAL_GRACE), b"allow 125000000 nanoseconds to finish, then cancel"),
+        (None, b"Close chat now"),
+    ];
+    pub const CHAT_LABEL: u32 = 7;
+    pub const CHAT_TEMPLATE: u32 = 1;
+    pub const CHAT_CHARTER: u32 = 1;
+    pub const SINGLE_TEMPLATE: u32 = 1;
+    pub const EMPTY_PARAMETERS: u32 = 0;
+    pub const PROPOSAL: c::ProposalKey = c::ProposalKey { proposer: c::Proposer::Task(DELEGATE), number: 3 };
+    pub const PROPOSAL_OUTPUTS: u32 = 256;
+    pub const PROPOSAL_NOW: skein_lib::Time = skein_lib::Time::ZERO;
+    pub const PROPOSAL_OFFERS: u32 = 2;
+    pub const EMPTY_BATCH: u32 = 0;
+
+    pub fn chat_header() -> skein_ui::Tree {
+        let mut b = Builder::new(&fixtures::tree_limits());
+        let root = fixtures::root_in_project(Some(fixtures::PROJECT));
+        crate::pages::chat::header(
+            &mut b,
+            &fixtures::task::document(),
+            root.pages().me(root.client()),
+            &fixtures::words(),
+        );
+        b.finish()
+    }
+    pub fn provisional() -> Thread {
+        provisional_with_text(b"Hello")
+    }
+    pub fn provisional_with_text(words: &[u8]) -> Thread {
+        let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
+        let text = c::RunText {
+            attempt: ATTEMPT,
+            began: Some(Wall::EPOCH),
+            turn: c::ProvisionalTurnName { attempt: ATTEMPT, number: TURN, retry: RETRY },
+            from: OFFSET,
+            through: u32::try_from(words.len()).expect("run text size fits"),
+            text: c::Text::new(Box::from(words), u32::try_from(BYTES).expect("byte bound fits")).expect("text"),
+            cut: false,
+            call: None,
+        };
+        thread.run(
+            &c::RunState { task: TASK, attempt: Some(ATTEMPT), committed_turn: COMMITTED, writing: None, call: None },
+            Some(&text),
+        );
+        thread
+    }
+    pub fn tree(thread: &Thread) -> skein_ui::Tree {
+        let mut b = Builder::new(&fixtures::tree_limits());
+        crate::pages::chat::conversation(&mut b, thread, &fixtures::words(), LINES, TEXT);
+        b.finish()
+    }
+    pub fn closing(grace: Option<skein_lib::Duration>) -> skein_ui::Tree {
+        let mut operations = List::with_capacity(CLOSE_OPERATIONS);
+        let reason = c::Text::new(Box::from(*b"Chat closed"), TEXT).expect("reason");
+        operations
+            .push(c::Operation::Cancel {
+                project: fixtures::PROJECT,
+                task: DELEGATE,
+                reason: reason.clone(),
+                grace: None,
+            })
+            .expect("delegate cancel");
+        operations
+            .push(c::Operation::Move { project: fixtures::PROJECT, task: OTHER_DELEGATE, reason: reason.clone() })
+            .expect("delegate move");
+        operations
+            .push(c::Operation::Cancel { project: fixtures::PROJECT, task: TASK, reason, grace })
+            .expect("chat close");
+        let mut b = Builder::new(&fixtures::tree_limits());
+        crate::confirm::close_choices(
+            &mut b,
+            TASK,
+            &operations,
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        );
+        b.finish()
+    }
+    pub fn chat_root() -> temper_client_domain::Domain {
+        use temper_client_domain::{Address, Event};
+        let (mut root, me_watch, task_watch) =
+            fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
+        let mut me = root.pages().me(root.client()).expect("me").clone();
+        let member = me.projects.get_mut(EMPTY_PARAMETERS).expect("project");
+        member.templates = List::with_capacity(SINGLE_TEMPLATE);
+        member
+            .templates
+            .push(c::Template {
+                number: CHAT_TEMPLATE,
+                name: c::DocumentText::complete(c::Text::new(Box::from(*b"Chat"), TEXT).expect("name")),
+                executor: c::TemplateExecutor::Charter(CHAT_CHARTER),
+                contract: c::TaskContractDocument::Report { words: TEXT },
+                shallower: SINGLE_TEMPLATE,
+                budget: c::TemplateBudget::AsAllowed { cap: None },
+                deadline: c::TemplateDeadline::None,
+                tracked: None,
+                flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+                label: CHAT_LABEL,
+                grace: Some(CLOSE_GRACE),
+            })
+            .expect("template");
+        let mut task = fixtures::task::document();
+        task.chip.task = TASK;
+        task.project = fixtures::PROJECT;
+        task.acts = List::with_capacity(SINGLE_TEMPLATE);
+        task.acts
+            .push(c::Offered {
+                act: c::ActKind::Cancel,
+                admission: c::Admission::Allowed,
+                effect: Some(c::Effect::Cancel(c::Impact {
+                    tasks: c::PhaseCounts {
+                        waiting: 0,
+                        running: 1,
+                        held: 0,
+                        closing: 0,
+                        ended: 0,
+                        done: 0,
+                        failed: 0,
+                        cancelled: 0,
+                    },
+                    live_runs: 1,
+                    proposals: 0,
+                })),
+            })
+            .expect("close");
+        for (watch, document) in [
+            (me_watch, c::Delivery::Me(Box::new(me))),
+            (task_watch.expect("chat watch"), c::Delivery::Task(Box::new(task))),
+        ] {
+            fixtures::root_event(
+                &mut root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(document) },
+                    },
+                },
+            );
+        }
+        root
+    }
+    pub fn proposal_root() -> temper_client_domain::Domain {
+        use temper_client_domain::Event;
+        let limits = fixtures::domain_limits();
+        let (mut root, _, watch) = fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &limits);
+        let mut task = fixtures::task::document();
+        task.chip.task = TASK;
+        task.proposals = List::with_capacity(SINGLE_TEMPLATE);
+        task.proposals.push(PROPOSAL).expect("one proposal");
+        let mut out = skein_lib::Queue::with_capacity(PROPOSAL_OUTPUTS);
+        temper_client_domain::step(
+            &mut root,
+            &skein_lib::Env { now: PROPOSAL_NOW, wall: Wall::EPOCH, limits },
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: watch.expect("task watch"),
+                        event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                    },
+                },
+            },
+            &mut out,
+        );
+        let mut acts = List::with_capacity(PROPOSAL_OFFERS);
+        for act in [c::ActKind::Accept, c::ActKind::Reject] {
+            acts.push(c::Offered { act, admission: c::Admission::Allowed, effect: None }).expect("offer");
+        }
+        let page = c::ReadValue::OwnerProposal(Box::new(c::OwnerProposal {
+            key: PROPOSAL,
+            project: fixtures::PROJECT,
+            reason: c::DocumentText::complete(c::Text::new(Box::from(*b"Make a goal"), TEXT).expect("reason")),
+            action: c::OwnerProposalAction::Batch(List::with_capacity(EMPTY_BATCH)),
+            as_holder: true,
+            waiting: c::OwnerProposalWaiting { holder: c::OwnerHistoryHolder::Person(PARTY), since: Wall::EPOCH },
+            funding: List::with_capacity(EMPTY_BATCH),
+            acts,
+        }));
+        let mut answered = false;
+        while let Some(request) = out.pop() {
+            if let temper_client_domain::Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Read {
+                                read,
+                                what: jig_client::Readable::Jig(c::Read::Proposal { proposal: PROPOSAL }),
+                            },
+                    },
+            } = request
+            {
+                fixtures::root_event(
+                    &mut root,
+                    Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::ReadDone {
+                                read,
+                                result: jig_client::Readout::Jig(c::ReadResult::Value(page)),
+                            },
+                        },
+                    },
+                );
+                answered = true;
+                break;
+            }
+        }
+        assert!(answered, "proposal read emitted");
+        root
+    }
+    pub fn rejecting_chat() -> temper_client_domain::Domain {
+        use temper_client_domain::{Action, Event, pages::Act};
+        let mut root = proposal_root();
+        let object = c::ObjectKey::Proposal(PROPOSAL);
+        for act in [
+            Act::CardWords { object, words: Box::from(*b"Too costly") },
+            Act::Decide { object, act: c::ActKind::Reject, revision: None },
+        ] {
+            fixtures::root_event(&mut root, Event::Act { action: Action::Pages(act) });
+        }
+        root
+    }
+}
+
+/// Build a page once for the status-only page tests.
+pub fn page_view(root: &temper_client_domain::Domain) -> crate::View {
+    let mut view = view();
+    build(&mut view, root);
+    view
 }
