@@ -140,6 +140,9 @@ fn tables(bytes: &[u8], limits: &wire::Limits) -> Option<Vec<Table>> {
         let length = reader.u32()?;
         let record = reader.bytes(length)?;
         let kept = wire::Kept::decode(limits, &mut Reader::new(record)).ok()?;
+        if key == jig_client::STREAM_KEY {
+            continue;
+        }
         let entry = wire::TableEntry::decode(limits, &mut Reader::new(kept.record())).ok()?;
         if key != entry.key().as_slice() {
             return None;

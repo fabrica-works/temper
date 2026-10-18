@@ -723,3 +723,23 @@ fn run_phase(
     drop(run);
     (result, std::mem::replace(&mut outcome.machine.0, machine::fresh()), records)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn an_adoption_saves_a_pending_window_before_the_engine_commit() {
+        let setup = Rc::new(RefCell::new(referee::Run::default()));
+        let (outcome, _, _) =
+            run_phase(fixtures::calm(1), Story::Adoption, Phase::Story, machine::fresh(), Store::new(), setup.clone());
+        assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+        assert_eq!(outcome.adopted, 1);
+        PROGRESS.with(|progress| {
+            assert!(
+                setup.borrow().window.is_some(),
+                "saved pending adoption window: {:?}",
+                progress.borrow().cache.borrow()
+            );
+        });
+    }
+}
