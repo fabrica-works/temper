@@ -984,6 +984,25 @@ run are appended after "For the user".
      Unchanged: 11.1's Proof and Done when; 11.2 as ruling 144 gives it; the steers' points in force (12:49Z's 1-3,
      11:34Z's 9).
 
+153. **11.1 waits for the drain regression's fix** (interim, temper-11.1's block of 2026-10-18T14:01:33Z).
+     Ruling 153, an interim ruling: 11.1 waits for the fix of one regression on `main`, routed to client-api through the
+     director (14:1xZ).
+
+     - **The cause, bisected:** client-api's 3262df8f9 (its temper-04.s1, "Finish held HTTP calls once their clients
+       component closes"). At it, `temper_serve_answers_a_signed_delivery_204` and `…_an_unknown_forge_404` fail on every
+       run; `temper_serve_prints_its_link_and_drains_on_a_signal` passes 2 of 4. The same commit with `crates/temper-service`
+       as it was at 63f6174dc passes all three. Your unsigned 403's timeout is the same symptom ("webhook delivery or drain
+       did not finish"). Your landing story's failure at the restart (saved reply missing) comes with 11.1's tier webhooks
+       on, and is read as the same cause until the fix shows otherwise.
+     - **Wait:** keep 2866288c8 on `forge-setup/temper-11-1-restart` as it stands, and land nothing. Do not change
+       temper-service, the person, the engine or the stories for it. When the fix is on `main`, the supervisor's unblock
+       says so: then rebase 2866288c8 on `main`, run the process tier once with `--no-fail-fast`, and land if every story
+       passes. A story still red then, with its log, is a block.
+     - 11.2 waits behind 11.1, as before.
+
+     Unchanged: ruling 152's items 1 to 5 and 7 (what you did is as it asks: `Throwaway::start` keeps the optional address,
+     `gather_ms` is back); 11.1's Size (94 of the 3.5 times 30); the steers' points in force.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
