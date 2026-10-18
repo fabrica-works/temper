@@ -2303,6 +2303,15 @@ choice would have been the user's (development.md, 10.4).
 317. **temper-04.4: prove the path with a party that holds no Amend** (design gap, temper-04.4's block of 2026-10-18T05:51:17Z).
      Ruling 317 (design gap, interim): whether a reader whose Amend authority passes `documents.lines` is refused its whole document is the designer's (question.md, 2026-10-18T05:58:00Z): temper `configuration.md`, 7 says "`documents.lines` bounds a document's short lists alone", and jig's `documents/offers.rs:59-62` refuses the document. Until the answer, 04.4 proves the path, which holds under either answer: its task-document test reads the producer's `task` document as a party of `change_world`'s project that holds no Amend on it, and asserts nothing of the owner's read. `documents.lines` stays 2 in the process tier, and no jig code changes. 04.4 runs its Proof's two stories once each, as the step says; if a story fails because the owner's `task` document is refused (`Answer::None(Why::Busy)` from `offers.rs:59-62`), 04.4 does not land: it reports the first failing line and its file:line, and waits for the answer.
 
+318. **jig-17.4: a SignedIn with no token holds none** (plan defect, jig-17.4's block of 2026-10-18T05:59:33Z).
+     jig-17.4: a `SignedIn` with no token signs the link in, holding none (plan defect). Ruling 307's line on the link's guard, "`token().as_ref().is_some_and(|t| t.len() == 40)`", contradicts the design and 17.4's own test, and goes. The design answers the block in its own words: the engine end answers a browser's link sign-in "signed in, the credential in the cookie and none in the body" (jig `protocol/browser.md:624-625`), and "the credential on `Exchange` and `OpenStream` is the one the client holds, or none when the transport carries one the client never sees" (`protocol/client.md:297-299`). A credential kept from before would be sent as a bearer, and "the bearer wins when both come" (17.4's Shape), over the cookie the answer just set.
+
+     So, in `crates/jig-client-protocol-link/src/sign_in.rs`'s `signing_answer`, `SignInAnswer::SignedIn`:
+     - admits a token of 40 bytes, or none (the `match` you wrote: clippy bans `is_some_and`); a token of any other length stays `Signing::Lost`;
+     - either way calls `end_sign_in` (which sets `credential = None`), sets `self.credential = fields.token`, advances the generation, and answers `Signing::SignedIn { party }`: with none, the link ends as `With::Transport` leaves it (`sign_in.rs:20-23`).
+
+     `a_sign_in_answer_with_no_token_leaves_none_held` starts with a credential held, as your stronger test does, and asserts `credential()` is `None` and the generation advanced. Nothing else in 17.4 changes; the proof is not run again. Refresh any further copy of the guard's old line, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

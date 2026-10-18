@@ -213,8 +213,12 @@ they differ.
   peer/closing.rs:103}`; `tests/engine-clients/tests/{sign_in.rs:45,
   requests.rs:17, closing.rs:128}`; `tests/client-protocol/src/native/wire.rs:177`
   (`credential` takes the option). The link's guard at
-  `crates/jig-client-protocol-link/src/sign_in.rs:97, 100` reads
-  `token().as_ref().is_some_and(|t| t.len() == 40)`.
+  `crates/jig-client-protocol-link/src/sign_in.rs:97, 100` admits a
+  token of 40 bytes or none (a `match`: clippy bans `is_some_and`); a
+  `SignedIn` with none signs the link in as `With::Transport` does,
+  holding none, whatever it held before (`end_sign_in` clears it), and
+  `a_sign_in_answer_with_no_token_leaves_none_held` starts with a
+  credential held (ruling 318).
 - **17.4, the regenerated files:** `generated/v8.rs` and the goldens
   `golden/v8/{record_signed_in_*, enum_sign_in_answer_signed_in_*}.bin`
   (`SKEIN_CODEGEN_WRITE=1`, then the drift test). So edited, the
