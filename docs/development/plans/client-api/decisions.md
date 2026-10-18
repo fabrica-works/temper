@@ -2710,6 +2710,14 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** three focused runs and 30 minutes from this unblock; ruling 339's 200 lines, ruling 351's abort included; each file outside the Files named in the commit body.
      5. **Unchanged:** every deadline's value, the stall bound among them; the referee's check; the `Server::stop` patch stays out; ruling 351's points 1, 2 and 5.
 
+354. **temper-06.4 refreshes the owned example's worker memory** (plan defect, temper-06's block of 2026-10-18T12:43:33Z).
+     Ruling 354, plan defect, a value derived from 06.4's change: 06.4 repairs it. forge-setup's temper-14.1 (`7f5ce036f`) landed the owned example with the worker's `memory_bytes` its gate's tree needed; 06.4's change raises the worker's worst case by 16 bytes, and `docs/design/configuration.md`, 7, "One worst case per service", refuses the start "saying by how much". The rule stands; the example's number follows the code, as every derived bound in this plan does (ruling 112).
+
+     1. **The repair:** in its own commit, raise `workers[0].memory_bytes` in `docs/examples/owned.json` by the shortfall the start names (16 bytes, unless the gate's tree names another), and refresh any further copy of that value the same way, each listed in the commit body with forge-setup's step `temper-14.1` and this ruling.
+     2. **Then land:** the startup test alone first, then `land` with the step's gate. A proof that passed before the rebase runs again only if 14.1's commits changed a file it runs (`crates/temper/tests/{process.rs, startup.rs, configuration.rs}`, `tests/support/`); the others stand, cited in the commit with their logs.
+     3. **Size:** the repair counts apart from 06.4's 455 production lines.
+     4. **Unchanged:** `configuration.md`'s rule, the example's other values and its agent; ruling 229.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
