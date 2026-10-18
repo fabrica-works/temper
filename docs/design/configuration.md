@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-16. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-18. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 and the forge's setup's commands with it, with jig's parts as jig
 defines them and temper's own members beside them; the private files it
@@ -396,6 +396,16 @@ top-level `workers`, in the same order; standalone has one. Each:
   are the client's. A test holds the example's and the process tier's
   configuration to temper's client's limits, so the two cannot drift
   apart unseen.
+- **The engine's watch room fits temper's client.** A watch past the
+  room the engine allows a party, or a stream, is refused busy, and each
+  holds its place until the engine has ended it, so a deployment allows
+  each party, and each stream, at least the watches one client opens at
+  its limit, `me`'s included (jig's `client/domain/contract.md`, 7.2;
+  `protocol/client.md`, section 13). temper's client opens 16, so its
+  engine allows 16 a party, 16 a stream and 16 in all, temper's own
+  numbers above jig's profiles' 4 (`domain/engine.md`, section 13). It
+  checks none of this at start, as for documents (above); the same test
+  holds these rooms to temper's client's watches.
 - **The forge's paths fit a document.** jig's documents carry a
   resource's path and a pattern whole, with as many segments as the
   engine admits in a name (jig's `client/domain/contract.md`, 5.3), and

@@ -153,6 +153,39 @@ path's segments apart from its rows (`configuration.md`, 7).
   The root's `max_out` (`domain.rs:362-363`) and what is sized from it
   grow with them; the process tiers' overrides to 16 stay.
 
+## Corrections after the designer's answer of 2026-10-18T05:52:56Z
+
+The answer to temper-04.3's question of 2026-10-18T05:45:00Z (jig
+544a57091, cd2cac35f; temper's landing of this section).
+
+- **Ruling 313's `VIEWS` stays,** 16 a party and 16 in all: it is the
+  design's now (`configuration.md`, 7, "The engine's watch room fits
+  temper's client").
+- **A stream's room is still 4.** jig's clients component refuses a
+  watch busy once a stream holds `Limits::watches_per_stream`
+  (`jig-protocol-engine-clients/src/watches.rs:168` on jig's main), 4 in
+  both of jig's profiles (`profile/small.rs`, `CLIENTS`; `standard.rs`
+  takes `..small::CLIENTS`), and no `clients.` override exists
+  (`jig-protocol-config/src/overrides.rs:17-34`). temper takes it
+  unchanged (`crates/temper-service/src/clients.rs:112`), so `temper
+  serve` and the process tier refuse a client's fifth watch on its
+  stream; configuration.md, 7 asks 16. temper's client world joins the
+  client to the engine root without the component, and meets the views'
+  room alone. No increment of this file sets it: the supervisor rules
+  which step does. The default: a temper constant of 16 beside `VIEWS`
+  (`crates/temper-engine-domain/src/limits.rs:103`), set where the
+  component's `Env` is built (`clients.rs:112`), and three assertions in
+  `crates/temper/tests/configuration.rs` (`:4`, beside its documents'):
+  that constant, `VIEWS.watchers_per_party` and `VIEWS.watchers` each at
+  least `native.watches`.
+- **A watch or `me` refused busy** is opened again after a backoff in
+  jig's design (`client/domain/client.md`, 8.1, 8.2); jig's client still
+  ends it (`jig-client-domain/src/watches.rs:153`), and lets a watch's
+  closing overtake its opening. The repair is jig's code, then temper's
+  repin: the supervisor adds both, or rules them out of the plan. No
+  temper code works around a busy `me`, and this file's increments do
+  not change jig's client.
+
 ## Increments
 
 ### 04.1 `templates` in temper's configurations, in place of `chats`
