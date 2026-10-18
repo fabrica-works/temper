@@ -3111,6 +3111,28 @@ choice would have been the user's (development.md, 10.4).
         No other crate of temper names it. Done when's two greps wait for the step the answer gives. The draft's `presentation/` copies, `specification.rs` and `document_text.rs` stay out of this landing: keep them on a branch of your worktree, named in the report.
      4. **Today's tree and words stay** (ruling 388, point 3): the view tests and goldens pass unchanged, except those 07.4's Files name. Give the count by file in the commit and the report (ruling 388, point 4).
 
+391. **temper 07.4 keeps the reference UI's child until the designer answers** (plan defect, temper 07.4's block of 2026-10-18T19:17:22Z).
+     Ruling 391, kind: plan defect. Neither of the two options: no view-owned `Ui`, and no jig change, before the designer answers. The reference UI's child stays, with all that names it, until the step the answer gives. 07.4 lands now only what compiles and passes with the child kept, at up to 400 production lines added, with no question. Past 400, block with the count.
+
+     1. **Ruling 390 was wrong:** it called the child's removal independent of the renderers. The renderers take `&jig_client_view::Borrowed`. Its fields are crate-private, and `Ui::borrow` is its only constructor (Checked). So the child goes with them.
+     2. **The answer may move the child as well.** Moving the child into the view, or changing jig's renderer API, is what the designer's question decides, under (b) or (c). Neither comes before the answer. The new fact goes to the designer with `question.md`.
+     3. **What lands now:** the work of 07.4 that needs neither the child gone nor the renderers replaced, for example:
+        - the two mains;
+        - the adoption's title row;
+        - `Request::Dropped` and the dropped count's line;
+        - the stories and fixtures moved to temper's addresses (`tests/client/src/fixtures.rs` `project()`, `crates/temper/tests/support/person.rs` `adopt_and_change` and `found`).
+
+        For anything else, compile with the child kept: if it compiles and its tests pass unchanged, land it; if not, set it aside with the renderers.
+     4. **What stays until the answer's step:**
+        - the child, its records, places and slots;
+        - `Address::Jig`, `Owner::Jig`, `parts.rs` and the forge side's held parts;
+        - `Limits.jig`, where the child or the renderers use it;
+        - the goldens of jig's pages, which jig's pages still reach;
+        - the card renderers' calls.
+
+        Today's tree and words stay (ruling 388, point 3).
+     5. **If nothing of 07.4 is left to land** once the child stays, say so in the report and wait, with the draft on its branch.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

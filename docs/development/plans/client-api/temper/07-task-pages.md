@@ -433,7 +433,9 @@ lands now without the card renderers' replacement, at up to 400
 production lines added; temper's calls into `jig-client-view`'s card
 renderers, and `jig-client-view` in `temper-client-view`'s manifest for
 them alone, stay until the step the answer gives, which meets Done
-when's two greps.
+when's two greps. Ruling 391: the reference UI's
+child stays with them, and what names it, since the renderers borrow it
+(`Ui::borrow`); 07.4 lands now only what compiles with the child kept.
 Removes: the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,
