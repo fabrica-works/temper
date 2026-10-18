@@ -59,7 +59,10 @@ fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     problems.append(found, &root);
     let engine = match engine_at {
         Some(at) => match config::engine(&document, at) {
-            Ok(engine) => Some(engine),
+            Ok(mut engine) => {
+                engine.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
+                Some(engine)
+            }
             Err(found) => {
                 problems.append(found, &root.member(b"engine"));
                 None

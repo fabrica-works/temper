@@ -433,7 +433,7 @@ fn start_with_worker(
     settings.limits.root.journal.held = 384;
     settings.limits.root.journal.writes = 8192;
     settings.jig.limits.clients.streams = 2;
-    settings.jig.limits.clients.watches_per_stream = 4;
+    settings.jig.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
     settings.jig.limits.clients.exchanges = 4;
     settings.jig.limits.clients.exchanges_per_client = 2;
     let first = settings.jig.projects.into_iter().next().unwrap();

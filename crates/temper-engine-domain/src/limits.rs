@@ -97,9 +97,11 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
 pub const FILL_MARK: u64 = 268_435_456;
 /// The most owned bytes one authenticated store read brings (`small.rs`).
 pub const LOAD_BYTES: u64 = 65_536;
-/// Watches use temper's client's own budget of 16, above jig's small
-/// profile's 4 (`small.rs`, views; configuration.md, 7). Live runs and
-/// provisional text retain jig's small profile's limits.
+/// Streams use temper's client's own budget of 16, above jig's small
+/// profile's 4 (`small.rs`, clients; configuration.md, 7).
+pub const WATCHES_PER_STREAM: u32 = 16;
+/// Watches use the client's budget above jig's small profile's 4 (`small.rs`, views).
+/// Live runs and provisional text retain jig's small profile's limits.
 pub const VIEWS: views::Limits = views::Limits {
     runs: 4,
     watchers: 16,

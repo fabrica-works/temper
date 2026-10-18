@@ -47,6 +47,9 @@ fn the_process_configurations_documents_fit_the_native_client() {
     assert!(engine.limits.core.documents.grants <= client.client.domain.authority, "every grant fits");
     assert!(engine.limits.core.documents.executors <= client.client.domain.authority, "every executor fits");
     assert!(engine.limits.core.documents.implications <= client.client.domain.authority, "every implication fits");
+    assert!(temper_engine_domain::WATCHES_PER_STREAM >= native.watches, "the stream fits the client's watches");
+    assert!(temper_engine_domain::VIEWS.watchers_per_party >= native.watches, "the party fits the client's watches");
+    assert!(temper_engine_domain::VIEWS.watchers >= native.watches, "the engine fits the client's watches");
 }
 
 #[test]
