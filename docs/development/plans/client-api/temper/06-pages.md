@@ -1,17 +1,18 @@
 # Session 06: the frame, the inbox and the chats, temper's own
 
 temper's pages stop being jig's reference UI. A child of temper's client
-root, its pages, owner `Pages` (2), holds what temper shows of jig's work,
-on `jig-client` and jig's helpers alone: the frame and its navigation,
-after the mockups' top bar; the inbox, home; the chats and their
-composer; and a chat, its conversation, its proposals in place, Stop and
-Close. Each act is one keyed request through `jig-client`, made with
-jig's helpers where they fit, said before it is sent where it cannot be
-undone, and naming the revision the person saw (`client.md`, 3.5, 3.6,
-5). Each page's story runs in `tests/client` against temper's engine
-root from the increment that builds it. Pages not yet temper's (a task's
-page, the project's pages some stories still visit) keep showing jig's
-reference pages inside temper's frame until temper 07.
+root, its pages, owner `Pages` (2), holds what temper shows of jig's
+work, on `jig-client` and jig's helpers alone: the frame and its
+navigation, after the mockups' top bar; the inbox, home; the chats and
+their composer; and a chat, its conversation, the proposals waiting in
+it, decided in place, Stop and Close. Each act is one keyed request
+through `jig-client`, made with jig's helpers where they fit, said
+before it is sent where it cannot be undone, and naming the revision the
+person saw (`client.md`, 3.5, 3.6, 5). Each page's story runs in
+`tests/client` against temper's engine root from the increment that
+builds it. Pages not yet temper's (a task's page, the project's pages
+some stories still visit) keep showing jig's reference pages inside
+temper's frame until temper 07.
 
 ## Read first
 
@@ -587,20 +588,29 @@ Removes: nothing.
 
 ### 06.6 A chat's proposals in place, and closing it
 
-Scope: a proposal a turn names, shown in place with its card: accept or
-reject, said before it is sent, gone from the chat's card once decided
-here or in the inbox; Close, said before it is sent, as one compound
-request with what becomes of each live delegate (`shapes::close_chat`)
-(`client.md`, 3.5, 3.6; the story "a goal proposed in a chat, accepted
+Scope: each proposal waiting in the chat's subtree (its `task`
+document's `proposals`), shown after the conversation with its card:
+accept or reject, said before it is sent, gone from the chat once
+decided here or in the inbox (the designer's answer to the question of
+2026-10-18T15:08:54Z: jig's `domain/engine.md`, 7.2, and
+`client/domain/objects.md`, 10); Close, said before it is sent, as one
+compound request with what becomes of each live delegate
+(`shapes::close_chat`) (`client.md`, 3.5, 3.6; the story "a goal proposed in a chat, accepted
 in the inbox, and gone from the chat's card", 10).
 Needs: 06.3, 06.5.
 Files: `crates/temper-client-domain/src/{pages/chat.rs, acts.rs}`;
 `crates/temper-client-view/src/{pages/chat.rs, confirm.rs, words.rs}`;
 `tests/client/tests/chat.rs`; the golden `chat.txt`.
 Shape:
-- The chat's cards: the `proposal` a turn names, read under a handle of
-  the chat page's, its card as 06.3's (the same `Confirm::Accept` and
-  `Confirm::Reject`).
+- The chat's cards: each `ProposalKey` in the `proposals` of the `task`
+  document the chat page watches (`Subject::Task { task }`,
+  `pages/chat.rs:35`), in that list's order, read once under a handle of
+  the chat page's when the document first names it (`Read::Proposal`, as
+  `pages/inbox.rs:153` reads one), and dropped, card and handle, when
+  the document no longer names it. Each card is 06.3's (the same
+  `Confirm::Accept` and `Confirm::Reject`), offering the acts its
+  document offers, after the conversation's lines. A turn names no
+  proposal at jig's pin: `Call.objects` is empty (`later.md`).
 - `Act::Close` opens `Confirm::Close { chat }`, which says each live
   delegate's fate (cancelled, or moved to the person) and the
   template's grace; confirmed, `shapes::close_chat(me, project, chat,
@@ -626,7 +636,7 @@ Tests, each under 20 ms (unit) or 0.5 s (world):
 `the_close_confirmation_names_each_live_delegates_fate`,
 `the_close_confirmation_names_the_templates_grace`,
 `rejecting_a_proposal_in_place_is_said_before_it_is_sent`,
-`a_proposal_named_by_a_turn_is_shown_in_place`,
+`a_proposal_waiting_in_the_chat_is_shown_after_its_conversation`,
 `a_proposal_decided_elsewhere_leaves_the_chats_card`,
 `a_goal_proposed_in_a_chat_accepted_in_the_inbox_leaves_the_chat`
 (world), `a_closed_chat_shows_under_closed_in_the_chats` (world).
@@ -636,7 +646,10 @@ temper-client-world -E 'test(a_goal_proposed_in_a_chat_accepted_in_the_inbox_lea
 it in the inbox, and the chat's card leaves, the engine root holding the
 goal.
 Don't: chain requests for one act (contract.md, 3.4); choose a
-delegate's fate the confirmation did not show.
+delegate's fate the confirmation did not show; read what a call made
+from its outcome's words; filter the task's proposals by proposer; drop
+a card by `Thread::shows`, which needs temper's turns to show a call's
+cards (`later.md`).
 Size: at most 250 lines. Ruling 364: it lands whole at up to 550 production
 lines with no question; past 550, it blocks with the count by file.
 Removes: nothing.
