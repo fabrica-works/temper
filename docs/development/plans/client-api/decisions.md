@@ -2726,6 +2726,14 @@ choice would have been the user's (development.md, 10.4).
      3. Its lines count in 19.5's Size, by file in the report.
      4. temper's server has the same line (below); the temper repin adapts it as README, "What a temper repin repairs", says, not 19.5.
 
+356. **temper-04.s1's startup run and the example's engine memory** (process, temper-04.s1's block of 2026-10-18T13:05:10Z).
+     Ruling 356, process: yes, as the report proposes. Ruling 353's three runs were for the teardown, which they closed; the startup refusal is a new failure point, brought by forge-setup's temper-14.1 (`7f5ce036f`), not a fourth try at the old one.
+
+     1. **One focused run** of the startup test that refuses (ruling 229), its log beside the others.
+     2. **Then the repair** the supplement prescribes, as ruling 354 does for 06.4's worker: in its own commit, raise `engine.memory_bytes` in `docs/examples/owned.json` by the shortfall the start names (339,650,368,720 bytes, unless the focused run names another); refresh any further copy of that value, each listed in the commit body with forge-setup's step `temper-14.1` and this ruling.
+     3. **Then the gate,** and land. temper-06.4 edits the same file's worker `memory_bytes` under ruling 354; whichever lands second reruns the startup test on the rebased tree.
+     4. **Unchanged:** the teardown repairs and their logs; ruling 339's 200 lines (the example's number counts apart); the landing story's turn, which comes after temper-05.s1 (ruling 352).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
