@@ -2768,6 +2768,14 @@ choice would have been the user's (development.md, 10.4).
         - If the service wrote the 200 and the harness still records `Some(0)`, the cause is past the service, in skein's harness or the world: stop with the cause line.
      3. **Unchanged:** ruling 358, point 4; `Profile::Small`'s limits.
 
+361. **temper-06.5 diagnoses its retained regression** (process, temper-06's block of 2026-10-18T13:29:39Z).
+     Ruling 361, process, under ruling 229: yes, as the report proposes; ruling 359, point 2 assumed the candidate passed its focused reproduction.
+
+     1. **Diagnose:** at most two focused runs of `prepared_chat_answer_reaches_the_pages_task_watch`, 20 minutes from this unblock, tracing where the final task's read leaves `Chat::task().chip.phase` at `Running`: whether the read is sent, whether its answer arrives, and whether the page applies it. Write the cause line, with its file:line, in `logs/temper-06/chat-proof.md`.
+     2. **Repair** only what that names, within 06.5's Files and ruling 359's 650; a cause in jig stops the step with the cause line.
+     3. **Then** the one joint run ruling 359, point 3 leaves, once the regression passes; if either still fails, report with the log, no further run.
+     4. **Unchanged:** ruling 357, point 4; the regression's assertions.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
