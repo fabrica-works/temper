@@ -1824,6 +1824,7 @@ dependencies = [
  "jig-client",
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
+ "jig-client-test-records",
  "jig-client-view",
  "skein-lib",
  "temper-client-protocol-wire",
@@ -1865,6 +1866,9 @@ name = "temper-client-view"
 version = "0.0.0"
 dependencies = [
  "jig-client",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
  "jig-client-view",
  "skein-lib",
  "skein-ui",

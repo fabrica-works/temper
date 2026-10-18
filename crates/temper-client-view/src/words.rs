@@ -11,6 +11,13 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    RunBegan,
+    RunEnded,
+    LinesLeft,
+    Message,
+    Send,
+    Stop,
+    Older,
     StartChat,
     Start,
     LiveChats,
@@ -84,7 +91,14 @@ pub enum Word {
     Shown,
     Unshowable,
 }
-const ALL: [Word; 71] = [
+const ALL: [Word; 78] = [
+    Word::RunBegan,
+    Word::RunEnded,
+    Word::LinesLeft,
+    Word::Message,
+    Word::Send,
+    Word::Stop,
+    Word::Older,
     Word::StartChat,
     Word::Start,
     Word::LiveChats,
@@ -160,6 +174,13 @@ const ALL: [Word; 71] = [
 impl Word {
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::RunBegan => 150,
+            Self::RunEnded => 151,
+            Self::LinesLeft => 152,
+            Self::Message => 146,
+            Self::Send => 147,
+            Self::Stop => 148,
+            Self::Older => 149,
             Self::StartChat => 138,
             Self::Start => 139,
             Self::LiveChats => 140,
@@ -274,8 +295,8 @@ impl Words {
             },
             None => return Err(Invalid::Overflow),
         };
-        let mut shapes = List::with_capacity(177);
-        let mut phrases = List::with_capacity(177);
+        let mut shapes = List::with_capacity(184);
+        let mut phrases = List::with_capacity(184);
         for word in ALL {
             let (literals, kinds) = english(word);
             let mut holes = List::with_capacity(3);
@@ -330,7 +351,7 @@ impl Words {
         };
         let limits = PhraseLimits {
             languages: 1,
-            phrases: 177,
+            phrases: 184,
             holes: 3,
             segments: 686,
             text_bytes: 6144,
@@ -365,6 +386,13 @@ impl Words {
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::RunBegan => (&[b"Run ", b" began"], &[Number]),
+        Word::RunEnded => (&[b"Run ", b" ended"], &[Number]),
+        Word::LinesLeft => (&[b"Earlier lines omitted ", b""], &[Number]),
+        Word::Message => (&[b"Message"], &[]),
+        Word::Send => (&[b"Send"], &[]),
+        Word::Stop => (&[b"Stop"], &[]),
+        Word::Older => (&[b"Older"], &[]),
         Word::StartChat => (&[b"Start a chat"], &[]),
         Word::Start => (&[b"Start"], &[]),
         Word::LiveChats => (&[b"Live chats"], &[]),

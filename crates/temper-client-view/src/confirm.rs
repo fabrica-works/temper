@@ -102,17 +102,7 @@ pub(crate) fn card(
         return;
     }
     if let Some(progress) = acts::pending(card, root.client()) {
-        jig.progress(
-            b,
-            match progress {
-                jig_client::Progress::InFlight => jig_client_view::intents::Progress::InFlight,
-                jig_client::Progress::Retrying { .. } => jig_client_view::intents::Progress::Retrying,
-                jig_client::Progress::Parked | jig_client::Progress::NotServed => {
-                    jig_client_view::intents::Progress::Parked
-                }
-                jig_client::Progress::Unknown => jig_client_view::intents::Progress::Unknown,
-            },
-        );
+        progress_text(b, jig, progress);
         return;
     }
     if card.key.is_some() {
@@ -205,4 +195,18 @@ pub(crate) fn main(
         b.close();
         return;
     }
+}
+
+pub(crate) fn progress_text(b: &mut Builder, jig: &jig_client_view::words::Words, progress: jig_client::Progress) {
+    jig.progress(
+        b,
+        match progress {
+            jig_client::Progress::InFlight => jig_client_view::intents::Progress::InFlight,
+            jig_client::Progress::Retrying { .. } => jig_client_view::intents::Progress::Retrying,
+            jig_client::Progress::Parked | jig_client::Progress::NotServed => {
+                jig_client_view::intents::Progress::Parked
+            }
+            jig_client::Progress::Unknown => jig_client_view::intents::Progress::Unknown,
+        },
+    );
 }

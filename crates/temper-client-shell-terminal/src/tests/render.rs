@@ -41,6 +41,7 @@ fn each_fixture_page_prints_as_its_golden_file() {
     for (name, tree) in [
         ("inbox", fixtures::inbox_page()),
         ("chats", fixtures::chats_page()),
+        ("chat", fixtures::chat::page()),
         ("task", fixtures::task_page()),
         ("project", fixtures::project_page()),
         ("deployment", fixtures::deployment_page()),

@@ -17,3 +17,6 @@ jig-client-protocol-wire.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+jig-client-test-records.workspace = true

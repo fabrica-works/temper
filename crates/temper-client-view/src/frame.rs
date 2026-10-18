@@ -38,6 +38,7 @@ impl Bindings {
                         Act::Filter { filter }
                     }
                     (Act::ChatWords { .. }, skein_ui::Act::Input { value }) => Act::ChatWords { words: value },
+                    (Act::MessageWords { .. }, skein_ui::Act::Input { value }) => Act::MessageWords { words: value },
                     (Act::CardWords { object, .. }, skein_ui::Act::Input { value }) => {
                         Act::CardWords { object: *object, words: value }
                     }

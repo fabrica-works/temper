@@ -1,3 +1,4 @@
+mod chat;
 mod chats;
 mod inbox;
 use super::fixtures;

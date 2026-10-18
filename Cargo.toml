@@ -81,6 +81,7 @@ skein-shell = { git = "https://github.com/forgetic/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
 jig-client = { git = "https://github.com/forgetic/jig.git" }
 jig-client-protocol-http = { git = "https://github.com/forgetic/jig.git" }
+jig-client-test-records = { git = "https://github.com/forgetic/jig.git" }
 jig-client-protocol-link = { git = "https://github.com/forgetic/jig.git" }
 jig-client-shell-native = { git = "https://github.com/forgetic/jig.git" }
 skein-tls = { git = "https://github.com/forgetic/skein.git" }

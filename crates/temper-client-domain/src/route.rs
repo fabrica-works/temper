@@ -107,6 +107,9 @@ pub(crate) fn route_jig(
             jig_client_view::Request::Save { .. } | jig_client_view::Request::Erase { .. } => {}
         }
     }
+    if let Some(address) = crate::pages::chat::from_reference(root) {
+        out.push(Request::Show { address, replace: true });
+    }
 }
 
 pub(crate) fn route_forge(

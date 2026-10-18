@@ -18,3 +18,6 @@ workspace = true
 
 [dev-dependencies]
 temper-client-protocol-wire.workspace = true
+jig-client-test-records.workspace = true
+jig-client-protocol-link.workspace = true
+jig-client-protocol-wire.workspace = true

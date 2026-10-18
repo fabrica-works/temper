@@ -96,11 +96,5 @@ fn starting_a_chat_waits_for_the_first_words() {
 }
 #[test]
 fn a_started_chat_opens_its_conversation_activity() {
-    assert_eq!(
-        crate::Address::Chat { task: fixtures::acts::TASK }.reference(),
-        Some(jig_client_view::address::Address::Task {
-            task: fixtures::acts::TASK,
-            section: jig_client_view::address::TaskSection::Activity
-        })
-    );
+    assert_eq!(crate::Address::Chat { task: fixtures::acts::TASK }.reference(), None);
 }

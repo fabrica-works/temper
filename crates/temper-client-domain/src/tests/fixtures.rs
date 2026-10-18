@@ -390,3 +390,4 @@ pub fn opened(root: &mut crate::Domain, out: &mut Queue<Request>) {
         );
     }
 }
+pub mod chat;

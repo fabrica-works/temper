@@ -6,6 +6,7 @@ use jig_client::{
     contract::{Delivery, Me, Subject},
 };
 use skein_lib::{Env, Queue, Time};
+pub mod chat;
 pub mod chats;
 pub mod inbox;
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub struct Pages {
     shown: u64,
     pub(crate) inbox: Option<inbox::Inbox>,
     chats: Option<chats::Chats>,
+    chat: Option<chat::Chat>,
     next: u64,
     pub(crate) serial: u64,
     seen: Option<(u64, jig_client::Key)>,
@@ -31,6 +33,12 @@ pub enum Act {
         words: Box<[u8]>,
     },
     StartChat,
+    MessageWords {
+        words: Box<[u8]>,
+    },
+    Send,
+    Stop,
+    Older,
     ClosedChats,
     Filter {
         filter: crate::address::Filter,
@@ -82,6 +90,7 @@ impl Pages {
             shown: 0,
             inbox: None,
             chats: None,
+            chat: None,
             next: 1,
             serial: 0,
             seen: None,
@@ -99,6 +108,10 @@ impl Pages {
     #[must_use]
     pub const fn chats(&self) -> Option<&chats::Chats> {
         self.chats.as_ref()
+    }
+    #[must_use]
+    pub const fn chat(&self) -> Option<&chat::Chat> {
+        self.chat.as_ref()
     }
     pub(crate) fn seeded(seed: u64) -> Self {
         Self { serial: skein_lib::Rng::new(seed).next_u64(), ..Self::new() }
@@ -154,7 +167,18 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
-        Event::Act { act: Act::Seen } => seen(pages, out),
+        Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Stop | Act::Older) } => {
+            if let Some(chat) = &mut pages.chat {
+                chat.act(env, client, act, &mut pages.serial, out);
+            }
+        }
+        Event::Act { act: Act::Seen } => {
+            if let Some(chat) = &mut pages.chat {
+                chat.act(env, client, Act::Seen, &mut pages.serial, out);
+            } else {
+                seen(pages, out);
+            }
+        }
         Event::Act {
             act: act @ (Act::Decide { .. } | Act::CardWords { .. } | Act::Again { .. } | Act::Confirm | Act::Cancel),
         } => crate::acts::step(pages, env, act, out),
@@ -201,14 +225,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
                 return;
             }
-            if let Some(chats) = &mut pages.chats {
-                if !chats.told(told, out) {
-                    return;
-                }
-            } else if !match &mut pages.inbox {
-                Some(inbox) => inbox.told(client, told, out),
-                None => false,
-            } {
+            if !page_told(pages, client, told, out) {
                 return;
             }
         }
@@ -239,12 +256,18 @@ fn contains(me: &Me, project: Option<u32>) -> bool {
 }
 
 fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<Request>) {
-    if (pages.inbox.is_none() && pages.chats.is_none()) || pages.address != address {
+    if (pages.inbox.is_none() && pages.chats.is_none() && pages.chat.is_none()) || pages.address != address {
         if let Some(inbox) = pages.inbox.take() {
             pages.next = inbox.leave(out);
         }
         if let Some(chats) = pages.chats.take() {
             pages.next = chats.leave(out);
+        }
+        if let Some(chat) = pages.chat.take() {
+            pages.next = chat.leave(out);
+        }
+        if let Address::Chat { task } = address {
+            pages.chat = Some(chat::Chat::new(task, pages.next, &env.limits, out));
         }
         if address == Address::Chats {
             pages.chats = Some(chats::Chats::new(pages.next));
@@ -276,4 +299,22 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
             })),
         }));
     }
+}
+
+fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if let Some(chat) = &mut pages.chat {
+        if !chat.told(client, told, out) {
+            return false;
+        }
+    } else if let Some(chats) = &mut pages.chats {
+        if !chats.told(told, out) {
+            return false;
+        }
+    } else if !match &mut pages.inbox {
+        Some(inbox) => inbox.told(client, told, out),
+        None => false,
+    } {
+        return false;
+    }
+    true
 }

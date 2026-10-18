@@ -32,13 +32,9 @@ impl Address {
     /// Reference content inside temper's frame until its own pages land.
     #[must_use]
     pub fn reference(&self) -> Option<jig_client_view::address::Address> {
-        use jig_client_view::address::Address as Jig;
         match self {
-            Self::Chat { task } => {
-                Some(Jig::Task { task: *task, section: jig_client_view::address::TaskSection::Activity })
-            }
             Self::Jig(address) => Some(*address),
-            Self::Inbox { .. } | Self::Adopt { .. } | Self::Chats => None,
+            Self::Inbox { .. } | Self::Adopt { .. } | Self::Chats | Self::Chat { .. } => None,
         }
     }
 }

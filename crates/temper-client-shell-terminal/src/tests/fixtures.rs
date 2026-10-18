@@ -800,3 +800,5 @@ pub fn chats_page() -> skein_ui::Tree {
     b.close();
     b.finish()
 }
+
+pub mod chat;

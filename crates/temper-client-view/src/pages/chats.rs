@@ -76,21 +76,7 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     );
     text(b, Role::Paragraph, line.chip.title.bytes());
     if let Some(me) = root.pages().me(root.client()) {
-        let status = jig_client::facts::chat_status(&line.chip, &line.waits_on, line.project, me);
-        let holes = match &status {
-            jig_client::facts::ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),
-            jig_client::facts::ChatStatus::Starting
-            | jig_client::facts::ChatStatus::Writing
-            | jig_client::facts::ChatStatus::Working { .. }
-            | jig_client::facts::ChatStatus::WaitingForYou { .. }
-            | jig_client::facts::ChatStatus::WaitingFor(_)
-            | jig_client::facts::ChatStatus::Parked
-            | jig_client::facts::ChatStatus::Retrying { .. }
-            | jig_client::facts::ChatStatus::Held(_)
-            | jig_client::facts::ChatStatus::Closing
-            | jig_client::facts::ChatStatus::Ended { .. } => None,
-        };
-        text(b, Role::Status, &words.say_word(jig_client::words::Word::status(&status), holes.as_slice()));
+        status(b, &line.chip, &line.waits_on, line.project, me, words);
     }
     text(
         b,
@@ -106,7 +92,12 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
     b.close();
 }
 
-fn outcome_text(b: &mut Builder, jig: &jig_client_view::words::Words, outcome: &jig_client::Outcome, text_limit: u32) {
+pub(crate) fn outcome_text(
+    b: &mut Builder,
+    jig: &jig_client_view::words::Words,
+    outcome: &jig_client::Outcome,
+    text_limit: u32,
+) {
     use jig_client::{Answered, Outcome};
     use jig_client_view::phrases::jig::JigPhrase as P;
     match outcome {
@@ -120,4 +111,29 @@ fn outcome_text(b: &mut Builder, jig: &jig_client_view::words::Words, outcome: &
         Outcome::Unconfirmed => jig.status(b, P::RequestUnconfirmed, &[]),
         Outcome::Answered(Answered::Family(_)) => {}
     }
+}
+
+pub(crate) fn status(
+    b: &mut Builder,
+    chip: &jig_client::contract::Chip,
+    waits_on: &jig_client::contract::WaitsOn,
+    project: u32,
+    me: &jig_client::contract::Me,
+    words: &Words,
+) {
+    let status = jig_client::facts::chat_status(chip, waits_on, project, me);
+    let holes = match &status {
+        jig_client::facts::ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),
+        jig_client::facts::ChatStatus::Starting
+        | jig_client::facts::ChatStatus::Writing
+        | jig_client::facts::ChatStatus::Working { .. }
+        | jig_client::facts::ChatStatus::WaitingForYou { .. }
+        | jig_client::facts::ChatStatus::WaitingFor(_)
+        | jig_client::facts::ChatStatus::Parked
+        | jig_client::facts::ChatStatus::Retrying { .. }
+        | jig_client::facts::ChatStatus::Held(_)
+        | jig_client::facts::ChatStatus::Closing
+        | jig_client::facts::ChatStatus::Ended { .. } => None,
+    };
+    text(b, Role::Status, &words.say_word(jig_client::words::Word::status(&status), holes.as_slice()));
 }

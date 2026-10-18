@@ -127,7 +127,13 @@ pub(super) fn step(pages: &mut Pages, env: &Env<Limits>, act: Act, out: &mut Que
             }
         }
         Act::Cancel => pages.confirm = None,
-        Act::ChatWords { .. } | Act::StartChat | Act::ClosedChats => unreachable!("chat acts routed to chats"),
+        Act::MessageWords { .. }
+        | Act::Send
+        | Act::Stop
+        | Act::Older
+        | Act::ChatWords { .. }
+        | Act::StartChat
+        | Act::ClosedChats => unreachable!("chat acts routed to chats"),
         Act::Project { .. } | Act::SignOut | Act::Filter { .. } | Act::Seen | Act::Go { .. } => {
             unreachable!("only deciding acts routed here")
         }

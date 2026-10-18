@@ -382,3 +382,25 @@ fn the_question_fixture_commits_its_numbered_question_before_the_client_starts()
             .any(|message| message.words.as_ref() == b"Which provider first?")
     );
 }
+
+const CHAT_REPLY: Token = Token::new(1005);
+const CHAT_KEY: [u8; 16] = [35; 16];
+const CHAT_PROJECT: u32 = 1;
+/// A real running chat, ready for the person's next words.
+pub fn chat(front: &mut Joint, words: &[u8]) -> u64 {
+    let driver = &mut front.engine;
+    driver.sign_in();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::Ask {
+        reply_to: skein_lib::ReplyTo::new(CHAT_REPLY),
+        sign_in: driver.session(),
+        key: CHAT_KEY,
+        ask: driver.chat_ask(CHAT_PROJECT, words),
+    }));
+    driver.settle();
+    driver.last_assignment().task
+}
+#[must_use]
+pub fn chat_page(task: u64) -> temper_client_domain::Address {
+    temper_client_domain::Address::Chat { task }
+}
