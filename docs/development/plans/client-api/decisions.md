@@ -2574,6 +2574,15 @@ choice would have been the user's (development.md, 10.4).
      Refresh any further match or copy the compiler finds by this rule, and
      list it in the commit body.
 
+338. **jig-19.4's restart takes args again** (plan defect, jig-19's block of 2026-10-18T11:33:42Z).
+     Ruling 338, plan defect in ruling 329's 19.4 correction, which said "`restart` with `{address}` is what serves `127.0.0.1:0`". The plan's own Shape says otherwise: `Tier::setup` gives `args: ["serve", <config>]`, "`restart` the same" (`jig/19-browser.md`, the `tests/client-browser/src/lib.rs` bullet), and jig 20 gives the stories that stop the server their stable address: "`jig-test` names its listener in its configuration, not its arguments, so jig's tier writes the configuration of each story that stops the server (20.2's two) with a port it reserved (…), and gives `restart` the same arguments. The other stories keep port `0`" (`jig/20-attack-stories.md`, "The restarted stories' address").
+
+     1. 19.4's `Setup.restart` is `["serve", <config>]`, `args` again, with no `{address}`; skein's harness substitutes `{address}` only where an argument holds it, so the arguments go as given.
+     2. `jig-test serve` keeps its command: no `--listen`, and `testing/jig-test/src/lib.rs` stays outside 19.4's Files.
+     3. 19.4's story stops no server; nothing is deferred: the stable address of a restarted server is 20.2's, as planned.
+
+     The plan's 19.4 bullet now says so. A further place in 19.4's work that reads `restart` as carrying the address takes `args` again; list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

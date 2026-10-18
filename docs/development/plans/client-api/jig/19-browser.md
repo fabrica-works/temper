@@ -178,7 +178,10 @@ found these, against the increments below; they replace what differs.
   test asserts, and 19.4's test shell takes it from the adapter.
 - **19.4:** the harness's `Setup` also has `server`, `chromium`,
   `expected` and `origins`, as the `Tier::setup` sketch has them;
-  `restart` with `{address}` is what serves `127.0.0.1:0`.
+  `restart` is `args` again, `["serve", <config>]`, with no `{address}`
+  (ruling 338): 19.4's story stops no server, `jig-test serve` takes no
+  listener argument, and the stories that stop it get a stable port
+  from jig 20's tier ("The restarted stories' address").
 - **Held:** `cargo update -p skein-lib --precise 0f093bb7..` leaves one
   skein in `Cargo.lock`, as "Choices" says; temper's `address.rs` wraps
   jig's `Address`, so 19.2 only adds to it, and temper uses no `web`
