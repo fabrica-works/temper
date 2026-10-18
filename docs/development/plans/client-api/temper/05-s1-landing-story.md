@@ -22,7 +22,10 @@ of this run's landings:
    (`person::found`) misses "Reply message:" in "Task 2:" at native
    person step 1 (`support/person.rs:272`, raised at `support/mod.rs:419`).
 
-Needs: nothing. The story has carried no ignore since 04.4.
+Needs: temper-04.s1 (ruling 352): its repin takes jig `38ae1ba17`, which
+carries authorities whole; at temper's pin, jig `e0c7b18bd`, the fixture's
+grants are cut and the story's first act is not offered. The story has
+carried no ignore since 04.4.
 
 Shape: one commit for each cause, in the order the story meets them on
 `main`. The bisect's commits say where to look, and the focused log

@@ -2694,6 +2694,13 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** three focused runs and 30 minutes from this unblock.
      5. **Unchanged:** ruling 349's points 4 and 5, and its Checked.
 
+352. **temper-05.s1 waits for temper-04.s1's repin** (plan order, temper-05.s1's block of 2026-10-18T12:32:17Z).
+     Ruling 352, plan order: yes, as the report proposes. temper-05.s1 Needs temper-04.s1. At temper's pin, jig `e0c7b18bd`, the fixture's ten grants are cut at `documents.lines` 2, so `Me.creating` is `None` and the story's first act is not offered (`logs/temper-05/s1-authority-cause.md`). temper-04.s1's repin takes jig `38ae1ba17` ("Carry authorities whole across the engine and client link"), which ruling 347 did not know the story needs.
+
+     1. **The coordinator** sets temper-05.s1's Needs to temper-04.s1 and starts it again once temper-04.s1 has landed, from that `main`.
+     2. **The session** then reruns the story's focused log on that `main` before any repair: a cause the repin removed needs no commit, and the report says so; the others go as the file's Shape says.
+     3. **Unchanged:** the file's Shape, Test shape, Proof, Size and Don't; ruling 229; the steer of 12:20Z, point 2, which counts from temper-05.s1's landing.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
