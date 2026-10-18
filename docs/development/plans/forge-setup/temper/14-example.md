@@ -278,7 +278,7 @@ Proof: process, on x1 with the guide and the example committed, the exports of 1
   heavy --gate sh ~/src/rust/tmp/temper/forge-setup/logs/temper-14.2/follow.sh
   ```
   The script exits 0 after printing checks (a) to (h), and `follow.log` holds the commands and their output. Bound: 420
-  s wall, the script's own timeouts as above, at most three runs; a third failure with the same symptom is a question.
+  s wall, the script's own timeouts as above, at most six runs, each after the last one's cause, a new one, was found by a focused probe and handled in the script (ruling 150); a failure with a cause seen before, or a fault in temper or the example rather than the script, is a question.
 Don't: run `temper sign-in`, `live-login` or anything that reaches the provider; use a binary other than the two pinned;
 read a forge file but `person_password` (as the person); change the guide while a run is under way (a fix starts the
 script again from step 1).

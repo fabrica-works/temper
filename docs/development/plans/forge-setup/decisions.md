@@ -917,6 +917,19 @@ run are appended after "For the user".
        log. Nothing else is wanted.
      - Unchanged: 14.s1's Files, Shape, Size and Proof; ruling 147's point 2 for 14.2; ruling 139's wait for 11.1.
 
+150. **14.2's script runs** (plan defect, temper-14.2's block of 2026-10-18T13:09:00Z).
+     Ruling 150, a plan defect in 14.2's Proof: three runs were too few for a script that meets the pinned Forgejo's
+     pages for the first time. Each of your three failed on a cause of its own (the version's build suffix; no `_csrf` on
+     `/user/login`; `/user/change_password` redirecting to `/user/settings/change_password`), each found by a focused probe
+     and handled in `follow.sh`.
+
+     - The Bound now reads: "at most six runs, each after the last one's cause, a new one, was found by a focused probe and
+       handled in the script (ruling 150); a failure with a cause seen before, or a fault in temper or the example
+       rather than the script, is a question." So you have three more full runs, each under the 420 s bound.
+     - A fault in `docs/examples/*` or the guide is fixed there, as 14.2's Files say; one in temper's code is a block.
+     - Unchanged: checks (a) to (h), the 420 s wall, the script's own timeouts, ruling 147's forms rule (the pages that held
+       no `_csrf` are named in the landing report, one line each), 14.2's Files, Size and Don't.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
