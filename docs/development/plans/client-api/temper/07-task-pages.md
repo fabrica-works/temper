@@ -68,7 +68,7 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   `temper_client_view::forge`'s functions from the parts the documents
   name, with no slot: `ShowPart`, `PartsLeft` and the forge side's held
   parts (`crates/temper-client-domain/src/parts.rs`, `forge.rs`'s
-  `Held`) go with the reference UI in 07.4.
+  `Held`) go with the reference UI in temper-07.s1 (ruling 391).
 - **The one-process world's goal** (`tests/one-process/src/stories.rs:15-46`
   sets it on jig's project's goals page) is given by a chat in 07.4, as
   the process tier's landing story gives its change
@@ -82,7 +82,7 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   of temper's words: `jig-client`'s `words` has none for the link's
   states (its `Word` is `Phase`, `Hold`, `Refusal`, `Waiting` and
   `Status`, `crates/jig-client/src/words.rs:15-21`), and jig's are
-  `jig_client_view`'s (`crates/jig-client-view/src/words.rs:67-68`), which 07.4 removes. When
+  `jig_client_view`'s (`crates/jig-client-view/src/words.rs:67-68`), which temper-07.s1 removes. When
   the engine does not serve this client's version of jig's records, the
   main says "This temper is out of date: run the temper the engine
   runs.", also temper's words, with no jig step and no repin (the
@@ -99,14 +99,22 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   the reference UI's child at the base, goes to the shell in 07.4, and
   the terminal prints `temper: N requests kept in DIRECTORY were not
   sent: another version of temper made them` once.
+- **temper's own cards** (the designer's answer of 2026-10-18T19:47Z
+  to the question of 19:10Z; `client.md`, 1): the cards temper's pages
+  show are temper's nodes after its mockups, drawn from the documents
+  and `jig-client`'s `facts`, a decision's facts said in `jig-client`'s
+  `words` under temper's phrasebook. No renderer, helper or phrase table
+  of `jig-client-view` is called or copied. They come in temper-07.s1,
+  the supervisor's to add, after jig-15.s1, with what rulings 391 and
+  392 keep.
 
 ## Rules that bind it
 
-- **jig's reference UI leaves temper in 07.4:** `git -C
+- **jig's reference UI leaves temper in temper-07.s1:** `git -C
   <worktree> grep -n -e jig-client-view -e jig-domain-client -e jig-view
-  -- '*Cargo.toml'` prints nothing at 07.4's end (README, Done when, 8),
-  and `git -C <worktree> grep -n -w jig_client_view -- '*.rs'` prints
-  nothing.
+  -- '*Cargo.toml'` prints nothing at temper-07.s1's end (README, Done
+  when, 8), and `git -C <worktree> grep -n -w jig_client_view -- '*.rs'`
+  prints nothing.
 - **The meeting point:** each page's story runs in `tests/client`
   against temper's engine root in the increment that builds it, with
   jig's check (README, Rules; temper's `testing.md`, 6.3).
@@ -114,6 +122,9 @@ temper's, and the goldens are recorded again by hand (`client.md`, 3.5,
   a repin of temper 05's repairs what breaks in at most 20 lines,
   counted with `git diff --numstat origin/main...HEAD -- <the changed
   paths outside the increment's Files>`; past 20 lines, a question.
+  The one exception is temper-07.s1's first commit, which moves
+  temper's jig pin alone to jig-15.s1's landing (the designer's answer
+  of 19:47Z).
 
 ## Increments
 
@@ -439,8 +450,13 @@ child stays with them, and what names it, since the renderers borrow it
 Ruling 392: so does any other use of `jig-client-view` that 07.4 cannot
 drop without the child, the renderers or a change in jig (the test
 transport of `jig-client-world` takes `jig_client_view::Limits`),
-listed in the report; the answer's step drops them.
-Removes: the transitional code decisions.md, 7 names: the reference
+listed in the report; the answer's step drops them. The designer's
+answer of 2026-10-18T19:47Z: 07.4 ends with what rulings 390 to 392 let
+it land. The card renderers' replacement, by temper's own cards, and
+the removals below go to temper-07.s1. Ruling 388's point 3 and ruling
+389's points 2 and 3 no longer bind the cards, since nothing of
+`jig-client-view` is copied.
+Removes (in temper-07.s1, the designer's answer): the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,
 the forge side's held parts, `jig-client-view` in temper's manifests.
@@ -477,7 +493,7 @@ pub enum Shape {
 
 ## Done when
 
-- 07.1 to 07.4 have landed on temper's `origin/main`.
+- 07.1 to 07.4 and temper-07.s1 have landed on temper's `origin/main`.
 - `git -C <worktree> grep -n -e jig-client-view -e jig-domain-client -e
   jig-view origin/main -- '*Cargo.toml'` prints nothing (README, Done
   when, 8).
