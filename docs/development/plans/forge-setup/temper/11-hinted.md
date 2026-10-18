@@ -77,6 +77,13 @@ below):**
   `person.rs:261` `found`, `limits.rs:249` `profile`, `forge.rs:115` `small`, `lib.rs:102` `Outgoing::json`,
   `instance.rs:110` the nap.
 - `temper_open_adopts_a_repository_by_commands` took 5.07 s in the check (the file says 13.1 s): the ceiling stands.
+- After 05.3 (ruling 141, at temper 01e467afc): the `webhooks.rs` sketch's `use skein_lib::Duration;` and `use
+  std::net::TcpListener;` go too (`support/webhooks.rs:4` and :11 import both). `support/mod.rs` moved by one line
+  (`pub mod webhooks;` at :7): `WITHIN` :8, `Scratch::new` :52, `ANSWER`/`EDIT` :343-344, the judge's messages :438 and
+  :450, `run_until_landed` :466-473 (its literal :472), the judge's deadline :495-498, the imports :12 (`Path`) and :77
+  (`Duration`); `limits.rs:252` `profile`; `forge.rs:116` `small`. `owned::document` (`support/owned.rs:21`) takes no
+  webhooks input and writes `"webhook_secret": null`: set `application.webhooks` and the forge's `webhook_secret` in
+  `forgejo::configuration` after it, or give `owned::Names` a field for them.
 Scope: the tier's owned document names the webhooks' listener and the forge's `webhook_secret` (setup.md 8), which 05.3's
 wiring hands to the preparation (`app.ini`'s `ALLOWED_HOST_LIST`, setup.md 6.2) and to reconcile (the org hook, setup.md 5
 step 6); one test shows the box's Forgejo deliver a push to that address, signed with the secret reconcile drew (decision

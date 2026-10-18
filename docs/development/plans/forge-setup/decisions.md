@@ -719,6 +719,9 @@ run are appended after "For the user".
      that no increment touches stay. The steer of this time passes them on, with the process changes of skein b30cc95 and
      b1d2276 that this run takes.
 
+141. **11.1 against 05.3** (re-check of temper-11.1).
+     Ruling 141, the re-check of temper-11.1 after 05.3 landed (5ee2677e9), at temper 01e467afc. Amends `temper/11-hinted.md` (its "Corrections against main"): the `webhooks.rs` sketch's two duplicate imports; `support/mod.rs`'s references moved by one line, `limits.rs:252`, `forge.rs:116`; `owned::document` takes no webhooks input, so `forgejo::configuration` sets them after it, or `owned::Names` gains a field. With these, in a scratch worktree: clippy `-D warnings` passes; the default 54 of 54; the process tier 16 of 17, `a_push_is_delivered_signed_with_the_secret_reconcile_drew` in 4.9 s; the landing story fails as ruling 139 says, with 11.1's changes and without them.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
