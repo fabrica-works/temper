@@ -2784,6 +2784,13 @@ choice would have been the user's (development.md, 10.4).
      3. **Downstream:** temper's own server, `crates/temper-service/src/limits.rs:314`, `connections: 4` ("Server bounds follow jig's shipped small profile"), has the same count: the closing repin's step 1 moves it to 8 (README, "Rules of this plan", the repin), not this step.
      4. **Unchanged:** ruling 358, point 4; the admission's rejection at capacity (`server.rs:124-128`); the tier's small engine profile (`tests/client-browser/src/lib.rs:142-143`).
 
+363. **temper's owned example follows the code** (plan defect, temper-05's block of 2026-10-18T13:32:53Z).
+     Ruling 363, plan defect: `docs/examples/owned.json` is exact (forge-setup `temper-14.1`, `configuration.md` 7), so each worst-case growth needs its refresh; this is the third in 50 minutes (rulings 354, 356). The README's "The run's steers" now holds a standing rule for it (2026-10-18 13:34Z, point 3), and this block goes by it.
+
+     1. **05.s1's session** raises `docs/examples/owned.json:192` `engine.memory_bytes` from 78669036604464 by the 32 bytes the refusal names, to 78669036604496, in a commit of its own naming `temper-14.1` and rulings 354, 356 and 363. Refresh any further copy of the value, and list it in the commit body.
+     2. **Then** `serve_prepares_once_on_the_owned_example` once, and the whole tier once, `heavy --gate scripts/proof-one-process.sh`, with both exports, as 05.s1's Proof runs it; land with `land`'s gate. The landing counts to 05.s1 (as ruling 335 counted 06.3's repairs).
+     3. **A test of the tier that still fails,** other than by a memory this rule closes, goes in the report with its first failure line, not repaired here (05.s1, Proof).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

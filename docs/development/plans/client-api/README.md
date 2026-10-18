@@ -942,6 +942,17 @@ per session are in each file.
     landing, run `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart`
     once, as temper/05-s1-landing-story.md's Proof runs it, with both
     exports. A failure there is the increment's, under ruling 229.
+  - 2026-10-18 13:34Z, point 3 (every temper session, until the run's
+    end; ruling 363): The owned example: `docs/examples/owned.json` is
+    exact (forge-setup `temper-14.1`, `configuration.md` 7). If your
+    change can raise a worst case, run `heavy cargo nextest run -p temper
+    --test startup -E 'test(serve_prepares_once_on_the_owned_example)'`
+    before your gate. When a start refuses a memory, raise the named value
+    (`engine.memory_bytes`, `workers[0].memory_bytes`) by the shortfall it
+    names, in a commit of its own that names `temper-14.1` and rulings
+    354 and 356, and list any further copy of the value. That is no block
+    and no failure outside your Files. A refusal of another kind, or a
+    shortfall one repair does not close, is a block.
 
 ## Prerequisites the run checks at its start
 
