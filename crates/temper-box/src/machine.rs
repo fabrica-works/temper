@@ -1,4 +1,4 @@
-//! Steps, exits and timers in; process orders out (setup.md, 7.2).
+//! Steps, exits and timers in; process orders out (protocol/setup.md, 7.2).
 use crate::limits::{Limits, Unfit, check};
 use alloc::boxed::Box;
 use skein_io::kernel::Exit;

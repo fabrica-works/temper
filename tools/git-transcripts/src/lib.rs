@@ -1,4 +1,4 @@
-//! Real git's arguments and output, recorded without credentials (git.md, 9).
+//! Real git's arguments and output, recorded without credentials (protocol/git.md, 9).
 mod cases;
 mod invocation;
 pub mod mask;

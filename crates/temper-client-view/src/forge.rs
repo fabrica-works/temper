@@ -1,4 +1,4 @@
-//! Keep: owner parts and parts held for the page (root.md, 6–9).
+//! Keep: owner parts and parts held for the page (jig's client/domain/root.md, 6–9).
 //! Replace: Ops subjects with the forge's resource words and fixed paragraph.
 use crate::words::{Word, Words};
 use alloc::boxed::Box;

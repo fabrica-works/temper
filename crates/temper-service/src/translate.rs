@@ -1,4 +1,4 @@
-//! Stateless application parts between the root and its channel (channel.md, 7).
+//! Stateless application parts between the root and its channel (protocol/channel.md, 7).
 use crate::settings;
 use alloc::boxed::Box;
 use skein_lib::{List, Secret, Writer};
@@ -164,7 +164,7 @@ pub fn identity(identity: &settings::Identity, limits: &v1::Limits) -> Result<Se
     Ok(wire::identity(&value))
 }
 
-/// The worker's decoded workspace and saved-work branch (channel.md, 7).
+/// The worker's decoded workspace and saved-work branch (protocol/channel.md, 7).
 pub type Assigned = (temper_worker_domain::wire::Workspace, Option<Box<[u8]>>);
 
 /// Copy every workspace field from its channel record, or an empty workspace.

@@ -78,7 +78,7 @@ fn failed_preparation(run: &engine::Assignment, preparation: engine::Preparation
 }
 
 // A permanent preparation failure names its repository beside the answer;
-// the root reports it as a fact of the attempt (domain/engine.md, 8).
+// the root reports it as a fact of the attempt (domain/root.md, 7.4).
 #[test]
 fn a_permanent_preparation_failure_is_reported_as_a_fact_of_its_attempt() {
     let (mut driver, run) = Driver::chat();

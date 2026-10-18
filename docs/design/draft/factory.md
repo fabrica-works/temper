@@ -65,9 +65,10 @@ what is open.
   database developed with temper, called `stoa` here, is the example.
 - **Deploying is landing.** The desired state is the IaC repository's
   main branch. A change to it goes through the forge's change procedure,
-  landing queue and gates (`domain/forge.md`, sections 8 and 9). Machines
-  then converge to what landed (section 9). Promotion from staging to
-  production is another change, gated on verdicts from staging.
+  landing queue and gates (`../domain/forge.md`, sections 8 and 9).
+  Machines then converge to what landed (section 9). Promotion from
+  staging to production is another change, gated on verdicts from
+  staging.
 - **Immutable systems.** A machine runs a root filesystem built from a
   revision, never a system modified in place. Rolling back is switching
   to the previous build.
@@ -114,7 +115,7 @@ temper ──"run this experiment at this head" (active)────────
 - **Through the forge, passively.** The lab watches the repositories it
   is given, runs experiments by its own rules (section 8), posts
   statuses at heads and files findings as issues. A status at a head is
-  already a fact temper's gates read, as CI's is (`domain/forge.md`,
+  already a fact temper's gates read, as CI's is (`../domain/forge.md`,
   8.3), so temper's forge connector does not grow. Anyone on the forge
   can consume it: a person, or another factory.
 - **Through a connector, actively.** When a coordinator wants "benchmark
@@ -122,14 +123,14 @@ temper ──"run this experiment at this head" (active)────────
   has a connector to the lab: resources are experiments; an effect is a
   request, keyed and priced, for an experiment at a head with a level of
   evidence; its result is a verdict with its evidence. The lab's price
-  is spent from the requesting task's budget (jig's `authority.md`,
+  is spent from the requesting task's budget (jig's `domain/authority.md`,
   section 7). temper is then a client of the lab that is not a person
   (jig's `README.md`, section 10).
 - **Done means proven in production.** A goal that changes a service can
   wait on the run side's health status at the commit it landed, and end
   only then.
 - **Identities.** The lab and the run side are parties on the forge of
-  their own, services (jig's `people.md`, section 3).
+  their own, services (jig's `domain/people.md`, section 3).
 
 ## 5. The ground: targets and pools
 
@@ -152,7 +153,7 @@ The concepts are generic; the right column is os, their first backend.
 An infrastructure connector, shared by the lab and the run side:
 
 - **Resources:** pools, machines, targets on machines, slots.
-- **Effects,** each with its recovery class (jig's `connectors.md`,
+- **Effects,** each with its recovery class (jig's `domain/connectors.md`,
   4.3):
   - *prepare* a target at a revision into a machine's inactive slot:
     keyed by target and revision, and repeating it finds what the first
@@ -349,7 +350,7 @@ baseline     for measurements: main's distribution, per experiment and metric
 7. **Scheduling follows value per cost:** gates that hold a landing,
    then landings, nightly runs, exploration. A burst of heads coalesces
    to its last, except for gates. Pools' slots are pooled holds (jig's
-   `tasks.md`, section 6), runs are priced, budgets are per period.
+   `domain/tasks.md`, section 6), runs are priced, budgets are per period.
    Untrusted heads wait for a maintainer, and pools reach nothing but
    their caches.
 

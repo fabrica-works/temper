@@ -1,4 +1,4 @@
-//! Arbitrary and mutated durable rows and keys (store/README.md, section 6).
+//! Arbitrary and mutated durable rows and keys (protocol/store.md, section 6).
 use skein_lib::{Duration, Rng};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as client;

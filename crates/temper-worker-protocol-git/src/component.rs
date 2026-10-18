@@ -38,7 +38,8 @@ fn event(out: &mut Outputs, event: Event) {
     out.events.push(event);
 }
 impl Component {
-    /// Refuse the limit that breaks git.md section 8 before allocating state.
+    /// Refuse the limit that breaks protocol/git.md section 8 before
+    /// allocating state.
     pub fn new(limits: &Limits, checkout: &checkout::Limits, settings: Settings) -> Result<Component, Unfit> {
         limits::check(limits, checkout)?;
         let capacity = limits.operations.checked_add(1).ok_or(Unfit::Memory)?;

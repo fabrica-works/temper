@@ -1,5 +1,6 @@
 //! Faults injected into independent boundary referees for each promise in
-//! domain/core.md, section 10. The same referees observe the passing worlds.
+//! jig's domain/core.md, section 11. The same referees observe the passing
+//! worlds.
 
 use jig_domain_people::Role;
 use jig_domain_tasks::Party;

@@ -1,5 +1,5 @@
 //! A host call that does not decode is answered at once as an error, with
-//! no commit and no record (domain/engine.md, 7.3; llm.md, 4).
+//! no commit and no record (domain/root.md, 5.2; protocol/llm.md, 4).
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::Token;

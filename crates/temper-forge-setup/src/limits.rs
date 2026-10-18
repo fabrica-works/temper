@@ -1,4 +1,4 @@
-//! Reconcile's bounded orgs, deadline and wait (configuration.md, 7).
+//! Reconcile's bounded orgs, deadline and wait (protocol/configuration.md, 7).
 use skein_lib::Duration;
 /// Limits checked before a setup is read.
 #[derive(Clone, PartialEq, Eq, Debug)]

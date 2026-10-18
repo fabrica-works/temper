@@ -84,6 +84,7 @@ fn permission_number(permission: forge_client::api::Permission) -> u16 {
     }
 }
 
+/// The project's role for a collaborator's forge permission (domain/forge.md, 4).
 fn seeded_role(domain: &Domain, project: u32, permission: forge_client::api::Permission) -> Option<people::Role> {
     let number = permission_number(permission);
     let mappings = domain.core.permission_roles.get(&project)?;

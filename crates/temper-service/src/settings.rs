@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use skein_lib::{List, Secret};
 
-/// A forge temper works on (configuration.md, section 3, `forges`).
+/// A forge temper works on (protocol/configuration.md, section 3, `forges`).
 #[derive(Debug)]
 pub struct Forge {
     pub number: u16,
@@ -35,7 +35,7 @@ pub enum Transport {
     Tls { server_name: Box<[u8]>, trust: Option<Box<[u8]>> },
 }
 
-/// A git identity (configuration.md, section 3, `identities`).
+/// A git identity (protocol/configuration.md, section 3, `identities`).
 #[derive(Debug)]
 pub struct Identity {
     pub number: u32,
@@ -69,7 +69,7 @@ pub struct Seeds {
 pub use temper_engine_protocol_forge::hooks::Webhooks;
 
 /// The engine's settings: jig's part, typed by jig-protocol-config, and
-/// temper's members (configuration.md, sections 2 and 3).
+/// temper's members (protocol/configuration.md, sections 2 and 3).
 #[derive(Debug)]
 pub struct Engine {
     pub jig: jig_protocol_config::Engine,
@@ -94,7 +94,7 @@ pub struct Agent {
     pub host_limits: smith_host_domain::Limits,
 }
 
-/// A worker's settings: jig's part and temper's (configuration.md,
+/// A worker's settings: jig's part and temper's (protocol/configuration.md,
 /// section 4); 09 builds the worker from it.
 #[derive(Debug)]
 pub struct Worker {

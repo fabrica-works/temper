@@ -1,4 +1,4 @@
-//! Waiting calls and returned answers (forge.md, sections 2 and 8).
+//! Waiting calls and returned answers (protocol/forge.md, sections 2 and 8).
 use crate::{
     boundary::{Answered, Event, Request},
     connection::{Body, Connection, Failure, Heard, Phase},

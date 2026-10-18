@@ -1,4 +1,5 @@
-//! Forge-owned brief sections, gathered from current provider facts (domain/connectors.md, section 9).
+//! Forge-owned brief sections, gathered from current provider facts
+//! (jig's domain/connectors.md, section 9).
 use crate::{BriefCommit, BriefItem, BriefRead, BriefSource, Domain, Request};
 use alloc::boxed::Box;
 use skein_lib::{List, Queue, Token};

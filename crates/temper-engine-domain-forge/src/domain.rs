@@ -1,5 +1,6 @@
-//! Top-level forge routing and commit fence (domain/connectors.md, sections
-//! 2–5). Durable rows are held here and mirrored by root store writes.
+//! Top-level forge routing and commit fence (jig's domain/connectors.md,
+//! sections 2–5). Durable rows are held here and mirrored by root store
+//! writes.
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Map, Queue, Token};
 use temper_engine_domain_forge_change as change;
@@ -110,7 +111,7 @@ pub struct Domain {
     pub(crate) application: adoption::State,
     pub(crate) writers: Map<u16, u64>,
     /// Each forge's git identity, the application credential its runs push
-    /// and fetch with (credentials.md).
+    /// and fetch with (protocol/credentials.md).
     pub(crate) identities: Map<u16, u32>,
     pub(crate) capabilities: Map<Token, crate::capabilities::Pending>,
     client: client::Domain,
@@ -1403,8 +1404,8 @@ fn lost_read(
 ) {
     let Some(mut pending) = d.lost.remove(&owner) else { return };
     // The client had no call slot for this read. The writer slot is freed
-    // only once the branch is read afresh (connectors.md, 3.3), so the read
-    // waits and is asked again when a slot frees (`resume`).
+    // only once the branch is read afresh (jig's domain/tasks.md, 6.3), so
+    // the read waits and is asked again when a slot frees (`resume`).
     if result == Err(client::api::Error::Busy) {
         pending.asked = false;
         d.lost.insert(owner, pending).expect("the read keeps its own lost slot");

@@ -1,4 +1,4 @@
-//! Isolated process specifications for owned setup (setup.md, 6.3–6.4).
+//! Isolated process specifications for owned setup (protocol/setup.md, 6.3–6.4).
 use crate::{
     check::joined,
     ini::flatten,

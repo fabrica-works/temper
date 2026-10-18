@@ -1,4 +1,4 @@
-//! Forgejo's HTTP vocabulary over the fake forge (forge.md, section 9).
+//! Forgejo's HTTP vocabulary over the fake forge (protocol/forge.md, section 9).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

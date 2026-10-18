@@ -1,5 +1,5 @@
 //! In-flight write lanes and uncertain-effect recovery (domain/forge.md,
-//! section 6; domain/connectors.md, section 4.3).
+//! section 6; jig's domain/connectors.md, section 4.3).
 //!
 //! The client holds execution copies, not the top's durable outbox entries.
 //! It never chooses effects or sends their news. `make` accepts a committed

@@ -1,5 +1,5 @@
 //! Forge client for live reads, resource keeping, and effect execution
-//! (domain/forge.md, sections 5–6; domain/connectors.md, section 4).
+//! (domain/forge.md, sections 5–6; jig's domain/connectors.md, section 4).
 //!
 //! Its state is the bounded working set, request budget, and in-flight write
 //! lanes. It never knows task policy, grants, subscribers, or the top's durable

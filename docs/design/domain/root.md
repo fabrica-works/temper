@@ -1,808 +1,649 @@
-# The engine
+# temper's root
 
-Provisional, 2026-10-04, revised 2026-10-18. What the temper engine is, as a domain layer:
-its parts and how they fit, how a decision reaches the store before
-anything leaves the engine, how it restarts, how it runs agents, and the
-capabilities it keeps from today (the fleet, briefs, notes, views,
-accounts). The model is core.md; tasks are tasks.md, authority
-authority.md, connectors connectors.md and the forge forge.md, people
-people.md. The worker it drives is worker.md, the agent smith, as
-agent.md says temper uses it. The
-mechanics are those of skein's `docs/foundation/programming-model.md`.
-What is still open is listed in section 17.
+Provisional, 2026-10-04, revised 2026-10-18. What temper's engine root
+is and does: `temper-engine-domain`, the top-level domain of temper's
+engine, which composes jig's core with the forge connector in the shape
+jig's `domain/root.md` gives every application's root. It says what the
+root composes and carries, its vocabulary toward the protocol layer, the
+one shape as temper holds it, how it routes, translates and puts outputs
+together, its store vocabulary, its part in restart and stopping, its
+limits, and what it never does. The core is jig's `domain/engine.md`;
+the forge is forge.md; the worker the root assigns runs to is worker.md,
+and the agent agent.md. What is still open is listed in section 13.
 
 ## 1. In one page
 
-- **The engine is where work is decided.** It keeps the tasks, checks
-  every action against authority, starts agents' runs on workers, steps
-  procedures, asks people, and drives external systems through its
-  connectors. Workers host runs; agents do the LLM work; the store keeps
-  what must outlive the process.
-- **A root domain and its children.** The tasks child domain is the hub;
-  authority is policy; the fleet, people, accounts, briefs, notes and
-  views are capabilities; each connector is a subtree. The root routes
-  between them and alone faces the protocol layer (section 3).
-- **A decision commits once,** and nothing leaves before it does
-  (section 5). The engine's state may run ahead of the store by the
-  commits in flight; every output (an effect, an assignment, an
-  acknowledgement, an answer to a person, a message relayed to a run)
-  waits until the commit it follows from is durable.
-- **A restart reads the store,** adopts the runs its workers still host,
-  reads afresh from the connectors what they own of the live work, and
-  looks for what uncertain effects made, before deciding anything new
-  (section 6).
-- **Agents run from their task.** A run is given its task's charter, a
-  brief built for why it runs, its transcript if it resumes, and the
-  engine's tools its authority allows. Each turn it takes is committed
-  as it ends, with what it spent and what it read, so a run lost
-  mid-conversation loses only the turns its worker had not had
-  acknowledged, which are bounded; every call that changed something is
-  committed and answered once, however often it is asked (section 7).
-- **Bounded.** The engine holds live work only: live tasks, their
-  inboxes and proposals, the runs in flight, the connectors' working
-  sets. Ended tasks, transcripts, history and notes are in the store,
-  loaded when wanted. Every limit is refused at its entrance.
-- **The domain is complete** (programming-model.md, section 4): a world
-  of domains and fakes runs everything the engine does, with no protocol
-  and no io (section 15).
+- **temper's root composes jig's core and the forge.** Its children are
+  jig's core, `jig-domain-core`, and the forge connector's four crates.
+  It alone faces the engine's protocol layer (section 3;
+  `../protocol/README.md`, section 6).
+- **It routes and translates; jig's core decides.** What commits
+  together, what waits for a commit, the order of a restart and the check
+  on every effect are the core's or the journal's (jig's
+  `domain/root.md`, section 1). The root carries them through skein-lib's
+  journal, its only way out (section 4).
+- **It speaks for the forge to the core.** The forge's crates name no
+  type of jig's core: the root makes, from what the forge says, what the
+  core takes (an effect's description, a verdict, a procedure's step and
+  its delegates, a hold's reason, a result), and back (sections 5 and 6).
+- **Every run is on a worker.** temper runs no agent in the engine: the
+  root has no hub child, and speaks jig's hub's link vocabulary to
+  workers, which in standalone share the engine's process (section 2).
+- **The owner keeps the value.** The root puts each output together from
+  its owners' parts: an assignment from the core's part and the forge's
+  workspace and brief sections, a call's answer from the core's part and
+  the forge's (section 7).
+- **One store vocabulary.** Its keys, records and ranges wrap the core's
+  and the forge's; it has no records of its own (section 8).
+- **Bounded, and checked at start.** Every event reserves the room of the
+  whole route it may take; the root's own limits sum with its children's
+  into its worst case, and limits that do not add up refuse the start
+  (section 10).
+- **On jig's rails.** The engine's world runs the root with its real
+  children over jig's store; the conformance world runs it on jig's
+  harness, under jig's referee (section 12).
 
-## 2. The engine in the system
+## 2. What the root is
 
 ```
-people    the web: requests in, answers and live views out
-engine    tasks, authority, runs, connectors; the store's only client
-store     what must outlive the engine's process
-workers   dial in: assignments, messages relayed and cancels down; turns, tool calls and answers up
-agents    reached only through their workers
-systems   reached only through their connectors: the forge's API and webhooks
+temper-engine-domain                       the root: the journal, routing, translation, putting outputs together
+├── jig-domain-core                        jig's core and its children (jig's domain/engine.md, section 3)
+└── temper-engine-domain-forge             the forge connector's top (forge.md, section 3)
+    ├── temper-engine-domain-forge-client  the working set, keeping up, fresh reads, the outbox's writes
+    ├── temper-engine-domain-forge-change  the change procedure and the landing queues
+    └── temper-engine-domain-forge-issues  the goals' issues
 ```
 
-- **Workers dial in** (worker.md, section 2). The engine assigns runs,
-  relays messages and cancels, answers the tool calls a run makes, and
-  acknowledges its turns and its answer once each is committed. It
-  never connects to a worker.
-- **The engine never reads a repository.** It works from what its
-  connectors read of their systems; what a checkout holds is for the run
-  to find (agent.md, section 2).
-- **People reach temper through the engine's web** (people.md), and the
-  forge, where they may also read, is a system temper drives, not where
-  they act.
-- **The store is the engine's alone.** Nothing else reads or writes it,
-  so the engine needs no compare-and-swap against anyone: its own
-  ordering of commits is the truth.
+- **One connector, the forge.** Configuration names the core one
+  connector, the forge, and a start naming another is refused
+  (`../protocol/configuration.md`, section 2). The root knows the forge
+  by that number and matches on its variants exhaustively.
+- **No hub, no agent in the engine.** The root links `jig-domain-host`
+  for the hub's link vocabulary alone: a worker's hello and its records
+  up and down (section 3). The engine has no slots of its own
+  (`fleet.engine_slots` 0) and temper's charters run on workers
+  (`hosts: "workers"`), so the fleet places every run on a worker (jig's
+  `domain/hosts.md`, section 3).
+- **Workers in the engine's process, in standalone.** The worker joins
+  the engine by an in-process address (`../protocol/README.md`, section
+  8), so the core is configured with its workers in process
+  (`workers_in_process`, which jig's configuration sets from an
+  in-process hosts' listener), and a restart settles their claims at once
+  (jig's `domain/engine.md`, section 6). temper's domain worlds run their
+  workers apart.
+- **Its state:** its children's; the journal; what it keeps of its
+  configuration (the forge's number and the forge's charter); its facts
+  waiting to be drained; and the values in flight between a hand-off and
+  its answer, each bounded (section 10): a worker's record until the
+  fleet takes it, a run's brief sections and workspace while its claim is
+  prepared, its assignment until the claim's decision, the loads it makes
+  for the core, host calls being decoded and rendered, and the forge's
+  reads, effects, subscriptions and adoptions in flight. None of it is
+  stored.
+- **Siblings share no types.** The core never names the forge's types,
+  nor the forge the core's; the forge's top names jig's people child's
+  outcomes alone, for its keyed adoptions (forge.md, section 4).
 
-## 3. Structure
+The crate, one module per part:
 
 ```
-temper-engine-domain                  the root: routing, commits and loads, restart, runs, translations
-├── temper-engine-domain-tasks        the hub: tasks, batches, lifecycle, inboxes, wakes, proposals
-├── temper-engine-domain-authority    authority's order and checks; the rules and the projects' policies
-├── temper-engine-domain-people       people: signing in, roles, requests, inboxes
-├── temper-engine-domain-fleet        workers: slots, placement, attempts, relaying
-├── temper-engine-domain-accounts     LLM accounts: refreshing, granting
-├── temper-engine-domain-brief        a run's brief, from typed sections within a byte budget
-├── temper-engine-domain-notes        notes: scopes, entries, indexes
-├── temper-engine-domain-views        live streams out; traces kept
-└── temper-engine-domain-forge        the forge connector, a subtree of its own (forge.md, section 3)
+temper-engine-domain/src/
+├── lib.rs              the tree, re-exports
+├── boundary.rs         the root's vocabulary: events in, requests out (section 3)
+├── admission.rs        what the journal takes before any child changes (section 4)
+├── domain.rs           Domain, step, fire, release: the one shape (section 4)
+├── decision.rs         the decision and the journal's limits (section 4)
+├── route.rs, route/    which child each event and hand-off goes to (section 5)
+├── translate.rs        Config and the small total functions (section 6)
+├── assemble.rs         assignments and briefs from their owners' parts (section 7)
+├── link.rs             the hub's link records, and what a run left (sections 3 and 7)
+├── store.rs, loads.rs  keys, records, ranges and pages (section 8)
+├── archive.rs          loads outside the working set (section 8)
+├── restart.rs          the restart script's steps (section 9)
+├── stopping.rs         the drain (section 9)
+├── deadline.rs         the children's timers
+├── limits.rs           the root's limits and its worst case (section 10)
+└── tests.rs
 ```
 
-The tree follows programming-model.md, 4.5: each child domain has its
-own vocabulary, limits and world; a parent owns its children's state and
-routes between them; siblings share no domain types, and the root
-translates between them with small total functions.
+## 3. Its vocabulary
 
-- **`tasks` is the hub,** as `work` is today: it knows a task's
-  lifecycle and nothing of runs, connectors or the web.
-- **`authority` is policy:** decisions over data, keeping only the rules
-  and policies in force.
-- **The others are capabilities,** each knowing its own concern: the
-  fleet the workers, people the web's parties, accounts the LLM
-  credentials, the brief a run's context, notes what temper learns,
-  views who watches.
-- **A connector is a subtree,** whose top is a child of the root. The set
-  is closed: the root knows every connector and matches on them
-  exhaustively; nothing below the root knows any but itself
-  (connectors.md, section 2).
+What crosses the domain boundary, in `boundary.rs`: an exhaustive enum
+per direction, one variant per peer. The engine's service on the other
+side, its components and what its routing does with each, is
+`../protocol/README.md`, section 6; in standalone it shares its process
+with the worker's (`../protocol/README.md`, section 8).
 
-The root's vocabulary is what crosses the domain boundary: the store's
-commits and loads, the workers' channel, the web's requests, each
-connector's protocol (for the forge, its calls and webhooks' hints), and
-the OAuth server's (credentials' own document).
+- **In, `Event`:**
+  - the store's answers (`StoreInput`): a commit durable, with the
+    store's fill; a commit failed; a page loaded, or not; a core read's
+    page;
+  - a worker's channel (`WorkerInput::Link`): a hello, a record up with
+    temper's `Parts` beside an answer, a loss; and the protocol layer's
+    hand-backs: a host call decoded into the root's `Tool`, a decided
+    answer rendered, an ended run's outcome read;
+  - a party's (`PartyInput`), among them signing in and out, a keyed
+    request, an application request, reads, watches and their
+    deliveries, a project's period;
+  - accounts' events, and a generation of a git identity
+    (`Event::Credential`, section 7.1);
+  - the forge's events: its API's answers and its webhooks' hints;
+  - a released output addressed to a child (`Event::Released`), and the
+    service's `Restart`, `Resume` and `Stop`.
+- **Out, `Request`:** to the store, a commit, a page to load, a core
+  read's load; to a worker, a link record, an assignment, a refusal, a
+  turn answered busy, a call to decode or dropped, an answer to render,
+  an ended outcome to read; to a party, replies, read answers, documents,
+  a watch refused or ended, a run's text; the forge's API calls
+  (`Request::Forge`); accounts' requests; a released output back to its
+  child (`Request::ToChild`); a forge event the drain hands back
+  (`Request::Busy`); `Drained`; `Stop`.
+- **temper's parts on the hub's records** (`../protocol/channel.md`,
+  sections 4 and 5): the assignment's `ForgeWorkspace` down; up, beside
+  an answer, `Parts`: the heads the run pushed, the repositories it
+  saved, a permanent failure to prepare one.
+- **Facts,** which decide nothing: the root's one, a failed preparation
+  (`Fact::PreparationFailed`, section 7.4), at most 32 waiting to be
+  drained, the rest counted as lost; and the children's own.
+- **Tools.** The root's `Tool` is a host call in typed form, as the
+  protocol layer decodes it (`../protocol/llm.md`, section 4): jig's
+  operations on tasks, notes, the forge's reads, effects and topics, and
+  the refusal of a call whose shape is past its bounds. Which tools
+  temper's agents get, and what each answers, is agent.md, 4.3.
 
-## 4. The top level
+## 4. The one shape, and the journal
 
-The root keeps little of its own:
+jig's shape (jig's `domain/root.md`, section 3), with temper's
+admission:
 
-- **the commits in flight,** each with the outputs waiting for it
-  (section 5);
-- **the loads in flight,** each with what waits for its rows;
-- **the next task number,** and every other number the engine gives,
-  committed as they are used;
-- **the runs in flight:** for each, its task's number, its attempt, and
-  what its assignment was made from, so an answer can be routed and a
-  brief rebuilt (section 7);
-- **the calls committed** for each live task since its last committed
-  turn, by attempt and name, with their answers (7.3).
+```
+try_step(root, event):
+    a store's answer, a released output, Resume:   always stepped
+    a core read's page:   kept, in order, until the journal takes its route
+    a worker's record:    handed back unless the journal takes the route and the root can keep its bytes
+    anything else:        handed back unless the journal takes the route
+step(root, event):
+    route the event to its child; drain every hand-off it starts, through a bounded work queue
+    the core finishes its decision: its writes and held outputs into one decision
+    journal.accept: at most one commit, the deployment's record its first write
+    outputs marked now: through the door
+release(root):   (the service's iterate)
+    after a step: the door's outputs and the commit
+    otherwise:    one held output whose commit is durable, then the next commit
+```
 
-Everything else is a child's. A decision is a route through several
-children, completed within one step (programming-model.md, 4.5), then
-one commit. What must first wait for a load or a read is a state of its
-own (a task preparing, a brief gathering), and its decision is made in
-the step its last answer arrives. The usual routes:
+- **The room is the whole route's.** A step drains every hand-off its
+  decision starts, so any event may reach the whole route; each reserves
+  the same room, the sum of what every child may write and hold along it,
+  with the call records (section 10). An event the journal cannot take
+  changes nothing.
+- **Handed back, not answered.** An input the journal cannot take returns
+  to its owner unchanged, who offers it again; the root answers nobody
+  busy itself. Busy answers are the core's (jig's `domain/engine.md`,
+  5.1).
+- **The deployment's record rides every commit:** the core's numbers,
+  with the commit's own, so a restart reads the last durable commit from
+  it.
+- **Released in order:** one held output per call, and the door's outputs
+  first, after the step that staged them. A released output addressed to
+  a child (a fleet's start, a relayed message, a forge entry to make, a
+  load) comes back as `Event::Released`, one more step of this shape.
+- **Owner progress is a step of its own.** `Resume` admits one: the
+  forge's continuation when it has one, else a due task's activation,
+  else the fleet's.
+- **Timers** fire through the same admission (`fire`): accounts' and
+  views' always; the forge's from its restart step on; the core's others
+  once decisions open.
+- **A decision past its reserve** fails stop, as jig's journal says
+  (jig's `domain/root.md`, section 4).
+
+## 5. Routing
+
+### 5.1 From the protocol layer
+
+Each event goes to the child it is for, by its variant: the store's
+answers to the journal and to the load that asked (section 8); a
+worker's hello and records, a party's requests, reads and watches, a
+project's period (`../protocol/configuration.md`, section 8), accounts'
+events and a git identity's generation to the core; the forge's events
+to the forge; a timer to the child that armed it. What temper adds:
+
+- **A worker's bytes stay with the root.** A turn's transcript and an
+  answer's outcome and parts are kept under tokens the fleet names, until
+  the core takes or drops them; the fleet sees their metadata alone.
+- **An ended run's outcome** goes out to the protocol layer to read, with
+  the change it may name; its typed end comes back to the core, temper's
+  parts translated (7.4).
+- **An adoption,** an application request, goes to the core to admit by
+  key, then to the forge (5.4).
+- **A hint that comes before decisions open** is dropped, since the
+  restart reads afresh (9.1).
+
+### 5.2 Host calls
+
+- **Fenced, then decoded by hand-out.** The fleet admits a call only from
+  its task's live attempt; the root hands it out (`HostRequest::Decode`),
+  and the protocol layer decodes its input into the root's `Tool`
+  (`../protocol/llm.md`, section 4). No domain parses a call's input
+  (jig's `domain/engine.md`, 4.4).
+- **Checked for shape** against the core's bounds before any child sees
+  it: a call past them becomes its refusal, answered and recorded as any
+  decided call is.
+- **An undecodable call decides nothing.** The protocol layer answers it
+  as an error naming what is wrong; the root relays that answer to the
+  run with no commit and no record, and the run may ask again with a
+  corrected input under a new name.
+- **Invalid or busy, answered at once:** a call naming no live attempt or
+  no completion is answered invalid; one that finds the call records, or
+  the loads it needs, full is answered busy, and its run asks again after
+  a backoff.
+- **Routed by tool** (agent.md, 4.3 lists them). A call the core has a
+  record of is answered from it (7.3). Otherwise the core checks it
+  against its task's authority; then jig's operations, notes and
+  subscriptions to tasks and timers go to the core as named actions, and
+  the forge's reads, effects and topics to the forge (5.5); a proposal of
+  a forge effect goes to the forge, which keeps it, then to the core.
+- **Rendered by hand-out.** A decided call's answer goes out to be
+  rendered (`HostDelivery::Render`) and comes back as smith takes it; the
+  core keeps the rendered answer with the call's record, so a call asked
+  again is answered without rendering again. A read's answer leaves
+  through the door.
+
+### 5.3 The core's asks of the forge
+
+The closed list (jig's `domain/connectors.md`, section 2), each by the
+forge's number:
+
+| The core asks | The root |
+|---|---|
+| describe, keep or drop an effect; judge a requirement | gives it to the forge (5.5) |
+| the holdings of a task, of a delegate batch, of a procedure's batch | has the forge name the branches each task will hold, before the core admits the batch |
+| take or hand down a hold; end a topic | gives it to the forge |
+| a claim | claims the forge's writer slots for the attempt's branches in the claim's decision, and starts the run through the fleet, with its grants, once the claim commits (7.1) |
+| gather, cut or drop a brief section | gives it to the forge (7.2) |
+| adopt a repository; an application admitted, answered or dropped | gives it to the forge (5.4) |
+| an attempt ended | gives the forge what the attempt pushed, then has it read its branches afresh before their writer slot frees (7.4) |
+| close, release | has the forge settle the task's effects, then release its holds (forge.md, section 11) |
+| project a goal; forget a projection | gives it to the forge's issues (forge.md, section 12) |
+| a subscription made or dropped | makes or drops the forge's subscription under the core's number, and answers the call |
+| start a procedure | starts the forge's change procedure (5.4) |
+| a step made or refused; a delegate or a repair refused | records the change's delegate, or holds the change |
+| a document or a read of the forge's; a document dropped | gives it to the forge, which makes it from its records and working set, within the scope the party named (forge.md, section 2; `../web/ux/forge.md`, section 9) |
+
+### 5.4 The forge's routes
+
+What temper adds to the core's usual routes (jig's `domain/engine.md`,
+4.4):
 
 | What arrives | Route | Then |
 |---|---|---|
-| a run's turn | fleet → root: tasks (the inbox taken), authority (spend), views | commit; the turn acknowledged |
-| a run's tool call | fleet → root: authority (the check), then tasks, notes or a connector | commit; the call answered |
-| a run's answer | fleet → root: tasks (result checked, task closing or idle), authority (spend), a connector (effects) | commit; the answer acknowledged; effects made |
-| a procedure's step | its connector → root: authority (each effect, each batch), tasks | commit; effects made; tasks started |
-| a connector's event | connector (classify for each subscriber) → root → tasks (inboxes, wakes) | commit; due tasks run, procedures step |
-| a person's request | people → root: authority (their role), tasks | commit; the person answered |
-| a task due | tasks → root: authority (the run may start); the task preparing while the brief gathers and its transcript loads; then fleet (place) | commit the claim; assign |
-| a timer | its child → root | as its child says |
-
-The hand-offs are short and acyclic, and each entry point completes
-them before it returns.
-
-## 5. Decisions and the store
-
-### 5.1 Commits
-
-- **One decision, one commit.** What a decision changes in every child
-  it touched (a task made, an inbox taken, a proposal accepted, an
-  outbox entry added, a procedure's state, a note) is one commit:
-  records written or removed, as one.
-- **Numbered and in order.** The root numbers its commits and the store
-  applies them in that order. Its answer is that a commit is durable,
-  which makes every earlier one durable too.
-- **The state runs ahead.** A child's state changes as the decision is
-  made, not when it commits, so the next decision sees it.
-- **Commits in flight are bounded,** and the store's answers are always
-  taken, so the bound never stops the answer that frees it. Past the
-  bound, a decision that would need a commit is not taken, and what
-  asked for it is told so: a person's request is answered busy; a run's
-  tool call is answered busy, and the run asks it again after a backoff
-  (smith's `run.md`, 5.2); a turn or an answer is answered busy, and its worker
-  sends it again after a backoff (worker.md, section 8); a connector
-  keeps its events and its outbox's outcomes until there is room. That
-  is backpressure on every entrance at once.
-- **A failed commit stops the engine** (core.md, section 4). The step
-  that hears it asks the shell to stop, and nothing waiting for that
-  commit, or any later one, goes out. A restart starts from the last
-  durable commit.
-
-### 5.2 What waits for a commit
-
-Every output that someone outside the engine could act on is tagged
-with the commit it follows from, and released once that commit is
-durable:
-
-- **effects:** an outbox entry is handed to its connector to make
-  (connectors.md, section 4);
-- **assignments:** a run is assigned only once its claim is durable, so
-  an attempt never runs that a restart would not know of;
-- **acknowledgements:** a worker's answer, and a run's turn, are
-  acknowledged once committed; until then the worker keeps them
-  (worker.md, 2);
-- **answers to tool calls** that changed state, and to people's
-  requests;
-- **messages relayed to a live run,** so a run never reads what a
-  restart would not have.
-
-What decides nothing waits for nothing: facts streamed to watchers
-(section 11), and reads served to a run's read tools.
-
-### 5.3 Loads
-
-- **What is loaded, not held:** ended tasks and their results;
-  transcripts; history; notes' entries; anything the web pages through.
-- **A load is a request** with a token and one terminal event, rows in
-  bounded pages (programming-model.md, 4.4). What waits on it is in a
-  state that says so: a brief gathering its sections, a run being
-  prepared to resume, a person's page.
-- **Bounded:** the loads in flight, and the bytes a load brings, are
-  limits; a load past its bytes is cut, and says how much.
-
-### 5.4 What the store keeps
-
-| Record | Written by | Loaded |
-|---|---|---|
-| the deployment: its id, made at its first start, and its numbers (tasks, runs, commits) | the root | at start |
-| projects: repositories and roles, policy, people's roles | people | at start |
-| people: identities, sign-ins | people | those with a live sign-in or a role, at start; others as they sign in |
-| people's requests' keys, with their answers, for a retention | people | at start, those within it |
-| tasks: every field of tasks.md, section 3, write holds and writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
-| calls committed since each live task's last committed turn, by attempt and name, with their answers | the root | with their task |
-| funders' numbers: each person's pool and each project's spend, per period | tasks | at start |
-| a task's history: made, amended, held, released, cancelled, by whom, why | tasks | on demand |
-| inboxes: messages not yet taken | tasks | with their task |
-| proposals: pending, and decided ones' outcome | tasks | pending ones at start |
-| transcripts: turns, with their spend | the root | to resume; on demand |
-| procedures' states | each connector | with their task |
-| the outbox: entries not yet made, and their keys | each connector | at start |
-| what temper made on each system, by key | each connector | live ones at start; on demand |
-| each connector's own state: for the forge, each repository's last listing time, the tips temper pushed or updated, read positions on participating objects, what each goal's issue last projected | each connector | at start |
-| notes | notes | indexes per scope in use; entries on demand |
-| traces | views | on demand, within their retention |
-| secrets: LLM accounts' refresh tokens, sign-in sessions' tokens or their digests | the engine's protocol layer, never the domain, which names them by account and generation, or by a session's number | at start, by the protocol layer |
-
-**Times** the store keeps are wall times (`env.wall`), so a record means
-the same after a restart; a wait the engine arms is a deadline on its
-monotonic clock (`env.now`), computed from them (programming-model.md,
-section 9).
-
-### 5.5 What the engine asks of the store
-
-The store is assumed (core.md, section 2); this is what the domain
-relies on, and all it relies on:
-
-- a commit of several records is applied whole or not at all;
-- commits are applied in the order sent, and durable once answered;
-- a load sees every commit answered before it was sent;
-- records are keyed by the engine's own keys, and listed by key ranges,
-  in bounded pages; what is live (live tasks, pending proposals, the
-  outbox, live resources) is kept in key ranges of its own, so a restart
-  reads it without reading history;
-- what one engine wrote, the next reads: records carry the version of
-  their shape;
-- nothing else writes it.
-
-What it is, where it lives and how it is built are not the domain's
-concern.
-
-### 5.6 How a child's records reach a commit
-
-Each child that keeps durable state defines its own `Stored` records and
-ordered `Key`s in its boundary vocabulary. Neither a sibling nor the
-store chooses their shapes. The root translates their keys and carries
-their records in its store vocabulary; the store's protocol layer encodes
-each shape with a version (5.5). The convention is shared by the children
-and their worlds:
-
-- **`Save { record: Stored }`** keeps the record under its own key, and
-  **`Erase { key: Key }`** removes that key. These requests are part of
-  the decision the parent is making. They have no terminal event and do
-  not ask the child to wait: its state changes as it decides (5.1), so
-  the next decision sees it.
-- **`Restore { record: Stored }`** supplies one record at restart, and
-  **`Restored`** says every record in the child's live ranges has been
-  supplied. The child then decides from that restored state. Its records
-  must carry everything needed to recover its decisions and pending work.
-- **`Load { owner: Token, range: Range }`** asks for one bounded page of
-  the child's own key range. Its one terminal event is
-  **`Loaded { owner: Token, rows: Box<[Stored]>, more: bool }`**. The token
-  is echoed, and `more` says another page remains: the parent supplies
-  each page in response to a separate load, rather than sending further
-  terminals for the first request. The child requests the next range when
-  needed, within its limits. This is distinct from restart's `Restore`
-  stream.
-
-A child never waits for a commit and never holds an output back for one.
-Assignments, answers and effects leave the child as it decides. Before
-its entry point returns, the root gathers every child's `Save` and
-`Erase` into the decision's one numbered `Commit`. It tags each outward
-request following from that decision with that commit, or with the last
-commit made if the decision made none. Requests wait until that number
-is durable and are released in their original order through the root's
-ready list, within `MAX_OUT`; the step hearing the store does not release
-an unbounded group at once. The outputs that decide nothing remain as
-5.2 specifies. A failed commit releases none of its waiting requests, nor
-any later ones (5.1).
-
-A child's world plays its parent and the store: it retains saved records,
-applies erases, commits at the end of each step, and restarts by feeding
-the durable records as `Restore` followed by `Restored`. It serves paged
-loads in the child's own vocabulary. Restart is therefore tested before
-the root is built, including decisions whose effects have yet to settle.
-
-## 6. Restart
-
-A restart is a cold start that rebuilds everything a decision reads from
-the store and the connectors, and makes nothing twice:
-
-1. **Load what is live:** the deployment's numbers; projects, their
-   policies and people's roles; live tasks with their inboxes,
-   subscriptions, holds and procedures' states; pending proposals; the
-   outbox's entries; the calls committed since each live task's last
-   turn; the funders' numbers; LLM accounts; each connector's own
-   state. The engine's limits bound what
-   is live (tasks.md, section 10), so what is loaded fits; a live set
-   past limits lowered since refuses the start, saying which.
-2. **Adopt the runs.** Every task claimed or running names its attempt.
-   Workers dial in and say what they host; the fleet adopts each
-   attempt the store names, keeps waiting for one within its grace, and
-   cancels any it does not name (section 8). Nothing new is assigned
-   before every claim loaded has reached the fleet. A claim no worker
-   reports within the grace counts as not started (tasks.md, 5.2).
-3. **Read afresh.** Each connector reads, for the live tasks that name
-   them, the resources its system owns (connectors.md, section 13).
-4. **Settle the outbox.** Every entry not committed as made may have
-   been made. Each is looked for by its key before it is made again; one
-   that cannot yet be found waits until a write's lifetime has passed
-   since the engine started (connectors.md, 4.3). Entries never sent
-   are among them: the engine cannot tell them apart, and looking costs
-   one read.
-5. **Decide afresh.** Every procedure steps once on the facts read;
-   every agent task due gets a run; every inbox's messages are relayed
-   or wake as their policy says.
-
-Workers keep the answers and turns they were not acknowledged for, and
-send them again after their hello; the engine commits any it does not
-have, and acknowledges each.
-
-## 7. Agent executors
-
-### 7.1 From a task to a run
-
-When an agent task is due (tasks.md, 5.2), the root:
-
-1. **Checks** that the run may start (authority.md, 8.3).
-2. **Prepares it,** the task preparing (tasks.md, 5.2) over as many
-   steps as it takes: gathers its brief (section 9), for why it runs,
-   its first activation or the messages that woke it; and loads its
-   transcript, if its charter resumes and it has one within the resume
-   limit (7.2). Either way it is given the calls committed after its
-   task's last committed turn: a resumed run as a note after the
-   transcript, a fresh one as a section of its brief.
-3. **Commits the claim:** the task claimed, with its new attempt number
-   and the writer slots of the write holds its workspace writes
-   (connectors.md, 3.3).
-4. **Places it** through the fleet, once the claim is durable, with an
-   assignment:
-   - its run and attempt, the engine's names for them;
-   - its workspace: the repositories its task reads and writes, from the
-     resources its spec names and its project's (connectors.md,
-     section 9): each with where to start, whether it may be written and
-     the branch a change is pushed to; and a workstream key, the number
-     of the task that holds the resources written, so that a change's
-     producing, repairs and conflicts find its checkout cached;
-   - its charter, for the agent (agent.md, section 4), which the
-     engine's protocol layer encodes as smith's: the task's instructions,
-     the brief, the tools its authority gives, the outcome its result
-     contract asks for, its budget for the run and its models with their
-     prices (authority.md, 7);
-   - its transcript, when it resumes, and the calls committed since its
-     last turn;
-   - the credential grants its models' accounts and its repositories'
-     identities need (section 12).
-
-### 7.2 Transcripts
-
-- **A transcript belongs to its task,** whichever runs added to it.
-- **Committed turn by turn.** A run sends each turn up as it ends: what
-  the LLM said and the calls it made, their results, what it spent, and
-  the last inbox message it read. The engine commits the turn with its
-  spend and with the messages up to that one taken, then acknowledges
-  it. A worker keeps each turn until it is acknowledged, and a run with
-  too many unacknowledged turns waits (worker.md, section 8).
-  Admission is whole: the task hub validates the attempt, turn and offered
-  read-through before changing its cumulative spend or funding ledger.
-  A refused turn changes neither; a duplicate accepted turn changes neither
-  again. Authority supplies arithmetic over snapshots; the hub owns and
-  saves the actual finite funding links and numbers. The root gathers those
-  saves with the opaque transcript into the same commit. It never precharges
-  an event in a separate hub operation or maintains a duplicate pool ledger.
-  The root owns transport evidence (a run's claim, its latest committed
-  turn, its worker's terminal), transcripts and correlation with its
-  children; the hub owns each task's lifecycle, dependencies and its
-  authentic funding numbers. Each of the root's records commits with the
-  hub's writes it accompanies.
-- **The engine never looks inside.** A turn is bytes of the agent's own
-  conversation vocabulary, bounded, which the web's protocol layer
-  renders. The domain reads only its size, its spend and what it took.
-- **Resuming.** A run that resumes is given the transcript whole, within
-  the resume limit (the deployment's configured bound on a task's
-  transcript bytes, across its attempts), and, as a note after it, the
-  calls committed after its last turn, with their answers, since the turn
-  that made them was lost: so it does not ask for them again. One past the
-  limit starts fresh from a brief that carries the transcript's tail. A
-  transcript the agent cannot use (an older shape, another provider)
-  fails its run as transient, saying so, and the next run is prepared
-  fresh, its brief carrying the tail.
-- **Turns are numbered within their attempt,** from one. The task keeps
-  the last turn committed for its live attempt, restored atomically with
-  the fleet's adoption of the claim, so a copy the engine has
-  already committed is acknowledged again and dropped, after a restart
-  too.
-
-### 7.3 The engine's tools
-
-A run reaches the engine through smith's host tools, declared in its
-charter, which its worker relays (worker.md, 4.2); their schemas,
-decoding and rendering are the engine's protocol layer's (agent.md,
-4.3). Each is checked against its task's authority
-(authority.md, section 8), decided, committed, and answered after the
-commit:
-
-| Tool | What it does | Answers |
-|---|---|---|
-| `delegate` | makes a batch of tasks as its delegates (tasks.md, section 4) | their numbers; refused, and why; beyond authority, and what |
-| `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full |
-| `amend`, `cancel`, `release` | its delegates (tasks.md, section 6) | done; refused, and why |
-| `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it (tasks.md, section 8) | done; beyond its authority, and passed up |
-| `propose` | any of these, or an effect, or more authority for itself, with a reason | proposed, and to whom |
-| `subscribe`, `unsubscribe` | a connector's topic, a referenced task's state, a timer | done; refused |
-| `effect` | a connector's effect (connectors.md, section 4) | made, with what it made; committed and pending, past the call's deadline; failed |
-| `note`, `recall` | writes a note in a scope; reads entries by name or by a search (section 10) | written; the entries |
-| a connector's reads | reads its system (connectors.md, section 8) | the answer, within the read's budget |
-
-**Calls are named, and decided once.** Every call names its task's
-attempt and the run's own name for it. The engine commits a call that
-changes state together with its answer, and answers a call it has seen
-before from that record, never deciding it twice. It keeps a task's
-records, by attempt and name, until a turn of the task that carries
-their answers commits, or the task ends; so calls an attempt made in a
-turn it lost are still there for the next attempt to be told of (7.1).
-A run whose call was withdrawn, lost with its channel, or answered busy
-asks it again with the same name while it lives, after a backoff
-(smith's `run.md`, 5.2), so the LLM is told the outcome rather than
-trying anew;
-an effect's key is derived from the call that asked for it
-(connectors.md, 4.4).
-
-Three tools a run has are not the engine's: `wait`, which the run and
-its worker serve, holding the slot until a message arrives (7.4);
-`finish`, which the run serves, checking its result against the
-contract (smith's `run.md`, section 7), and whose result reaches the
-engine as the run's answer (tasks.md, 5.6); and `deliver`, which its
-worker serves as a push (agent.md, section 6).
-
-Beyond authority, a call is refused naming what it lacked; the run may
-`propose` the same action with a reason. Calls never become proposals on
-their own, so a person is never asked by accident.
-
-**A call whose input does not decode decides nothing.** The protocol
-layer, which decodes every call the fleet has fenced
-(`docs/design/llm.md`, section 4), answers one it cannot decode at once,
-as an error naming what is wrong; the root relays that answer to the run
-with no commit and no record, as it relays a call it could not serve,
-and the run may ask again with a corrected input under a new name.
-
-### 7.4 Answers, waiting and parking
-
-- **A run answers once:** finished, with its result; parked; or failed,
-  with a typed failure (worker.md, 4.3). The engine commits it, once
-  it has every turn the answer counts, and acknowledges it; a finished
-  task closes, a parked one is idle, a failed one retries or is held
-  (tasks.md, 5.5).
-- **Waiting holds the slot; parking frees it.** A run that calls `wait`
-  keeps its worker's slot while it waits, so a chat answers at once.
-  Idle past its charter's threshold, it parks: every turn it took is
-  committed first, so nothing of it is lost, and it ends. A coordinator's
-  threshold is zero: it parks as soon as it waits.
-- **Woken again,** a parked task is due. Its charter says whether the
-  next run resumes the transcript or starts fresh from a brief; by
-  default a chat resumes and a coordinator starts fresh, its brief
-  carrying its goal, its plan's state, its inbox and its notes.
-- **Messages to a live run** are relayed as they arrive, named, and a
-  turn that reads one takes it (7.2). What the run did not read before
-  it ended stays in the inbox.
-- **A cancel** ends the run: the worker cancels it and answers; what it
-  committed before stays committed.
-- **Saved work.** A run that parks, fails or is cancelled with
-  unfinished changes has them saved by its worker to its saved-work
-  branch, and the next run of its task starts from it (worker.md, 4.2).
-
-## 8. The fleet
-
-The fleet child domain knows the workers and the runs they host. It
-keeps what it does today, with a run named by its task and attempt
-instead of an item's:
-
-- **Workers** dial in with their slots and the workstreams their
-  checkouts hold; a run goes to a worker with a free slot, preferring
-  one that holds its workstream. A refusal as busy is no failure.
-- **Attempts are fenced.** Everything a worker sends is dropped unless
-  its attempt is its task's live one, but a cancelled attempt's answer.
-  No attempt of a task is placed while the fleet knows a worker may
-  still host another.
-- **Answers and turns are acknowledged once committed** (5.2), or once
-  fenced off; a copy before then is dropped unacknowledged, one for an
-  attempt the engine has finished with is acknowledged again.
-- **Losing contact.** A lost worker's runs are kept for a grace; one
-  that reconnects says what it hosts, and the engine keeps or cancels
-  each. Past the grace they are lost, and their tasks retry.
-- **Relaying:** messages and cancels down, tool calls up and their
-  answers back, each call answered once; a call the fleet cannot pass
-  up is answered at once, unserved, by the root, never left without an
-  answer.
-- **The graces are ordered.** The engine's grace is longer than the
-  longest a worker may take to stop a run it lost contact for: its
-  grace, then the longer of its cancel's grace and a push's deadline,
-  then a save's commit and push (worker.md, 4.2). The worker says that
-  sum at its hello; a worker whose sum is equal to or longer than the
-  engine's grace is refused. So the engine places no next attempt while a
-  worker may still host the last, and one run at most writes a write hold at a time
-  (connectors.md, 3.3). A lost attempt's push is found by its change
-  afterwards (forge.md, 8.2).
-- **Every start and adoption ends once:** answered, lost, withdrawn (the
-  engine cancelled it), or refused (busy, a duplicate, or invalid).
-- **A failed preparation names its repository and why** (worker.md,
-  4.3): for a permanent failure, the worker sends the repository's tag
-  and the reason (what the forge lacks, or that it refused the identity)
-  as temper's part beside the answer (`docs/design/channel.md`, section
-  5), and the root reports them as a fact of the attempt: its task, its
-  attempt, the repository's tag and the reason. jig's core keeps no
-  failure detail for an attempt at temper's pinned revision (its
-  answer's end is a class only), so people read the reason on the task's
-  page once it does (`docs/design/STATUS.md`, "Not planned"). Whether
-  the task tries again follows the answer's own class, transient or
-  permanent, as for any failure.
-- **Restarting** (section 6): the fleet adopts the claims the store
-  names, then hears that the loading is done; a run a worker lists that
-  no claim adopts is cancelled once a grace has passed.
-
-## 9. Briefs
-
-The brief child domain builds every run's brief from typed sections,
-each within a budget, the brief within its own, and the agent's protocol
-layer renders them as text, as today: sections
-follow why the run runs, those it runs for are required, the rest
-optional; what does not fit is cut in its kind's order, at its gather
-as in the brief, and says how much; sections are gathered within one deadline, while the task is
-preparing, and a required one missing sends the task back to due after
-a backoff, no attempt spent (tasks.md, 5.2).
-
-Its sections come from two places:
-
-- **The core:** the task (its spec and contract, and its lineage: its
-  requesters' specs, cut); its inbox since its last run, people's words
-  whole; its dependencies' results; its delegates and their states, and
-  the results that came since (the plan, for a coordinator); its earlier
-  attempts and why they failed; the calls its task committed since its
-  last turn, when it does not resume; the proposals and escalations
-  waiting for its decision; the index of its notes; its charter's
-  template, if it follows one; a transcript's tail, when it does not
-  resume.
-- **Its connectors,** for the resources it names (connectors.md,
-  section 8): for the forge, the pull request against its base; CI's
-  failures on its head, with their output; reviews' remarks; a conflict,
-  with what landed in the base since (forge.md, section 8).
-
-A section is loaded or read as it is cut, asking for no more than it
-keeps.
-
-## 10. Notes
-
-Notes are what temper learns and passes on: a convention a reviewer
-keeps asking for, why an approach was dropped, which test is flaky, what
-a person prefers. The notes child domain knows scopes, entries and
-indexes:
-
-- **An entry** has a one-line description, a body, a scope (the
-  deployment, a project, a repository, a goal), references to tasks, and
-  who wrote it: a person, or a task.
-- **In the store,** where people read, correct and delete them in the
-  web. Notes are hints: where a note and the facts disagree, the facts
-  are right.
-- **Written by a tool,** checked against the task's note scopes
-  (authority.md, section 3), and committed like any decision. A revision
-  names the revision its run recalled, and is refused as moved if the
-  entry changed since: the notes child domain checks it against the
-  revision its index holds, which is exact, since the engine is the
-  store's only writer and this child domain its only writer of notes.
-- **Read in two steps.** A brief carries the index of the notes in its
-  scope, a line per entry, saying how many more there are when they do
-  not all fit; a run asks for the entries it wants with `recall`, by name
-  or by a search of their descriptions, answered a page at a time.
-  Indexes are kept per scope in use, and evicted least recently used;
-  entries per scope are bounded.
-- **Knowledge of the code itself** belongs in the repository, as
-  `AGENTS.md` does. A note that matures may be proposed as a change to
-  it, which is a change task like any other.
-
-## 11. Views and the web's reads
-
-The views child domain streams what runs report, and what tasks do, to
-the people watching, as today:
-
-- **Watches:** a run (its streaming text, its tool calls, its turns as
-  they commit), a task's tree (phases as they change), a project's goals.
-  A watch starts from a snapshot the engine gives, delivered first.
-- **A slow watcher never holds the engine up:** one delivery in flight,
-  a bounded backlog, what overflows dropped and the watcher told.
-- **Traces** are batched into the store, kept for a retention period,
-  with content as the run's capture policy says; expendable.
-- **History is the store's.** What the web shows of the past (a task's
-  results, its transcript, a plan's revisions and why) is loaded
-  (5.3), paged, never held.
-
-Nothing the engine decides depends on a fact or a view arriving.
-
-## 12. Accounts
-
-The accounts child domain is jig's (jig's `domain/engine.md`, section
-12): the charters' models' accounts, each wanted from the restart's first
-step, held on skein's accounts driver in the protocol layer, which alone
-keeps their records and refreshes them; grants pushed to every live
-attempt that uses an account, and a run whose account is unusable not
-started (`docs/design/credentials.md`, section 3).
-
-temper's application credentials are its git identities, one per forge:
-the accounts child hears each one's number and generation from temper's
-own source of credentials, a file read at start, and a run whose
-workspace names one is granted it (jig's `domain/engine.md`, 12.1;
-worker.md, 4.1; `docs/design/credentials.md`, section 4). The forge's API
-token and the webhook secret stay the engine's protocol layer's, and are
-never granted.
-
-## 13. Limits and working sets
-
-What the engine holds, each bounded by its limits and summed into its
-worst case (programming-model.md, 6.3):
-
-- live tasks, with their inboxes, subscriptions, references and holds;
-  pending proposals (tasks.md, section 10);
-- the rules and the live projects' policies, within limits on projects,
-  repositories per project and people holding roles;
-- people signed in, and their pending requests;
-- the calls committed since each live task's last turn, and the
-  funders' numbers;
-- workers, their runs, and the calls and messages relayed;
-- LLM accounts;
-- each connector's working set, outbox and request budget
-  (connectors.md);
-- commits in flight and the outputs waiting for them; loads in flight
-  and their rows;
-- briefs gathering, and the notes' indexes in use;
-- watches and their backlogs.
-
-None of it grows with the store's history. A new task, a person, a run
-or a watch past its limit is refused at its entrance, and the asker
-told why.
-
-The numbers jig's core added (the store's fill mark, a load's bytes,
-documents' limits, the hub's turns) take jig's small profile's values
-until temper's configuration names its own (jig's
-`protocol/configuration.md`, section 6). Documents' limits are the
-configured ones (`engine.limits`), which configuration.md, 7 keeps
-within what temper's client takes. The watches' rooms are temper's own,
-16 a party, 16 a stream and 16 in all, which configuration.md, 7 keeps
-at least what temper's client opens.
-
-## 14. Below the domain
-
-What the protocol and io layers owe the domain. The engine's protocol
-layer is the engine's service of `docs/design/protocol.md` (section 6),
-composing jig's components with temper's own; each boundary below is
-designed where it says.
-
-- **The store:** jig's store component on skein-kv (jig's
-  `protocol/store.md`): commits numbered and answered once durable,
-  loads by key range in pages, transcripts as files, with temper's
-  families, the forge's records, under temper's store version
-  (`docs/design/store/README.md`).
-- **Workers:** jig's channel (jig's `protocol/channel.md`), with temper's
-  parts beside jig's records under temper's payload version
-  (`docs/design/channel.md`); in one process, the worker joined by an
-  in-process address (`docs/design/protocol.md`, section 8). Host tools'
-  calls are decoded, their answers rendered and a run's result read in
-  the routing, by `temper-engine-smith` (`docs/design/llm.md`, section
-  4).
-- **Connectors:** each its own protocol; for the forge, its calls (forge.md,
-  section 17; `docs/design/forge.md`), polled in standalone, its webhooks
-  after.
-- **People:** jig's clients' component (jig's `protocol/client.md`), on
-  the clients' listener of temper's server with jig's default HTTP
-  mapping, with temper's client wire for the forge's application
-  requests; signing in by the deployment's link in standalone, through
-  the forge later (people.md, section 11; `docs/design/client.md`,
-  section 8).
-- **Accounts and credentials:** skein's accounts driver through jig's
-  accounts component, and temper's git identities' table
-  (`docs/design/credentials.md`).
-- **Configuration** (`docs/design/configuration.md`): jig's part (the
-  deployment's rules, owners, seeded projects and policies, charters, LLM
-  endpoints, models' prices and accounts, workers' names and secrets'
-  digests, listeners, limits) and temper's members (the forges, their
-  API tokens and git identities, landing rules, the forge's charter,
-  temper's limits). Charters are numbered (jig's
-  `protocol/configuration.md`, section 3): one is the chats'; the agent
-  work the forge's procedures start runs under the one temper's
-  configuration names. Projects and their policies are the store's,
-  seeded from configuration on a first start; repositories are adopted
-  by people, never configured (forge.md, section 4). Whether the workers
-  run in the engine's process is configuration too: standalone, they do
-  (jig's `domain/engine.md`, section 6).
-
-## 15. The world
-
-Each child domain has a world of its own under `tests/engine/<name>`,
-its parent and neighbours scripted in it, its scenario's expectations in
-a referee; authority, which keeps no state, is tested by its step tests.
-
-The engine's world, `tests/engine/domain`, runs the root with every
-child domain beneath it against fakes that share none of its types
-(testing-strategy.md, section 4): the fake forge, its faults drawn from
-the seed; one to three scripted workers, which play each run's script,
-keep answers and turns until acknowledged, lose their channels and come
-back, or vanish; scripted people on the web; a fake store, slow, or
-failing a commit, which stops the engine; and the engine restarting
-cold, at drawn moments or at one a scenario chooses, from the store's
-last durable commit.
-
-Its stories, as people meet them: a chat that answers, parks and
-resumes; a small fix made in a chat and landed; a goal proposed,
-accepted, planned with spikes, a person's choice and changes, revised
-mid-way, and done; a change failing CI, repaired, reviewed at its head
-and landed; two goals landing into one branch, one updated cleanly, one
-in conflict and resolved (forge.md, section 15); a delegate held past
-its tries, escalated to a person and released; a goal cancelled with
-runs live and a merge in flight, closing deepest first; a tool call
-whose answer is lost with the channel and the engine, asked again after
-a restart and answered from its record, made once; a chat's push handed
-to a change while its run still holds the writer slot; a note written,
-corrected by a person and recalled; a recurring task across a period's
-reset; a person's words to a running run; a pull request closed by
-someone else, held, and explained.
-
-Its referee holds the engine to core.md, section 10, seen from outside:
-authority holds; keyed effects are made once, across a restart at any
-drawn moment; nothing a worker, a person or the forge saw depended on a
-commit that was lost; dependencies come first; one run per task, one
-writer per resource; merges land exactly the heads decided; results and
-people's words arrive; nothing is written over; every story ends within
-a bound; every call is decided once; budgets are never counted twice.
-The engine, workers and agents meet in the system worlds
-(`docs/design/testing.md`, 2.1), which reuse this world's people, store
-and referee.
-
-## 16. From today
-
-- **The top level** keeps its routing, its translations, the brief's
-  gathering, the runs it starts and the calls it serves, renamed from
-  items to tasks. It loses most of its state: the item table, records
-  composed into comments and split from them, their nonces, side writes
-  and their retries, and the restart contract built on them become tasks
-  in the store, commits and section 6. People's requests (`people.rs`
-  today) move to the people child domain.
-- **`work`** becomes `tasks`, and **`plan`** splits between `tasks` and
-  the forge's change procedure (tasks.md, section 12). **`rules`**
-  becomes `authority` (authority.md, section 12).
-- **`forge`** becomes the forge connector's subtree, losing records,
-  the wiki and labels as the index of live work (forge.md, section 19).
-- **`fleet`, `accounts`, `brief`, `notes` and `views`** stay, with
-  items renamed to tasks, snapshots replaced by transcripts, notes moved
-  from the wiki to the store, and briefs' sections given by the core and
-  by connectors.
-- **The engine's tools.** Today it serves five calls: forge reads,
-  `recall`, `note`, a comment and an escalation. The forge's reads become
-  a connector's reads, the comment an `effect`, the escalation a
-  `propose`; `delegate`, `message`, `amend`, `cancel`, `release`,
-  `decide`, `subscribe` and `unsubscribe` are new.
-- **Configuration splits.** Today's (`config.rs`) holds the
-  repositories and the wiki's home, the tracking, hand-in and projected
-  labels, the rules, the session's step, templates, models, the trace
-  policy, and the branch and saved-work prefixes. Repositories, rules
-  and roles seed projects and policies in the store; labels go; the
-  session's step and templates become charters; the prefixes give way to
-  forge.md, section 11's names.
-- **Two boundaries are new below the domain,** the store and people's
-  clients, both jig's components (section 14). An LLM account's record
-  stays in a private file, kept by skein's accounts driver, never in the
-  store (`docs/design/credentials.md`, section 3).
-- **Runs:** starting from saved work, which the worker supports and the
-  engine never asks for, and deleting saved-work branches, are new; so
-  are transcripts in place of snapshots, which nothing produces today.
-- **Tests:** `tests/engine/work` and `tests/engine/plan` give way to
-  worlds for `tasks`, `people` and the forge's subtree; the engine
-  world's codecs for records and wiki pages go; its fake store gains
-  ordered commits, paged loads and commits that fail, and its people act
-  only on the web.
-- **New:** `people`, as a child domain of its own (people.md,
-  section 13); commits and loads; transcripts turn by turn.
-
-## 17. Open questions
-
-- **Commits in flight:** how many, and whether the store should take
-  several decisions as one commit when they wait together.
-- **Briefs:** whether a brief's store loads and connector reads share
-  one budget; cancelling a brief while it gathers; how a missing section
-  shows in what the agent reads.
-- **Transcripts' limits:** whether runs compact a transcript (smith's
-  `session.md`, section 8) before the resume limit is reached, and how long
-  the store keeps them.
-- **Views:** a limit on watchers per subject; how a watch of a task's
-  tree is bounded when the tree is large.
-- **Scaling out:** one engine per deployment until it binds; the store
-  being the engine's alone is what would change first.
+| a forge API answer, or a hint | the forge: its working set (forge.md, 5.2); each change it moves, stepped | commit; news to subscribers through the core; changes stepped |
+| a change due | the core starts its procedure → the forge's change procedure, on fresh facts → its decision in the core's terms (section 6): a delegate, an effect, a wait, a hold, its result | commit; delegates made; effects made after the commit |
+| a merge's outcome | the forge → the change's result; the landing as news on its branch's topic → each goal's subscription, waking it by overlap (forge.md, 7.3) | commit; the change closes, its branch released |
+| a landing branch's CI failing | the change procedure asks a queue repair → a change task into that branch, first in its queue (forge.md, section 9) | commit; the repair runs |
+| an adoption | the core's people child admits it by key → the forge locates the repository → jig's adoption request on the party's behalf (`adopt_repository_ask`), which the core judges as the party's own → the forge reads what temper may do there, and seeds collaborators' roles (section 6) | commit; the outcome kept under the request's key, answered once durable (forge.md, section 4) |
+| a goal changing | the core → the goal's issue → its effects | commit; effects made |
+| a task closing | the core → the forge settles the task's effects, then releases its branches | commit; releases made |
+| a run's answer | the fleet → the core, temper's parts translated (7.4) | commit; acknowledged |
+
+### 5.5 Effects and verdicts
+
+- **From an agent's call:** the forge describes the effect (its kind, the
+  resource's name, temper's access to it) and keeps it under a token; the
+  core checks it against authority and asks for its verdicts; the root
+  routes each to the forge's judges and back; the core's answer (allow,
+  propose, wait, refuse) goes to the forge, which enqueues the effect
+  under a key derived from the call, keeps it as a proposal, or drops it.
+  All within one step, one decision (jig's `domain/root.md`, section 9).
+- **From the change procedure:** its effect is described and checked the
+  same way before the step's decision is complete; one the core refuses
+  leaves the change's state as it was.
+- **The forge is every requirement's judge:** temper's landing rules are
+  the forge's criteria (section 6; forge.md, 8.7).
+- **Made after the commit:** the core's held output to make an entry is
+  released once its commit is durable, fed back to the forge, which makes
+  its API call (`Request::Forge`) behind every commit before it.
+- **Priced at nothing.** Only LLMs are counted: the root gives no forge
+  effect a price, and a forge request is load, within the forge's
+  request budget (forge.md, 5.4), never spend.
+
+## 6. Translation
+
+Small total functions, one per pair of vocabularies, matching
+exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
+
+- **Configuration,** `Config`, field by field as
+  `../protocol/configuration.md`, section 3 says: `core` to the core
+  whole; `forge` to the forge, its namespace the deployment's id;
+  `identities`, each forge's git identity, to the forge; `landing`
+  translated (below); `forge_charter` kept, the charter of every agent
+  task the forge's procedures make. The root holds its configuration to
+  its limits as it is made, and a start that breaks one is refused,
+  naming it (`../protocol/configuration.md`, section 2): one connector;
+  each charter's run within an assignment's bytes; the forge's charter
+  one of the core's; the resume limit within a row's bytes; each seeded
+  owner's project naming its escalation role; the landing rules and the
+  permission mappings within a row's bytes, and within the forge's
+  judges' tables.
+- **The landing policy,** `LandingPolicy`: the deployment's rules and
+  each project's, each a `LandingRule` on a pattern of landing branches.
+  Each criterion of a rule (CI, up to date, a gate, an approval) becomes
+  two values under one index: a requirement on the forge's merge, for
+  authority, judged by the forge and guarded or observed as forge.md, 8.7
+  says; and the forge's own criterion, by which its judge reads the
+  facts. A rule that does not enforce gives the forge its criteria and
+  authority no requirement. As the root is made, the deployment's
+  requirements join the configured rules and each project's its policy;
+  a rule's gates become the forge's gate templates, which every change
+  into a covered branch asks for (forge.md, 8.3).
+- **Names.** The root makes two names from the forge's own (the forge,
+  the repository's id, what in it): a path for authority (`forge`, the
+  forge's host, the owner, the name, then `branch` and its segments, or
+  `pull` or `issue` and a number; forge.md, section 2); and, for a hold,
+  three segments, the forge's number, the repository's id and the
+  branch, which it reads back for the forge's branches only. A saved
+  repository's tag becomes the task's saved resource, and back.
+- **The change procedure's decisions** become the core's procedure
+  steps:
+
+  | The change decides | The core hears |
+  |---|---|
+  | finished, merged | its result: the change, its pull request and the merge |
+  | a delegate: producing, a repair (CI, a semantic conflict, a gate's remarks), a resolution, a gate | a batch of one delegate (below); the step waits |
+  | ready; a wait | a wait; ready steps it again |
+  | a queue repair | the repair started (5.4) and a wait, or, when it cannot start, held for its effects |
+  | held: its branch moved or missing, its pull request retargeted or closed | held for drift |
+  | held: stalled | held, stalled |
+  | held: past its repairs, resolutions or updates | held by its procedure |
+  | held: a delegate or an effect failed for good; an approval declined | held, an effect failed |
+
+- **A change's delegates,** in the core's terms: an agent task under the
+  forge's charter for producing, repairs, resolutions, and agents' and
+  checks' gates; a person task for the project's maintainers for a
+  person's gate. Its parameters name the repository, its base and the
+  change's branch, and a resolution's base commit or a gate's number and
+  head; its contract is a change, or a gate's verdict; its authority is
+  the change's, its budget what the change has left, with no delegation
+  of its own.
+- **A collaborator's permission** on the forge (read, write, admin)
+  becomes the role its project's configured mapping names, as a
+  repository is adopted (forge.md, section 4).
+- **A repository as a notes scope** is jig's resource scope on the
+  forge's connector, its pattern the repository's path; the root
+  translates nothing of it (jig's `domain/engine.md`, section 10).
+- **The hub's link vocabulary** to the fleet's and back: a hello with its
+  bounds, the worker's stop bound among them (worker.md, section 2), a
+  run's phases, activity and counts. A message relayed to a run
+  keeps its kind in its words: a result, a proposal decided, a person
+  task stalled and an effect not made each lead with what it is and its
+  source's number.
+
+## 7. Putting outputs together
+
+### 7.1 An assignment
+
+The core's part (the run, its attempt and conversation, its charter, its
+brief's core sections, its start's messages, its transcript's current
+window, the calls committed since its last turn; jig's
+`domain/engine.md`, 7.1) and the forge's (the workspace, the brief's
+forge sections), put together while the task is preparing, held until
+its claim commits:
+
+- **The repositories:** for a change's delegate, the change's
+  repository; otherwise the project's home repository, those its spec
+  names and those it saved work in; and, for every run, the project's
+  context repositories, read only. Each item is the forge's: where it
+  starts, and the branch it pushes to, the change's branch for a
+  change's delegate and the task's own `r` branch for any other run
+  (forge.md, section 11; worker.md, 4.1), pushed only when the task
+  holds that branch, or the change it works for does, and its authority
+  grants the push; otherwise read only.
+- **The workstream:** the change's task for its delegates, so a change's
+  producing, repairs and resolutions find its checkout cached; the task's
+  own otherwise.
+- **Saving:** the task's saved-work branch (forge.md, section 11) for a
+  run that may write, so the unfinished work it leaves is saved and the
+  next run starts from it (jig's `domain/engine.md`, 7.4; worker.md,
+  4.2).
+- **Grants:** the LLM accounts its charter's models need, the core's;
+  and each repository's forge's git identity, one of temper's
+  application credentials, by number and generation (jig's
+  `domain/engine.md`, 12.1). Their generations come from temper's own
+  source, a file read at start, each announced before the restart
+  (`../protocol/credentials.md`, section 4). The forge's API token and
+  webhook secret stay in the protocol layer, and are never granted.
+- **The writes it claims:** the branches it pushes, the core's writer
+  slots in the claim's commit and the forge's after it (5.3).
+
+### 7.2 The forge's brief sections
+
+- **For a change's delegate,** once the change's pull request is open,
+  one section at the change's last head, required: CI's failures, with
+  the failed step and its output's end, for a CI repair; reviews'
+  remarks for a gate's repair; the pull request against its base for
+  producing and a gate, and with what landed in the base and the files
+  in conflict for a resolution; and both CI's failures and the pull
+  request with what its clean update merged in for a semantic repair
+  (forge.md, section 2). Each kind has its budget (`ci`, `reviews`,
+  `pull`).
+- **Planned with the core's.** The brief child places, cuts and orders
+  them with the core's sections (jig's `domain/engine.md`, section 9);
+  the forge gathers each and keeps it, cut to its allotment, and the root
+  takes it once the brief is complete. A section whose bytes the forge no
+  longer has sends the brief back, as a missing one does.
+
+### 7.3 A call's answer
+
+The core's part (its status, an effect's entry, why it was refused) and
+the forge's (what an effect made, a read's answer, the forge's refusal),
+which the forge keeps under the call's key and the root writes beside
+the call's record in the same commit. Asked again, the answer is put
+together again from both. A run's read is answered through the door.
+
+### 7.4 What a run left
+
+- **Pushed heads,** from the answer's parts, kept until the core says the
+  attempt has ended; then given to the forge against the branches the
+  attempt was granted, which it reads afresh before their writer slot
+  frees (forge.md, 8.2).
+- **Saved work:** the repositories saved, as the task's saved resources,
+  which its next run starts from.
+- **A failed preparation** names its repository and why: what the forge
+  lacks (the repository, the branch, the commit), or that it refused the
+  identity (`../protocol/channel.md`, section 5). The root reports it as
+  a fact of the attempt: its task, its attempt, the repository's tag, the
+  reason. Whether the task tries again follows the answer's class, as for
+  any failure (worker.md, 4.3).
+- **Past their bounds,** an answer's parts fail its run as invalid,
+  whatever the answer says.
+
+## 8. Its store vocabulary
+
+- **`Key`, `Record`, `Write`** wrap the core's and the forge's, one
+  variant each, the core's first; a write saves a record under its own
+  key or erases a key (jig's `domain/engine.md`, 5.6).
+- **No records of its own.** The deployment's record is the core's; a
+  call's record is the core's part and the forge's (7.3).
+- **`Range`:** the core's ranges the root loads; the census of ended
+  owners (jig's `protocol/store.md`, 7.2); and `Range::Forge`, every
+  record of the forge's, all live (`../protocol/store.md`, section 2).
+  The core's: at restart, the deployment's record, people, live tasks and
+  goals' projections, claims and calls; on demand, a task's result, an
+  ended read position, a task's current window, an attempt's turns, a
+  decided escalation or proposal, a page of notes.
+- **Pages,** bounded in rows and bytes, are checked whole (range, order,
+  cursor, each row's bytes) before any row is kept; a page past its
+  bytes comes back cut, saying how much.
+- **Loads for the core.** A run's preparation (its transcript's window,
+  its dependencies' and inputs' results), a delegate batch's inputs, and
+  the core's historical reads (ended conversations, decided escalations
+  and proposals) are loads the root makes for the core and answers back
+  in its terms; a full table of them answers busy.
+
+## 9. Restart and stopping
+
+### 9.1 Restart
+
+The core's script (jig's `domain/engine.md`, section 6); the root does
+each step the core asks for:
+
+1. **The core's records:** every configured account wanted; the
+   deployment's record, which binds the forge's namespace to the
+   deployment's id and gives the journal its last durable commit;
+   people, the configured projects and owners seeded at a first start;
+   live tasks and goals' projections; claims; calls. A page past its
+   bytes, or a record past the limits, refuses the start, naming its
+   step.
+2. **The inbox:** the census of ended owners.
+3. **The forge's records,** `Range::Forge`, a page at a time; then the
+   forge reconciles them.
+4. **Runs adopted:** the claims to the fleet, those on in-process
+   workers settled at once (section 2).
+5. **The forge reads afresh,** then **settles its outbox** (forge.md,
+   section 16).
+6. **Decisions open:** every due task is activated.
+
+Until decisions open, the forge's hints are dropped and its timers fire
+from its restore on.
+
+### 9.2 Stopping
+
+The core drains as jig's `domain/engine.md`, 6.1 says. What the root
+adds:
+
+- **the forge's events** go back to their owner undecided
+  (`Request::Busy`), and no change steps;
+- **a relayed call** is answered busy;
+- **a committed forge entry** is not made: its release goes back, and the
+  next start's settlement makes it;
+- **`Drained`** once nothing waits for a commit.
+
+## 10. Limits and worst cases
+
+- **The core's children's limits** are `engine.limits`, jig's part:
+  tasks, authority, people, the fleet, accounts, notes, documents,
+  templates and call records (jig's `protocol/configuration.md`, section
+  6).
+- **The root's own,** `root.` in temper's limits
+  (`../protocol/configuration.md`, section 7):
+  - the journal (`JournalLimits`): commits in flight; outputs held across
+    decisions; writes per commit, the deployment's record among them;
+    outputs per decision; a row's bytes; a result's bytes; a charter's
+    bytes;
+  - loads: in flight, rows per page, the bytes kept and a page's bytes;
+  - briefs: gathers, sections per gather, parts per section, a section's
+    read bytes, a budget per kind of section (the task, dependencies, CI,
+    reviews, the pull request, attempts, the plan, notes), a brief's
+    bytes and the gather's deadline.
+
+  They give the core its resume limit, within a row's bytes, its
+  charters' bytes, its load slots and its briefs'.
+- **Checked against each other** at start: the held outputs at least
+  three decisions' worth; a decision's outputs at least what every
+  worker's fleet events may ask in one; a commit's writes at least the
+  route's and the call records; a row's bytes at least the largest task
+  row and the forge's largest answer; a result's bytes at least a brief,
+  a task's result and a party's words; the forge's named calls at least
+  the call records, and its brief sections and bytes at least what the
+  briefs may plan.
+- **The room per event** (section 4): the writes the children may make
+  along the whole route, hand-offs included, with the call records; the
+  held outputs of one decision.
+- **The watches' rooms are temper's:** 16 a party, 16 a stream and 16 in
+  all, above jig's profiles' 4, since temper's client opens 16
+  (`../protocol/configuration.md`, section 7). The rest of the views'
+  limits are jig's small profile's: 4 runs watched, 65,536 bytes of a
+  run's text, 32 subjects marked per change, 32 facts.
+- **The store's fill mark and a read's bytes** are jig's small profile's
+  numbers, 268,435,456 and 65,536 bytes, held as the root's constants
+  (section 13).
+- **The worst case:** the core's, the forge's, the journal's, the loads',
+  the landing policy's and the permission mappings', and every value in
+  flight (section 2), summed in checked arithmetic (programming-model.md,
+  6.3). The service computes it at start; limits whose sum overflows, or
+  that break a check above, refuse the start.
+
+## 11. What the root never does
+
+- decide anything of the core's or the forge's: what to commit, what
+  waits, whether an effect may be made, what a change does next, the
+  order of a restart;
+- send an output any way but through the journal;
+- keep anything between steps but its children, the journal and the
+  values in flight of section 2;
+- read or rewrite a value it carries, beyond wrapping and translating
+  it;
+- give the core a type of the forge's, or the forge one of the core's;
+- route by content beyond the variant;
+- price a forge effect, or grant the forge's API token or webhook
+  secret.
+
+## 12. The world
+
+The root has no child domain of its own; its worlds are the engine's
+(`../testing.md`, section 2):
+
+- **The engine's world,** `tests/engine/domain`: the root with jig's real
+  children and the forge's crates, over jig's store through the service's
+  store routing, an independent fake forge below, a scripted person and
+  worker, and the protocol layer played (the hub's records, host calls
+  decoded and rendered, ended outcomes read, accounts). The engine
+  restarts cold at drawn moments and at each commit a scenario chooses.
+- **The conformance world,** `tests/conformance`: the root on jig's
+  harness and its outside referee, with jig's shared scenarios bound to
+  the forge and temper's own stories, crashed at every commit (jig's
+  `domain/testing.md`, sections 5 and 8).
+- **The system worlds:** the root with the worker and smith's agent
+  (`tests/system`), and with temper's client (`tests/client`)
+  (`../testing.md`, 2.1).
+
+Its stories, as the root meets them: a chat that answers, parks and
+resumes from its transcript's window; a chat past its resume limit
+starting fresh, its tail in its brief; a tool call whose answer is lost
+with the channel and the engine, asked again after a restart and
+answered from its record, made once; an undecodable call answered with
+no commit and no record, then decided once under a new name; a lost
+attempt told of the calls committed after its last turn; calls under
+backpressure handed back and decided once; a failed preparation reported
+as a fact of its attempt and retried by its answer's class; an answer
+pushing more heads than its task may hold, failing as invalid; saved
+work reaching the next attempt's checkout; an adoption refused for a
+forge not configured, a repository not found or not readable, and one
+adopted with its collaborators seeded into roles, sent again and
+answered its kept outcome, across a restart too; a forge effect
+committed before its write and made once, and one proposed and kept
+until its holder accepts; a stop with a committed forge effect, making
+no commit and no write; a start refused for live tasks past lowered
+limits, or for a malformed page. The forge's own stories are forge.md,
+section 18's.
+
+Its referees hold the root to jig's promises from outside (jig's
+`domain/core.md`, section 11): the walking referee reads durable rows,
+never the root's state; a referee per promise rejects a fault injected
+against it; jig's conformance referee checks that nothing a party, a
+host or the forge saw depended on a lost commit, and that every effect
+the fake forge saw, in its own terms, is the one the core decided. Each
+step's memory is measured against the declared worst case.
+
+## 13. Open questions
+
+- **What the root keeps between steps** (section 2). jig's root keeps
+  nothing between steps but its children and the journal (jig's
+  `domain/root.md`, section 7). Whether each value in flight moves to its
+  owner. Default: kept, each bounded.
+- **The forge's work done in the root:** choosing a run's repositories,
+  planning the forge's brief sections from a change's state, making a
+  change's delegates (sections 6 and 7). jig's connectors gather their
+  workspace items and plan their sections themselves (jig's
+  `domain/connectors.md`, sections 9 and 10), but temper's forge names no
+  type of jig's tasks. Default: translation in the root.
+- **The store's fill mark and a read's bytes** (section 10): taken from
+  `engine.limits` as the core's other limits are, or kept as the root's
+  constants. Default: constants.
+- **A failed preparation's reason on the task's page** (7.4): jig's core
+  keeps an attempt's end as a class only; temper would ask jig to keep
+  its detail. Default: the fact alone.
+- **Procedures other than the forge's change:** the boundary carries a
+  procedure's step out and its decision back (`Delivery::Procedure`,
+  `PartyInput::ProcedureStep`), which temper's worlds use; temper's
+  service steps none, and stops if one is asked. Default: none.

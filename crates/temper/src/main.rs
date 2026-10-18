@@ -1,4 +1,4 @@
-//! Temper's standalone commands (protocol.md, section 4).
+//! Temper's standalone commands (protocol/README.md, section 4).
 use std::{env, process::ExitCode};
 
 fn main() -> ExitCode {

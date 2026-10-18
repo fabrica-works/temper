@@ -1,4 +1,5 @@
-//! The two token files are checked before the bot's id (setup.md, 5.3).
+//! The two token files are checked before the bot's id (protocol/setup.md,
+//! section 5, step 3).
 use super::{Event, Need, Reconcile, Reply, State, Why};
 use crate::place::File;
 use alloc::boxed::Box;

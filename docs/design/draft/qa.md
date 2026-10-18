@@ -1,38 +1,38 @@
 # Continuous QA
 
-Draft, 2026-10-07, revised 2026-10-16. Agents and procedures that keep
+Draft, 2026-10-07, revised 2026-10-18. Agents and procedures that keep
 using a build of main, on every landing or on a period, to check it
 still works and to find bugs, with temper as its first subject. This
 document says what continuous QA is for, given temper's worlds; which of
 temper's and jig's parts it is built from; what is new; where it lives;
-and in what order it could be built. Nothing here is adopted:
-`docs/design/domain/` and jig's documents describe what is built. What
-is still open is listed in section 10.
+and in what order it could be built. Nothing here is adopted. What is
+still open is listed in section 10, where QA lives among it, which
+`factory.md`, section 13 answers otherwise.
 
 ## 1. In one page
 
-- **Aimed past the worlds.** temper's domain is complete in its worlds,
-  with fakes, crashes at every commit and a referee
-  (programming-model.md, section 4). QA on a running build would not
-  find domain bugs faster than the fuzzy suite does. It is for what the
-  worlds cannot reach: the fakes' fidelity, the layers below the domain,
-  the agents' quality, the experience of using it, and long horizons
+- **Aimed past the worlds.** temper's domain is checked in its worlds,
+  with fakes, faults drawn from every seed, a crash at every commit and
+  a referee (`testing-strategy.md`, sections 3 and 7; jig's `README.md`,
+  6.6; `../testing.md`). QA on a running build would not find domain
+  bugs faster than the fuzzy suite does. It is for what the worlds
+  cannot reach: the fakes' fidelity, the layers below the domain, the
+  agents' quality, the experience of using it, and long horizons
   (section 2).
 - **Every finding ends in the worlds.** A bug found on a running build
   is a story the worlds lack, a fake that differs from its system, a
   bug below the domain, a charter's regression, or a problem of use.
   Its fix carries a world scenario, a pinned seed or a fake's
   correction, so that QA feeds the worlds rather than competing with
-  them.
+  them (`testing-strategy.md`, section 9).
 - **Built from parts that exist.** Landings as news, standing and
-  recurring procedures, test environments as a connector, pooled holds,
-  findings as issues, requirements judged by another connector, priced
-  effects and services as parties are all in temper's or jig's design
-  already (section 3).
+  recurring procedures, pooled holds, findings as issues, requirements
+  judged by another connector, priced effects and services as parties
+  are all in temper's or jig's design already (section 3).
 - **What is new** is small:
   - an environments connector, whose first kind is temper in a box;
-  - a driver, through which an agent uses the product as a person
-    does;
+  - for temper, its agents' tools as the driver (`../tools.md`); for
+    other products, drivers of their own;
   - oracles beyond an agent's opinion;
   - findings as state of their own;
   - a few charters and procedures (section 4).
@@ -40,19 +40,21 @@ is still open is listed in section 10.
   factory, and its loop closes there: finding, goal, change, landing,
   checked again. Independence comes from a separate deployment pinned
   to a trusted release, not from a separate codebase (section 6).
+  `factory.md`, section 13 puts it in the factory's lab instead
+  (section 10).
 - **A project of its own** only if QA comes to serve products temper
   does not build, or people who want no factory (6.2).
-- **Later than the domain.** temper runs only in its worlds until the
-  layers below its domain exist, so QA is built in steps, the first
-  needing no agent (section 8).
+- **Built in steps,** the first needing no agent (section 8).
 
 ## 2. What it is for
 
 What the worlds cannot reach, and so what QA aims at:
 
 1. **The fakes' fidelity.** Where the fake forge differs from a Forgejo
-   release, or a fake LLM from a provider's API. `tools/forgejo-conformance`
-   checks this by hand today, against one version.
+   release, or a fake LLM from a provider's API.
+   `tools/forgejo-conformance` checks the facts temper relies on against
+   the pinned release (`../protocol/forge.md`, section 13); QA would
+   check each new one (section 8, step 1).
 2. **Below the domain.** The protocol and io layers: real processes, a
    real `kill -9`, real disks and the store's files, webhooks that
    arrive late or twice, a network that drops.
@@ -60,7 +62,7 @@ What the worlds cannot reach, and so what QA aims at:
    charters still land fixes after a change of charter or of model.
    These are evals: statistical, priced, never pass or fail on one run.
 4. **Use.** Whether a person gets from "I want X" to a goal, a
-   proposal accepted and a landing, without getting lost in the web.
+   proposal accepted and a landing, without getting lost in the client.
 5. **Long horizons:**
    - soak: a deployment running for days, its memory and its store's
      growth watched;
@@ -76,36 +78,36 @@ stories.
 
 | QA needs | Already in the design |
 |---|---|
-| a run on every landing on main | the forge's topic of landings on a branch (`domain/forge.md`, 7.1), and a standing procedure subscribed to it (jig's `connectors.md`, 6.6) |
-| a run every night, within a budget | the recurring procedure, its budget carved each period (`domain/tasks.md`, section 9) |
-| an environment made from a head | test environments as a connector (`domain/connectors.md`, section 14); `ops`'s provision and tear-down (jig's `examples.md`, 3.2) |
-| few environments, shared | holds pooled as counted slots, a taken one waited for (jig's `tasks.md`, section 6) |
-| agents using a running build | T10, an agent with a test environment (`domain/core.md`, section 9) |
-| aiming where a landing changed | overlap by files, as the forge classifies landings (`domain/forge.md`, 7.3) |
-| bugs filed | findings as issues, keyed; taking one up is a goal (`domain/forge.md`, section 12) |
-| QA holding a landing | a requirement judged by the connector whose facts it is (jig's `authority.md`, section 10; jig's `connectors.md`, section 7) |
-| environments' time paid for | priced effects (jig's `authority.md`, section 7) |
-| QA as an identity | a service, a party of its own kind (jig's `people.md`, section 3) |
-| a second deployment on temper's forge | a branch prefix per deployment (`domain/connectors.md`, section 11) |
+| a run on every landing on main | the forge's topic of landings on a branch (`../domain/forge.md`, 7.1), and a standing procedure subscribed to it (jig's `domain/connectors.md`, 6.6) |
+| a run every night, within a budget | the recurring task, its budget carved each period (jig's `domain/tasks.md`, section 10; jig's `domain/authority.md`, section 7) |
+| an environment made from a head | test environments as a connector (`../README.md`, section 8: a second connector); `ops`'s provision and tear-down (jig's `examples.md`, 3.2) |
+| few environments, shared | holds pooled as counted slots, a taken one waited for (jig's `domain/tasks.md`, section 6) |
+| agents using a running build | an agent's task holding an environment, as `ops`'s agents hold theirs (jig's `examples.md`, 3.2) |
+| aiming where a landing changed | overlap by files, as the forge classifies landings (`../domain/forge.md`, 7.3) |
+| bugs filed | findings as issues, keyed; taking one up is a goal (`../domain/forge.md`, section 12) |
+| QA holding a landing | a requirement judged by the connector whose facts it is (jig's `domain/authority.md`, section 10; jig's `domain/connectors.md`, section 7) |
+| environments' time paid for | priced effects (jig's `domain/authority.md`, section 7) |
+| QA as an identity | a service, a party of its own kind (jig's `domain/people.md`, section 3) |
+| a second deployment on temper's forge | a branch prefix per deployment (jig's `domain/connectors.md`, section 12) |
 
 ## 4. What is new
 
 ### 4.1 Environments
 
-`domain/connectors.md`, section 14, made a design: temper's second
-connector, close kin of `ops`'s infrastructure connector.
+The second connector of `../README.md`, section 8, made a design: close
+kin of `ops`'s infrastructure connector (jig's `examples.md`, 3.2).
 
 - **Resources:** pools, environments in them, and deployments in an
   environment, each of a head of a repository.
-- **Temper in a box,** its first kind: an owned setup (`setup.md`), run
-  by `temper box` or by QA's host from the same commands (`setup.md`,
-  sections 7 and 12): Forgejo and its runner, an engine and a worker
-  built at the head; an LLM endpoint; seed state (an owner, repositories
-  to adopt, accounts).
+- **Temper in a box,** its first kind: an owned setup
+  (`../protocol/setup.md`), run by `temper box` or by QA's host from the
+  same commands (`../protocol/setup.md`, sections 7 and 12): Forgejo and
+  its runner, an engine and a worker built at the head; an LLM endpoint;
+  seed state (an owner, repositories to adopt, accounts).
 - **Two levels of LLM:**
-  - *scripted:* a fake endpoint over the providers' real protocol,
-    cheap and deterministic, for the plumbing (section 2, items 1, 2
-    and 5);
+  - *scripted:* skein's fake LLM peer, over the providers' real
+    protocols (`../testing.md`, 4.1), cheap and deterministic, for the
+    plumbing (section 2, items 1, 2 and 5);
   - *real:* models at their prices, for evals and use (items 3 and 4),
     on credentials of their own, capped.
 - **Effects:** deploy a head, a keyed creation; tear down, as the
@@ -121,23 +123,17 @@ connector, close kin of `ops`'s infrastructure connector.
 
 ### 4.2 A driver
 
-For temper's core, replaced by `tools.md`: agents drive jig's
-plumbing through `temper ctl`, not the text view; the pages are the
-fake person's, and the browser's QA drives the browser. The rest of
-this section stands for other products.
+How an agent uses the product as a person does.
 
-How an agent uses the product as a person does. For temper, and for any
-application on jig, the design has it already: jig's client domain, on
-the native shell over skein's HTTP client, read as a text view by role,
-name and text, as the worlds' fake person reads it (jig's `README.md`,
-section 10).
-
-- **As a host tool,** an explorer acts through the same interface the
-  fake person scripts act through, so a path an explorer found is
-  written down as a fake person's script in a world, the finding's
-  regression test.
-- **Not the browser.** The wasm shell and the page's rendering need a
-  driver of their own, later.
+- **For temper,** its agents' tools (`../tools.md`): jig's reads,
+  operations and waits, and the forge's family, through `temper ctl`,
+  never the pages. The pages are the fake person's, in the worlds; the
+  browser's QA drives the browser.
+- **A path an explorer found** is written down as a story: a tool's
+  calls transcribe into the worlds' calls (`../tools.md`, 11.5), the
+  finding's regression test.
+- **For any application on jig,** the same tools once they are jig's
+  (`../tools.md`, section 14).
 - **Other products** need other drivers: a browser, HTTP, a command
   line (section 10).
 
@@ -146,16 +142,17 @@ section 10).
 What says a bug was found, beyond an agent thinking so:
 
 - **A stop or a panic** in the box's logs. A failed commit stops the
-  engine by design (`domain/core.md`, section 4), so every stop is
+  engine by design (jig's `domain/core.md`, section 4), so every stop is
   read.
-- **temper's promises, seen from outside** (`domain/core.md`,
-  section 10), on the box's forge, as the referee sees them in the
-  worlds: two creations under one key; a forced push; a write to an
-  object temper does not own; a merge at a head its decision did not
-  see.
-- **Memory against the declared worst cases** (`domain/engine.md`,
-  section 13): an engine or a worker past its own declared bound is a
-  finding, which soak gets for free.
+- **temper's promises, seen from outside** (`../README.md`, section 5;
+  jig's `domain/core.md`, section 11), on the box's forge, as the
+  referee sees them in the worlds: two creations under one key; a forced
+  push; a write to an object temper does not own; a merge at a head its
+  decision did not see.
+- **Memory against the declared worst cases:** an engine or a worker
+  past its own `memory_bytes`, which its start checks its worst case
+  against (`../protocol/configuration.md`, section 7), is a finding,
+  which soak gets for free.
 - **Result contracts** of scripted paths.
 - **Baselines:** spend per change landed, turns per task, the time from
   a request to a landing, compared with their history.
@@ -165,7 +162,7 @@ What says a bug was found, beyond an agent thinking so:
 ### 4.4 Findings
 
 More than an issue: state of their own, kept in the store, which an
-issue projects (`domain/forge.md`, section 12).
+issue projects (`../domain/forge.md`, section 12).
 
 - **A signature,** for deduplication: a panic's message and place, a
   promise and its subject, or a triager's judgement against the open
@@ -219,7 +216,7 @@ Q, the QA deployment's service
 - **F is filed** as an issue on temper's home repository, naming h5,
   the repro and its class: below the domain, the store's protocol.
 - **Someone takes it up:** a person, or temper's development deployment,
-  for which the issue is a participating object (`domain/forge.md`,
+  for which the issue is a participating object (`../domain/forge.md`,
   section 13). Its change carries a test at the store's protocol layer.
 - **The fix lands at h9.** W hears it; F is checked again at h9, passes,
   and closes, its issue with it.
@@ -228,10 +225,13 @@ Q, the QA deployment's service
 
 ### 6.1 In temper, as a deployment of its own
 
-- **In temper's code.** The environments connector, the driver as a
-  host tool, findings and the charters are temper's: QA belongs to a
-  software factory, and the environments connector is the second
-  connector temper's design expected (`domain/core.md`, section 1).
+This draft's answer; `factory.md`, section 13 gives another (section
+10).
+
+- **In temper's code.** The environments connector, findings and the
+  charters are temper's: QA belongs to a software factory, and the
+  environments connector is the second connector temper's design
+  expects (`../README.md`, section 8).
 - **A deployment of its own,** pinned to a release that is trusted,
   testing builds of main inside its environments, so the tester never
   runs the code it tests:
@@ -284,34 +284,36 @@ If it were split:
 
 ## 8. An order of building
 
-1. **Now, with no agent:** `tools/forgejo-conformance` on a schedule,
+1. **With no agent:** `tools/forgejo-conformance` on a schedule,
    against each new Forgejo release, its observations compared with the
    fake forge's. It finds fake gaps (section 2, item 1) before a
    protocol depends on them.
-2. **Once the store, the web and the workers' protocols run:** temper
-   in a box with a scripted LLM, and a few scripted paths (adopt a
-   repository, ask a chat for a small fix, see it land). They may start
+2. **Temper in a box** with skein's fake LLM peer, and a few scripted
+   paths through `temper ctl` (adopt a repository, ask a chat for a
+   small fix, see it land: `../tools.md`, 5.5, area 1). They may start
    outside temper, as a scheduled job, written so that their scripts
    and charters carry over.
-3. **Once a release is trusted:** the QA deployment (section 6.1), its
+3. **Once a release is trusted:** the QA deployment (6.1), its
    watch and its findings; then explorers, chaos and evals.
 4. **Later, if wanted:** cheap scenarios as gates on landings, judged
    by the environments connector at the change's head (section 3).
 
 ## 9. What it asks of temper and jig
 
-- **temper:** the environments connector, designed from
-  `domain/connectors.md`, section 14; findings, as a child domain of
-  temper's root or grown from the forge's issues; the charters.
-- **jig:** a client shell an agent can use as a tool, which the
-  client's design (jig's `README.md`, section 10) is to allow; whether a
-  connector's crate may be shared by applications (6.2).
-- **An LLM endpoint that is scripted** over the providers' real
-  protocols, for the box, from whichever of skein, smith or temper keeps
-  the fakes of LLMs.
+- **temper:** the environments connector, the second connector of
+  `../README.md`, section 8; findings, as a child domain of temper's
+  root or grown from the forge's issues; the charters.
+- **jig:** whether a connector's crate may be shared by applications
+  (6.2); the agents' tools as jig's, for applications other than temper
+  (`../tools.md`, section 14).
 
 ## 10. Open questions
 
+- **Where QA lives:** in temper, as a deployment of its own (6.1), or in
+  the factory's lab, as an application of its own (`factory.md`,
+  section 13), which would also make the environments, the drivers, the
+  oracles and the findings the lab's rather than temper's. The two
+  drafts disagree, and `../README.md`, section 8 holds the question.
 - **The subject:** temper and applications on jig only, or anything
   temper builds? It decides the drivers (4.2) and most of 6.2.
 - **First goal:** the plumbing with a scripted LLM only, or evals of

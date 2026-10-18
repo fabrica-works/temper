@@ -1,4 +1,4 @@
-//! Temper's members, read strictly with jig's readers (configuration.md, 3, 4, 10).
+//! Temper's members, read strictly with jig's readers (protocol/configuration.md, 3, 4, 10).
 mod landing;
 mod read;
 use super::{Problems, What};
@@ -20,13 +20,13 @@ pub struct Members {
     pub overrides: Box<[(Box<[u8]>, u64)]>,
     pub workers: Box<[Worker]>,
 }
-/// The application's clients listener (configuration.md, section 3).
+/// The application's clients listener (protocol/configuration.md, section 3).
 #[derive(Debug)]
 pub struct Clients {
     /// The socket address used for the listener, Host guard and printed links.
     pub listener: config::Address,
 }
-/// The optional webhook listener (configuration.md, section 3).
+/// The optional webhook listener (protocol/configuration.md, section 3).
 #[derive(Debug)]
 pub struct Webhooks {
     pub listener: config::Address,

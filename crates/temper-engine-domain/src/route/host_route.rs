@@ -1,5 +1,5 @@
 //! Typed host calls cross the protocol boundary before tool decisions and after
-//! their answers (jig's domain/engine.md, 7.3; domain/hosts.md, 2).
+//! their answers (jig's domain/engine.md, 7.3; jig's domain/hosts.md, 2).
 use super::{
     Call, CallAnswer, CallKey, Decision, Delivery, Domain, Env, Limits, Payload, Request, Work, emit, relay_payload,
 };

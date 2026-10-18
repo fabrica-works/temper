@@ -1,4 +1,4 @@
-//! The fields carried by the webhook hints (forge.md, section 5).
+//! The fields carried by the webhook hints (protocol/forge.md, section 5).
 use crate::{document::Body, id::ObjectId, request::ReviewEvent};
 use alloc::boxed::Box;
 use skein_lib::{Decimal, Writer};
@@ -50,7 +50,8 @@ impl Delivery {
             | Self::Job { .. } => None,
         }
     }
-    /// A branch deletion's push has an all-zero `after` (forge.md, section 5).
+    /// A branch deletion's push has an all-zero `after` (protocol/forge.md,
+    /// section 5).
     #[must_use]
     pub fn deleted(&self) -> bool {
         match self {
@@ -64,7 +65,7 @@ impl Delivery {
         }
     }
 }
-/// The org hook's subscribed events (forge.md, section 5).
+/// The org hook's subscribed events (protocol/forge.md, section 5).
 pub const SUBSCRIBED: [&[u8]; 22] = [
     b"issues",
     b"issue_assign",
@@ -93,7 +94,7 @@ pub const SUBSCRIBED: [&[u8]; 22] = [
 pub const EVENT_HEADER: &[u8] = b"X-Forgejo-Event";
 /// The header holding the body's HMAC-SHA256 in hexadecimal.
 pub const SIGNATURE_HEADER: &[u8] = b"X-Forgejo-Signature";
-/// The listener path for a forge's deliveries (forge.md, section 5).
+/// The listener path for a forge's deliveries (protocol/forge.md, section 5).
 #[must_use]
 pub fn hook_target(forge: u16) -> Box<[u8]> {
     let number = Decimal::of(u64::from(forge));

@@ -1,6 +1,6 @@
 //! Root committed call answers as bounded, UTF-8 Smith host feedback. The
 //! root's typed record is authoritative; rendering has no effects or retry
-//! policy (domain/agent.md, 4.3; domain/engine.md, 7.3).
+//! policy (domain/agent.md, 4.3; domain/root.md, 5.2).
 
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, Writer, bytes};

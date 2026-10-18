@@ -1,4 +1,4 @@
-//! Keep: frame, owner page and two slot passes (root.md, 9).
+//! Keep: frame, owner page and two slot passes (jig's client/domain/root.md, 9).
 //! Replace: Ops connector fragments and phrasebooks with the forge's.
 use crate::{
     Limits, forge,

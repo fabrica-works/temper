@@ -1,4 +1,4 @@
-//! Stateless host tools and fenced results (llm.md, 4 and 5).
+//! Stateless host tools and fenced results (protocol/llm.md, 4 and 5).
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;

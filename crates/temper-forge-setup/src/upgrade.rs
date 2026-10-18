@@ -1,4 +1,4 @@
-//! Recorded versions and the upgrade's backup name (setup.md, 6.3).
+//! Recorded versions and the upgrade's backup name (protocol/setup.md, 6.3).
 use crate::check::joined;
 use alloc::boxed::Box;
 use core::cmp::Ordering;

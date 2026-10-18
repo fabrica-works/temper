@@ -1,7 +1,6 @@
 //! Wikis: a repository's pages by name, each with its content, its author and
-//! a revision that grows with every write to the wiki (engine-domain.md,
-//! section 10: notes live here). Listing gives names and revisions a page at
-//! a time; writing needs write permission.
+//! a revision that grows with every write to the wiki. Listing gives names
+//! and revisions a page at a time; writing needs write permission.
 
 use alloc::boxed::Box;
 

@@ -1,4 +1,5 @@
-//! One worker root and its channels, with values below the domain (service.md, 6).
+//! One worker root and its channels, with values below the domain (jig's
+//! protocol/service.md, 6).
 use crate::{
     identities::IdentityTable,
     settings::{Agent, Files},

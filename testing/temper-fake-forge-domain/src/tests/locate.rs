@@ -1,4 +1,4 @@
-//! A repository located with read permission (forge.md, 12).
+//! A repository located with read permission (protocol/forge.md, 12).
 use super::*;
 
 #[test]

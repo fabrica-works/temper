@@ -1,4 +1,4 @@
-//! The application's listener and HTTP connections (service.md, 2).
+//! The application's listener and HTTP connections (jig's protocol/service.md, 2).
 use core::net::SocketAddr;
 use skein_http::server as http;
 use skein_io as io;

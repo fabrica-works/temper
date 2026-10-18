@@ -1,9 +1,9 @@
-//! The root's ordered commit seam (domain/engine.md, sections 5.1–5.2).
+//! The root's ordered commit seam (domain/root.md, section 4).
 //! [`Decision`] keeps a bounded unique-key write set and owned deliveries;
 //! skein-lib's [`Journal`] keeps cumulative durability and deliveries held behind
-//! their prerequisite commits; [`Counters`] keeps deployment numbers until jig
-//! owns them. Neither knows child policy, worker
-//! placement, store encoding or IO; the walking root routes internal deliveries.
+//! their prerequisite commits; [`Counters`], jig's core's, keeps the deployment's
+//! numbers. Neither knows child policy, worker placement, store encoding or IO;
+//! the walking root routes internal deliveries.
 //!
 //! Reserve a decision before child mutation, then call [`accept_pending`] once
 //! synchronous routes finish. The store answers issued commits through [`committed`] or
@@ -21,7 +21,7 @@ use skein_lib::{
 };
 
 /// Startup capacities supplied by the root, immutable across journal calls
-/// (domain/engine.md, 5.1–5.2). Positive commit/write/delivery room and a held
+/// (domain/root.md, 4 and 10). Positive commit/write/delivery room and a held
 /// queue at least as large as one delivery batch are required.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
@@ -46,7 +46,7 @@ pub struct Limits {
     pub run_bytes: u32,
 }
 
-/// Owned root effects held after the decision they follow (domain/engine.md, section 5.2). External notices have no acknowledgement of their own; web
+/// Owned root effects held after the decision they follow (domain/root.md, section 4). External notices have no acknowledgement of their own; web
 /// replies consume one reply destination. Internal fleet/load deliveries are
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
@@ -174,7 +174,7 @@ pub enum Delivery {
 }
 
 /// Journal to its root caller: at most one value per entry point; the caller
-/// translates it to store IO or an outward/internal delivery (domain/engine.md, 5).
+/// translates it to store IO or an outward/internal delivery (domain/root.md, 4).
 #[derive(PartialEq, Eq, Debug)]
 pub enum JournalOutput {
     /// Output that decides nothing, admitted through the journal's door.
@@ -195,7 +195,7 @@ pub enum JournalOutput {
 }
 
 /// One root route's bounded transient writes and deliveries; it owns their
-/// payloads until accepted or returned on refusal (domain/engine.md, 5.1–5.2).
+/// payloads until accepted or returned on refusal (domain/root.md, 4).
 /// This value knows no durability and emits nothing on drop.
 #[derive(Debug)]
 pub struct Decision {

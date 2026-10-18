@@ -1,4 +1,4 @@
-//! Restart and shutdown bounds (configuration.md, 7).
+//! Restart and shutdown bounds (protocol/configuration.md, 7).
 use skein_lib::{Duration, Queue, Time};
 /// The five box limits, durations in milliseconds at configuration boundaries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

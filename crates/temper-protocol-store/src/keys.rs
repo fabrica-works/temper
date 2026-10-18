@@ -1,4 +1,4 @@
-//! Handwritten keys preserve the forge's derived order (store/README.md, section 3).
+//! Handwritten keys preserve the forge's derived order (protocol/store.md, section 3).
 use alloc::boxed::Box;
 use skein_kv::{KeyReader, KeyWriter};
 use skein_lib::List;

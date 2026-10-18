@@ -543,7 +543,7 @@ pub fn locate_name(op: &client::Op) -> Option<Box<[u8]>> {
     }
 }
 
-/// Map a fake hook as the component maps a Forgejo delivery (forge.md 5).
+/// Map a fake hook as the component maps a Forgejo delivery (protocol/forge.md 5).
 #[must_use]
 pub fn hint(repository: client::Repository, request: &temper_fake_forge_domain::Request) -> Option<client::Hint> {
     let temper_fake_forge_domain::Request::Hook { change, number, branch, commit: head, by, body, ended, .. } = request

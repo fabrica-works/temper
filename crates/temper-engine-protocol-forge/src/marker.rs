@@ -1,4 +1,4 @@
-//! Key markers at the head of written bodies (forge.md, section 4).
+//! Key markers at the head of written bodies (protocol/forge.md, section 4).
 use alloc::boxed::Box;
 use skein_lib::{Writer, bytes};
 /// A marker's first bytes.

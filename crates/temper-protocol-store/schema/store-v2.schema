@@ -1,6 +1,6 @@
 family temper-store 2
 
-# 04.2: values the families share (store/README.md, 2 and 3).
+# 04.2: values the families share (protocol/store.md, 2 and 3).
 record Repository { forge: u16 repository: u32 }
 record Number { number: u64 }
 record Commit { commit: fixed 32 }

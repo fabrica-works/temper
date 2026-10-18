@@ -1,4 +1,4 @@
-//! Lent account credentials stay in the protocol layer (credentials.md, 3).
+//! Lent account credentials stay in the protocol layer (protocol/credentials.md, 3).
 use alloc::boxed::Box;
 use jig_domain_host as host;
 use jig_protocol_accounts::table::Table;

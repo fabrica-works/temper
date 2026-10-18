@@ -1,4 +1,5 @@
-//! A public account's explicit sign-in, without starting a service (credentials.md, 3).
+//! A public account's explicit sign-in, without starting a service
+//! (protocol/credentials.md, 3).
 use jig_protocol_config as config;
 use skein_io::kernel::{Complete, Exit, Submit};
 use skein_lib::{List, Queue, Time, Wall};

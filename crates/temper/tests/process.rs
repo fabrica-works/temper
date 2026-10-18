@@ -3,7 +3,7 @@ pub mod support;
 use skein_io::kernel::{Exit, Signal};
 use skein_lib::Duration;
 
-// setup.md 13.3 bounds each whole-example box story at 120 seconds.
+// Each whole-example box story is bounded at 120 seconds.
 const BOX_DEADLINE: Duration = Duration::from_secs(120);
 
 #[test]

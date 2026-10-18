@@ -1,4 +1,4 @@
-//! Requests counted at their HTTP entrance (forge.md, section 9).
+//! Requests counted at their HTTP entrance (protocol/forge.md, section 9).
 use skein_lib::Map;
 pub(crate) const ROUTES: u32 = 64;
 use temper_forge_forgejo::request::Request;

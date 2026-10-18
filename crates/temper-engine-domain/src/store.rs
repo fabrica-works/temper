@@ -1,4 +1,4 @@
-//! The root's typed durable store vocabulary (domain/engine.md, 5.3–5.6).
+//! The root's typed durable store vocabulary (domain/root.md, 8).
 //! It wraps core and forge records and keys. The root gathers owner-produced
 //! writes into atomic decisions; the store
 //! protocol encodes versions and supplies ordered, bounded pages.
@@ -245,10 +245,10 @@ pub enum Key {
     Forge(temper_engine_domain_forge::Key),
 }
 
-/// Root-owned page ranges (domain/engine.md, section 5.3).
+/// Root-owned page ranges (domain/root.md, section 8).
 /// The root asks the store for strictly ordered rows from one range; child
 /// records already have concrete task/people wrappers. These values issue no
-/// request on their own and promise no cross-page snapshot (domain/engine.md, 5.3).
+/// request on their own and promise no cross-page snapshot (domain/root.md, 8).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CoreRange {
     /// One immutable decision for a later authenticated proposal caller.
@@ -302,7 +302,7 @@ pub enum Range {
     Core(CoreRange),
     /// Ended owners in jig's census index-walk order, with repeats. The
     /// cursor is the last index key walked, rather than an owner row's key
-    /// (store/README.md, section 5).
+    /// (protocol/store.md, section 5).
     Census(jig_domain_core::Census),
     Forge,
 }
@@ -422,7 +422,7 @@ impl CoreRange {
 
 /// Owned typed row sent root to store in a commit or returned store to root in
 /// a bounded page. The transaction/page, not each row, has the store terminal
-/// (domain/engine.md, 5.1, 5.3 and 5.6).
+/// (domain/root.md, 8).
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[expect(clippy::large_enum_variant, reason = "jig's core records move whole through the store's pages")]
 pub enum Record {
@@ -444,7 +444,7 @@ impl Record {
 
 /// Root to store: one unique-key operation within an atomic commit. Child
 /// saves/erases acquire no separate terminal; the ordered commit answers once
-/// (domain/engine.md, 5.1 and 5.6).
+/// (domain/root.md, 8).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Write {
     /// Replace the row at its own key.

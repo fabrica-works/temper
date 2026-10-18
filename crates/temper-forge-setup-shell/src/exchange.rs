@@ -1,4 +1,4 @@
-//! One plaintext exchange, with streamed document decoding (setup.md, 5).
+//! One plaintext exchange, with streamed document decoding (protocol/setup.md, 5).
 use crate::reconcile::Settings;
 use skein_http::client as http;
 use skein_json::tokenizer;

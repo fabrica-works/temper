@@ -1,5 +1,5 @@
 //! Forge API values passed between this client and its protocol adapter
-//! (domain/forge.md, sections 5, 6 and 20.1).
+//! (domain/forge.md, sections 5 and 6; protocol/forge.md, section 13).
 //!
 //! These types describe bounded requests and answers; they retain no state.
 //! They never name tasks or authorization policy. The adapter maps a `Read`
@@ -378,7 +378,7 @@ pub struct JobAttempt {
     pub job: u64,
     pub attempt: u32,
 }
-/// The first failed step of a job attempt (forge.md, 3.2).
+/// The first failed step of a job attempt (protocol/forge.md, 3.2).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Step {
     pub number: u32,

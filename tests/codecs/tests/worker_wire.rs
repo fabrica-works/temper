@@ -1,4 +1,4 @@
-//! Secret-safe identity inspection (channel.md, section 6).
+//! Secret-safe identity inspection (protocol/channel.md, section 6).
 use temper_protocol_worker_wire::v1;
 
 #[test]

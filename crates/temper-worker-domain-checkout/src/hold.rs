@@ -1,5 +1,5 @@
 //! Holds: a client's hold on a workspace, from its prepare to its release,
-//! and the operations it runs there, one at a time (worker-domain.md, 4.2
+//! and the operations it runs there, one at a time (domain/worker.md, 4.2
 //! steps 2, 7 and 8, and 5).
 //!
 //! A prepare that passes the entrance holds a workspace ([`crate::cache`]) and

@@ -1,4 +1,4 @@
-//! Hosts of the forge setup machines (setup.md, 11).
+//! Hosts of the forge setup machines (protocol/setup.md, 11).
 pub mod command;
 pub mod exchange;
 pub mod files;

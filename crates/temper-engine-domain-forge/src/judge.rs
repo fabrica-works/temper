@@ -1,4 +1,4 @@
-//! Forge judgements over a change's own facts (jig's domain/connectors.md, section 7).
+//! Forge judgements over a change's own facts (domain/forge.md, 8.7).
 //!
 //! The connector keeps each criterion's parameters. The root supplies verified
 //! project roles for authenticated reviewers; it does not interpret the forge's

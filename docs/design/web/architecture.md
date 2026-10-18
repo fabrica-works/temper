@@ -1,16 +1,16 @@
 # The web's architecture
 
-Provisional, 2026-10-05, revised 2026-10-15. What stays true of
-temper's browser client: a later shell of temper's client (client.md),
-on skein's browser parts. What the web does is `ux/`, with the mockups'
-look (`mockups/`), which this document takes as given; how a view runs
-in a browser is skein's (skein's `ui-web.md`). What is still open is
-section 5.
+Provisional, 2026-10-05, revised 2026-10-18. What stays true of
+temper's browser client: a later shell of temper's client (../client.md),
+on skein's browser parts. What its pages do is the client's (../client.md;
+`ux/forge.md`), with the mockups' look (`mockups/`), which this document
+takes as given; how a view runs in a browser is skein's (skein's
+`ui-web.md`). What is still open is section 5.
 
 ## 1. In one page
 
 - **The browser is a later shell of the same client.** temper's client
-  root, its view and the forge's family (client.md, sections 3 to 5),
+  root, its view and the forge's family (../client.md, sections 3 to 5),
   compiled to WebAssembly under a browser shell of temper's,
   `temper-client-shell-web`, on skein's browser parts (`skein-ui-web`;
   skein's `ui-web.md`), with jig's default HTTP mapping's client end over
@@ -26,7 +26,7 @@ section 5.
   DOM library.
 - **Served by temper's server, from one origin.** `temper-service` serves
   the page and the bundle on its clients' listener (skein's `ui-web.md`,
-  4.4), beside jig's clients' component under `/jig` (client.md,
+  4.4), beside jig's clients' component under `/jig` (../client.md,
   section 8), with jig's example guards and the page's policy, which is
   temper's: a strict content security policy, no frames, no CORS (jig's
   `protocol/browser.md`, section 12).
@@ -42,9 +42,9 @@ section 5.
 - **Its look:** the mockups' (`mockups/style.css`), as temper's style
   tokens and a stylesheet over skein's (skein's `ui-web.md`, 3.2 and
   section 12).
-- **Its pages,** the client's (client.md, 3.5), as `ux/` intends them,
-  each at an address of its own (`ux/README.md`, section 4; skein's
-  `ui-web.md`, section 9); and the forge family's, from `ux/forge.md`,
+- **Its pages,** the client's (../client.md, 3.5), each at an address of
+  its own (jig's `client/domain/pages.md`, section 2; skein's
+  `ui-web.md`, section 9); and the forge's parts, from `ux/forge.md`,
   as the forge serves their documents.
 - **Signing in:** in standalone, the browser opens the link `temper
   serve` prints. Its `GET` spends nothing: temper's page answers it,
@@ -56,7 +56,7 @@ section 5.
   sees; after a reload the client signs in with `Transport` (jig's
   `protocol/browser.md`, section 11; jig's `client/domain/client.md`,
   section 12). The forge as people's sign-in provider is temper's own
-  routes, later (client.md, section 11).
+  routes, later (../client.md, section 11).
 - **The toolchain:** the standard library for `wasm32-unknown-unknown`,
   skein's bundler and the glue it names (skein's `ui-web.md`, section 4),
   and Chromium for the browser tier.
@@ -95,12 +95,12 @@ and the domain, its worlds and its stories would not change.
   attack stories that need a browser, a cross-site request and a framed
   page (jig's `protocol/browser.md`, section 15).
 - **A suite of its own,** outside the focused and fuzzy suites: it needs
-  Chromium and does not replay (testing.md, section 9).
+  Chromium and does not replay (../testing.md, section 9).
 
 ## 5. Open questions
 
 - **When temper builds its browser shell.** Default: temper's only
-  client is the terminal (client.md).
+  client is the terminal (../client.md).
 - **The browser tier's budget,** set with skein's browser tier's (skein's
   `ui-web.md`, 14.1). Default: a suite of its own, run by the gate.
 - **Other browsers** than Chromium are `skein-browser`'s question

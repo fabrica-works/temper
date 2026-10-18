@@ -1,4 +1,4 @@
-//! One forge reconciled from its answers, with one need outstanding (setup.md, 5).
+//! One forge reconciled from its answers, with one need outstanding (protocol/setup.md, 5).
 mod hooks;
 mod orgs;
 mod tokens;

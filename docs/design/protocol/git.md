@@ -1,8 +1,8 @@
 # The checkout's io: git
 
-Provisional, 2026-10-14, revised 2026-10-16. How the worker's protocol layer runs the
-checkout's operations (`domain/worker.md`, section 5): the git component,
-`temper-worker-protocol-git`. For each operation of
+Provisional, 2026-10-14, revised 2026-10-18. How the worker's protocol
+layer runs the checkout's operations (`../domain/worker.md`, section 5):
+the git component, `temper-worker-protocol-git`. For each operation of
 `temper-worker-domain-checkout`'s `git::Op`, the fixed sequence of git
 invocations it runs, their arguments and environment, how its terminal is
 read from what git says, and how its failures are classified; then the
@@ -17,13 +17,13 @@ credentials.md's (section 4). What is open is listed in section 10.
   `git::Op` with a deadline (`Request::Io`) and may cancel it
   (`Request::CancelIo`); the git component runs it and answers with
   exactly one `Event::Done`. It is step code, a child of the worker's
-  protocol layer, with its own limits and worst case (protocol.md,
+  protocol layer, with its own limits and worst case (README.md,
   section 5).
 - **A fixed sequence per operation:** at most four git invocations, each
   its own process in a process group of its own, all under the
   operation's one deadline. Which invocation comes next depends only on
   what the last one said, never on a retry: the component never retries
-  (protocol.md, section 5).
+  (README.md, section 5).
 - **git as it ships, told exactly what to do.** git is run by the
   absolute path configuration gives (configuration.md, section 4), in an
   environment given whole, with settings on the command line that turn
@@ -89,13 +89,13 @@ the worker's root directory     workers[].root
 - **Each operation ends exactly once:** `Done` with its own terminal, or
   `Failed`/`FailedWithOutput` with a fault, and `Cancelled` only if the
   cancel won the race (section 7). Its `owner` token is echoed.
-- **The worker's root directory** is opened once at start by the worker's
-  service and is the root every spawn and file operation resolves
-  beneath (skein's `io.md`, section 5). At every start the component renames
-  `workspaces` and `home` into `trash` if they exist, and makes them
-  afresh, private (0o700), with `trash` if it is absent: the worker keeps
-  nothing durable (`domain/worker.md`, section 1), and git's `HOME` must
-  be empty.
+- **The worker's root directory** is opened once at start by the
+  worker's service and is the root every spawn and file operation
+  resolves beneath (skein's `io.md`, section 5). At every start the
+  component renames `workspaces` and `home` into `trash` if they exist,
+  and makes them afresh, private (0o700), with `trash` if it is absent:
+  the worker keeps nothing durable (`../domain/worker.md`, section 1),
+  and git's `HOME` must be empty.
 - **What it depends on:** `skein-lib`, `skein-io` and the checkout's
   vocabulary. It never decodes a channel record or reads configuration.
 
@@ -137,11 +137,18 @@ pipes      stdin (written, then closed), stdout, stderr
   worker's root, never `-C`: a repository's directory is
   `workspaces/<token>/<repository>`, with the workspace's token in
   decimal and the repository's name, one path component
-  (`domain/worker.md`, 4.1).
+  (`../domain/worker.md`, 4.1).
 - **Operands.** Object ids are hex the component writes; branches appear
   only inside refspecs the component composes (`refs/heads/<branch>`);
   the remote URL and Clone's directory come after `--`. So no operand can
   be read as an option.
+- **A renamed repository.** The remote is made from the owner and name
+  the engine's root holds (channel.md, section 4). git follows Forgejo's
+  redirect from a renamed repository's old path for its first request
+  (`http.followRedirects`, whose default is `initial`), as
+  `tools/git-transcripts` records (fact
+  `git-follows-a-renamed-repository-redirect`); a remote that changes
+  misses the checkout's cache, which clones afresh.
 - **Object ids** cross the boundary as the checkout's 32-byte `Commit`.
   From git: exactly 40 or 64 lowercase hex digits, anything else is
   `Broken`; a SHA-1 id becomes its 20 bytes followed by twelve zero
@@ -186,13 +193,13 @@ section 3 writes them. The settings of section 3 precede each command.
 
 `Succeeded` once both are done; a failed file operation is `Broken`. So
 what the cache evicted, or a worker left behind before a restart, never
-fails a prepare (`domain/worker.md`, section 9), and Make takes two file
-operations however large the old tree was.
+fails a prepare (`../domain/worker.md`, section 9), and Make takes two
+file operations however large the old tree was.
 
 **The sweep** empties `trash`, which io cannot do in one operation (io
-never removes a tree: skein's `io.md`, section 5). While `trash` is not empty and
-the worker is not shutting down, the component runs one file operation
-at a time:
+never removes a tree: skein's `io.md`, section 5). While `trash` is not
+empty and the worker is not shutting down, the component runs one file
+operation at a time:
 
 - it lists a page of `trash` (`Scan`, within `sweep_entries` and
   `sweep_bytes`) and takes the first entry;
@@ -246,7 +253,7 @@ full id for `Want::Commit`, and `HEAD`, the forge's default branch, for
   not have; `Commit` for a commit it does not have (section 6). A full id
   is required: git looks an abbreviation up as a reference name.
 - **A push that ended ambiguously** is verified by the domain with a
-  fetch of its branch (`domain/worker.md`, section 5): no other
+  fetch of its branch (`../domain/worker.md`, section 5): no other
   invocation is needed for it.
 
 ### 4.4 Create
@@ -397,6 +404,11 @@ The push's status line decides:
 | `!` `[remote rejected] (…)`, its reason ending in `declined` | the fault `Refused`, with its diagnostic: a protected branch, a hook |
 | any other, `+` included, or no status line | the fault of section 6 |
 
+Forgejo refuses a push to a protected branch with that `[remote
+rejected]` line, its reason ending in `declined`, as
+`tools/git-transcripts` records (fact
+`protected-push-is-remote-rejected-declined`).
+
 A push that fails in a way that may have landed (`Unreachable`, `Broken`,
 `TimedOut`, `Cancelled`) is verified by the domain (section 4.3).
 
@@ -491,16 +503,16 @@ variable of the worker's own process reaches git.
 ## 7. Processes, deadlines and cancel
 
 - **One invocation at a time per operation,** each spawned in a process
-  group of its own (skein's `io.md`, section 6), until skein's contained process
-  trees exist (jig's `protocol/README.md`, section 10). git's own
-  children (its remote helper, `index-pack`, `pack-objects`) stay in that
-  group. The settings of section 3 leave git nothing that would leave
-  the group: no detached maintenance, no credential daemon, no file
-  system monitor.
+  group of its own (skein's `io.md`, section 6); contained process trees
+  are for hosts apart (jig's `protocol/README.md`, section 10; section
+  10). git's own children (its remote helper, `index-pack`,
+  `pack-objects`) stay in that group. The settings of section 3 leave
+  git nothing that would leave the group: no detached maintenance, no
+  credential daemon, no file system monitor.
 - **An invocation ends** once git has exited, stdout and stderr have
   reached their ends, and io has closed the child, which kills whatever
-  is left of its group (skein's `io.md`, section 6). The next invocation starts
-  only then.
+  is left of its group (skein's `io.md`, section 6). The next invocation
+  starts only then.
 - **One deadline per operation:** the domain's, from the checkout's
   `remote_timeout` or `local_timeout`. It covers the whole sequence,
   Commit's scan included. When it passes, the component signals `Kill` to
@@ -514,13 +526,15 @@ variable of the worker's own process reaches git.
 - **Kill at once.** A killed git may leave a lock file or half an index;
   the checkout does not trust a workspace whose operation timed out, was
   cancelled or broke, and makes it again from an empty directory
-  (`domain/worker.md`, section 5).
+  (`../domain/worker.md`, section 5).
 - **stdin** is written whole (the message, for `commit-tree`; nothing
   otherwise) and closed; stdout and stderr are read as they come, both at
   once, so git never waits on a full pipe.
 - **At the worker's end** the service closes every child, killing their
-  groups (jig's `protocol/service.md`, section 10); operations in flight
-  end as io closes them.
+  groups: in temper's one process, the service ends the worker at once
+  after the engine has drained (README.md, section 8; jig's
+  `protocol/service.md`, section 10). Operations in flight end as io
+  closes them.
 
 ## 8. Limits and the worst case
 
@@ -551,14 +565,14 @@ and io's close timeout bounds the end of a killed invocation.
 - **Time:** an operation ends within its deadline and io's close timeout.
 - **Most outputs per entry point:** a constant the component exports; an
   event starts at most one invocation, or one file operation.
-- **Disk:** the workspaces are the cache's (`domain/worker.md`, section
+- **Disk:** the workspaces are the cache's (`../domain/worker.md`, section
   5); `trash` holds no more than the workspaces it took, until the sweep
   has emptied it.
 
 ## 9. Testing
 
-As testing.md applies skein's strategy, within the suites' budgets
-(testing.md, 6.1):
+The tiers, their budgets and the fakes are `../testing.md`'s. What
+checks this document's contract:
 
 - **Step tests** in `temper-worker-protocol-git`:
   - **the builders:** for each operation and case (each `Want`, a push
@@ -577,10 +591,12 @@ As testing.md applies skein's strategy, within the suites' budgets
   `tools/git-transcripts`: every invocation of section 4, and every
   failure of section 6 (a missing repository, branch and commit, a wrong
   token, no permission, a protected branch, a refused connection),
-  against the throwaway Forgejo (testing.md, 2.6), which it starts as
-  `tools/forgejo-conformance` does. Each keeps the argument vector, exit
-  status, stdout and stderr, masked: object ids, ports, paths and times.
-  No credential is ever written. They are captured again when an
+  against the throwaway Forgejo (`../testing.md`, 2.6), which it starts
+  as `tools/forgejo-conformance` does. Each keeps the argument vector,
+  exit status, stdout and stderr, masked: object ids, ports, paths and
+  times. No credential is ever written. The facts this document relies
+  on, named in sections 3 and 4.8, are in `tools/git-transcripts/facts.txt`
+  with git's and Forgejo's versions. They are captured again when an
   invocation changes, or to move to another git.
 - **The git component's machine world,** `tests/worker/protocol-git`:
   the component between scripted operations above and scripted io below:
@@ -594,15 +610,15 @@ As testing.md applies skein's strategy, within the suites' budgets
   cancel; every child is closed before its operation's terminal; no
   credential in an argument; memory within `worst_case`. Its scripted
   outputs are the transcripts.
-- **The fake git program,** `testing/temper-fake-git` (testing.md, 4.3),
-  answers this document's invocations as real git does, and is checked
-  against the same transcripts: each transcript's arguments and
-  environment, run on the fake over the equivalent fixture, give the
-  same exit status, the same stdout once masked, and stderr lines that
-  classify alike. The one-process world runs it (testing.md, 2.5).
-- **The process tier** runs the machine's git, 2.41 or later, against the
-  throwaway Forgejo: clone, fetch, create, check out, commit, push, in
-  the story of testing.md, 2.6.
+- **The fake git program,** `testing/temper-fake-git`
+  (`../testing.md`, 4.3), answers this document's invocations as real
+  git does, and is checked against the same transcripts: each
+  transcript's arguments and environment, run on the fake over the
+  equivalent fixture, give the same exit status, the same stdout once
+  masked, and stderr lines that classify alike.
+- **The process tier** runs the machine's git, 2.41 or later, against
+  its owned Forgejo: clone, fetch, create, check out, commit, push, in
+  its story (`../testing.md`, 2.6).
 
 ## 10. Open questions
 
@@ -614,12 +630,6 @@ As testing.md applies skein's strategy, within the suites' budgets
   and the URL on the command line cover what they name. Contained trees
   (skein's `draft/process.md`), with the git directory unwritable by an
   agent's tree, close both.
-- **A renamed repository's remote.** The remote is made from the owner and
-  name the engine's root holds. Default: git follows the forge's
-  redirect for its first request (git's `http.followRedirects`, whose
-  default is `initial`), and a remote that changes misses the checkout's
-  cache, which clones afresh. Whether Forgejo v17.0 redirects git's
-  requests for a renamed repository is checked by `tools/git-transcripts`.
 - **HEAD after a commit.** Default: not moved (section 4.7), keeping each
   commit to four invocations; an agent that reads git sees the work
   since its start as uncommitted. Moving it costs a fifth invocation

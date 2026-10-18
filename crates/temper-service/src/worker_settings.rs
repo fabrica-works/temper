@@ -1,4 +1,4 @@
-//! The worker's checked construction bounds and payload sizes (protocol.md, 7).
+//! The worker's checked construction bounds and payload sizes (protocol/README.md, 7).
 use crate::{limits, settings};
 use jig_protocol_config::{self as config, Path, Problems, What};
 use jig_protocol_worker_link as link;

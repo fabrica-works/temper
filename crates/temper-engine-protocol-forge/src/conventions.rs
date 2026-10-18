@@ -1,4 +1,4 @@
-//! Request conventions (forge.md, section 3.1).
+//! Request conventions (protocol/forge.md, section 3.1).
 use alloc::boxed::Box;
 use core::net::{IpAddr, SocketAddr};
 use skein_lib::{Decimal, List};

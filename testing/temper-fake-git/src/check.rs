@@ -1,4 +1,4 @@
-//! Admission of only git.md's builder vectors and whole environments.
+//! Admission of only protocol/git.md's builder vectors and whole environments.
 use skein_io::kernel::Spawn;
 use skein_lib::{Secret, base64};
 use std::collections::BTreeMap;

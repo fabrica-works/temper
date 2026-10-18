@@ -1,4 +1,5 @@
-//! The accounts driver, its private keeper and secret-free translation (llm.md, 5).
+//! The accounts driver, its private keeper and secret-free translation
+//! (jig's protocol/llm.md, 5).
 use crate::{
     settings::{Files, Seeds},
     values::Values,

@@ -1,4 +1,5 @@
-//! The deployment store and its three file drivers (store/README.md, 3–5).
+//! The deployment store and its three file drivers (protocol/store.md, 3–5;
+//! jig's protocol/store.md, 13).
 mod ranges;
 pub mod route;
 use jig_protocol_store as protocol;

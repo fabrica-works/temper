@@ -22,10 +22,11 @@ document says what temper adds. What is open is listed in section 11.
 - **jig's parts are jig's:** `jig-protocol-config` parses them; temper
   writes no parser of its own for them, and adds only the checks
   standalone needs (section 2).
-- **temper's members:** `forges`, `identities`, `landing`, `charter`,
-  `clients`, `webhooks` and `limits` for the engine (section 3), and
-  `workers` for each worker (section 4). `webhooks` is the forge
-  component's webhooks' listener, on loopback (forge.md, section 5).
+- **temper's members,** under `application`: `forges`, `identities`,
+  `landing`, `charter`, `clients`, `webhooks` and `limits` for the
+  engine (section 3), and `workers`, one entry per worker (section 4).
+  `webhooks` is the forge component's webhooks' listener, on loopback
+  (forge.md, section 5).
 - **`setup`, for the forge's setup** (setup.md): how each set-up forge is
   run and set up, which the `temper forge` commands and `temper box` act
   on, and `temper serve` checks and acts on none of (section 3).
@@ -35,8 +36,7 @@ document says what temper adds. What is open is listed in section 11.
 - **No secret in the document.** Each secret is a private file the
   document names, read at start (section 6).
 - **One format rule** for temper's typed members: member names are the
-  Rust field names, and a plan writes the parser from the types (section
-  10).
+  Rust field names, and the parser follows the types (section 10).
 - **Standalone shape:** exactly one worker, joined to the engine by the
   in-process name `workers`; the clients' listener, and the webhooks'
   listener when configured, on loopback; the agent program is temper's
@@ -55,20 +55,17 @@ document says what temper adds. What is open is listed in section 11.
 ```
 
 - **`engine`** is jig's engine part (jig's `protocol/configuration.md`,
-  section 3): `deployment`, `owners`, `providers`, `rules`, `projects`,
-  `charters`, `templates`, `hosts`, `llm`, `clients`, `connectors`,
-  `limits` and `memory_bytes`, in jig's formats (jig's
-  `protocol/configuration.md`, section 10). Its `clients` member is what
-  jig's clients' component takes; the clients' listener is temper's
+  section 3), in jig's formats (its section 10). Its `clients` member is
+  what jig's clients' component takes; the clients' listener is temper's
   (section 3).
 - **`workers`** is a list of jig's worker parts (jig's
-  `protocol/configuration.md`, section 4): `engine`, `name`, `secret`,
-  `slots`, `graces`, `agent`, `limits` and `memory_bytes`.
+  `protocol/configuration.md`, section 4).
 - **`application`** holds temper's members (sections 3 and 4).
 - **jig's reference fixtures** are a complete example of jig's parts: the
   reference binary's test configuration (`jig-test`'s
   `tests/support/mod.rs`, made from jig's channel world's `fixtures.rs`).
-  temper's process tier writes its own the same way (testing.md, 2.6).
+  temper's process tier writes its own the same way (`../testing.md`,
+  2.6), and the owned example is a whole document (setup.md, 8.1).
 - **What standalone requires of jig's parts,** each checked at start, a
   failure naming its path:
   - `workers` has exactly one entry, whose `engine` is `{"in_process":
@@ -77,17 +74,27 @@ document says what temper adds. What is open is listed in section 11.
     `engine.hosts.workers` names that one worker;
   - `engine.connectors` is exactly `[1]`: the forge connector, temper's
     one connector, whose number both ends of the client's wire fix as
-    `temper-client-protocol-wire`'s `FORGE` (client.md, 4.6);
+    `temper-client-protocol-wire`'s `FORGE` (`../client.md`, 4.6);
   - the worker's `agent` paths are absolute (section 5).
 
   The worker's `agent` names temper's own binary (section 5), which no
   check can tell from another program.
+- **What temper's root requires of jig's parts,** standalone or not, each
+  checked at start, a failure naming its path: `engine.limits`'
+  `fleet.engine_slots` is 0, and every charter's `hosts` is `"workers"`.
+  The root has no hub child, so the fleet must place every run on a
+  worker (`../domain/root.md`, section 2).
 - **Templates are jig's two defaults,** chat (template 1, label 1) and
   goal (template 2, label 2), as jig's `protocol/configuration.md`,
   3.1 gives them, the chat's executor the charter chats run under;
   temper defines no template of its own. Its client's lists filter on
-  those labels (client.md, 3.5), and a project's policy may override
+  those labels (`../client.md`, 3.5), and a project's policy may override
   their defaults as jig's allows.
+- **A project's permission mapping,** jig's `roles` of each of
+  `engine.projects` (jig's `domain/people.md`, section 4), names the
+  forge's permissions by number under the forge connector, 1: 1 read, 2
+  write, 3 admin. An adoption gives a repository's collaborators the
+  roles their permissions map to (`../domain/forge.md`, section 4).
 - **Reading,** by `temper serve`, in this order:
   1. the file, whole, with skein's startup kit, within the bound jig's
      reference binary sets on a configuration's bytes;
@@ -137,7 +144,7 @@ jig's limit on an engine's application credentials (the accounts child's
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
-| `number` | u32 | unique among `identities` | the credential's number, as the root names it in `Event::Credential` and in grants |
+| `number` | u32 | unique among `identities`; from 1 to the accounts child's `credentials`, in `engine.limits` and in the worker's `limits`, since the worker's identities' table holds those numbers alone | the credential's number, as the root names it in `Event::Credential` and in grants |
 | `token` | a file | a private file (section 6) | the token git authenticates with |
 | `login` | string | not empty; no `:` and no control byte | the user of git's HTTP basic authentication |
 | `author` | `{"name": string, "email": string}` | each not empty; no NUL byte, newline, `<` or `>` | the author and committer of the commits made with it (git.md, section 5) |
@@ -163,12 +170,19 @@ A rule is a `LandingRule`, member for member:
 | `connector` | u16 | the forge connector's number, the one `engine.connectors` names |
 | `kind` | u16 | the effect kind the rule governs: 4, the forge's merge, the only kind a landing rule takes |
 | `pattern` | jig's pattern, as jig's `rules` and `projects` write one: `{"segments": [string], "last": "exact" or "open", "value": string}` | the resources the rule covers, as jig's authority matches them: the exact base segments, then one more segment equal to `value` (`exact`), or beginning with it, with all below it (`open`). The forge's resource path is `forge`, the forge's host (as `git` gives it), the repository's owner and name, then `branch` and the branch's segments |
-| `enforce` | boolean | true makes each criterion below a requirement every landing it covers must meet (`domain/authority.md`, section 10); false leaves them to the change procedure alone |
+| `enforce` | boolean | true makes each criterion below a requirement every landing it covers must meet (jig's `domain/authority.md`, section 10; `../domain/forge.md`, 8.7); false leaves them to the change procedure alone |
 | `ci` | boolean | CI must have passed at the change's head |
 | `up_to_date` | boolean | the change's head must contain its base's tip |
-| `gates` | list of `{"number": u32, "blocking": boolean, "freshness": "exact" or "clean"}` | the gates every change it covers asks for (`domain/forge.md`, 8.3): an agent's review, or one of a repository's checks when it has no CI; at most the forge's `change_policy.gates` |
-| `approvals` | list of `{"role": u32, "people": u32, "freshness": "exact" or "clean"}` | `people` distinct people holding `role` in the project approve the change |
+| `gates` | list of `{"number": u32, "blocking": boolean, "freshness": "exact" or "clean"}` | the gates every change it covers asks for (`../domain/forge.md`, 8.3): an agent's review, or one of a repository's checks when it has no CI; at most the forge's `change_policy.gates` |
+| `approvals` | list of `{"role": u32, "people": u32, "freshness": "exact" or "clean"}` | `people` distinct people holding `role` in the project approve the change, each by a review on the forge (`../domain/forge.md`, 8.7) |
 
+- **`freshness`,** a gate's or an approval's, says at which later heads
+  a verdict still counts: `exact`, the head it was given at; `clean`,
+  every head reached from it by updates temper made that merged cleanly
+  (`../domain/forge.md`, 8.3). It is not jig's freshness of an observed
+  requirement, the age within which its facts must have been read: CI,
+  gates and approvals are guarded, and up to date is observed with a
+  freshness of 0 (`../domain/forge.md`, 8.7).
 - **Bounds:** each list of rules holds at most jig's authority limit on
   requirements; a project appears in `projects` at most once, and must
   be one of `engine.projects`; each approval's `role` must be a role of
@@ -181,11 +195,11 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 `Config.forge_charter`.
 
 **`clients`:** the clients' listener, which `temper-service` owns
-(client.md, section 8):
+(`../client.md`, section 8):
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
-| `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (client.md, section 7) |
+| `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3) | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; and the address of the sign-in links `temper serve` prints (`../client.md`, section 7) |
 
 **`limits`:** temper's profile and overrides (section 7).
 
@@ -199,14 +213,14 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 - **A delivery is a hint,** never a fact: polling is the same with
   webhooks or without (forge.md, section 6), and finds what a delivery
   lost, refused or never sent told of.
-- **From another host** waits for skein's TLS server side; such a forge
-  polls (setup.md, section 15).
+- **A forge on another host polls:** its deliveries would need TLS on
+  the listener (README.md, section 14; setup.md, section 15).
 
 **`setup`:** the forges' setup, a list of at most one entry per forge,
-`[]` for none, and never missing (section 10). Its members, their bounds and the checks of the forge's
-own members against each entry are setup.md, section 8's. `temper serve`
-checks it whole, and acts on none of it: it reads no file that only
-`setup` names.
+`[]` for none, and never missing (section 10). Its members, their bounds
+and the checks of the forge's own members against each entry are
+setup.md, section 8's. `temper serve` checks it whole, and acts on none
+of it: it reads no file that only `setup` names.
 
 **What the engine root's `Config` takes,** field by field:
 
@@ -232,7 +246,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 
 | Member | Type | Bounds | Feeds |
 |---|---|---|---|
-| `root` | a directory | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `domain/worker.md`, section 5) |
+| `root` | a directory | made private (0o700) if absent; an existing one must be the process's user's, private, and not reached through a link | the worker's workspace directory: every checkout's workspace is made under it (git.md, section 2; `../domain/worker.md`, section 5) |
 | `git` | string | an absolute path to an executable file, checked at start, whose `git version` is at least the one git.md, section 3 names | the program the git component runs for each invocation, in the environment git.md, section 5 gives it |
 
 - **The worker's root takes the rest from jig's and smith's:** the hub's
@@ -252,19 +266,19 @@ top-level `workers`, in the same order; standalone has one. Each:
   - `configuration`: the absolute path of smith's agent configuration;
   - `arguments`: `["agent", <that same path>]`,
 
-  so each agent process is `temper agent AGENT.json` (protocol.md,
+  so each agent process is `temper agent AGENT.json` (README.md,
   section 4).
 - **Read twice:** by `temper serve` at start, for smith's host limits,
   the channel's limits and the agent's bounds, as jig's reference binary
   reads it; and by each agent process as it starts.
 - **It holds no credential:** an agent's grants come over smith's
   channel (credentials.md, section 3).
-- **The same names as the engine's,** checked at start: every endpoint of
-  `engine.llm.endpoints` must be in the agent's configuration under the
-  same name with the same account, and every model a charter names must
-  be declared there, or the start is refused, naming it. One process
-  reads both, so a mismatch that would fail every run's charter is
-  caught before the loop (llm.md, section 3).
+- **The same names as the engine's** (jig's `protocol/configuration.md`,
+  section 4), checked at start: every endpoint of `engine.llm.endpoints`
+  must be in the agent's configuration under the same name with the same
+  account, and every model a charter names must be declared there, or
+  the start is refused, naming it. One process reads both, so a mismatch
+  that would fail every run's charter is caught before the loop.
 
 ## 6. Secrets' files
 
@@ -290,18 +304,15 @@ top-level `workers`, in the same order; standalone has one. Each:
   token's is the channel's bound on a grant's value, which its whole
   value, login and author included, must fit (section 3; channel.md,
   section 8).
-- **A set-up forge's directory** (`application.setup[].directory`) is
-  private, 0o700, the user's own and not reached through a link, made so
-  by the first command that writes in it, and refused otherwise, as a
-  worker's root is (section 4). Its files are setup.md, section 3's, each
-  written whole by the layer that makes it; the forge's `api_token`,
-  `user` and `webhook_secret`, and its identity's `token`, name them
-  (setup.md, section 8).
+- **A set-up forge's directory** (`application.setup[].directory`) and
+  its files are setup.md, section 3's; the forge's `api_token`, `user`
+  and `webhook_secret`, and its identity's `token`, name them (setup.md,
+  section 8).
 - **Never written by `temper serve`.** The setup's commands write the
   files of a set-up forge's directory (setup.md, section 3); an operator
   replaces any other and restarts (credentials.md, sections 4 and 5).
 - **No temper secret in jig's secrets' store** (credentials.md, section
-  6).
+  2).
 
 ## 7. Limits
 
@@ -318,31 +329,21 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **One profile, `small`,** for one person's machine; another name is
   refused. Its numbers are constants in `temper-service`'s limits module,
   and the setup's and the box's in their own crates, each documented
-  with what it bounds. Where a limit of temper's is a quantity jig's
-  profile also sets, its constant cites jig's small profile's (jig's
-  `protocol/configuration.md`, section 6).
+  with what it bounds; the design names limits and what they bound, and
+  never their numbers (jig's `protocol/configuration.md`, section 6).
+  Where a limit of temper's is a quantity jig's profile also sets, its
+  constant cites jig's small profile's.
 - **`small` starts as it stands,** with no override, against the agent
-  temper runs: smith's, whose run bounds are smith's own and no
-  configuration changes (smith's `smith-domain-run`, `derive`: 2
-  directories, a directory's name of 256 bytes; `smith-agent-service`'s
-  4 accounts), and whose largest call, under the owned example's agent
-  configuration (section 10), is 4096 bytes (its `outcome_bytes`). Each
-  constant is held to the checks below:
-  - `checkout.repositories` 2 and `forge.resources_per_task` 2: a task's
-    resources are its workspace's repositories, each one of the agent's
-    directories;
-  - `checkout.name_bytes` 256, the agent's directory names;
-  - `checkout.message_bytes` 4096: a run's push message, which smith
-    bounds as a call, the agent's largest;
-  - `forge.name_bytes` 64: the longest remote, an owner and a name of 64
-    bytes, two `/` and `.git`, leaves 122 bytes of a `git` base within
-    the checkout's 256;
-  - `git_component.stdout_bytes` 1024: the checkout's 4 conflicts of 255
-    bytes with their NULs, and a push's report, two names and 256.
-
-  So an `application.limits` of `small` with no override starts a
-  document whose forges' `git` bases are at most 122 bytes, as the owned
-  example's and the standalone one's are, 21 each (section 10). A test
+  temper runs: smith's, whose run bounds (its directories, their names,
+  its accounts) are smith's own and no configuration changes (smith's
+  `smith-domain-run`, `derive`; `smith-agent-service`), and whose largest
+  call, its run's `outcome_bytes`, follows from its agent configuration,
+  the owned example's (setup.md, 8.1). Every constant passes the
+  checks below with that agent: a task's resources and the checkout's
+  repositories within the agent's directories, the checkout's names
+  within theirs, and a run's push message, which smith bounds as a call,
+  within the checkout's commit message. So `small` takes a forge's `git`
+  base of at most 122 bytes, the longest remote's bound (below). A test
   whose agent has other bounds states the overrides it needs.
 - **Overrides by dotted name:** the path of the field in its owner's
   `Limits` type, a duration's last segment with `_ms`. A name temper does
@@ -365,7 +366,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 
   | Name | Bounds |
   |---|---|
-  | `forge.client.settle_ms` | after a move of a pull request's head or base, how long a not mergeable answer, or a hinted job's pending CI, is read again at `hinted` and not believed, by the change procedure (`domain/forge.md`, 5.2); above 0, as `hinted` is |
+  | `forge.client.settle_ms` | after a move of a pull request's head or base, how long a not mergeable answer, or a hinted job's pending CI, is read again at `hinted` and not believed, by the change procedure (`../domain/forge.md`, 5.2); above 0, as `hinted` is |
   | `forge_component.hooks` | the webhooks' listener's connections in all |
   | `forge_component.hook_head_bytes` | a delivery's request head |
   | `forge_component.hook_body_bytes` | a delivery's body, hashed and decoded as it streams, so time and bytes, not memory; one past it is answered `413` and hints nothing |
@@ -397,7 +398,8 @@ top-level `workers`, in the same order; standalone has one. Each:
     are counted. The sockets are temper's own, a constant of
     `temper-service`'s limits module that its io check takes in place
     of the sum of jig's engine's and worker's, and `small`'s hold a
-    document with both listeners, as the owned example has;
+    document with both listeners, as the owned example has (setup.md,
+    8.1);
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest
     part the engine can send within what the worker's limits take; the
@@ -417,41 +419,53 @@ top-level `workers`, in the same order; standalone has one. Each:
     2, and no other value starts.
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
+- **What the root takes of `engine.limits`:** its core children's
+  (`tasks.`, `authority.`, `people.`, `fleet.`, `accounts.`, `notes.`
+  and `documents.`), with `core.templates` and `core.call_records`. The
+  rest of the core's it gives the core itself (`../domain/root.md`,
+  section 10): from its own `root.` limits, in place of `brief.`,
+  `core.brief_parts`, `core.brief_core_budgets.`, `core.resume_bytes`,
+  `core.run_bytes`, `core.policy_bytes`,
+  `core.escalation_reason_bytes`, `core.call_answer_bytes` and
+  `core.load_slots`; as constants, in place of `views.`,
+  `core.fill_mark`, `core.load_bytes` and `core.connectors`. An
+  override of one of these changes nothing the root holds.
 - **The engine's documents fit temper's client.** A document past the
   bounds a client decodes is refused there whole, as too large (jig's
   `protocol/client.md`, section 3), so the documents the engine serves
-  are within what temper's client takes: its client takes `jig-client`'s
-  limits from jig's small profile with the same `documents.` overrides
-  the example's `engine.limits` names (client.md, section 2). The engine
-  cuts each text to its bound and says so (jig's
-  `client/domain/contract.md`, 5.3). It checks none of this at
-  start: it serves whatever client the deployment lets in, whose limits
-  are the client's. A test holds the example's and the process tier's
-  configuration to temper's client's limits, so the two cannot drift
-  apart unseen.
+  must be within what temper's client takes: its client takes
+  `jig-client`'s limits from jig's small profile with the same
+  `documents.` overrides the owned example's `engine.limits` names
+  (`../client.md`, section 2; setup.md, 8.1). The engine cuts each
+  text to its bound and says so (jig's `client/domain/contract.md`,
+  5.3). It checks none of this at start: it serves whatever client the
+  deployment lets in, whose limits are the client's. A test holds the
+  owned example's and the process tier's configuration to temper's
+  client's limits, so the two cannot drift apart unseen.
 - **The engine's watch room fits temper's client.** A watch past the
   room the engine allows a party, or a stream, is refused busy, and each
   holds its place until the engine has ended it, so a deployment allows
   each party, and each stream, at least the watches one client opens at
   its limit, `me`'s included (jig's `client/domain/contract.md`, 7.2;
-  `protocol/client.md`, section 13). temper's client opens 16, so its
-  engine allows 16 a party, 16 a stream and 16 in all, temper's own
-  numbers above jig's profiles' 4 (`domain/engine.md`, section 13). It
-  checks none of this at start, as for documents (above); the same test
-  holds these rooms to temper's client's watches.
+  jig's `protocol/client.md`, section 13). temper's client opens 16, so
+  its engine allows 16 a party, 16 a stream and 16 in all, temper's own
+  numbers above jig's profiles' 4, which the root holds whatever
+  `engine.limits` says (`../domain/root.md`, section 10). It checks none
+  of this at start, as for documents (above); the same test holds these
+  rooms to temper's client's watches.
 - **The forge's paths fit a document.** jig's documents carry a
   resource's path and a pattern whole, with as many segments as the
   engine admits in a name (jig's `client/domain/contract.md`, 5.3), and
   `documents.lines` bounds a document's short lists alone, at most the
-  client's rows. So `engine.limits` names the bounds on a name's
+  client's rows. So `engine.limits` must name the bounds on a name's
   segments, `authority.segments`, `tasks.hold_segments` and
   `tasks.authority_segments`, at least the segments of the deepest path
   the forge names: a branch's, the forge's five segments then the
-  branch's own (`domain/forge.md`, section 2), 8 as temper's branches
-  name them. The example names them 8. temper's client takes a path's
-  segments, 9, apart from its rows (jig's `client/domain/client.md`,
-  section 14), so a page of the forge's work is never refused for a
-  path, and a long path shows cut, with jig's mark (client.md, 5.4).
+  branch's own (`../domain/forge.md`, section 2), 8 as temper's branches
+  name them. temper's client takes a path's segments, 9, apart from its
+  rows (jig's `client/domain/client.md`, section 14), so a page of the
+  forge's work is never refused for a path, and a long path shows cut,
+  with jig's mark (`../client.md`, 5.4).
 - **The forge's authorities fit a document.** jig's documents carry an
   authority's lists whole, with as many entries as the engine admits in
   each, and neither cut nor refuse a document or an offer for one (jig's
@@ -460,57 +474,16 @@ top-level `workers`, in the same order; standalone has one. Each:
   takes an authority's entries, 12, apart from its rows (jig's
   `client/domain/client.md`, section 14): the most the process tier and
   the owned example admit in a list, their `authority.grants` and
-  `tasks.authority_grants` of 12. A long authority shows in part, with
-  jig's mark (client.md, 5.4). The test above holds the engine's bounds
-  on an authority's lists to temper's client's.
-- **The owned example's `engine.limits`** (section 10) are the small
-  profile with the overrides the bullets above ask, and those its
-  owner's grants need, and no other:
-  - `authority.segments`, `tasks.hold_segments` and
-    `tasks.authority_segments`, 8: a name's segments;
-  - `documents.rows` 2, `documents.lines` 2 and `documents.text_bytes`
-    128: temper's client's rows and text;
-  - `views.watchers` and `views.watchers_per_party`, 16: the watch room;
-  - `authority.grants` and `tasks.authority_grants`, 12: its owner
-    holds a grant for each of the forge's kinds its work uses, 10
-    (section 10), and small's 4 hold none of that work; with
-    `notes.scopes` 15, since jig's core admits an authority's grants
-    only with 3 notes' scopes more, and refuses every override of the
-    core's otherwise (`jig-domain-core`'s `worst_case`);
-  - `tasks.authority_bytes` 512 and `tasks.batch` 1, the process
-    tier's: the bounds above widen a task's stored row past the small
-    profile's store, whose bounds no override changes, so the start is
-    refused (jig's `protocol/store.md`, 5.4); these two bring the row
-    back within.
-- **The owned example's worker `limits`** are jig's small profile with
-  the two of the hub's that jig's small, sized for any agent, sets past
-  smith's agent (the worker's check above), and no other: `hub.accounts`
-  4, the agent's accounts, where jig's small has 8; and `hub.event_bytes`
-  598, the example's agent's `message_bytes`, 600, less the separator,
-  where jig's small has 65,536. Its `application.limits` is `small` with
-  no override.
+  `tasks.authority_grants` (setup.md, 8.1). A long authority shows
+  in part, with jig's mark (`../client.md`, 5.4). The test above holds
+  the engine's bounds on an authority's lists to temper's client's.
 - **One worst case per service:** jig's sum (the root's, its components'
   and the journal's) and temper's (its domains', its components', the
   identities' table) together must fit the memory jig's part states,
   `engine.memory_bytes` for the engine's service and `memory_bytes` of
   the worker's part for the worker's, or the start is refused, saying by
-  how much.
-- **The owned example's `memory_bytes`** hold its worst cases wherever a
-  person lays it and whatever its forge's files hold: each start passes
-  with each string its service's worst case counts, and a person's copy
-  changes, at its bound. The engine's counts the forge's `api_token` and
-  its `git` base, a byte for each of theirs: the token at `small`'s
-  `forge_component.token_bytes`, 512, past which the start is refused,
-  and the base at an owned forge's longest, `http://` with a loopback
-  address and a port, `http://127.255.255.254:65535`, 28 bytes. The
-  worker's counts its agent's `program` and the configuration's path
-  among its `arguments`, two bytes for each of theirs with the example's
-  one slot: each at Linux's `PATH_MAX`, 4,096 bytes. Nothing else a copy
-  changes moves either: its directory but for that path, its other
-  addresses and secrets, its logins, emails, binaries and charters, the
-  account handed in. A test starts the example with those strings at
-  their bounds, so that the example starts from a person's directory,
-  with Forgejo's tokens, on the ports a host picks.
+  how much. The owned example's `engine.limits`, worker `limits` and
+  `memory_bytes`, and why each holds, are setup.md, 8.1's.
 
 ## 8. First start and every start
 
@@ -520,15 +493,14 @@ top-level `workers`, in the same order; standalone has one. Each:
   limits and `setup`, and none of the checks that need a private file
   read, since a set-up forge's files do not exist before reconcile makes
   them (setup.md, section 8). Each reads the private files its own part
-  needs alone: a `temper
-  forge` command its forge's, by setup.md, sections 5 and 6; `temper
-  box` none; `temper serve` every one the document names but those that
-  only `setup` names. A set-up forge's files that its members name, which
-  the commands before it made, are among the ones it reads.
-- **A deployment's first start** is the first with an empty store (jig's
-  `protocol/configuration.md`, section 8): the shell draws the
-  deployment's id, and the core seeds owners and projects from
-  `engine`. temper adds:
+  needs alone: a `temper forge` command its forge's, by setup.md,
+  sections 5 and 6; `temper box` none; `temper serve` every one the
+  document names but those that only `setup` names. A set-up forge's
+  files that its members name, which the commands before it made, are
+  among the ones it reads.
+- **A deployment's first start** is jig's (jig's
+  `protocol/configuration.md`, section 8): the first with an empty store,
+  whose owners and projects the core seeds from `engine`. temper adds:
   - **periods from the smallest source,** as jig's reference service
     gives them (jig's `protocol/configuration.md`, section 5): before the
     core admits a party's request, the engine's routing gives the root
@@ -536,8 +508,8 @@ top-level `workers`, in the same order; standalone has one. Each:
     spend per period, with no next start;
   - **each project's landing rules** join its policy as it is seeded.
 - **Every start:**
-  - jig's parts apply as jig says: its rules, charters, limits, hosts,
-    endpoints and accounts as configured, its projects ignored;
+  - jig's parts apply as jig says (jig's `protocol/configuration.md`,
+    section 8);
   - temper's members apply as configured: the forges, the identities,
     the deployment's landing rules, the forge's judges for every rule,
     the charter, the limits and the workers;
@@ -546,6 +518,9 @@ top-level `workers`, in the same order; standalone has one. Each:
     section 8), so a `git` base or a limit changed since the last start
     is refused before io starts when a remote or a part could pass its
     bound;
+  - the root's configuration is held to the root's limits before the
+    root is made (`../domain/root.md`, section 6): a start that breaks
+    one is refused, naming it;
   - every identity is announced at generation 1 before the restart
     (credentials.md, section 4), and every forge's user is checked by the
     forge component's first exchange (credentials.md, section 5);
@@ -556,7 +531,7 @@ top-level `workers`, in the same order; standalone has one. Each:
 - **Repositories are never configured.** A person adopts each at runtime
   through the client, by the forge's number, the owner and the name, and
   the store keeps it (jig's `protocol/configuration.md`, section 3;
-  client.md, section 4).
+  `../client.md`, section 4).
 - **What a change reaches,** after its restart: a forge's `git`, every
   remote from the next assignment on; a forge's `api_token` and `user`,
   checked again; a forge's `webhook_secret`, and the webhooks' listener,
@@ -567,21 +542,10 @@ top-level `workers`, in the same order; standalone has one. Each:
 ## 9. The client's arguments
 
 - **`temper open DIRECTORY LINK_OR_ADDRESS`** takes no configuration
-  file (client.md, 6.1 holds its arguments exactly):
-  - `DIRECTORY` is the client's private directory, made 0o700 if absent,
-    and refused unless it is a directory of the user's with no group or
-    other permission bits (skein's `io.md`, 5.3). It holds the bearer
-    token and the small store, `jig-client-shell-native`'s files (jig's
-    `protocol/client.md`, sections 8, 10 and 12; client.md, section
-    7).
-  - `LINK_OR_ADDRESS` is the link `temper serve` printed, the first
-    time, by which the client signs in (jig's `protocol/client.md`,
-    section 8; client.md, section 7); or the clients' listener's
-    `http://HOST:PORT`, later, when the directory holds a bearer token.
-  - HOST must be an IP address on loopback, in standalone; another is
-    refused before anything is sent.
-  - The client's limits are constants of temper's client (client.md,
-    section 2).
+  file: its two arguments are `../client.md`, 6.1's, and its limits are
+  constants of temper's client (`../client.md`, section 2).
+- **`temper ctl DIRECTORY ...`** takes none either (`../tools.md`,
+  section 8).
 - **`temper sign-in CONFIG.json ACCOUNT`** reads the same document as
   `temper serve` (credentials.md, section 3).
 - **`temper agent AGENT.json`** reads smith's agent configuration
@@ -701,13 +665,7 @@ not itself valid JSON):
     "llm": ...,
     "clients": {"link": true, ...},
     "connectors": [1],
-    "limits": {"profile": "small", "overrides": {
-      "authority.segments": 8, "tasks.hold_segments": 8, "tasks.authority_segments": 8,
-      "documents.rows": 2, "documents.lines": 2, "documents.text_bytes": 128,
-      "views.watchers": 16, "views.watchers_per_party": 16,
-      "authority.grants": 12, "tasks.authority_grants": 12, "notes.scopes": 15,
-      "tasks.authority_bytes": 512, "tasks.batch": 1
-    }},
+    "limits": {"profile": "small", "overrides": {"authority.segments": 8, ...}},
     "memory_bytes": ...
   },
   "workers": [{
@@ -720,63 +678,25 @@ not itself valid JSON):
       "configuration": "/home/me/temper/agent.json",
       "arguments": ["agent", "/home/me/temper/agent.json"]
     },
-    "limits": {"profile": "small", "overrides": {"hub.accounts": 4, "hub.event_bytes": 598}},
+    "limits": {"profile": "small", "overrides": {"hub.event_bytes": ..., ...}},
     "memory_bytes": ...
   }],
   "application": { ... as above ... }
 }
 ```
 
-**The owned example** (setup.md, section 8) is a file,
-`docs/examples/owned.json`: a whole document, `engine` and `application`
-both, for one owned forge with a runner, webhooks, one git identity, one
-worker and one LLM account handed in (credentials.md, section 3), with
-the files it names that hold no secret beside it in
-`docs/examples/owned/` (the agent's configuration, the charters). The
-files that hold a secret, the worker's secret and its digest and the
-LLM account's file, are never shipped: the first milestone's setup
-document says how each is made. A person, a test or QA's host starts
-from a copy; `temper box CONFIG.json` runs it (setup.md, section 7),
-and the process tier's test of `temper box` runs one (setup.md, 13.4).
-
-- **The forge's members are its setup's, written out** (setup.md, section
-  8): `api` and `git` from `listen`, plaintext; `api_token`, `user`,
-  `webhook_secret` and the identity's `token` in the forge's directory;
-  the identity's `login` the bot's.
-- **Its landing rule asks for CI,** Actions on the owned runner, and an
-  agent's review; `acme/widget` is a repository the person makes in the
-  org on Forgejo's web, with Actions, then adopts (setup.md, 6.5).
-- **Its owner may do the forge's work in the org,** and no more: the
-  rules' ceiling, the project's ceiling, its role's authority and its
-  projections each hold one grant on the org, `acme`, for each kind a
-  change and its goal's issue use (forge.md, section 6): read, push,
-  open a pull request, merge, comment, create an issue, edit a pull
-  request, update it from its base, close or reopen it, and edit, close
-  or reopen an issue; 10, as the process tier's owner holds them. Its
-  `engine.limits` admit them (section 7).
-- **Its agent's configuration** (section 5), `owned/agent.json`, takes
-  the process tier's profile, the sizes its live tier runs a real model
-  with: smith's `standard`, with `declared` `memory` 2,147,483,648,
-  `tool_payload` 600, `read_window` 256, `conversations` 1 and
-  `calls_per_response` 1, and `policy` `max_turns` 5, `group_stop` 10,
-  `inbox` 8 and `unacknowledged` 8. Its messages are then 600 bytes, and
-  its worker's `limits` follow from them (section 7). smith's standard
-  sizes with nothing declared refuse the example's model declaration at
-  start.
-- **Its `memory_bytes`** hold its worst cases with the strings a copy
-  changes at their bounds (section 7), never its least for one
-  directory.
-- **Three loopback addresses,** Forgejo's (`listen`), the clients'
-  listener's and the webhooks' listener's, are what a host changes to run
-  several boxes on one machine, with each box's directories.
+Its `engine.limits` names the overrides section 7 asks, and its worker's
+`limits` those the worker's check against the agent asks (section 7).
+The owned example, `docs/examples/owned.json`, is a whole document for
+one owned forge, with its own values (setup.md, 8.1).
 
 ## 11. Open questions
 
 - **A calendar for periods.** The smallest source opens one period per
   configured project at the first start and none after, so a project's
-  budget is not renewed. Default: as is, until a calendar child of
-  temper's root is designed, as `ops`'s is (jig's
-  `protocol/service.md`, section 7).
+  budget is not renewed. Default: the smallest source; a calendar child
+  of temper's root, as `ops`'s (jig's `protocol/configuration.md`,
+  section 5; jig's `examples.md`, section 4), would renew it.
 - **A forge removed while the store holds its repositories.** Default:
   the start is refused at the forge's restart step, naming the forge
   number (jig's `protocol/configuration.md`, section 9, removed parts).
@@ -786,9 +706,18 @@ and the process tier's test of `temper box` runs one (setup.md, 13.4).
   reaches the policy only through a policy change by a person.
 - **A repository renamed or moved after adoption.** Default: its
   resource path, which landing patterns match, and its remote keep the
-  owner and name of its adoption.
+  owner and name of its adoption; Forgejo redirects the old path, and
+  git follows the redirect (`tools/forgejo-conformance/facts.txt`,
+  `moved-repository-is-a-redirect`; `tools/git-transcripts/facts.txt`,
+  `git-follows-a-renamed-repository-redirect`).
 - **Profiles' numbers,** from the first deployments' measurements
   (jig's `protocol/configuration.md`, section 9). Default: `small` as
   written.
-- **A configuration's format version** (jig's open question). Default:
-  none; unknown members refuse the start.
+- **`small`'s worst cases against a person's machine.** With the owned
+  example's strings at their bounds, the engine's and the worker's worst
+  cases are past any machine's memory (setup.md, 8.1 and section 16), so
+  the start's check (section 7, one worst case per service) bounds
+  nothing a person's machine holds. Which terms make them so large is
+  not known. Default: the check as it stands.
+- **A configuration's format version** (jig's `protocol/configuration.md`,
+  section 9). Default: none; unknown members refuse the start.

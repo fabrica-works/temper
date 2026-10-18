@@ -1,4 +1,4 @@
-//! The committed codecs and golden bytes against their schemas (codec.md, 6).
+//! The committed codecs and golden bytes against their schemas (skein's codec.md, 6).
 use skein_codegen::{generate, parse};
 use std::{fs, path::Path};
 

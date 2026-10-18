@@ -1,4 +1,4 @@
-//! Forge connection (forge.md, sections 3 and 8).
+//! Forge connection (protocol/forge.md, sections 3 and 8).
 use alloc::boxed::Box;
 use skein_lib::{Duration, Wall};
 use temper_forge_forgejo::{decode, document, header};
@@ -48,7 +48,8 @@ pub enum Body {
     Malformed(decode::Malformed),
 }
 
-/// Why an exchange failed (forge.md, 3.4, "Unavailable is provable only before the first byte").
+/// Why an exchange failed (protocol/forge.md, 3.4,
+/// "Unavailable is provable only before the first byte").
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Failure {
     /// The server never saw the request: no byte written (a refused connect, a failed

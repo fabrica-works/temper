@@ -1,18 +1,20 @@
-//! Forge component settings (forge.md, sections 2, 3.5, 7 and 8).
+//! Forge component settings (protocol/forge.md, sections 2, 3.5, 7 and 8).
 use alloc::boxed::Box;
 use skein_io::Addr;
 use skein_lib::{List, Secret};
 
-/// What the component is told at start (forge.md, 2): one entry per configured forge.
+/// What the component is told at start (protocol/forge.md, 2): one entry per
+/// configured forge.
 #[derive(Debug)]
 pub struct Settings {
     /// At most `Limits::forges`, numbers unique.
     pub forges: List<Forge>,
-    /// The listener and secrets, present together (forge.md, 5).
+    /// The listener and secrets, present together (protocol/forge.md, 5).
     pub webhooks: Option<crate::hooks::Webhooks>,
 }
 
-/// One forge, from `application.forges` (configuration.md, 3) and what the binary resolved.
+/// One forge, from `application.forges` (protocol/configuration.md, 3) and
+/// what the binary resolved.
 #[derive(Debug)]
 pub struct Forge {
     /// The domain's forge number: a repository's `forge`.

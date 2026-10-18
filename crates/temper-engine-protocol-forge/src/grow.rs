@@ -1,4 +1,4 @@
-//! Forge connection grow (forge.md, sections 3 and 8).
+//! Forge connection grow (protocol/forge.md, sections 3 and 8).
 use alloc::boxed::Box;
 use skein_lib::List;
 

@@ -1,4 +1,4 @@
-//! Temper's ordered families under jig's application tag (store/README.md).
+//! Temper's ordered families under jig's application tag (protocol/store.md).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
@@ -11,7 +11,7 @@ pub mod v2;
 #[cfg(test)]
 mod tests;
 
-/// One version for every durable family (store/README.md, section 4).
+/// One version for every durable family (protocol/store.md, section 4).
 pub const STORE_VERSION: u32 = 2;
 
 /// Largest encodings under the forge's checked bounds, before jig's key tag.

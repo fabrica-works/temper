@@ -1,4 +1,5 @@
-//! Accepted streams, the workers' component and its typed root handoff (channel.md, 10.2).
+//! Accepted streams, the workers' component and its typed root handoff
+//! (jig's protocol/channel.md, 10.2).
 use crate::{
     assignment::Encoding,
     settings::{Files, Forge},

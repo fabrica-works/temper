@@ -1,6 +1,6 @@
 //! Values crossing the connector top's parent boundary. Durable records are
 //! whole rows: the parent saves them in the decision and only then sends
-//! `Committed` for a new outbox entry (domain/connectors.md, 4.2).
+//! `Committed` for a new outbox entry (jig's domain/connectors.md, 4.2).
 use alloc::boxed::Box;
 use skein_lib::Token;
 use temper_engine_domain_forge_change as change;
@@ -107,7 +107,7 @@ pub struct Repository {
 }
 /// The git identity a forge's repositories are pushed and fetched with: an
 /// application credential numbered by the deployment's configuration
-/// (credentials.md, "each repository to a git identity").
+/// (protocol/credentials.md, "each repository to a git identity").
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct GitIdentity {
     pub forge: u16,

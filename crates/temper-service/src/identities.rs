@@ -1,4 +1,4 @@
-//! The two newest git identity generations by grant number (credentials.md, 4).
+//! The two newest git identity generations by grant number (protocol/credentials.md, 4).
 use skein_lib::List;
 use temper_worker_protocol_git::Identity;
 

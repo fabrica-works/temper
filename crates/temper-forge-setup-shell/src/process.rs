@@ -1,4 +1,4 @@
-//! The one exception for the lock and exec (setup.md, 6.4).
+//! The one exception for the lock and exec (protocol/setup.md, 6.4).
 use std::{
     fs, io,
     os::unix::{fs::OpenOptionsExt, process::CommandExt},

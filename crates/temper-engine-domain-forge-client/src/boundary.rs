@@ -1,4 +1,4 @@
-//! Values exchanged with the connector top (domain/connectors.md, sections 2–4).
+//! Values exchanged with the connector top (jig's domain/connectors.md, sections 2–4).
 //!
 //! The client keeps live-resource rows and repository scan positions, while
 //! the top keeps durable outbox entries. It never knows tasks beyond numbers.

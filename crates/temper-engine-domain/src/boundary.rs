@@ -16,7 +16,7 @@ use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_client as forge_client;
 
 /// A complete claim's assignment, root to worker after durability; its
-/// brief sections are bounded by brief limits (domain/engine.md, 7.1 and 9).
+/// brief sections are bounded by brief limits (domain/root.md, 7.1 and 7.2).
 /// The protocol layer encodes it as the hub's assignment, with the forge
 /// workspace beside it as temper's application part (jig's
 /// `protocol/channel.md`, 6.2).
@@ -111,7 +111,7 @@ pub struct ForgeWorkspace {
 }
 
 /// One typed engine tool request from the current worker claim
-/// (domain/engine.md, section 7.3). Later routes extend this vocabulary.
+/// (domain/root.md, sections 3 and 5.2). Later routes extend this vocabulary.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Tool {
     /// Write or correct one scoped note by the revision this run recalled.
@@ -210,7 +210,7 @@ pub struct Call {
     pub tool: Tool,
 }
 
-/// External inputs to the walking root (domain/engine.md, 5–7). Admission is
+/// External inputs to the walking root (domain/root.md, 3). Admission is
 /// `try_step`'s: an input the journal cannot take returns to its owner, and
 /// store answers are always taken (jig's `domain/root.md`, 3).
 /// The input union, with one variant for each typed peer.
@@ -221,7 +221,7 @@ pub enum Event {
     Party(PartyInput),
     Account(accounts::Event),
     /// A generation named by temper's own credential source for one numbered
-    /// application credential, a repository's git identity (domain/engine.md, 12).
+    /// application credential, a repository's git identity (domain/root.md, 7.1).
     Credential {
         number: u32,
         generation: u64,
@@ -300,7 +300,7 @@ impl Parts {
     }
 }
 
-/// Why a repository could not be prepared, permanently (channel.md, 5).
+/// Why a repository could not be prepared, permanently (protocol/channel.md, 5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Preparation {
     /// The forge lacks what the assignment names for this repository.
@@ -309,7 +309,7 @@ pub enum Preparation {
     Refused { tag: u32 },
 }
 
-/// What the forge lacks for a preparation (channel.md, 5).
+/// What the forge lacks for a preparation (protocol/channel.md, 5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Missing {
     Repository,
@@ -317,7 +317,7 @@ pub enum Missing {
     Commit,
 }
 
-/// An observation of the root, which decides nothing (domain/engine.md, 8).
+/// An observation of the root, which decides nothing (domain/root.md, 3 and 7.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Fact {
     /// A fenced answer reported a permanent preparation failure.
@@ -423,8 +423,8 @@ pub enum PartyInput {
 }
 
 /// Root to shell/worker/web. Commit and load requests each have one store
-/// terminal; deliveries are notices or consume a `ReplyTo` (domain/engine.md, 5).
-/// Every output crosses the journal door in its peer's vocabulary.
+/// terminal; deliveries are notices or consume a `ReplyTo` (domain/root.md, 3
+/// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
     Store(StoreRequest),

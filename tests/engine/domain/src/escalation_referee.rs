@@ -170,7 +170,8 @@ impl Referee {
     }
 
     /// Register the exact keyed ask and independently expected terminal before
-    /// dispatch, including stale winners and refusals (domain/people.md, section 5.1).
+    /// dispatch, including stale winners and refusals (jig's domain/people.md,
+    /// section 5.1).
     pub fn ask(&mut self, to: Token, person: u64, key: [u8; 16], ask: people::Ask, outcome: people::Outcome) {
         assert!(
             self.asks.insert(to, AskReply { person, key, ask, terminal: ExpectedTerminal::Outcome(outcome) }).is_none(),
@@ -179,7 +180,8 @@ impl Referee {
     }
 
     /// Register an immediate key-conflict refusal and freeze the existing saved
-    /// request/outcome; no new answered key is expected (domain/people.md, section 5.1).
+    /// request/outcome; no new answered key is expected (jig's domain/people.md,
+    /// section 5.1).
     pub fn key_conflict(
         &mut self,
         rows: &BTreeMap<Key, Record>,
@@ -220,7 +222,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects missing/wrong identity or session, and duplicate terminals
-    /// (domain/people.md, sections 3 and 5).
+    /// (jig's domain/people.md, sections 3 and 5).
     pub fn signed_in(
         &mut self,
         rows: &BTreeMap<Key, Record>,
@@ -251,7 +253,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects duplicate starts or mismatched requester/question/answer
-    /// (domain/engine.md, section 7.1).
+    /// (jig's domain/people.md, section 5.1).
     pub fn started(&mut self, rows: &BTreeMap<Key, Record>, number: u64) -> Result<(), &'static str> {
         if self.start_replies != 0 {
             return Err("chat-start terminal twice");
@@ -275,7 +277,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects early, duplicate, wrong-task or stale-price assignments
-    /// (domain/engine.md, section 7.1).
+    /// (jig's domain/engine.md, section 7.1).
     pub fn assigned(&mut self, rows: &BTreeMap<Key, Record>, assignment: &Assignment) -> Result<(), &'static str> {
         if self.task != Some(assignment.task) {
             return Err("assignment for another task");
@@ -538,8 +540,8 @@ impl Referee {
     }
 
     /// Count durable claims whose assignment never escaped and whose canonical
-    /// refusal preserved expense without spending a try (domain/engine.md, section 7.4;
-    /// domain/tasks.md, section 5.5).
+    /// refusal preserved expense without spending a try (jig's domain/engine.md,
+    /// section 7.4; jig's domain/tasks.md, section 5.5).
     #[must_use]
     pub fn unplaced_claims(&self) -> usize {
         self.unplaced_claims.len()
@@ -550,7 +552,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects unsolicited/duplicate replies, changed winner or missing durability
-    /// (domain/people.md, section 5.1).
+    /// (jig's domain/people.md, section 5.1).
     pub fn replied(
         &mut self,
         rows: &BTreeMap<Key, Record>,
@@ -651,7 +653,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects duplicates, wrong fences or an ACK preceding its charge
-    /// (domain/engine.md, section 7.4).
+    /// (jig's domain/engine.md, section 7.4).
     pub fn acknowledged(
         &mut self,
         rows: &BTreeMap<Key, Record>,
@@ -714,7 +716,7 @@ impl Referee {
     ///
     /// # Errors
     /// Rejects lost/doubled prices, held reopening or wrong final funding
-    /// (domain/tasks.md, section 12).
+    /// (jig's domain/authority.md, section 7).
     pub fn final_state(&self, rows: &BTreeMap<Key, Record>) -> Result<(), &'static str> {
         let number = self.task.ok_or("no script task")?;
         let record = task(rows, number).ok_or("missing final task")?;

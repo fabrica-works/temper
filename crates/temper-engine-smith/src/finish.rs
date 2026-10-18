@@ -1,7 +1,8 @@
 //! Concrete Smith turn and terminal metadata become the root's opaque turn
-//! and typed task ending (domain/engine.md, 7.2 and 7.4; domain/tasks.md, 5.6).
-//! The boundary caller supplies encoded turn bytes and the worker's settled
-//! pushed resource evidence; this crate does not encode history or inspect git.
+//! and typed task ending (jig's domain/engine.md, 7.2 and 7.4; jig's
+//! domain/tasks.md, 5.6). The boundary caller supplies encoded turn bytes and
+//! the worker's settled pushed resource evidence; this crate does not encode
+//! history or inspect git.
 
 use alloc::boxed::Box;
 use jig_domain_host as host;

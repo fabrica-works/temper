@@ -1,4 +1,4 @@
-//! The whole standalone document and its checked startup (configuration.md, 2).
+//! The whole standalone document and its checked startup (protocol/configuration.md, 2).
 pub(crate) mod application;
 pub(crate) mod checks;
 mod problems;

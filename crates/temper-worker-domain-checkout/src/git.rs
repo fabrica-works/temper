@@ -1,4 +1,4 @@
-//! What the checkout asks of io (worker-domain.md, 8): git and file
+//! What the checkout asks of io (domain/worker.md, 9): git and file
 //! operations on the worker's disk. The protocol layer runs each as one
 //! contained git invocation, or one file operation, and parses what it says
 //! into one terminal ([`Done`]); the domain never parses.

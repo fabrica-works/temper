@@ -1,4 +1,4 @@
-//! One root input per pass, with store answers always accepted (protocol.md, 6).
+//! One root input per pass, with store answers always accepted (protocol/README.md, 6).
 use crate::{End, route, stop, store::route::Up};
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Time, Wall};

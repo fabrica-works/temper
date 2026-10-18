@@ -1,4 +1,4 @@
-//! Organization, team and membership steps, before any hooks (setup.md, 5).
+//! Organization, team and membership steps, before any hooks (protocol/setup.md, 5).
 use super::{
     Event, Need, Reconcile, Reply, Stage, State, Why,
     tokens::{reply, unexpected},

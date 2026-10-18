@@ -392,7 +392,8 @@ fn repository(instance: &Instance, person: &Token) -> u64 {
         201,
     );
     request(instance, person, "PATCH", "/api/v1/repos/acme/widget", &json!({"has_actions":true}), 200);
-    // The hinted job outlasts temper-service's 30 s settle window (setup.md 13.4).
+    // The hinted job outlasts temper-service's 30 s settle window
+    // (protocol/setup.md 13.4).
     for (path, content) in
         [("check.sh", "test ! -e slow || sleep 60\ntest -s README.md\n"), (".forgejo/workflows/check.yaml", WORKFLOW)]
     {

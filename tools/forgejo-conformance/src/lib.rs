@@ -1,4 +1,4 @@
-//! Records format-faithful exchanges against an isolated Forgejo (forge.md, 10).
+//! Records format-faithful exchanges against an isolated Forgejo (protocol/forge.md, 10).
 mod cases;
 mod cli;
 pub mod component;

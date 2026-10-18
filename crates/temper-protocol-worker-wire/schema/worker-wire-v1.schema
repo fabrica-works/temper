@@ -1,8 +1,8 @@
 family temper-worker-wire 1
 
-# Down: the workspace items (channel.md, 4). Names, branches and the save
-# branch take Bounds.name_bytes; the remote Bounds.remote_bytes; the list
-# Bounds.repositories.
+# Down: the workspace items (protocol/channel.md, 4). Names, branches and
+# the save branch take Bounds.name_bytes; the remote Bounds.remote_bytes;
+# the list Bounds.repositories.
 record Merge { branch: bytes 1024 base: fixed 32 }
 record Branch { branch: bytes 1024 }
 record Commit { commit: fixed 32 }
@@ -12,7 +12,7 @@ enum Access { writable: Writable, read_only }
 record Repository { tag: u32 name: bytes 1024 remote: bytes 1024 start: Start access: Access identity: u32 }
 record Items { repositories: list 64 Repository save: option bytes 1024 }
 
-# Up: what a run left and saved, a failed preparation (channel.md, 5).
+# Up: what a run left and saved, a failed preparation (protocol/channel.md, 5).
 # Lists of repositories take Bounds.repositories; Files Bounds.conflicts
 # paths of Bounds.path_bytes; the diagnostic its ceiling, the domain's
 # PushDiagnostic::CAPACITY.
@@ -30,5 +30,5 @@ record Missed { tag: u32 missing: Missing }
 record Tag { tag: u32 }
 enum Preparation { transient, missing: Missed, refused: Tag }
 
-# Beside a grant: a git identity's value (channel.md, 6).
+# Beside a grant: a git identity's value (protocol/channel.md, 6).
 record Identity { token: secret 4096 login: text 256 name: text 256 email: text 256 }

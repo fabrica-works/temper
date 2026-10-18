@@ -1,6 +1,6 @@
 //! One real root and its children, driven by one person, one worker and
 //! the existing ordered fake store. Requests become later input events
-//! (domain/engine.md, section 15).
+//! (domain/root.md, section 12).
 
 use crate::protocol::{self, Protocol};
 use crate::store::Store;
@@ -254,7 +254,7 @@ pub fn config(seed: u64) -> engine::Config {
         core: jig_domain_core::Config {
             deployment: [31; 16],
             seed,
-            // The worlds' workers run apart from the engine (domain/engine.md, 14).
+            // The worlds' workers run apart from the engine (domain/root.md, 2).
             workers_in_process: false,
             hub_turns: HUB_TURNS,
             owners: Box::new([people::InitialOwner {
@@ -394,7 +394,7 @@ enum TerminalRecovery {
 }
 
 /// Complete frozen world state between iterations; only the store and scripts
-/// outlive replacement of the root process (domain/engine.md, section 15).
+/// outlive replacement of the root process (domain/root.md, section 12).
 #[derive(Debug)]
 pub struct World {
     settings: Settings,
@@ -812,7 +812,7 @@ impl World {
 
 /// Replay every frozen root, child, store and pending script state in lockstep,
 /// including diagnostic queues with identical observation settings
-/// (domain/engine.md, section 15; testing-strategy.md, section 6).
+/// (domain/root.md, section 12; testing-strategy.md, section 6).
 #[must_use]
 pub fn run_replayed(settings: Settings) -> World {
     let mut first = World::new(settings);

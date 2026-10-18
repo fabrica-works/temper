@@ -1,4 +1,4 @@
-//! Forge component boundary (forge.md, sections 2, 3.5, 7 and 8).
+//! Forge component boundary (protocol/forge.md, sections 2, 3.5, 7 and 8).
 use skein_lib::Token;
 use temper_engine_domain_forge_client::api;
 
@@ -25,7 +25,7 @@ pub enum Request {
     /// A verified hint refused by root admission, held until the next offer.
     RefusedHint(crate::hooks::Hinted),
     /// An answer the root returned undecided in its drain (`Request::Busy`): kept until
-    /// `Close`, never offered again (forge.md, 2).
+    /// `Close`, never offered again (protocol/forge.md, 2).
     Returned(Answered),
     /// The root admits again: held answers go up again, at most `MAX_OUT.above`.
     Offer,
@@ -50,7 +50,7 @@ pub enum Event {
     Closed,
 }
 
-/// Why a forge's start stopped the engine (forge.md, 3.5 and 8).
+/// Why a forge's start stopped the engine (protocol/forge.md, 3.5 and 8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Stopped {
     /// `GET /api/v1/user` answered with another user's id.

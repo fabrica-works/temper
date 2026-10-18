@@ -1,4 +1,4 @@
-//! The root's bounded paged-load ownership seam (domain/engine.md, 5.3).
+//! The root's bounded paged-load ownership seam (domain/root.md, 8).
 //! [`Loads`] keeps waiter identities, requested ranges/cursors and generational
 //! IO slots. It never keeps page rows, store encodings or journal durability;
 //! the caller dispatches each load only after its prerequisite commits answer.
@@ -16,7 +16,7 @@ use alloc::boxed::Box;
 use core::mem::size_of;
 use skein_lib::{Id, List, Queue, Slab, Token};
 
-/// Startup bounds for paged store reads (domain/engine.md, section 5.3).
+/// Startup bounds for paged store reads (domain/root.md, section 8).
 /// The root supplies them; the protocol enforces the same decoded-page bound.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
@@ -34,7 +34,7 @@ pub struct Limits {
     pub transcript_bytes: u32,
 }
 
-/// Explicit omission from a validated page (domain/engine.md, section 5.3).
+/// Explicit omission from a validated page (domain/root.md, section 8).
 /// A load waiter receives this with the kept prefix; it must handle zero progress.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Cut {
@@ -44,7 +44,7 @@ pub struct Cut {
     pub bytes: u64,
 }
 
-/// Terminal load failure delivered to its root waiter (domain/engine.md, 5.3).
+/// Terminal load failure delivered to its root waiter (domain/root.md, 8).
 /// A malformed page is rejected whole before allocating any kept prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Failure {
@@ -63,7 +63,7 @@ pub enum Failure {
     Bytes,
 }
 
-/// Store IO and root-waiter handoffs (domain/engine.md, section 5.3).
+/// Store IO and root-waiter handoffs (domain/root.md, section 8).
 /// Every issued load ends once; abandonment retains IO ownership until then.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
@@ -116,7 +116,7 @@ enum Phase {
     Closed,
 }
 
-/// Root-owned bounded in-flight page slots (domain/engine.md, section 5.3).
+/// Root-owned bounded in-flight page slots (domain/root.md, section 8).
 /// It keeps waiter/range fences, never store rows or journal durability state.
 /// Issued loads remain counted through abandonment, terminal and reclaim.
 #[derive(Debug)]

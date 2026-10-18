@@ -1,4 +1,4 @@
-//! Arbitrary and mutated channel parts (channel.md, section 9).
+//! Arbitrary and mutated channel parts (protocol/channel.md, section 9).
 use skein_lib::{Reader, Rng, Writer};
 use temper_protocol_worker_wire::v1;
 

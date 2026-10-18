@@ -363,7 +363,7 @@ pub struct Job {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Step {
     pub number: u32,
-    /// Empty when the name exceeds `string_bytes` (forge.md, 3.3).
+    /// Empty when the name exceeds `string_bytes` (protocol/forge.md, 3.3).
     pub name: Box<[u8]>,
     pub status: StepStatus,
 }

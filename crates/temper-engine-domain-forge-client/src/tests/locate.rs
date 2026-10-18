@@ -1,4 +1,4 @@
-//! Locate bounds and its nonzero answer (forge.md, 12).
+//! Locate bounds and its nonzero answer (protocol/forge.md, 12).
 use super::*;
 
 #[test]

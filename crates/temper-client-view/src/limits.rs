@@ -1,4 +1,4 @@
-//! Keep: checked child sums and both slot passes (view.md, 10).
+//! Keep: checked child sums and both slot passes (jig's client/domain/view.md, 10).
 //! Replace: Ops families with a paragraph and its text per part slot.
 use crate::words::Words;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

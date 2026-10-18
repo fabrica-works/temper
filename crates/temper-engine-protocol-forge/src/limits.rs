@@ -1,10 +1,11 @@
-//! Forge component limits (forge.md, sections 2, 3.5, 7 and 8).
+//! Forge component limits (protocol/forge.md, sections 2, 3.5, 7 and 8).
 use skein_lib::Duration;
 use temper_engine_domain_forge_client as client;
 use temper_forge_forgejo::limits as documents;
 
-/// The component's limits (forge.md, 7), in temper's `limits` member as
-/// `forge_component.<field>`; the profile `small`'s values are 14.1's.
+/// The component's limits (protocol/forge.md, 7), in temper's `limits`
+/// member as `forge_component.<field>`; the profile `small`'s values are
+/// 14.1's.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     /// The forges served.
@@ -52,7 +53,8 @@ pub struct Limits {
     pub tls: skein_tls::client::Limits,
 }
 
-/// What the component is given of its neighbours' limits (forge.md, 12, "Shared limits").
+/// What the component is given of its neighbours' limits
+/// (protocol/forge.md, 12, "Shared limits").
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Shared {
     /// The forge client's: `calls`, `rows`, `answer_bytes`, `op_bytes`, `lifetime`.
@@ -65,7 +67,7 @@ pub struct Shared {
     pub io: skein_io::Limits,
 }
 
-/// The listings whose page size the component chooses (forge.md, 3.1).
+/// The listings whose page size the component chooses (protocol/forge.md, 3.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Listing {
     Items,
@@ -88,7 +90,8 @@ pub enum Stacked {
     JsonOverServer,
 }
 
-/// Why the component cannot start (configuration.md, 7: "each failure naming both limits").
+/// Why the component cannot start (protocol/configuration.md, 7:
+/// "each failure naming both limits").
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Unusable {
     /// A limit is 0, or the worst case passes a `u64`.

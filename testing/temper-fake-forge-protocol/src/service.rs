@@ -1,4 +1,4 @@
-//! Shared pending reply rights and scenario tables (forge.md, 9).
+//! Shared pending reply rights and scenario tables (protocol/forge.md, 9).
 use crate::{Config, Limits, Tally};
 use alloc::boxed::Box;
 use skein_lib::{Id, List, Map, ReplyTo, Rng, Slab, Token};

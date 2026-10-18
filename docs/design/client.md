@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-16. temper's client: temper's
+Provisional, 2026-10-14, revised 2026-10-18. temper's client: temper's
 own presentation on jig's client, `jig-client`. Its crates; its client
 root, which holds `jig-client` and temper's pages, after its mockups
 (`web/mockups/`); the forge's client family, its words and its one form;
@@ -20,11 +20,11 @@ section 11.
   durable, the work kept across a restart, and the forge's family
   carried as bytes. Its
   pages, words, confirmations and navigation are temper's own. jig's
-  reference UI (jig's `client/domain/pages.md` and `view.md`) is not
-  temper's: temper arranges no page of jig's, and copies no client root,
-  view root or native client of jig's.
-- **After its mockups.** Its pages are the mockups' (`web/mockups/`), as
-  `web/ux/` intends them: the inbox (home), the chats, a chat, a
+  reference UI (jig's `client/domain/pages.md` and
+  `client/domain/view.md`) is not temper's: temper arranges no page of
+  jig's, and copies no client root, view root or native client of jig's.
+- **After its mockups.** Its pages are the mockups' (`web/mockups/`), on
+  jig's pages (jig's `client/domain/pages.md`): the inbox (home), the chats, a chat, a
   project's board, a task's page, the changes, and the forge's adoption
   form (3.5). What the mockups do not show is open (section 11).
 - **On jig's API alone.** What a page shows, it watches through jig's
@@ -86,7 +86,7 @@ the shell
 temper-client-shell-terminal    the terminal: temper's host, its settings and lines (section 6)
 ├── skein-ui-text               skein's text shell: the renderer, the command reader, the terminal
 └── jig-client-shell-native     jig's native transport: skein's HTTP client with jig-client-protocol-http; the small store's file and the credential's
-temper                          the binary; `temper open` runs the terminal (protocol.md, section 4)
+temper                          the binary; `temper open` runs the terminal (protocol/README.md, section 4)
 
 for agents
 temper-client-tools             the agents' tools on jig-client, beside the view (tools.md, section 4)
@@ -125,10 +125,10 @@ temper-client-world             tests/client: temper's client joined to temper's
 - **The client's limits** are constants of
   `temper-client-shell-terminal`: `jig-client`'s, from jig's small
   profile with the overrides temper's configuration gives the engine's
-  documents (configuration.md, section 7); the pages' and the forge
+  documents (protocol/configuration.md, section 7); the pages' and the forge
   side's; skein-ui's, derived from the view's (5.4); and their sum. The
   client reads no configuration: its only inputs are its two arguments
-  (configuration.md, section 9).
+  (protocol/configuration.md, section 9).
 
 ## 3. The client root
 
@@ -230,13 +230,13 @@ Each page has an address, follows its mockup, and watches what it shows
 while it is open; leaving it closes its handles. Lists of tasks are task
 queries (jig's `client/domain/contract.md`, 6.1): the chat and goal
 templates' labels are jig's defaults, which temper's configuration keeps
-(configuration.md, section 2).
+(protocol/configuration.md, section 2).
 
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
 | `Chats` | `chats.html` | a composer to start a chat; the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity | start a chat |
-| `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `objects.md`, 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names | message, stop, close, accept or reject a proposal in place; seen |
+| `Chat { task }` | `index.html` | the conversation: committed turns, the person's words, work summaries, provisional text; the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html`, `agent-task.html` | a goal: its header, what was asked, its plan as a tree, its latest activity and history, its budget and authority, with Amend, Stop and Cancel; an agent's task: its transcript and a composer, with Amend and Stop | `task`, `tree`, `activity`; `run` while one is live | amend, stop, cancel, release a held task of the plan, message an agent's task |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues | nothing: not served (4.2) | none |
@@ -254,7 +254,8 @@ templates' labels are jig's defaults, which temper's configuration keeps
   page; changes in flight and the project's health on the board) say
   "Shown on the forge." (4.2).
 - **Links are by number:** a chip, an entry or a line naming a task
-  opens its page, from any page (`web/ux/README.md`, section 4).
+  opens its page, from any page (jig's `client/domain/pages.md`,
+  section 2).
 
 ### 3.6 Requests and confirmations
 
@@ -276,7 +277,8 @@ templates' labels are jig's defaults, which temper's configuration keeps
   closing a chat, accepting, rejecting) says what it will do before it
   is sent, from the facts the document gives: what accepting grants and
   costs and the pool after it, what cancelling ends, what releasing does
-  (`web/ux/README.md`, 5.3; jig's `client/domain/contract.md`, 5.4).
+  (jig's `client/domain/objects.md`, section 1; jig's
+  `client/domain/contract.md`, 5.4).
   Where the document offers an act as proposable (jig's
   `client/domain/contract.md`, 5.3), the card says so, and to whom;
   where it offers it as refused, the card says why and sends nothing.
@@ -447,7 +449,7 @@ Then a button "Adopt", and below it the request's state or outcome.
 - **`FORGE`:** the forge connector's number, 1, which is the family's
   owner number on the wire, under which its records travel as bytes
   (jig's `protocol/client.md`, section 11), and the engine's one
-  configured connector (`engine.connectors`, configuration.md, section
+  configured connector (`engine.connectors`, protocol/configuration.md, section
   2).
 - **`Owner`:** temper's owners, one enum the engine's root and the
   client root share, with the functions from an owner to its number and
@@ -621,14 +623,14 @@ temper's client takes every document within the bounds the engine's
 configuration gives its documents. A path's segments have a bound of
 their own, 9, apart from the windows' rows (jig's
 `client/domain/client.md`, section 14), at least the most the engine
-admits in a name (configuration.md, section 7), so a page of the
+admits in a name (protocol/configuration.md, section 7), so a page of the
 forge's work is never refused for a path. A path longer than a node's
 text shows its last segments after jig's mark (jig's
 `client/domain/view.md`, section 7), which adds nothing to the view's
 limits. An authority's entries have a bound of their own, 12, apart
 from the windows' rows (jig's `client/domain/client.md`, section 14),
 at least the most the engine admits in an authority's list
-(configuration.md, section 7), so a task's page is never refused for
+(protocol/configuration.md, section 7), so a task's page is never refused for
 its authority, nor an amendment drafted from part of one. Each of an
 authority's lists shows at most the rows per window, then jig's mark
 (jig's `client/domain/view.md`, section 7), which adds nothing to the
@@ -824,7 +826,7 @@ golden text fixes how temper's pages print (section 10).
 
 - **By jig's printed link** (jig's `protocol/client.md`, section 8): at
   start, `temper serve` prints a sign-in link for the deployment's
-  first owner (protocol.md, section 4): the secret jig's clients'
+  first owner (protocol/README.md, section 4): the secret jig's clients'
   component gives, in the default mapping's link route under temper's
   prefix, `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`. `temper
   open DIRECTORY LINK` checks that the link names the engine's address
@@ -861,7 +863,7 @@ golden text fixes how temper's pages print (section 10).
   the same step leaves (jig's `protocol/client.md`, section 10). It
   holds `jig-client`'s records alone: the requests it keeps, jig's and
   the forge's adoptions, pending. temper's pages keep none (3.4).
-- **Loopback only** in standalone (configuration.md, section 2; 6.1), so
+- **Loopback only** in standalone (protocol/configuration.md, section 2; 6.1), so
   a bearer token never crosses a network in plaintext. Clients between
   hosts, over TLS, come after standalone.
 - **One person.** The deployment's link signs in its first owner.
@@ -871,8 +873,8 @@ golden text fixes how temper's pages print (section 10).
 
 - **temper's server owns the clients' listener.** `temper-service`'s
   engine owns it: TCP on the loopback address temper's configuration
-  names (configuration.md, section 3), and the stream's and exchanges'
-  connections on it (protocol.md, section 6). On it, it mounts jig's
+  names (protocol/configuration.md, section 3), and the stream's and exchanges'
+  connections on it (protocol/README.md, section 6). On it, it mounts jig's
   clients' component (`jig-protocol-engine-clients`) with jig's default
   HTTP mapping's engine end (`jig-protocol-engine-clients-http`) under
   the prefix `/jig` (jig's `protocol/service.md`, section 2). Every other
@@ -908,13 +910,13 @@ golden text fixes how temper's pages print (section 10).
   another family or version, is answered undecodable, as jig's
   reference service answers it. The routing fills the adoption's host
   from that forge's configured `git` base: its host, with `:port` when
-  it names one, as the forge's resource paths have it (configuration.md,
+  it names one, as the forge's resource paths have it (protocol/configuration.md,
   section 3). It leaves the host empty for a forge number not
   configured, and hands the root the party's keyed request: its reply,
   its sign-in, its key, the digest of the record's bytes, and the
   adoption.
 - **The root routes it** (`domain/forge.md`, section 4;
-  `domain/engine.md`): jig's people child admits it by key, and refuses
+  `domain/root.md`, 5.4): jig's people child admits it by key, and refuses
   at admission as jig's answer; admitted, it goes to the forge
   connector, which refuses a forge not configured (no such forge),
   locates the repository by owner and name (not found when the forge
@@ -1007,7 +1009,7 @@ The client's tiers, as testing.md places them (section 2):
   pending.
 - **The process tier** (testing.md, 2.6): the real `temper` binary;
   skein's fake person through temper's client signs in by the printed
-  link and adopts a repository on an owned Forgejo (setup.md, section 2),
+  link and adopts a repository on an owned Forgejo (protocol/setup.md, section 2),
   with "It runs CI" checked, since its runner runs Actions (testing.md,
   2.6). And `temper open` itself, stdin and stdout piped: it signs in by
   the printed link, prints the inbox, adopts a repository by commands,
@@ -1026,7 +1028,8 @@ The client's tiers, as testing.md places them (section 2):
   client.
 - **Pages the mockups do not show:** a project's page with its
   resources, findings, notes and settings (policy, people and roles,
-  spend; `web/ux/projects.md`); the system's page; the "Tasks" list of a
+  spend; jig's `client/domain/pages.md`, section 6, and the forge's parts
+  in `web/ux/forge.md`, 5.3 and 7.3); the system's page; the "Tasks" list of a
   project; a procedure's task and a person task beyond `task.html`'s
   header and plan; making a service and showing its credential once;
   another party's kept work. Default: not in temper's client; the
@@ -1041,7 +1044,7 @@ The client's tiers, as testing.md places them (section 2):
   5.1). Default: not served; "Shown on the forge."; the forge asked by
   number; home checked.
 - **The form's place:** among a project's settings, once temper has
-  that page (`web/ux/projects.md`, 7.1). Default: a page of its own,
+  that page (`web/ux/forge.md`, 5.3). Default: a page of its own,
   from the navigation.
 - **An adopted repository on its project:** jig's core lists only roles
   live tasks narrowed, never an owned one (4.3); the listing is jig's

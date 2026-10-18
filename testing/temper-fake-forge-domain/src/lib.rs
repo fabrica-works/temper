@@ -5,8 +5,8 @@
 //! requests sharing one numbering, comments, reviews, CI statuses, merges, a
 //! wiki, and the git a worker clones, fetches and pushes, all in one store,
 //! so a branch a worker pushes is the head the engine reads, and a merge the
-//! engine makes moves the branch the next fetch sees (engine-domain.md,
-//! sections 12 and 14).
+//! engine makes moves the branch the next fetch sees (domain/forge.md;
+//! protocol/forge.md, section 9).
 //!
 //! Calls come up from its protocol layer as [`Event::Call`] (the `boundary`
 //! module states the contract), each by a user

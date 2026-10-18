@@ -1,4 +1,4 @@
-//! The checkout's fixed git invocations (git.md).
+//! The checkout's fixed git invocations (protocol/git.md).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

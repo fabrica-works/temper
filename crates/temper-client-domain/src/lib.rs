@@ -1,7 +1,7 @@
 //! Keep: the child/table routing shape and exhaustive owner variants.
 //! Replace: Ops connector sides with the forge's side and temper's navigation.
-//! The children keep visibility and pending acts. The root retains
-//! only those children and the shared client (client/domain/root.md, 3–10).
+//! The children keep visibility and pending acts. The root retains only
+//! those children and the shared client (jig's client/domain/root.md, 3–10).
 //! Each step routes one event; take reclaims after routing every tell.
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]

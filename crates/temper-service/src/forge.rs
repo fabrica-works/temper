@@ -1,4 +1,4 @@
-//! The forge component's boundary to the engine (protocol.md, 6).
+//! The forge component's boundary to the engine (protocol/README.md, 6).
 use crate::{limits, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, Segment, What};

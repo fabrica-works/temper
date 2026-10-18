@@ -1,13 +1,15 @@
 # Tools: temper for agents
 
-Provisional, 2026-10-17. How agents drive temper: they read what it
-holds, act through jig's operations and wait for what changes, with
-`temper ctl`, a command line. It serves the agents (smith's) that QA and
-develop temper's core: they drive a throwaway deployment on coding tasks
-of growing size, then on temper's features, until the first milestone
-(`draft/mvp.md`) is usable for real tasks. Their QA loop extends the
-tools area by area (section 5.5). An MCP endpoint and the tools'
-extraction into jig are later (section 14).
+Provisional, 2026-10-17, revised 2026-10-18. How agents drive temper:
+they read what it holds, act through jig's operations and wait for what
+changes, with `temper ctl`, a command line. It serves the agents
+(smith's) that QA and develop temper's core: they drive a throwaway
+deployment on coding tasks of growing size, then on temper's features,
+until the first milestone (`README.md`, section 2) is usable for real
+tasks. Their QA loop extends the tools area by area (5.5). What
+the tools ask of jig is section 13; an MCP endpoint and the tools'
+extraction into jig are later (section 14). What is still open is
+listed in section 15.
 
 ## 1. In one page
 
@@ -35,11 +37,12 @@ extraction into jig are later (section 14).
 - **Thin command line.** `temper ctl DIRECTORY TOOL ...` makes one call
   per process, in `jig-client`'s one-shot mode, over jig's native
   transport, and prints its result (section 8).
-- **The deployment under test is a box** (`setup.md`, section 7): the
-  agent's harness starts it, signs in by its printed link, and throws it
-  away (section 10).
-- **Later, named:** the MCP endpoint, the extraction into
-  `jig-client-tools`, the areas past the first (section 14).
+- **The deployment under test is a box** (`protocol/setup.md`, section
+  7): the agent's harness starts it, signs in by its printed link, and
+  throws it away (section 10).
+- **Grown by areas,** the first designed in full, the others named
+  (5.5); **later, named:** the MCP endpoint and the extraction into
+  `jig-client-tools` (section 14).
 
 ## 2. What it is for, and what not
 
@@ -54,21 +57,21 @@ extraction into jig are later (section 14).
   them to agents that have no shell (section 14).
 - **Not the person's pages.** temper's pages are the person's, proven by
   the fake person's stories in `tests/client` (`client.md`, section 10).
-  No tool waits for a page: the board, the changes page and an agent's
-  task page (client-api's `later.md`) are no tool's prerequisite.
+  No tool waits for a page: a tool reads jig's documents, so no page is
+  a tool's prerequisite.
 - **Not the browser.** Once temper has one, its QA is agents driving the
   browser as a person does. These tools are no way around it.
 - **Not the deployment.** Starting temper with a forge, a runner and a
-  model is `setup.md`'s; resetting it is the harness's, never a tool's
-  (section 10).
+  model is `protocol/setup.md`'s; resetting it is the harness's, never a
+  tool's (section 10).
 
 ## 3. Why the plumbing, not the pages
 
 - **The pages are for people.** The text view's numbers are positions
   that change between prints, the banner and navigation cost an agent's
-  context on every read, and a page shows only what its mockup chose.
-  This replaces `draft/qa.md`, 4.2's driver, the text view, for the
-  core.
+  context on every read, and a page shows only what its mockup chose. So
+  the text view is no agent's driver; these tools are, for temper
+  (`draft/qa.md`, 4.2).
 - **jig's client was made for this.** It is presentation-agnostic: "a
   browser, a terminal, a chat bot, a one-shot command and a service with
   no presentation hold the same client" (jig's `client/domain/client.md`,
@@ -150,7 +153,7 @@ A read answers with a document, or a page and its cursor, and its mark
 |---|---|---|
 | `me` | the party, its projects with their roles and pools, what waits for it counted, the bounds of what it may create, the retention | `me` |
 | `inbox [--project P] [--kind K] [--root N] [--after C]` | what needs the party, then updates, each with its acts | `inbox` |
-| `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines | `tasks{query}` (contract.md, 6.1) |
+| `tasks --project P [--label chat\|goal] [--tracked] [--mine] [--ended] [--order activity\|priority] [--after C]` | task lines | `tasks{query}` (jig's `client/domain/contract.md`, 6.1) |
 | `task N [--tree] [--activity K] [--run]` | a task's document, with its acts; with its live tree, its K latest activity lines, its live run, in one answer | `task{n}`, `tree{root}`, `activity{n}`, `run{n}` |
 | `chat N [--before C]` | a conversation: turns, words and provisional text in order, a page from its end | `activity{n}`, `run{n}`, through `thread` |
 | `activity N [--before C] [--limit K]` | a task's activity, a page from its end | `activity{n}` |
@@ -166,10 +169,11 @@ A read answers with a document, or a page and its cursor, and its mark
   client's limit for one document is answered with its size and that
   it is past it; the agent reports it as a finding.
 - **The forge's changes are read on the forge,** with its API or `git`,
-  as a person reads them there. The forge's parts of a document print
-  "Shown on the forge.", with the resource in the forge's words
-  (`client.md`, 4.1 and 4.2), until the forge's read family exists
-  (`draft/mvp.md`, 5.2), whose records then join the table.
+  as a person reads them there. A part of the forge's that the engine
+  does not serve prints "Shown on the forge.", with the resource in the
+  forge's words (`client.md`, 4.1 and 4.2). The forge's read family
+  (`web/ux/forge.md`, section 9) joins the table as tools of its own
+  (section 14).
 
 ### 5.3 Acts
 
@@ -199,11 +203,11 @@ agent must name.
   before sending it (`client.md`, 3.6); an agent reads it in the
   document's acts and their effects, and the revision is its promise.
 - **A draft beyond the party's bounds** is compared with the bounds the
-  document gives, as the person's client does (contract.md, 5.3):
-  within, sent; between the bounds, sent as `Propose` where it is
-  proposable, and the result says so; past them, refused by the client,
-  nothing sent. Where `me` gives no bound for a draft (section 13), it
-  is sent and the engine's answer printed.
+  document gives, as the person's client does (jig's
+  `client/domain/contract.md`, 5.3): within, sent; between the bounds,
+  sent as `Propose` where it is proposable, and the result says so; past
+  them, refused by the client, nothing sent. Where `me` gives no bound
+  for a draft, it is sent and the engine's answer printed.
 
 ### 5.4 Waiting
 
@@ -211,14 +215,15 @@ agent must name.
 wait SUBJECT [--since MARK] [--until CONDITION] [--timeout DURATION]
 ```
 
-- **The subject** is a watch's (contract.md, 7.1): `me`, `inbox`, `task
-  N`, `tree N`, `run N`, or a task query as `tasks` takes it.
+- **The subject** is a watch's (jig's `client/domain/contract.md`, 7.1):
+  `me`, `inbox`, `task N`, `tree N`, `run N`, or a task query as `tasks`
+  takes it.
 - **A mark** is a digest of the subject's document as the engine
   delivered it, the first 8 bytes of its SHA-256 (skein's `lib.md`,
   6.2), printed as 16 hex digits with every read of that subject and
   every wait's answer. jig's revisions move only with what a party
-  decides about (contract.md, 5.2), so they cannot say that a document
-  changed; the mark can, and needs nothing of jig.
+  decides about (jig's `client/domain/contract.md`, 5.2), so they cannot
+  say that a document changed; the mark can, and needs nothing of jig.
 - **`--since MARK`:** answered at the first delivery whose mark differs;
   without it, at the first change after the watch's first delivery.
 - **`--until CONDITION`:** answered at the first delivery that meets it,
@@ -236,16 +241,16 @@ wait SUBJECT [--since MARK] [--until CONDITION] [--timeout DURATION]
 - **`--timeout`:** 300 seconds by default, at most 3600; answered with
   the current document, its mark, and that the condition is not met
   (6.3).
-- **Level-triggered, as the watch is** (contract.md, 7.2): deliveries
-  between are coalesced, and the answer is the document as it is when
-  answered. A change before the wait began is in its first delivery,
-  which `--since` compares.
+- **Level-triggered, as the watch is** (jig's
+  `client/domain/contract.md`, 7.2): deliveries between are coalesced,
+  and the answer is the document as it is when answered. A change before
+  the wait began is in its first delivery, which `--since` compares.
 - **The loop:** `wait me --until waiting`; `inbox`; act; again. An agent
   following one chat: `wait tree N --until waiting-on-me`, or `wait task
   N --until ended`.
 - **On a box,** the forge's webhooks make the engine's documents move
   soon after the forge does; with polling alone, the same waits answer
-  later (`setup.md`, section 10).
+  later (`protocol/setup.md`, section 10).
 
 ### 5.5 Areas
 
@@ -253,7 +258,7 @@ The table grows in the order the QA loop reaches temper's surface. Each
 area lands with its stories (section 11).
 
 1. **A chat to a landed change** (the first QA loop, the milestone's
-   story, `draft/mvp.md`, section 2): `sign-in`, `sign-out`, `pending`,
+   story, `README.md`, section 2): `sign-in`, `sign-out`, `pending`,
    `help`; every read of 5.2; `wait`; every act of 5.3.
 2. **Goals and plans:** `goal --project P [--priority I] [--budget A |
    --as-allowed] [--deadline T] TEXT` (`shapes::set_goal`, keyed),
@@ -269,8 +274,8 @@ area lands with its stories (section 11).
 
 - **Area 1 is designed here in full.** Areas 2 to 4 name their tools and
   jig's operations; each area's arguments are checked against jig's
-  operations as they stand when the QA loop reaches it, by a light
-  design pass (skein's `development.md`, 4.1), and land with it.
+  operations as they stand when the QA loop reaches it, by a design
+  pass (`development.md`, section 4), and land with it.
 - **The QA loop may ask for a tool no area names.** It goes to the
   designer as a design question, and joins the table as a row of an
   area.
@@ -337,7 +342,8 @@ with them.
 - **The numbers** are constants of `temper-client-tools`' `limits`
   module, beside the client's (`client.md`, section 2), and within
   them. A path is never cut: the tools print it whole, within the
-  client's segment bound (jig's client `Limits`, `segments`).
+  client's bound on a path's segments (`jig-client-domain`'s `Limits`,
+  `segments`).
 
 ## 7. Requests: once, and named
 
@@ -351,12 +357,13 @@ with them.
   anything is sent.
 - **A named key is the engine's key:** the first 16 bytes of the SHA-256
   of `temper-tools`, a zero byte and the name. jig scopes it to the party
-  (contract.md, 3.1). The same name asked again by the same party, within
-  the engine's retention, is the same request: a rerun after a lost
-  answer, an agent's own timeout or a lost context gets the first
-  answer, never a second chat. The same name with another ask is
-  refused as a key conflict. Nothing is kept on the agent's side, so a
-  rerun is the same request from any directory signed in as the party.
+  (jig's `client/domain/contract.md`, 3.1). The same name asked again by
+  the same party, within the engine's retention, is the same request: a
+  rerun after a lost answer, an agent's own timeout or a lost context
+  gets the first answer, never a second chat. The same name with another
+  ask is refused as a key conflict. Nothing is kept on the agent's side,
+  so a rerun is the same request from any directory signed in as the
+  party.
 - **Names are the party's.** Agents sharing a party give their names a
   prefix of their own; the guide says so (11.4).
 - **Acts that decide name the revision the agent saw;** a moved one is
@@ -444,12 +451,13 @@ An agent runs a `wait` while it acts, or several agents share a party.
 - **Credentials are files,** private, never arguments, never printed.
 - **The agent's LLM account is not the tools'.** The deployment's model
   account is handed in by its configuration, as the owned example has
-  it (`credentials.md`, section 3; `draft/mvp.md`, section 7).
+  it (`protocol/setup.md`, 8.1; `protocol/credentials.md`, section 3).
 
 ## 10. The box
 
 The deployment an agent drives is an owned setup run by `temper box`
-(`setup.md`, section 7), in a scratch directory of the QA harness's:
+(`protocol/setup.md`, section 7), in a scratch directory of the QA
+harness's:
 
 - **Started:** `temper box CONFIG.json`; its stdout carries `temper
   serve`'s sign-in links, and the harness passes the first to `temper
@@ -457,8 +465,8 @@ The deployment an agent drives is an owned setup run by `temper box`
 - **A repository to adopt,** in an org of the owned Forgejo, adopted
   with `adopt` as the first act of area 1.
 - **The forge read directly:** its API and `git` on `owned.listen`, as
-  the person (`setup.md`, 6.5). A token for those reads is `setup.md`'s
-  open question (section 16).
+  the person (`protocol/setup.md`, 6.5). A token for those reads is
+  `protocol/setup.md`'s open question (section 16).
 - **Logs:** the engine's and the worker's in the box's stderr, each line
   prefixed by its step; Forgejo's in its directory. Outside the tools.
 - **Thrown away** by stopping the box with a termination signal and
@@ -512,43 +520,31 @@ Each bug an agent finds through the tools ends as a story in
 (`draft/qa.md`, section 1). A story's calls are the tools' calls, so an
 agent's history of `temper ctl` commands transcribes into one.
 
-## 12. Order of building
-
-1. **After client-api, jig's and skein's part** (section 13): the named
-   key and the read of one turn, and temper's repin to them.
-2. **Area 1** (5.5): the two crates, `temper ctl`, the guide, the
-   stories of 11.2 and 11.3. The QA loop starts here, with small coding
-   tasks through a chat on a box.
-3. **Areas 2 to 4,** each when the QA loop reaches it, each with its
-   stories.
-4. **Later** (section 14).
-
 ## 13. What it asks of jig
 
-Before area 1:
+Area 1 needs two things of jig and skein, which the tools do not work
+around:
 
 - **A named key.** `jig-client`'s `Send` under an engine key the
   application gives, in place of the one the request table draws (jig's
-  `client/domain/client.md`, section 6): skein's request table admits a
-  request under a given key, refused when it holds that key already
-  (skein's `lib.md`, section 12). Everything else of keyed requests
-  stays: kept before sent, sent again until durable, answered once, a
-  second ask under the key a conflict (contract.md, 3.1).
+  `client/domain/client.md`, section 6), which needs skein's request
+  table to admit a request under a given key, refused when it holds that
+  key already (skein's `lib.md`, section 12). Everything else of keyed
+  requests stays: kept before sent, sent again until durable, answered
+  once, a second ask under the key a conflict (jig's
+  `client/domain/contract.md`, 3.1).
 - **A read of one turn.** A contract read, `turn{n, attempt, turn}`
-  (contract.md, section 6), answered from the store's `Scope::Turn`
-  (jig's `protocol/store.md`, 7.3) with the turn decoded, within the
-  client's limit for one document, and with its size in its place past
-  it. It is jig-protocol's ruling 240, option (b).
+  (jig's `client/domain/contract.md`, section 6), answered from the
+  store's `Scope::Turn` (jig's `protocol/store.md`, 7.3) with the turn
+  decoded, within the client's limit for one document, and with its size
+  in its place past it.
 
-Landed by client-api, and nothing more asked: jig's helpers (`shapes`,
-`thread`, `words`), the documents' acts and `me`, the client's segment
-bound, a service's sign-in, the one-shot mode's parts (the modes
-"differ in the host alone", jig's `client/domain/client.md`, section
+Everything else the tools use is jig's as designed: its helpers
+(`shapes`, `facts`, `thread`, `words`), the documents' acts and `me`'s
+bounds (jig's `client/domain/contract.md`, 5.3), the client's bound on a
+path's segments, a service's sign-in, and the one-shot mode, whose modes
+"differ in the host alone" (jig's `client/domain/client.md`, section
 20).
-
-Not blocking: `me`'s bounds for creating with every executor
-(client-api's `later.md`); until they come, a draft is sent and the
-engine's answer printed (5.3).
 
 ## 14. Later
 
@@ -559,17 +555,16 @@ Each is named here and designed when it comes.
   listener, each session a tools' root holding `jig-client` over an
   in-process transport to jig's clients' component (jig's
   `protocol/service.md`, section 10), signed in by its bearer, a wait a
-  long call. It waits for jig's client in the engine's process
-  (client-api's `later.md`), and for an agent other than a shell agent
-  to drive temper. Area 1 leaves it wiring: a call decoded from JSON
-  (`--call`), the rendering told how to print a call, a call per asker.
+  long call. It needs jig's client in the engine's process, and an
+  agent other than a shell agent to drive temper. Area 1 leaves it
+  wiring: a call decoded from JSON (`--call`), the rendering told how to
+  print a call, a call per asker.
 - **Extraction into jig,** `temper-client-tools`' module `jig` moved to
-  `jig-client-tools`, when a second application wants the tools (jig's
-  `README.md`, section 10).
-- **The forge's read family's tools,** with the plan of
-  `draft/mvp.md`, 5.2.
-- **A service's credential reissued or a service removed,** once jig
-  does either (jig-protocol's `later.md`).
+  `jig-client-tools`, when a second application wants the tools.
+- **The forge's read family's tools,** as the engine serves each of the
+  forge's parts (`web/ux/forge.md`, section 9).
+- **A service's credential reissued, or a service removed** (jig's
+  `domain/people.md`, section 3): tools of area 3.
 
 ## 15. Open questions
 

@@ -1,4 +1,4 @@
-//! Startup for temper's standalone binary (configuration.md, section 2).
+//! Startup for temper's standalone binary (protocol/configuration.md, section 2).
 use jig_protocol_config::{self as config, read};
 use skein_io::kernel::{Error, Exit, Fd};
 use skein_lib::{List, Secret};

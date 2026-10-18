@@ -1,4 +1,4 @@
-//! Call-specific HTTP refusals and table invalidation (forge.md, 3.4).
+//! Call-specific HTTP refusals and table invalidation (protocol/forge.md, 3.4).
 use crate::connection::{Failure, Fields};
 use skein_lib::Duration;
 use temper_engine_domain_forge_client::api;

@@ -4,7 +4,7 @@
 //! Four peers are behind it, and each record names which by its variant:
 //!
 //! - The engine, over jig's worker link (jig's `domain/hosts.md`, 6.1;
-//!   `protocol/channel.md`, section 10), which dials, redials, keeps the
+//!   jig's `protocol/channel.md`, section 10), which dials, redials, keeps the
 //!   grace and the relays across channels, and tells the domain what it
 //!   notices: a channel [`Event::Ready`], [`Event::Lost`], the grace passed
 //!   ([`Event::GracePassed`]), a turn to send again ([`Event::Resend`]), a

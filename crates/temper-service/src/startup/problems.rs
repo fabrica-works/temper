@@ -1,4 +1,4 @@
-//! Bounded problems and measured stderr lines (configuration.md, 2).
+//! Bounded problems and measured stderr lines (protocol/configuration.md, 2).
 use crate::limits;
 use alloc::boxed::Box;
 use jig_protocol_config as config;

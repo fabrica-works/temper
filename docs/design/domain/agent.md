@@ -1,62 +1,58 @@
 # The agent
 
-Provisional, 2026-10-05, revised 2026-10-14. temper's agent is smith: the kit for flexible
-LLM agents, and the standard agent built from it, in smith's repository,
-on skein like temper. What smith is and does is its own design (smith's
-`docs/design/domain/`, cited as smith's `run.md`, `session.md`,
-`tools.md`, `host.md`). This document says what temper takes from smith
-and what temper fills in: the charters its engine writes, the tools its
-engine serves, its result contracts and conventions, and its worker as
-smith's host. What is still open is listed in section 10; where the
-previous version of this document went, in README.md, 6.4.
+Provisional, 2026-10-05, revised 2026-10-18. temper's agent is smith's:
+the standard agent built from smith, the kit for LLM agents, on skein
+like temper. smith's design is its own (smith's `domain/run.md`,
+`domain/session.md`, `domain/tools.md`, `domain/host.md`), and how a
+run's charter, tools, contract, messages and delivery become smith's is
+jig's (jig's `domain/hosts.md`, sections 8 and 9). This document says
+what temper fills in: the charters its engine writes, the host tools its
+engine serves (4.3, the one table of them), its result contracts and
+conventions, delivery as a push, and the agents temper runs. What is
+still open is listed in section 10.
 
 ## 1. In one page
 
-- **temper runs smith's stock agent.** A worker spawns smith's agent for
-  each run, as a child process, in one process with the engine as
-  between hosts: temper's own binary run as its `agent` command, smith's
-  agent shell (`docs/design/protocol.md`, section 4). temper builds no
-  code into it. Policy is data: a run's charter and its host's answers are all
-  that make it temper's.
+- **temper runs smith's stock agent,** on workers, one process per run:
+  temper's own binary run as `temper agent`, smith's agent shell
+  (`../protocol/README.md`, section 4). temper builds no code into it. A
+  run's charter and its host's answers are all that make it temper's.
 - **The engine writes the charter** (section 4): the task's instructions,
-  its brief rendered, the engine's tools and its connectors' reads as host
-  tools, a result contract with temper's verdicts and a change's title and
-  body, `.temper/pre-pr` and `AGENTS.md` as conventions, a budget in the
-  deployment's unit with its models' prices.
-- **The worker is smith's host** (section 6 and worker.md): it prepares
-  the workspace from the forge, supervises the agent's process with
-  smith's host domain, delivers a change by pushing it, and relays the
-  rest to the engine.
+  its brief rendered, every host tool, a result contract with temper's
+  verdicts and a change's `title` and `body`, `.temper/pre-pr` and
+  `AGENTS.md` as conventions, and a budget in the deployment's unit with
+  its models' prices.
+- **The host tools are temper's** (4.3): jig's core's tools under temper's
+  own names, and the forge's reads, effect and topics.
+- **The worker is smith's host** (section 6; worker.md): it prepares the
+  workspace from the forge, supervises the agent's process with smith's
+  host domain, delivers a change by pushing it, and relays the rest to
+  the engine.
 - **The engine keeps what smith leaves to hosts:** transcripts, turn by
   turn, in its store; host tools' calls, decided once; what follows an
-  answer.
-- **One translation.** The engine's protocol layer is the only place where
-  temper's charter, tools and messages become smith's, and smith's calls
-  become the engine's. smith interprets no temper vocabulary, and the
-  worker none of either.
-- **temper imports smith at every layer** (section 3): its domains in
-  temper's worlds, its protocol crates in the engine's and the worker's
-  protocol layers, its agent shell in temper's binary.
+  answer (jig's `domain/engine.md`, section 7).
+- **One translation, temper's own.** `temper-engine-smith`, which the
+  engine's routing calls, is the only place where temper's charter,
+  tools and results become smith's, and smith's back. temper uses
+  neither `jig-protocol-charter` nor `jig-protocol-tools`, since its root
+  has a `Tool` vocabulary of its own (`../protocol/llm.md`, sections 4
+  and 5). smith interprets no temper vocabulary, and the worker none of
+  either.
 
 ## 2. The agent in the system
 
 ```
-engine   tasks, authority, connectors, the store; writes each run's charter and serves its tools
+engine   jig's core and the forge, the store; writes each run's charter and serves its tools
 worker   smith's host: workspaces, agent processes, pushing their changes; relays the rest
 agent    smith: LLM work, one run per process, reporting to its worker
 ```
 
-- **The engine is the only client** of the store and of every
-  connector's system. It answers the host tools a run calls, and commits
-  the run's turns and result. The worker's one write is pushing a run's
-  branch, over git.
-- **The engine never reads a repository.** It works from what its
-  connectors read; what a workspace holds, such as a repository's
+- **The engine is the only client** of the store and of the forge. It
+  answers the host tools a run calls, and commits the run's turns and
+  result. The worker's one write is pushing a run's branch, over git.
+- **The engine never reads a repository.** It works from what the forge
+  connector reads; what a workspace holds, such as a repository's
   `AGENTS.md` or its checks, is for the run to find.
-- **The worker starts a run** with smith's start: the charter the engine
-  wrote, carried as bytes, and the workspace the worker prepared.
-  Credentials never reach a domain: a charter names an LLM endpoint, and
-  the protocol layers hold the rest.
 - **The agent acts on the world only through the worker:** a delivery,
   which the worker makes as a push, and host tools, which the worker
   relays to the engine. It never pushes, merges or writes to a system on
@@ -66,123 +62,164 @@ agent    smith: LLM work, one run per process, reporting to its worker
 
 ## 3. What temper takes from smith
 
-| Where in temper | smith's crates | For |
-|---|---|---|
-| the engine's domain | none | transcripts and charters are bytes to the core; the charter's policy is the core's (jig's `domain/hosts.md`, section 8) |
-| the engine's protocol layer | `smith-domain`, `smith-domain-run`, `smith-domain-session` through `temper-engine-smith`; smith's codecs (`smith-protocol-channel`, `smith-channel`) | smith's start from an assignment, its charter encoded; host tools' calls decoded and their answers rendered; a run's result read (`docs/design/llm.md`, sections 4 and 5) |
-| the worker's domain | `smith-host-domain` | its agent child: processes, the channel's rules, the watchdog, cancel then kill |
-| the worker's protocol layer | `smith-host-protocol`, smith's host half; smith's codecs | the channel over an agent's pipes; smith's payloads decoded and encoded by hand-out (jig's `domain/hosts.md`, 6.8) |
-| temper's binary | `smith-agent-shell` | the agent process: temper's own binary run as its `agent` command (`docs/design/protocol.md`, section 4) |
-| worlds | `smith-domain`, smith's fakes and scripted agent, smith's agent process world | the worker's and the system worlds (section 9); the one-process world's agent processes (`docs/design/testing.md`, 2.5) |
-
-LLM accounts are jig's, on skein's accounts driver, in the engine's
-protocol layer; their tokens reach a run as grants, through its worker
-and smith's host half (`docs/design/credentials.md`, section 3).
-
-What both would otherwise keep is skein's, as smith's `README.md`,
-section 4, lists: framed channels, an OAuth client and its accounts
-driver, supervised processes.
+- **In the domains:** the engine's root links no smith crate; charters,
+  transcripts and results are bytes to jig's core (jig's
+  `domain/hosts.md`, 6.8). The worker's root composes `smith-host-domain`
+  as its agent child (worker.md, section 3). `temper-engine-smith`, the
+  translation of section 4, is step code over `smith-domain`,
+  `smith-domain-run` and `smith-domain-session`.
+- **In the protocol layers:** smith's codecs, its host half and its agent
+  shell (`../protocol/README.md`, section 5).
+- **In the worlds:** smith's agent domain over skein's fake LLM, its
+  agent processes, and its codecs (section 9).
+- **LLM accounts are jig's,** on skein's accounts driver; their tokens
+  reach a run as grants, through its worker and smith's host half
+  (`../protocol/credentials.md`, section 3).
 
 ## 4. temper's charter
 
-The engine decides an agent task's charter in its own terms (engine.md,
-7.1); its protocol layer encodes it as smith's (smith's `run.md`, 3.1),
-in one place. The agent process's translation belongs to smith's
-`smith-protocol`.
+The core decides a run's charter in its own terms (jig's
+`domain/engine.md`, 7.1); `temper-engine-smith` writes it as smith's
+(smith's `domain/run.md`, 3.1) from the root's assignment, and the
+engine's routing encodes it (`../protocol/llm.md`, section 5).
 
 ### 4.1 Instructions and brief
 
-- **Instructions:** the task's charter's instructions, from its template
-  in configuration or its spec: a chat, a coordinator, a reviewer with a
-  lens, a producer of a change.
-- **The brief:** the typed sections the brief child domain gathered and
-  cut to its budget (engine.md, section 9), rendered as smith's titled
-  sections: the task and its lineage, its inbox, its dependencies'
-  results, its delegates and their states, its earlier attempts, the
-  calls committed since its last turn, the proposals and escalations
-  waiting for it, its notes' index, a transcript's tail, and what its
-  connectors say of its resources (for the forge, the pull request, CI's
-  failures with their output, reviews' remarks, a conflict). smith adds
+- **Instructions:** the charter's, from the deployment's configuration
+  (jig's `protocol/configuration.md`, section 3): a chat's, a
+  coordinator's, a reviewer's with a lens, a change's producer's.
+- **The brief:** the sections jig's core gathers (jig's
+  `domain/engine.md`, section 9) and the forge's (forge.md, section 2),
+  each rendered as one of smith's titled sections, titled by its kind:
+  `Task`, `Lineage`, `Dependencies`, `Plan`, `Earlier attempts`,
+  `Calls`, `Waiting`, `Notes`, `Transcript tail`, and the forge's
+  `Pull request`, `CI` and `Reviews`. A section its gather could not fill
+  says why: its read failed, timed out, or exceeded its limit. smith adds
   the sections about its own mechanics, and each repository's guide.
 
 ### 4.2 Workspace
 
-The engine names the repositories, where each starts, which may be
-written and the branch a change goes to (engine.md, 7.1); the worker
-prepares them and gives smith the workspace: each repository's directory
-and name, whether it may be written, and for a merge in progress the
-files in conflict (worker.md, section 5). Every temper workspace is git
-repositories. A run with no repository, such as a chat that names none,
-runs with no workspace (worker.md, 4.1).
+The connectors name the repositories, where each starts, which may be
+written and the branch a change goes to (jig's `domain/engine.md`, 7.1;
+worker.md, 4.1); the worker prepares them and gives smith the workspace:
+each repository's directory and name, whether it may be written, and for
+a merge in progress the files in conflict (worker.md, section 5). Every
+temper workspace is git repositories. A run with no repository, such as
+a chat that names none, runs with no workspace (worker.md, 4.1).
 
 ### 4.3 Tools
 
-A task's tool families (authority.md, section 3) become smith's:
+- **smith's own families** by the charter's policy: inspecting,
+  modifying and the shell in the workspace, and sub-agents, each as the
+  charter's `inspect`, `modify`, `shell` and `agents` say; `wait`, always;
+  `deliver`, for a change's contract, and mid-run for a run with a
+  repository it may write, as a chat delivers a small fix (jig's
+  `domain/hosts.md`, section 8; smith's `domain/run.md`, 8.4).
+- **Every host tool below,** declared in every charter, each with the
+  charter's call timeout. The task's authority decides each call by its
+  family (jig's `domain/authority.md`, sections 3 and 8.5): a call beyond
+  it is answered beyond authority, naming what it lacked, and the run may
+  `propose` it instead.
 
-| temper's family | In smith |
-|---|---|
-| inspecting, modifying, the shell | smith's inspect, modify and shell |
-| sub-agents | smith's sub-agents |
-| `delegate`, `message`, `amend`, `cancel`, `release`, `decide`, `propose`, `subscribe`, `unsubscribe`, `effect`, `note`, `recall` | host tools, each declared with its schema, its description and its effect (engine.md, 7.3) |
-| each connector's reads | host tools, one per read the connector defines, each a read |
-| waiting, by its wake policy | smith's `wait` |
-| a change, by its result contract or mid-run | smith's `deliver` |
+| Tool | Family | What it does | What it names, as the run saw it | What it answers |
+|---|---|---|---|---|
+| `delegate` | delegate | makes a batch of direct delegates, each with what a party's `Create` names (jig's `domain/tasks.md`, section 4) | | their numbers, their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why |
+| `message` | message | words, a question, or the answer to one, to a task it references (jig's `domain/tasks.md`, 8.5) | the question, for an answer | sent, with the message's number; refused: no reference, the inbox full, too large for a run to read |
+| `introduce` | message | gives two tasks it references a reference to each other | | done; refused, and why |
+| `amend` | amend and cancel | changes a live delegate (jig's `domain/tasks.md`, section 7) | its spec's revision, as the run last read it; for a change of priority alone, none counts | done, with the spec's revision after the commit, the one its next amendment names; refused, and why; moved, with what it is now |
+| `release` | amend and cancel | lifts a delegate's hold; for an effect held uncertain, says whether to make it again (`again`) | its hold's revision | done, with its spec's revision, which a release leaves as it was; `again` missing for an effect held uncertain, or given for another; refused, and why; moved, with what it is now |
+| `cancel` | amend and cancel | a live delegate and its tree, with a reason | | done; refused, and why |
+| `decide` | decide | accepts, rejects with a reason, or passes up a proposal waiting for it (jig's `domain/tasks.md`, section 9) | the proposal, by its proposer and number | decided, and how; refused, and why |
+| `decide_escalation` | decide | releases, rejects with a reason, or passes up a held descendant's escalation waiting for it | its hold's revision | decided, and how; beyond its authority, and passed up; moved, with what it is now; refused, and why |
+| `withdraw` | decide | its own pending proposal | the proposal | withdrawn; already decided, and how |
+| `propose` | propose | an action beyond its authority, with a reason, to the holder that may accept it: a batch, an amendment, a release, a forge effect, or a widening of its own authority (jig's `domain/authority.md`, section 9) | for an amendment, its spec's revision, as `amend` names it | proposed, as which number, and to whom; refused, when nobody may accept it; moved, for an amendment |
+| `subscribe`, `unsubscribe` | subscribe | a referenced task's state, held or ended, or a timer, once or periodic (jig's `domain/tasks.md`, 8.4); removes a subscription by its number | | the subscription's number; removed; refused, and why |
+| `subscribe_forge` | subscribe | a forge topic (forge.md, 7.1): landings on a branch, with the task's own change and the paths by which a landing overlaps; CI on a head; a pull request's state; the comments and reviews on a participating object | | the subscription's number; refused, and why |
+| `effect_forge` | effect | one of the effects the forge offers to agents (forge.md, section 2) on an adopted repository: an issue created, a comment posted on an issue or a pull request, a commit status posted | | made or found, with what it made; committed and pending, past the call's deadline; uncertain, the connector finding it, or its task held for a person; raced; withdrawn; failed, and why; refused before it was committed; waiting for a verdict; unavailable, deciding nothing, while the forge has no room for another |
+| `note` | note | writes a note in a scope, or revises one (jig's `domain/engine.md`, section 10) | for a revision, the note's revision it recalled | written, with its name and revision; refused: busy, too large, full, already there, missing, moved |
+| `recall` | recall | reads notes by name, or a page of a search of their scoped descriptions | | the entries, and whether more remain |
+| the forge's reads | read | one fresh read each, of an adopted repository (forge.md, section 2), below | | the answer, cut to the read's limit; failed, and why |
 
-- **Declared and decoded by the engine's protocol layer:** each host
-  tool's JSON Schema and description are written once there; a call's
-  input arrives as the LLM wrote it, is decoded into the engine's typed
-  call, or answered as an error naming what is wrong.
-- **Effects:** connectors' reads and `recall` are reads; every other
-  engine tool is a write, run alone.
-- **Answers are rendered there too,** as smith's text: done, with what it
-  made; refused, and why; beyond authority, naming what it lacked, so the
-  LLM may `propose` it instead.
-- **Calls are named by the run** and decided once by the engine, from its
-  record when asked again (engine.md, 7.3); smith asks again under the
-  same name after busy or a lost answer (smith's `run.md`, 5.2).
+The forge's reads, each a host tool of its own: `read_items`, a page of
+a repository's issues and pull requests; `read_item`, an issue or a pull
+request with its comments; `read_pull`, a pull request; `read_pull_for`,
+the pull request for a head and a base; `read_pull_files`, the files a
+pull request changes; `read_reviews`, a pull request's reviews;
+`read_remarks`, their remarks; `read_statuses`, a commit's statuses;
+`read_checks`, a commit's combined checks; `read_job`, one CI job's log,
+bounded, its failed step named before it; `read_branch`, a branch's head;
+`read_branches`, the branches; `read_compare`, two commits compared;
+`read_file`, a file at one head, bounded; `read_protection`, a branch's
+protection; `read_settings`, the repository's settings;
+`read_collaborators`, its collaborators; `read_permission`, a user's
+permission on it.
+
+- **Reads and writes:** the forge's reads and `recall` are reads; every
+  other host tool is a write, which smith runs alone (smith's
+  `domain/run.md`, 5.2).
+- **Declared, decoded and rendered in one place,** `temper-engine-smith`:
+  each tool's JSON Schema, description and effect, written once; a
+  call's input decoded into the root's `Tool`, or answered at once as an
+  error naming what is wrong, deciding nothing; an answer rendered as
+  smith's text, marked an error or not (`../protocol/llm.md`, section 4).
+- **Calls are named and decided once** (jig's `domain/engine.md`, 7.3):
+  the engine answers a call it has seen before from its record, and smith
+  asks again under the same name after busy or a lost answer (smith's
+  `domain/run.md`, 5.2).
+- **A call names what it saw** (jig's `domain/engine.md`, 7.3): the
+  revisions above are those its brief, its messages and its earlier
+  answers showed it. One whose object has moved since is answered moved,
+  with what it is now, and the run decides again on that.
+- **Not the engine's:** `wait`, `finish` and `deliver` (jig's
+  `domain/engine.md`, 7.3). `deliver` is a push (section 6).
 
 ### 4.4 Result contracts
 
-A task's result contract (tasks.md, section 3) becomes smith's (smith's
-`run.md`, 7.1):
+A task's result contract (jig's `domain/tasks.md`, section 3) becomes
+smith's (smith's `domain/run.md`, 7.1):
 
-| temper | In smith |
+| temper's | In smith |
 |---|---|
-| a report: words, bounded | a report |
-| a verdict from a closed list, each with the fields it requires and the follow-up tasks it may propose, how many and of which kinds | a verdict: the same labels and fields; follow-ups as items, whose kinds are the kinds of task a verdict may propose, with their fields |
-| a change: a branch pushed | a change, requiring the fields `title` and `body`, checks required unless the contract waives them |
-| a failure | a failure |
+| a report: words, bounded | a report, and a failure, within the same bound |
+| a verdict from a closed list, each with the fields it requires and the follow-up tasks it may propose | a verdict for each choice, named by its number, with its fields and its words' bound; follow-ups as items, of the kinds of task the verdict may propose; a failure of at most 1,024 bytes |
+| a connector's result: a change landed | a change, requiring the fields `title` and `body`, each within the contract's bound, its checks required; a failure within the same bound |
+| an approval | a failure only, of at most 1,024 bytes: approvals are people's |
 
-The engine judges a result again as it commits it, against the contract
-and the state as it is now (tasks.md, 5.6).
+A change's result names the resource the worker's push and the forge
+settled, never one from the LLM's fields, and its words are the `body`.
+The core judges a result again as it commits it, against the contract
+and the state as it is now (jig's `domain/tasks.md`, 5.6).
 
 ### 4.5 Conventions
 
-Checks at `.temper/pre-pr`, guides at `AGENTS.md`.
+Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
+`domain/run.md`, 3.1 and 8.1).
 
 ### 4.6 Budget, models, waiting
 
-- **Budget:** what the task has left, capped per run by the deployment,
-  in the deployment's unit (authority.md, section 7), with each model's
-  prices from its account (engine.md, section 12); turns and wall time.
-- **LLMs:** the endpoints are the deployment's accounts; the charter names
-  the main session's and those its sub-agents may use; their credentials
-  come to the agent as grants through the worker
-  (`docs/design/credentials.md`, section 3).
+- **Budget:** the run's turns, spend and time, with its reserve of turns
+  and time for finishing (smith's `domain/run.md`, 9.1), from its charter
+  in configuration; its spend is what its task has left, capped per run,
+  reserved at its claim, in the deployment's unit (jig's
+  `domain/hosts.md`, section 8).
+- **Models:** the main session's and those its sub-agents may use, each
+  with its endpoint, account, window, output and prices
+  (`../protocol/llm.md`, section 3). Their credentials come to the agent
+  as grants through the worker (`../protocol/credentials.md`,
+  section 3).
 - **Waiting and resuming:** the waiting time is the charter's; a
-  coordinator's is zero. A chat resumes its transcript by default, and a
-  coordinator starts fresh from its brief (engine.md, 7.4).
+  coordinator's is zero. A chat resumes its transcript, and a
+  coordinator starts fresh from its brief (jig's `domain/engine.md`,
+  7.4).
 
 ## 5. Messages
 
-What a task hears while its run is live (tasks.md, 7.1) goes to smith as
-messages, rendered by the engine's protocol layer: a sender's label (its
-requester, a delegate by number, a person by name, a subscription's
-topic) and the message's words, whole. Proposals and escalations waiting
-for the task's decision are relayed the same way, each naming what
-`decide` takes. Every message is named; the run names the last it read
-with each turn and when it waits, and the engine takes the inbox up to
-that one as it commits the turn (engine.md, 7.2).
+What a task hears while its run is live reaches smith as messages, as
+jig's `domain/hosts.md`, section 9 says: each named, with its sender's
+label and its words whole, the start carrying those waiting in the
+task's inbox. Proposals and escalations waiting for the task's decision
+are relayed the same way, each naming what `decide` or
+`decide_escalation` takes.
 
 ## 6. Delivery is a push
 
@@ -191,7 +228,7 @@ worker commits exactly the tree the run checked, with the result's
 `title` and `body`, and pushes it as a fast-forward, never forced, to the
 branch the assignment names; a merge in progress is committed as the
 merge, with both parents. Its outcomes, in smith's terms (smith's
-`run.md`, 8.2):
+`domain/run.md`, 8.2):
 
 | The push | smith's delivery |
 |---|---|
@@ -199,7 +236,7 @@ merge, with both parents. Its outcomes, in smith's terms (smith's
 | nothing to push | nothing |
 | a branch moved, as a fast-forward cannot take it or its head is not the one expected | stale: the run ends, and the engine decides afresh |
 | a conflicted file still holds a marker | refused, naming the file |
-| refused by the forge, unreachable, timed out, broken, too large, missing a branch or a commit | failed, with the reason and the last 512 bytes of git's diagnostic output |
+| refused by the forge, unreachable, timed out, broken, too large, missing the repository, a branch or a commit | failed, with the reason and the last 512 bytes of git's diagnostic output |
 
 A push that lands is the result, even if the run was winding down. The
 answer carries what the run left on the forge (worker.md, 4.2), and the
@@ -207,25 +244,25 @@ forge's change procedure goes on from it (forge.md, section 8).
 
 ## 7. Turns and transcripts
 
-- **Turns are smith's** (smith's `session.md`, section 3): bytes of its
-  versioned conversation vocabulary. The worker reads only their number,
-  size, spend and last message read (worker.md, section 8); the engine
-  keeps them opaque in its store (engine.md, 7.2); the web renders them
-  with `smith-transcript`.
-- **Resuming:** within the resume limit, a run is given its task's
-  transcript and the calls committed after its last turn; past it, or
-  when smith refuses the transcript, the next run starts fresh, its brief
-  carrying the tail.
+Turns are smith's bytes (smith's `domain/session.md`, section 3), which
+the worker relays and the engine keeps opaque, by conversation and
+window (jig's `domain/engine.md`, 7.2; jig's `domain/hosts.md`, 6.4).
+temper's client decodes them as jig's client does (jig's
+`client/domain/client.md`, section 10). A run that resumes is given its
+transcript's current window and the calls committed after its last turn;
+past the resume limit, or when smith refuses the transcript, the next
+run starts fresh, its brief carrying the tail.
 
 ## 8. The agents temper runs
 
-| Agent | Messages in | Tools it is given | Ends when |
+| Agent | Messages in | Tools its authority gives | Ends when |
 |---|---|---|---|
-| producing a change | none | the workspace's; `finish` with a change | its change passes its checks and is pushed |
-| a review, a triage | none | reads; `finish` with a verdict | its verdict meets its contract |
-| resolving a conflict | none | the workspace's, from a merge in progress; `finish` with a change | the merge is resolved, checked and pushed |
+| producing a change (forge.md, 8.2) | none | the workspace's, from the landing branch or saved work; `finish` with a change | its change passes its checks and is pushed |
+| a repair (forge.md, 8.4) | none | the workspace's, from the change's branch, its brief carrying why; `finish` with a change | its new head passes its checks and is pushed |
+| resolving a conflict (forge.md, 8.4) | none | the workspace's, from a merge in progress; `finish` with a change | the merge is resolved, checked and pushed |
+| a review (forge.md, 8.3), a triage | none | reads; `finish` with a verdict | its verdict meets its contract |
 | a chat | its person's words; its delegates' results | most; `deliver` mid-run; `wait` | its person closes it |
-| a coordinator | questions, results, overlapping landings; proposals and escalations to decide | `delegate`, `amend`, `cancel`, `decide`, `propose`, `note`; `wait` | its goal's report is written |
+| a coordinator | questions, results, overlapping landings; proposals and escalations to decide | `delegate`, `amend`, `cancel`, `release`, `decide`, `decide_escalation`, `propose`, `subscribe_forge`, `note`; `wait` | its goal's report is written |
 
 ## 9. The world
 
@@ -233,14 +270,21 @@ smith's worlds test the agent itself (smith's documents, each section
 "The world"). temper's test what it fills in, and the agent under its
 host:
 
-- **The engine's protocol tests:** every charter the engine writes
-  encodes to one smith admits; every host tool's schema accepts what the
-  engine's decoding takes and nothing it refuses; every answer renders
-  within smith's limits.
-- **The worker's worlds:** smith's scripted agent, for the agent child
-  (worker.md, section 10); and the system world, where the worker meets
-  the real engine and each run is smith's domain with a fake LLM
-  provider, its tools working in the trees the worker prepared.
+- **`temper-engine-smith`'s step tests:** the root's charter becomes
+  smith's start, its brief in order and its budget exact; every declared
+  tool decodes its least shape and refuses a wrong one; `amend` and
+  `release` name their revision; every answer renders as smith's text
+  within smith's limits, or as an error; a job's answer names its failed
+  step before its log; smith's terminals keep their spend and the root's
+  contract.
+- **The routing's tests:** a call decoded into the root's `Tool`; one of
+  another activation, or of an unknown tool, answered as an error with no
+  commit; a result that does not decode failing its attempt as invalid;
+  a change's result kept only with its settled resource; each settled
+  delivery the hub's answer (`../protocol/llm.md`, section 6).
+- **The worker's and the system worlds** (worker.md, section 10): smith's
+  scripted agent for the agent child, and smith's real agent domain over
+  skein's fake LLM, its tools working in the trees the worker prepared.
 - **Stories that are temper's:** a change produced, checked and pushed,
   and its push found moved; a coordinator that delegates a batch, hears
   results, and proposes what is beyond its authority; a chat that waits,
@@ -249,34 +293,12 @@ host:
 
 ## 10. Open questions
 
-- **Which engine tools each charter offers** by default, beyond what its
-  task's authority allows; and how a brief teaches an LLM when to delegate
-  a task rather than a sub-agent.
+- **Which host tools a charter offers.** jig's charter carries the tools
+  its task's authority gives (jig's `domain/engine.md`, 7.1); temper's
+  declares every host tool, and the authority refuses what it does not
+  allow. Whether to declare only what it allows, and how a brief teaches
+  an LLM when to delegate a task rather than a sub-agent.
+- **A cancel's grace:** jig's `cancel` takes one, if the run gives it
+  (jig's `domain/engine.md`, 7.3); temper's takes none.
 - **A code graph** for a workspace (worker.md, section 12), as an MCP
   tool source once smith has one.
-- **Moving with smith:** which revision of smith temper pins, and how a
-  change to smith's channel reaches temper's workers.
-
-## 11. From today
-
-- **The agent's domains move to Smith:** `temper-agent-domain` and its
-  children, with their worlds. Smith uses Skein's provider-neutral
-  `skein-llm::client::Client`; provider wire codecs and shared wire-peer
-  fakes belong in Skein. Smith owns no provider client or OAuth refresh
-  implementation. The host supplies credentials
-  (`docs/design/credentials.md`, section 3).
-- **`temper-agent-protocol` splits:** the agent process's half (the
-  channel's agent side, the shared LLM client boundary, tools' schemas,
-  rendering the prompt)
-  is smith's `smith-protocol`; temper's half (rendering the brief,
-  mapping the charter, the verdict lists fixed in code, the engine tools'
-  schemas and answers) stays, as the engine's protocol layer's.
-- **`temper-channel` loses the agent's hop** to `smith-channel`; it keeps
-  the engine's channel with workers.
-- **`temper-worker-domain-agent`** becomes `smith-host-domain`.
-- **What the previous version of this document planned as new** (the
-  engine's tools offered and relayed, messages and waiting, turns and
-  resuming, results that are reports and failures, pushing mid-run, a
-  merge in progress, budgets in a unit with prices, calls asked again)
-  is built in smith, generic (smith's `run.md`, section 14), and filled in
-  here.

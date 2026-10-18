@@ -35,7 +35,7 @@ mod engine;
 mod route;
 mod stop;
 mod tools;
-/// How the service ended (protocol.md, 6).
+/// How the service ended (protocol/README.md, 6).
 #[derive(PartialEq, Eq, Debug)]
 pub enum End {
     Drained,

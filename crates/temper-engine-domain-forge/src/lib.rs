@@ -1,4 +1,4 @@
-//! The forge connector's top (domain/connectors.md, sections 2–7;
+//! The forge connector's top (jig's domain/connectors.md, sections 2–8;
 //! domain/forge.md, sections 3–12). It keeps adopted repositories, resource
 //! holds, writer slots, subscriptions, procedure and projection rows, and
 //! outbox entries. The client alone executes API calls; change and issues

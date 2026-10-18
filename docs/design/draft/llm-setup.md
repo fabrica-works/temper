@@ -94,7 +94,7 @@ to settle, and shows what a person writes:
   dialect skein speaks, or a local model with an endpoint on loopback
   and no source to hold, whose one account is the deployment's (jig's
   `draft/llm-accounts.md`, 3.1).
-- **The agent's configuration** (configuration.md, section 5) gains
+- **The agent's configuration** (`../protocol/configuration.md`, section 5) gains
   each program's path and the directory that holds its configuration
   directories: `"programs": {"claude_code": {"path":
   "/usr/local/bin/claude", "directory": "/home/me/temper/programs"}}`.
@@ -108,7 +108,8 @@ to settle, and shows what a person writes:
 ## 3. A first run
 
 1. **Start and open,** as `temper box CONFIG.json` and `temper open
-   DIRECTORY LINK` do (setup.md, section 7; client.md, section 7).
+   DIRECTORY LINK` do (`../protocol/setup.md`, section 7;
+   `../client.md`, section 7).
 2. **The banner,** on every page while no account is usable:
 
    > Agents need an LLM account to run.
@@ -139,8 +140,9 @@ which on one person's machine is all of it.
 
 ### 4.1 Accounts
 
-The system page's "LLM accounts" (`web/ux/projects.md`, section 8)
-becomes the person's accounts, and, for an owner, the deployment's:
+The system page's "LLM accounts" (jig's `client/domain/pages.md`,
+section 7) becomes the person's accounts, and, for an owner, the
+deployment's:
 
 - **Each account:** its provider and display name ("ChatGPT ·
   alice@example.com"), each source and its state, the runs using it and
@@ -175,14 +177,14 @@ becomes the person's accounts, and, for an owner, the deployment's:
 
 ### 4.3 Where the account shows
 
-- **The composer,** in a chat (`web/ux/chats.md`, section 4): "Using
+- **The composer,** in a chat (jig's `client/domain/pages.md`, section 4): "Using
   ChatGPT plan · Manage usage"; "Using your Claude subscription,
   through Claude Code"; "Using your OpenAI API key".
-- **The task page** (`web/ux/tasks.md`, section 2): "runs on", the model,
+- **The task page** (jig's `client/domain/pages.md`, section 5): "runs on", the model,
   the effort and the account, each changeable by an amendment
   (section 7).
 - **A held task** whose account is unusable says so, with the account's
-  actions (`web/ux/tasks.md`, section 7).
+  actions (jig's `client/domain/objects.md`, section 5).
 
 ### 4.4 Signing out
 
@@ -253,14 +255,14 @@ becomes the person's accounts, and, for an owner, the deployment's:
   chat's next run.
 - **A goal:** setting a goal names its planner's model and effort, the
   template's by default, beside the planner it already names
-  (`web/ux/projects.md`, 3.4). The planner gives each task it delegates
+  (jig's `client/domain/pages.md`, section 6). The planner gives each task it delegates
   a model and an effort of its own, from the catalogue its brief shows,
   with each model's `about` and prices (jig's `draft/llm-accounts.md`,
   5.2).
 - **Every task's page** shows its model, effort and account, and a
   person changes them by amending the task.
 - **A project's policy** may narrow the models its roles allow
-  (`web/ux/projects.md`, section 7); one person rarely needs it.
+  (jig's `client/domain/pages.md`, section 6); one person rarely needs it.
 
 ## 8. Commands
 
@@ -268,7 +270,7 @@ becomes the person's accounts, and, for an owner, the deployment's:
   is kept in the store (jig's `draft/llm-accounts.md`, sections 6 and
   7).
 - **`temper program-login CONFIG.json NAME`** is new (section 5).
-- **`temper ctl`'s tools** (`tools.md`, section 5) gain the accounts:
+- **`temper ctl`'s tools** (`../tools.md`, section 5) gain the accounts:
   `llm-accounts`; `llm-sign-in PROVIDER`, which prints the address and
   waits for its end; `llm-sign-out ACCOUNT`; `add-key PROVIDER FILE
   [ACCOUNT]`, a new account when none is named; `replace-key ACCOUNT
@@ -276,7 +278,7 @@ becomes the person's accounts, and, for an owner, the deployment's:
   `declare-program PROVIDER ADAPTER NAME`; `check ACCOUNT`; and later,
   with jig's move, `move-out` and `move-in`. A key's file is read by the
   tool and sent once, never an argument. An agent driving temper for a
-  person, with the person's credential or a service's (`tools.md`,
+  person, with the person's credential or a service's (`../tools.md`,
   section 9), and a script use them as the person's pages do.
 
 ## 9. The live tier on a subscription
@@ -303,32 +305,31 @@ becomes the person's accounts, and, for an owner, the deployment's:
 - **Which one runs** is the script's argument; Claude is its default,
   since it needs nobody.
 - **As now:** at most 25 completions and 15 minutes, one run at a time,
-  never at the gate (testing.md, 2.7).
+  never at the gate (`../testing.md`, 2.7).
 
 ## 10. What changes in temper's design
 
-- **`credentials.md`,** sections 1, 2, 3, 7 and 8: LLM accounts in jig's
+- **`../protocol/credentials.md`,** sections 1, 2, 3, 7 and 8: LLM accounts in jig's
   store, signed in from the client; `temper sign-in` and handed-in
   files removed.
-- **`configuration.md`,** sections 1, 2, 5, 6, 8, 9 and 10: providers;
+- **`../protocol/configuration.md`,** sections 1, 2, 5, 6, 8 and 9: providers;
   the agent's programs; the agent's configuration no longer checked for
   "the same account" as the engine's endpoints, since an endpoint names
-  none; the secrets' table without LLM rows; the commands; the owned
-  example.
-- **`llm.md`,** sections 1 to 3 and 6: providers and accounts, the
+  none; the secrets' table without LLM rows; the commands.
+- **`../protocol/llm.md`,** sections 1 to 3 and 6: providers and accounts, the
   agent's two backends.
-- **`protocol.md`,** sections 4, 5, 11 and 12: the commands, the crates,
-  and their tests.
-- **`setup.md`,** section 8: the owned example's LLM provider in place
+- **`../protocol/README.md`,** sections 4, 5 and 11: the commands, the
+  crates, and their tests.
+- **`../protocol/setup.md`,** 8.1: the owned example's LLM provider in place
   of a handed-in account.
-- **`testing.md`,** 2.7 and 4.1: the live tier on a subscription; a fake
+- **`../testing.md`,** 2.7 and 4.1: the live tier on a subscription; a fake
   `claude` beside skein's fake LLM peer and fake issuer.
-- **`tools.md`,** sections 5 and 9: the accounts' tools; the agent's
+- **`../tools.md`,** sections 5 and 9: the accounts' tools; the agent's
   account no longer handed in by configuration.
-- **`web/ux/projects.md`,** 3.4, 7 and 8, **`web/ux/chats.md`**, 4,
-  **`web/ux/tasks.md`**, 2 and 7, and **`client.md`:** the screens of
-  sections 3 to 7, in the browser and the terminal.
-- **`draft/mvp.md`,** section 7: the first milestone's account.
+- **`../client.md`,** on jig's pages (jig's `client/domain/pages.md`,
+  sections 4 to 7): the screens of sections 3 to 7, in the browser and
+  the terminal.
+- **`../README.md`,** section 2: the first milestone's account.
 
 ## 11. Open questions
 
@@ -339,5 +340,5 @@ becomes the person's accounts, and, for an owner, the deployment's:
   section 12). Default: as said.
 - **The first-use notice in the terminal:** a line once, or a card that
   waits to be dismissed. Default: a card.
-- **QA's evals** (`draft/qa.md`): on keys, or on QA's own subscriptions.
+- **QA's evals** (`qa.md`): on keys, or on QA's own subscriptions.
   Default: keys.

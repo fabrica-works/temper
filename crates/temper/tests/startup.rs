@@ -312,7 +312,7 @@ fn the_owned_example_asks_for_reconciles_files() {
 }
 #[test]
 fn serve_prepares_once_on_the_owned_example() {
-    // configuration.md 7: Linux PATH_MAX and small's forge_component.token_bytes.
+    // protocol/setup.md 8.1: Linux PATH_MAX and small's forge_component.token_bytes.
     const PATH_BYTES: usize = 4096;
     const TOKEN_BYTES: usize = 512;
     const BOT_USER: &[u8] = b"42"; // forge-1/user's content.

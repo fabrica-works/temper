@@ -1,4 +1,4 @@
-//! Repository paths and user logins, evicted by least recent use (forge.md, 3.5).
+//! Repository paths and user logins, evicted by least recent use (protocol/forge.md, 3.5).
 use alloc::boxed::Box;
 use skein_lib::Map;
 use temper_engine_domain_forge_client::api;

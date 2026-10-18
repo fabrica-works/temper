@@ -1,4 +1,4 @@
-//! One streaming, authenticated webhook connection (forge.md, 5 and 8).
+//! One streaming, authenticated webhook connection (protocol/forge.md, 5 and 8).
 use super::{Hinted, Webhooks, hint};
 use crate::{Event, Limits, limits, marker};
 use alloc::boxed::Box;

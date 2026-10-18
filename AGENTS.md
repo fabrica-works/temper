@@ -18,9 +18,13 @@
   - `testing-strategy.md`: how that code is tested;
   - `notes.md`: the questions still open, and why the memory strategy is
     what it is.
-- temper's own design documents are in `docs/design/`; `testing.md` is how
-  the testing strategy applies to temper.
+- temper's own design documents are in `docs/design/`, whose `README.md`
+  comes first and says where each part lives; `testing.md` is how the
+  testing strategy applies to temper. Code cites a design document by its
+  path from `docs/design/`: `domain/forge.md, 8.2`, `protocol/forge.md, 3.2`.
 - jig, the kit temper is built on, is its own repository
   (`~/src/rust/jig`), pinned as skein and smith are
   (`docs/development/local-jig.md`). temper cites its documents as
-  jig's `<file>.md`, never by a path.
+  jig's `<path>`, the path in jig's `docs/design/` (jig's
+  `domain/connectors.md`, jig's `client/domain/client.md`), never by a
+  path on disk.

@@ -1,4 +1,4 @@
-//! JSON read plans, streamed rows and their running answer bound (forge.md, 3.2).
+//! JSON read plans, streamed rows and their running answer bound (protocol/forge.md, 3.2).
 use crate::{
     connection::{Body, Heard},
     limits::{self, Limits, Listing, Shared},

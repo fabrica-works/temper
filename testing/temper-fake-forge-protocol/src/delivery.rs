@@ -1,4 +1,4 @@
-//! Signed webhook requests for a world to write (forge.md, sections 5 and 9).
+//! Signed webhook requests for a world to write (protocol/forge.md, sections 5 and 9).
 use crate::{Limits, Service, routes};
 use alloc::boxed::Box;
 use skein_lib::{Decimal, Secret, Writer, sha256::Hmac};

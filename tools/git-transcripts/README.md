@@ -8,8 +8,9 @@ TEMPER_FORGEJO=<absolute path to the pinned Forgejo> git-transcripts --git /usr/
 
 The tool starts and removes its own isolated Forgejo, with Actions off.
 `VERSION` in `crates/temper-forge-forgejo/src/pin.rs` pins it.
-It records 42 invocations using git.md's settings and whole environment;
-credentials are Basic headers in the environment, scanned before writing.
+It records 42 invocations using protocol/git.md's settings and whole
+environment; credentials are Basic headers in the environment, scanned
+before writing.
 Each case holds `argv` (one argument per line), `exit`, `stdout`, and
 `stderr`. A single map masks object ids, abbreviated ids, loopback ports
 and the scratch path across all cases. `facts.txt` names Forgejo's version

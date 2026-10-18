@@ -1,4 +1,5 @@
-//! Bounded connector top state (domain/engine.md, section 13).
+//! Bounded connector top state (domain/root.md, section 10;
+//! protocol/configuration.md, section 7).
 use crate::{BranchHead, Criterion, Hold, Key, Name, PullState, Repository, Stored, Subscriber, Topic};
 use core::mem::size_of;
 use skein_lib::{Map, Queue};

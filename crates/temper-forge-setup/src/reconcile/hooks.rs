@@ -1,4 +1,5 @@
-//! Listener hook convergence, retaining one lowest matching id (setup.md, 5.6).
+//! Listener hook convergence, retaining one lowest matching id
+//! (protocol/setup.md, section 5, step 6).
 use super::{
     Event, Need, Reconcile, Reply, Stage, State, Why,
     tokens::{reply, unexpected},

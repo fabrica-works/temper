@@ -13,7 +13,8 @@ use std::{
 };
 
 pub const SECRET: &[u8] = b"fixture-hook-secret";
-// setup.md 8 gives forge 1 the listener path; forge 9 is not configured.
+// protocol/forge.md 5 and protocol/configuration.md 3 give forge 1 the
+// listener path; forge 9 is not configured.
 pub const KNOWN_FORGE: &str = "/hooks/1";
 pub const UNKNOWN_FORGE: &str = "/hooks/9";
 // The listener stories allow five seconds for each socket operation.

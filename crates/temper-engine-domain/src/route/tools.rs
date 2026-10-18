@@ -1,5 +1,5 @@
 //! The decoded engine tools, translated into core or connector vocabulary
-//! (domain/engine.md, 7.3; jig's `domain/engine.md`, 7.3).
+//! (domain/root.md, 5.2; jig's `domain/engine.md`, 7.3).
 use super::{
     Decision, Domain, Env, EscalationChoice, Limits, MessageForm, Payload, ProposalChoice, ProposedAction, ReplyTo,
     Token, Tool, Work, call_answer, current_proof, delegate_call, forge_route, proposals, relay_call, take_payload,

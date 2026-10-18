@@ -1,4 +1,4 @@
-//! The shell's adapter over the temper composition (protocol/service.md, 7).
+//! The shell's adapter over the temper composition (jig's protocol/service.md, 7).
 use skein_io::kernel::{Complete, Exit, Submit};
 use skein_lib::{Queue, Time, Wall};
 use std::io::{self, Write};

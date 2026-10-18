@@ -18,6 +18,6 @@ python3 -m http.server 8765 --directory docs/design/web/mockups
 
 Several sample tasks and chats have no mockup page of their own.
 
-The layout follows `../ux/`: the inbox is home, a chat is a task with its conversation first, the same pending proposal appears in the chat and inbox, goals are ordered on a board, and the forge contributes a changes view.
+The layout follows temper's client (`../../client.md`) on jig's pages: the inbox is home, a chat is a task with its conversation first, the same pending proposal appears in the chat and inbox, goals are ordered on a board, and the forge contributes a changes view.
 
 The only external asset is the optional Google Fonts stylesheet. System fonts are used if it cannot load.

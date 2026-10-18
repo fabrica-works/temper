@@ -1,4 +1,4 @@
-//! Sized builders for git.md, sections 3 to 5.
+//! Sized builders for protocol/git.md, sections 3 to 5.
 use crate::Identity;
 use alloc::boxed::Box;
 use skein_lib::{Decimal, List, Writer, base64};

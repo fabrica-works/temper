@@ -23,7 +23,7 @@ use temper_engine_domain_forge_change as forge_change;
 pub const FACTS: u32 = 32;
 
 /// Root startup bounds, supplied by configuration and immutable at every step
-/// (domain/engine.md, 4–5). `worst_case` checks the cross-child route, page,
+/// (domain/root.md, 10). `worst_case` checks the cross-child route, page,
 /// journal and payload capacities before `Domain::new` allocates fixed room.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -93,12 +93,12 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
 
 /// The store map's bytes at or above which new party work is refused, as
 /// jig's `crates/jig-protocol-config/src/profile/small.rs` sets it until
-/// temper's configuration names its own (domain/engine.md, 13).
+/// temper's configuration names its own (domain/root.md, 10).
 pub const FILL_MARK: u64 = 268_435_456;
 /// The most owned bytes one authenticated store read brings (`small.rs`).
 pub const LOAD_BYTES: u64 = 65_536;
 /// Streams use temper's client's own budget of 16, above jig's small
-/// profile's 4 (`small.rs`, clients; configuration.md, 7).
+/// profile's 4 (`small.rs`, clients; protocol/configuration.md, 7).
 pub const WATCHES_PER_STREAM: u32 = 16;
 /// Watches use the client's budget above jig's small profile's 4 (`small.rs`, views).
 /// Live runs and provisional text retain jig's small profile's limits.

@@ -1,4 +1,5 @@
-//! Smith payloads are translated in the worker layer (channel.md, 6.1 and 6.4).
+//! Smith payloads are translated in the worker layer (jig's
+//! protocol/channel.md, 6.1 and 6.4).
 use alloc::boxed::Box;
 use jig_domain_host as hub;
 use skein_lib::{List, Reader, Token, Writer};

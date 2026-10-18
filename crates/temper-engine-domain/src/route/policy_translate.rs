@@ -1,5 +1,6 @@
-//! Total bounded translations between a person's typed policy request and the
-//! authority child's policy value. Siblings share no types (programming-model.md).
+//! Total bounded translations of the configured landing policy (domain/root.md,
+//! 6): the authority child's requirements, the forge's criteria and its gate
+//! templates, under one index. Siblings share no types (programming-model.md).
 
 use alloc::boxed::Box;
 

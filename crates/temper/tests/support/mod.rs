@@ -462,7 +462,7 @@ pub fn run(
 ) -> Seen {
     run_story(directory, script, peer, deadline, None)
 }
-/// setup.md 13.4 bounds each landing story at 180 seconds.
+/// testing.md 2.6 bounds each landing story at 180 seconds.
 pub const LANDING: Duration = Duration::from_secs(180);
 /// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
 pub const RAISED_MS: u64 = 600_000;

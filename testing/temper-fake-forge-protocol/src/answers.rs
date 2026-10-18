@@ -1,4 +1,4 @@
-//! The fake's typed reads in Forgejo's document vocabulary (forge.md, 9).
+//! The fake's typed reads in Forgejo's document vocabulary (protocol/forge.md, 9).
 use crate::{Config, routes};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall, Writer, bytes};

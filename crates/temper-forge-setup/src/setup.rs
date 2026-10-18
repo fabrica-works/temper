@@ -1,4 +1,4 @@
-//! Strict setup members and bounds (setup.md, 8).
+//! Strict setup members and bounds (protocol/setup.md, 8).
 use crate::{limits::Limits, problem::Problems};
 use alloc::boxed::Box;
 use core::net::SocketAddr;

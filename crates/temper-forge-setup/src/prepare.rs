@@ -1,4 +1,4 @@
-//! The owned preparation's one-request machine (setup.md, 6.3 and 13.1).
+//! The owned preparation's one-request machine (protocol/setup.md, 6.3 and 13.1).
 use crate::{
     check::joined,
     ini,

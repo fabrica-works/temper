@@ -1,4 +1,4 @@
-//! Arbitrary and mutated forge-family records (codec.md, section 6).
+//! Arbitrary and mutated forge-family records (skein's codec.md, section 6).
 use skein_lib::{Reader, Rng, Writer};
 use temper_client_protocol_wire::v1;
 

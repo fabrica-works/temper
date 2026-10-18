@@ -1,4 +1,4 @@
-//! Machine output and failure tails (git.md, sections 4 and 6).
+//! Machine output and failure tails (protocol/git.md, sections 4 and 6).
 use crate::{Version, invocation};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes};

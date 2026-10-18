@@ -6,7 +6,7 @@
 pub use crate::push::{PushDiagnostic, PushFailure, PushReason};
 use alloc::boxed::Box;
 
-/// Workspace items whose channel bytes did not decode (channel.md, 7).
+/// Workspace items whose channel bytes did not decode (protocol/channel.md, 7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Undecodable;
 

@@ -1,4 +1,4 @@
-//! temper's parts on jig's channel (channel.md, sections 3 to 6 and 8).
+//! temper's parts on jig's channel (protocol/channel.md, sections 3 to 6 and 8).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
@@ -10,10 +10,11 @@ pub mod v1;
 use alloc::boxed::Box;
 use skein_lib::{Secret, Writer};
 
-/// The application's channel payload version (channel.md, section 3).
+/// The application's channel payload version (protocol/channel.md, section 3).
 pub const PAYLOAD_VERSION: u32 = 1;
 
-/// Domain bounds shared by both sides of the channel (channel.md, section 8).
+/// Domain bounds shared by both sides of the channel (protocol/channel.md,
+/// section 8).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Bounds {
     pub repositories: u32,
@@ -110,7 +111,7 @@ pub fn preparation(value: &v1::Preparation) -> Box<[u8]> {
     writer.finish()
 }
 
-/// Encode an identity directly into a secret (channel.md, section 6).
+/// Encode an identity directly into a secret (protocol/channel.md, section 6).
 #[must_use]
 pub fn identity(value: &v1::Identity) -> Secret {
     let mut writer = Writer::new(usize::try_from(value.measure()).expect("measured length fits usize"));
@@ -118,7 +119,7 @@ pub fn identity(value: &v1::Identity) -> Secret {
     Secret::new(writer.finish())
 }
 
-/// Check configuration's login and author rules (channel.md, section 6).
+/// Check configuration's login and author rules (protocol/channel.md, section 6).
 #[must_use]
 pub fn valid(identity: &v1::Identity) -> bool {
     for byte in identity.login() {

@@ -1,17 +1,16 @@
 # The forge's protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-16. How the engine reaches the
+Provisional, 2026-10-03, revised 2026-10-18. How the engine reaches the
 forge: Forgejo v17.0's API over HTTP and JSON, the keys' markers the
 engine writes at the head of what it creates, the webhooks Forgejo sends
 back to a listener on loopback, and the fake forge's protocol layer that
-serves the same API in the worlds. The overview is protocol.md (sections
-5 and 6); the vocabulary carried is the forge
-client's (`temper_engine_domain_forge_client::api`, `domain/forge.md`,
-sections 5, 6 and 17); the machines are skein's (skein's `http.md`,
-`json.md`, `tls.md`). GitHub comes later, and section 11 says where it
-fits. What others owe this layer is in section 12, what is known of
-Forgejo and what is still to check in section 13, and what is open in
-section 14.
+serves the same API in the worlds. The overview is README.md (sections
+5 and 6); the vocabulary carried is the forge client's
+(`temper_engine_domain_forge_client::api`, `../domain/forge.md`,
+sections 5 and 6); the machines are skein's (skein's `http.md`,
+`json.md`, `tls.md`). What others owe this layer is in section 12, what
+temper relies on of Forgejo in section 13, and what is open, GitHub
+among it, in section 14.
 
 ## 1. In one page
 
@@ -43,17 +42,19 @@ section 14.
   reach a listener of the component's own, on loopback (section 5):
   verified as they stream, answered first, each hint naming what caused
   it. Polling stands as it is and finds what a delivery lost, refused or
-  never sent told of; a forge on another host polls alone until skein's
-  TLS server side (setup.md, section 15).
+  never sent told of; a forge on another host polls alone, since
+  deliveries over TLS need skein's TLS server side (setup.md, section
+  15).
 - **The fake forge speaks the same API,** from the server's side, with
   Forgejo's quirks where they are known (its default order, its page
   cap, its unpaged threads), and counts the requests it serves, so the
   engine's worlds can hold the forge's load to a ceiling.
-- **Facts are checked against a real Forgejo v17.0** before the
-  component relies on them, by a conformance run against a throwaway
-  instance and forgejo-runner v13.2, outside the suites; what it records
-  becomes the decoders' transcripts. temper requires that release: one
-  patch release of it is pinned, and no other version is served.
+- **What temper relies on of Forgejo is recorded** against a real
+  Forgejo v17.0, by a conformance run against a throwaway instance and
+  forgejo-runner v13.2, outside the suites: each behaviour a named fact
+  (section 13), each exchange a transcript the decoders are tested
+  against. temper requires that release: one patch release of it is
+  pinned, and no other version is served.
 
 ## 2. In the engine
 
@@ -80,18 +81,17 @@ skein-io socket
   request's method, path, query and JSON body as a sized encoder; each
   answer's decoder, a small state machine over JSON tokens; error
   bodies; the deliveries' headers and each payload's decoder, of the
-  fields a hint reads (section 5); and the setup's documents, admin
-  users, tokens by the admin's routes, orgs, teams and their members,
-  and org hooks, which reconcile sends (setup.md, sections 5 and 11).
-  Both sides live there, the client's for the engine and reconcile and
-  the server's for the fake forge (section 9); for deliveries, the
-  fake forge's encoder and the engine's decoder. So the two are also
-  fed transcripts of the real Forgejo (section 10).
+  fields a hint reads (section 5); and the setup's documents, which
+  reconcile sends (setup.md, section 11). Both sides live there, the
+  client's for the engine and reconcile and the server's for the fake
+  forge (section 9); for deliveries, the fake forge's encoder and the
+  engine's decoder. So the two are also fed transcripts of the real
+  Forgejo (section 10).
 - **The forge component,** `temper-engine-protocol-forge`, is a
   child of the engine's protocol layer, beside jig's components, with its
   own limits, worst case, deadlines and most outputs per entry point; the
   routing carries what passes between it, io and the root, and decides
-  nothing (protocol.md, sections 5 and 6; jig's `protocol/service.md`,
+  nothing (README.md, sections 5 and 6; jig's `protocol/service.md`,
   section 2). One component serves every configured forge. It holds the
   calls in flight, the forges' connections, each forge's start
   (section 3.5), the repositories' paths and the users, and the
@@ -104,17 +104,15 @@ skein-io socket
   cost, result }`, which the routing hands the root as `Event::Forge`
   (the forge's `Event::Client`); and the forge's `Event::Hint { hint }`,
   which no request causes: a verified delivery's (section 5;
-  `domain/forge.md`, 5.2).
-- **Room, and the drain.** An answer or a hint the root's admission
-  cannot take yet (its journal full) comes back to the component, which
-  holds it and offers it again, reading nothing more off that
-  connection meanwhile (jig's `protocol/service.md`, section 2, room);
-  it holds at most one per call and one per webhook connection. One the
-  root returns undecided during its drain (its `Request::Busy`) stays
-  with the component and is never
-  offered again: it goes when the component closes, and the next
-  process reads afresh and settles its outbox (jig's
-  `domain/engine.md`, 6.1; `domain/forge.md`, section 16).
+  `../domain/forge.md`, 5.2).
+- **Room, and the drain,** as jig's components keep them (jig's
+  `protocol/service.md`, section 2; jig's `domain/engine.md`, 6.1): an
+  answer or a hint the root cannot take yet is held and offered again,
+  at most one per call and one per webhook connection, and nothing more
+  is read off its connection meanwhile. One the root returns during its
+  drain (its `Request::Busy`) is never offered again: it goes when the
+  component closes, and the next process reads afresh and settles its
+  outbox (`../domain/forge.md`, section 16).
 - **What it is told at start:** each entry of `application.forges`
   (configuration.md, section 3): the forge's number, its kind (Forgejo),
   its API's address and transport, its API token's file, the user the
@@ -149,7 +147,7 @@ skein-io socket
   the id (3.5). A call whose repository has no path kept first resolves
   it with `GET /api/v1/repositories/{id}`, and that request counts in its
   cost. A locate names an owner and a name itself, and is addressed with
-  the forge's number and repository 0 (`domain/forge.md`, section 4).
+  the forge's number and repository 0 (`../domain/forge.md`, section 4).
 - **Names in paths** (an owner, a repository's name, a branch, a login,
   a file's path) are percent-encoded, each as one path segment; a slash
   inside a branch's name is `%2F`. A file's path keeps its slashes
@@ -227,14 +225,15 @@ Notes on the table:
 - **The keep-up listing** is the only listing of items: always
   `state=all`, always `since`, so its rows are what changed since the
   last pass and its cost follows the rate of change, not the number of
-  pull requests held (`domain/forge.md`, 5.2). A find for an issue lists
-  from the entry's start, `type=issues`. Nothing is listed by label.
+  pull requests held (`../domain/forge.md`, 5.2). A find for an issue
+  lists from the entry's start, `type=issues`. Nothing is listed by
+  label.
 - **`sort=leastupdate`** is Forgejo's least-recently-updated order. Its
   default is `latest`, newest *created* first, and a GitHub-style
   `sort=updated&direction=asc` is not in its vocabulary: a client that
   sends the wrong words gets the wrong order with no error. The fake
-  forge answers the same way (section 9), and section 13 checks the
-  real one.
+  forge answers the same way (section 9), and section 13 names the
+  real one's facts.
 - **An item's comments are not paged by Forgejo.** The call reads the
   whole thread, keeps the comments with ids above `after` as the answer
   holds them, and skips the rest as they stream, bodies unread; the next
@@ -274,45 +273,44 @@ Notes on the table:
   when none before it failed. The steps are read as they stream, and only
   the failed one is kept, the others skipped as they pass: a job of any
   number of steps is read, its steps costing time, not memory. Its log
-  alone is read
-  (`step`), and of it the end, by a suffix range, since a step tells its
-  failure last. A job with no step failed (one cancelled, or one whose
-  runner was lost) is read whole, its end the same way; one never given
-  to a runner has no log (`404`, `MissingJob`). The job's `attempt` is its
-  latest: one other than the call's (the job ran again since) is
-  `MissingJob`, as a log Forgejo no longer keeps is (`404`). A `200` is
-  read through, its last `max_bytes` bytes kept as it streams, within
-  `body_bytes_in` like any body (section 7); a range over an empty log
-  is an empty log (13). The log's search (`q`) and its
-  NDJSON form are not read: neither answers a range.
+  alone is read (`step`), and of it the end, by a suffix range, since a
+  step tells its failure last. A job with no step failed (one cancelled,
+  or one whose runner was lost) is read whole, its end the same way; one
+  never given to a runner has no log (`404`, `MissingJob`). The job's
+  `attempt` is its latest: one other than the call's (the job ran again
+  since) is `MissingJob`, as a log Forgejo no longer keeps is (`404`). A
+  `200` is read through, its last `max_bytes` bytes kept as it streams,
+  within `body_bytes_in` like any body (section 7); a range over an empty
+  log is an empty log (13). The log's search (`q`) and its NDJSON form
+  are not read: neither answers a range.
 - **Links are absolute.** A status's link goes to the domain whole: one
   relative to the forge's origin (a `target_url` that starts with one
   `/`) gets the origin (scheme, host and port) of the repository's
   `html_url` before it, so a brief or an agent reading it has a link
   that opens; any other is carried as Forgejo wrote it.
 - **Who posted a status is not carried.** A status written by Actions
-  has no `creator` (13), and nothing in the domain reads a status's
+  has no `creator`, and nothing in the domain reads a status's
   poster: CI is read by context and state, and a gate's verdict temper
   posts is for protection, which reads it by context
-  (`domain/forge.md`, 8.3). `api::Status` has no author.
+  (`../domain/forge.md`, 8.3). `api::Status` has no author.
 - **Contents of a pull request's files and of a comparison** are read
   file by file, two reads each, since the domain carries each changed
   file whole on both sides (`api::File`); the reads count in the call's
   cost. A side that does not fit what is left of the answer's bound
   fails the call as `TooLarge`, which the domain reads as an overlap
-  unknown (`domain/forge.md`, 7.3). A comparison's files are Forgejo's
+  unknown (`../domain/forge.md`, 7.3). A comparison's files are Forgejo's
   (from the two commits' merge base); their sides are read at `before`
   and at `after`.
 - **Merges.** `Do` is the repository's `default_merge_style`, kept with
   its path (3.5): the merge style is the repository's own
-  (`domain/forge.md`, section 4). `head_commit_id` makes the merge
+  (`../domain/forge.md`, section 4). `head_commit_id` makes the merge
   conditional on the head the domain names, which Forgejo refuses when it
   moved (`Stale`). The merge answers with no body; the read after it
   gives the merge's commit. If that read fails, the call answers
   `Timeout`: the merge's outcome is unknown, and the client finds it by
-  reading the pull request (`domain/forge.md`, section 6).
+  reading the pull request (`../domain/forge.md`, section 6).
 - **Updates** merge the base into the branch (`style=merge`), never a
-  rebase (`domain/forge.md`, section 10).
+  rebase (`../domain/forge.md`, section 10).
 - **A pull request for a head and base.** Forgejo keeps at most one pull
   request open for a head and a base. Its lookup, `pulls/{base}/{head}`,
   names one of several, the oldest (13), and its listing has
@@ -322,22 +320,22 @@ Notes on the table:
   `base.ref` are the call's head, its repository and its base, every
   other row skipped as it streams. With none open, it answers the one
   the lookup named. A change opens a pull request only when none exists
-  for its branches, and reopens it when it was closed (`domain/forge.md`,
-  sections 6 and 8.5), so the oldest is the one it follows, and the
-  listing is read only when that one is closed or merged, or another
-  hand opened one for its branches. Each page counts in the call's cost;
-  the call's deadline bounds them.
+  for its branches, and reopens it when it was closed
+  (`../domain/forge.md`, sections 6 and 8.5), so the oldest is the one it
+  follows, and the listing is read only when that one is closed or
+  merged, or another hand opened one for its branches. Each page counts
+  in the call's cost; the call's deadline bounds them.
 - **Comparisons ask for what they keep.** Every comparison sends
   `verification=false`, since no commit's signature is read; one read
   only for its `total_commits` (`OpenPull`'s, and `Compare`'s second)
-  also sends `files=false`, so Forgejo lists no commit's files. Whether
-  `files=false` leaves out the comparison's own `files` too is to check
-  (13); `Compare`'s first comparison, which keeps them, never sends it.
-  The answer is decoded as before: what the call does not keep is
-  skipped as it streams.
+  also sends `files=false`, so Forgejo lists no commit's files.
+  `files=false` leaves the comparison's own `files` empty too (13), so
+  `Compare`'s first comparison, which keeps them, never sends it. The
+  answer is decoded as before: what the call does not keep is skipped as
+  it streams.
 - **Opening compares first.** Forgejo opens a pull request whose head
   adds nothing to its base (13), which the forge client's vocabulary
-  refuses as `NothingToMerge` (`domain/forge.md`, section 6). So
+  refuses as `NothingToMerge` (`../domain/forge.md`, section 6). So
   `OpenPull` reads both branches and compares their commits before it
   writes: a head with no commit its base lacks (`total_commits` 0, a
   head equal to its base included) fails the call `NothingToMerge`, and
@@ -408,8 +406,8 @@ Notes on the table:
 - **A malformed answer** (a document that does not decode, a field
   missing, a number out of range, a commit id of the wrong length, a
   string past its cap, a body past `body_bytes_in`, a log read through
-  included) fails a write as `Timeout`: the request reached
-  the forge, so what it asked may have been done. It fails a read as
+  included) fails a write as `Timeout`: the request reached the forge,
+  so what it asked may have been done. It fails a read as
   `InvalidAnswer`. Either way the connection is closed, since what
   followed on it can no longer be trusted. A repository id past the
   domain's 32 bits fails the call as `TooLarge`.
@@ -455,14 +453,15 @@ such a request costs nothing.
   it (`idle`, section 7).
 - **One status, several meanings.** Where Forgejo answers two failures
   with one status (`405` on a merge), the decoder reads its `message`
-  into the failure; the messages are pinned by transcripts of the pinned
-  Forgejo (section 13). A `4xx` means Forgejo did not act, so a message
-  the decoder does not know is `Refused` on a write, never a guess at
-  which failure it was; on a read, `InvalidAnswer`.
+  into the failure; the messages are those the pinned release answers,
+  in the conformance's transcripts (section 13). A `4xx` means Forgejo
+  did not act, so a message the decoder does not know is `Refused` on a
+  write, never a guess at which failure it was; on a read,
+  `InvalidAnswer`.
 - **Not errors:** a `409` on `CreateBranch` is `Branch(Exists)`, which
   the client follows with a read of the branch; a `404` on
   `DeleteBranch` is `Missing`, which the client counts as the branch
-  gone (`domain/forge.md`, section 6). Forgejo answers the
+  gone (`../domain/forge.md`, section 6). Forgejo answers the
   deletion of a branch that is not there `500` with an empty body (13):
   a `Timeout`, after which the client's find reads the branch, and that
   read's `404` is `Missing`, the branch gone.
@@ -509,11 +508,10 @@ Mechanism only, bounded, and rebuilt by asking again:
   table is full, the row used longest ago goes.
 - **Users:** a table of logins by user id, filled from every user object
   an answer carries (`user`, a status's `creator` when it is not `null`,
-  `requested_reviewers`, a
-  collaborators' listing); an id the table does not hold is looked up
-  with `GET /api/v1/users/search?uid=<id>&limit=1`, counted in the call,
-  and a user not found fails the call as `Missing`. At most `users`
-  rows; when full, the entry used longest ago goes.
+  `requested_reviewers`, a collaborators' listing); an id the table does
+  not hold is looked up with `GET /api/v1/users/search?uid=<id>&limit=1`,
+  counted in the call, and a user not found fails the call as `Missing`.
+  At most `users` rows; when full, the entry used longest ago goes.
 - **Each forge's page cap,** from its start.
 - **The API tokens,** one per forge, read at start from the files
   configuration names, held in the component's own table, never logged,
@@ -526,8 +524,8 @@ request, and a restarted engine starts with none.
 
 What the engine writes inside what it creates: keys' markers, and
 nothing else. No record, outcome or page of the engine's is written into
-the forge, and labels are for display only, which no call writes
-(`domain/forge.md`, section 17).
+the forge, and no call of 3.2 writes a label: labels are for display
+only, and no decision reads one (`../domain/forge.md`, section 4).
 
 - **A creation's key,** at the head of an issue's body, a comment or a
   review: `<!-- temper:key <the key in lowercase hexadecimal> -->` and a
@@ -538,7 +536,7 @@ the forge, and labels are for display only, which no call writes
   the root derives from the deployment's id, then the effect's identity
   (its purpose and its numbers). So the marker carries the deployment's
   id, and deployments that share a repository tell their creations
-  apart (`domain/forge.md`, section 17). The key's first byte is its
+  apart (jig's `domain/connectors.md`, 4.4). The key's first byte is its
   version; the marker has none of its own.
 - **Decoded** from a body whose first bytes are `<!-- temper:key `, then
   an even count of lowercase hexadecimal digits, then ` -->` and a line
@@ -557,16 +555,17 @@ the forge, and labels are for display only, which no call writes
 ## 5. Webhooks
 
 Forgejo's deliveries, made hints: they cut polling's latency, and decide
-nothing. Polling stands as it is (section 6; `domain/forge.md`, 5.2) and
-finds whatever a delivery lost, refused or never sent told of. A
-delivery reaches the engine on loopback; a forge on another host polls
-alone until skein's TLS server side (setup.md, section 15).
+nothing. Polling stands as it is with no webhook (section 6;
+`../domain/forge.md`, 5.2): its `poll`, `poll_max`, `hinted` and `slow`
+are unchanged, and it finds whatever a delivery lost, refused or never
+sent told of. A delivery reaches the engine on loopback; a forge on
+another host polls alone (setup.md, section 15).
 
 - **The webhooks' listener,** `application.webhooks`, `{"listener":
   address}` (configuration.md, section 3): a socket address on loopback
   (in `127.0.0.0/8`, or `::1`), plaintext HTTP on skein's HTTP server, a
   listener of the forge component's own, apart from the clients'
-  listener (client.md, section 8). It takes `POST` on one path per
+  listener (`../client.md`, section 8). It takes `POST` on one path per
   forge, `/hooks/<number>`, the forge's `number`, one request at a time
   per connection, kept alive.
 - **Each forge's secret,** its `webhook_secret`: a member of its
@@ -583,8 +582,9 @@ alone until skein's TLS server side (setup.md, section 15).
   decodes the body at the same time into the few fields its hint reads;
   nothing of it is believed until the whole body is read and the
   signature holds, compared with `sha256::equal`, in constant time
-  (skein's `lib.md`, 6.2). A delivery with no signature or a wrong one
-  is answered `403` and dropped.
+  (skein's `lib.md`, 6.2). A delivery with no signature is answered
+  `403` from its head, its body unread; one with a wrong signature,
+  `403` once its body is read; either is dropped.
 - **Answered first.** Once the body is read and verified, the response
   (`204`) is queued, and only then does the hint go up. The engine never
   makes Forgejo wait on its work. skein's HTTP server lets the component
@@ -604,41 +604,35 @@ alone until skein's TLS server side (setup.md, section 15).
   | `pull_request`, `pull_request_assign`, `pull_request_label`, `pull_request_milestone`, `pull_request_sync`, `pull_request_review_request` | `pull_request` | `Change::Item(number)`, with no key: a pull request's key is its branches (3.2) |
   | `issue_comment`, `pull_request_comment` | `issue_comment` | `Change::Item(number)`, with the key of the comment's body |
   | `pull_request_review_approved`, `pull_request_review_rejected`, `pull_request_review_comment` | `pull_request_approved`, `pull_request_rejected`, `pull_request_comment` | `Change::Item(number)`, with the key of the review's body |
-  | `push` | `push` | of a branch, `Change::BranchMoved { branch, head, actor }`, the commit it moved to and the pusher's id; of a branch deleted, `Change::Branch(branch)` |
+  | `push` | `push` | of a branch, `Change::BranchMoved { branch, head, actor }`, the commit it moved to and the pusher's id; of a branch deleted (its `after` all zeros), `Change::Branch(branch)` |
   | `create`, `delete` | `create`, `delete` | of a branch, `Change::Branch(branch)` |
   | a job's ends: `workflow_job_success`, `workflow_job_failure`, `workflow_job_cancelled`, `workflow_job_skipped` | the same | `Change::Commit(commit)`, the run's `commit_sha` |
   | none | anything else; a tag's `push`, `create` or `delete` | nothing |
 
-  The names a hook's events take, the headers each arrives under and
-  the fields each hint reads are Forgejo's sources', recorded on the
-  pinned release by the conformance tool (section 13); where it records
-  otherwise, the table follows it. An event the tool records no
-  delivery of stays as the sources name it, its fields those of the
-  events whose payload it shares, and the tool names it unrecorded: a
-  hint only brings a read sooner (`domain/forge.md`, 5.2), so a row
-  that is wrong costs a poll's wait.
+  Each row's events, its header and the fields its hint reads are
+  recorded on the pinned release (section 13). A row that went wrong
+  would cost a poll's wait, never a decision: a hint only brings a read
+  sooner (`../domain/forge.md`, 5.2).
 
   **Who caused it** is what lets the domain drop its own writes' echoes:
-  a creation's key for an item, the pusher for a push (`domain/forge.md`,
-  5.2). A job's delivery carries `job` (its `id`, `run_id`, `attempt`
-  and `status`) and `run`, whose `repository`, `trigger_user.id` and
-  `commit_sha` stand for the top-level repository and sender it does not
-  have. A hint for a repository the deployment has not adopted goes up
-  all the same; the domain drops it.
+  a creation's key for an item, the pusher for a push
+  (`../domain/forge.md`, 5.2). A job's delivery has no top-level
+  repository or sender: its `run.repository.id` and `run.commit_sha`
+  stand for them, and its hint names the commit and no actor. A hint
+  for a repository the deployment has not adopted goes up all the same;
+  the domain drops it.
 - **CI is hinted as each job ends.** A job's delivery is sent for each
   of its attempts, so a job run again is hinted again when it ends. The
   run's deliveries (`workflow_run_*`), sent once its last job ends, and
   the deprecated `action_run_*` are not subscribed.
-- **What has no delivery** is found by polling alone (`domain/forge.md`,
-  5.2): a commit status, which Forgejo never delivers, so CI that a
-  system other than Actions reports and the verdicts temper posts.
-- **What Forgejo settles after it delivers,** which section 13 records
-  (whether a job's commit status is written before its delivery; whether
-  a pull request's mergeability is settled when the push that moved its
-  head or base is delivered), is read again at `hinted`, doubling,
-  within `settle` of the move, and a pull request that reads
-  not mergeable within it is never taken as conflicted
-  (`domain/forge.md`, 5.2).
+- **What has no delivery** is found by polling alone
+  (`../domain/forge.md`, 5.2): a commit status, which Forgejo never
+  delivers, so CI that a system other than Actions reports and the
+  verdicts temper posts.
+- **What Forgejo settles after it delivers** (a pull request's
+  mergeability, a job's commit status: section 13) is the domain's to
+  read again, within `settle` of the move (`../domain/forge.md`, 5.2);
+  the component hints at once.
 - **Bounded.** Connections (`hooks`), the head (`hook_head_bytes`) and
   the body (`hook_body_bytes`) are capped, and each request is read
   within `hook_deadline` (section 7). A body whose length passes its cap
@@ -656,19 +650,11 @@ alone until skein's TLS server side (setup.md, section 15).
   signature, or never sent is found by polling. A hint that arrives
   before the engine's domain is ready is dropped, and the keep's first
   listing finds what it told of.
-- **Polling is unchanged.** The keep's `poll`, `poll_max`, `hinted` and
-  `slow` are what they are with no webhook: a hint brings a read sooner,
-  and nothing waits on one (`domain/forge.md`, 5.2).
-- **Hooks are set up by reconcile, or by the person.** For a managed or
-  owned forge, reconcile makes one org hook per org of its setup, its
-  URL the listener's path for the forge
-  (`http://<listener>/hooks/<number>`), with the forge's secret, the
-  events above, JSON and active, and patches it at every start (setup.md,
-  section 5, step 6); an owned Forgejo's settings allow the listener
-  (setup.md, 6.2). For a connected forge, the person makes each org's or
-  repository's hook the same way, and lets Forgejo's `[webhook]
-  ALLOWED_HOST_LIST` reach the listener (setup.md, section 4). A
-  repository with no hook polls (`domain/forge.md`, section 4).
+- **Hooks are set up by reconcile, or by the person,** at
+  `http://<listener>/hooks/<number>`, with the forge's secret, the
+  events above, JSON and active (setup.md, sections 4 and 5, step 6, and
+  section 10). A repository with no hook polls (`../domain/forge.md`,
+  section 4).
 
 ## 6. The load rules, and where each is kept
 
@@ -676,7 +662,7 @@ alone until skein's TLS server side (setup.md, section 15).
 |---|---|
 | No listing without a filter on a periodic path; no history | the domain's one keep-up listing per repository, always `since` (3.2); the slow pass reads live resources one at a time |
 | Calls per pass do not grow with history | one listing per pass, nothing listed by label; checked by the cost checks (10) |
-| Cache by change token | comments and reviews by revision (3.3); repositories' paths and users cached (3.5); a pull request read on a backoff (`domain/forge.md`, 5.2) |
+| Cache by change token | comments and reviews by revision (3.3); repositories' paths and users cached (3.5); a pull request read on a backoff (`../domain/forge.md`, 5.2) |
 | One path to CI; never a closed pull request's | statuses of the head only (3.2); a closed item leaves the working set |
 | API only; `page` and `limit` always; the forge's cap | 3.1 |
 | Contents only when a decision reads them | a pull request's files and a comparison, read for a brief or an overlap, each file's reads charged (3.2) |
@@ -686,7 +672,7 @@ alone until skein's TLS server side (setup.md, section 15).
 | Slow cadences; webhooks for latency, polling for liveness | the domain's `poll`, `hinted` and `slow`, unchanged by webhooks; a forge with no hook, or on another host, polls alone |
 
 Nothing the engine writes changes often: it writes the forge only to
-make an effect (`domain/forge.md`, section 6), never as a heartbeat.
+make an effect (`../domain/forge.md`, section 6), never as a heartbeat.
 
 ## 7. Entities, limits and the worst case
 
@@ -728,6 +714,9 @@ configuration.md, section 7; their values in `temper-service`'s profile
   domain keeps is read;
 - `body_bytes`: the largest body kept whole; at least the client's
   `op_bytes` with a marker (section 4);
+- `inner`: the most elements kept of a list inside one document (a pull
+  request's reviewers, a rule's contexts); `target_bytes`: the longest
+  request target, its path and query;
 - `repositories`: the paths' table, at most the forge's `repositories`;
   `users`: the logins' table;
 - `deadline`: a call's, at most the client's `lifetime`, and each of a
@@ -745,8 +734,8 @@ configuration.md, section 7; their values in `temper-service`'s profile
   connection's accept or its last answer; `hook_secret_bytes`, the
   largest webhook secret.
 
-**Checked at start,** with every limit of temper's and jig's
-(configuration.md, section 7): `connections` equals the client's `calls`;
+**Checked at start** (configuration.md, section 7), with every limit of
+temper's and jig's: `connections` equals the client's `calls`;
 `deadline` is at most the client's `lifetime`; `body_bytes` holds the
 largest body temper writes; and, for each listing, at least one of its
 largest rows fits the client's `answer_bytes`, so no page size is 0.
@@ -800,7 +789,7 @@ cost.
 | Settings | `GET /settings/api`: Ready; a `4xx` but `429`: Stopped; unreachable, `429`, `5xx`, malformed: Waiting |
 | Waiting | the backoff: Checking |
 | Ready | serves calls |
-| Stopped | the engine ends, exit status 1, naming the forge (protocol.md, section 6) |
+| Stopped | the engine ends, exit status 1, naming the forge (README.md, section 6) |
 
 **Ending:** the routing closes the component after the root's drain
 (jig's `protocol/service.md`, section 5); calls in flight end with their
@@ -810,8 +799,8 @@ connections, and no answer goes up once the root has stopped.
 
 | State | Holds | Demand | Deadline | On |
 |---|---|---|---|---|
-| Head | the head so far | a scan for the head's end | `hook_deadline` | a `POST` to the path of a forge with a secret, its length within `hook_body_bytes`: Body; its length past it: `413`, Closing; a path of no such forge: `404`, Closing; another method on a forge's path: `405`, Closing; any other head: answered `4xx`, Closing; past the deadline: Closing, with no answer |
-| Body | the HMAC state, the fields decoded | the body, as the decoder demands | `hook_deadline` | read and verified: Answering; the signature missing or wrong: `403`, Closing; a verified body that does not decode: `400`, Closing |
+| Head | the head so far | a scan for the head's end | `hook_deadline` | a signed `POST` to the path of a forge with a secret, its length within `hook_body_bytes`: Body; its length past it: `413`, Closing; a path of no such forge: `404`, Closing; another method on a forge's path: `405`, Closing; no signature: `403`, Closing; any other head: answered `4xx`, Closing; past the deadline: Closing, with no answer |
+| Body | the HMAC state, the fields decoded | the body, as the decoder demands | `hook_deadline` | read and verified: Answering; the signature wrong: `403`, Closing; a verified body that does not decode: `400`, Closing |
 | Answering | the hint, or none | room | `hook_deadline` | `204` queued: the hint offered up, and held while the root has no room (section 2); then Head (kept alive) or Closing |
 | Closing | nothing | none | io's close deadline | closed |
 
@@ -821,7 +810,7 @@ finds what it told of (section 5).
 
 ## 9. The fake forge's protocol layer
 
-The fake forge is a service (testing.md, 4.2): its domain,
+The fake forge is a service (`../testing.md`, 4.2): its domain,
 `testing/temper-fake-forge-domain`, is the one the forge connector's
 world drives, and its protocol layer, `testing/temper-fake-forge-protocol`,
 serves Forgejo's API over it, on skein's HTTP server, from the server
@@ -833,16 +822,16 @@ side of `temper-forge-forgejo`.
   `/api/v1/users/search`. Each request is decoded, translated to the
   fake's `Read` or `Write` (as the forge connector world's translation
   does, `tests/engine/forge/client/src/translate.rs`), and its answer
-  encoded as Forgejo encodes it. Where a route needs what the fake's
-  vocabulary does not read, the fake's domain grows that read: Actions'
-  runs, for `Read::Checks` and `Read::Job` (3.2), as a commit's run by
-  its number (`actions/runs?head_sha&run_number`), a run by its id
+  encoded as Forgejo encodes it. The fake's domain has the reads these
+  routes need beyond the forge client's vocabulary: Actions' runs, for
+  `Read::Checks` and `Read::Job` (3.2), as a commit's run by its number
+  (`actions/runs?head_sha&run_number`), a run by its id
   (`actions/runs/{id}`) and a run's jobs (`actions/runs/{id}/jobs`), each
   job with its id and attempt, and a job by its id (`actions/jobs/{id}`)
   with its steps, its log read by attempt and step
   (`actions/jobs/{id}/logs?attempt&step`) with byte ranges, a suffix
-  range among them; the oldest pull request for a head and
-  base, open or not, and the open pull requests, oldest first, for
+  range among them; the oldest pull request for a head and base, open or
+  not, and the open pull requests, oldest first, for
   `Read::PullFor`'s requests (3.2); and the fake's CI statuses link their
   jobs in Forgejo's shape, relative to the origin, `<the path of
   html_url>/actions/runs/<run number>/jobs/<job index>`, with no
@@ -868,11 +857,11 @@ side of `temper-forge-forgejo`.
   reads it not mergeable until it ends, and is delivered while it runs,
   the order Forgejo sometimes takes (section 13). A client that leans on
   Forgejo being better than it is fails in the fake first.
-- **Faults move down** (testing.md, 4.2): a call refused for the rate is
-  a `429` with `Retry-After`; one failed before it is made is a refused
-  connect or a reset before the request is read; one made and then timed
-  out is a `5xx` or a dropped connection after the request was read; a
-  late answer is a slow one.
+- **Faults move down** (`../testing.md`, 4.2): a call refused for the
+  rate is a `429` with `Retry-After`; one failed before it is made is a
+  refused connect or a reset before the request is read; one made and
+  then timed out is a `5xx` or a dropped connection after the request
+  was read; a late answer is a slow one.
 - **Requests are counted,** by route, by user and in total, in the
   fake's tally, so a world can hold the engine's load to its ceilings
   (section 10).
@@ -885,30 +874,25 @@ side of `temper-forge-forgejo`.
   the world writes it on a connection to the listener. A status of the
   fake's CI is delivered as its job's end; a status anyone else
   reports sends nothing, as on Forgejo.
-- **The setup's routes** (setup.md, sections 11 and 13.2), for
-  reconcile's world: admin users and their tokens, orgs, teams and their
-  members, and org hooks, from the server side of
-  `temper-forge-forgejo`'s setup documents. What they keep is the fake's
-  protocol layer's, a store beside its routes, not its domain's, whose
-  state is per repository.
-- **No git over HTTP.** The engine's protocol layer never speaks git. In
-  the one-process world a run's git is the fake git program
-  (`testing/temper-fake-git`, git.md, section 9), over the fake checkout
-  and the fake forge's typed transport; in the process tier it is real
-  git against the throwaway Forgejo (testing.md, 2.6).
+- **The setup's routes,** for reconcile's world, from the server side of
+  `temper-forge-forgejo`'s setup documents, kept in a store of the
+  protocol layer's beside its routes, not in its domain's (setup.md,
+  sections 11 and 13.2).
+- **No git over HTTP:** the fake forge's git is reached through its
+  typed transport alone (`../testing.md`, 4.2 and 4.3).
 
 ## 10. Testing
 
-The tiers below the domain (testing.md, section 2), each within the
-suites' budgets:
+The tiers, the fakes and the layout are `../testing.md`'s (sections 2,
+4.2 and 7). The forge's own:
 
-- **Step tests** for `temper-forge-forgejo`: each decoder against
-  transcripts of a throwaway Forgejo v17.0 (each answer section 3.2
-  reads, each error section 3.4 names, and each delivery section 5
-  hints), against answers generated from the seed, and against
-  mutations of both; golden bytes for each encoder; bounds at their limit
-  and one past; a fuzz target for each decoder. Server encoders meet the
-  client decoders, and the client encoders meet the server decoders.
+- **Step tests** for `temper-forge-forgejo`: each decoder against the
+  conformance's transcripts (each answer section 3.2 reads, each error
+  section 3.4 names, and each delivery section 5 hints), against answers
+  generated from the seed, and against mutations of both; golden bytes
+  for each encoder; bounds at their limit and one past; a fuzz target
+  for each decoder. Server encoders meet the client decoders, and the
+  client encoders meet the server decoders.
 - **Transcripts are format-faithful, content-irrelevant.** Ids, times,
   counts and text vary; keys, nesting, types and status lines must
   match. Volatile fields are masked before comparing; tokens and secrets
@@ -917,24 +901,28 @@ suites' budgets:
   against canned answers; the marker's encoder and decoder; the page
   size; names percent-encoded; times both ways; the failures of 3.4.
 - **The machine world,** in `tests/engine/protocol-forge`'s crate beside
-  the protocol world (testing.md, section 7): the forge component against
-  a scripted HTTP peer, over in-memory streams: every state of section
-  8's machines, faults at every byte, deadlines, a wrong user or another
-  `4xx` stopping the start, a path dropped on `404` or a redirect and
-  resolved again, a body past `body_bytes`. And the webhooks' listener
-  against scripted deliveries: a good delivery hinted, its `204` queued
-  before its hint goes up; a bad signature `403`; an oversize body `413`;
+  the protocol world: the forge component against a scripted HTTP peer,
+  over in-memory streams: every state of section 8's machines, faults
+  at every byte, deadlines, a wrong user or another `4xx` stopping the
+  start, a path dropped on `404` or a redirect and resolved again, a
+  body past `body_bytes`. And the webhooks' listener against scripted
+  deliveries: a good delivery hinted, its `204` queued before its hint
+  goes up; a missing or a bad signature `403`; an oversize body `413`;
   an unknown event `204` and nothing hinted; a forge with no secret
   `404`; a hint held while the root has no room; faults at every byte.
 - **The protocol world,** `tests/engine/protocol-forge`: the engine's
   forge component and the fake forge's protocol layer, joined by
   in-memory streams cut at random, running the forge connector world's
-  stories (`tests/engine/forge`, `domain/forge.md`, section 18) through
-  bytes: what the engine's domain asked is what the fake's domain did.
-  The fake's deliveries reach the engine's listener signed, late, out of
-  order or never, so its stories run with hints and without them.
-  A focused test of it aims at 0.5 s at most; missed, it is made
-  cheaper or moved to the fuzzy suite, never merged with another.
+  stories (`tests/engine/forge`, `../domain/forge.md`, section 18)
+  through bytes: a change produced, opened, checked, queued and landed;
+  a creation and a merge whose answers were lost, found after a restart
+  and never made twice; a failed head repaired and checked again; a held
+  branch moved by another hand, reported as drift. Its invariants: what
+  the engine's domain asked is what the fake's domain did; each call is
+  answered once, however its streams are cut; the API token reaches no
+  record, request or fact. The fake's deliveries reach the engine's
+  listener signed, late, out of order or never, so its stories run with
+  hints and without them.
 - **The cost checks,** in the forge connector's world counting
   `Request::Forge`, and in the protocol world counting HTTP requests:
   - **idle:** over a span with no change on the forge, the calls made are
@@ -950,261 +938,204 @@ suites' budgets:
     equal the sum of the costs the answers reported, the forges' starts'
     reads aside.
 - **The real Forgejo check,** outside the two suites:
-  `tools/forgejo-conformance` against a throwaway Forgejo v17.0 (SQLite
-  in a scratch directory, loopback, a small `MAX_RESPONSE_ITEMS` so
-  paging shows, webhooks allowed to loopback; the tool makes its admin
-  user and tokens; never an existing Forgejo). Its binary is the one
-  `TEMPER_FORGEJO` names, as the process tier's is (testing.md, 2.6): the
-  tool names no path of its own, refuses to run without the variable,
-  and refuses a binary whose `--version` is not the pinned release,
-  naming it; it records the binary's digest with what it captured. The
-  pin is one patch release of v17.0, a constant the throwaway Forgejo and
-  the tool share; moving it to a later patch is a change of that constant
-  and of the transcripts and facts the tool records, with no change to
-  this document. It drives the facts
-  of section 13 through plain requests and the forge component, says
-  which hold, and records what it sent and received as transcripts,
-  masked. Actions facts need a runner: `forgejo-runner` v13.2, the
-  program `TEMPER_FORGEJO_RUNNER` names, pinned as Forgejo is and refused
-  at another version, registered with the throwaway instance alone;
-  without it the tool reports those facts unchecked.
-- **The process tier** (testing.md, 2.6): the real binary against an
-  owned Forgejo (setup.md, 13.4), a repository adopted and a change
-  landed, the forge component's start, polling and webhooks among what
-  it runs.
-
-## 11. Room for GitHub, and for recording
-
-**GitHub** comes later. Nothing here assumes Forgejo above
-`temper-forge-forgejo` and the call plans of section 3.2:
-
-- **A provider is a crate of documents and a set of call plans.** The
-  forge client asks for an item, a page of what changed, CI on a commit;
-  GitHub's plans answer from its REST or GraphQL API, a call made of
-  whatever requests that takes, its cost reported as Forgejo's is.
-- **Conditional requests,** which GitHub does not count against its rate
-  when nothing changed, fit as validators the domain carries without
-  reading: an answer brings an opaque validator, a later call names it,
-  and the answer can be `Unchanged`. The client grows that pair when
-  GitHub is built; until then nothing names one.
-- **Batched reads** (a pull request, its CI and its reviews in one
-  GraphQL query) fit inside one call; several calls in one query would
-  be the component gathering calls that wait, a mechanism it may add.
-- **Checks** are read into the same `Ci` and `Status`es; GitHub's
-  `since` listings fit the same reads.
-- **The rate as it stands:** GitHub reports what is left of its window
-  and when it resets on every answer; an answer would carry it to the
-  client's budget beside its cost (section 12).
-
-**Recording real traffic,** later: each forge connection and webhook
-connection can tee the bytes it sends and receives, at the io boundary,
-to a recorder that masks credentials and volatile fields and writes
-transcripts in the shape the conformance check records (section 10).
+  `tools/forgejo-conformance`, against the throwaway Forgejo
+  (`../testing.md`, 2.6) with a small `MAX_RESPONSE_ITEMS`, so paging
+  shows, and webhooks allowed to loopback; the tool makes its admin user
+  and tokens. It drives section 13's facts through plain requests, a
+  hook made as reconcile makes one, and the forge component itself, each
+  call of 3.2 a fact; it records each fact as `holds`, `fails` or
+  `unchecked` in its `facts.txt`, and what it sent and received as
+  transcripts, masked, with the binary's digest. Actions facts need a
+  runner, the forgejo-runner `TEMPER_FORGEJO_RUNNER` names; without it
+  the tool records them unchecked.
+- **The pin** is one patch release of Forgejo v17.0 and one of
+  forgejo-runner v13.2, constants the throwaway Forgejo, the tool and
+  owned mode share (`VERSION` and `RUNNER_VERSION`,
+  `crates/temper-forge-forgejo/src/pin.rs`; setup.md, 6.1); a binary of
+  another release is refused, naming it. Moving to a later patch changes
+  those constants and the transcripts and facts the tool records, and
+  not this document.
+- **The process tier** runs the forge component's start, polling and
+  webhooks against an owned Forgejo (`../testing.md`, 2.6; setup.md,
+  13.4).
 
 ## 12. What others owe
 
-**The forge client** (`temper_engine_domain_forge_client`,
-`domain/forge.md`, section 4):
+The boundary, the configuration and the setup's hooks are sections 2
+and 5's. The forge client (`temper_engine_domain_forge_client`,
+`../domain/forge.md`, section 4) owes the component:
 
 - **`Read::Locate { owner, name }`,** answered `Answer::Located {
   repository }`, addressed with the forge's number and repository 0
-  (3.2); its answer's shape checked as every other's, and its owner and
-  name counted in the call's bytes.
+  (3.2); its answer's shape checked as every other's, a located id never
+  0, and its owner and name counted in the call's bytes.
 - **Costs,** as the boundary carries them: `Event::Answered { call,
   cost, result }`, `cost` the requests the call wrote, cache fills
-  included, 0 for none; the budget charges it (`domain/forge.md`, 5.4).
+  included, 0 for none; the budget charges it (`../domain/forge.md`,
+  5.4).
 - **Hints,** as the vocabulary has them: `Hint { repository, change, key
   }`, with the pusher on `Change::BranchMoved`, so the domain drops its
   own echoes (section 5).
 - **Shared limits:** the client's `calls`, `rows`, `answer_bytes`,
-  `op_bytes`, `lifetime` and the forge's `repositories` are given to the
-  component too, which sets and checks its own by them (section 7).
+  `op_bytes` and `lifetime`, and the forge's `repositories` and
+  `name_bytes`, are given to the component too, which sets and checks
+  its own by them (section 7).
 
-**The root and the routing** (protocol.md, section 6): `Request::Forge`
-to the component, its answers and hints back as `Event::Forge`; one the
-root cannot take yet held and offered again, and one returned in the
-drain kept and never offered again (section 2).
+## 13. What temper relies on
 
-**Configuration** (configuration.md, section 3): each forge's number,
-kind, API address, transport, API token's file and user, a number or a
-file holding it; its `webhook_secret`'s file, optional; and
-`application.webhooks`, the listener's address on loopback. A
-`webhook_secret` with no `webhooks` refuses the start, naming its path.
+What the component and the forge connector rely on of Forgejo, on the
+pinned release (section 10). Each is named by its fact in
+`tools/forgejo-conformance/facts.txt`, where it `holds`; a fact marked
+*fails* is phrased the other way there, and its failing is what temper
+relies on. What no fact records yet is open (section 14).
 
-**The setup** (setup.md, section 5, step 6): for a managed or owned
-forge, each org's hook at the listener's path for the forge, with its
-secret and section 5's events.
-
-**skein owes,** for webhooks, lib's HMAC-SHA256 and its comparison in
-constant time, `sha256::Hmac` and `sha256::equal` (skein's `lib.md`,
-6.2). Otherwise temper's protocol layer uses skein at its pinned
-revision as it is (protocol.md, section 11).
-
-- skein-http's client tells a request the server never saw from one it
-  may have read (skein's `http.md`, 3.4), which 3.4 needs; its server
-  lets the side above answer when it chooses (skein's `http.md`, 5.4 and
-  5.5), which webhooks need.
-- skein-json keeps a string only whole, within the cap its reader names
-  (skein's `json.md`, 3.1). The component keeps bodies whole within
-  `body_bytes` and carries a longer one empty, its key none, counted
-  (3.3). A string kept to its first bytes while the rest is digested
-  would let it keep a long body's head; that is a question of section
-  14, not a prerequisite.
-
-## 13. Facts checked, and to check
-
-From Forgejo v17.0's API description (its tagged
-`templates/swagger/v1_json.tmpl`) and its sources:
-
-- `/settings/api` answers `max_response_items` and `default_paging_num`.
-- The issue listing takes `state`, `type`, `since`, `before`, `labels`,
-  `created_by`, `page`, `limit` and `sort`, among `relevance`, `latest`,
-  `oldest`, `recentupdate`, `leastupdate`, `mostcomment`, `leastcomment`,
-  `nearduedate` and `farduedate`; it has no `direction`.
-- An issue's comments take `since` and `before` (updated times) and no
-  page; a review's comments take neither; a comparison
-  (`compare/{basehead}`) takes no page and answers `total_commits`,
-  `commits` and `files` (each a `filename` and a `status`); it takes
-  `files` (which files each commit changed) and `verification` (each
-  commit's signature checked), both true by default.
-- A combined status is paged and answers `state`, `statuses` and
-  `total_count`; a status is `pending`, `success`, `error`, `failure`,
-  `warning` or `skipped`.
-- A pull request's files are paged, with `X-HasMore`; a file has
-  `filename`, `previous_filename` and `status`. A pull request has
-  `merge_base`, `merge_commit_sha`, `mergeable` and
-  `requested_reviewers`.
-- A repository is read by id (`/repositories/{id}`), and says its
-  `object_format_name` (`sha1` or `sha256`), its `default_merge_style`
-  and its `allow_*` styles. A branch says its
-  `effective_branch_protection_name`.
-- A merge takes `Do` (`merge`, `rebase`, `rebase-merge`, `squash`,
-  `fast-forward-only`, `manually-merged`) and `head_commit_id`, and
-  answers `200`, `404`, `405`, `409`, `413` or `423`. An update takes
-  `style` (`merge` or `rebase`) and answers `200`, `403`, `404`, `409`,
-  `413` or `422`. Creating a branch takes `new_branch_name` and
-  `old_ref_name`, and answers `409` among its failures.
-- A run's jobs are listed by `actions/runs/{run_id}/jobs`, unpaged, each
-  with its `id`, `run_id` and `attempt`; runs are listed with
-  `head_sha` and `run_number` filters.
-- A job is read by `actions/jobs/{job_id}`: its `id`, `run_id`,
-  `attempt` (its latest), `status`, `runs_on`, and its latest attempt's
-  `steps`, each a `number`, `name` and `status`; number 0 is `Set up
-  job`, the last `Complete job`, and a job no runner took has no steps.
-- A job's plaintext log is read by
-  `actions/jobs/{job_id}/logs?attempt=`, its latest attempt's without
-  it, with `step=` for one step's slice; it is served with byte ranges
-  (Go's `http.ServeContent`: `200`, or `206` for a range, a suffix range
-  included), over the step's slice when one is named. A step past the
-  last, a job never run and a log expired answer `404`. With `q` (`qi`
-  for any case) it answers the lines holding the string, and with
-  `format=ndjson` one `{time, content}` object a line; either answers
-  the whole body, with no ranges.
-- A completed job is run again, with the jobs that need it, by
-  `POST actions/jobs/{job_id}/rerun`, and a completed run by
-  `POST actions/runs/{run_id}/rerun`: `204`, or `400` for one not
-  completed. A run is cancelled, its waiting and running jobs with it,
-  by `POST actions/runs/{run_id}/cancel`: `204`, for a run already
-  finished too, which it leaves unchanged; temper never cancels one.
-- A webhook delivery names its event in `X-Forgejo-Event` and
-  `X-Forgejo-Event-Type`. A job's events are `workflow_job_waiting`,
-  `_blocked`, `_running`, `_success`, `_failure`, `_cancelled` and
-  `_skipped`, chosen per hook; a run's are `workflow_run_` and the same
-  states; `action_run_failure` and `action_run_success` are deprecated.
-  A job's payload is `action`, `job` and `run`, a run's `action` and
-  `run`, with no top-level repository or sender. There is no event for a
-  commit status.
-- `GET /users/search` takes a `uid`; a collaborators' listing answers
-  users only, so each one's permission is a read by login.
-
-Observed on Forgejo v17.0 by `tools/forgejo-conformance` (`facts.txt`
-names each), where the design leans on them:
-
-- With Forgejo's default settings, `max_response_items` is 50 and
-  `default_paging_num` 30.
-- `sort=leastupdate` is honoured, ties ordered by number; `since` is
-  inclusive at the second, and in 2554 answers an empty page with its
-  `Date`. Comments, reviews, a push to a head, closing and reopening
-  move an item's updated time; a comment's edit or deletion, a status
-  and a base's push do not. An unedited comment's and review's updated
-  time equals its creation's, and an edit moves it.
-- The lookup `pulls/{base}/{head}` takes a percent-encoded slash, and
-  names the oldest of several pull requests for a head and base: a
-  closed one before a newer open one (3.2, "A pull request for a head
-  and base").
-- `POST R/pulls` whose head adds nothing to its base answers `201` and
-  opens the pull request; it is not refused (3.2, "Opening compares
-  first").
-- An update refused for a conflict answers `409`, `merge failed because
-  of conflict`; a merge naming an old head answers `409`, `head out of
-  date`; a merge answers `200` with no body; merges refused for a closed
-  pull request, a conflict, a protection or a style answer `405`.
-- A pull request's files page, with `X-HasMore`; a comparison ignores
-  `page` and `limit` and answers everything.
-- Creating a branch at a full commit id answers `201` at that commit.
-  Deleting a branch that is not there answers `500` with an empty body,
-  not `404` (3.4).
-- A branch's `effective_branch_protection_name` is empty for a write
-  collaborator who is not an admin, and names the rule for an admin; a
-  writer's protection reads answer `403` (3.2, `Read::Protection`).
-- A status written by Actions has `creator` `null`, and its
-  `target_url` is relative to the origin:
-  `/fixture/specimen/actions/runs/1/jobs/0` for a repository whose
-  `html_url` is `http://127.0.0.1:3000/fixture/specimen`; the job's
-  index counts from 0, and the link names no attempt (3.2, "Job
-  attempts"). Each job is a status on its head; `run_number` is a run's
-  `index_in_repo`; a run's jobs come in index order; a job's log and a
-  raw file answer a range `206`.
-- A body's line feed after the marker is kept, and bodies of 64 KiB and
-  1 MiB are kept whole; `PATCH issues/{index}` edits a pull request's
-  title and body; `branches/{branch}` takes a percent-encoded slash; a
-  pull request's `base.sha` is its base's tip; a combined status with no
-  status counts 0, and `skipped` with `success` combines as passed; an
-  issue's comments and a pull request's reviews come oldest first; a
-  dismissed review keeps its body; a remark's `position` is its line;
-  opening a pull request that is open answers `409`, an empty title
-  `422`; deleting a protected branch answers `403`; creating a branch
-  that exists answers `409`.
-- A repository the token cannot read answers `404`, by path and by id;
-  a moved repository's old path answers a redirect; an archived
-  repository's write answers `423`. No rate-limit headers are sent.
-
-To check on v17.0 (section 10), each before the component relies on
-it:
-
-- that a job's steps are numbered from 0, `Set up job` first and
-  `Complete job` last; that a failed workflow step is `failure`, and the
-  completion step `failure` with it; that a job waiting for a runner has
-  no steps;
-- that a step's log (`step`) holds that step's lines alone, and that a
-  range over it answers `206`: a suffix range with the slice's last
-  bytes, and a `Content-Range` naming where they start; what a range
-  answers over an empty log; that a step past the last answers `404`;
-- that a comparison sent `files=false` lists no commit's files, and
-  whether it leaves out its own `files` too; that `verification=false`
-  changes nothing the calls keep;
-- by `tools/git-transcripts` (git.md, section 9), for the git
-  component: that git follows Forgejo's redirect for a renamed
-  repository's old path (git.md, section 10), and that a push a
-  protected branch refuses prints a `[remote rejected]` whose reason
-  ends in `declined` (git.md, 4.8);
-- the deliveries of section 5, by a hook made as reconcile makes one:
-  the name a hook's events take for each event of section 5's table, and
-  the `X-Forgejo-Event` and `X-Forgejo-Event-Type` it arrives under; the
-  signature's header and its hexadecimal; the fields each hint reads (a
-  repository's id; an item's number and its body's, its comment's or its
-  review's key; a push's branch, its new head, its deletion and its
-  pusher's id; a creation's or deletion's branch and that it is a
-  branch's; a job's `run.repository.id` and `run.commit_sha`); a job's
-  cancelled end, from cancelling the run of a job no runner takes; that
-  Forgejo delivers the engine's own changes; whether a job's delivery
-  comes after its commit status is written; whether a pull request's
-  mergeability is ever still checked when the push that moved its head
-  or base is delivered (the order varies between recordings, so one
-  read checking is enough), and that it settles within `settle` of the
-  delivery; and that Forgejo answers `mergeable` false while it checks
-  one. The setup's own facts, its command line, admin
-  routes, orgs, teams and org hooks, are setup.md, 13.3's.
+- **Every call of 3.2, made by the component.** Each read and write
+  answers as its row says, its cost the requests it sent, and the keys
+  temper writes are found on reading back; a forge's start is ready, and
+  another user or a wrong token stops it (every `component-` fact: one
+  per call, from `component-read-items` to
+  `component-write-delete-branch`, with
+  `component-read-pull-for-open-after-closed` and
+  `component-write-open-pull-no-changes`; one per start's outcome, from
+  `component-start-ready`; `component-costs-equal-requests-sent`;
+  `component-keys-found-on-read-back`).
+- **Paging.** With Forgejo's default settings, `max_response_items` is
+  50 and `default_paging_num` 30 (`api-default-page-cap-50-and-30`). A
+  pull request's files are paged, with `X-HasMore`
+  (`pull-files-page-with-x-hasmore`); a comparison ignores `page` and
+  `limit` and answers everything (`compare-ignores-page-and-limit`).
+- **The keep-up listing.** `sort=leastupdate` lists the least recently
+  updated first, ties by number
+  (`leastupdate-orders-least-recently-updated-first`,
+  `leastupdate-ties-ordered-by-number`); `since` is inclusive at the
+  second (`since-is-inclusive-at-the-second`), and in 2554 answers an
+  empty page with its `Date`
+  (`since-in-2554-answers-an-empty-page-with-date`). An item's updated
+  time moves on a comment, a review, a push to its head, closing and
+  reopening (`updated-moves-on-comment`, `updated-moves-on-review`,
+  `updated-moves-on-head-push`, `updated-moves-on-close`,
+  `updated-moves-on-reopen`), and stays on a comment's edit or deletion,
+  a status and a push to its base (`updated-stays-on-comment-edit`,
+  `updated-stays-on-comment-delete`, `updated-stays-on-head-status`,
+  `updated-stays-on-base-push`): so a pull request's CI and base are
+  read on a backoff (`../domain/forge.md`, 5.2).
+- **Bodies and their versions.** A marker's line feed is kept
+  (`marker-line-feed-kept`); bodies of 64 KiB and 1 MiB are kept whole
+  (`body-of-65536-bytes-kept-whole`, `body-of-1048576-bytes-kept-whole`).
+  An unedited comment's or review's updated time is its creation's
+  (`unedited-comment-updated-equals-created`,
+  `unedited-review-updated-equals-submitted`), and an edit moves it
+  (`edit-moves-comment-updated`). An issue's comments and a pull
+  request's reviews come oldest first (`comments-come-oldest-first`,
+  `reviews-come-oldest-first`); a dismissed review keeps its body
+  (`dismissed-review-keeps-its-body`); a remark's `position` is its line
+  (`remark-position-is-its-line`).
+- **Pull requests.** `PATCH issues/{index}` edits a pull request's title
+  and body (`patch-issue-edits-a-pull-request`); its `base.sha` is its
+  base's tip (`base-sha-is-the-base-tip`). The lookup
+  `pulls/{base}/{head}` takes a percent-encoded slash
+  (`pull-for-accepts-encoded-slash`) and names the oldest of several
+  pull requests, a closed one before a newer open one
+  (`pull-for-names-the-newest-of-several`, *fails*). Opening one whose
+  head adds nothing to its base answers `201` and opens it
+  (`open-pull-no-changes-is-422`, *fails*); opening one for a head and
+  base that have one open answers `409` (`open-pull-exists-is-409`).
+- **Merges and updates.** A merge answers `200` with no body
+  (`merge-answers-200-with-no-body`); one naming an old head `409`,
+  `head out of date` (`merge-old-head-is-409-head-out-of-date`); one
+  refused for a closed pull request, a conflict, a protection or a style
+  `405` (`merge-closed-is-405`, `merge-conflict-is-405`,
+  `merge-protected-is-405`, `merge-style-is-405`). An update refused for
+  a conflict answers `409`, `merge failed because of conflict`
+  (`update-conflict-is-409-merge-failed`).
+- **Branches.** `branches/{branch}` takes a percent-encoded slash
+  (`branch-path-takes-encoded-slash`). A branch is created at a full
+  commit id (`create-branch-at-full-commit-id`), and creating one that
+  exists answers `409` (`create-branch-exists-is-409`). Deleting a
+  protected branch answers `403` (`delete-protected-branch-is-403`), and
+  deleting one that is not there `500`, with an empty body
+  (`delete-missing-branch-is-404`, *fails*).
+- **Protection.** A write collaborator who is not an admin is refused
+  protection reads, `403` (`writer-protection-reads-are-403`), and reads
+  a branch's `effective_branch_protection_name` empty
+  (`effective-protection-name-for-a-writer`, *fails*), which names the
+  rule for an admin (`effective-protection-name-for-an-admin`): so
+  adoption records protection as unknown, never absent
+  (`../domain/forge.md`, section 4).
+- **CI.** A combined status with no status counts 0
+  (`combined-status-without-status-counts-0`), and `skipped` with
+  `success` combines as passed (`skipped-and-success-combine-as-passed`).
+  Actions report each job as a status on its head
+  (`actions-report-each-job-as-a-status-on-its-head`), linking
+  `<…>/actions/runs/<run number>/jobs/<job index>` and naming no attempt
+  (`actions-status-link-is-runs-n-jobs-i`,
+  `actions-status-link-names-no-attempt`); a run's number is its
+  `index_in_repo` (`run-number-is-index-in-repo`), and its jobs come in
+  index order (`run-jobs-come-in-index-order`).
+- **Jobs and their logs.** A job's steps are numbered from 0, `Set up
+  job` first and `Complete job` last
+  (`job-steps-number-from-0-set-up-first-complete-last`); a failed
+  workflow step is `failure`, and the completion step with it
+  (`failed-workflow-step-and-completion-step-are-failure`). A step's log
+  holds that step's lines alone (`step-log-holds-that-steps-lines-alone`),
+  and a step past the last answers `404` (`step-past-the-last-is-404`).
+  A range answers `206`, over a job's log and over a raw file
+  (`job-log-range-answers-206`, `raw-range-answers-206`); a suffix range
+  over a step's log, its last bytes, with a `Content-Range` naming where
+  they start (`step-log-suffix-range-answers-206-with-its-last-bytes`,
+  `step-log-suffix-content-range-names-its-first-byte`); over an empty
+  log, nothing (`empty-log-suffix-range-answers-206-empty`).
+- **Comparisons.** `files=false` lists no commit's files and leaves the
+  comparison's own `files` empty, and keeps `total_commits` and the
+  commits' ids (`compare-files-false-lists-no-commits-files`,
+  `compare-files-false-keeps-its-own-files-empty`,
+  `compare-files-false-keeps-total-commits-and-shas`);
+  `verification=false` changes nothing the calls keep
+  (`compare-verification-false-changes-nothing-kept`).
+- **Access and errors.** A repository the token cannot read answers
+  `404`, by path and by id (`unreadable-repository-by-path-is-404`,
+  `unreadable-repository-by-id-is-404`); a moved repository's old path
+  answers a redirect (`moved-repository-is-a-redirect`); a write to an
+  archived repository `423` (`archived-write-is-423`); an empty title
+  `422` (`empty-title-is-422`). No rate-limit headers are sent
+  (`no-rate-limit-headers`).
+- **Deliveries.** Each row of section 5's table arrives under its
+  `X-Forgejo-Event` with the fields its hint reads
+  (`delivery-issues-row`, `delivery-pull-requests-row`,
+  `delivery-comments-row`, `delivery-reviews-row`, `delivery-push-row`,
+  `delivery-create-delete-row`, `delivery-job-ends-row`,
+  `delivery-cancelled-job-end-is-delivered`), with its repository's id
+  (`delivery-carries-the-repository-id`); a hook's events read back as
+  made (`delivery-subscribed-events-read-back`); the signature is
+  HMAC-SHA256 in hexadecimal (`delivery-signature-is-hmac-sha256-hex`);
+  refs are full, and a tag's told from a branch's
+  (`delivery-refs-are-full-and-tags-are-told-apart`); a branch's
+  deletion is delivered as a push too
+  (`delivery-branch-deletion-sends-no-push`, *fails*). Forgejo delivers
+  the actor's own writes (`delivery-echoes-the-actors-own-writes`), so
+  the domain drops its echoes; it refuses to deliver to loopback by
+  default, and delivers there when its settings name the address
+  (`delivery-loopback-is-refused-by-default`,
+  `delivery-loopback-is-allowed-when-named`); a failed delivery is not
+  sent again (`delivery-failed-delivery-is-not-sent-again`).
+- **What it settles after it delivers.** A pull request reads `mergeable`
+  false while Forgejo checks it
+  (`delivery-pull-reads-not-mergeable-while-checked`). In the recorded
+  run, a pull request was still being checked when the push that moved
+  its head or base was delivered, and settled within 30 s
+  (`delivery-pull-is-checking-when-its-push-is-delivered`;
+  `delivery-pull-is-settled-when-its-push-is-delivered`, *fails*); a
+  job's commit status was written before its end was delivered
+  (`delivery-job-end-follows-its-commit-status`;
+  `delivery-job-end-precedes-its-commit-status`, *fails*). temper relies
+  on neither order, only on each settling within `settle` of the move,
+  30 s in the profile `small` (`../domain/forge.md`, 5.2).
+- **The setup's, and git's.** What the setup relies on (Forgejo's
+  command line, its admin routes, orgs, teams and org hooks, the runner)
+  is setup.md, 13.3's; what git relies on of Forgejo (a renamed
+  repository's redirect, a protected branch's refusal of a push) is
+  git.md's (section 3 and 4.8), named in
+  `tools/git-transcripts/facts.txt`.
 
 ## 14. Open questions
 
@@ -1231,8 +1162,29 @@ it:
   who edits temper's keyed comment within that second is not heard.
   Default: `Original` when the times are equal.
 - **The merge style:** the repository's `default_merge_style`. A style a
-  project names per repository (`domain/forge.md`, section 4) would need
-  `Write::Merge` to carry it. Default: the repository's.
+  project names per repository (`../domain/forge.md`, section 4) would
+  need `Write::Merge` to carry it. Default: the repository's.
 - **An expired or revoked API token** reads as `Forbidden` on every call
   until the next start, which it stops (3.5). Default: so; the domain
   could tell it apart, so a person is told once.
+- **What no fact records yet,** read from Forgejo's API description and
+  sources alone (section 13):
+  - that an issue's comments and a review's comments take no page and
+    come whole however many there are (3.2, `Item` and `Remarks`);
+  - that a job no runner took has no steps, and that its log, and a log
+    Forgejo no longer keeps, answer `404` (3.2, "A failed job's log");
+  - that the push workflow an update starts runs on exactly the head
+    the update made, so CI is read again there (`../domain/forge.md`,
+    section 10);
+  - that a merge after its pull request's base was changed lands in the
+    new base: the pull request is read afresh before a merge, and one
+    retargeted since the decision is not merged, but nothing makes the
+    merge itself conditional on its base (`../domain/forge.md`, section
+    6).
+- **GitHub,** later: nothing above `temper-forge-forgejo` and the call
+  plans of 3.2 assumes Forgejo, so a provider is a crate of documents
+  and a set of call plans, each call made of whatever requests it takes,
+  its cost reported as Forgejo's is. What its API would add to the
+  forge client's vocabulary is open: validators for conditional
+  requests, which GitHub does not count against its rate; reads batched
+  into one query; the rate's window, reported on every answer.

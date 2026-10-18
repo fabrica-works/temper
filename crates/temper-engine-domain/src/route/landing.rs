@@ -1,6 +1,6 @@
 //! Temper's forge landing policy and connector judge parameters. These values
 //! belong to the application; people carries only authority requirements
-//! (jig's domain/authority.md, sections 6 and 10).
+//! (domain/forge.md, 8.7; jig's domain/authority.md, sections 6 and 10).
 
 use alloc::boxed::Box;
 use core::mem::size_of;

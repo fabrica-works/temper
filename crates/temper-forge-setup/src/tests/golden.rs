@@ -5,7 +5,7 @@ const RUNNER: &[u8] = b"runner:\n  capacity: 1\n  timeout: 3h\n  shutdown_timeou
 #[test]
 fn app_ini_for_an_owned_forge_with_a_runner_matches_the_golden_text() {
     let text = ini::text(&fixtures::owned(), &fixtures::place(), &fixtures::secrets(), None);
-    assert_eq!(text.expose(), APP_INI_WITH_RUNNER, "written by hand from setup.md 6.2");
+    assert_eq!(text.expose(), APP_INI_WITH_RUNNER, "written by hand from protocol/setup.md, 6.2");
 }
 #[test]
 fn app_ini_without_a_runner_turns_actions_off() {

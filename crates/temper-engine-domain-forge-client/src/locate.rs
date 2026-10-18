@@ -1,4 +1,4 @@
-//! Locate's owned names and the forge's nonzero repository id (forge.md, 12).
+//! Locate's owned names and the forge's nonzero repository id (protocol/forge.md, 12).
 use crate::api::Answer;
 
 pub(crate) fn bytes(owner: &[u8], name: &[u8]) -> Option<u64> {

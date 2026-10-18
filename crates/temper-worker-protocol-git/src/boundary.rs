@@ -1,4 +1,4 @@
-//! The git component's boundary (git.md, sections 2 and 7).
+//! The git component's boundary (protocol/git.md, sections 2 and 7).
 use alloc::boxed::Box;
 use skein_io::{self as io, kernel};
 use skein_lib::{Queue, Secret, Time, Token};

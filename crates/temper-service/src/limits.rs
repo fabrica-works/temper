@@ -1,4 +1,4 @@
-//! The small profile and checked field overrides (configuration.md, section 7).
+//! The small profile and checked field overrides (protocol/configuration.md, section 7).
 mod names;
 use skein_lib::Duration;
 use temper_engine_domain as engine;

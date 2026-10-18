@@ -1,5 +1,5 @@
 //! The cache: the workspaces on the worker's disk, keyed by workstream
-//! (worker-domain.md, 5), bounded by count.
+//! (domain/worker.md, 5), bounded by count.
 //!
 //! A workspace is a directory on the disk and the workstream it is for. It is
 //! held by one hold at a time, or idle. A prepare finds its workstream's

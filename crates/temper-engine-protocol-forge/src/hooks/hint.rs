@@ -1,4 +1,4 @@
-//! Verified delivery fields mapped to the forge client's hints (forge.md, 5).
+//! Verified delivery fields mapped to the forge client's hints (protocol/forge.md, 5).
 use crate::marker;
 use skein_lib::bytes;
 use temper_engine_domain_forge_client::api;

@@ -1,4 +1,4 @@
-//! One process, joined through io's workers channel (protocol.md, 8).
+//! One process, joined through io's workers channel (protocol/README.md, 8).
 use crate::{
     AccountsRuntime, End, Stop, Worker, accounts, clients, engine, limits, settings, stop, store, translate, values,
     workers,

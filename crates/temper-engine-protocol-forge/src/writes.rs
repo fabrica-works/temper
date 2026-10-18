@@ -1,4 +1,5 @@
-//! Forge writes, with validation before resolution and no retry (forge.md, 3.2–3.4).
+//! Forge writes, with validation before resolution and no retry
+//! (protocol/forge.md, 3.2–3.4).
 use crate::{
     connection::{Body, Heard},
     failure::{self, Asked, Drop},

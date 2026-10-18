@@ -480,7 +480,7 @@ fn workspace_items_are_sized_context_is_read_only_and_saved_work_starts_the_next
 }
 
 // Each repository's git identity is the configured credential of its forge
-// (credentials.md; brief D10).
+// (protocol/credentials.md; brief D10).
 #[test]
 fn a_workspace_item_names_its_forges_git_identity() {
     let mut d = domain();
@@ -735,8 +735,8 @@ fn branch_at(d: &mut Domain, call: u64, commit: u8) -> Box<[Request]> {
 }
 
 // A lost writer's slot is freed only once its branch is read afresh
-// (connectors.md, 3.3): a read refused for want of room in the client waits,
-// and is asked again once room frees, rather than given up.
+// (jig's domain/tasks.md, 6.3): a read refused for want of room in the
+// client waits, and is asked again once room frees, rather than given up.
 #[test]
 fn a_lost_writers_read_refused_for_room_is_asked_again_when_room_frees() {
     let mut d = four_writers();

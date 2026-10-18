@@ -1,4 +1,4 @@
-//! Private app.ini from setup and the secrets recorded once (setup.md, 6.2).
+//! Private app.ini from setup and the secrets recorded once (protocol/setup.md, 6.2).
 use crate::{check::joined, place::Place, setup::Owned, state::Secrets};
 use alloc::boxed::Box;
 use core::net::{IpAddr, SocketAddr};

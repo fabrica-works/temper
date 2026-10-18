@@ -1,4 +1,4 @@
-//! Fixed sequences, never retries (git.md, section 4).
+//! Fixed sequences, never retries (protocol/git.md, section 4).
 use crate::{
     invocation::{self, Command, Source},
     output::{self, Status},

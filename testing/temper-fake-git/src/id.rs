@@ -1,4 +1,4 @@
-//! The forge's counted ids (forge.md, section 9).
+//! The forge's counted ids (protocol/forge.md, section 9).
 /// Count big-endian, then twelve zero bytes, as forty lowercase hex digits.
 #[must_use]
 pub fn id(count: u64) -> [u8; 40] {

@@ -1,4 +1,4 @@
-//! Limits and counted payloads (git.md, section 8).
+//! Limits and counted payloads (protocol/git.md, section 8).
 use crate::{capped::Capped, operation::Operation, ring::ByteRing};
 use alloc::boxed::Box;
 use skein_io::kernel;
@@ -76,7 +76,8 @@ pub fn worst_case(limits: &Limits, checkout: &checkout::Limits) -> Option<u64> {
     // Forty argument boxes; settings/options/ids have fewer than 1024 bytes,
     // and the longest leased push owns its remote and branch twice.
     let arguments = List::<Box<[u8]>>::worst_case(40)?.checked_add(1024)?.checked_add(name.checked_mul(3)?)?;
-    // channel.md's grant ceiling is 8192 bytes (the pinned jig schema).
+    // The grant ceiling of jig's protocol/channel.md, section 11, is 8192
+    // bytes (the pinned jig schema).
     // Four identity fields, their base64 header and author copies, fixed
     // variable names, and HOME fit this envelope for a filesystem path.
     let environment = List::<Box<[u8]>>::worst_case(14)?.checked_add(32768)?;
