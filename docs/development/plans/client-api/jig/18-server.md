@@ -166,6 +166,27 @@ the session's start.
   `std::env::temp_dir`, not `tempfile`.
 - Files gain `testing/jig-test/src/lib.rs`'s `mod bundle;`.
 
+## The mount's stream end (ruling 327)
+
+- **18.2's Files gain** `crates/jig-protocol-engine-clients-http/src/stream.rs`
+  and `crates/jig-protocol-engine-clients-http/src/tests.rs` (with its
+  `tests/fixtures.rs`). `Call::end` (`stream.rs:67-70`) sends
+  `sse::Request::Finish` whenever a writer exists, and skein's SSE writer
+  refuses it while a record is being written (`writer.rs:248` at skein
+  `0f093bb`, "a Finish while an event is being written"), as it refuses
+  a second Finish and one after the stream failed (:242-250). 18.2 sends
+  the Finish only while `stream.writer.waiting()` is `sse::Waiting::Above`,
+  holds it while it is `Room` and sends it once the writer is idle again,
+  and sends none at `Close` or `Nothing`; the shape is 18.2's, within
+  these Files.
+- **Its regression test** is 18.2's
+  `ending_a_mount_stream_while_its_record_waits_for_room_does_not_panic`,
+  in the mount crate's `tests.rs` where its fixtures reach a `Call`, or
+  else where 18.2 wrote it (`testing/jig-test-service/src/tests/server.rs`).
+  It fails before the repair and passes after it.
+- **Size:** the repair and its test, at most 40 lines together, count
+  apart from 18.2's 250.
+
 ## Increments
 
 ### 18.1 The server's listener in `jig-test`'s own configuration

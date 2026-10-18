@@ -2412,6 +2412,15 @@ choice would have been the user's (development.md, 10.4).
      - One scheduling change, no test changed: in temper's `.config/nextest.toml`, a `[[profile.fuzzy.overrides]]` with `filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"` and `priority = 20`, above the default profile's `kind(test)` priority 10, so that the sweep starts first. It is a commit of its own in 06.2's inbox landing, measured by that landing's gate alone; the report names the fuzzy time before and after. Nothing else is run for it, and no other setting of that file changes.
      - Unchanged: temper's budgets and slow periods; the `SLOW` rule; the measure commands; ruling 122; jig's rules.
 
+327. **The mount's stream end: jig-18.2 repairs it** (plan defect, jig 18's block of 2026-10-18T07:44:07Z).
+     Plan defect: the mount jig 17 landed ends a stream while its record is being written, and 18.2 repairs it, its Files widened to it.
+     - The cause, as jig 18 found it: `Call::end` (`crates/jig-protocol-engine-clients-http/src/stream.rs:67-70`) sends `sse::Request::Finish` whenever a writer exists; skein's SSE writer refuses it in `State::Writing` (`writer.rs:248` at skein `0f093bb`, "a Finish while an event is being written"), as it refuses a second Finish and one after the stream failed (:242-250).
+     - 18.2's Files gain `crates/jig-protocol-engine-clients-http/src/stream.rs` and `src/tests.rs` (with `src/tests/fixtures.rs`). 18.2 sends the Finish only while `stream.writer.waiting()` is `sse::Waiting::Above`, holds it while it is `Room` and sends it once the writer is idle again, and sends none at `Close` or `Nothing`; the shape is 18.2's, within these Files.
+     - Its regression test is 18.2's `ending_a_mount_stream_while_its_record_waits_for_room_does_not_panic`, in the mount crate's `tests.rs` where its fixtures reach a `Call`, or else where 18.2 wrote it. It fails before the repair and passes after it.
+     - Size: the repair and its test, at most 40 lines together, count apart from 18.2's 250; the rest stays within implementer.md's tolerance (322 of 250 is within twice).
+     - No other step changes the mount crate, and no other use of `sse::Request::Finish` is in jig or temper. temper takes the repair with its next repin onto jig's main; no step is added for it.
+     - Unchanged: every referee, judge and expected value; the gate; ruling 229 for any further cause outside these Files.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
