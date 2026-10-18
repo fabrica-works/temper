@@ -3233,6 +3233,21 @@ choice would have been the user's (development.md, 10.4).
 401. **Ruling 401 of client-api** (plan defect, the hourly check of 2026-10-18T22:52Z).
      Ruling 401, kind: plan defect, from the hourly check of 2026-10-18T22:52Z. Done when, item 12's temper half said `git -C ~/src/rust/temper diff c7095516 origin/main -- .config/nextest.toml` prints nothing, but ruling 326 (point 2) added one scheduling override there (`b2fdb71e7`): `[[profile.fuzzy.overrides]]`, `filter = "test(=fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure)"`, `priority = 20`. It raises no budget or period. The item now says the diff prints only that override (Landed). The command is unchanged; the jig half is unchanged.
 
+402. **the test-time aims missed at the run's end** (the Done when's record, item 11, 2026-10-18T23:16Z).
+     Ruling 402, kind: the run's record, for the user (Done when, item 11). The test-time aims are missed at the run's end; every suite is under its budget, and the run is done (item 11: "the run is done either way").
+
+     1. **The medians** of three runs at `origin/main` (`heavy --gate`, alone; logs `20261018T230836-732.log`, jig, and `20261018T231233-732.log`, temper):
+        - jig focused 14.283 s (14.443, 14.283, 14.249; 4270 tests) against the aim of 13.3 s and the budget of 30 s (ruling 275);
+        - jig fuzzy 26.789 s (26.692, 26.926, 26.789; 111 tests) against 24.91 s, budget 60 s;
+        - temper focused 6.476 s (6.557, 6.476, 6.380; 1879 tests) against 6.0 s, budget 15 s;
+        - temper fuzzy 23.885 s (24.137, 23.885, 23.803; 50 tests) against 19.36 s, budget 60 s.
+     2. **The three slowest tests of each suite**, from the last landing gates (their per-test times, under the gate's load; the Done when's command keeps only `Summary`): jig's gate `20261018T222526-732.log` (jig-22.s1), temper's `20261018T224544-734.log` (temper-repin).
+        - jig focused: `jig-client-protocol-world::protocol actual_busy_not_ready_restart_and_dropped_watch_retry_the_same_request` 0.888 s, `words_to_a_stopped_task_release_it_in_one_compound_request` 0.884 s, `signed_out_with_requests_pending_then_signed_in_again` 0.878 s (0.321, 0.317 and 0.308 s alone, ruling 400);
+        - jig fuzzy: `jig-client-protocol-world::fuzzy_protocol random_people_over_bytes_keep_the_referee_s_rules` 13.703 s (4.968 s alone), `jig-conformance-world::fuzzy_scenarios every_shared_story_survives_every_commit_and_seeded_random_cuts` 9.697 s (3.298 s alone), `jig-ops-world::fuzzy_joint p_story_survives_seeded_commit_crashes_and_random_presses` 8.403 s (4.079 s alone);
+        - temper focused: `temper-one-process-world::one_process an_adopted_repository_gets_its_change_pushed_through_git` 3.171 s (0.947 s alone, ruling 378), `temper-engine-domain-world::escalation held_and_decision_commit_cuts_restore_paged_real_children_and_exact_scripts` 1.677 s, `temper-engine-domain-world::walking terminal_restart_replays_complete_state_with_delayed_store_and_page_terminals` 0.925 s;
+        - temper fuzzy: `temper-engine-domain-world::fuzzy_walking fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure` 24.690 s (ruling 122's excepted sweep, the suite's whole time), `temper-conformance-world::fuzzy_shared a_changed_judge_is_crashed_at_every_commit` 9.112 s, `temper-conformance-world::fuzzy_stories a_ci_repair_is_crashed_at_every_commit` 8.599 s.
+     3. **For the user and the retrospective:** temper's fuzzy median is its walking sweep alone, which ruling 122 keeps unrepaired; jig's focused budget goes back to 15 s in the pass after the run (ruling 275), and the 14.283 s median is under it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
