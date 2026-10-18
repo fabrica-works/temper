@@ -49,7 +49,7 @@ pub(crate) const MOVING_USER: u64 = 2;
 pub(crate) const AUTHORITY_DEPTH: u32 = 3;
 pub(crate) const CHARTER_TURNS: u32 = 8;
 pub(crate) const IMPLICATIONS: [u16; 2] = [1, 2];
-pub(crate) const ENGINE_OVERRIDES: [(&str, u32); 18] = [
+pub(crate) const ENGINE_OVERRIDES: [(&str, u32); 20] = [
     ("tasks.tasks", 4),
     ("tasks.project_tasks", 4),
     ("tasks.tree_tasks", 4),
@@ -60,6 +60,8 @@ pub(crate) const ENGINE_OVERRIDES: [(&str, u32); 18] = [
     ("brief.sections", 8),
     ("brief.brief_bytes", 4096),
     ("tasks.result_bytes", 128),
+    ("tasks.resource_reports", 4),
+    ("tasks.pools", 2),
     ("tasks.parameters", 4),
     ("tasks.executor_kinds", 2),
     ("tasks.authority_grants", 4),
