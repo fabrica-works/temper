@@ -188,10 +188,11 @@ on the real kernel in the focused suite, within its existing budget.
 
 Most behavioural cases remain in the domain and system worlds. This
 tier keeps a few stories of transport, persistence and lifecycle, within
-6.1's budgets. The process tier retains executable startup, CLI parsing,
-directory-lock contention, exit statuses, OS process launch and signal
-handling, and the owned Forgejo and runner. Production containment
-still waits for skein's contained process trees (section 6).
+6.1's budgets. `temper ctl`'s lock and DIRECTORY's files run here
+(tools.md, 11.3). The process tier retains executable startup, CLI
+parsing, exit statuses, OS process launch and signal handling, and the
+owned Forgejo and runner. Production containment still waits for
+skein's contained process trees (section 6).
 
 ### 2.5 The one-process world
 

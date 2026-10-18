@@ -629,6 +629,14 @@ forge's content marker and its webhooks delivered to the engine
 (`testing.md`, 2.4). Real git waits for the real-git bridge (`testing.md`,
 section 10).
 
+Each call of `temper ctl` in these stories is its host,
+`temper-client-shell-cli`'s, hosted as a program of the real world, one
+per call, on its DIRECTORY: the lock, DIRECTORY's files and the call's
+exit run on the real kernel. Two acts at once on one DIRECTORY are
+serialized by the lock: skein's `Lock` is `flock`, held per open
+descriptor (skein's `kernel.md`), so two programs of one process contend
+as two processes do.
+
 These are a small set of focused tests at the gate. They reuse lower
 worlds' scripts and outside expectations where applicable, and add
 checks of the full transport, persistence and teardown on the real
@@ -640,17 +648,13 @@ where possible; its seed does not replay the kernel's schedule.
 ### 11.4 The process tier
 
 `temper serve` and `temper ctl` as processes over skein's fake LLM peer
-(`testing.md`, 2.6), on a scratch directory of their own: sign-in by the
-printed link; a repository adopted; a chat asked for a change and waited
-for to its end; a wait answered by another process's act; an act cut by
-a termination signal, then asked again under its key, made once; the
-exit statuses; two acts at once on one DIRECTORY, serialized by the
-lock.
-
-The executable boundary is checked here: argv through `main`, printed
-output, exit statuses, the directory's lock, OS signals and agent
-process launch. The owned Forgejo and runner prove the change against
-real git and CI (`testing.md`, 2.6).
+(`testing.md`, 2.6), on a scratch directory of their own, for what
+needs the executable: argv through `main`, printed output, the OS's
+exit statuses, the printed link read on stdin (`sign-in -`), an act cut
+by a termination signal then asked again under its key, made once, and
+agent process launch. One landing on the owned Forgejo proves a change
+against real git and CI (`testing.md`, 2.6). The lock, DIRECTORY's files
+and a call's exit are the real loop's (11.3).
 
 ### 11.5 The agents' guide
 
