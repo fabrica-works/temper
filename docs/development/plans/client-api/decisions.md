@@ -2427,6 +2427,14 @@ choice would have been the user's (development.md, 10.4).
 329. **jig-19's Shapes against main** (ready check of jig-19.1).
      The ready check of jig-19 (skein 0be1255e7, jig 7d3becac7, temper 9ea74ad40; jig's whole gate and the new wasm32 clippy passed with its correction; the browser tier, Chromium and the bundle were not run, jig-18.2 and 18.3 not landed) found its file off main, corrected in `jig/19-browser.md`, "Corrections after the ready check": an `expect` unfulfilled on wasm32 takes `cfg_attr(target_pointer_width = "64", ..)` in 19.1's Files; `workflow.md` section 1 and the header comments of `scripts/check.sh` and `.config/nextest.toml` follow the gate and its third suite; 19.2 registers its test module and keeps to its `no_std` crate's rules; `tests/boundary/src/tests/graph.rs` names the new shell crates; the adapter, not the mapping's client end, adds the `Jig-Client` header. The steps not landed at the check are re-checked when 19.1 starts.
 
+330. **temper-06.2's inbox at 607 lines** (plan defect, temper 06's block of 2026-10-18T08:33:41Z).
+     Plan defect: 06.2's Size, 300, did not count the whole inbox it asks for, and the inbox lands whole at 607 production lines, with no split and no change of scope.
+     - The count, by file (report `temper-06-20261018T083203Z.md`): the domain's `pages/inbox.rs` 218, `pages.rs` 60, `route.rs` 9, `limits.rs` 2, `address.rs` 1, `domain` 1; the view's `pages/inbox.rs` 221, `words.rs` 70, `frame.rs` 19, `root.rs` 3, `pages.rs` 2, `lib.rs` 1. It is 7 lines past implementer.md's tolerance (twice 300), all in 06.2's scope: the live and owner adapters, the goal queries, the per-object reads, seen, and their routing and frame.
+     - `route.rs`, `limits.rs`, `address.rs`, `frame.rs` and `lib.rs`, outside 06.2's Files, are its own plumbing (32 lines): they land with it, and the commit body names them.
+     - Nothing is trimmed to meet the count: no doc comment, test or formatting (implementer.md, "The Size's tolerance").
+     - The commit body gives the count by file. A count past 650 at land, after the rebase, is a new question.
+     - Unchanged: 06.2's Proof, run once; ruling 325 (no further process Proof by 06); ruling 326 (the `SLOW` rule and 80% of a budget); the gate.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

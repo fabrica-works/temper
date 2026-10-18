@@ -342,7 +342,8 @@ temper-client-world -E 'test(a_question_needing_the_person_is_shown_first_in_the
 inbox. Nothing else is run.
 Don't: decide anything on a card (06.3); count what needs the person in
 the client (it is `me`'s count).
-Size: at most 300 lines.
+Size: at most 300 lines. Ruling 330 lets the whole inbox land at 607
+production lines, as counted at 2026-10-18T08:32Z, with no split.
 Removes: jig's inbox page at temper's home (the `Jig(Inbox ..)` place in
 temper's navigation).
 
