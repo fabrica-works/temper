@@ -3172,6 +3172,9 @@ choice would have been the user's (development.md, 10.4).
      5. **What it replaces.** Ruling 388, point 3, and ruling 389, points 2 and 3, no longer bind the cards. The default order: both steps run beside jig 20.4 and 20.5, and temper-repin waits for temper-07.s1. The README's order is the supervisor's.
      6. **Deferred:** jig-client's words for executors and outcomes (jig's `view.md`, 7), in a `later.md` row. temper uses its own phrases for them until then.
 
+395. **The check of 20:13Z: frame.rs's tests split, a crossed 800 named, reports name only what changed** (steer of 2026-10-18T20:14Z).
+     The check of 2026-10-18T20:13:51Z, three points, in the README's "The run's steers" (2026-10-18 20:14Z, points 1 to 3). 1: one behaviour per test again: temper `5fd9d29c4`'s `crates/temper-client-view/src/tests/frame.rs` has two tests of four behaviours each (`:106`, `:117`), split in place by the next session that changes the file; 18:44Z point 2 reached 07.4 only from its next increment. 2: a file a commit leaves over 800 is named in the report, also when it was at most 800 at the base: `crates/temper-client-shell-terminal/src/tests/fixtures.rs` went 795 to 803 under 07.4, whose report said no file over 800 changed. 3: a report names only what changed: 07.4's report of 19:49:26Z ran 24 lines and 3,664 bytes, its Size list repeating the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

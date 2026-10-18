@@ -942,6 +942,30 @@ per session are in each file.
     named for what it stands for; expected values are literals. Split a
     test that asserts several behaviours under one name (development.md
     14.3, Shape).
+  - 2026-10-18 20:14Z, point 1 (every temper session, from its next
+    increment, until the run's end; ruling 395): One behaviour per test
+    (README, 16:47Z point 1). If you change
+    `crates/temper-client-view/src/tests/frame.rs`, split
+    `signed_out_the_main_says_so_and_nothing_else` and
+    `an_engine_not_serving_jigs_version_says_temper_is_out_of_date` in
+    place into one test per behaviour (the main's text, the banner's
+    status, no Sign out button, no navigation), assertions kept, shared
+    setup in `tests/fixtures.rs`, and name them in your report.
+  - 2026-10-18 20:14Z, point 2 (every temper session, from its next
+    report, until the run's end; ruling 395): Before `land`, run
+    `git diff --name-only --diff-filter=d origin/main -- '*.rs' | xargs
+    -r wc -l`. Your report names, in one line, each file your commit
+    leaves over 800 lines, with base and now, even if it was at most 800
+    at the base (15:00Z point 1; code-organization.md 7).
+    `crates/temper-client-shell-terminal/src/tests/fixtures.rs` is at
+    803: put new code for that crate's tests in a module beside it.
+  - 2026-10-18 20:14Z, point 3 (the coordinator and every session, from
+    its next report, until the run's end; ruling 395): Your landing
+    report names only what your commit changed (15:00Z point 1) and
+    stays under about 3,000 bytes. Give a by-file Size count once, in
+    the commit body or a file under `logs/<session>/`, and cite where in
+    the Size line; do not list it again in the report. Keep Evidence to
+    one line.
   - 2026-10-18 18:44Z, point 1 (the coordinator and every session,
     until the run's end; ruling 387): File one landing report per
     landing. To correct it, say so in one line of your next report; do
