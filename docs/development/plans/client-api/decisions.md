@@ -2252,6 +2252,54 @@ choice would have been the user's (development.md, 10.4).
      2. From now to the run's end, a `land` exit 7 whose push error says "cannot lock ref" is main moved: the coordinator has the step run `land` once more, without a block. A second exit 7 in a row is a block, with its log.
      3. Unchanged: ruling 314; 17.3's commit and its report's numbers.
 
+316. **temper-04.3's question: a watch holds its room until it ends; busy never ends one** (design gap, temper-04.3's block of 2026-10-18T05:21:08Z, the designer's answer of 2026-10-18T05:52:56Z).
+     Ruling 316 (design, the designer's answer of 2026-10-18T05:52:56Z, jig `544a57091` and `cd2cac35f`, temper `bf33cf174`): the designer's decision, below.
+
+
+
+     Landed: jig 544a57091 (`client/domain/client.md`, 8.1, 8.2, 14, 18;
+     `contract.md`, 7.2; `protocol/client.md`, 4, 7; `client/domain/testing.md`,
+     6.1, 7; `STATUS.md`) and cd2cac35f (`protocol/client.md`, 13; `contract.md`,
+     7.2; `STATUS.md`); temper bf33cf174 (`configuration.md`, 7;
+     `domain/engine.md`, 13; `STATUS.md`; the plan's `temper/04-engine.md`,
+     "Corrections after the designer's answer of 2026-10-18T05:52:56Z").
+     544a57091's `Designer-Session:` line is not read as a trailer (a blank
+     line before `Co-Authored-By:`); cd2cac35f and bf33cf174 name the session.
+
+
+     1. **Yes, both count.** contract.md, 7.2: "A watch holds its place from
+        its admission until the engine has ended it: while its closing is in
+        flight, and while its stream's end or its last delivery is". The
+        client counts the same: client.md, 8.1, "Each of the engine's watches
+        counts toward the client's limit (section 14) from the opening it
+        sends until its terminal". A watch the engine admits again after the
+        client closed it is a closing that overtook its opening; protocol/client.md,
+        7: "the client sends a watch's closing only once its opening is
+        answered admitted, and none once it is refused. An opening or a
+        closing that gets no answer ... drops the stream".
+     2. **The rooms' floor:** "A deployment allows each party, and each
+        stream, at least the engine's watches one client opens at its limit,
+        `me`'s included" (contract.md, 7.2), and the client keeps one for
+        `me`: "while no watch on `me` is held, the application's take at most
+        one fewer" (client.md, 8.1). The stream's room is the clients
+        component's own (protocol/client.md, 13). temper: "its engine allows
+        16 a party, 16 a stream and 16 in all" (configuration.md, 7).
+     3. **Busy is never a watch's end.** client.md, 8.1: "one it refused as
+        busy, is opened again after a backoff, under a fresh name; its handle
+        stays, behind". `me`, 8.2: "`me` ends only with the sign-in, or when
+        jig's version is not served (below): a refusal of it, busy included,
+        or any other end of it, is opened again after a backoff, as a dropped
+        watch (8.1), and the link is offline until its next delivery."
+     4. **For the run:** ruling 313's `VIEWS` stays. A stream's room is still
+        4: `git grep -n "watches_per_stream: 4" origin/main` in jig prints
+        `crates/jig-protocol-config/src/profile/small.rs:266`, and in temper
+        `git grep -n watches_per_stream origin/main` prints only
+        `crates/temper-service/src/tests/fixtures.rs:436`. jig's client still
+        ends a busy watch (`jig-client-domain/src/watches.rs:153`). Which
+        steps set the stream's room and repair jig's client, with temper's
+        repin, is the supervisor's (04-engine.md's corrections name a
+        default). No temper code works around a busy `me`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
