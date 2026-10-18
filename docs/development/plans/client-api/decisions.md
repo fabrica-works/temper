@@ -3085,6 +3085,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Each replacement keeps today's words and tree:** the view tests and goldens pass unchanged, except those 07.4's Files name (jig's pages' goldens removed or recorded again). No behaviour removed, no test weakened. A renderer two pages share is written once (README, 2026-10-18 18:44Z, point 3).
      4. **Give the count by file** in the commit and the report, name each file outside Files, and each lint exception with its reason.
 
+389. **temper 07.4 lands whole at up to 2,000 lines, the rest counted first** (plan defect, temper 07.4's block of 2026-10-18T18:56:17Z).
+     Ruling 389, kind: plan defect. Yes, the proposal: 07.4 lands whole at up to 2,000 production lines added (removals not counted), under ruling 388's points 1 to 4, with no question; past it, block with the count.
+
+     1. **The 1,000 counted the call sites, not what they reach.** The renderers copied so far (490 lines, the report) reach helpers and phrases in `jig-client-view`, whose phrase tables alone are 4,399 lines at temper's jig pin (Checked).
+     2. **Count what is left first, then go on.** Before more code, count the helpers, phrases, bounds and callers the copied renderers still need (by file, from jig's files at the pin), and add the 1,014 drafted. If the whole passes 2,000, block now with that estimate, not on reaching the stop.
+     3. **Copy only what temper's pages reach.** A helper or phrase that no copied renderer reaches stays in jig. A word `jig-client`'s `words` already gives (a phase, hold, refusal, wait or chat status: `Word`, `crates/jig-client/src/words.rs:15-21`) is said through `Words::say_word` (`crates/temper-client-view/src/words.rs:452`), as `confirm.rs:185` says a hold today, not copied: `client.md`, 5.1, "temper's phrasebook, English, with jig's words for jig's enums (`jig-client`'s `words`) under it". Temper's phrasebook gets only the phrases the copied renderers say that `jig-client`'s words lack, with today's English. If saying an enum through `jig-client`'s words changes a test's or a golden's words, keep `jig-client`'s, record the golden again, and name each change in the report.
+     4. **The count by file** (ruling 388, point 4) gives the copied renderers and phrases apart from the rest of 07.4.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

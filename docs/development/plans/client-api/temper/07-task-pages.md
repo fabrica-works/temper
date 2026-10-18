@@ -424,8 +424,10 @@ UI; keep a golden of a page temper no longer has.
 Size: at most 140 lines added (the removals are not counted): 120,
 and 20 for the title's row and the dropped count's line (the designer's
 answer to ruling 320). Ruling 388: with the native replacements of the
-reference UI's renderers, it lands whole at up to 1,000 production
-lines added, with no question; past it, block with the count.
+reference UI's renderers, it lands whole, with no question; past the
+stop, block with the count. Ruling 389: the stop is 2,000 production
+lines added, what is left counted before more code is written, and
+jig's enums said in `jig-client`'s words, not copied.
 Removes: the transitional code decisions.md, 7 names: the reference
 UI's child, `owner::Owner::Jig` and `Address::Jig` (from temper 03.6
 and 06.1), `parts.rs`,
