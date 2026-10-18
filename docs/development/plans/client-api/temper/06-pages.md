@@ -422,7 +422,8 @@ jig's check holding.
 Don't: compute what the person may do (the document's offers say it);
 send a deciding act from a tree that did not show its facts; keep the
 confirmation across pages.
-Size: at most 300 lines.
+Size: at most 300 lines. Ruling 345: 603 production lines, the proof's two
+repairs (ruling 340) among them; with the gate's repairs, it stops at 650.
 Removes: nothing.
 
 ### 06.4 The chats, and starting one

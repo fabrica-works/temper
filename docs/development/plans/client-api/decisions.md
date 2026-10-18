@@ -2634,6 +2634,13 @@ choice would have been the user's (development.md, 10.4).
      4. **Size:** the cap counts toward 19.4's 581, and the stop stays at 650. The file joins 19.4's Files.
      5. **Then the proof once,** as ruling 229 says. A failure at a later point goes on under ruling 229.
 
+345. **temper-06.3 lands at 603** (plan defect, temper-06's block of 2026-10-18T12:04:30Z).
+     Ruling 345, plan defect in 06.3's Size. code-organization.md, section 7, says: "An increment lands within twice its Size without asking … past that it asks, with the count by file". The report asks, and gives the count by file (domain acts 227, lib 1, pages 39, inbox 35; view confirm 202, frame 3, lib 1, inbox 31, root 8, words 56). The three lines past 600 come from the proof's two repairs, which ruling 340 asked for where the log named them: `Temper::window_changed`'s visibility for Confirm, and `Inbox::refresh` keeping a keyed card until its answer. A split would add a gate and a session for the same lines, now that they are built and the proof passes.
+
+     1. 06.3 lands at 603 production lines. With the repairs land's gate asks for, it stops at 650.
+     2. The report at landing gives the count by file again, and the two lint exceptions with their reasons, as it does now.
+     3. Unchanged: ruling 229 for the gate; ruling 340, point 5; the referee's and the judge's checks.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
