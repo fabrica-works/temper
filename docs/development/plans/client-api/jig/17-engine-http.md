@@ -121,6 +121,70 @@ worlds' clients sending a `Host` the allow-list takes.
   `prefix` and `loopback` only, and 17.5's guards' fixture builds it with
   both fields named, so a field added fails that fixture's build.
 
+## Corrections at jig `5b4e287f0` (ruling {ruling}, the ready check of jig 17, 2026-10-18)
+
+These take precedence over the increments' Files, Shape, Test shape and
+sketches where they differ. Refresh any further copy or derived value,
+and list it in the commit body.
+
+- **17.1, the protocol world's engine:** the link is kept at
+  `tests/client-protocol/src/engine.rs:78` (`Request::Link { link } =>
+  self.link = link`) and the provider arm panics at :107; :69 and :98
+  are the wall and `to_root`. Read "`engine.rs:69` and `:98`" as :78 and
+  :107.
+- **17.1, users its Files miss** (without them 17.1 does not build):
+  `crates/jig-protocol-engine-clients/src/watches.rs:107` (`|
+  Route::Provider(_)`); `tests/engine-clients/src/peer/closing.rs:3,
+  :44` (`ProviderCall`, `take_provider`); `tests/engine-clients/src/peer.rs:178`
+  (`providers: VecDeque<…>`) and :285-286.
+- **17.1, Test shape:** the unit file `src/tests/closing.rs` holds only
+  `stopping_keeps_the_printed_link_live_and_unspent` (:4; its
+  `Request::Link { .. }` at :9 becomes `secret`). The five provider
+  tests are the world's, `tests/engine-clients/tests/closing.rs:107,
+  :130, :139, :307, :317`: they move or go there.
+- **17.1, the sketch's fixtures are new:** `Peer::mint`, `Peer::minted`
+  and `fixtures::application_person` exist nowhere at the base; 17.1
+  adds them, in `tests/engine-clients/src/{peer.rs, fixtures.rs}`.
+- **17.2, the world's front:** `tests/client-protocol/src/front.rs` has
+  331 lines. It signs in with the printed link at :157-161 and :318-322
+  (`side.connections.printed(&self.engine.link)`), and `Event::Io` is at
+  :150, :192 and :199: read these for "`front.rs:441`" and
+  "`front.rs:312-379`".
+- **17.2, the component's `Limits`** are `small.rs`'s `CLIENTS`
+  (`crates/jig-protocol-config/src/profile/small.rs:257-266`) and
+  `standard.rs:147-148` (`{ connections: 16, streams: 8, exchanges: 32,
+  ..small::CLIENTS }`); `small.rs:250` (`clients: CLIENTS,`) and
+  `standard.rs:137` (the driver's `exchanges: 8`) are not them. A new
+  field such as `mints` is named in small's `CLIENTS`.
+- **17.4, who builds `SignedIn`:** `component.rs:484-486` builds it
+  (`w::SignedInParts { token, … }`), and so does the unit fixture
+  `src/tests/fixtures/services.rs:77-79`; `services.rs:25` only reads it.
+  Its users the Files miss: `crates/jig-client-protocol-link/src/sign_in.rs:97`,
+  `crates/jig-client/src/tests/fixtures.rs:239-242`,
+  `crates/jig-client-protocol-link/src/tests/fixtures.rs:269-272`,
+  `tests/client-protocol/src/native/wire.rs:176`; the schema's field is
+  `client-v8.schema:13` (`token: secret 48`). `jig-client-shell-native`
+  reads no token: drop it from 17.4's Files.
+- **17.5, the native shell:** the crate is `crates/jig-client-shell-native`
+  (there is no `jig-shell-native`): `connections.rs:65` (`host:
+  "localhost".to_owned()`) and `tests.rs:77` (`host: localhost\r\n`).
+  `connections.rs:81` (`if self.host != "localhost" && self.host !=
+  host`) reads `"localhost"` as "no link yet": change that marker with
+  the default (an `Option`, or the configured address), not the default
+  alone.
+- **17.5, the host guard:** `Settings` holds `prefix` and `loopback` only
+  (the sketches' `pub struct Settings`), and the sketch calls `guards::host(&self.hosts, &head)` (the sketch of the mount):
+  the guard is `fn host(hosts: &List<Box<[u8]>>, call: &Call) -> bool`.
+- **The sketches under clippy `-D warnings`:** `#[derive(Debug)]` on
+  each public type; `#[must_use]` on `claims`, `link_path`, `cookie`,
+  `cleared`, `link_page` and `Mount::{new, up, next_deadline}`;
+  `PartialEq` on `FromTransport` and `Message`; a `type Fields =
+  &'static [(&'static [u8], &'static [u8])];` for 17.5's `REFUSED`; and
+  the reference tests (17.3's and 17.5's, which call `fixtures::component(&mut out)`) compare `*fixtures::component(..)`
+  with the array, or return a slice. With these the sketches pass
+  clippy. jig pins skein at `ca5b75ef7`, where `skein_lib::sha256` is
+  not yet: a sketch that needs it takes the repin first.
+
 ## Increments
 
 ### 17.1 `Mint` in place of the provider route, and the link's secret

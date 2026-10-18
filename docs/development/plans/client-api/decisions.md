@@ -2114,6 +2114,21 @@ choice would have been the user's (development.md, 10.4).
 301. **jig-16.5's board move offer: interim** (design gap, interim, jig-16.5's block of 2026-10-18T01:53:07Z).
      Ruling 301, interim: a design gap, gone to the designer (question.md, "jig-16.5: the goals board's move offer once `ActKind::Prioritise` goes"). contract.md, 5.3 offers amending "in a task's document", pages.md, 6.2 makes the board "one task query", and objects.md's Prioritise is "priority-only amendments in one compound request": none says which offer gates moving a goal once the project's `Prioritise` offer goes. Until the answer amends `jig/16-shed.md`, jig-16.5 goes on with its engine, wire, schema and test migrations, and leaves the board's move offer (`page/project/moving.rs`, the arrows' gate and their confirmation) on whatever keeps it building, unchanged in behaviour; it opens no task watches for the board, and does not land before the answer.
 
+302. **jig 17's Shapes against main** (ready check of jig-17.1).
+     Ruling 302: jig 17's Shapes against main, from the ready check of jig-17.1 at jig `5b4e287f0`, skein `37c676e`, temper `e7484c11f`. `jig/17-engine-http.md` gains "Corrections at jig `5b4e287f0`": the protocol world's engine lines (:78, :107); 17.1's users its Files miss (`watches.rs:107`, `peer/closing.rs:3, :44`, `peer.rs:178, :285-286`), its tests' place (the world's `closing.rs`), and the fixtures it adds (`Peer::mint`, `Peer::minted`, `fixtures::application_person`); 17.2's front lines and the component's `Limits` (`small.rs:257-266`, `standard.rs:147-148`); 17.4's builders and users of `SignedIn`; 17.5's crate (`jig-client-shell-native`), its no-link marker, and the host guard's signature; and what the sketches need under clippy. Refresh any further copy, and list it in the commit body.
+
+     ## Checked
+
+     - `git grep -n -E 'self.link = link|Request::Provider' origin/main -- tests/client-protocol/src/engine.rs` → `:78 Request::Link { link } => self.link = link`, `:107 Request::Provider { .. } => panic!(…)`.
+     - `git grep -n 'Route::Provider' origin/main -- crates/jig-protocol-engine-clients/src/watches.rs` → `:107 | Route::Provider(_)`; `git grep -n -E 'ProviderCall|take_provider|providers:' origin/main -- tests/engine-clients/src` → `peer/closing.rs:3, :44`, `peer.rs:178`.
+     - `git grep -n -E 'fn mint|fn minted|fn application_person' origin/main -- tests/engine-clients` → nothing.
+     - `git grep -n 'printed(&self.engine.link)' origin/main -- tests/client-protocol/src/front.rs` → `:161`, `:322`; `wc -l` → 331.
+     - `git grep -n -E 'const CLIENTS|exchanges' origin/main -- crates/jig-protocol-config/src/profile/{small,standard}.rs` → `small.rs:257 pub(super) const CLIENTS`, `standard.rs:147-148 { connections: 16, streams: 8, exchanges: 32, ..small::CLIENTS }`.
+     - `git grep -n SignedIn origin/main -- crates/jig-protocol-engine-clients/src` → `component.rs:484-486 w::SignedInParts { token, … }`, `services.rs:25 Answer::SignedIn(value) =>`.
+     - `git grep -n localhost origin/main -- crates/jig-client-shell-native/src` → `connections.rs:65 host: "localhost".to_owned()`, `:81 if self.host != "localhost" && self.host != host`, `tests.rs:77`.
+     - `git grep -n 'pub mod sha256' ca5b75ef7 -- crates/skein-lib/src` (skein) → nothing; at origin/main → `lib.rs:37`.
+     - The sketches compiled under clippy `-D warnings` in a scratch crate after the listed derives, attributes and alias (the check's sub-agent).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
