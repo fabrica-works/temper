@@ -821,6 +821,28 @@ run are appended after "For the user".
      `stall`. `later.md`'s row now says so. Unchanged: 11.2's Size (about 18), its control and Done when as the amendment
      gives them; 11.1's block (ruling 139) and 14.1.
 
+145. **14.1's application and worker limits, interim** (design gap, temper-14.1's block of 2026-10-18T12:10:04Z).
+     Ruling 145, an interim ruling on temper 14.1's block of 12:10Z: which `application.limits` and `workers[0].limits`
+     the owned example states is a design gap, sent to the designer in `question.md` at 12:1xZ. configuration.md 10's
+     skeleton gives both as `{"profile": "small", "overrides": {}}`, and on `main` `small` does not fit smith's fixed agent
+     bounds (the report's four refusals); whether the example lowers the forge's bounds, `small` changes, or smith's bounds
+     widen is the design's (configuration.md 7, "the limits against each other and the worst case").
+
+     Meanwhile 14.1 goes on with the work that does not rest on the answer:
+
+     - the two `temper_box_*` tests in `process.rs`, the webhook setup, `owned::application` and `tier_configuration`, as
+       Shape 3 and Files say; T1, T2 and T4 as they pass now;
+     - to reach the later stages of the start, state provisionally in `owned.json` the tier's eight overrides,
+       `crates/temper/tests/support/configuration.rs:44-45` (application: `checkout.name_bytes` 256,
+       `checkout.repositories` 2, `checkout.message_bytes` 4096, `forge.name_bytes` 64, `forge.resources_per_task` 2,
+       `git_component.stdout_bytes` 2048) and `:24-25` (the worker: `hub.accounts` 4, `hub.event_bytes` 598); run T3 and the
+       box tests on them, and report whether the start passes, or the next refusal with its log.
+
+     Rule: nothing of 14.1 lands before the designer's answer reaches you as an unblock; after the Proof and clippy, wait for
+     it. The answer's numbers replace the provisional ones. Change no `startup.rs`, `worker_settings.rs` or smith code.
+     Unchanged: ruling 143 (each number the least its check accepts; a field refused twice is a block), ruling 142's
+     `engine.limits`, the Test shape's ceilings, Size, Proof and Done when.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
