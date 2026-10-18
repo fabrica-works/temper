@@ -1144,7 +1144,7 @@ fn batch_fixture_custom(
     bounds.fleet.slots = slots;
     bounds.call_records = 4;
     bounds.brief.sections = 5;
-    bounds.journal.writes = 6000;
+    bounds.journal.writes = 4096;
     bounds.journal.deliveries = 100;
     bounds.journal.held = 300;
     let mut configuration = config(92);

@@ -80,9 +80,9 @@ pub fn root(
     limits.journal.deliveries = 512;
     limits.journal.held = 4096;
 
-    // Native stories use at most four tasks and two simultaneous runs. Keep
+    // Native stories and ChangedJudge use at most four tasks and two runs. Keep
     // the bound small without shortening their every-commit sweeps.
-    if story.is_some() {
+    if story.is_some() || scenario == Some(Scenario::ChangedJudge) {
         limits.tasks.tasks = 5;
         limits.tasks.project_tasks = 5;
         limits.tasks.tree_tasks = 16;

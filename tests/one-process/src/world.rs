@@ -264,7 +264,7 @@ impl Person {
                 ClientSettings {
                     engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
                     directory: b"private".as_slice().into(),
-                    limits: temper_client_shell_terminal::limits::native(),
+                    limits: fixtures::client_limits(),
                 },
                 self.root.take().expect("private root"),
                 1000,
@@ -591,7 +591,7 @@ fn person(inherited: &Inherited) -> Proc {
                 ClientSettings {
                     engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 7100).into()),
                     directory: b"private".as_slice().into(),
-                    limits: temper_client_shell_terminal::limits::native(),
+                    limits: fixtures::client_limits(),
                 },
                 person.root.take().expect("private root"),
                 1000,

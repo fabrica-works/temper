@@ -78,6 +78,15 @@ pub(crate) const AGENTS: u32 = 2;
 pub fn calm(seed: u64) -> Settings {
     Settings { seed, config: skein_sim::Config::calm() }
 }
+pub(crate) fn client_limits() -> temper_client_shell_terminal::limits::Limits {
+    let mut limits = temper_client_shell_terminal::limits::native();
+    limits.connections.body_bytes = 262_144;
+    limits.client.jig.document_bytes = 65_536;
+    limits.client.client.domain.document_bytes = limits.client.jig.document_bytes;
+    limits.client.client.domain.requests.bytes = 262_144;
+    limits.client.client.domain.ask_bytes = limits.client.client.domain.requests.bytes;
+    limits
+}
 pub(crate) fn document() -> Vec<u8> {
     let mut value: serde_json::Value = serde_json::from_slice(&channel::engine_document()).expect("engine JSON");
     value.as_object_mut().expect("object").remove("service");
