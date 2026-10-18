@@ -2932,6 +2932,45 @@ choice would have been the user's (development.md, 10.4).
      `watches.rs:123-132`"; jig-17.s3 already leaves `stream_open` to it. No
      deferral, so no `later.md` row; temper's repin changes nothing for it.
 
+374. **jig 19.5's named controls hold no node** (design gap answered, jig 19.5's block of 2026-10-18T14:51:40Z).
+     Ruling 374, kind: design gap answered, the designer's answer of 2026-10-18T16:11Z: skein `f7a4e7022` (`ui.md`, 3; `ui-web.md`, 6; `STATUS.md`) and temper `f5d63eaee` (19.5's added part; one `later.md` row).
+
+     jig 19.5's question of 2026-10-18T14:51:40Z (a click on a button's text
+     child). Landed: skein `f7a4e7022` (`ui.md`, 3; `ui-web.md`, 6;
+     `STATUS.md`); temper `f5d63eaee` (`jig/19-browser.md`, 19.5's part "The
+     designer's answer of 2026-10-18T16:11Z"; `later.md`, one row).
+
+     1. **A button holds no node of its own when it has a name.** skein's
+        `ui.md`, 3, now says: "**A button, a tab or a menu item takes its
+        words one way:** as its name, holding no node, or, with no name, as
+        the text nodes it holds. … A press on a node it holds is a press on
+        it: a person presses the control, and its words are part of it."
+     2. **The run's repair is jig's controls.** They give a name and a text
+        node of it, against `ui.md`, 3 ("a name, where its text does not give
+        it") and `ui-web.md`, 6 ("a button, a tab, a menu item and an option
+        show their name as their text"): the browser shows the label twice,
+        and the click lands on node 4. 19.5's added part drops that text call
+        at 17 sites (Files, added), moves `notes.rs`'s pattern after its
+        button, and has `whole_page` assert `size == 1` for each named button,
+        tab and menu item, with `a_named_control_holds_no_node`. Size: about
+        60 lines; past 120, report. It comes before 19.5's two stories.
+     3. **skein's click for the unnamed form waits.** `ui-web.md`, 6, now
+        says: "A click finds instead the nearest element whose node a person
+        presses, a link, a button, a tab or a menu item, … a click inside none
+        of them, its nearest `data-node`." `page/web.rs:76-79` finds a link's
+        alone. It and the builder's assertion are a `later.md` row and two
+        rows of skein's `STATUS.md`: no skein step, no skein-01.s4, no repin.
+     4. **Unchanged:** the README's "Pins" and 19's "Done when" (jig moves
+        skein once); ruling 373's part, ruling 358 but point 2's stop for the
+        files the part names, and the stories' assertions; skein's code;
+        temper 06 and 07 (temper's builders give a name and no node:
+        `temper-client-view`'s `frame.rs`, `action`, and `pages/inbox.rs`,
+        `chats.rs`, `chat.rs`, `control`); a test finding a button by role and
+        name. One finding it by `Find::text` finds it by role and name.
+     5. **The 17 sites** are counted in the Reasoning: 16 lines from the
+        command there, and `control` (`frame.rs:160`), the one helper that
+        opens a role it is given (`rg -n '\.open\((role|r|kind)\)'`).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
