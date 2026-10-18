@@ -400,6 +400,35 @@ UI is `crates/jig-client-view/src/` (`acts.rs`, `intents.rs`, `page/`):
 - **16.4, Proof:** its second test is 16.2's: the filter runs both once
   16.2 has landed, which 16.4 needs.
 
+## Corrections at jig `4fad1fcc8` (ruling 298, the re-check of 16.3 after 16.2)
+
+These take precedence over ruling 297's "16.3, the stories' `me`" where
+they differ; its other points stand.
+
+- **16.3, the goal template:** 16.2 added it to `templates()`
+  (`tests/client/src/stories/conversations.rs:21-27`), cloned from the
+  chat's. It takes core.md 7.3's goal fields that `shapes::set_goal`
+  reads: `executor: TemplateExecutor::Chosen`, `budget:
+  TemplateBudget::Given`, `deadline: TemplateDeadline::Given`. 16.2's
+  label 2, `tracked: Some(0)` and flags stay. With the chat's `AsAllowed`
+  budget, `fill` sets the task's spend to 0, so `fall` judges the story's
+  budget 2 `Within` and gives a `Create`, not the proposal the story
+  expects; with `Charter(1)`, the procedure story's draft is
+  `NotOffered::Executor`.
+- **16.3, each goal world's bounds:** `frame()` gets `creating:
+  Some(..)` with `goal_world`'s bounds, as ruling 297 says. `goal_world`
+  (`tests/client/src/stories.rs:694`) and `procedure_goal_world` (`:746`,
+  procedures `[{ connector: 2, code: 7 }]`) each set their `me`'s
+  `creating` to the `CreateBounds` and `Beyond` of their project's
+  `SetGoal` offer. Each one's scripted rule asks what `shapes::set_goal`
+  gives for its story's draft, an `Ask::Propose` with
+  `ProposeAction::Batch` (both stories' budget 2 is beyond the bounds'
+  1), in place of `Ask::SetGoal`.
+- **16.3, Test shape** adds the procedure story,
+  `a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once`
+  (`tests/client/tests/stories.rs:283`): it keeps its name and expected
+  values, as the two stories named there do.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query

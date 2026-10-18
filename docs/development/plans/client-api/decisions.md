@@ -2080,6 +2080,15 @@ choice would have been the user's (development.md, 10.4).
      - `client-v8.schema:629: record OwnerInboxEntry { reply: option ConversationLine …`; `codec/tasks.rs:142-144` encodes tags 14 to 16 through `index::conversation` and `index::goal_row` (`codec/tasks/index.rs:65, :135`); `git ls-tree`: `crates/jig-protocol-store/src/tests/{reads/indexed.rs, intervals.rs}`; `crates/jig-domain-client` and `crates/jig-view` absent.
      - The check's sub-agent: clippy clean on `jig-client-world` with a probe of `chat`, `close_chat`, `set_goal` and `fall`; default 361 of 361 (`jig-client-world`, with the `creating` correction) and 833 of 833 over five crates; fuzzy 38 of 38; 16.4's first Proof test passed in 0.17 s. Not checked: 16.3's Proof as 16.3 changes it, temper's users of the removed tags.
 
+298. **jig 16.3's goal template and goal worlds after 16.2** (re-check of jig-16.3).
+     Ruling 298 (plan defect, the re-check of jig 16.3 after 16.2 landed at jig `4fad1fcc8`): corrected in `jig/16-shed.md`, under "Corrections at jig `4fad1fcc8` (ruling 298…)". 16.2's goal template in the stories' `templates()` is the chat's clone: 16.3 gives it core.md 7.3's goal fields (`TemplateExecutor::Chosen`, `TemplateBudget::Given`, `TemplateDeadline::Given`); `goal_world` and `procedure_goal_world` each set their `me`'s `creating` from their `SetGoal` offer, and their rules ask the `Ask::Propose` that `shapes::set_goal` gives; the procedure story keeps its name and values.
+
+     Checked:
+     - `git diff 3b58a775f 4fad1fcc8 -- tests/client/src/stories/conversations.rs`: `let mut goal = chat.clone(); goal.number = jig_client::shapes::GOAL; goal.label = 2; goal.tracked = Some(0); …`; the chat's `budget: TemplateBudget::AsAllowed { cap: None }` (`:14`), `executor: TemplateExecutor::Charter(1)` (`:11`).
+     - `crates/jig-client/src/shapes.rs`, `fill`: `TemplateBudget::AsAllowed { cap } => { authority.spend = 0; …`, `TemplateBudget::Given => { authority.spend = draft…budget; …`, `TemplateExecutor::Chosen => draft.ok_or(NotOffered::Template)?.executor`; `fall`: `if draft.budget <= within.budget && … { return Fall::Within; }`.
+     - jig `docs/design/domain/core.md`, 7.3: "| budget | `AsAllowed` | the creator's to give, within their allotment |", "| deadline | none | the creator's to give, or none |", "| executor | an agent, under the project's chat charter | a charter or a procedure the role may create with |".
+     - `tests/client/src/stories.rs:746: pub fn procedure_goal_world`: `procedures: list([CreateProcedure { connector: 2, code: 7 }])`, `budget: 1`, rule `Ask::SetGoal { … executor: GoalExecutor::Procedure { connector: 2, code: 7 }, budget: 2 … }`; `tests/client/tests/stories.rs:283: fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
