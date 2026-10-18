@@ -591,8 +591,8 @@ checks this document's contract:
   `tools/git-transcripts`: every invocation of section 4, and every
   failure of section 6 (a missing repository, branch and commit, a wrong
   token, no permission, a protected branch, a refused connection),
-  against the throwaway Forgejo (`../testing.md`, 2.6), which it starts
-  as `tools/forgejo-conformance` does. Each keeps the argument vector,
+  against skein's throwaway Forgejo (`fake-forge.md`, section 6;
+  `../testing.md`, 2.6). Each keeps the argument vector,
   exit status, stdout and stderr, masked: object ids, ports, paths and
   times. No credential is ever written. The facts this document relies
   on, named in sections 3 and 4.8, are in `tools/git-transcripts/facts.txt`

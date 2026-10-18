@@ -166,8 +166,9 @@ forge, temper adds:
 - **`protocol/`:** temper's protocol layer on jig's: the processes and
   the binary, the configuration, the credentials, temper's parts on the
   workers' channel, its families in the store, the host tools and LLM
-  accounts, the forge's protocol, git, and the forge's setup. Its
-  `README.md` gives the reading order and the names.
+  accounts, the forge's protocol on skein's forge kit (skein's
+  `forge.md`), git, and the forge's setup. Its `README.md` gives the
+  reading order and the names.
 - **`client/`:** temper's client on `jig-client`. Its `README.md` is the
   client: its client root and pages, the forge's client family, its view,
   the terminal, signing in, and the clients' listener; `forge.md` is the
@@ -228,21 +229,24 @@ temper's crates follow jig's rule (jig's `README.md`, section 15), with
 temper's side before the layer:
 
 - `temper-engine-domain` (the root) and its forge children
-  `temper-engine-domain-forge`, `-forge-change`, `-forge-client`,
-  `-forge-issues`; `temper-worker-domain` (the worker's root) and
+  `temper-engine-domain-forge`, `-forge-change` and `-forge-issues`,
+  which own skein's forge client, `skein-forge-client`;
+  `temper-worker-domain` (the worker's root) and
   `temper-worker-domain-checkout`;
-- the protocol layer's: `temper-engine-protocol-forge`,
-  `temper-worker-protocol-git`, `temper-protocol-store`,
-  `temper-protocol-worker-wire`, and `temper-engine-smith`, the
-  translation to smith;
-- the forge's, of no side: its documents, `temper-forge-forgejo`,
-  which the forge component and the setup share; its setup, outside
-  the services, `temper-forge-setup`, `temper-forge-setup-shell` and
+- the protocol layer's: `temper-worker-protocol-git`,
+  `temper-protocol-store`, `temper-protocol-worker-wire`, and
+  `temper-engine-smith`, the translation to smith; the forge component
+  is skein's, `skein-forge-connection`;
+- the forge's, of no side: skein's, `skein-forge` (its documents and
+  call plans, which the forge component and the setup share) and
+  `skein-forge-setup` (reconcile); its setup's rest, outside the
+  services, `temper-forge-setup`, `temper-forge-setup-shell` and
   `temper-box`;
 - the client's, under `temper-client` (`client/README.md`, section 2);
 - the services, `temper-service`, and the binary, `temper`.
 
 `protocol/README.md`, section 5 says what each holds and depends on. Test
-kits are named by their kind (`testing/temper-fake-forge-domain`,
-`testing/temper-fake-git`, `testing/temper-throwaway-forgejo`), and the
-worlds live in `tests/` (`testing.md`, section 7).
+kits are named by their kind (`testing/temper-fake-git`); the forge's are
+skein's (`testing/skein-fake-forge-domain`,
+`testing/skein-throwaway-forgejo`), and the worlds live in `tests/`
+(`testing.md`, section 7).

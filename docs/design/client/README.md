@@ -918,11 +918,11 @@ does for the client:
   The outcome is kept under the request's key for the retention and
   answered once durable (jig's `client/domain/contract.md`, 3.3).
 - **The forge's errors as reasons,** by the forge connector
-  (`temper-engine-domain-forge`'s `reason`, from
-  `temper-engine-domain-forge-client`'s `api::Error`): `Missing` is not
-  found; `Forbidden` is no access; `Refused` is refused; `Busy` is in
-  flight; `TooLarge` and `Full` are too large; `Unavailable`, `Timeout`
-  and `RateLimited` are unreachable; any other is an invalid answer.
+  (`temper-engine-domain-forge`'s `reason`, from `skein-forge`'s
+  `Error`, skein's `forge.md`, section 3.4): `Missing` is not found;
+  `Forbidden` is no access; `Refused` is refused; `Busy` is in flight;
+  `TooLarge` and `Full` are too large; `Unavailable`, `Timeout` and
+  `RateLimited` are unreachable; any other is an invalid answer.
 - **The outcome, encoded** by `temper-client-protocol-wire`, goes back
   as the family's answer to jig's clients' component.
 - **The forge's reads and watches** are decoded by

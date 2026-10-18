@@ -35,7 +35,7 @@ temper's engine
 temper-engine-domain                       the root (root.md)
 ├── jig-domain-core                        jig's core and its children (jig's domain/engine.md)
 └── temper-engine-domain-forge             the forge connector's top (forge.md)
-    ├── temper-engine-domain-forge-client  the working set, keeping up, fresh reads, the outbox's writes
+    ├── skein-forge-client                 the working set, keeping up, fresh reads, the request budget, effects' keys, write lanes (skein's forge-client.md)
     ├── temper-engine-domain-forge-change  the change procedure and the landing queues
     └── temper-engine-domain-forge-issues  the goals' issues
 
@@ -75,7 +75,7 @@ temper-worker-domain                       the worker's root (worker.md)
   path from `docs/design/`: `domain/forge.md, 8.2`; jig's as
   `jig's domain/connectors.md, 12`.
 - **Facts about Forgejo and git** are stated as what temper relies on;
-  `tools/forgejo-conformance/facts.txt` and
+  the conformance's `facts.txt` (skein's `fake-forge.md`, section 7) and
   `tools/git-transcripts/facts.txt` hold the evidence, named by fact.
 - **Each document** says in one page what it is, then its structure, its
   parts, what it owes and is owed below the domain, its world, and what

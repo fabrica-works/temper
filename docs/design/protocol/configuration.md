@@ -707,8 +707,9 @@ one owned forge, with its own values (setup.md, 8.1).
 - **A repository renamed or moved after adoption.** Default: its
   resource path, which landing patterns match, and its remote keep the
   owner and name of its adoption; Forgejo redirects the old path, and
-  git follows the redirect (`tools/forgejo-conformance/facts.txt`,
-  `moved-repository-is-a-redirect`; `tools/git-transcripts/facts.txt`,
+  git follows the redirect (skein's conformance, `fake-forge.md`,
+  section 7: `moved-repository-is-a-redirect`;
+  `tools/git-transcripts/facts.txt`,
   `git-follows-a-renamed-repository-redirect`).
 - **Profiles' numbers,** from the first deployments' measurements
   (jig's `protocol/configuration.md`, section 9). Default: `small` as

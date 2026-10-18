@@ -117,8 +117,9 @@ open is listed in section 20.
 ## 3. Structure
 
 ```
-temper-engine-domain-forge              the connector's top: resources and holds, adoption, topics, judges, briefs, routing
-├── temper-engine-domain-forge-client   the working set, keeping up, fresh reads, the outbox's writes, the request budget
+temper-engine-domain-forge              the connector's top: resources and holds, adoption, topics, judges, briefs, routing; the effects and their identities
+├── skein-forge-client                  the working set, keeping up, fresh reads, the request budget, effects' keys, write lanes and recovery (skein's forge-client.md)
+├── skein-forge                         the vocabulary the top and the client share: calls, answers, errors, hints (skein's forge.md, section 3)
 ├── temper-engine-domain-forge-change   the change procedure and the landing queues: decisions over facts
 └── temper-engine-domain-forge-issues   the goals' issues: what each projects, when to write it
 ```
@@ -128,8 +129,14 @@ temper-engine-domain-forge              the connector's top: resources and holds
   and their subscribers, the changes' procedure states, the issues'
   projection states, and the landing rules' gates and judges' parameters.
   It routes between its children and translates to and from the root.
-- **`client` is a capability:** it knows the forge's API, the working
-  set, the request budget, and how a write is made once.
+  It names the client's live resources, owns the effects and their
+  identities (section 6), and hands the client their bytes and its
+  namespace, the deployment's id, before any restored entry or live
+  resource (section 16).
+- **`skein-forge-client` is a capability:** it knows the forge's API as
+  `skein-forge`'s vocabulary states it, the working set, the request
+  budget, and how a write is made once. Its owner, how it is driven and
+  what it never knows are skein's `forge-client.md`, sections 2 and 9.
 - **`change` and `issues` are policy:** given a change's state and the
   facts, or a goal's state, they say what is due. They keep nothing
   between calls; their states are the top's, committed in the store.
@@ -174,7 +181,7 @@ temper-engine-domain-forge              the connector's top: resources and holds
   repository, merging only where the repository allows a merge style;
   read gives reads alone; no permission refuses the adoption as
   forbidden. Forgejo refuses protection reads to a writer who is not an
-  admin (`../protocol/forge.md`, section 13): adoption records
+  admin (skein's `forge.md`, section 9): adoption records
   protection as unknown, never as absent. A write the forge refuses
   narrows what temper may do there, for every later decision (jig's
   `domain/connectors.md`, 12).
@@ -210,7 +217,7 @@ temper-engine-domain-forge              the connector's top: resources and holds
   issues are kept (section 12), one per project and never a context
   repository; and whether it runs CI, and if not, the checks its changes
   are gated on (8.3). The merge style is the repository's default
-  (`../protocol/forge.md`, 3.2).
+  (skein's `forge.md`, section 12).
 - **Nothing is required:**
   - no webhook: polling is the backstop, webhooks only cut the latency,
     and the client shows a repository whose hints never arrive;
@@ -225,102 +232,104 @@ temper-engine-domain-forge              the connector's top: resources and holds
 
 ## 5. What it holds, and keeping up
 
+The working set, the keep, fresh reads and the budget are the client's
+(skein's `forge-client.md`, sections 3 to 6). This section keeps what
+temper puts in them and the members that set them: the client's limits
+are `forge.client.<limit>`, with durations in `_ms`
+(`../protocol/configuration.md`, section 7).
+
 ### 5.1 The working set
 
-For the live resources (jig's `domain/connectors.md`, 3.4), and nothing
-else:
+Held by skein's `forge-client.md`, section 3. temper's part:
 
-- **per repository:** the forge's time of the last listing, the
-  landing branches' tips, and the CI on each tip;
-- **per pull request temper owns that a live task names:** its head and
-  base, its state (open, closed, merged), its mergeability, CI on its
-  head (each context's latest status, and the combined state), and,
-  when a decision wants them, its files at its head;
-- **per branch a live task holds:** its tip as temper last pushed or
-  updated it, to tell drift from temper's own moves;
-- **per participating object:** the position its comments and reviews
-  have been read to, and those not yet given to its task (section 13);
-- **per issue of a live goal:** its number, and what temper last wrote
-  into it, by a digest, so an unchanged projection is not written again.
-
-A resource enters when a live task names it, and leaves when none does.
-Its capacity is a limit: a batch naming resources past it is refused.
+- **The live resources, and nothing else** (jig's
+  `domain/connectors.md`, 3.4). A resource enters when a live task names
+  it, and leaves when none does. The top names them to the client.
+- **What temper watches:**
+  - per repository: the landing branches' tips, and the CI on each tip;
+  - per pull request temper owns that a live task names: its head and
+    base, its state (open, closed, merged), its mergeability, CI on its
+    head (each context's latest status, and the combined state), and,
+    when a decision wants them, its files at its head;
+  - per branch a live task holds: its tip as temper last pushed or
+    updated it, to tell drift from temper's own moves;
+  - per participating object: its comments and reviews not yet given to
+    its task (section 13);
+  - per issue of a live goal: what temper last wrote into it, so an
+    unchanged projection is not written again.
+- **Its capacity:** `forge.client.resources` live resources and
+  `forge.client.repositories` repositories. A batch naming resources past
+  it is refused.
 
 ### 5.2 Keeping up
 
-- **A listing per repository** of what changed since the last, by the
-  forge's time, inclusive, least recently updated first, paged; its cost
-  follows the rate of change, not the number of pull requests held.
-- **Per pull request,** what moves no updated time on Forgejo (CI
-  reporting, its base moving) is read again on a backoff that doubles
-  from `poll` up to `poll_max`, and at once on a hint naming its number,
-  its head or its base, by branch or by commit: after `hinted`, the
-  pause that gathers one change's hints into one read. Its backoff then
-  starts again from `poll`.
+Held by skein's `forge-client.md`, section 4: the listing per
+repository since the forge's time, a pull request's backoff, the hints,
+the landing branches' tips, the slow pass and the forge's clock. temper's
+part:
+
+- **Its values:** `forge.client.poll_ms`, `poll_max_ms`, `hinted_ms`,
+  `slow_ms` and `settle_ms`. The paces are what they are with no
+  webhook, so a delivery lost, refused or never sent costs latency,
+  never liveness (skein's `forge-client.md`, section 4).
+- **Hints** come from the forge's webhook deliveries
+  (`../protocol/forge.md`, section 5). The client reads on every hint it
+  holds a resource for. temper, the owner, drops its own echoes, by key
+  and by pusher: a creation's key for an item, the pusher for a push
+  (skein's `forge-client.md`, section 4).
 - **What Forgejo settles after it delivers** is read again sooner, by
   the change procedure, which reads its pull request afresh (5.3), not
   by the keep. Forgejo checks a pull request's mergeability after a push
   moves its head or base, and answers it not mergeable while it checks;
   and temper relies on no order between a job's end being delivered and
   its commit status being written, only on both settling within `settle`
-  (`../protocol/forge.md`, section 13). So, within `settle` of a move of
+  (skein's `forge.md`, section 9). So, within `settle` of a move of
   its head or base (known by a hint, a read or temper's own push), a
   pull request that reads not mergeable is read again at `hinted`,
   doubling, until it reads mergeable or `settle` has passed; and a
   commit a job's hint named whose CI reads pending is read again the
-  same way. `settle` is a limit of the forge client's, above 0.
-- **The window is its own wait.** Until `settle` has passed since the
-  move, not mergeable is not known: the change waits until the window's
-  end at most, never stalls on it, and is never taken as conflicted on
-  it; once the window has passed, not mergeable is a conflict (8.2). A
-  move long before, such as a head pushed before a long CI, leaves no
-  window open. The window's start is the later of the change's own
-  last push, which it keeps, and the last move a hint or a read told
-  of, which it does not: after a restart, only its own push opens a
-  window.
-- **Landing branches' tips** are read on a hint naming them, or a
-  commit at their tip, and at the `slow` pace otherwise.
-- **Hints** come from the forge's webhook deliveries
-  (`../protocol/forge.md`, section 5): each names the repository and
-  what changed (an item, a branch, a commit) and who caused it; temper's
-  own are echoes, dropped. A hint is a reason to read, never a fact: it
-  brings forward the reads of what it names and the repository's
-  listing, and a hint naming a commit reads CI on it for whatever
-  watches it. One for a repository or a resource the keep does not
-  hold, or that comes before its restore, is dropped; the next listing
-  finds what it told of.
-- **The paces are unchanged by webhooks:** `poll`, `poll_max`, `hinted`
-  and `slow` are what they are with no hook, so a delivery lost, refused
-  or never sent costs latency, never liveness.
-- **A slow pass** reads again, at its own pace, every live resource the
-  listings have not shown for a while, so that nothing waits on a hint
-  that never came.
-- **The forge's clock** for every time a listing compares.
+  same way. These rereads are temper's fresh reads. `settle` is a limit
+  of the forge client's, which checks only that it is above 0 and runs
+  no window (skein's `forge-client.md`, sections 4 and 5).
+- **The window is the change procedure's own wait.** Until `settle` has
+  passed since the move, not mergeable is not known: the change waits
+  until the window's end at most, never stalls on it, and is never taken
+  as conflicted on it; once the window has passed, not mergeable is a
+  conflict (8.2). A move long before, such as a head pushed before a
+  long CI, leaves no window open. The window's start is the later of the
+  change's own last push, which it keeps, and the last move a hint or a
+  read told of, which it does not: after a restart, only its own push
+  opens a window.
 
 ### 5.3 Fresh reads
 
-Before a decision depends on a fact, the change child domain asks for it
-afresh: the branch's head, the base's tip, the pull request, CI on the
-exact head and on the base's tip, the comparison of the head with the
-base's tip, the pull request's reviews, and the files of the pull
-requests an overlap compares. These are also the facts the forge's
-requirements are judged on (8.7). A fresh read goes first in the
-request budget (5.4).
+Held by skein's `forge-client.md`, section 5: a fresh read goes first
+in the request budget (5.4). temper's part is what it asks for. Before a
+decision depends on a fact, the change child domain asks for it afresh:
+the branch's head, the base's tip, the pull request, CI on the exact
+head and on the base's tip, the comparison of the head with the base's
+tip, the pull request's reviews, and the files of the pull requests an
+overlap compares. These are also the facts the forge's requirements are
+judged on (8.7).
 
 ### 5.4 The request budget
 
-The client keeps the forge's budget as jig's `domain/connectors.md`,
-section 13 orders it: fresh reads first, a write's own checks and finds
-among them; then writes; then keeping up; then the slow pass, with
-`reserve` of each `window` kept for the last two. Each call is charged
-the requests it cost the forge, at most `rate` per `window`. A refusal
-for the rate stops every call until its reset.
+Held by skein's `forge-client.md`, section 6: the four queues in their
+order, the charge of each call and the wait after a refusal for the
+rate. The order is the one jig's `domain/connectors.md`, section 13
+gives: fresh reads first, a write's own checks and finds among them;
+then writes; then keeping up; then the slow pass. temper's values:
+`forge.client.rate` requests per `forge.client.window_ms`, with
+`forge.client.reserve` of each window kept for keeping up and the slow
+pass.
 
 ## 6. Effects
 
 Every effect is committed into the outbox and made by `client`, in
 commit order per lane (a pull request, an issue, a repository) and one
-at a time on each (jig's `domain/connectors.md`, 4.2):
+at a time on each (jig's `domain/connectors.md`, 4.2). The top owns the
+effects and their identities; the client's keys, its write lanes and its
+recovery are skein's `forge-client.md`, section 7. temper's effects:
 
 | Kind | Effect | What it is | Recovery class (jig's `domain/connectors.md`, 4.3) | Found again after an uncertain failure |
 |---|---|---|---|---|
@@ -340,29 +349,57 @@ at a time on each (jig's `domain/connectors.md`, 4.2):
 
 - **Each row is a kind of its own** (jig's `domain/connectors.md`,
   3.1): a policy that grants writing issues grants each kind it means.
-- **Classes follow what Forgejo offers** (`../protocol/forge.md`,
-  section 13). It keeps no key it would refuse a second creation by, so
-  no kind is keyed. A pull request is
-  opened only while none is open for its branches, and Forgejo keeps
-  every pull request, closed or not, so the state it leads to is always
-  found, closed by another hand included, which is drift (8.5). A change
-  opens one only when none exists for its branches, and reopens its own
-  when it was closed (8.5), so the oldest for its branches is the one it
-  follows; one another hand opened while that one is closed is the open
-  one, found first. A branch is created only while none of its name
-  exists, but another hand can delete it, and nothing then shows it was
-  made: its creation is unrecoverable.
+- **Classes follow what Forgejo offers** (skein's `forge-client.md`,
+  section 7.3; the facts, skein's `forge.md`, section 9). It keeps no
+  key it would refuse a second creation by, so no kind is keyed. A pull
+  request is opened only while none is open for its branches, and
+  Forgejo keeps every pull request, closed or not, so the
+  state it leads to is always found, closed by another hand included,
+  which is drift (8.5). A change opens one only when none exists for its
+  branches, and reopens its own when it was closed (8.5), so the oldest
+  for its branches is the one it follows; one another hand opened while
+  that one is closed is the open one, found first. A branch is created
+  only while none of its name exists, but another hand can delete it, and
+  nothing then shows it was made: its creation is unrecoverable.
 - **An unrecoverable creation is looked for first:** an uncertain review,
   comment, issue, update or branch found by its key, or by the state it
   leads to, is made; one not found by its deadline holds its task for a
-  person, and is never sent again by temper on its own.
+  person, and is never sent again by temper on its own. The client makes
+  the find (skein's `forge-client.md`, section 7).
 - **Keys are carried** in what temper creates: a marker at the head of a
-  body, a comment or a review, hidden where the forge renders it
-  (`../protocol/forge.md`, section 4). A pull request's key is its
-  branches, which temper alone names.
-- **An entry's start** is the forge's time and the last item seen when
-  it first went out, committed with it, so a find reads only what came
-  after.
+  body, a comment or a review, hidden where the forge renders it (skein's
+  `forge.md`, section 6; temper's word and namespace,
+  `../protocol/forge.md`, section 4). A pull request's key is its
+  branches, which temper alone names. An entry's start, and the find that
+  reads only what came after it, are the client's (skein's
+  `forge-client.md`, section 7).
+- **An effect's identity** is its purpose, and the top encodes it. The
+  client takes the bytes whole and never inspects them (skein's
+  `forge-client.md`, section 7). A key is the client's frame (version 1, the namespace's
+  length as two bytes big-endian, the namespace) and then the purpose's
+  bytes: a tag, and its fields in order, each number big-endian. The
+  namespace is the deployment's id, 16 bytes. A purpose is derived from
+  what the effect is for, never from when it was asked or its entry's
+  number, so asking again for the same thing gives the same bytes (jig's
+  `domain/connectors.md`, 4.4):
+
+  | Tag | Purpose | Fields, with their bytes | Bytes with the tag |
+  |---|---|---|---|
+  | 1 | a call: one agent's call in one task attempt | task (8), attempt (8), completion (4), position (4) | 25 |
+  | 2 | a step: one purpose within a task's procedure | task (8), purpose (2) | 11 |
+  | 3 | a projection: one part of a goal's issue | goal (8), part (1), number (8) | 18 |
+  | 4 | a release: cleanup of a task's named resource | task (8), the resource's length (2), the resource | 11 and the resource |
+  | 5 | a history milestone: one task's milestone in a goal's issue | family (1), goal (8), task (8), position (8) | 26 |
+
+  A part of a projection is the issue's open (1), its body at a local
+  revision (2), the plan accepted (3), a plan revision by its history
+  number (4), a change landed (5), a change held (6), a report kept (7),
+  the goal finished (8) and the issue's close (9); the number is the
+  revision, the history number or the change's, and 0 for the others. A
+  history milestone's family is a task's lifecycle position (1) or a
+  task's semantic revision (2, whose position is the revision). So a
+  call's key is 44 bytes, and a key is refused when it passes the
+  client's `op_bytes` or the namespace is empty.
 - **Conditions travel with the effect:** a merge names the head its
   decision saw, which the forge checks, and a stale head is refused, not
   merged. It names the base too: the pull request is read afresh first,
@@ -420,7 +457,7 @@ The files are read from the forge (a pull request's files, or the
 comparison of the branch's old and new tips), cached per head and cut at
 a limit past which the overlap is unknown. Forgejo pages a pull
 request's files but answers a comparison whole
-(`../protocol/forge.md`, section 13): the protocol layer bounds the
+(skein's `forge.md`, section 9): the protocol layer bounds the
 comparison's bytes, files and commits before the domain holds them, and
 a bound reached, an unusable answer or an uncertain completeness makes
 the overlap unknown and wakes every affected subscriber. A pull
@@ -559,7 +596,7 @@ starts from current code. It never updates only because its base moved.
   log, where a step tells its failure; the job's whole log's end when no
   step failed. The log is read at the job attempt that failed on this
   head, within the brief's byte budget, and its truncation is said; a
-  read that fails is said in its place (`../protocol/forge.md`, 3.2).
+  read that fails is said in its place (skein's `forge.md`, 5.2).
 - **A resolution** is a task for an agent whose workspace starts from a
   merge in progress: the base merged into the branch, the conflicting
   files marked. The agent edits them and runs the checks, with no git
@@ -630,7 +667,7 @@ merge, kind 4, on a pattern of landing branches (jig's
   and the forge answers from the fresh reads its step made for that
   decision (5.3). Facts read for another head are wait.
 - **Guarded or observed.** Forgejo applies a merge only at the head it
-  names (section 6; `../protocol/forge.md`, section 13), so a fact
+  names (section 6; skein's `forge.md`, section 9), so a fact
   pinned to that head still holds as the
   merge lands: CI, gates and approvals are guarded, and are marked as
   requirements that must be guarded. Up to date is observed: the base
@@ -949,7 +986,11 @@ At a restart (jig's `domain/engine.md`, section 6; jig's
 `domain/connectors.md`, section 14) the connector is given its records
 from the store: the projects' repositories and what temper may do there,
 the live tasks' resources and holds, the changes' and issues' states, and
-its outbox's entries with their attempts. Then:
+its outbox's entries with their attempts. The deployment's id is given
+to the client first, as its namespace, before any restored entry or live
+resource. The client's part is skein's `forge-client.md`, section 8: what
+it reads afresh before anything else steps, how it settles an outbox
+entry as its class says, and where its listings start. temper's steps:
 
 1. it reads afresh each repository's landing branches' tips and each
    live pull request (head, state, mergeability, CI), before any change
@@ -1034,7 +1075,8 @@ idle are bounded by the limits.
 - **A resource refused as forbidden:** whether the connector should hear
   when it is readable again, rather than read it on a backoff.
 - **A merge style per repository,** named by the project rather than the
-  repository's default (`../protocol/forge.md`, section 14).
+  repository's default (skein's `forge.md`, section 12). Default: the
+  repository's.
 - **GitHub,** later: the same connector over another protocol layer
   (`../protocol/forge.md`, section 14), its pull request update and
   merge queue mapped onto the same effects.

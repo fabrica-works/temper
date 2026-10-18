@@ -49,7 +49,7 @@ and the agent agent.md. What is still open is listed in section 13.
 temper-engine-domain                       the root: the journal, routing, translation, putting outputs together
 ├── jig-domain-core                        jig's core and its children (jig's domain/engine.md, section 3)
 └── temper-engine-domain-forge             the forge connector's top (forge.md, section 3)
-    ├── temper-engine-domain-forge-client  the working set, keeping up, fresh reads, the outbox's writes
+    ├── skein-forge-client                 the working set, keeping up, fresh reads, the request budget, effects' keys, write lanes (skein's forge-client.md)
     ├── temper-engine-domain-forge-change  the change procedure and the landing queues
     └── temper-engine-domain-forge-issues  the goals' issues
 ```
@@ -364,7 +364,7 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   change's branch, and a resolution's base commit or a gate's number and
   head, each commit as text: its id in lowercase hexadecimal, 40 digits
   for a SHA-1 id and 64 for a SHA-256 one, as the forge's ids are
-  written (`../protocol/forge.md`, section 3), since a task's parameters
+  written (skein's `forge.md`, 5.1), since a task's parameters
   are text (jig's `client/domain/contract.md`, 5.3); its contract is a
   change, or a gate's verdict; its authority is the change's, its budget
   what the change has left, with no delegation of its own.
