@@ -126,6 +126,58 @@ reach the engine through the mapping from the first increment on.
   never set by hand in a test; a test that needs another value names it
   beside the profile's, with the reason.
 
+## Corrections after the ready check of temper-05.1 (ruling 306)
+
+Checked at skein `a0c3a66`, jig `6605e0564`, temper `90a3f7048`; these
+take precedence over the increments below where they differ.
+
+- **05.1, lines:** `Stop::Listener` is `lib.rs:51`; the binary's line
+  `host.rs:58`; `fixtures::started()` `tests/fixtures.rs:399`; the
+  token's reader `tests/clients.rs:168` (not :155).
+- **05.1, the listeners' readiness** is `system.rs:171, 412` and
+  `workers.rs:94`, not `engine.rs`; `tests/engine.rs:160` is the workers'
+  listener's test, kept. The clients' listener's failure is tested at
+  `tests/clients.rs:193` and `tests/system.rs:66-68`: both take the
+  server's io tag.
+- **05.1, users the Files miss**, in `crates/temper-service/src/`:
+  `stop.rs:17, 29, 53-54`; `tests.rs` (`mod server;`);
+  `tests/limits.rs:5-16` (the tokens' list); `tests/system.rs:66-68`;
+  `tests/clients/peer.rs:42` (a second `Host: localhost`, changed as :13
+  is); and `crates/temper-client-shell-terminal/src/client.rs:259-264`
+  (the `SignedIn` arms, beside the token's readers).
+- **05.1, the routing sketch:** skein's `Call` has no `path()`; its
+  `target: Box<[u8]>` holds the query too. The route is the target up to
+  its first `?`.
+- **05.1, the `Host` of temper's restored clients**
+  (`tests/one-process/src/world.rs:585-600`, `Start::Token`): jig 17.5
+  makes the native shell send its configured engine address
+  (`127.0.0.1:7100` there), the address the list holds; nothing to do
+  here unless that world's listener moves off 7100 (05.2).
+- **05.2, lines:** `startup/application.rs` is 610 lines; `parse` reads
+  `charter` at :383, and `forge`'s `api` is read at :222. The binary
+  reads `application` at `crates/temper/src/lib.rs:280` and
+  `setup.rs:42-44`, not :268, and neither reads `clients`; `setup.rs:38`
+  reads `named.clients`, unchanged while its type is kept.
+- **05.2, users the Files miss:** `checks::standalone`
+  (`startup/checks.rs:24`) takes no application: it gains the
+  `Clients` parameter its loopback check reads;
+  `tests/one-process/src/world.rs:265, 592` hard-code `7100`, which
+  follows the one-process world's `application.clients`; and
+  `crates/temper/tests/support/configuration.rs` gains
+  `"clients":{"listener":{"socket":"127.0.0.1:0"}}` (the process tier
+  binds port 0). `skein-http` is a workspace dependency already
+  (`Cargo.toml:86`).
+- **05.2, the reference test:** `listener` is a `skein_io::Addr`, so
+  `parse()` does not compile (E0277): bind it with `let
+  config::Address::Addr(skein_io::Addr::Ip(listener)) =
+  members.unwrap().clients.listener else { panic!("a socket address") };`.
+  So corrected, it passed with 05.2's reader applied, under clippy, the
+  default and the fuzzy profiles (`temper-service`, `temper`,
+  `temper-one-process-world`: 234 and 3 passed).
+
+Refresh any further copy of these lines or names, and list it in the
+commit body.
+
 ## Increments
 
 ### 05.1 The clients' listener in `temper-service`, and `/jig` mounted

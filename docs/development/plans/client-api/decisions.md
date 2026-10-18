@@ -2186,6 +2186,9 @@ choice would have been the user's (development.md, 10.4).
      - **temper-04.3** waits for jig-16.s1, then moves its pin to jig-16.s1's landing. Each removed arm is still replaced by nothing, but for the read position's: its arms follow jig-16.s1's names, and temper's own `EndedRead::SeenChat` becomes `EndedRead::SeenConversation`, at the 11 lines in 9 files 04.3's Shape now lists. Its grep (04.3's Rules and Done when) is unchanged and prints nothing at its end. The work already in `client-api/temper-04-3` stays.
      - Rename any further identifier that names this read position for a chat, in jig or temper (a function, a fixture, a doc comment), and list it in the commit body.
 
+306. **temper 05's Shapes against main** (ready check of temper-05.1).
+     temper 05's Shapes against main, from temper-05.1's ready check at skein `a0c3a66`, jig `6605e0564`, temper `90a3f7048`: the corrections are `temper/05-server.md`'s section "Corrections after the ready check of temper-05.1": 05.1's line references, the listeners' readiness in `system.rs` and `workers.rs`, six users its Files miss, the route as the target up to its first `?`, and the restored clients' `Host` covered by jig 17.5; 05.2's line references, `checks::standalone`'s `Clients` parameter, the one-process world's `7100`, the process tier's `clients` member, and the reference test's binding of a `skein_io::Addr`. Refresh any further copy, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
