@@ -258,7 +258,7 @@ Shape:
    in its place the account for skein's fake peer,
    `{"access_token":"token","expires_at":4102444800,"account_id":"acc"}`, private (`support/mod.rs:28-31`); block 5 in
    the background (`box.out`, `box.err`); the web steps as the person's HTTP requests: the sign-in and the
-   password-change forms (`/user/login`; `/user/change_password`), each posted with the `_csrf` its page holds, then the
+   password-change forms (`/user/login`; `/user/change_password`), each posted with the fields its page holds, its `_csrf` when it holds one (the pinned `/user/login` holds none; ruling 147), then the
    repository, `check.yaml`, `check.sh` and check (e)'s push as API requests under basic auth with the new password
    (routes from the pinned Forgejo's `swagger.v1.json`); block 7 with its lines fed through a pipe, each after the
    client printed the control it names (`process.rs:33-68`); then a stop (SIGTERM) and block 5 again.

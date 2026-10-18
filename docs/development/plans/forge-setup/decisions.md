@@ -872,6 +872,24 @@ run are appended after "For the user".
         tier's own overrides stay. Ruling 145's "Change no `startup.rs`, `worker_settings.rs` or smith code" stays.
         `limits.rs` is in scope. Size: about +8 lines. README's Done when is unchanged.
 
+147. **14.2's person password and web forms** (plan defect, temper-14.2's block of 2026-10-18T12:45:45Z).
+     Ruling 147, two plan defects in temper 14.2.
+
+     1. **`person_password` holds Forgejo's whole line, a defect of 07's prepare; it is step temper-14.s1**, in session
+        temper 14, before 14.2 goes on: `temper/14.s1-person-password.md`. setup.md 3's table says the file is "the person's
+        first password on the owned Forgejo"; `prepare.rs`'s `CreatePerson` arm writes `first_line` of Forgejo's
+        `generated random password is '<password>'`. The file keeps the bytes between the line's first and last `'`, as
+        `tools/forgejo-conformance/src/cli.rs`'s `password_of` reads them, and a line without them ends in
+        `Failure::Unread`. As you proposed; the guide never extracts the password itself.
+     2. **The web forms post the fields their page holds.** 14.2's Shape 3 said each is "posted with the `_csrf` its page
+        holds"; the pinned Forgejo's `/user/login` holds `user_name`, `password` and `remember`, and no `_csrf` (your probe,
+        `logs/20261018T124234-45.log`). It now says: "each posted with the fields its page holds, its `_csrf` when it holds
+        one (the pinned `/user/login` holds none; ruling 147)". The password-change form posts its `_csrf` if its page
+        holds one. No setting of Forgejo changes; the landing report names each page that held no `_csrf`, one line.
+
+     Unchanged: 14.2's Files, checks (a) to (e), Size and Proof; 14.1 as landed. Refresh any further copy of the CLI's
+     password line in a fixture that a suite shows failing, and list it in the commit body.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
