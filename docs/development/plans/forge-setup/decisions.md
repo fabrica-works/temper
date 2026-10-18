@@ -1015,6 +1015,45 @@ run are appended after "For the user".
 
      Unchanged: ruling 152's items 1 to 5 and 7; 11.1's Size (94 of the 3.5 times 30); the steers' points in force.
 
+155. **The Done when's six misses** (Done when run of 2026-10-18T16:29:31Z).
+     Ruling 155: six of the seven FAILs of the Done when run of 2026-10-18T16:29:31Z (done.md) are misses, each
+     recorded here with its reason and the command that shows the property on `main` now; no step follows from them.
+     The seventh, the gate (temper 01.7, 03.7, 06.5, 10.1, 07.1, 14.2, 15.4), went to the designer at 16:33Z
+     (`question.md`: the owned example's `memory_bytes` against a person's directory); its step follows the answer.
+
+     1. **README 7, temper's default suite: the aim is missed.** README's Rules: "the run adds at most 1.0 s to the
+        first". Median of three at temper 58c5321c1, `--no-fail-fast` (the default run stops at the gate's failure): 5.991 s
+        for 1816 tests, against 3.928 s for 1306 at eab91b13d (+2.06 s). client-api's commits since the base are inside
+        that difference and are not separable by item 7's command. The three slowest default tests:
+        `an_adopted_repository_gets_its_change_pushed_through_git` 1.555 s,
+        `held_and_decision_commit_cuts_restore_paged_real_children_and_exact_scripts` 0.861 s,
+        `terminal_restart_replays_complete_state_with_delayed_store_and_page_terminals` 0.437 s. For the user; the README
+        says the run is done either way. The fuzzy suite's aim is met (21.977 s against 24.745 s); skein's too (+0.30 s).
+     2. **temper 01.6: a miss of the command, not of the property.** The command reads the plan's history: its three
+        lines are temper-02.1's (faadff494, `let actual = forgejo::decode_answer(…)` and two `actual.…` assertions), and
+        temper-02.2 (3e4c7f039) removed them 25 minutes later. No later commit can make it pass. Now: `git log origin/main
+        --grep='^Plan: forge-setup$' -p --format= -- '*.rs' | grep -E '^[-+]' | grep -iE
+        'actual|genuine|legacy|compat|workaround'` prints those three lines once with `+` and once with `-`.
+     3. **temper 03.1: a miss of the text.** The third line is a test vector, `crates/temper-forge-setup/src/tests/upgrade.rs`'s
+        `the_upgrade_names_its_dump_by_both_versions` (`upgrade::backup_name(b"16.0.5", b"17.0.0")`, temper-15.1), a literal
+        expectation as ruling 140 asks; the pin is named only in `pin.rs`'s `VERSION` and `RUNNER_VERSION`. Now: the item's
+        `grep` with `| grep -v '/tests/'` prints the two `pin.rs` lines.
+     4. **temper 04, the transcripts' diff: a miss of the text.** It was written for 04's own landings; temper 01 and 02 add
+        the `setup-*` captures their own Done when counts. None of the base's transcripts changed: with `B=eab91b13d`,
+        `git diff $B origin/main --stat --diff-filter=MDR -- tools/forgejo-conformance/transcripts` prints nothing, and
+        `--diff-filter=A` lists 120 files, each under a `setup-*` directory.
+     5. **temper 08.4b: a miss of the text.** temper-15.1 renamed three of the run's step tests (for example
+        `the_run_refuses_another_forgejo_binary`); its filter now finds one. Now: the README 7 run's default suite
+        (`logs/donewhen-20261018/out/x7-temper.out`) ran temper-forge-setup's `tests::run` among 1815 passed, with
+        `serve_prepares_once_on_the_owned_example` its only failure.
+     6. **temper 10.3d: a miss of the text.** temper-14.1 (7f5ce036f) moved the tier's application to the owned example's,
+        so the CI rule left `support/forgejo.rs`. Now: `git grep -c '"ci":true\|"ci": true' origin/main --
+        crates/temper/tests/support docs/examples/owned.json` prints `docs/examples/owned.json:1` alone.
+
+     Rule: a Done when item that a later step changes is shown by the command that reads the property on `main`, named as
+     above; the item's own text stays as the plan wrote it. Unchanged: the README's Done when, the other items' PASS, and
+     the release's order: "done when ran" waits for the gate's step.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
