@@ -78,6 +78,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `jig/15-helpers.md` | jig 15: `jig-client`'s helpers: `shapes`, `facts`, `thread`, `words` | jig 22 | 15.2, 15.3, 15.4: 15.1; 15.5: 15.2; 15.6: 15.3, 15.5 (ruling 248) |
 | `jig/21-ops-and-ui.md` | jig 21: `ops` and the reference UI's state on the client alone; `ops`'s wire crate | jig 13 | |
 | `jig/16-shed.md` | jig 16: the shapes of work leave the engine and the wire; the reference UI's lists on task queries | jig 15.1 to 15.3, jig 21 | 16.3: 15.6; 16.5: every jig 15 step (ruling 248) |
+| `jig/16-s1-read-positions.md` | jig-16.s1 (ruling 305): a conversation's read position named for no shape | nothing (lands before temper 04.3) | |
 | `jig/17-engine-http.md` | jig 17: `Mint`, the link's secret, `jig-protocol-engine-clients-http` and its guards | jig 16 | |
 | `jig/18-server.md` | jig 18: the test application's server owns the listener, mounts `/jig`, serves its bundle | jig 17 | |
 | `jig/19-browser.md` | jig 19: the browser parts, the test shell, the bundle and the browser tier | jig 18 | 19.4, 19.5: skein 01; 19.4: skein-01.s2 |

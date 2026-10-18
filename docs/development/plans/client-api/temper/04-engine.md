@@ -339,7 +339,8 @@ Scope: the engine root's arms, reads and restart keys for chats, goals
 and lists, and the store's `Disposal` refusal, gone with jig 16's; the
 tests' chats made from the chat template (`STATUS.md`, "temper on jig's
 client API"; code-organization.md, 6).
-Needs: jig 16's last increment.
+Needs: jig 16's last increment, and jig-16.s1 (ruling 305): its pin is
+jig-16.s1's landing.
 Files (production, found by `git grep -n -w -e StartChat -e SetGoal -e
 Prioritise -e SeenChat -e ForgetChat -e ReadChat -e SeenChatLoaded -e
 Disposal -e DisposalIssue -- '*.rs'` in temper: 79 lines in 30 files at
@@ -378,8 +379,19 @@ board on task queries, the chat and goal acts through `shapes`):
 their expected names followed as jig 16 follows its own worlds'.
 `root_routes.rs` and `forge_routes.rs` are over 800 lines: at most 40
 added lines each (code-organization.md, 7).
-Shape: no new type. Each removed arm is replaced by nothing; each test
-that sent `people::Ask::StartChat { project, words }` sends the chat
+Shape: no new type. Each removed arm is replaced by nothing, but for a
+conversation's read position, which stays under jig-16.s1's names
+(ruling 305): `Key`/`Stored::ReadConversation`, `core::Now::SeenConversation`
+and `Event::SeenConversationLoaded`, and temper's own `EndedRead::SeenChat`
+becomes `EndedRead::SeenConversation`. Their users at temper `90a3f7048`
+(`git grep -n -w -E 'ReadChat|SeenChat|SeenChatLoaded' -- '*.rs'`, 11
+lines in 9 files): `crates/temper-engine-domain/src/{archive.rs:232,
+boundary.rs:586, route/now.rs:141, 241, store.rs:622}`,
+`crates/temper-service/src/clients/translation.rs:70`,
+`tests/client/src/translate.rs:78`,
+`tests/conformance/src/scenarios/conversations.rs:156`,
+`tests/engine/domain/src/{roles.rs:221, roles_referee.rs:102, 146}`.
+Each test that sent `people::Ask::StartChat { project, words }` sends the chat
 template filled into jig's `Create`, by jig 16's helper or by
 `walking::chat(project, words)` (Choices).
 Test shape: the tests named above keep their names and expected values;
