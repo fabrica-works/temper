@@ -378,7 +378,8 @@ clippy.toml, jig_client_test_shell_web.css, files/robots.txt, pictures/}`,
 `skein-ui-bundle`, `skein-scratch`, `[profile.dev.package.skein-ui-bundle]`);
 `tests/boundary/src/tests/graph.rs` (roles, if a list names client
 crates); `crates/jig-client/src/client.rs` and the exhaustive matches on
-`jig_client::Request` (ruling 337). Shared hotspots: workspace
+`jig_client::Request` (ruling 337); `testing/jig-test/src/bundle.rs` and
+its tests (ruling 344: the module's file cap). Shared hotspots: workspace
 `Cargo.toml`, `Cargo.lock`, `tests/boundary/src/tests/graph.rs`.
 Shape:
 - `jig-client-test-shell-web`: `crate-type = ["cdylib"]`, its
@@ -489,7 +490,8 @@ Don't: write a page of jig's own; carry a JavaScript snippet (`browser.md`,
 raise a profile's budget; move skein in any commit.
 Size: at most 250 lines (the shell's; `tests/` is not counted). Ruling
 342: 581 with the host, its limits and records, the manifests and ruling
-337's forwarding, which the Scope holds; stop at 650.
+337's forwarding, which the Scope holds; stop at 650, ruling 344's
+module cap among them.
 Removes: nothing.
 
 ### 19.5 The test shell's steps of 3.5: a root file, and the codec under a prefix

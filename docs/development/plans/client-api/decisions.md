@@ -2625,6 +2625,15 @@ choice would have been the user's (development.md, 10.4).
      4. **Bound:** at most four further focused runs, and 30 minutes from this unblock. Past that bound, report what the runs show.
      5. **Unchanged:** ruling 339's points 2, 3 and 5; the referee's check; every production deadline; ruling 229 for the gate and the proof. No undo from point 1 reaches a commit.
 
+344. **jig-19.4's module cap** (plan defect, jig-19's block of 2026-10-18T11:58:43Z).
+     Ruling 344, plan defect in jig 18.3's bounds. The design sets no byte bound on the bundle's reader. Its only size is a guide for another build: browser.md 4.2, "Its size is a guide: jig's test application's module, built with `web`, at most 4 MiB before compression". 4.1 builds the tier's module otherwise: "The browser tier's module is built with the dev profile, as code under test". 18.3 copied skein's example's constants (`examples/ui/server/src/bundle.rs:5-6`), which suit that example's small module, not a dev build of jig's. The proposal stands.
+
+     1. **The module's cap:** `testing/jig-test/src/bundle.rs` reads the bundle's module, `<name>_bg.wasm` under the digest directory, with a cap of 16 MiB, equal to `BUNDLE_BYTES`. Every other file keeps `FILE_BYTES`, 4 MiB. `BUNDLE_BYTES` (16 MiB), the 128 files, the 256 entries and every refusal stay as they are. The refusal for a file past its cap still names the file.
+     2. **Tests:** focused reader tests in `testing/jig-test`, one behaviour each: a module past 4 MiB and within 16 MiB is read; another file past 4 MiB is refused, naming it; a bundle past 16 MiB in all is refused. The diagnostic test in the worktree becomes one of them, or goes.
+     3. **Not the gate's profile:** the tier stays on the dev profile (4.1). The `web` guide of 4.2 is measured as 19.4's Shape says, apart from this cap.
+     4. **Size:** the cap counts toward 19.4's 581, and the stop stays at 650. The file joins 19.4's Files.
+     5. **Then the proof once,** as ruling 229 says. A failure at a later point goes on under ruling 229.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
