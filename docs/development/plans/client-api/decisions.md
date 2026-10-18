@@ -2503,6 +2503,29 @@ choice would have been the user's (development.md, 10.4).
      Unchanged: section 11.4's `df` floors, `kache gc` and the removal of
      `target/` of sessions not running.
 
+335. **temper-06.3's repair commit and its trailer** (plan defect, temper 06's block of 2026-10-18T09:06:30Z).
+     Plan defect, of the record only. temper `80425a3f0` ("Bound native
+     adoption's unused resource-report and pool capacity") is temper-06.3's
+     first commit: the repair the README's rule asks before 06.3 lands ("A
+     test the gate flags `SLOW` is made cheaper before its increment lands",
+     which ruling 326 left unchanged), after 06.2's gate flagged the native
+     adoption story. Its trailer `Step: temper-06.s3` reads `temper-06.3`
+     wherever the run counts it (the ledger, the metrics, the
+     retrospective); main's history is not rewritten, and no step is added.
+
+     - The ledger gains no row: temper-06.3 runs again, and lands with
+       06.3's production commit. That landing's report and commit body name
+       `80425a3f0` as its repair, with its gate times (focused 7.821 s,
+       fuzzy 28.792 s).
+     - Each further repair commit, before 06.3's production work, carries
+       `Step: temper-06.3`. The native adoption story still flags `SLOW` in
+       `80425a3f0`'s own gate (3.658 s): it is made cheaper before 06.3
+       lands, and 06.3's gate log has no `SLOW` line but ruling 122's
+       walking sweep.
+     - A commit's `Step:` trailer names a step of the ledger
+       (`awk -F'\t' '{print $1}' ledger.tsv`); a commit that serves the
+       session's next increment names that increment.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
