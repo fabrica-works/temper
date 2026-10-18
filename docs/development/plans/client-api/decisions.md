@@ -2526,6 +2526,14 @@ choice would have been the user's (development.md, 10.4).
        (`awk -F'\t' '{print $1}' ledger.tsv`); a commit that serves the
        session's next increment names that increment.
 
+336. **jig-19.3's push after DNS** (infrastructure, jig 19's block of 2026-10-18T11:16:39Z).
+     Infrastructure, passed. github.com resolves again and jig's origin
+     answers, at 11:18Z. jig's `main` has not moved: 19.3's checked commit
+     `171a96501` sits on `38ae1ba17`, its tip. jig-19.3 runs `land` again,
+     once, under jig's lock, for that commit. If the push fails on the
+     network again, it blocks (infrastructure) with land's output, and runs
+     nothing else for it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
