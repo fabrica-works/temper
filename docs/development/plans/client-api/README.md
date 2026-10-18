@@ -992,7 +992,11 @@ per session are in each file.
     Make no test-cost repair for an aim, and report each suite's
     Gate-Result time. Repair first only a test the gate flags `SLOW`, or
     when the fuzzy suite passes 48 s. Leave out of your commit a speed
-    change that no gate time shows.
+    change that no gate time shows. Except
+    `a_resumed_run_is_sent_only_its_current_window` (0.257 s alone, under
+    the 500 ms period; ruling 384): if your gate flags it SLOW under
+    load, do not repair it: name it in your report with the gate's time
+    and its time alone.
   - 2026-10-18 13:34Z, point 2 (temper-06.5, temper-07.1 and every later
     temper increment, until a landing gate shows no focused `SLOW`;
     ruling 364): A test the gate flags `SLOW` is made cheaper before your
