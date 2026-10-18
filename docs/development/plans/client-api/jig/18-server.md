@@ -112,6 +112,60 @@ makes.
   are `jig_test_service::limits::for_profile`'s; a test that needs
   another value names it beside the profile's, with the reason.
 
+## Corrections after the ready check of jig-18.1 (ruling 308)
+
+Checked at skein `a0c3a66`, jig `6605e0564`, temper `90a3f7048`; where
+this section and the increments below differ, this section holds. jig 17
+lands before 18.1 and moves lines again: re-read each line named here at
+the session's start.
+
+18.1:
+- Lines that moved: `crates/jig-protocol-config/src/tests/fixtures.rs:63`
+  (not 59), `testing/jig-test-service/src/tests/fixtures.rs:54` (not 50),
+  `tests/channel/src/fixtures.rs:84` (not 79),
+  `tests/client-protocol/src/native/config.rs:48` (not 44); `hosts.rs:53`,
+  `:73` and `testing/jig-test/tests/support/mod.rs:60` are right.
+- Files gain `testing/jig-test-service/src/tests/clients.rs:258`, which
+  calls `Clients::new` with the listener.
+- `jig_protocol_config::check::address` is `pub(crate)` in a private
+  module: the startup reads the listener with the public
+  `jig_protocol_config::address::read`. The loopback check has no public
+  form: write it in `jig-test-service`'s startup, beside its one user.
+- The three JSON fixtures (`tests/channel/src/fixtures.rs:84`,
+  `tests/client-protocol/src/native/config.rs:48`,
+  `testing/jig-test/tests/support/mod.rs:60`) each gain
+  `"server":{"listener":{"socket":"127.0.0.1:7100"}}` in `application`
+  as they lose `engine.clients.listener`: without it 68 default and 2
+  fuzzy tests fail; with it, all pass (the check ran it).
+- "Rules that bind it": temper's code names `clients.listener` in 7 lines
+  of 5 files, beside its configurations' JSON; temper 05.2 moves them
+  all (its Files), not jig. Drop the count "10 lines in 5 files".
+
+18.2:
+- `fixtures::head` exists nowhere: 18.2 adds it to
+  `testing/jig-test-service/src/tests/fixtures.rs`.
+- Files gain `testing/jig-test-service/Cargo.toml` (the `skein-http`
+  dependency, if jig 17 has not added it).
+- The sketch's `Server::new(limits: &Limits)` and `fn answer(&self, call:
+  &Call) -> Answer` are not jig 17.2's, which lands first and which temper
+  05.1 copies: keep 17.2's `fn new(listener: skein_io::Addr, limits:
+  &Limits)`, `fn answer(&mut self, call: Token, request:
+  skein_http::server::Request, out: &mut Queue<Routed>)`, `fn up`,
+  `fn done` and `fn listening`.
+  18.2's decision is `fn route(&self, head: &Call) -> Answer`, which
+  17.2's `answer` calls; `serve(&mut self, bundle: Bundle)` is 18.2's.
+- `Answer` derives `Clone, Copy, Debug, PartialEq, Eq`; the routing
+  table's rows have a `type Row` alias (clippy's `type_complexity`).
+
+18.3:
+- skein's bundle refusals name no file: "each naming the file" is this
+  increment's own work, not a copy.
+- The refusal of a type off the closed list is skein's private `of()`:
+  write its like in `bundle.rs`.
+- The test scratch directory is `tests.rs:4`'s `scratch(case)`, on
+  `std::env::temp_dir`, not `tempfile`.
+- Files gain `testing/jig-test/src/lib.rs`'s `mod bundle;`.
+
 ## Increments
 
 ### 18.1 The server's listener in `jig-test`'s own configuration

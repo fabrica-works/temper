@@ -2192,6 +2192,9 @@ choice would have been the user's (development.md, 10.4).
 307. **jig 17's Shapes against main after jig 16.5** (re-check of jig-17.1).
      jig 17's Shapes against main after jig 16.5, from the re-check at skein `a0c3a66`, jig `6605e0564`, temper `90a3f7048`: the corrections are `jig/17-engine-http.md`'s section "Corrections at jig `6605e0564`": the lines 16.5 moved; who builds `SignedIn` (ruling 302's `services.rs:77-79` decodes one, and builds none); 17.4's generated limit `signed_in_token_some` and its users; the readers of `.token()` that take the option; the regenerated goldens; and `tests/ops/src/joint/bytes.rs`, a user for 17.1 and 17.2. The earlier section's heading names ruling 302. Refresh any further copy, and list it in the commit body.
 
+308. **jig 18's Shapes against main** (ready check of jig-18.1).
+     The ready check of jig-18.1 (skein a0c3a66, jig 6605e0564, temper 90a3f7048) found jig 18's Shapes off main in ten places: lines that moved, a private address reader, three JSON fixtures that need the server's listener, a temper count, a missing fixture and dependency, and 18.2's sketch of `Server` against 17.2's. jig/18-server.md gains "Corrections after the ready check of jig-18.1 (ruling 308)", which holds where it and the increments differ; 17.2's `Server` signatures stand, and 18.2's decision is `fn route(&self, head: &Call) -> Answer`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
