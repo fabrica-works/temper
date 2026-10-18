@@ -199,7 +199,9 @@ Files:
   without `listener` at :96; the component's `Request::Io` and
   `Event::Io` and the io queue at :19, :174-198, :218, :262-300 move to
   the server; `kit::Request::Link { link }` at :219 becomes `Link {
-  secret }`; the `Provider` arm at :231-232 goes), `system.rs` (620
+  secret }`; the `Provider` arm at :231-232 goes; the worst case's
+  `limits.http.body` at :314, a copy of `jig-test-service`'s
+  `clients.rs`, follows that file as jig 17.3 lands it, ruling 314), `system.rs` (620
   lines: the clients' io at :289-293 and the listener's failure at
   :508 and :517 come from the server), `engine.rs` (the listeners'
   readiness), `lib.rs` (`pub mod server`; `Stop::Listener` kept at :49),

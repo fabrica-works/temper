@@ -499,6 +499,10 @@ signed out and `409` otherwise, the statuses the base answers.
 jig_protocol_engine_clients_http::Limits`, its numbers moved from
 `CLIENTS.http`, `CLIENTS.queued_bytes`' framing and the base's
 `connections` bound on calls.
+`jig_protocol_engine_clients::Limits` gains `message_bytes: u32`, the
+component's bound on a message's bytes (jig's `protocol/client.md`, 4.2
+and 13; ruling 314), from the old `http.body`'s numbers, the profiles'
+`clients_http.body` equal to it.
 Test shape: step tests in `crates/jig-protocol-engine-clients-http/src/tests.rs`
 on new fixtures in `src/tests/fixtures.rs` (step code's tests: no `Vec`,
 no closure-taking combinator, as jig's `clippy.toml` bans them): `mount()`
@@ -545,7 +549,8 @@ moves and renames, among which jig 17.3 is: the command's number, and
 beside it the added lines that name a moved path or a new name
 (`jig_protocol_engine_clients_http`, `call.rs`, `dispatch.rs`,
 `credential.rs`, the per-call half of `connection.rs`, which `-M` does not
-follow), the Size checked against the difference.
+follow), the Size checked against the difference. Landed at 743 under
+the README's "A move's Size" (ruling 314: 861 added, 452 removed).
 Removes: `Event::Call`, `Event::Http`, `Request::Http`, `Request::Done`,
 the component's `connection.rs`, `routes::route`, `sign_in::bearer`,
 `skein-http` and `skein-io` from the component's dependencies.

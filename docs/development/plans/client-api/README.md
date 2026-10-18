@@ -572,6 +572,12 @@ per session are in each file.
 - **Files over 800 lines at the base** that an increment changes grow
   by at most 40 lines each, a rule with its count in code-organization.md
   7; their splits are `later.md`'s.
+- **A move's Size** (rulings 312 and 314, the same block twice): a step
+  whose count passes its stop because it moves code that `-M` does not
+  follow lands without a block when the count less the lines the same
+  command removes is within the stop. Its report names the files moved
+  from and to, and gives the added, the removed and the difference on
+  its Size line. A difference past the stop is a block, as before.
 - **The run's steers** (ruling 167, the coordinator's block of
   2026-10-16T19:39:21Z): each "Pass on" text of the run's steers that
   holds until the run's end and that no rule above says, as the steer gave
