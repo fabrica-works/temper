@@ -379,7 +379,9 @@ clippy.toml, jig_client_test_shell_web.css, files/robots.txt, pictures/}`,
 `tests/boundary/src/tests/graph.rs` (roles, if a list names client
 crates); `crates/jig-client/src/client.rs` and the exhaustive matches on
 `jig_client::Request` (ruling 337); `testing/jig-test/src/bundle.rs` and
-its tests (ruling 344: the module's file cap). Shared hotspots: workspace
+its tests (ruling 344: the module's file cap);
+`testing/jig-test-service/src/{clients.rs, startup.rs, lib.rs}`, where the
+clients child is built and clocked (ruling 348). Shared hotspots: workspace
 `Cargo.toml`, `Cargo.lock`, `tests/boundary/src/tests/graph.rs`.
 Shape:
 - `jig-client-test-shell-web`: `crate-type = ["cdylib"]`, its

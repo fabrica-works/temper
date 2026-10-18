@@ -2669,6 +2669,15 @@ choice would have been the user's (development.md, 10.4).
      - The focused test `a_printed_link_survives_the_first_host_clock` stays as the step's test (ruling 229), then the browser story and 19.4's gate.
      - Its lines count in 19.4's Size, by file in the report; the stop stays 650 (ruling 344).
 
+349. **temper-04.s1's drain stops its worker** (process, temper-04.s1's block of 2026-10-18T12:23:03Z).
+     Ruling 349, process, within ruling 346's point 2, its first branch: the log names temper's own drain, not a jig rule. The worker link redials a stream it lost while its worker is not stopping (`protocol/channel.md`, 10.1), as a worker on another machine must; it is temper's service that never tells its embedded worker the drain has begun. `protocol/service.md`, 5, "A shutdown drains", point 4: "Each component closes, its peers told, and reports closed."
+
+     1. **Repair in temper,** in s1's increment, within ruling 339's 200 lines: the drain stops the embedded worker (`Worker::stop`, `crates/temper-service/src/worker.rs:137`) before the engine closes the workers' channels, so its link closes as stopping rather than losing its stream. Where in the drain is the implementer's choice, by the log; name each file outside the Files in the commit body.
+     2. **Prove it** with the focused story at seed 7: process 0 holds no policy deadline at teardown. Then the gate, as ruling 229 says, and, once temper-05.s1 has landed, the landing story (README, "The run's steers", 12:20Z, point 2).
+     3. **If the link still arms a retry** with its worker stopping, that is jig's: stop, and report the log's line with the call site in `jig-protocol-worker-link`.
+     4. **Bound:** three focused runs and 30 minutes from this unblock; past that, report what the log shows.
+     5. **Unchanged:** the referee's check; every production deadline; the link's backoff; ruling 229; ruling 339's point 5; the `Server::stop` patch stays out.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
