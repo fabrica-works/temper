@@ -3028,6 +3028,13 @@ choice would have been the user's (development.md, 10.4).
      - The 11:42Z point 3 is unchanged: the 16:47Z point 1 names temper's sessions with it.
      - Point 3 of the steer holds until a jig gate shows the test not SLOW, so it stays out of the README and is given to jig 20.1 as the steer says.
 
+380. **jig 19.5 bisects the power-loss spin and repairs its cause** (process, jig 19.5's block of 2026-10-18T16:50:55Z).
+     Ruling 380, kind: process. The failure is the candidate's until a run shows otherwise (ruling 229): jig's landing gates on `main` pass `a_power_loss_mid_run_restarts_and_adopts_nothing_from_the_dead_worker`, and 19.5's candidate changes what a restart does (ruling 373: a Save of the stream's name at each hello, and the first `OpenStream` after `Start` held behind the kept name's `StreamGone`). A power-loss restart is a `Start` with a kept stream name.
+     1. **Bisect first:** the story alone, once at each of the candidate's base `5b5f92c99`, `73335dab7`, `4b28d2e6d`, `36352623e` and `497e06d6f`. The first that fails names the change.
+     2. **If it fails at the base,** it is not 19.5's: stop with that run's log line; it gets a step of its own.
+     3. **Otherwise,** trace from the service's due Tasks timer back to what that commit changed, and repair it there. A repair in 19.5's Files is the step's. A repair in production outside them (the engine's clients component, the Tasks timer's settling) is authorized here: at most 40 production lines, in the crate the trace names, as its design says, one commit, with a focused test at the lowest layer that shows it (ruling 229), named in the report.
+     4. **Stop** with the cause line past 40 lines, or for a change to a deadline, the core timer's value, the iteration bound, `cut128`, the proof's expected values or any referee check.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
