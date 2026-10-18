@@ -2385,6 +2385,9 @@ choice would have been the user's (development.md, 10.4).
         replaces `..._says_jigs_out_of_date_words`, and it gains two tests,
         for the title and the line. Its Size is 140 lines, from 120.
 
+322. **temper-04.s1's Shapes against main** (ready check of temper-04.s1).
+     The ready check of temper-04.s1 (skein 0be1255e7, jig 1c041ac77, temper 6637a5a57; temper pins jig 509303cbf) found its Shape off main in five places, corrected in `temper/04-s1-repin-rooms.md`: the client's authority bound, 12, reaches the `authority` jig-17.s1 adds to `jig_client_domain::Limits` where temper builds it (`temper-client-domain/src/limits.rs:56-79`), set in the terminal's `native()`, not on the view's `jig_client_view::Limits` alone, and the view's, the domain's and `tests/client`'s fixture literals of that struct take a value; `configuration.rs`'s three authority assertions see the process tier's 12 (`Forge::Unreached` returns at `support/forgejo.rs:142`, before `:186` and `:190`), the commit body saying how; the engine's `DocumentLimits` copies in `tests/engine/domain` (`walking.rs:124-133`, `forge_routes/paths.rs:85-92`) take the three derived fields jig-17.s1 adds, and `tests/one-process`'s tier is its own; the stream room's constant of 16 is exported beside `VIEWS` (`mod limits` is private) and applied once, so that the clients component's `Env` (`clients.rs:112`) and its memory sum (`system.rs:576`, through `clients::worst_case`) both see it, the service fixture's `watches_per_stream = 4` (`src/tests/fixtures.rs:436`) going. Refresh any further copy, and list it in the commit body. The default suite's one failure on the pin, the owner's read in `forge_routes/paths.rs` (`Some(None(Busy))`), is the step's own repin repair, owed to jig-17.s1 and jig-17.s2.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
