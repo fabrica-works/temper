@@ -2889,6 +2889,49 @@ choice would have been the user's (development.md, 10.4).
      3. **temper-06.5** needs temper-05.s2 and jig-17.s3. It rebases its candidate on 05.s2's landing. Its first commit is the repin onto jig-17.s3's landing, by the README's "Pins", with that saved test. Then seed 7, its gate and the whole tier (ruling 370).
      4. **Unchanged:** rulings 368, 369 (but its point 2's focused test) and 371's flaky-repeat rule; the README's five exceptions until 05.s2 lands (14:05Z point 1); 05.s1's Don't list; every deadline; skein's read half-end.
 
+373. **one stream per client (the designer's answer)** (design, jig-19's block of 2026-10-18T13:53:12Z).
+     Ruling 373, kind: design, the designer's answer (jig `e444994d4`, temper `8e2e88622`) to jig 19.5's question of 2026-10-18T13:53:12Z:
+
+
+     One stream per client, never one per sign-in; the sign-in-keyed refusal
+     is not intended, and goes. Landed as jig `e444994d4` (design) and temper
+     `8e2e88622` (jig 19.5's part, jig 20.2's note).
+
+     The design it rests on, `protocol/client.md`, 4, as landed:
+     - "**The stream** is one per client, for as long as the client keeps
+       it." (unchanged)
+     - "**A client is one run of `jig-client`,** from its start to its end: a
+       native process; a browser page from its load until it is left. A link
+       followed, or back and forward, within the page's history keeps it
+       ...; a reload, an address typed or opened, or back and forward to an
+       entry another load made, starts a new client. Each client holds a
+       stream of its own, so two clients of one sign-in, two tabs or a page
+       and the page that follows it, hold two. The engine never refuses or
+       ends a stream for another stream of its sign-in: streams are bounded
+       in all, by the component and by the transport (section 13), and an
+       opening past either bound is refused, which the client takes as a
+       dropped stream."
+     - "**The predecessor's stream is sent gone.** ... the client keeps its
+       stream's name in the small store, saved at each hello (section 10).
+       The first time it would open a stream, a client whose kept records
+       name one sends that stream gone (4.1), and opens its own once that
+       exchange has its terminal, a reply or `Lost`. The engine ends a stream
+       named gone only when it is the sign-in's and still open".
+
+     So a full-page navigation is a new client: its page sends the old
+     page's stream gone, then opens its own, and is never refused for the
+     old one. A second tab holds its own stream.
+
+     What the run does: jig 19.5's added part ("The designer's answer of
+     2026-10-18T14:27Z", `jig/19-browser.md`), before its two stories:
+     `stream_open` (`watches.rs:123-132`) loses its `existing` loop and keeps
+     its capacity `Conflict`; the link saves the stream's name under
+     `STREAM_KEY` at each hello and sends a kept name gone before its first
+     `OpenStream`; the three 16-byte-key routers and two kept lists take the
+     stream's record. It replaces ruling 366, point 4's "the refusal at
+     `watches.rs:123-132`"; jig-17.s3 already leaves `stream_open` to it. No
+     deferral, so no `later.md` row; temper's repin changes nothing for it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
