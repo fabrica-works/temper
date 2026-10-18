@@ -312,13 +312,28 @@ fn the_owned_example_asks_for_reconciles_files() {
 }
 #[test]
 fn serve_prepares_once_on_the_owned_example() {
-    let scratch = owned_example("owned-example-prepared");
+    // configuration.md 7: Linux PATH_MAX and small's forge_component.token_bytes.
+    const PATH_BYTES: usize = 4096;
+    const TOKEN_BYTES: usize = 512;
+    const BOT_USER: &[u8] = b"42"; // forge-1/user's content.
+    let scratch = support::Scratch::startup("owned-example-prepared");
+    let owned = support::owned::Owned {
+        forgejo: "127.255.255.254:65535".parse().expect("longest owned forge"),
+        ..support::owned::Owned::example()
+    };
+    support::owned::lay(scratch.path(), &owned);
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&support::owned::example_document(scratch.path(), &owned)).expect("example JSON");
+    let path = format!("/{}", "p".repeat(PATH_BYTES - 1));
+    value["workers"][0]["agent"]["program"] = path.clone().into();
+    value["workers"][0]["agent"]["arguments"][1] = path.into();
+    support::write_private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("example JSON"));
     let forge = scratch.path().join("forge-1");
     fs::create_dir(&forge).expect("forge directory");
     fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("private forge");
     for (name, bytes) in [
-        ("api_token", b"api-token".as_slice()),
-        ("user", b"42"),
+        ("api_token", [b't'; TOKEN_BYTES].as_slice()),
+        ("user", BOT_USER),
         ("webhook_secret", b"webhook-secret"),
         ("git_token", b"git-token"),
     ] {
