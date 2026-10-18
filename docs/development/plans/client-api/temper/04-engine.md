@@ -186,6 +186,17 @@ The answer to temper-04.3's question of 2026-10-18T05:45:00Z (jig
   temper code works around a busy `me`, and this file's increments do
   not change jig's client.
 
+## Corrections after temper 04.4's block of 2026-10-18T05:51:17Z (ruling 317, interim)
+
+- **04.4, Test shape:** `a_change_on_the_forges_deepest_branch_is_served_in_its_task_document`
+  reads the producer's `task` document as a party of `change_world`'s
+  project that holds no Amend on it (a role beside `policy.roles[0]`, as
+  `forge_routes.rs:243-247` adds the maintainer and the member), within
+  the file's 40 lines. The path is what the step proves; the owner's
+  read, refused when its Amend authority passes `documents.lines`
+  (jig `documents/offers.rs:59-62`), waits on the designer's answer to
+  the question of 2026-10-18T05:58:00Z, and the test asserts nothing of it.
+
 ## Increments
 
 ### 04.1 `templates` in temper's configurations, in place of `chats`

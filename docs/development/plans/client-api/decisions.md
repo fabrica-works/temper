@@ -2300,6 +2300,9 @@ choice would have been the user's (development.md, 10.4).
         repin, is the supervisor's (04-engine.md's corrections name a
         default). No temper code works around a busy `me`.
 
+317. **temper-04.4: prove the path with a party that holds no Amend** (design gap, temper-04.4's block of 2026-10-18T05:51:17Z).
+     Ruling 317 (design gap, interim): whether a reader whose Amend authority passes `documents.lines` is refused its whole document is the designer's (question.md, 2026-10-18T05:58:00Z): temper `configuration.md`, 7 says "`documents.lines` bounds a document's short lists alone", and jig's `documents/offers.rs:59-62` refuses the document. Until the answer, 04.4 proves the path, which holds under either answer: its task-document test reads the producer's `task` document as a party of `change_world`'s project that holds no Amend on it, and asserts nothing of the owner's read. `documents.lines` stays 2 in the process tier, and no jig code changes. 04.4 runs its Proof's two stories once each, as the step says; if a story fails because the owner's `task` document is refused (`Answer::None(Why::Busy)` from `offers.rs:59-62`), 04.4 does not land: it reports the first failing line and its file:line, and waits for the answer.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
