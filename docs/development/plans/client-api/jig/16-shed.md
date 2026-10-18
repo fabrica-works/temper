@@ -549,6 +549,56 @@ the commit body.
   them. The re-check applied both renames at `5b4e287f0`: clippy clean,
   1087 default and 44 fuzzy tests passed in the five suites they reach.
 
+## Corrections after the designer's answer of 2026-10-18 (jig 16.5's question of 01:53:07Z)
+
+jig's `client/domain/contract.md`, 5.3 and 9, `pages.md`, 6.2 and
+12.5, and `objects.md`, 11 now say these (jig `ad465272b`). They take
+precedence over 16.5's Shape and rulings 287, 299 and 300 where they
+differ.
+
+- **16.5, the board's offer stays the project's, renamed:**
+  `ActKind::Prioritise` (`jig-client-domain/src/contract/documents.rs:215`)
+  becomes `ActKind::Reorder`, the wire's `ActKind` `prioritise`
+  (`client-v8.schema:496`) `reorder`, and the engine's `Act::Prioritise`
+  (`jig-domain-core/src/acts.rs:56`) `Act::Reorder`; none is removed.
+  The project's document offers it as now (`documents/offers.rs:133`),
+  made or refused, never proposable. Its users are the 28 files
+  `git grep -l -E '\b(ActKind|Act)::Prioritise\b' -- '*.rs' ':!*/generated/*'`
+  lists at jig `5b4e287f0` (47 lines). The arms that match
+  `people::Ask::Prioritise` or `Ask::Prioritise` (`acts/requests.rs:63`,
+  the scripted engine's `requests.rs:664`,
+  `tests/core/src/referee/offers.rs:220`) go with that ask. The others
+  take the new name, the scripted engine's `requests/priorities.rs:29`
+  among them: it judges the board's compound by the project's offer.
+- **16.5, its judging:** `roles.rs`'s `priorities_allowed` (:288)
+  stays, and may take the act's name (for example `reorder_allowed`).
+  It keeps its role check (`acts::role`, :295) and the policy's word on
+  the role's Amend; its `goals` and `task_capacity` arguments and the
+  check they serve go with `Ask::Prioritise`'s bound (ruling 300's
+  `Limits.goals`). `prioritise`, the route to `tasks::Event::Prioritise`,
+  goes, as ruling 299 says. `acts/objects.rs:81` and
+  `acts/objects/task.rs:103` call it with the project and the role
+  alone. `acts/standing.rs:14`'s owner-or-maintainer arm stays under the
+  new name: `acts/bounds.rs:322` judges a compound's amendment that
+  names `tracked` by it.
+- **16.5, the board:** `crates/jig-client-view/src/page/project/moving.rs:13, :34`
+  read `ActKind::Reorder` from the project's document, which every
+  project section reads (`page/opening.rs`, `Read::Project`). Ruling
+  287's "16.2, the arrows' offer" reads with the new name. No goal's
+  document is watched, and `TaskLine` is unchanged.
+- **16.5, the checks:** in `jig-domain-core`'s
+  `task_controls_owner_changes_priorities_and_note_scopes_share_their_judges`
+  (`src/tests/acts.rs:469`), the owner's `Act::Reorder` offer stays
+  asserted `Allowed` (:502), and the `core.prioritise` lines (:503-507)
+  go. jig 16.2's proof, `moving_a_goal_up_reorders_the_board_in_one_compound_request`
+  (`tests/client-protocol/tests/client/goals.rs:56`), passes unchanged
+  but for the name. The third "Done when" grep then finds no
+  `Prioritise`.
+- **16.5, Size:** the rename's changed lines count apart from the 150,
+  as one count in the report.
+- **Later:** the board offering no move that would amend a closing goal
+  is a row of `later.md`.
+
 ## Increments
 
 ### 16.1 The conversations section on a task query
@@ -854,7 +904,8 @@ Shape: the records that go, or are renamed in place:
 | `DisposalIssue`, `RefusalDisposal`, `LimitConversationWords` | gone: a compound's refusal at its place; `LimitWords` |
 | `OwnerHistoryChangePrioritised { priority }` | gone: an amendment's history line |
 | `BoundsGoal`, `GoalProcedure` | renamed `BoundsCreate`, `CreateProcedure` in jig 22.1; nothing here |
-| `ActKind`'s `close`, `set_goal`, `prioritise` | gone: `cancel`, `move_task`, `amend` offered, and `create` bounded in `me` |
+| `ActKind`'s `close`, `set_goal` | gone: `cancel`, `move_task`, `amend` offered, and `create` bounded in `me` |
+| `ActKind`'s `prioritise` | renamed `reorder`: the project's offer of a compound of priority-only amendments (the designer's answer of 2026-10-18, above) |
 | `OwnerPersonCapacityAction`'s `close`, `chat`, `goal`, `priority` | gone with their asks (the people child's capacity actions of the operations are jig 03's and jig 04's) |
 
 and in the engine: `people::Ask::{StartChat, SetGoal, Prioritise,
