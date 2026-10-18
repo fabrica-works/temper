@@ -186,8 +186,9 @@ The webhooks' path: skein 01.1 → 01.2 and temper 04.2 → temper 05.1 →
   reads each landing's new tests for it. Landed tests that no increment touches stay.
 - **A shared support function changed, its users run (ruling 148; seen at 12:37Z).** An increment that changes a
   `support` function that other stories call (`forgejo::configuration`, `owned::application`) lists each override or
-  member it drops or moves in its report, one line each, and runs the process tier once before landing; a story red on
-  `main` for a known cause stays red, with its cause named.
+  member it drops or moves in its report, one line each, and runs the process tier once before landing, with `--no-fail-fast`; a story red on
+  `main` for a known cause (ruling 139's landing story) stays red, its cause named in the commit body, and the
+  increment lands without waiting for the fix (ruling 149).
 
 ## Prerequisites the run checks at its start
 

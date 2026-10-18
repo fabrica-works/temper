@@ -900,6 +900,23 @@ run are appended after "For the user".
      check (skein b1d2276, point 6): temper has no `scripts/check.sh` yet (the workspace's AGENTS.md), and three steps are
      left; a proposal for the retrospective.
 
+149. **14.s1 lands past the known red landing story** (plan defect, temper-14.s1's block of 2026-10-18T12:59:00Z).
+     Ruling 149, a plan defect in ruling 148's rule: 14.s1 lands now; it does not wait for client-api's fix.
+
+     - Ruling 139's wait ("A proof of 11.1 that runs the landing story and fails as above is reported with its log, and
+       waits") is 11.1's: its Proof is the landing story. 14.s1's Proof is `heavy cargo nextest run -p temper-forge-setup`,
+       which passed (98). Ruling 148's rule said "a story red on `main` for a known cause stays red, with its cause named";
+       it now reads: "runs the process tier once before landing, with `--no-fail-fast`; a story red on `main` for a known
+       cause (ruling 139's landing story) stays red, its cause named in the commit body, and the increment lands without
+       waiting for the fix (ruling 149)".
+     - Your run stopped at the first failure: `logs/20261018T125712-45.log` ends `1/16 tests run: 0 passed, 1 failed`, so
+       the other 15 stories did not run. Run the same command once more with `--no-fail-fast` added. What counts: 15 of
+       16 pass, and `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart` fails as ruling 139 names it (person
+       step 4 sees no "Process answer"; the fake LLM gets no query). Then land, with one line in the commit body naming the
+       red story and its cause (client-api's temper-04.s1 and 05.s1, not on `main`). Any other failure is a block, with its
+       log. Nothing else is wanted.
+     - Unchanged: 14.s1's Files, Shape, Size and Proof; ruling 147's point 2 for 14.2; ruling 139's wait for 11.1.
+
 ## For the user
 
 - 1: the box lands on polling before webhooks reach it.
