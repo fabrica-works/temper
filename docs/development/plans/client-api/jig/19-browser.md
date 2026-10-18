@@ -503,7 +503,8 @@ Scope: the tier's checks of what jig's test application takes of
 prefix on the reference codec in one story.
 Needs: skein 01's `Step::Request` (its last landing, as 19.4).
 Files: `testing/jig-client-test-shell-web/src/lib.rs` (the dev build's
-`/test/prefixed` codec), `tests/client-browser/tests/browser_tier.rs`.
+`/test/prefixed` codec), `tests/client-browser/tests/browser_tier.rs`;
+`testing/jig-test-service/src/server.rs` (`Server::done`, ruling 355).
 Shape: in the shell, `#[cfg(debug_assertions)]`, a page opened at a path
 under `/test/prefixed` takes `Codec { prefix: b"/test/prefixed",
 ..address::REFERENCE }` for the session.

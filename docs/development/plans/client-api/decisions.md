@@ -2718,6 +2718,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Size:** the repair counts apart from 06.4's 455 production lines.
      4. **Unchanged:** `configuration.md`'s rule, the example's other values and its agent; ruling 229.
 
+355. **jig-19.5's closing response drains** (plan defect, jig-19's block of 2026-10-18T13:02:59Z).
+     Ruling 355, a plan defect: yes, as the report proposes. 19.5's story is the first to read a whole response the server closes after (`Reuse::Close`) while it is still serving, and its Files missed the test service's server.
+
+     1. 19.5's Files gain `testing/jig-test-service/src/server.rs`, `Server::done` only: a connection whose response is done and not kept is ended draining, so the response reaches its peer, unless the phase is `Phase::Aborting`; aborting stays as it is.
+     2. The focused regression that reproduces it (ruling 229) stays as the step's test; then the browser story and 19.5's gate.
+     3. Its lines count in 19.5's Size, by file in the report.
+     4. temper's server has the same line (below); the temper repin adapts it as README, "What a temper repin repairs", says, not 19.5.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
