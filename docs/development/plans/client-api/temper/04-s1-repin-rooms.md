@@ -55,6 +55,12 @@ Shape:
   `Admission::Bounded`; the reader's read stays.
 - If the start refuses memory, `engine.memory_bytes` rises by what
   the refusal names.
+- **One watch kept for `me`** (jig-17.s2): `temper-client-domain/src/limits.rs:61-62`
+  give the client `handles: jig.watches` and `watches: jig.watches`;
+  each takes one more, `checked_add(1)?`, as jig's view fixture does
+  (`jig-client-view/src/tests/fixtures/client.rs:35`, `:47`, `:68`), so
+  that the application keeps its 16; the terminal's
+  `temper-client-shell-terminal/src/limits.rs:29` derives from it.
 - **A stream's room:** a temper constant of 16 beside `VIEWS`
   (`crates/temper-engine-domain/src/limits.rs:103`), both exported from
   `lib.rs:39` (`mod limits` is private, `:15`), set as the clients
