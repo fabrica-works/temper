@@ -216,7 +216,12 @@ client holds requests not yet answered durable"): the server stopped,
 the person makes a request (the application's script), sees it pending,
 reloads and meets the closing warning, the server started, and the
 request shows made; with nothing pending, a reload meets no warning; the
-server killed shows `offline`, started again shows `live`.
+server killed shows `offline`, started again shows `live`. A reload
+is a new client, whose page sends the old page's stream gone before it
+opens its own (`protocol/client.md`, 4; 19.5's designer's answer); the
+stories assert nothing of it, and its gone failing while the server is
+stopped is the `net::ERR_CONNECTION_REFUSED` that `Setup.expected`
+names below.
 Needs: 20.1.
 Files: `testing/jig-client-fake-person-browser/src/stories.rs`;
 `tests/client-browser/src/lib.rs` (`Tier::reserved(name)`: a

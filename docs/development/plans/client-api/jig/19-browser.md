@@ -526,6 +526,55 @@ the prefix.
 Size: at most 40 lines.
 Removes: nothing.
 
+The designer's answer of 2026-10-18T14:27Z (jig `e444994d4`, ruling
+366, point 3): "**A client is one run of `jig-client`,** ... Each client
+holds a stream of its own, so two clients of one sign-in, two tabs or a
+page and the page that follows it, hold two. The engine never refuses or
+ends a stream for another stream of its sign-in" (`protocol/client.md`,
+4); "**The predecessor's stream is sent gone.**" (4, 4.3, 10). This part
+replaces ruling 366, point 4's "the refusal at `watches.rs:123-132`";
+the rest of 19.5 holds, and its two stories come after this part.
+Files, added:
+- `crates/jig-protocol-engine-clients/src/watches.rs`: `stream_open`
+  (`:123-132`) loses its `existing` loop; its capacity check, `Conflict`
+  at `self.streams.capacity()`, stays.
+- `crates/jig-client-protocol-link/src/{component.rs, store.rs, lib.rs}`:
+  at each hello (`stream_event`, `component.rs:563`), a `Request::Save`
+  of the stream's name under `STREAM_KEY`, `b"stream"`, its bytes a
+  `w::Kept` of the 16-byte name at `TABLE_VERSION`; `start_store`
+  (`store.rs:167`) takes that one record beside at most
+  `requests.requests` of the table's, and keeps its name; the first
+  `OpenStream` after `Start` waits behind that name's `StreamGone`
+  exchange, built as `drop_stream` builds it (`component.rs:666-672`),
+  until its reply or `Event::Lost`; `crates/jig-client/src/lib.rs`
+  re-exports `STREAM_KEY`.
+- The three routers that hand `jig-client` its records by `key.len() ==
+  16` hand it `STREAM_KEY`'s as well:
+  `testing/jig-client-test-shell-web/src/records.rs:30`,
+  `tests/client-protocol/src/native.rs:248`,
+  `tests/client-protocol/src/front/persistence.rs:67`; the kept lists
+  filled from them hold one more:
+  `testing/jig-client-test-shell-web/src/host.rs:53-54`,
+  `testing/jig-client-test-domain/src/route.rs:26`.
+Tests, added, aim for under 20 ms each:
+`tests/engine-clients/tests/stream.rs`,
+`two_streams_of_one_sign_in_each_open_with_their_own_names`; in
+`crates/jig-client-protocol-link/src/tests/`,
+`the_stream_s_name_is_saved_at_each_hello`,
+`a_kept_stream_name_is_sent_gone_before_the_first_open` (no
+`OpenStream` until the gone's reply, and one after `Lost`), and
+`a_full_table_and_the_stream_s_name_start`.
+Don't: change the closing warning's test,
+`testing/jig-client-test-shell-web/src/lib.rs:143` (a 16-byte key is a
+request; the stream's name warns of nothing); bound streams per sign-in;
+rename `exchanges_per_client`; change the mapping's `streams` refusal
+(`jig-protocol-engine-clients-http/src/lib.rs:69-90`) or a profile's
+`streams`.
+Unchanged: ruling 358, point 4; ruling 362; the stories' assertions;
+every deadline and lifetime.
+Size: about 150 lines more than 19.5's 40; past 250, report.
+Removes: the refusal of a second stream for one sign-in.
+
 ## One test of the browser suite
 
 The README's section of that name holds the commands, built on 19.4's
