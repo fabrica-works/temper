@@ -2203,6 +2203,13 @@ choice would have been the user's (development.md, 10.4).
      3. From now until the run's end, at each disk check of development.md 11.4, also run `sudo -n btrfs filesystem usage /srv | grep -E 'unallocated|Metadata,'`. When unallocated is below 5 GiB, run `sudo -n btrfs balance start -dusage=40,limit=10 /srv` once, then the usage line again, and log both outputs in `log.md`. If it is still below 5 GiB, block (kind: infrastructure) with both outputs; run no other btrfs command.
      4. Unchanged: the disk floors of development.md 11.4 and `plan check`, read from `df`; every step's Files, Proofs and gate.
 
+310. **the last retrospective's check holds no resume of this run** (process, the coordinator's block of 2026-10-18T04:09:48Z).
+     Ruling 310: the check no longer fails, and it never held this run's resume. development.md 1 says of a retrospective's proposals: "The user, or the director, decides each before the next run starts: `plan check` refuses a plan while a proposal of the last retrospective is open." client-api's run started before kit-batch's retrospective; a resume starts no run. The director recorded the decisions at 04:10:10Z (skein `c0662b5`, "Record the director's decisions on kit-batch's retrospective"), and `plan check` now prints "ok    the last retrospective's proposals are decided (skein's kit-batch)".
+
+     1. Go on with the resume. From now until the run's end, a `plan check` line about the last retrospective's proposals holds no resume and no session start of this run: log it, and go on.
+     2. kit-batch's decided proposals do not reach this run: its kit stays at skein `841f487` (ruling 295) and its process at `15ddb75` (supervision.md's Process line), until a steer moves either.
+     3. Unchanged: every other line of `plan check` binds as before.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
