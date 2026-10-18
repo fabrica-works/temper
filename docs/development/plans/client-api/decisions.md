@@ -2653,6 +2653,14 @@ choice would have been the user's (development.md, 10.4).
      3. **Bound:** three focused runs and 30 minutes from this unblock. Past that bound, report what the trace shows.
      4. **Unchanged:** the referee's check; every production deadline; ruling 229 for the gate and the proof; the candidate's two commits; ruling 339's point 5.
 
+347. **temper-05.s1: the landing story passes again** (steer of 2026-10-18T12:20:00Z).
+     Ruling 347, plan scope and order (the director's request of 2026-10-18T11:55Z, for forge-setup). Three of this run's temper landings broke the process tier's landing story, `a_persons_change_lands_on_the_forge_and_is_found_after_a_restart` (`crates/temper/tests/process.rs:68-89`). forge-setup's step 11.1 and its Done when 4 wait for it on `main`. The causes are in this run's areas, so this run repairs them. None of the three landings ran the story: their process proofs ran only `temper_open_signs_in_prints_the_inbox_and_exits_on_q`. 03.5's could not run it, under ruling 163, until temper 04.4.
+
+     1. **temper-05.s1** (`temper/05-s1-landing-story.md`): it repairs the three regressions (`3f8b3df6f`, 05.1; `e461dfd8d`, 04.3; `fe8fcdf6b`, 03.5), in the order the story meets them on `main`. Its proof is the story in the process profile, then the whole tier once. Needs: nothing. It runs off jig's chain, beside temper 06 and temper-04.s1, and starts before temper 06.4.
+     2. **The binaries on carbon-forge:** forge-setup's pinned Forgejo 17.0.0 and runner 13.2.0 are fetched from their release pages (the runner checked OK at 12:14Z, Forgejo still coming), each checked by `sha256sum -c` against its release's `.sha256`, into `~/src/tmp/temper/forgejo/v17.0.0/` and `runner-v13.2.0/`, the paths forge-setup's README gives under `~/src/rust`. The step's ready check waits for both OKs.
+     3. **From temper-05.s1's landing,** every temper increment runs the landing story once before landing ("The run's steers", 2026-10-18 12:20Z, point 2), so that the story stays green for forge-setup.
+     4. **Unchanged:** ruling 229; the story's assertions; forge-setup's rule that no other Forgejo is used.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
