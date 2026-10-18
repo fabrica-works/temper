@@ -2641,6 +2641,18 @@ choice would have been the user's (development.md, 10.4).
      2. The report at landing gives the count by file again, and the two lint exceptions with their reasons, as it does now.
      3. Unchanged: ruling 229 for the gate; ruling 340, point 5; the referee's and the judge's checks.
 
+346. **temper-04.s1: name 7d3becac7's timer** (process, temper-04's block of 2026-10-18T12:06:35Z).
+     Ruling 346, process, within ruling 339's point 3 and ruling 229 ("reproduce each new failure point in a focused test first, log its cause there, and change only what that log names"). The bisect has named the commit: jig `7d3becac7` (jig-17.s2, "Reopen busy watches and wait for opening answers before closing"). It has not named the cause: the report says that "a specific internal timer field has not been identified". A jig supplement needs that cause line, so there is none yet.
+
+     The check that fails is skein-world's teardown (`testing/skein-world/src/world.rs:461-474` at skein `8a51e10`). After the world's last word, a process whose host is not empty must have no policy deadline (`host.next_policy_deadline()`) between the last word and the run's end. Process 0 has one at 173728718 ns, so something in it still waits on a timer after the drain.
+
+     1. **Name the timer:** use at most three focused runs of the story at seed 7, on the candidate (`e14416f4b`, jig `38ae1ba1`), with a trace kept out of every commit. Log the policy deadline process 0 holds at teardown: who armed it (its call site), for which watch or request, and that watch's state. Say which of jig-17.s2's four rules armed it, by its Shape's names: "Busy is dropped, not ended", "`me` ends only with the sign-in or its version", "A closing waits for its opening's answer", "One kept for `me`". If none of them did, name what did.
+     2. **Then, by the log:**
+        - if it is temper's own code (its drain, its loop, its adapter of the client), repair it there, in s1's increment, within ruling 339's 200 lines, as README "Pins" says, and name each file outside the Files in the commit body. Then run the gate, as ruling 229 says;
+        - if it is `jig-client-domain`, or another jig crate, stop and report the log's cause line, the rule and its file:line in jig. A jig supplement then repairs it, or the designer answers whether the rule holds while the client's application drains.
+     3. **Bound:** three focused runs and 30 minutes from this unblock. Past that bound, report what the trace shows.
+     4. **Unchanged:** the referee's check; every production deadline; ruling 229 for the gate and the proof; the candidate's two commits; ruling 339's point 5.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
