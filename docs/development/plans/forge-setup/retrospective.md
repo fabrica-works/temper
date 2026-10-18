@@ -1031,19 +1031,37 @@ The kit's, for skein:
 
 ## 10. Decisions
 
-For the user, or the director.
+2026-10-18. The director, acting for the user with their authority
+(development.md, section 2.7), adopted each proposal. The designer
+applied the text parts to development.md, its cards, testing-strategy.md
+and the workspace `AGENTS.md` in skein 49e7eb6, and the kit parts of
+proposals 2, 3, 7 and 10 in skein d450346. Proposal 2's wait is a command
+of its own, `plan await`, beside `plan idle`. Proposal 6's kit part, the
+pulse's `aims:` verdict summing the test times of the packages an aim
+names, goes to the next kit batch; until then the hourly check and "Done
+when" sum them from the gate's log.
+
+temper's client-api run, on carbon-forge, keeps its claim's kit, skein
+841f487, and the process in it (development.md, section 12). That kit has
+no move at a pause's resume, so this batch reaches the run only by its
+supervisor's ruling: the practice of proposals 1, 5, 7, 8 and 12, and the
+kit of proposals 2, 3, 7 and 10 by moving its `kit/` to d450346 or later
+(section 3.6). Proposals 4, 6 and 9 are planning rules, for the plans
+after it. The workspace `AGENTS.md` (proposal 11) is read from
+carbon-forge's primary checkout, not from `kit/`: it reaches the run's
+sessions once that checkout is fast-forwarded.
 
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
-| 10 | open | |
-| 11 | open | |
-| 12 | open | |
+| 1 | adopted | skein 49e7eb6: development.md, 5.2 (the README's Process tier), 12, 14.1 and 14.5; supervisor.md, 6 |
+| 2 | adopted | skein d450346: `plan await` and the watch's `landed:` event and coordinator turn; skein 49e7eb6: development.md, 3.5, 3.6, 7.4 and 10.5; supervisor.md, 2 and 6 |
+| 3 | adopted | skein d450346: `plan resume` of a paused run moves `kit/` to skein's `origin/main` and appends its Process line; skein 49e7eb6: development.md, 3.6, 4.4, 7.6, 12 and 14.1; supervisor.md, 1, 2 and 6 |
+| 4 | adopted | skein 49e7eb6: development.md, 5.2 ("Done when") and 5.4 (the literal reading) |
+| 5 | adopted | skein 49e7eb6: testing-strategy.md, 10; development.md, 5.6, where the test rules are; supervisor.md, 8 |
+| 6 | adopted | skein 49e7eb6: development.md, 5.2 (the aims) and 5.4; the pulse's `aims:` verdict over the named packages, in the next kit batch |
+| 7 | adopted | skein d450346: the pulse's short waits; skein 49e7eb6: development.md, 7.4, 11.4 and 14.2; implementer.md, 8.3 |
+| 8 | adopted | skein 49e7eb6: development.md, 7.2 and 10.3; supervisor.md, 3; implementer.md, 8.1 |
+| 9 | adopted | skein 49e7eb6: development.md, 2.2, 5.2 and 5.4 |
+| 10 | adopted | skein d450346: `plan docs` and `plan ruling` refuse a worktree whose branch has commits `origin/main` lacks; skein 49e7eb6: development.md, 3.6 and 10.3; supervisor.md, 3 |
+| 11 | adopted | skein 49e7eb6: the workspace `AGENTS.md` gives smith's and temper's gate as `scripts/check.sh`, and its section "Until the reliability plan ends" goes |
+| 12 | adopted | skein 49e7eb6: development.md, 10.3; supervisor.md, 3 |
