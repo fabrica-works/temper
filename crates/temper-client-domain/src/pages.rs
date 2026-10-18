@@ -127,9 +127,15 @@ impl Pages {
     }
     #[must_use]
     pub fn cards(&self) -> Option<&skein_lib::List<inbox::Card>> {
+        if let Some(task) = &self.task {
+            return Some(&task.cards);
+        }
         if let Some(chat) = &self.chat { Some(&chat.cards) } else { Some(&self.inbox.as_ref()?.cards) }
     }
     pub(crate) fn cards_mut(&mut self) -> Option<&mut skein_lib::List<inbox::Card>> {
+        if let Some(task) = &mut self.task {
+            return Some(&mut task.cards);
+        }
         if let Some(chat) = &mut self.chat { Some(&mut chat.cards) } else { Some(&mut self.inbox.as_mut()?.cards) }
     }
     pub(crate) fn seeded(seed: u64) -> Self {

@@ -21,6 +21,7 @@ pub struct Confirm {
 #[must_use]
 pub fn offers(page: &ReadValue) -> &[Offered] {
     match page {
+        ReadValue::Task(v) => v.acts.as_slice(),
         ReadValue::Proposal(v) => v.acts.as_slice(),
         ReadValue::OwnerProposal(v) => v.acts.as_slice(),
         ReadValue::Question(v) => v.acts.as_slice(),
@@ -32,7 +33,6 @@ pub fn offers(page: &ReadValue) -> &[Offered] {
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)
-        | ReadValue::Task(_)
         | ReadValue::Result(_)
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
@@ -52,6 +52,10 @@ pub fn offers(page: &ReadValue) -> &[Offered] {
 #[expect(clippy::manual_map, reason = "step code keeps optional owner facts explicit")]
 pub fn revision(page: &ReadValue) -> Option<contract::Revision> {
     match page {
+        ReadValue::Task(v) => match &v.hold {
+            Some(hold) => Some(hold.revision()),
+            None => None,
+        },
         ReadValue::Escalation(v) => Some(v.hold.revision),
         ReadValue::OwnerEscalation(v) => match &v.task.hold {
             Some(hold) => Some(hold.revision()),
@@ -63,7 +67,6 @@ pub fn revision(page: &ReadValue) -> Option<contract::Revision> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)
-        | ReadValue::Task(_)
         | ReadValue::Result(_)
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
@@ -168,7 +171,7 @@ fn send(pages: &mut Pages, open: Confirm, out: &mut Queue<Request>) {
                 },
             },
         },
-        (ObjectKey::Escalation(task), ActKind::Release) => {
+        (ObjectKey::Escalation(task) | ObjectKey::Task(task), ActKind::Release) => {
             if jig_client::facts::effect(offers(page), open.act)
                 == Some(&contract::Effect::Release(contract::ReleaseEffect::Uncertain))
                 && open.again.is_none()

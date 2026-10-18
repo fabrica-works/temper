@@ -253,7 +253,7 @@ impl App for Temper {
             }
             jig_client::Ask::Jig(ask) => {
                 let mut sent = observe::jig_sent(*attempt, *key, ask);
-                // temper's Release acts on the inbox escalation, not a reference task page.
+                // Both inbox and plan releases use the held task's deciding card.
                 if let jig_client::contract::Ask::Release { task, .. } = ask.as_ref() {
                     sent.card = Some(observe::key(jig_client::contract::ObjectKey::Escalation(*task)));
                 }
@@ -274,7 +274,24 @@ impl App for Temper {
         let Some(event) = event.root() else { return vec![Receipt::Started] };
         match event {
             domain::Event::Jig(event) => observe::jig_received(event),
-            domain::Event::Client { event: jig_client::Event::Up { up } } => observe::up_received(up),
+            domain::Event::Client { event: jig_client::Event::Up { up } } => {
+                let mut receipts = observe::up_received(up);
+                if let jig_client::Up::ReadDone {
+                    result:
+                        jig_client::Readout::Jig(jig_client::contract::ReadResult::Value(
+                            jig_client::contract::ReadValue::Task(task),
+                        )),
+                    ..
+                } = up
+                    && let Some(hold) = &task.hold
+                {
+                    receipts.push(Receipt::Card {
+                        key: observe::key(jig_client::contract::ObjectKey::Escalation(task.chip.task)),
+                        revisions: vec![(2, hold.revision().value)],
+                    });
+                }
+                receipts
+            }
             domain::Event::SignedOut => vec![Receipt::Parked],
             domain::Event::Start { .. }
             | domain::Event::Went { .. }

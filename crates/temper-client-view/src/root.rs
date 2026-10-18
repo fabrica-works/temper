@@ -40,6 +40,9 @@ impl View {
             limits: *limits,
         }
     }
+    fn task_main(&mut self, b: &mut Builder, root: &Domain) {
+        crate::pages::task::main(b, root, &self.forge_words, &self.jig_words, &mut self.pages, &mut self.jig);
+    }
     #[must_use]
     pub fn tree(&self) -> &Tree {
         self.render.tree()
@@ -90,7 +93,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             &mut view.jig,
         );
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
-        crate::pages::task::main(&mut builder, root, &view.forge_words, &mut view.pages);
+        view.task_main(&mut builder, root);
     } else if !jig_client_view::pages::main(&mut builder, &jig, &view.jig_words, &mut view.jig)
         && let Some(form) = root.forge().form()
     {

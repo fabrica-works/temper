@@ -95,3 +95,47 @@ fn only_a_tracked_agents_task_gets_the_full_page() {
         assert_eq!(page.shape, *expected, "{priority:?}, {executor:?}");
     }
 }
+const HELD: u64 = 12;
+const FIRST_CARD: u32 = 0;
+#[test]
+fn releasing_from_the_plan_names_the_holds_revision_the_card_showed() {
+    use crate::pages::Act;
+    let mut pages = fixtures::task::held_pages();
+    let mut out = fixtures::acts::act(
+        &mut pages,
+        Act::Decide {
+            object: c::ObjectKey::Task(HELD),
+            revision: Some(fixtures::acts::REVISION),
+            act: c::ActKind::Release,
+        },
+    );
+    assert!(fixtures::acts::sent(&mut out).is_empty(), "release waits for confirmation");
+    let mut out = fixtures::acts::act(&mut pages, Act::Confirm);
+    assert_eq!(
+        fixtures::acts::sent(&mut out).as_ref(),
+        [c::Ask::Release { project: fixtures::PROJECT, task: HELD, revision: fixtures::acts::REVISION, again: None }]
+    );
+    assert!(fixtures::acts::sent(&mut fixtures::acts::act(&mut pages, Act::Confirm)).is_empty());
+}
+#[test]
+fn a_moved_hold_is_refused_and_the_card_asks_to_look_again() {
+    use crate::pages::Act;
+    let mut pages = fixtures::task::held_pages();
+    fixtures::acts::act(
+        &mut pages,
+        Act::Decide {
+            object: c::ObjectKey::Task(HELD),
+            revision: Some(fixtures::acts::REVISION),
+            act: c::ActKind::Release,
+        },
+    );
+    fixtures::acts::act(&mut pages, Act::Confirm);
+    let key = pages.cards().expect("cards").get(FIRST_CARD).expect("held").key.expect("sent");
+    let outcome = jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused {
+        refusal: c::Refusal::Moved { now: fixtures::acts::NEW_REVISION, what: c::Moved::Hold { reason: None } },
+        at: None,
+    }));
+    crate::acts::told(&mut pages, &Told::Answered { key, outcome: outcome.clone() });
+    assert_eq!(pages.cards().expect("cards").get(FIRST_CARD).expect("held").outcome, Some(outcome));
+    assert!(fixtures::acts::sent(&mut fixtures::acts::act(&mut pages, Act::Confirm)).is_empty());
+}

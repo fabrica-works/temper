@@ -92,6 +92,9 @@ pub(crate) fn card(
             Outcome::Answered(Answered::Jig(Answer::Done(outcome))) => jig.outcome(b, outcome),
             Outcome::Answered(Answered::Jig(Answer::Refused { refusal, .. })) => {
                 jig.refusal(b, refusal, jig_bindings.text_limit());
+                if let jig_client::contract::Refusal::Moved { .. } = refusal {
+                    jig.text(b, P::LookAgain, &[]);
+                }
             }
             Outcome::NotKept => jig.status(b, P::RequestNotKept, &[]),
             Outcome::Unknown => jig.status(b, P::Unknown, &[]),
@@ -109,6 +112,9 @@ pub(crate) fn card(
         return;
     }
     for (act, word) in ACTIONS {
+        if root.pages().task().is_some() && act != ActKind::Release {
+            continue;
+        }
         let Some(admission) = jig_client::facts::offer(acts::offers(page), act) else { continue };
         match admission {
             Admission::Allowed | Admission::Bounded { .. } => {
@@ -171,6 +177,26 @@ pub(crate) fn main(
         b.name(&words.say(word, &[]));
         b.text(Run::Plain, &words.say(word, &[]));
         facts(b, root, page, jig, jig_bindings);
+        if open.act == ActKind::Release
+            && let ReadValue::Task(task) = page
+        {
+            match &task.hold {
+                Some(jig_client::contract::TaskHold::Owner(hold)) => {
+                    b.text(Run::Plain, &words.say_word(jig_client::words::Word::hold(&hold.reason), &[]));
+                    jig.text(b, P::HoldRevision, &[skein_ui::phrases::Hole::Number(hold.revision)]);
+                }
+                Some(jig_client::contract::TaskHold::Document(hold)) => {
+                    jig_client_view::cards::escalation::held(
+                        b,
+                        &root.jig().borrow(root.client()),
+                        hold,
+                        jig,
+                        jig_bindings,
+                    );
+                }
+                None => {}
+            }
+        }
         if jig_client::facts::dangerous(open.act) {
             jig.status(b, P::Dangerous, &[]);
         }

@@ -35,3 +35,26 @@ fn a_forge_panel_on_a_goals_page_says_shown_on_the_forge() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }
+#[test]
+fn a_held_task_released_from_a_goals_plan_runs_again() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let (goal, held) = fixtures::goal_with_held_delegate(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Release task"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Release task") },
+            Step::See { find: Find::named(Role::Dialog, b"Release task"), within: fixtures::WITHIN },
+            Step::See {
+                find: Find::text(b"The next run resumes its conversation; tries count again from zero"),
+                within: fixtures::WITHIN,
+            },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::See { find: fixtures::plan_item(held, b"Running"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    assert_eq!(world.front().engine.task(held).expect("released delegate").tries, jig_domain_tasks::Tries::NONE);
+}

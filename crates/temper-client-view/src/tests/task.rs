@@ -105,8 +105,11 @@ fn a_plans_items_are_nested_under_their_supplied_parent() {
     crate::pages::task::plan(
         &mut b,
         &tree,
+        &f::root(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY)),
         &fixtures::words(),
+        &fixtures::jig_words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        &mut jig_client_view::JigBindings::new(fixtures::tree_limits().bindings, TEXT_BYTES),
     );
     let tree = b.finish();
     let parent = fixtures::find(&tree, Role::TreeItem, b"Task 9").expect("parent");
@@ -125,4 +128,97 @@ fn a_plans_items_are_nested_under_their_supplied_parent() {
     let parent_index = parent_index.expect("parent index");
     let child_index = child_index.expect("child index");
     assert!(child_index < parent_index + usize::try_from(nodes[parent_index].size).expect("parent size"));
+}
+#[test]
+fn the_release_confirmation_says_what_releasing_does() {
+    use temper_client_domain::{Action, Event, pages::Act};
+    let mut root = f::held_root();
+    fixtures::root_event(
+        &mut root,
+        Event::Act {
+            action: Action::Pages(Act::Decide {
+                object: c::ObjectKey::Task(TASK),
+                revision: Some(f::HOLD_REVISION),
+                act: c::ActKind::Release,
+            }),
+        },
+    );
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    assert!(fixtures::find(tree, Role::Dialog, b"Release task").is_some());
+    let text = fixtures::text(tree);
+    assert!(
+        skein_lib::bytes::find(&text, b"The next run resumes its conversation; tries count again from zero").is_some()
+    );
+    assert!(skein_lib::bytes::find(&text, b"Hold revision 7").is_some());
+}
+
+#[test]
+fn a_moved_hold_is_refused_and_the_card_asks_to_look_again() {
+    let root = f::held_root();
+    let mut card = root.pages().cards().expect("cards").get(FIRST_CARD).expect("held").clone();
+    card.outcome = Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Refused {
+        refusal: c::Refusal::Moved { now: NEW_HOLD_REVISION, what: c::Moved::Hold { reason: None } },
+        at: None,
+    })));
+    let limits = fixtures::tree_limits();
+    let mut builder = Builder::new(&limits);
+    crate::confirm::card(
+        &mut builder,
+        &root,
+        &card,
+        &fixtures::words(),
+        &fixtures::jig_words(),
+        &mut crate::frame::Bindings::new(limits.bindings),
+        &mut jig_client_view::JigBindings::new(limits.bindings, TEXT_BYTES),
+    );
+    let text = fixtures::text(&builder.finish());
+    assert!(skein_lib::bytes::find(&text, b"Inspect current object").is_some());
+}
+const FIRST_CARD: u32 = 0;
+const NEW_HOLD_REVISION: c::Revision = c::Revision { value: 8 };
+const TEXT_BYTES: u32 = 32;
+
+#[test]
+fn a_held_plans_release_has_its_public_escalation_card_identity() {
+    let root = f::held_root();
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    assert!(has_release_card(tree));
+}
+fn has_release_card(tree: &skein_ui::Tree) -> bool {
+    for node in tree.nodes() {
+        if node.role == Role::Item
+            && node.key == Some(skein_ui::Key { owner: jig_client_view::Owner::Jig.opaque(), kind: 2, a: TASK, b: 0 })
+        {
+            return true;
+        }
+    }
+    false
+}
+#[test]
+fn a_released_plans_item_keeps_its_decision_result_while_running() {
+    use temper_client_domain::{Action, Event, pages::Act};
+    let mut root = f::held_root();
+    for act in [
+        Act::Decide { object: c::ObjectKey::Task(TASK), revision: Some(f::HOLD_REVISION), act: c::ActKind::Release },
+        Act::Confirm,
+    ] {
+        fixtures::root_event(&mut root, Event::Act { action: Action::Pages(act) });
+    }
+    let mut tree = f::tree();
+    let c::Delivery::OwnerTree(value) = &mut tree else { panic!("owner tree") };
+    value.root.phase = c::Phase::Running;
+    let limits = fixtures::tree_limits();
+    let mut builder = Builder::new(&limits);
+    crate::pages::task::plan(
+        &mut builder,
+        &tree,
+        &root,
+        &fixtures::words(),
+        &fixtures::jig_words(),
+        &mut crate::frame::Bindings::new(limits.bindings),
+        &mut jig_client_view::JigBindings::new(limits.bindings, TEXT_BYTES),
+    );
+    assert!(has_release_card(&builder.finish()));
 }

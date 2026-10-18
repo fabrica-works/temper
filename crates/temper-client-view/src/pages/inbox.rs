@@ -232,7 +232,7 @@ fn body(b: &mut Builder, page: &ReadValue, jig: &jig_client_view::words::Words) 
     }
 }
 
-fn card_key(object: ObjectKey) -> skein_ui::Key {
+pub(crate) fn card_key(object: ObjectKey) -> skein_ui::Key {
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
         ObjectKey::Proposal(key) => match key.proposer {

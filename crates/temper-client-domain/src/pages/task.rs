@@ -1,9 +1,9 @@
 //! One task's borrowed documents, first activity page and live run handle.
-use super::Request;
+use super::{Request, inbox::Card};
 use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Latest, Readable, Readout, Told, Watchable, contract as c};
-use skein_lib::Queue;
+use skein_lib::{List, Queue};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape {
     Unknown,
@@ -22,6 +22,7 @@ pub struct Task {
     pub final_task: Option<Box<c::Task>>,
     pub next: u64,
     pub through: Option<u64>,
+    pub cards: List<Card>,
 }
 impl Task {
     pub(crate) fn new(number: u64, first: u64, limits: &Limits, out: &mut Queue<Request>) -> Self {
@@ -46,6 +47,7 @@ impl Task {
             final_task: None,
             next: first.checked_add(3).expect("task handles fit"),
             through: None,
+            cards: List::with_capacity(limits.jig.objects),
         }
     }
     #[must_use]
@@ -62,9 +64,24 @@ impl Task {
         for handle in [Some(self.document), Some(self.tree), Some(self.activity), self.run].into_iter().flatten() {
             unwatch(handle, out);
         }
+        for card in &self.cards {
+            unwatch(card.handle, out);
+        }
         self.next
     }
     pub(crate) fn told(&mut self, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+        if let Told::Page { handle, page: Readout::Jig(c::ReadResult::Value(value)) } = &told {
+            for index in 0..self.cards.len() {
+                let card = self.cards.get_mut(index).expect("bounded held card");
+                if card.handle == *handle {
+                    if let c::ReadValue::Task(task) = value {
+                        card.project = Some(task.project);
+                    }
+                    card.page = Some(value.clone());
+                    return true;
+                }
+            }
+        }
         match told {
             Told::Changed { handle } if handle == self.document => {
                 if let Some(Latest::Jig(c::Delivery::Task(task))) = latest(client, handle) {
@@ -100,7 +117,22 @@ impl Task {
                     self.latest = Some(page);
                 }
             }
-            Told::Changed { handle } | Told::Text { handle } if handle == self.tree || Some(handle) == self.run => {}
+            Told::Changed { handle } if handle == self.tree => match latest(client, handle) {
+                Some(Latest::Jig(c::Delivery::OwnerTree(tree))) => {
+                    self.held(&tree.root, out);
+                    for row in &tree.rows {
+                        self.held(&row.chip, out);
+                    }
+                }
+                Some(Latest::Jig(c::Delivery::Tree(tree))) => {
+                    for node in &tree.nodes {
+                        self.held(&node.chip, out);
+                    }
+                }
+                Some(Latest::Jig(_) | Latest::Family(_)) | None => {}
+            },
+            Told::Text { handle } if handle == self.tree => {}
+            Told::Changed { handle } | Told::Text { handle } if Some(handle) == self.run => {}
             Told::Ended { handle, .. } if handle == self.tree || Some(handle) == self.run => {}
             Told::Link { .. }
             | Told::Pending { .. }
@@ -113,6 +145,33 @@ impl Task {
             | Told::Page { .. } => return false,
         }
         true
+    }
+    fn held(&mut self, chip: &c::Chip, out: &mut Queue<Request>) {
+        if chip.phase != c::Phase::Held || self.cards.len() == self.cards.capacity() {
+            return;
+        }
+        let object = c::ObjectKey::Task(chip.task);
+        for card in &self.cards {
+            if card.object == object {
+                return;
+            }
+        }
+        let handle = handle(self.next);
+        self.next = self.next.checked_add(1).expect("task handles fit");
+        self.cards
+            .push(Card {
+                object,
+                group: c::InboxGroup::Escalations,
+                project: None,
+                position: None,
+                handle,
+                page: None,
+                words: None,
+                key: None,
+                outcome: None,
+            })
+            .expect("held cards bounded");
+        read(handle, c::Read::Task { task: chip.task }, out);
     }
     fn changed(&mut self, task: &c::Task, out: &mut Queue<Request>) {
         self.shape = match task.chip.executor {
@@ -181,6 +240,11 @@ fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    // The first activity page and a final task read, after the live watch ended.
-    limits.jig.document_bytes.checked_mul(2)
+    // Activity, the final task, and bounded held-task cards and their words.
+    limits
+        .jig
+        .document_bytes
+        .checked_mul(u64::from(limits.jig.objects).checked_add(2)?)?
+        .checked_add(List::<Card>::worst_case(limits.jig.objects)?)?
+        .checked_add(u64::from(limits.jig.objects).checked_mul(u64::from(limits.jig.text))?)
 }

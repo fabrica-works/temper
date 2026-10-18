@@ -21,7 +21,14 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
     b.name(&words.say(word, &[]));
     text(b, Role::Heading { level: 2 }, &words.say(word, &[]));
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+    jig_bindings: &mut jig_client_view::JigBindings,
+) {
     b.open(Role::Main);
     if let Some(page) = root.pages().task()
         && let Some(task) = page.document(root.client())
@@ -34,12 +41,13 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
-            plan(b, tree, words, bindings);
+            plan(b, tree, root, words, jig, bindings, jig_bindings);
         }
         if page.shape == Shape::Tracked {
             latest(b, page.latest.as_deref(), words);
         }
     }
+    crate::confirm::main(b, root, words, jig, bindings, jig_bindings);
     b.close();
 }
 pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words) {
@@ -167,7 +175,15 @@ fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &
         text(b, Role::Status, &words.say(Word::HeldBelow, &[Hole::Number(u64::from(held_below))]));
     }
 }
-pub(crate) fn plan(b: &mut Builder, tree: &c::Delivery, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn plan(
+    b: &mut Builder,
+    tree: &c::Delivery,
+    root: &Domain,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+    jig_bindings: &mut jig_client_view::JigBindings,
+) {
     region(b, Word::Plan, words);
     b.open(Role::Tree);
     b.name(&words.say(Word::Plan, &[]));
@@ -175,11 +191,13 @@ pub(crate) fn plan(b: &mut Builder, tree: &c::Delivery, words: &Words, bindings:
         c::Delivery::OwnerTree(tree) => {
             let mut stack = List::with_capacity(tree.rows.len().checked_add(1).expect("tree stack fits"));
             chip(b, &tree.root, words, bindings);
+            controls(b, &tree.root, root, words, jig, bindings, jig_bindings);
             stack.push(tree.root.task).expect("root fits");
             owner_folds(b, tree, tree.root.task, words);
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
+                controls(b, &row.chip, root, words, jig, bindings, jig_bindings);
                 stack.push(row.chip.task).expect("tree stack fits");
                 owner_folds(b, tree, row.chip.task, words);
             }
@@ -191,6 +209,7 @@ pub(crate) fn plan(b: &mut Builder, tree: &c::Delivery, words: &Words, bindings:
             for node in &tree.nodes {
                 parent(b, &mut stack, node.parent);
                 chip(b, &node.chip, words, bindings);
+                controls(b, &node.chip, root, words, jig, bindings, jig_bindings);
                 stack.push(node.chip.task).expect("tree stack fits");
                 counts(b, node.folded, node.held_below, words);
             }
@@ -212,6 +231,26 @@ pub(crate) fn plan(b: &mut Builder, tree: &c::Delivery, words: &Words, bindings:
     }
     b.close();
     b.close();
+}
+fn controls(
+    b: &mut Builder,
+    chip: &c::Chip,
+    root: &Domain,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+    jig_bindings: &mut jig_client_view::JigBindings,
+) {
+    if let Some(page) = root.pages().task() {
+        for card in &page.cards {
+            if card.object == c::ObjectKey::Task(chip.task) && (chip.phase == c::Phase::Held || card.key.is_some()) {
+                b.open(Role::Item);
+                b.key(super::inbox::card_key(c::ObjectKey::Escalation(chip.task)));
+                crate::confirm::card(b, root, card, words, jig, bindings, jig_bindings);
+                b.close();
+            }
+        }
+    }
 }
 fn owner_folds(b: &mut Builder, tree: &c::OwnerTree, parent: u64, words: &Words) {
     use c::Phase as P;
