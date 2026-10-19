@@ -1194,6 +1194,17 @@ where its answer lands.
 
      Instructions: coordinator adds skein-03.s1 in check with its new session file after skein-03.3; normal readiness precedes implementation. Closing forge-kit/temper-repin also waits for it after its existing prerequisites. Preserve historical increment counts; final connection count gains relative+1. Refresh further reached copies/derived counts and name each in the commit body. Existing starts and temper’s deletion proof remain unheld.
 
+165. **Record skein03.s1 readiness against current main** (ready check of skein-03.s1, 2026-10-19T13:20Z).
+     Reverses: nothing. Amends skein/03.s1-connection-shapes.md’s readiness evidence and findings/connection-shapes.md; scope and budgets stay as ruling164.
+
+     The normal ready check found no blocking plan mismatch. Its final fixture correction independently compiles; preserve the nineteen-site/eighty-three-evaluation map,128→129 relative+1 and temper’s112 inherited identities/deletion delta−107. Historical preparation failures and128 proofs remain historical. The gate is scripts/check.sh; no scripts/recovery-shape/check.sh exists or is required.
+
+     Checked: report pump/ready-skein-03s1.md freezes skein9fbda6b7076a20b5dcf387bbbc47453a3cea84a0, smith9d4430e956b558571687642291769afd884e520b, jig39c1e4db9dc923b0a2063468fa5533fa3c50113a, hearth61ab3d16477c4dc97b10d4b7dc2ac6e0cddf7ef0 and temper79eff1cddcfe45e9584415c5338d8449cd73904e. Name/source/copy audit found no additional sampled-test consumer; new names belong to03.s1.
+     Checked: one pinned-heavy explicit-bash attempt20261019T131645-824 exits0; format, both all-target clippy commands, connection5+/9-/decoys, original exactly3violations, recovery and plan-shapes controls pass. Sequential package profiles129/0/0 pass; focused0.102s, sampled units4/3/3/13ms, ceilings unchanged. No full gate/process/recording/live/downstream build was claimed.
+     Checked: pinned plan supports ready/ruling at672/671. Readiness worker ended before removing only its completed target; detailed commands/ownership retained in scratch-ready-skein-03s1.
+
+     Instructions: mark skein-03.s1 ready now with these snapshots; coordinator starts after its landed03.3 prerequisite. Preserve all shared modes/controls present at implementation, rechecking listing if it lands meanwhile; serialize common-file edits without holding other starts. Refresh further reached copies/derived counts and list each in the commit body. Existing closing forge-kit/temper-repin waits for03.s1, with no additional repin.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
