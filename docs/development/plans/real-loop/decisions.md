@@ -827,4 +827,9 @@ and the user, or the director, may veto it before the run:
   1 s; (c) no sum: the per-test guides and the 15 s rule alone. The
   designer recommends (b). Until it is decided: measured, never moved,
   cut or merged for the sum (README, Rules, "The worlds' sum").
-  Decision: pending, with the director.
+  Decision: (b), by user, 2026-10-19, as amended by the director: the
+  real loop is counted apart, with a standing ceiling of 6 s for its
+  sum, in place of an aim per plan, and each story at most 1 s. The
+  other worlds below the domain keep 4 s. The ceiling is sized to smoke
+  (ruling 130 keeps the real loop to smoke, the testing pyramid), and
+  the user revisits it when it is reached. testing.md 6.1 takes it.
