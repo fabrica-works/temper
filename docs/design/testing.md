@@ -34,8 +34,9 @@ what is not built yet (section 9), and what is still open (section 10).
   layer serves Forgejo's API; its git is reached by the fake git program,
   never over HTTP.
 - **Checks follow content.** The machine's sh is a small subset of POSIX
-  sh, in which fake repositories write their checks and their CI, so a
-  change that is wrong fails in the run and on the forge alike.
+  sh, in which fake repositories write their checks and, later, their CI
+  (4.2), so a change that is wrong fails in the run and on the forge
+  alike.
 - **The referee is built,** on skein's world harness, and every engine
   world holds its scenarios' expectations in one.
 - **No fake of temper's own components:** the system world runs the real
@@ -474,11 +475,11 @@ sees from outside (sections 2 and 3). temper's worlds add:
 - **Its costs.** The protocol layer counts the requests it serves, by
   route, which the engine's cost checks hold to ceilings
   (protocol/forge.md, section 10).
-- **Its deliveries.** For each of the domain's webhooks the protocol
-  layer renders a signed delivery, which the world writes on a
-  connection to the engine's webhooks' listener, as Forgejo sends one
-  (protocol/forge.md, section 5); the forge peer does so in the real
-  loop (2.4).
+- **Its deliveries.** For each hook the domain fires, of the events
+  skein's `fake-forge.md` (section 4) names, the protocol layer renders
+  a signed delivery, which the world writes on a connection to the
+  engine's webhooks' listener, as Forgejo sends one (protocol/forge.md,
+  section 5); the forge peer does so in the real loop (2.4).
 - **Its setup routes.** Reconcile's tests use the protocol layer's
   routes for admin users and their tokens, orgs, teams and their
   members, and org hooks (`fake-forge.md`, section 4; protocol/setup.md,
@@ -494,9 +495,12 @@ sees from outside (sections 2 and 3). temper's worlds add:
   for the tools (2.6). The real-loop world's repository stories run on
   the fake git program too (2.4); a real-git bridge is later work
   (section 10).
-- **CI follows content.** A repository's CI runs its checks in the shell
-  subset (4.3) on the pushed tree, so a change that is wrong fails on the
-  forge as it fails in the run.
+- **CI follows content,** by the fake forge's cue: a commit whose file at
+  the cue's path holds its text passes, any other fails (skein's
+  `fake-forge.md`, section 2.3; here, 2.4). CI that runs a repository's
+  checks in the shell subset (4.3) on the pushed tree, so that a change
+  that is wrong fails on the forge as it fails in the run, is later
+  work (section 10).
 - **GitHub's API** comes after Forgejo's (protocol/forge.md, section 14).
 
 ### 4.3 The machine, and the fake git program
@@ -582,12 +586,13 @@ preparations alongside live pushes before reclaim.
 real build. The machine's sh interprets a small subset of POSIX sh: a few
 commands (`test`, `grep -q`, `cat`, `echo`, `exit`) joined by `&&`, `||`
 and `;`. The fake LLM's scripts write their commands in it, and fake
-repositories write their checks (`.temper/pre-pr`) and their CI in it.
-This gives two things:
+repositories write their checks (`.temper/pre-pr`) in it, and later
+their CI (4.2). This gives two things:
 
-- **Checks follow content.** An edit is right or wrong, and the check,
-  the run and the forge's CI all say so. A scenario can tell a run that
-  fixed the bug from one that only said it did.
+- **Checks follow content.** An edit is right or wrong, and the check
+  and the run say so, as the forge's CI will once it runs the subset
+  (4.2). A scenario can tell a run that fixed the bug from one that only
+  said it did.
 - **Scenarios run on a real machine unchanged,** since real sh speaks the
   subset.
 

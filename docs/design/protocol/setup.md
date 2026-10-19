@@ -181,9 +181,10 @@ managed or owned.
   | its limits | `setup.orgs`, `setup.deadline_ms`, `setup.backoff_ms` and `setup.backoff_max_ms` (configuration.md, section 7) |
 
   The API's address is the host's: the forge's `api` (configuration.md,
-  section 3). A value the kit's check refuses comes back as its `Place`
-  (skein's `forge-setup.md`, section 6.1), and the setup shell names the
-  path this table gives for it.
+  section 3). temper-forge-setup maps the setup onto these values and
+  runs the kit's check on them, for every command (section 11); a value
+  the check refuses comes back as its `Place` (skein's `forge-setup.md`,
+  section 6.1), and is named by the path this table gives for it.
 - **What the host answers, as needs:**
 
   | Reconcile asks for | The setup shell answers |
@@ -723,13 +724,15 @@ skein-forge-setup            reconcile's machine, its types and its checks; the 
 ├── skein-forge
 └── skein-lib, skein-json
 temper-forge-setup           step code: the setup's types and checks, read from the configuration; the
-│                              preparation's machine; app.ini and the runner's files; the processes'
+│                              setup mapped onto reconcile's given values, and the kit's check of them;
+│                              the preparation's machine; app.ini and the runner's files; the processes'
 │                              specs; the configuration's steps. Names no host
-├── skein-forge
+├── skein-forge-setup, skein-forge
 └── jig-protocol-config, skein-lib, skein-json
 temper-forge-setup-shell     ordinary Rust: the hosts of prepare, run and reconcile: commands, files,
 │                              the forge's locks, the exec; HTTP on skein-http over skein-io. Its
-│                              reconcile maps the setup onto the machine's values (section 5)
+│                              reconcile runs skein's machine on the values temper-forge-setup maps
+│                              (section 5)
 ├── temper-forge-setup, skein-forge-setup, skein-forge
 └── skein-io, skein-http, skein-lib, skein-json, skein-shell
 temper-box                   the box's machine (step code) and its host (ordinary Rust) on skein-io's
@@ -792,9 +795,10 @@ relies on.
   of the preparation's in any argument.
 - **Reconcile's decisions** from answers are skein's (skein's
   `forge-setup.md`, section 7). What is temper's is the mapping of
-  section 5: each member of a managed setup and of an owned one becomes
-  its value, the word `temper` and the names `temper-api` and
-  `temper-git` among them.
+  section 5, in temper-forge-setup: each member of a managed setup and
+  of an owned one becomes its value, the word `temper` and the names
+  `temper-api` and `temper-git` among them, and each `Place` the kit's
+  check refuses is named by its path.
 - **The configuration:** each mismatch of section 8 refused, naming its
   path; `steps` for each arrangement of modes.
 - **The box's machine:** the order; a restart after its once steps; the
