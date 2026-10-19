@@ -862,6 +862,20 @@ where its answer lands.
 
      Keep one revision per git source and the full skein update. The existing workspace/all-target check and gate establish compatibility before the repin commit. Name old/new smith pins and the landed repair in that commit; refresh any further reached copy following that repair and list it in the body. Follow README's compatible smith source rule on subsequent temper repins; do not patch Cargo's dependency checkout.
 
+143. **Named page fixtures and scoped recurrence gate** (hourly04 bounded check of2026-10-19T09:26:37Z).
+     Reverses: ruling140 of2026-10-19T09:26:37Z only its pending supplement assignment; its named-page fixture correction remains.
+     Amends: README session table and Named page fixtures rule; new skein/10.s1-named-page-fixtures.md; closing temper-repin dependency.
+
+     Add skein-10.s1, session10.s1 in skein/10.s1-named-page-fixtures.md, after skein-10.5. It preserves the two named plan-call test functions and adds the bounded AST recurrence gate to the existing syn executable in separate listing-sizes mode. Its Files include calls.rs, scripts/recovery-shape/src/{main,listing_sizes}.rs and scripts/check.sh. Keep ruling140's correction if it already landed; no duplicate change to tests, counts or assertions. Normal ready check precedes implementation. Skein10's current session and increments remain unheld.
+
+     The closing temper-repin waits for skein-10.s1. plan status and ledger show temper-repin waiting, so no repeat closing repin is added. Register the new step and dependency now; send it through normal check/ready before start.
+
+     Checked: search_graph on project srv-data-git-runner-src-skein returns page_size_is_passed_to_each_listing and remarks_are_sliced_without_wire_paging in forgejo/plans/tests/calls.rs; git show origin/main of that path with scoped rg confirms three size rows2/8/1, eight listings and exactly four bare size/slice positions. The checker main's --controls dispatch and scripts/check.sh's existing recovery invocation exist; listing_sizes module/mode are the supplement's new additions. Scripts are outside graph coverage and were checked directly.
+
+     Read-only bounded evidence: scratch-hourly-04-named/results.md and candidate.patch, skeinbd503f9e38ffdee4207224fcb0bd2219c1fccff9, temper8c481125bc8ab472a0e82535f71eaa3551336344. Pinned-heavy984, one attempt,21s active: rustfmt, checker/package all-target clippy -D warnings PASS; original source rejected exactly4 violations and corrected source accepted;7 negative/4 positive listing controls PASS; existing6 positive/7 negative/2 decoy recovery controls PASS; package135 default tests PASS0.163s, fuzzy/browser0 successful sequentially. No full gate, process/live proof, future10.2–10.5 proof or repin claimed. Scratch evidence/source/patch/logs retained; owned worker/target released.
+
+     The checker claims only those bounded mechanical positions; assertion cases, semantic row behavior and fixture derivations retain explicit source review. The normal readiness audit re-resolves all post10.5 owners, copies and derived count users. Refresh any further reached copy and list it in the commit body. Existing budgets, production behavior and recovery/contract gates remain. Pinned kit plan supports ruling/ready/ring/bg and no kit move is authorized.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

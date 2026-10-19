@@ -64,6 +64,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/08-machine-world.md` | skein 08: the component's machine and listener world, `tests/forge/machine`, moved, with plaintext and TLS faults, deadlines, closing and the counted worst case (forge-connection.md 10; decision 23) | temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved, with its owner, stories and invariants on skein's client and component (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/10-plans.md` | skein 10: `skein-forge`'s plans' pure tests on canned exchanges, and the plans' differences from the design (answers 7 to 12 and 35), each its own increment (decision 28) | skein 01.4 | 10.5: skein 08.1 |
+| `skein/10.s1-named-page-fixtures.md` | skein10.s1: named page fixtures and scoped AST recurrence checks | skein10.5 | |
 
 ### temper
 
@@ -77,7 +78,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2 and06.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1 and10.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -127,7 +128,7 @@ chain.
 
 - **Client contract fixtures:** skein 02.s1 owns hourly-02's new contract-test corrections after 02.4, following testing-strategy.md 10's One behaviour per test, The setup the assertion reads, A setup written once, Named fixtures and sizes, and A bound's two sides. The repeated setup/size findings also require the scoped Rust gate checks in that supplement (development.md 14.4). The closing temper repin waits for skein 02.s1; skein 01.s1's preserved-test scope stays.
 
-- **Named page fixtures:** in the plan-call tests, use the shared PAGE_SIZE and a named, derived one-row fixture for page-size rows and expected slices. Preserve every literal expected wire byte and assertion case. Recurring mechanical violations receive a scoped AST gate check under development.md14.4; its separate supplement is assigned after bounded scope verification.
+- **Named page fixtures:** in the plan-call tests, use the shared PAGE_SIZE and a named, derived one-row fixture for page-size rows and expected slices. Preserve every literal expected wire byte and assertion case. Skein10.s1 owns the scoped AST gate check after10.5 under development.md14.4, reusing the existing checker executable with a separate listing-sizes mode. Normal readiness precedes implementation; the closing temper-repin waits for10.s1. Skein10's existing start and increments remain unheld.
 
 - **The hourly test supplement:** new tests follow testing-strategy.md 10.
   Only `skein/01.s1-test-shapes.md` may split its five named preserved tests,
