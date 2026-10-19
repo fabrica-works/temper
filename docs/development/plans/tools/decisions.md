@@ -602,3 +602,10 @@ and the user, or the director, may veto it before the run:
   group byte beside jig's; or a designer joins the run (`plan join
   designer`, in a design session) and answers question.md. temper 03.3's
   `tasks` waits on it; the rest of 03 goes on.
+  Decision: the default, by director, 2026-10-19: one group per call.
+  Without `--ended`, `tasks` reads the live group, `--after C` its `live`
+  cursor; with `--ended`, the ended group alone, as jig's view reads it,
+  `--after C` its `ended` cursor, and the call that reads on keeps
+  `--ended`. Its help reads "Only ended tasks". An agent that wants both
+  makes two calls; the printed cursor stays jig's, with no group byte.
+  tools.md, 5.2, says so at the designer's next pass, after this plan.
