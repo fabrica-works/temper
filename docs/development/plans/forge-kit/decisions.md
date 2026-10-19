@@ -755,6 +755,11 @@ where its answer lands.
 
      Pass restored graph permission to the running sessions; retain source-search permission and actual-worktree checks. Future sessions follow README Graph freshness. Refresh any further uncovered copy by source and name it in the work's report. Ruling132's cumulative counts and all proof budgets remain.
 
+134. **Bound the upstream OneShot cause and repair** (cross-session scope, temper06.2 block of 2026-10-19T08:38:28Z).
+     Assign the upstream cause and evidenced driver repair to new skein-06.s1 in skein/06.s1-oneshot.md, under its explicit15minute/3probe budget and existing contracts. Complete reply receipt is unproved. io.md3.3 says “Failed may come at any time” and nothing follows but Closed; no io failure-semantics change is authorized. Distinguish a complete buffered reply from an incomplete reply before choosing a OneShot scheduling fix. A required contract change returns to the designer.
+
+     Temper06.2 retains its clean JSON checkpoint; recording proof awaits the landed evidenced repair and a compatible skein repin/all-target check. No full recording during diagnosis. Existing required recording/facts/transcript assertions and budgets remain. The closing temper repin also awaits skein-06.s1; none has landed, so no repeated repin step is added.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

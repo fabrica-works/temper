@@ -58,6 +58,7 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/04-setup.md` | skein 04: `skein-forge-setup`: reconcile's machine moved, on the owner's given values and the kit's item; the design's differences; section 7's step tests | temper 01.2 | 04.1: skein 01.3 |
 | `skein/05-fakes.md` | skein 05: the fake forge's domain and protocol layer moved, with their tests; the forge peer in `skein-fake-peers` | temper 01.2 | 05.4: temper 05.1 |
 | `skein/06-conformance.md` | skein 06: the throwaway Forgejo on skein's HTTP client; the conformance on the kit, with its transcripts, and its script; the dialect's document tests on the transcripts | temper 01.2 | 06.2: temper 03.1, temper 06.4 |
+| `skein/06.s1-oneshot.md` | skein06.s1: bounded throwaway driver cause and evidenced scheduling repair | skein06.1 | |
 | `skein/07-worlds.md` | skein 07: the client's and setup's worlds, `tests/forge/client` and `tests/forge/setup`, moved, with the stories the design asks for | temper 02.1, temper 05.1 | 07.1: skein 02.2; 07.3: temper 04.1, skein 08.1; 07.4: skein 04.2 |
 | `skein/08-machine-world.md` | skein 08: the component's machine and listener world, `tests/forge/machine`, moved, with plaintext and TLS faults, deadlines, closing and the counted worst case (forge-connection.md 10; decision 23) | temper 03.1, temper 05.1, skein 06.2 | |
 | `skein/09-protocol-world.md` | skein 09: the protocol world's component and fake tests, `tests/forge/protocol`, moved, with its owner, stories and invariants on skein's client and component (forge-connection.md 10; decisions 22, 23) | skein 07.1, skein 08.1, temper 03.1, temper 05.1, skein 06.2 | |
@@ -72,10 +73,10 @@ more says so in its row and its file. Dependencies are by capability:
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
-| `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | |
+| `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus the test supplements skein 01.s1 and 02.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1 and06.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -114,6 +115,8 @@ chain.
 ## Rules of this plan
 
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
+
+- **Throwaway reset repair:** skein06.s1 owns the bounded driver diagnosis/repair before temper06.2 resumes recording proof. Preserve io's Failed contract and genuine incomplete-reply failure; no further full recording precedes deterministic cause proof. The closing temper repin waits for skein06.s1.
 
 - **Wait discipline:** follow development.md 7.4. Prefer completion notifications; use supported work-completion waits of at least 300 seconds and identify tool-imposed exceptions instead of repeatedly polling on expiry. This does not delay handling messages or required operational checks.
 
