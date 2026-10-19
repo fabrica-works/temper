@@ -276,6 +276,14 @@ pass:
      - `agent::new` calls `Root::unlinked`. The tools' unit fixture (`src/tests/fixtures.rs`, `Root::with_client(Client::unlinked(..))`) may take it; refresh any further copy of that construction, and list it in the commit body.
      - No other session edits `root.rs`; no upstream change and no pin moves.
 
+108. **temper 06.1: the agent's tree shows its link** (plan defect, temper 06's block of 2026-10-19T14:17:55Z).
+     Plan defect, the proposal adopted. The Rules say "jig's check and Made once hold through `Verdict::Passed`", and jig's referee rearms `Online` for every client and meets it, and `Offline`, only from `Seen::Link`, which `Temper::seen` reads from a `Status` named `Live` or `Offline` in the region at `view::frame::link_region()`. Choice 1's empty tree could never meet it. No design text speaks of the agent's tree: it is the harness's.
+
+     - **The agent's tree is the link alone.** `View::Agent { render, limits }`: `render` is `skein_ui::View::new(&limits)`, `limits` the person preset's tree bound (ruling 103). Its tree: `Page` > `Banner` > `Region` at `view::frame::link_region()` > one `Status` named `Live` for `Link::Live`, `Offline` for `Link::Offline`, none for the other states; then an empty `Main`, so that `skein_ui::outline::check` holds (a `Page` root and one `Main`). `build` rebuilds it when that state changes (`render.stale` of a count per state, `render.finish` emitting the patches), from `root.client().link().state`; `tree` is `render.tree()`. The two names are consts of `app.rs` that `Temper::seen` matches too. No bindings; `act` returns `None`; `take` does nothing.
+     - **`Until::Steps(2)`, not `Steps(1)`,** in `fixtures::answered`, `fixtures::give` and 06.5's `fixtures::cut`: a `Steps(1)` run stops before world time moves (jig's `World::run`), so repeated runs never reach a callback. `ANSWER_STEPS` stays the loop's guard.
+     - **Size:** ~285 lines of `tests/client/src`, the link tree's ~25 added.
+     - If the link tree breaks the heap check, or `Online` is still unmet with it, raise it with the peak or the referee's line. Refresh any further copy of the empty agent tree or of `Steps(1)` in these fixtures, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

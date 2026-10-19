@@ -65,7 +65,7 @@ Steps: `temper-06.1`, `temper-06.2`, `temper-06.3`, `temper-06.4`,
 
 1. **One App, two arms.** `app::Root` is `Person(Domain)` or
    `Agent(Box<agent::Agent>)`; `app::View` is `Person(View)` or
-   `Agent { tree, limits }`; `app::Event` gains `Call { number, call,
+   `Agent { render, limits }`; `app::Event` gains `Call { number, call,
    json }`. The tools' `Request::Client { request }` passes on as
    `temper_client_domain::Request::Client { request }`, `Fact` as `Fact`,
    so `duty`, `sent`, `unsent`, the `Joint` and `translate` serve the
@@ -74,14 +74,21 @@ Steps: `temper-06.1`, `temper-06.2`, `temper-06.3`, `temper-06.4`,
    env.limits, tools: limits::tools() }`: `Event::Start` steps
    `StartUnlinked { kept }`, then `SignIn { with: With::Transport }`, as
    the person's arm does; `domain::Event::Client` goes to the root, `Went` is ignored,
-   any other variant panics, named. `take` and `build` do nothing, `act`
-   returns `None`; `max_out` adds the runner's `2 × rows`; `worst_case`
+   any other variant panics, named. `take` does nothing, `build` shows
+   only the link (below), `act` returns `None`; `max_out` adds the runner's `2 × rows`; `worst_case`
    stays one function of the limits (Questions): `domain::worst_case`
    of the limits it takes, plus twice `view::worst_case` at
    `fixtures::domain_limits()`, the person's preset, whose view bound
    the tools' preset overflows (ruling 103). The agent's
-   `View::Agent { limits }` is that preset's tree bound; its tree stays
-   empty.
+   `View::Agent { render, limits }` is `skein_ui::View::new(&limits)` at
+   that preset's tree bound, and its tree is the link alone, as jig's
+   referee meets `Online` and `Offline` only from `Seen::Link` (ruling
+   108): `Page` > `Banner` > `Region` at `view::frame::link_region()` >
+   one `Status` named `Live` for `Link::Live`, `Offline` for
+   `Link::Offline`, none otherwise, then an empty `Main`, so that
+   `skein_ui::outline::check` holds; `build` rebuilds it when that state
+   changes (`render.stale`), from `root.client().link().state`, and the
+   two names are consts that `Temper::seen` matches too. No bindings.
 2. **The agent's limits are the tools' preset.** `fixtures::agent` gives
    `Joint::next_client_limits` `temper_client_tools::limits::client()`,
    then `client_with(PARTY, inbox(), that, agent::new)`. The `Joint`
@@ -150,7 +157,7 @@ Shape:
 - `fixtures::call(words)`: `table::parse`'s `Parsed::Call` as
   `app::Event::Call`; a usage error panics, named. `fixtures::give`
   numbers its call `Agent::calls() + 1`. `fixtures::answered` runs
-  `Until::Steps(1)` until `Printed(number)`, bounded by `ANSWER_STEPS`,
+  `Until::Steps(2)` until `Printed(number)`, bounded by `ANSWER_STEPS`,
   and asserts the verdict. `fixtures::done_task` reads `done: task N, `.
 Test shape: `tests/agent.rs`, focused, under 0.5 s.
 ```rust
@@ -173,9 +180,9 @@ world), no higher than its test: the process tier belongs to temper 08,
 09 and 10.
 Don't: give the tools' root a `worst_case` (tools plan's crate); use the
 person's limits for the agent's root or its `Joint` traffic (its
-presentation allowance and empty tree's bound are the person's, ruling
-103); route by `Request` variants the person lacks.
-Size: at most ~260 lines of `tests/client/src`, by the plan's command
+presentation allowance and link tree's bound are the person's, rulings
+103 and 108); route by `Request` variants the person lacks.
+Size: at most ~285 lines of `tests/client/src`, by the plan's command
 over that directory alone (`git diff -M --numstat origin/main...HEAD --
 tests/client/src`, summed by awk); 0 by part 1's count, which leaves out
 `tests/`.
@@ -292,7 +299,7 @@ Files: `tests/client/src/{front.rs, fixtures.rs}`,
 `tests/client/tests/agent_recovery.rs` (new).
 Shape: `Joint::answers_to_lose()`: the count `FrontFault::NoAnswer`
 arms. `fixtures::cut(world, agent, words)` arms `NoAnswer`, gives the
-call, runs `Until::Steps(1)` until `answers_to_lose()` is 0 (bounded by
+call, runs `Until::Steps(2)` until `answers_to_lose()` is 0 (bounded by
 `ANSWER_STEPS`), and asserts world time is before the client's first
 retry (`limits::client()`'s `first`), so the process ends unresent.
 Test shape: `tests/agent_recovery.rs`, each focused, under 0.5 s, each
@@ -344,7 +351,7 @@ the worlds below the domain.
 ```rust
 // tests/client/src/app.rs
 pub enum Root { Person(temper_client_domain::Domain), Agent(Box<crate::agent::Agent>) }
-pub enum View { Person(temper_client_view::View), Agent { tree: skein_ui::Tree, limits: skein_ui::Limits } }
+pub enum View { Person(temper_client_view::View), Agent { render: skein_ui::View, limits: skein_ui::Limits } }
 impl Root {
     pub fn person(&self) -> &temper_client_domain::Domain;
     pub fn agent(&self) -> &crate::agent::Agent;
@@ -376,7 +383,8 @@ impl Joint {
 pub const LARGE_TURN_TEXT: usize = 24_576;
 /// An estimate 06.3 replaces by its measure: a lone read of the turn fits `LOAD_BYTES`; its activity row does not.
 pub const LARGE_TURN_OPAQUE: usize = 38_912;
-/// The `Until::Steps(1)` runs `give` waits for a call's answer before it fails: a loop's guard, not a limit.
+/// The `Until::Steps(2)` runs `give` waits for a call's answer before it fails: a loop's guard, not a limit.
+/// One `Steps(1)` run stops before world time moves (jig's `World::run`), so it never reaches a callback (ruling 108).
 const ANSWER_STEPS: u32 = 4096;
 pub fn agent(world: &mut World<Temper, Joint>) -> ClientId;
 pub fn call(words: &[&[u8]]) -> crate::app::Event;
