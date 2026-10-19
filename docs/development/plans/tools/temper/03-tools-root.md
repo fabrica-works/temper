@@ -30,7 +30,7 @@ are temper 11's, **the tools' adopt**. temper 04 adds waits; the next plan hosts
   JSON result, integers only; one JSON object per kept result on stderr.
 - **6.3, 7, 13:** named or drawn engine keys; build a named request from the call and `me`, a deadline span kept as a span.
   Exit 2 is the engine's answer alone; client-own answers exit 1, except the sized turn's 0. Impossible client answers say “tools' bug”.
-- **8.2:** me live first; its party's kept requests answered and erased before the host's new call; other parties stay parked. **12:** 50 rows, 32 KiB text, 16 KiB turn parts,
+- **8.2:** me live first; its party's kept requests answered and erased before the host's new call; other parties stay parked. **12:** 32 rows (jig's client wire ceiling, decisions.md, K), 32 KiB text, 16 KiB turn parts,
   1 MiB document; paths and authorities whole. Forge parts are temper 11's.
 
 ## Choices this plan makes
@@ -195,14 +195,14 @@ Files: under `crates/temper-client-tools/`, `src/jig/render/{lists,activity,turn
 Shape:
 - **Lists.**
   - `inbox` reads `Read::Inbox` once per `InboxReadGroup`, needs first. `tasks` reads `Read::Tasks`.
-  - Each prints at most 50 rows, one a line, number first, then the call that reads on, or `no more`.
+  - Each prints at most 32 rows, one a line, number first, then the call that reads on, or `no more`.
 - **A task's parts.**
-  - `--tree` watches `Subject::Tree { task, window: 50 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
+  - `--tree` watches `Subject::Tree { task, window: 32 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
     Each is unwatched at its first delivery.
-  - `--activity K` reads `Read::Activity` and prints its K latest lines (K at most 50). `run N` is `--run` alone.
+  - `--activity K` reads `Read::Activity` and prints its K latest lines (K at most 32). `run N` is `--run` alone.
 - **The conversation.**
   - `chat N` pages through `jig_client::thread::Thread` (`older`, `accept`, `parts`).
-  - `activity N` reads `Read::Activity`, `--limit K` at most 50.
+  - `activity N` reads `Read::Activity`, `--limit K` at most 32.
   - Provisional text prints only where `client.text` gives it.
 - **Turns.**
   - A line whose turn is `TurnProblem::TooLarge` prints `turn A.T · S KB · read with: turn N A.T`.
@@ -237,7 +237,7 @@ fn a_turn_past_the_read_bound_exits_0_past_the_limit() {
 ```
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(/turn/)'` (under 1 s). It shows 5.2's three turn
 forms. The next plan's story "a turn too large for a page read whole" connects it.
-Don't: keep a watch past its first delivery; print more than 50 rows; cut a path.
+Don't: keep a watch past its first delivery; print more than 32 rows; cut a path.
 Size: at most 300 lines.
 Removes: nothing.
 

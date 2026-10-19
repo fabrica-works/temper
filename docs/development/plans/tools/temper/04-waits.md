@@ -30,7 +30,7 @@ real-loop stories, once those drivers exist.
 - **5.4, the digest:** first 8 bytes of SHA-256, printed as 16 hex digits, of the
   watch subject's JSON document without `digest`. A read and a wait use one form:
   for inbox/tasks, the first window's rows in order and whether more follow,
-  within the tools' 50 rows. A read's cursor prints outside that form.
+  within the tools' 32 rows. A read's cursor prints outside that form.
 - **5.4, which reads:** `me`, unfiltered `inbox`, `tasks` with watch arguments,
   `task N`, `run N`; `task N --tree --run` gives three separate digests.
   `--activity`'s lines, `chat`, `activity` and `turn` have none. A subject takes
@@ -65,7 +65,7 @@ real-loop stories, once those drivers exist.
   it. Keep the result envelope (`met`, `why`) and read cursor outside the hash.
 - **Lists.** Normalize inbox read groups and both inbox delivery forms into the
   watch's first window: needs before updates, each in its supplied order, at
-  most 50 rows across both. Normalize tasks from the live rows, in query order.
+  most 32 rows across both. Normalize tasks from the live rows, in query order.
   Keep a `more` bit from the continuation/remaining rows; exclude cursor bytes
   and watch-only counts from the digested form. Conditions still read those
   counts from the delivery. A filtered inbox or a tasks read with after/ended
@@ -129,10 +129,10 @@ Test shape: `src/tests/jig/digest.rs`, on the shared document fixtures and
 ```rust
 #[test]
 fn a_read_and_a_watch_window_digest_the_same_rows() {
-    let (read, watched) = fixtures::inbox_first_window(51);
+    let (read, watched) = fixtures::inbox_first_window(33);
     assert_eq!(digest::part(&read, &fixtures::LIMITS),
                digest::part(&watched, &fixtures::LIMITS));
-    assert_eq!(read.rows(), 50);
+    assert_eq!(read.rows(), 32);
     assert!(read.more());
 }
 ```
@@ -144,7 +144,7 @@ Others, each under 20 ms:
 - `the_printed_part_without_digest_is_the_bytes_digested` (16 lower-case hex);
 - `one_delivery_under_two_clocks_and_two_mes_has_one_digest`;
 - `list_cursors_and_watch_counts_are_outside_the_digest` (both inbox forms,
-  tasks, 49/50/51 rows, a full window with no more and with more);
+  tasks, 31/32/33 rows, a full window with no more and with more);
 - `task_with_tree_and_run_prints_three_digests_each_over_its_part`;
 - `pages_and_non_watch_arguments_print_no_digest`, including tasks after/ended
   and each inbox flag; supported task query filters still print one.

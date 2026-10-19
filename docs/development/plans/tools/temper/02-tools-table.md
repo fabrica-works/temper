@@ -116,7 +116,7 @@ Shape:
   `temper-client-protocol-wire`, `skein-lib`, `skein-json`;
   `temper-client-shell-terminal` as a dev-dependency only (temper 03.2
   adds `skein-ui`). `[lints] workspace = true`.
-- `limits`: `ROWS: u32 = 50`, `TEXT: u32 = 32_768`, `PART: u32 = 16_384`
+- `limits`: `ROWS: u32 = 32`, `TEXT: u32 = 32_768`, `PART: u32 = 16_384`
   and `DOCUMENT: u64 = 1_048_576`; the `skein_lib::Duration`s `DEADLINE`
   (30 s), `LOCK` (60 s), `LOCK_TRY` (100 ms), `WAIT` (300 s) and
   `WAIT_MOST` (3600 s). `client()` writes out `native`'s numbers, with
@@ -209,7 +209,7 @@ const READS: &[&[&str]] = &[
     &["tasks", "--project", "3", "--label", "chat", "--tracked", "--order", "priority"],
     &["task", "41", "--tree", "--activity", "5", "--run"],
     &["chat", "41", "--before", "0a1b"],
-    &["activity", "41", "--limit", "50"],
+    &["activity", "41", "--limit", "32"],
     &["turn", "41", "3.7", "--part", "2", "--from", "16384"],
     &["run", "41"],
 ];
@@ -222,7 +222,7 @@ fn each_read_parses_into_its_call_and_prints_back() {
 ```
 The others, each under 20 ms: `each_host_tool_parses_into_its_call_and_prints_back`,
 `an_unknown_tool_or_argument_is_a_usage_error`, `a_missing_or_repeated_argument_is_a_usage_error`,
-`a_value_outside_its_kind_or_rows_is_a_usage_error` (`--limit 51`), `a_project_is_a_number_or_a_name`,
+`a_value_outside_its_kind_or_rows_is_a_usage_error` (`--limit 33`), `a_project_is_a_number_or_a_name`,
 `a_second_stdin_is_a_usage_error`, `call_and_json_are_the_hosts_options`.
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E
 'test(each_read_parses_into_its_call_and_prints_back)'` (under 20 ms):
@@ -407,6 +407,6 @@ Each in `~/src/rust/temper`, after `git fetch`:
 - `git show origin/main:crates/temper-client-tools/Cargo.toml | grep -qx 'skein-json.workspace = true'`
 - `test -z "$(git grep -n -i temper origin/main -- crates/temper-client-tools/src/jig.rs crates/temper-client-tools/src/jig)"`
 - `test -z "$(git grep -h -o -E 'crate::[a-z_]+' origin/main -- crates/temper-client-tools/src/jig.rs crates/temper-client-tools/src/jig | grep -vx 'crate::jig')"`
-- `git show origin/main:crates/temper-client-tools/src/limits.rs | grep -c -E 'pub const (ROWS: u32 = 50|TEXT: u32 = 32_768|PART: u32 = 16_384|DOCUMENT: u64 = 1_048_576);' | grep -qx 4`
+- `git show origin/main:crates/temper-client-tools/src/limits.rs | grep -c -E 'pub const (ROWS: u32 = 32|TEXT: u32 = 32_768|PART: u32 = 16_384|DOCUMENT: u64 = 1_048_576);' | grep -qx 4`
 - `git grep -q -F 'b"temper-tools"' origin/main -- crates/temper-client-tools/src`
 - `! for t in me inbox tasks task chat activity turn run message close adopt answer decide release stop cancel wait sign-in sign-out pending help; do git grep -q -F "name: b\"$t\"" origin/main -- crates/temper-client-tools/src/jig/rows.rs crates/temper-client-tools/src/adopt.rs || echo "missing $t"; done | grep -q missing`

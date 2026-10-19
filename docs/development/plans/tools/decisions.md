@@ -404,6 +404,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C ~/src/rust/temper grep -n '"src' origin/main -- crates/temper-box/src/tests/boundary.rs`: 53 `pending.push(std::path::PathBuf::from("src"))`.
      - temper/03-*.md:3 "temper repins onto jig's named send, turn read and deadline spans (03.1)"; :17 names `Held`.
 
+114. **temper 02.1's rows** (design gap, temper 02.1's block of 2026-10-19 05:31:30 UTC).
+     decisions.md, For the user, K, decided by the director (temper 724865e25): the tools' rows are 32, jig's client wire ceiling, wherever tools.md, 12, and the plan say 50; jig's wire stays as it is. `limits::ROWS: u32 = 32` in temper 02.1; the plan now says 32 for every page, window and `--limit` that read it: temper 02.2's `READS` row `activity 41 --limit 32` and `a_value_outside_its_kind_or_rows_is_a_usage_error` with `--limit 33`; temper 03's pages (`at most 32 rows`, `Subject::Tree { task, window: 32 }`, `--activity K` and `--limit K` at most 32); temper 04's windows (`fixtures::inbox_first_window(33)`, `read.rows()` 32, the 31/32/33-row cases); the Done-when grep, `ROWS: u32 = 32`. `the_tools_preset_has_a_worst_case` stays as the plan gives it: with `ROWS = 32`, temper 02's re-check passed it, 6 of 6 in `temper-client-tools`. tools.md, 12, says so at the designer's next pass (later.md). Any further 50 that is the tools' rows, or 49 or 51 beside it: make it 32, 31 or 33, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
