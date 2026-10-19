@@ -176,10 +176,11 @@ pub fn incoming(
     transport: &mut Transport,
     request: engine::Request,
     limits: &jig_client::DomainLimits,
+    codec: &jig_protocol_transcript::Limits,
 ) -> Option<packets::Incoming> {
     match request {
         engine::Request::Party(request) => match request {
-            PartyRequest::Deliver(delivery) => delivery_packet(transport, delivery, limits),
+            PartyRequest::Deliver(delivery) => delivery_packet(transport, delivery, limits, codec),
             PartyRequest::SignInRefused { to } => {
                 let Some(Reply::SignIn { client }) = transport.take_reply(to.into_token()) else { return None };
                 Some(packets::Incoming::SignInFailed { client, failure: packets::SignInFailure::Capacity })
@@ -208,6 +209,7 @@ fn delivery_packet(
     transport: &mut Transport,
     delivery: Delivery,
     limits: &jig_client::DomainLimits,
+    codec: &jig_protocol_transcript::Limits,
 ) -> Option<packets::Incoming> {
     match delivery {
         Delivery::WebReply { to, reply } => {
@@ -220,8 +222,7 @@ fn delivery_packet(
         Delivery::Read { reply, answer } => {
             let reply = reply.into_token();
             transport.reply(reply).is_some().then(|| {
-                read_packets::read_with_codec(transport, reply, &answer, limits, &crate::fixtures::codec())
-                    .expect("whole read translates")
+                read_packets::read_with_codec(transport, reply, &answer, limits, codec).expect("whole read translates")
             })
         }
         Delivery::Document { watcher, document } => transport.watch(watcher).is_some().then(|| {

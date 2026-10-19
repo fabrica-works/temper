@@ -81,6 +81,13 @@ pub fn inbox() -> temper_client_domain::Address {
 }
 #[must_use]
 pub fn world(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::new(seed, domain_limits()))
+}
+#[must_use]
+pub fn world_with_large_turns(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::with_large_turns(seed, &domain_limits()))
+}
+fn world_with(seed: u64, front: Joint) -> World<Temper, Joint> {
     let mut world = World::new(
         Settings {
             seed,
@@ -89,7 +96,7 @@ pub fn world(seed: u64) -> World<Temper, Joint> {
             iterations: 4096,
             ..Settings::default()
         },
-        Joint::new(seed, domain_limits()),
+        front,
     );
     world.randomness(2, 0, 0);
     world
@@ -590,4 +597,125 @@ pub fn done_task(printed: &temper_client_tools::jig::Printed) -> u64 {
         .0
         .parse()
         .expect("task number")
+}
+
+/// tools.md, 12: two 16 KiB parts within the tools' 32 KiB text bound.
+pub const LARGE_TURN_TEXT: usize = 24_576;
+/// The encoded turn's single row fits `LOAD_BYTES`; its activity row crosses it.
+pub const LARGE_TURN_OPAQUE: usize = 38_572;
+#[must_use]
+pub fn codec_for(limits: &jig_client::DomainLimits) -> jig_protocol_transcript::Limits {
+    let bytes = limits.document_bytes.min(u64::from(jig_client_protocol_wire::CEILINGS.turn_carried_bytes));
+    jig_protocol_transcript::Limits::new(
+        u32::try_from(bytes).expect("wire bound fits"),
+        jig_client::contract::TurnLimits { messages: limits.rows, blocks: limits.rows, text: limits.text },
+    )
+}
+/// Commit smith's session turn through the worker's real turn boundary.
+pub fn large_turn(front: &mut Joint, task: u64) -> (u64, u32) {
+    use smith_domain_session::llm;
+    let assignment = front.engine.last_assignment();
+    let mut turn =
+        temper_worker_domain_world::protocol::session_turn(FIRST_REPLY_TURN, REPLY_SPEND, LARGE_TURN_TEXT, true);
+    for message in &mut turn.messages {
+        let mut blocks = message.content.to_vec();
+        blocks.push(llm::Block::Opaque { bytes: vec![0; LARGE_TURN_OPAQUE].into_boxed_slice() });
+        message.content = blocks.into_boxed_slice();
+    }
+    let body = smith_protocol_channel::encode_turn(
+        &turn,
+        &smith_transcript::CEILINGS,
+        &temper_worker_domain_world::protocol::endpoints(),
+    )
+    .expect("large turn encodes");
+    front.engine.send(temper_engine_domain_world::protocol::turn(
+        QUESTION_WORKER,
+        task,
+        assignment.attempt,
+        FIRST_REPLY_TURN,
+        REPLY_SPEND,
+        None,
+        &body,
+    ));
+    front.engine.settle();
+    (assignment.attempt, FIRST_REPLY_TURN)
+}
+/// Complete ownership of a turn alone and joined to its activity row.
+#[must_use]
+pub fn turn_row_costs(front: &Joint, task: u64) -> (u64, u64) {
+    use jig_domain_core::{self as core, reads};
+    let owner = front.engine.task(task).expect("live turn owner").clone();
+    let turn = front
+        .engine
+        .store
+        .rows
+        .values()
+        .find_map(|record| {
+            if let engine::Record::Core(value @ core::Record::Core(core::CoreRecord::Turn(turn))) = record
+                && turn.task == task
+            {
+                Some(value.clone())
+            } else {
+                None
+            }
+        })
+        .expect("durable turn");
+    let mut row = reads::Row {
+        value: turn,
+        owner: Some(Box::new(owner)),
+        ancestors: Box::new([]),
+        related: None,
+        unjoined: None,
+        ended_read: None,
+        linked: Box::new([]),
+        inbox: None,
+    };
+    let single = row.owned_bytes().expect("single row cost");
+    let line = front
+        .engine
+        .store
+        .rows
+        .values()
+        .find_map(|record| {
+            if let engine::Record::Core(core::Record::Tasks(tasks::Stored::Activity(line))) = record
+                && line.task == task
+                && matches!(line.line, tasks::Line::Turn { .. })
+            {
+                Some(line.clone())
+            } else {
+                None
+            }
+        })
+        .expect("durable turn activity");
+    row.related = Some(row.value);
+    row.value = core::Record::Tasks(tasks::Stored::Activity(line));
+    (single, row.owned_bytes().expect("activity row cost"))
+}
+/// Follow the printed continuation calls, retaining the turn's text alone.
+pub fn read_whole(
+    world: &mut World<Temper, Joint>,
+    agent: jig_client_world::harness::ClientId,
+    words: &[&[u8]],
+) -> (Vec<u8>, u32) {
+    let mut words: Vec<Box<[u8]>> = words.iter().map(|word| Box::from(*word)).collect();
+    let mut text = Vec::new();
+    let mut reads = 0;
+    loop {
+        let borrowed: Vec<&[u8]> = words.iter().map(AsRef::as_ref).collect();
+        let number = give(world, agent, &borrowed);
+        let printed = answered(world, agent, number);
+        assert_eq!(printed.status, 0, "{printed:?}");
+        reads += 1;
+        let stdout = std::str::from_utf8(&printed.stdout).expect("turn text UTF-8");
+        let mut next = None;
+        for line in stdout.lines() {
+            if let Some((_, call)) = line.split_once("read on with: ").or_else(|| line.split_once("read with: ")) {
+                next = Some(call.split_ascii_whitespace().map(|word| Box::from(word.as_bytes())).collect());
+            } else if !line.starts_with("turn ") && !line.starts_with("opaque ") {
+                text.extend_from_slice(line.as_bytes());
+            }
+        }
+        let Some(next) = next else { return (text, reads) };
+        words = next;
+    }
 }

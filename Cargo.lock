@@ -1998,6 +1998,9 @@ dependencies = [
  "skein-lib",
  "skein-ui",
  "skein-world",
+ "smith-domain-session",
+ "smith-protocol-channel",
+ "smith-transcript",
  "temper-client-domain",
  "temper-client-protocol-wire",
  "temper-client-tools",
@@ -2007,6 +2010,7 @@ dependencies = [
  "temper-engine-domain-forge-client",
  "temper-engine-domain-world",
  "temper-service",
+ "temper-worker-domain-world",
 ]
 
 [[package]]

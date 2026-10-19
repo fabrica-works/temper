@@ -109,6 +109,14 @@ impl Store {
         Self::with_limits(&widest())
     }
     #[must_use]
+    pub fn with_transcript_bytes(bytes: u32) -> Store {
+        let mut limits = widest();
+        limits.journal.transcript_bytes = bytes;
+        limits.loads.reply_bytes = bytes;
+        limits.loads.transcript_bytes = bytes;
+        Self::with_limits(&limits)
+    }
+    #[must_use]
     pub fn with_limits(limits: &engine::Limits) -> Store {
         let component_limits = component_limits(limits);
         let stores = Stores {
@@ -512,7 +520,7 @@ fn component_limits(limits: &engine::Limits) -> Limits {
     core.call_records = limits.call_records;
     core.resume_bytes = limits.journal.transcript_bytes;
     core.run_bytes = limits.journal.run_bytes;
-    core.policy_bytes = u64::from(limits.journal.transcript_bytes);
+    core.policy_bytes = core.policy_bytes.min(u64::from(limits.journal.transcript_bytes));
     core.call_answer_bytes = limits.journal.transcript_bytes;
     let mut profile = profile.store;
     profile.store.budget = 4 * 1024 * 1024;

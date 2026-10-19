@@ -70,6 +70,24 @@ impl Joint {
             Driver::with_repositories(Store::new(), walking::config(seed), &engine_limits(), fixtures::REPOSITORIES);
         Self::with_engine(seed, &limits, engine, 1)
     }
+    /// The small profile carries a whole turn while an activity page can size it.
+    #[must_use]
+    pub fn with_large_turns(seed: u64, limits: &client::Limits) -> Self {
+        let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).root;
+        let mut engine_limits = engine_limits();
+        // tools.md, 11.2: preserve the profile's byte bounds for the large turn.
+        engine_limits.journal.transcript_bytes = profile.journal.transcript_bytes;
+        engine_limits.loads.bytes = profile.loads.bytes;
+        engine_limits.loads.reply_bytes = profile.loads.reply_bytes;
+        engine_limits.loads.transcript_bytes = profile.loads.transcript_bytes;
+        let engine = Driver::with_repositories(
+            Store::with_transcript_bytes(profile.journal.transcript_bytes),
+            walking::config(seed),
+            &engine_limits,
+            fixtures::REPOSITORIES,
+        );
+        Self::with_engine(seed, limits, engine, 1)
+    }
     /// A chat's allotment leaves pool funding for the goal it proposes.
     #[must_use]
     pub fn with_goal_proposals(seed: u64, limits: client::Limits) -> Self {
@@ -337,7 +355,10 @@ impl Joint {
                     who = self.transport.watch(*watcher).map(|watch| watch.client);
                 }
                 let limits = who.map_or(self.limits, |who| self.client_limits[&who]);
-                if let Some(packet) = translate::incoming(&mut self.transport, *request, &limits.client.domain) {
+                let codec =
+                    if limits == self.limits { fixtures::codec() } else { fixtures::codec_for(&limits.client.domain) };
+                if let Some(packet) = translate::incoming(&mut self.transport, *request, &limits.client.domain, &codec)
+                {
                     self.incoming(packet);
                 }
             }
