@@ -51,7 +51,8 @@ pub(crate) fn check(bytes: &[u8]) -> Result<(Named, Checked, temper_box::limits:
     let at = super::member(&document, application, b"setup");
     let setup_overrides: Vec<_> =
         named.overrides.iter().filter(|(name, _)| !name.starts_with(b"box.")).cloned().collect();
-    let checked = check::checked(&document, at, &members, named.webhooks.is_some(), &setup_overrides)
+    let listener = named.webhooks.as_ref().map(|webhooks| super::address(&webhooks.listener)).transpose()?;
+    let checked = check::checked(&document, at, &members, listener, &setup_overrides)
         .map_err(|why| String::from_utf8_lossy(&problem::lines(&why)).into_owned())?;
     let limits = box_limits(&named.overrides)?;
     Ok((named, checked, limits))

@@ -6,7 +6,7 @@ use crate::{
 use alloc::boxed::Box;
 use core::net::{Ipv4Addr, SocketAddr};
 fn refused(bytes: &[u8], members: &Members, expected: &[u8]) {
-    let problems = check::checked(&fixtures::document(bytes), 0, members, false, &[]).unwrap_err();
+    let problems = check::checked(&fixtures::document(bytes), 0, members, None, &[]).unwrap_err();
     assert_eq!(&*problem::lines(&problems), expected);
 }
 #[test]
@@ -93,7 +93,8 @@ fn a_webhook_secret_off_the_forge_directory_is_refused() {
 }
 
 fn refused_webhooks(members: &Members, expected: &[u8]) {
-    let problems = check::checked(&fixtures::document(fixtures::TWO), 0, members, true, &[]).unwrap_err();
+    let problems =
+        check::checked(&fixtures::document(fixtures::TWO), 0, members, Some(fixtures::listener()), &[]).unwrap_err();
     assert_eq!(&*problem::lines(&problems), expected);
 }
 #[test]

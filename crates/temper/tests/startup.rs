@@ -364,3 +364,28 @@ fn the_owned_example_is_named_without_a_problem() {
         );
     }
 }
+
+#[test]
+fn every_command_checks_setup_before_reading_files() {
+    let scratch = owned_example("every-command-setup");
+    let path = scratch.path().join("config.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 6000.into();
+    let bytes = serde_json::to_vec(&value).expect("configuration JSON");
+    support::write_private(&path, &bytes);
+    let line = "application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n";
+    for (command, refused) in [
+        ("serve", temper::prepare_in(scratch.path()).err().expect("serve refused")),
+        ("sign-in", temper::sign_in::account(&bytes, 1).err().expect("sign-in refused").line()),
+        ("box", temper::run(temper::Command::Box { configuration: path }).expect_err("box refused")),
+    ] {
+        assert_eq!(refused, format!("temper {command}: {line}"), "{command}");
+    }
+    for verb in ["prepare", "reconcile", "run"] {
+        support::owned::refused(scratch.path(), verb, format!("temper forge {verb}: forge 1: {line}").as_bytes());
+    }
+    let runner = support::owned::command(scratch.path(), "runner").output().expect("runner refuses");
+    assert_eq!(runner.status.code(), Some(1));
+    assert_eq!(runner.stderr, format!("temper forge run: forge 1: {line}").as_bytes());
+    scratch.remove();
+}

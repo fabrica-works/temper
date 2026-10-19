@@ -4,7 +4,7 @@ use crate::{check, limits, problem};
 fn the_small_profile_passes_the_setup_limit_checks() {
     assert_eq!(skein_forge_setup::limits::check(&limits::small()), Ok(()));
     assert_eq!(
-        check::checked(&fixtures::document(fixtures::TWO), 0, &fixtures::members(), false, &[]).unwrap().setup,
+        check::checked(&fixtures::document(fixtures::TWO), 0, &fixtures::members(), None, &[]).unwrap().setup,
         fixtures::setup()
     );
 }
@@ -14,7 +14,7 @@ fn a_backoff_past_its_maximum_names_both_limits() {
         (b"setup.backoff_ms".as_slice(), 6000, b"application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n".as_slice()),
         (b"setup.backoff_max_ms", 120_000, b"application.limits.overrides.setup.backoff_max_ms: must agree with application.limits.overrides.setup.deadline_ms\n"),
     ] {
-        let problems = check::checked(&fixtures::document(fixtures::TWO), 0, &fixtures::members(), false, &[(name.into(), value)]).unwrap_err();
+        let problems = check::checked(&fixtures::document(fixtures::TWO), 0, &fixtures::members(), None, &[(name.into(), value)]).unwrap_err();
         assert_eq!(&*problem::lines(&problems), expected);
     }
 }

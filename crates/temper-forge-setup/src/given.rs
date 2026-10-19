@@ -73,3 +73,28 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
     problems.push(path, what);
     problems
 }
+
+/// Copies temper's configured setup and owner constants into the kit's values.
+#[must_use]
+pub fn values(
+    entry: &crate::setup::Entry,
+    listener: Option<core::net::SocketAddr>,
+    limits: &skein_forge_setup::limits::Limits,
+) -> skein_forge_setup::given::Given {
+    skein_forge_setup::given::Given {
+        forge: entry.forge,
+        bot_login: entry.bot.login.clone(),
+        bot_email: entry.bot.email.clone(),
+        orgs: entry.orgs.clone(),
+        org_owner: match &entry.mode {
+            crate::setup::Mode::Managed { .. } => None,
+            crate::setup::Mode::Owned(owned) => Some(owned.person.login.clone()),
+        },
+        listener,
+        word: skein_lib::bytes::copy_of(b"temper"),
+        admin_name: skein_lib::bytes::copy_of(b"temper-admin"),
+        api_name: skein_lib::bytes::copy_of(b"temper-api"),
+        git_name: skein_lib::bytes::copy_of(b"temper-git"),
+        limits: limits.clone(),
+    }
+}

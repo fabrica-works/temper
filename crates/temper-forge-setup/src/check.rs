@@ -135,7 +135,7 @@ pub fn checked(
     document: &Document,
     at: u32,
     members_value: &Members,
-    webhooks: bool,
+    listener: Option<SocketAddr>,
     overrides: &[(Box<[u8]>, u64)],
 ) -> Result<Checked, Problems> {
     let mut ps = Problems::empty();
@@ -152,12 +152,24 @@ pub fn checked(
             );
         }
     }
-    if let Err(why) = skein_forge_setup::limits::check(&limits) {
-        ps.extend(given::refusal(0, why));
-    }
+    let limits_ok = match skein_forge_setup::limits::check(&limits) {
+        Ok(()) => true,
+        Err(why) => {
+            ps.extend(given::refusal(0, why));
+            false
+        }
+    };
     let setup = Setup::read(document, at, &limits, &mut ps);
     if let Some(setup) = &setup {
-        members(setup, members_value, webhooks, &mut ps);
+        members(setup, members_value, listener.is_some(), &mut ps);
+        if limits_ok {
+            for (position, entry) in setup.entries.iter().enumerate() {
+                let values = given::values(entry, listener, &limits);
+                if let Err(why) = skein_forge_setup::given::check(&values) {
+                    ps.extend(given::refusal(u32::try_from(position).expect("bounded entries"), why));
+                }
+            }
+        }
     }
     if ps.is_empty() { Ok(Checked { setup: setup.expect("clean parse"), limits }) } else { Err(ps) }
 }

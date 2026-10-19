@@ -32,3 +32,70 @@ fn each_kit_place_names_its_temper_path() {
         assert_eq!(&*problem::lines(&problems), line.as_bytes(), "{place:?}");
     }
 }
+
+fn expected_given() -> skein_forge_setup::given::Given {
+    use alloc::boxed::Box;
+    use skein_lib::Duration;
+    skein_forge_setup::given::Given {
+        forge: 1,
+        bot_login: b"temper".as_slice().into(),
+        bot_email: b"temper@example.invalid".as_slice().into(),
+        orgs: Box::new([b"acme".as_slice().into()]),
+        org_owner: None,
+        listener: None,
+        word: b"temper".as_slice().into(),
+        admin_name: b"temper-admin".as_slice().into(),
+        api_name: b"temper-api".as_slice().into(),
+        git_name: b"temper-git".as_slice().into(),
+        limits: skein_forge_setup::limits::Limits {
+            orgs: 8,
+            deadline: Duration::from_secs(120),
+            backoff: Duration::from_millis(100),
+            backoff_max: Duration::from_secs(5),
+        },
+    }
+}
+
+#[test]
+fn a_managed_setup_maps_every_given_value() {
+    let setup = super::fixtures::setup();
+    let given = crate::given::values(setup.entry(1).unwrap(), None, &crate::limits::small());
+    assert_eq!(given, expected_given());
+    assert_eq!(skein_forge_setup::given::check(&given), Ok(()));
+}
+
+#[test]
+fn an_owned_setup_maps_every_given_value() {
+    let setup = super::fixtures::setup();
+    let listener = super::fixtures::listener();
+    let given = crate::given::values(setup.entry(2).unwrap(), Some(listener), &crate::limits::small());
+    let expected = skein_forge_setup::given::Given {
+        forge: 2,
+        orgs: Box::new([b"work".as_slice().into()]),
+        org_owner: Some(b"ada".as_slice().into()),
+        listener: Some(listener),
+        ..expected_given()
+    };
+    assert_eq!(given, expected);
+    assert_eq!(skein_forge_setup::given::check(&given), Ok(()));
+}
+
+#[test]
+fn a_refused_limit_pair_keeps_its_order_and_is_printed_once() {
+    use super::fixtures;
+    for bytes in [fixtures::TWO, b"[]"] {
+        let problems = crate::check::checked(
+            &fixtures::document(bytes),
+            0,
+            &fixtures::members(),
+            None,
+            &[(b"setup.backoff_ms".as_slice().into(), 121_000), (b"setup.backoff_max_ms".as_slice().into(), 120_000)],
+        )
+        .unwrap_err();
+        assert_eq!(
+            &*problem::lines(&problems),
+            b"application.limits.overrides.setup.backoff_ms: must agree with application.limits.overrides.setup.backoff_max_ms\n",
+            "{bytes:?}",
+        );
+    }
+}

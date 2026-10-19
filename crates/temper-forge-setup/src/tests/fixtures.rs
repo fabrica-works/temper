@@ -381,3 +381,7 @@ pub fn hooked_members() -> Members {
     members.forges[1].webhook_secret = Some(bytes::copy_of(b"forge-2/webhook_secret"));
     members
 }
+
+pub fn listener() -> SocketAddr {
+    SocketAddr::from((Ipv4Addr::LOCALHOST, 9898))
+}
