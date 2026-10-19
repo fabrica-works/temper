@@ -100,8 +100,9 @@ gate.
 |---|---|---|
 | `smith-repin` | skein 01 has landed | smith's skein to skein's `origin/main` |
 | `jig-repin` | `smith-repin` and every jig step have landed | jig's skein and smith, together, to their `origin/main` |
+| `jig-repin.s1` | added by ruling 138 for `temper-repin`'s block of 2026-10-19T11:25:37Z; starts at once | jig's skein and smith, together, to their `origin/main` again, past live-text's smith: `live: None` in each start, an ignored `OpenEvent::Live`, `smith_channel::v3` for `v2` in jig's four files (smith's live-text README, Repin) |
 | `hearth-repin` | `jig-repin` has landed, and `~/src/rust/hearth` is a checkout (Prerequisites) | hearth's skein to skein's `origin/main` |
-| `temper-repin` | `hearth-repin` and every temper step have landed | temper's skein, smith and jig to their `origin/main` |
+| `temper-repin` | `jig-repin.s1`, `hearth-repin` and every temper step have landed | temper's skein, smith and jig to their `origin/main`, with live-text's `live: None` and ignored `OpenEvent::Live` in temper too |
 
 Neither smith nor hearth uses skein's request table, so their repins
 should move the pin and repair nothing (findings/base-repin.md).
