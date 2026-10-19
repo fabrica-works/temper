@@ -47,7 +47,8 @@ read, `sign-in FILE` and the `chat` act, all temper 08.3 needs; 05.5 and
   Acts and the host's tools: native `Shell`. A `Shell` would load the
   store and send its stream gone (8.3). No jig change (decision 3).
 - **One owner per descriptor.** `Startup.parent` goes to the host's
-  `FileIo` (`adopt_root`): `OpenPrivate` of DIRECTORY's leaf, then `Lock`
+  `FileIo` (`adopt_root`): for a call other than `sign-in`, `OpenDirectory`
+  of DIRECTORY's leaf first (ruling 102); `OpenPrivate` of it, then `Lock`
   (calls that send), `Load` of `address`, and, on the memory path, of
   `token` (40 bytes, `no_follow`, as `files.rs` does). For `Shell`, the
   host opens a second descriptor, `Op::Open { root: parent, path: b".",
@@ -105,8 +106,12 @@ Shape:
   `Keyed::Never`; `rows::{SIGN_IN, SIGN_OUT, PENDING, HELP}`; a wait
   (`rows::WAIT`); else a read. `Parsed::File` is 05.6's: usage until.
 - `directory::Directory` over `FileIo`: `OpenPrivate`, `Lock`, `Load`;
-  only `sign-in` creates DIRECTORY: any other call on an absent one exits
-  1, `temper ctl: DIRECTORY does not exist`, and on one with no `token`,
+  only `sign-in` creates DIRECTORY (ruling 102): any other call first
+  sends `OpenDirectory { root: parent, name: leaf, no_follow: true }`,
+  which makes nothing; its `NotFound` exits 1, `temper ctl: DIRECTORY does
+  not exist`, before any `OpenPrivate`; its `Opened` token is closed
+  (`Close`), then `OpenPrivate` as for `sign-in`. On one with no `token`,
+  or a zero-byte one (tools.md 8.1, "which a call reads as no token"),
   `temper ctl: DIRECTORY is not signed in` (design question 5);
   of `address` (`limits::ADDRESS` bytes): exactly one numeric
   `http://HOST:PORT` line; 127/8 or `[::1]`, else exit 1 "the engine's
@@ -136,7 +141,9 @@ fn a_busy_directory_is_refused_after_60_s_of_retries() {
 ```
 Others: `calls_that_send_nothing_take_no_lock`, `a_name_address_is_refused`,
 `a_non_loopback_address_exits_1_before_the_token`,
-`a_refused_directory_exits_1`, `sigterm_exits_143_printing_nothing_more`,
+`a_refused_directory_exits_1`, `an_absent_directory_is_never_made` (no
+`MakeDirectory` or `OpenPrivate` submitted; exit 1),
+`a_zero_byte_token_is_not_signed_in`, `sigterm_exits_143_printing_nothing_more`,
 `sigint_exits_130`, `partial_writes_finish_before_exit`; each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p temper-client-shell-cli -E
 'test(a_busy_directory_is_refused_after_60_s_of_retries)'`:
@@ -277,6 +284,9 @@ Files: new `src/pending.rs`; `src/{signing,host,tests}.rs`,
 `src/tests/fixtures.rs`, the crate's `Cargo.toml` (`jig-client-domain`);
 temper-client-tools' new `src/jig/render/pending.rs`, `render.rs` (`pub
 mod pending`), `src/tests/jig.rs`, new `src/tests/jig/pending.rs`, and
+`src/jig/rows.rs` (`SIGN_OUT`'s `line`, "End sign-in and erase the
+token", becomes "End sign-in and leave the token empty": tools.md 5.6,
+"leaves `token` empty, zero bytes, read as signed out"; ruling 102),
 `src/guide.rs` with `tests/golden/{help,help_pending}.txt` and
 `tests/help.rs` (`PENDING`'s stale `create` becomes `chat`, the word
 `Operation::of` prints, `findings/code-checks.md`); root
@@ -312,7 +322,7 @@ fn a_pending_row_reads_operation_party_not_sent() {
 Others: `pending_lists_each_kept_request` (`chat, party 73,
 not sent`, no network, unlocked), `pending_counts_unread_records_in_its_line`,
 `pending_skips_the_stream_record`, `pending_json_carries_its_rows_with_unread`,
-`a_file_that_is_no_store_cannot_be_read`, `sign_out_waits_for_the_token_erase`,
+`a_file_that_is_no_store_cannot_be_read`, `sign_out_waits_for_the_empty_token_stored`,
 `sign_in_dash_reads_stdin`, `close_kept_line`,
 `a_drawn_key_is_resent_from_directory`, `adopt_is_an_act`; each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p temper-client-shell-cli -E

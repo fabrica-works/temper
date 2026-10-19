@@ -228,6 +228,14 @@ pass:
 101. **The code graph for temper, re-indexed** (steer of 2026-10-19T13:51:25Z).
      The code graph indexes temper again: re-indexed at 2026-10-19T13:51:25Z, at temper `ed725ce57`, past the claim. The README's rule "**The code graph** is not used for temper until the supervisor has re-indexed it past its `origin/main` (AGENTS.md) and a steer says so. Until then, search with `rg` in the worktree." is removed; AGENTS.md's rule stands in its place: "Check each name the graph gives with `rg` in the worktree before relying on it." The graph indexes the primary checkout's `main`, never a session's worktree, and lags behind what lands; the hourly check re-indexes it.
 
+102. **temper 05.1: DIRECTORY opened before its private open; a zero-byte token** (plan defect, temper 05's block of 2026-10-19T13:52:58Z).
+     Plan defect: 05.1's Shape prescribes `OpenPrivate`, which makes an absent root, for every call. tools.md 6.3: "`temper ctl: DIRECTORY does not exist`, for any other call on a DIRECTORY that is not there"; decisions.md 5: "Only `sign-in` creates DIRECTORY, so an act on a mistyped path never leaves a directory behind."
+
+     - Every call but `sign-in` first sends `file::Request::OpenDirectory { root: parent, name: leaf, no_follow: true }`, which opens and never makes. Its `NotFound` exits 1 with `temper ctl: DIRECTORY does not exist`, before any `OpenPrivate`. Its `Opened` token is closed (`Close`), then `OpenPrivate`, `Lock` and `Load` go on as the Shape says, keeping io's private-root checks. `sign-in` sends `OpenPrivate` alone, as now.
+     - The window between the two opens, in which another process removes DIRECTORY and `OpenPrivate` makes it again empty, is accepted: that call then finds no `token` and exits 1, "DIRECTORY is not signed in". An existing-only private open in skein's io would close it: `later.md`'s new row, not planned. No upstream change and no pin moves ("temper alone").
+     - Also from temper 116d0a645 (tools.md 8.1, after the plan's base): `sign-out` "leaves `token` a zero-byte file, which a call reads as no token". 05.1: a zero-byte `token` exits 1 as an absent one, `temper ctl: DIRECTORY is not signed in`. New 05.1 tests: `an_absent_directory_is_never_made` (no `MakeDirectory` or `OpenPrivate` submitted; exit 1) and `a_zero_byte_token_is_not_signed_in`.
+     - 05.5: `temper-client-tools`' `src/jig/rows.rs` joins its Files: `SIGN_OUT`'s `line`, "End sign-in and erase the token", becomes "End sign-in and leave the token empty" (tools.md 5.6: "leaves `token` empty, zero bytes, read as signed out"), with `tests/golden/help.txt`, which repeats it; its test `sign_out_waits_for_the_token_erase` is named `sign_out_waits_for_the_empty_token_stored`. Refresh any further copy of the old line, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
