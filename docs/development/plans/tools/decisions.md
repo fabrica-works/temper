@@ -855,3 +855,11 @@ and the user, or the director, may veto it before the run:
   a designer joins the run (`plan join designer`, in a design session)
   and answers question.md. temper 03.3's inbox call that reads on waits
   on it; the rest of 03.3 goes on.
+  Decision: the default, by director, 2026-10-19: the printed cursor is
+  one group byte (0 needs, 1 updates) and then jig's cursor, whole. The
+  call that reads on stays in needs while needs has more, then moves to
+  updates. `--after C` reads C's group, and with `--kind K` a C of the
+  other group is a usage error, exit 1. The inbox stays the one call
+  tools.md, 5.2, gives it, "what needs the party, then updates"; the
+  cursor stays opaque to the agent. tools.md, 5.2, says so at the
+  designer's next pass, after this plan.
