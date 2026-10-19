@@ -725,6 +725,9 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
          298:    identity alone, `kept: chat, proposed: t3/17`, with no `to` (decisions.md, For the user, Q, decided by the director,
          332:  `a_restored_proposals_kept_line_prints_its_identity_without_a_recipient` (Q),
 
+137. **temper 04.1: an inbox read's digest when updates do not fit** (design, temper 04.1's block of 2026-10-19 10:32:17 UTC).
+     Not a design gap: tools.md 5.4 answers it, and ruling 133 (decision O) stands. A digest is of "the subject's document as `--json` prints it", and "a read and a wait digest one form, the watch's document: for `inbox` and `tasks` ... the rows the watch's first window holds, in its order, and whether more follow, within the tools' page of rows. The read makes that form from its own rows and prints its cursor beside it, outside the digest"; 04's Choices has the read assemble "the watch's first window: needs before updates, each in its supplied order, at most 32 rows across both". So an inbox read that O's first page cuts before updates (31 needs and 2 updates) prints O's page, 31 needs, and digests the watch's first window all the same: its needs, then the first rows of the updates' page it read (`updates_fit` reads both pages), to 32 rows, and whether more follow, through `digest::part` and the one JSON renderer. The bytes digested are what a wait's first delivery prints, so a wait `--since` that digest does not answer at once; the read's printed rows are then fewer than the digested, which is not a second renderer or a hidden document. temper/04-waits.md, 04.1, says so in its Shape and adds `an_inbox_read_cut_before_updates_digests_the_watchs_first_window`; `the_printed_part_without_digest_is_the_bytes_digested` holds for each delivery and for a read whose page is the window. temper 04.1 goes on whole, inbox included.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

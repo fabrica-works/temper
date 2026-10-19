@@ -126,6 +126,13 @@ Shape:
 - The read's list form is assembled from its rows as Choices says. Preserve
   owner row identity, ordering and supplied fields; no re-sort by tool name,
   no cursor in JSON rows used for hashing. Retain read continuations outside it.
+- An inbox read that O's first page cuts before updates (31 needs, 2 updates)
+  prints O's page and digests the watch's first window all the same (ruling
+  137): its needs, then the first rows of the updates' page it read, to 32
+  rows, and whether more follow, through `digest::part` and the one JSON
+  renderer (tools.md 5.4, "The read makes that form from its own rows"). Its
+  printed rows are then fewer than the digested; no second renderer, no other
+  form.
 - All eligible parts gain a digest; pages and filtered non-subject reads do not.
 Test shape: `src/tests/jig/digest.rs`, on the shared document fixtures and
 `fixtures::limits()`. Add builders for inbox needs/updates and a tasks page/window pair.
@@ -144,7 +151,11 @@ inbox groups and an overflow, with the expected row identities/order checked
 against the supplied window, not recomputed by the implementation.
 Others, each under 20 ms:
 - `a_digest_moves_with_the_document_and_only_then` (including row order/more);
-- `the_printed_part_without_digest_is_the_bytes_digested` (16 lower-case hex);
+- `the_printed_part_without_digest_is_the_bytes_digested` (16 lower-case hex;
+  a delivery, and a read whose page is the window);
+- `an_inbox_read_cut_before_updates_digests_the_watchs_first_window` (31
+  needs, 2 updates: 31 rows printed, the digest a wait's first delivery's, 32
+  rows and more);
 - `one_delivery_under_two_clocks_and_two_mes_has_one_digest`;
 - `list_cursors_and_watch_counts_are_outside_the_digest` (both inbox forms,
   tasks, 31/32/33 rows, a full window with no more and with more);
