@@ -113,7 +113,7 @@ chain.
 
 ## Rules of this plan
 
-- **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. Current hold: both skein and temper, pending the refresh begun after the 08:12 ready events. Source search remains available throughout.
+- **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. Both primary indexes were refreshed after the 08:12 ready events; the temporary hold is lifted. Source search remains available throughout.
 
 - **Wait discipline:** follow development.md 7.4. Prefer completion notifications; use supported work-completion waits of at least 300 seconds and identify tool-imposed exceptions instead of repeatedly polling on expiry. This does not delay handling messages or required operational checks.
 

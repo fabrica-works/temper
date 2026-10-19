@@ -640,7 +640,7 @@ where its answer lands.
      Register skein-02.s1 from skein/02.s1-contract-tests.md after skein-02.4; make temper-repin await it. Pass the Client contract fixtures rule to the running skein02 session and later implementers. Preserve all independent work and existing proof obligations; implement and validate the supplement against its actual post02.4 source.
 
 127. **Refresh primary graphs after the next source landings** (graph comparison at the 08:12 ready events).
-     Reverses: ruling124 of2026-10-19T07:31:24Z and ruling122 of2026-10-19T07:19:58Z only as permission to use stale primary indexes; exact-project/worktree verification remains.
+     Reverses: ruling124 of2026-10-19T07:30:20Z and ruling122 of2026-10-19T07:19:58Z only as permission to use stale primary indexes; exact-project/worktree verification remains.
      Amends: README Rules, standing Graph freshness rule and current temporary hold.
 
      ## Decision
@@ -661,6 +661,25 @@ where its answer lands.
      Authorize the new06.2 diagnostic exception: scratch only,20minutes and three executable diagnostic attempts, at most one full recording among them. Compare the unchanged archived-write request with pre-06.2 code and report its failure layer/proposed repair location or remaining uncertainty in at most15lines. This assigns diagnostic scope without presuming the JSON migration is independent.
 
      The plan's “Behaviour unchanged” and Don't's “change a transcript, a delivery or facts.txt” still hold. No outside-scope repair lands under this authorization; the next ruling assigns upstream scope. Preserve the JSON implementation checkpoint and all proof checks; do not swallow the reset. Independent sessions continue.
+
+129. **Use refreshed primary graphs after the next landings** (graph refresh after the 08:12 ready events).
+     Reverses: ruling127 of2026-10-19T08:15:49Z and its steer of2026-10-19T08:16:18Z, only the temporary two-repository graph hold.
+     Amends: README Graph freshness removes the hold; ruling127 metadata corrects ruling124's reference from the steer time07:31:24Z to verified commit time07:30:20Z.
+
+     ## Decision
+
+     Both primary graphs are refreshed; resume discovery for exact projects srv-data-git-runner-src-skein and srv-data-git-runner-src-temper. Keep README Graph freshness, worktree source verification and source search for newer/unindexed/partial code. No kit move or proof-budget change. Correct the earlier metadata timestamp as named above; no substantive ruling changes.
+
+     ## Checked
+
+     - index_repository fast/persistent succeeded; index_status reports skein root/srv/data/git/runner/src/skein ready08:17:08Z,26724nodes; temper root/srv/data/git/runner/src/temper ready08:18:00Z,22399nodes.
+     - git rev-parse HEAD origin/main agrees in skein at5aaba05472924164e6fb6f07ea779036dbe4c153 and temper atb7569d47472fcfe4b0132b50f4e0cfd1a755161a. Since the indexed temper source e83e552e, intervening changes are Markdown only (git diff --stat), so its indexed code is current.
+     - Known partial parse counts remain3/2; hostile JSON and excluded paths use source. git show of49949acedcca187bbecaa9dac3586a01d480b3f5 gives2026-10-19T08:30:20+01:00, hence07:30:20Z.
+     - The recorded graph steer is2026-10-19T08:16:18Z; pinned kit plan ruling/ring commands exist. Kit d6d4abe remains.
+
+     ## Instructions
+
+     Lift only the temporary graph hold in running sessions; retain the README rule, exact primary project identities, worktree verification and source fallbacks. Temper06.2's bounded diagnostic authorization remains unchanged.
 
 ## For the user
 
