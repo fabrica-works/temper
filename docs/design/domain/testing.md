@@ -167,10 +167,14 @@ on the real kernel in the focused suite, within its budgets (6.1).
   under its named key and made once (../client/tools.md, 11.3); the
   forge's API stories, and stories that clone, push or land, on the fake
   git program (below).
-- **An account first.** A story whose agents run adds a key the fake
-  LLM peer accepts, from the client, before its first task, and waits
-  for its account to be usable: a key needs no sign-in to drive (jig's
-  `domain/accounts.md`, 3.4; ../client/tools.md, 11.3).
+- **An account first,** with area 5's tools (../client/tools.md, 5.5):
+  a story whose agents run adds a key the fake LLM peer accepts, from
+  the client, before its first task, and waits for its account to be
+  usable: a key needs no sign-in to drive (jig's `domain/accounts.md`,
+  3.4; ../client/tools.md, 11.3). Until those tools, the real loop and
+  the process tier (2.6) hand the deployment's credential in as a
+  `handed_in` file of the configuration the test writes, the engine's
+  handed-in account.
 - **LLM accounts' stories** (../protocol/credentials.md, section 7),
   each scripted on the fake peers, never by chance:
   - **a sign-in:** on skein's fake issuer, the engine's redirect
@@ -348,7 +352,8 @@ and 10).
 - **The story,** one test:
   1. the person signs in by the link the binary prints, and adds the
      test's key as the deployment's on the accounts page
-     (../client/README.md, 3.6), which shows its account usable;
+     (../client/README.md, 3.6), which shows its account usable; until
+     area 5's tools, the key is handed in instead (2.4);
   2. a chat is answered;
   3. a repository is adopted through temper's client, as above;
   4. a goal is given whose change, its CI passed, lands on the owned
@@ -369,7 +374,10 @@ and 10).
   referee reads the printed pages (the inbox and the adoption's
   outcome) and the exit status.
 - **The agents' tools,** `temper ctl` against `temper serve`, on a
-  scratch directory of their own: ../client/tools.md, 11.4.
+  scratch directory of their own: ../client/tools.md, 11.4. A call cut
+  by `SIGINT` or `SIGTERM` sends nothing more, prints nothing more,
+  leaves DIRECTORY's kept requests as they are, and exits 130 or 143
+  (../client/tools.md, 8.2).
 - **The server's guards,** a third test, against `temper serve`'s
   clients' listener: jig's one attack story that needs no browser, a
   rebound Host (jig's `protocol/browser.md`, section 15): a request
@@ -410,10 +418,11 @@ and 10).
   the person saw before the kill is lost after it; no process the binary
   or the test started outlives it.
 - **Credentials:** none borrowed. The fake LLM peer accepts a key the test
-  makes; the person adds it from the client once signed in, as the
-  deployment's, and the agents' tools' test with `temper ctl add-key`
-  (../client/tools.md, 11.4); it is kept in jig's secrets' store, and no
-  file the configuration names holds an LLM account
+  makes; until area 5's tools it is handed in as a `handed_in` file
+  (2.4). With them, the person adds it from the client once signed in,
+  as the deployment's, and the agents' tools' test with `temper ctl
+  add-key` (../client/tools.md, 11.4); it is then kept in jig's secrets'
+  store, and no file the configuration names holds an LLM account
   (../protocol/credentials.md, section 3). The forge's API token, its user
   and the git identity's token are reconcile's, in the forge's directory,
   and the admin's token the preparation's, read by reconcile alone

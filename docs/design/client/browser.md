@@ -91,19 +91,25 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
     mapping under `/jig` and its stream; the root's requests to jig's
     adapter (`jig-client-shell-web`'s `adapter`) and skein's transport,
     and their reports back to the root;
-  - `records`: the small store's records per owner, jig's and the
-    forge's pending adoption, encoded by `temper-client-protocol-wire`
+  - `records`: the small store's records, `jig-client`'s alone; from the
+    adoption form (section 6), a pending adoption is among them, a kept
+    request whose request `temper-client-protocol-wire` encodes
     (`README.md`, 4.6);
   - `limits`: the client's limits in a browser, derived as the
     terminal's are (`README.md`, section 2), and their sum.
 - **It decides nothing.** What a page shows and does is the domain's
   and the view's, step code under the subset; the shell orders the
   platform's work (jig's `protocol/browser.md`, 3.1).
+- **The failure page:** past the restart part's limit, the page says
+  "The application failed.", in temper's words, since it takes none of
+  jig's look; it starts nothing and keeps the small store (jig's
+  `protocol/browser.md`, 5.1).
 - **The small store** is the browser's session storage, under the
   prefix `temper.`, holding `jig-client`'s records alone, as the
-  terminal's file does (`README.md`, section 7). Each load of the page
-  is a client of its own, with its own stream (jig's
-  `protocol/browser.md`, section 10).
+  terminal's file does (`README.md`, section 7); from the adoption form
+  (section 6), a pending adoption is among them, a kept request
+  (`README.md`, 4.6). Each load of the page is a client of its own, with
+  its own stream (jig's `protocol/browser.md`, section 10).
 - **What the terminal says in lines of its own** (`README.md`, 3.4 and
   6.6): another party's kept work and kept work dropped have no place
   in the browser, whose small store lives as long as its tab, of one
@@ -117,15 +123,17 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   skein's serving of a bundle (skein's `ui-web.md`, 4.4):
   1. what jig's default mapping claims, under `/jig`, to jig's clients'
      component: every request there but a `GET` of the printed link's
-     route, which the mapping leaves to the page (6; jig's
-     `protocol/browser.md`, section 11);
+     route, which the mapping leaves to the page, answered with the
+     page's policy and `Referrer-Policy: no-referrer` (jig's
+     `protocol/browser.md`, 12.1 and 12.2);
   2. with no bundle configured, every other path not found, as
      `README.md`, section 8 says;
   3. a request other than `GET`: `405`;
   4. `/bundle/<digest>/…`: the bundle's files, immutable; any other path
      under `/bundle/`: not found;
-  5. `/robots.txt`, the bundle's one root file (jig's
-     `protocol/browser.md`, 3.5), disallowing every path;
+  5. `/robots.txt`, the bundle's one root file (skein's `ui-web.md`,
+     3.3, step 5; jig's `protocol/browser.md`, section 12), disallowing
+     every path;
   6. any other `GET`, the printed link's route among them: the page,
      with its ETag and `no-cache`, and `304` on a matching
      `If-None-Match` (skein's `ui-web.md`, 4.4).
@@ -211,20 +219,24 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   nodes the mockups style: the frame's banner, navigation and main; the
   cards; the conversation's turns; the composers. The view sets them
   (`README.md`, 5.1); the terminal prints none.
-- **`temper.css`,** loaded after skein's `skein-ui.css`, after
-  `mockups/style.css`: its palette as variables under the prefix, the
-  system's monospaced font, the compact top navigation and quiet
-  borders. Nothing a person must know is said by style alone (skein's
-  `ui.md`, section 8). The mockups' icons are left out: each control is
-  named by its words.
+- **The bundle's stylesheets:** skein's `skein-ui.css`, then
+  `temper.css`, which takes its rules from `mockups/style.css`; the
+  mockups are not shipped. `temper.css` holds the mockups' palette as
+  variables under the prefix, the system's monospaced font, the compact
+  top navigation and quiet borders. Nothing a person must know is said
+  by style alone (skein's `ui.md`, section 8). The mockups' icons are
+  left out: each control is named by its words.
+- **Light only:** the mockups' palette is light, and `temper.css` sets
+  `color-scheme: light`, where `skein-ui.css` follows the system's dark
+  preference. A dark palette is open (section 5).
 - **The composers** (the chats' and a chat's) are text areas with
   skein-ui's `SubmitsOnEnter`: Enter sends, Shift+Enter is a new line
   (skein's `ui-web.md`, section 7), which the view allows in a
-  composer's words, counted within its bound (`README.md`, 5.1). They grow with their words and
-  shrink after sending by `temper.css` alone (`field-sizing: content`,
-  from one line to a bound), with no component and no script of
-  temper's; a browser without it shows an area of fixed height that
-  scrolls.
+  composer's words, counted within its bound (`README.md`, 5.1). They
+  grow with their words and shrink after sending by `temper.css` alone
+  (`field-sizing: content`, from one line to a bound), with no
+  component and no script of temper's; a browser without it shows an
+  area of fixed height that scrolls.
 - **A run's live text** is a patch like any other: the chat's
   provisional turn ("Writing…", `README.md`, 3.5) changes in place;
   skein's page keeps focus, caret and scroll across it, and the
@@ -238,14 +250,19 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   on a pipe, from the loop beside the engine.
 - **The person's browser face is skein's** (`skein-fake-person-browser`;
   skein's `ui-web.md`, 14.2): the same queries and acts as on the tree,
-  made over Chromium's accessibility tree.
+  made over Chromium's accessibility tree, and the browser's own: the
+  current address, read from the navigation history, and keys pressed
+  with Shift.
 - **What it runs against:** `temper serve`, a child of the harness's
   loop, on a scratch directory, from a configuration the test writes
-  with the bundle named, its forge the fake forge, hosted on loopback in
-  that loop by skein's forge peer (`../domain/testing.md`, 4.2), and its LLM
-  skein's fake LLM peer, as the process tier has it (`../domain/testing.md`,
-  2.6): no Forgejo, no runner. The stories need no answer of the LLM's
-  or the forge's.
+  with the bundle named: no Forgejo, no runner. The first milestone's
+  stories need no answer of the forge's or the LLM's, so its forge and
+  its LLM endpoint are unreached, on closed loopback ports, as jig's
+  tier serves (jig's `protocol/browser.md`, section 15). The fake
+  forge, hosted on loopback in that loop by skein's forge peer
+  (`../domain/testing.md`, 4.2), and skein's fake LLM peer, as the
+  process tier has them (`../domain/testing.md`, 2.6), join with the
+  second milestone's first story that needs them (4.2).
 - **Only what a browser alone shows.** temper's stories (what a page
   shows, what an act sends, a chat answered, a proposal accepted, a
   repository adopted, a run's live text) are the joint world's
@@ -264,13 +281,16 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 
 ### 4.1 The first milestone's stories
 
-1. **Signing in by the printed link:** the address reads `/` before
-   the first request, and the inbox shows; a reload on a chat's
-   address shows that chat, signed in by the cookie; a link spent
-   shows the browser's signed-out paragraph (2.4).
+1. **Signing in by the printed link:** the inbox shows, and the
+   address reads `/` once it does; a reload on a chat's address shows
+   that chat, signed in by the cookie; a link spent shows the browser's
+   signed-out paragraph (2.4). That the secret leaves the address
+   before the first request is held by the shell's start order (2.1),
+   and is not tested.
 2. **Addresses:** skein's `back_and_forward` (skein's `ui-web.md`,
    14.2), from the chats to a chat by its link and back; an address
-   that is no page opens the inbox at `/` (2.3).
+   that is no page opens the inbox, and the address reads `/` once it
+   shows (2.3).
 3. **The composer:** in the chats, Enter starts a chat with the words
    once, and Shift+Enter makes a new line in them (2.5).
 4. **A panic:** skein's `panic` (skein's `ui-web.md`, 14.2), which
@@ -330,6 +350,8 @@ that opens a tab of its own.
   unfiltered.
 - **The bundle in the binary,** so that `temper serve` needs no
   directory. Default: a directory the configuration names (2.2).
+- **A dark palette,** following the system's preference as
+  `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question
   (skein's `browser.md`).
 
@@ -346,12 +368,15 @@ that opens a tab of its own.
   item finding it (skein's `ui-web.md`, section 6), since temper's pages
   click buttons; `back_and_forward` awaiting a page that holds its
   server's state before its first move (skein's `ui-web.md`, 14.2),
-  since the first page signs in by the printed link; and skein's forge
-  peer, which the tier's server takes (4; forge-kit's). Done when
-  temper's gate passes 4.1's stories.
+  since the first page signs in by the printed link; and the fake
+  person reading the current address and pressing a key with Shift
+  (skein's `ui-web.md`, 14.2). Done when temper's gate passes 4.1's
+  stories.
 - **The second: the other pages.** The inbox, a task's page (a goal's
   and an agent's task's) and the adoption form, each with its look
-  (2.5), and 4.2's story. Done when temper's gate passes it.
+  (2.5), and 4.2's story; the forge peer and the fake LLM peer join the
+  tier with its first story that needs them (4; the forge peer
+  forge-kit's). Done when temper's gate passes it.
 - **What it touches in temper:** `temper-service`'s clients' server and
   its configuration and limits (2.2); `temper-client-domain`'s address
   codec (2.3); the view's style tokens, its composers' `SubmitsOnEnter`

@@ -184,6 +184,25 @@ watch's subject, its digest (5.4). It needs no key.
   a call with either, and such a call is refused a command line, never
   given a guessed one, so that a call's command line parses back to
   that call (6.1).
+- **`inbox` reads needs, then updates,** in the one call. jig reads the
+  inbox a group a call, needs or updates, each with its own cursor, and
+  each kind in one group. A call reads needs first; while needs has
+  more, its page is needs alone. Once needs ends on a page, updates'
+  first page follows it when both fit in a page's rows (section 12);
+  when they do not, the call that reads on starts updates. No page
+  passes the rows, and no update is read twice.
+- **The inbox's printed cursor** is one group byte, 0 for needs and 1
+  for updates, then jig's cursor, whole, or none when the call that
+  reads on starts updates; to the agent it stays opaque. The call that
+  reads on stays in needs while needs has more, then moves to updates.
+  `--after C` reads C's group; with `--kind K`, a C of the other group
+  is a usage error, exit 1.
+- **A page cut by `--limit K`** reads on with the same read without
+  `--limit`, `activity N`, or `activity N --before C` with the C it was
+  given, which prints the page whole, its K rows again, then reads on
+  at jig's `before`. `task N --activity K` that cuts a page prints
+  `read with: activity N`. The printed cursor stays jig's: at most a
+  page's rows repeat, and no row is skipped.
 - **Provisional text is the run's host's.** An agent process gives none
   (`../protocol/llm.md`, section 7), and `chat` and `run` then print none:
   a run shows by its activity, and its words as each turn commits.
@@ -451,10 +470,11 @@ area lands with its stories (section 11).
   no client and sends nothing (8.3).
 - **A `pending` row** is a line each: the request's operation, as a
   `kept:` line names it (6.1); its party, `party N`; and when it was
-  first sent, in temper's words for a wall time, or `not sent` (skein's
-  `lib.md`, section 12). No name and no key, as a `kept:` line prints
-  none. Under `--json`: `pending`, rows of `operation`, `party` and
-  `first_sent`, a wall time as jig's integer, or `null`; and `unread`.
+  first sent, `first sent HH:MM UTC`, the documents' words for a wall
+  time (skein's `lib.md`, section 12), or `not sent`. No name and no
+  key, as a `kept:` line prints none. Under `--json`: `pending`, rows
+  of `operation`, `party` and `first_sent`, a wall time as jig's
+  integer, or `null`; and `unread`.
 - **A record these tools cannot read,** of a store version, or of a
   family's owner or version, that they do not declare, is counted, never
   listed: jig's client reads nothing of such a record, drops it at start
@@ -492,6 +512,11 @@ digest: task 7c1e09a2b44f0d13
   act's call ends with `--key NAME`. A proposable act says to whom; a
   refused one says why, and prints no call. The host gives the
   rendering how a call is printed.
+- **An offered act with no tool** (5.3 has none for it) prints its name
+  in the tools' words and ` (no tool)`, in the document's order, with no
+  call and no admission: the agent learns the act is there and may hand
+  it to a person, and no call names a tool that does not exist. Under
+  `--json`, the document's offers print as they are.
 - **jig's words and the forge's** (section 4): phases, holds, what a
   task waits on and refusals in the words a person reads.
 - **Lists** print one line per row, its number first, then the cursor
@@ -507,6 +532,16 @@ digest: task 7c1e09a2b44f0d13
   engine's key, drawn or a name's digest, and the client's, the
   runner's (jig's `protocol/client.md`, section 10), never the name,
   and neither key is of use to an agent.
+- **A restored proposal's `kept:` line** prints its identity alone,
+  `kept: chat, proposed: t3/17`, with no recipient: jig keeps none with
+  the request, so the line is never stale, and the agent reads the
+  proposal for its present one. A new call's outcome keeps `, to
+  <recipient>`.
+- **`adopt`'s `kept:` line** has two forms: `kept: adopt WORDS`, with no
+  comma, for an answer in `README.md`, 4.7's words, unknown among them,
+  or an answer that could not be decoded; and `kept: adopt, REASON`, as
+  every other operation's, for the client's own answers: held, the
+  limit, unconfirmed, not kept.
 - **What it does not send** prints a line on stderr too: another
   party's kept requests, `kept: N for party P, unsent while it is not
   signed in here` (8.2); the records the client dropped at start,
@@ -536,6 +571,7 @@ may change with them.
 | 1 | the call failed: usage, the directory refused, its store unreadable (5.6), or busy past the lock's wait (8.3), the engine's address not on loopback, the engine unreachable or the link down past its deadline, signed out, a request past the client's limits, a name the client holds already (`Held`, section 7), unknown past the retention, not kept (DIRECTORY's store not written); the client's own answers alike, a read past its limits among them; a wait's watch ended by the sign-in's end | one line on stderr, `temper ctl: ...` |
 | 2 | refused by the engine, and only by it: a key conflict among them (section 7); a wait's subject no longer visible to the party | jig's refusal, typed in JSON, in words in text; the act's alternatives where the refusal names them (read again, propose instead) |
 | 3 | a wait's timeout, or its subject's watch ended, its condition not met | the current document, or the last, and its digest |
+| 128 + N | ended by signal N, `SIGINT` or `SIGTERM`: 130 or 143 (8.2) | nothing more |
 
 - **2 is the engine's answer alone:** what it decided about the
   request, with the alternatives it names. The client's own answers
@@ -544,10 +580,17 @@ may change with them.
   conflict, since each call's keys are its own (section 4). Either is
   the tools' bug: it exits 1, says so, and the guide says to report it
   as a finding (11.5).
-- **A call cut by a signal** exits as the OS ends it: the tools catch
-  no signal, so its status is the OS's, never 0 (8.2).
+- **A call cut by a signal** ends at once and exits 128 plus the
+  signal's number, never 0 (8.2).
 - **A call whose link stays down** past its deadline exits 1, and what
   it sent stays in the small store, for the next call that sends (8.2).
+- **Only `sign-in` creates DIRECTORY.** Three of 1's lines, word for
+  word: `temper ctl: DIRECTORY does not exist`, for any other call on a
+  DIRECTORY that is not there; `temper ctl: DIRECTORY is not signed
+  in`, for a call that needs the token when DIRECTORY holds none; and
+  `temper ctl: the engine at ADDRESS did not answer within 30 s`, the
+  link down past its deadline (section 12), ADDRESS as `address` holds
+  it.
 - **`adopt`:** adopted exits 0, with branch protection unknown or not
   (`README.md`, 4.7, prints "Branch protection could not be read."
   then); unknown past the retention exits 1; each other outcome there,
@@ -667,18 +710,21 @@ as the terminal's host is:
    take its lock (8.3) and load the small store's records;
 3. start the tools' root, sign in with the token, wait for `me`;
 4. send what the store kept for `me`'s party, each answered as a line
-   on stderr, `kept: ...` (6.1); the step ends once each is answered
-   and its record erased, so that the store keeps nothing of the
-   party's when the call is sent;
+   on stderr, `kept: ...`, a restored proposal's without its recipient
+   (6.1); the step ends once each is answered and its record erased, so
+   that the store keeps nothing of the party's when the call is sent;
 5. run the call: a read answered, an act's answer durable, a wait's
    condition met or its timeout;
 6. print the result on stdout, close the stream, exit with the call's
    status.
 
-- **A termination signal** stops the call: the tools catch none, so its
-  exit status is the OS's. What it sent stays in the small store, the
-  next call that sends sends it again under its key, and a rerun under
-  its name gets its first answer (section 7).
+- **A termination signal,** `SIGINT` or `SIGTERM`, arrives as skein's
+  `Shutdown` (skein's `io.md`, section 7), and ends the call at once:
+  it sends nothing more, leaves DIRECTORY's kept requests as they are,
+  prints nothing more, and exits 128 plus the signal's number, 130 or
+  143. What it sent stays in the small store, the next call that sends
+  sends it again under its key, and a rerun under its name gets its
+  first answer (section 7).
 - **A link down** past the link's deadline (section 12), at step 3, 4
   or 5, exits 1; what was sent stays in the small store, as after a
   signal.
@@ -833,12 +879,19 @@ the first party's kept request stays unsent, and the call goes on. The
 forge's stories adopt a repository, and clone, push and land through the
 fake git program on the shared in-memory fake forge, with CI by the fake
 forge's content marker and its webhooks delivered to the engine
-(`../domain/testing.md`, 2.4). Real git meets a forge in the process tier
-(11.4).
+(`../domain/testing.md`, 2.4). Real git meets a forge in the process
+tier (11.4). The forge's stories run on `skein-world`'s
+`World::new_controlled`, unchecked: fake git's memory in the shared fake
+forge outlives the git program that made it, which the checked world
+fails (skein's `testing-strategy.md`, section 6; skein's
+`fake-forge.md`, section 5). Every other story here is checked.
 
-Every story first adds a key the fake LLM peer accepts, `add-key` from
-a scratch file, as section 10's harness does, and waits for `usable`.
-Area 5's stories (`../domain/testing.md`, 2.4):
+Until area 5's tools (5.5), the deployment's credential is handed in as
+a `handed_in` file of the configuration the test writes, the engine's
+handed-in account (`../domain/testing.md`, 2.4). With area 5, every story
+first adds a key the fake LLM peer accepts, `add-key` from a scratch
+file, as section 10's harness does, and waits for `usable`. Area 5's
+stories (`../domain/testing.md`, 2.4):
 
 - **A sign-in:** `connect` against skein's fake issuer, the browser's
   visit and the redirect to the engine's loopback listener driven by the
@@ -879,12 +932,14 @@ where possible; its seed does not replay the kernel's schedule.
 (`../domain/testing.md`, 2.6), on a scratch directory of their own, for
 what needs the executable: argv through `main`, printed output, the OS's
 exit statuses, the printed link read on stdin (`sign-in -`), the
-deployment's key added from a private file as the first act (section 10),
-a key's file refused when it is not private, an act cut by a termination
-signal, its status not 0, then asked again under its key, made once, and
-agent process launch. One landing on the owned Forgejo proves a change
-against real git and CI (`../domain/testing.md`, 2.6). The lock,
-DIRECTORY's files and a call's exit are the real loop's (11.3).
+deployment's credential (a `handed_in` file until area 5's tools, as in
+11.3; with them, its key added from a private file as the first act,
+section 10, and a key's file refused when it is not private), an act
+cut by a termination signal, its status 128 plus the signal's number
+(8.2), then asked again under its key, made once, and agent process
+launch. One landing on the owned Forgejo proves a change against real
+git and CI (`../domain/testing.md`, 2.6). The lock, DIRECTORY's files
+and a call's exit are the real loop's (11.3).
 
 ### 11.5 The agents' guide
 
@@ -928,7 +983,7 @@ terminal's, whose window shows two rows:
 
 | What | Bound |
 |---|---|
-| rows: a list's page, the activity lines `task` adds, a conversation's page; the client's rows per window | 32, the most jig's client wire takes in a limit of rows (its schemas' ceilings; jig's `protocol/client.md`, section 3) |
+| rows: a list's page, the inbox's needs and updates together, the activity lines `task` adds, a conversation's page; the client's rows per window | 32, the most jig's client wire takes in a limit of rows (its schemas' ceilings; jig's `protocol/client.md`, section 3) |
 | a result's text | 32 KiB |
 | a turn's part | 16 KiB |
 | one document, the client's `document_bytes` | 1 MiB |
