@@ -143,7 +143,10 @@ Shape:
 - `write_call` and `write_tool` measure, then write, with
   `skein_json::writer::Encoder`. A record holds its name, line, area,
   keyed, result, and forms of arguments (name, shown, place, kind,
-  occurs, line). An output past its representable bound is `Refusal::Long`.
+  occurs, line). `Encoder::measured`'s `TooLong` and `TooDeep` are
+  `Refusal::Long`; its `Text` and `Number`, from argv bytes a `Value::Text`
+  or `File` carries that are not UTF-8, are `Refusal::Text`: matched, since
+  clippy.toml bans `map_err`.
 Test shape: `src/tests/json.rs`. `fixtures::EVERY_TOOL` holds one argv
 per row and form, from temper 02's tables; `fixtures::from_json`
 decodes. The reference test:
@@ -167,7 +170,9 @@ The others, each under 20 ms:
 matrix, forbidden inbox flags and tasks' cursor/ended, all four terminal
 phases, since/until together and timeout bounds),
 `a_text_from_stdin_is_refused_under_call_stdin`,
-`a_document_past_ask_bytes_is_a_usage_error`,
+`a_document_past_ask_bytes_is_a_usage_error` (`Usage::Json`; the length
+is checked against `ask_bytes`, a u64, before the tokenizer, whose length
+is a u32),
 `each_tools_record_is_written_as_json`.
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E
 'test(every_call_goes_from_argv_to_json_and_back_unchanged)'` (under 20
@@ -185,7 +190,8 @@ then each tool's usage line and line; with TOOL, its record. Usage lines
 derived from the rows, reading as 5.2 to 5.6 write them; the guide,
 temper's text; each derivation naming every tool (5.1); help as golden
 text (11.1).
-Needs: a call's JSON and a tool's JSON record (temper 12.1).
+Needs: a call's JSON and a tool's JSON record (temper 12.1); the root and
+the runner, with `me` and `task N` (temper 03.2), for `fixtures::golden`.
 Files: new `src/jig/help.rs`, `src/guide.rs`, `src/help.rs`,
 `src/tests/help.rs` and
 `src/tests/golden/{help,help_decide,help_close,help_wait,help_pending,help_adopt}.txt`
@@ -200,8 +206,12 @@ Shape:
   `wait`'s help gives Choices' subject arguments and condition matrix,
   the ten live words from `subject::phase_word`, and `--until ended`.
   It explains the matching read's digest and combined since/until.
-- `jig::help::{tools, tool}` and temper's `help::text` write into a
-  `skein_lib::Writer` of at most `limits::TEXT` bytes.
+- `jig::help::{tools, tool}` and temper's `help::text` measure into
+  `skein_lib::Writer::new(text)`, `text` being
+  `usize::try_from(limits::TEXT)`, then write into
+  `Writer::new(measured.written())`: a `Writer` is exact-length, and
+  `finish` asserts it full. `the_help_fits_the_tools_window` asserts on
+  the measured length.
 - `guide::GUIDE` covers sign-in (`sign-in -`, the link on stdin), the
   loop of 5.4, key names and their prefix (7), reading acts (5.3), the
   exit statuses (6.3), and reading the forge but changing it only
@@ -278,10 +288,13 @@ decoding before any call reaches the runner.
 ```rust
 // crates/temper-client-tools/src/jig/json.rs
 use crate::jig::{argv::Usage, call::{Call, Source}, table::{Limits, Tool}};
-/// An encoded call or tool record cannot fit its output bound.
+/// An encoded call or tool record cannot fit its output bound, or cannot be JSON.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Refusal {
     /// Nothing is written; the caller reports the bound.
     Long,
+    /// An argument's bytes are not UTF-8; nothing is written.
+    Text,
 }
 /// Decode one call with the table's checks; Source controls stdin's single use.
 pub fn call(table: &[&Tool], bytes: &[u8], from: Source, limits: &Limits) -> Result<Call, Usage>;
