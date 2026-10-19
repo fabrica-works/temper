@@ -95,6 +95,8 @@ jig-client-test-domain = { git = "https://github.com/fabrig-dev/jig.git" }
 temper-client-view = { path = "crates/temper-client-view" }
 temper-client-domain = { path = "crates/temper-client-domain" }
 temper-client-tools = { path = "crates/temper-client-tools" }
+temper = { path = "crates/temper" }
+skein-scratch = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-service = { path = "crates/temper-service" }
 jig-protocol-config = { git = "https://github.com/fabrig-dev/jig.git" }
 smith-host-protocol = { git = "https://github.com/fabrig-dev/smith.git" }

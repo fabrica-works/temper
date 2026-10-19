@@ -1245,6 +1245,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "skein-scratch"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#92e177c3165f937df5d51138c2d0974e15e033e0"
+
+[[package]]
 name = "skein-shell"
 version = "0.0.0"
 source = "git+https://github.com/fabrig-dev/skein.git#92e177c3165f937df5d51138c2d0974e15e033e0"
@@ -2386,15 +2391,21 @@ name = "temper-real-loop-world"
 version = "0.0.0"
 dependencies = [
  "jig-channel-world",
+ "serde_json",
  "skein-fake-llm-domain",
  "skein-fake-llm-protocol",
  "skein-fake-peers",
+ "skein-io",
  "skein-lib",
  "skein-llm",
  "skein-llm-world",
+ "skein-scratch",
  "skein-shell",
  "skein-world",
  "smith-agent-process-world",
+ "smith-agent-shell",
+ "temper",
+ "temper-service",
 ]
 
 [[package]]

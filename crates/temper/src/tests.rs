@@ -147,3 +147,51 @@ fn box_with_two_paths_prints_the_usage() {
     assert_eq!(configure(["box".into(), "one.json".into(), "two.json".into()].into_iter()),
         Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into()));
 }
+
+#[test]
+fn the_standalone_envelope_retains_no_descriptors() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let directory = std::env::temp_dir().join(format!("temper-envelope-{}", std::process::id()));
+    fs::create_dir(&directory).expect("envelope scratch");
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).expect("private scratch");
+    for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
+        fs::create_dir_all(directory.join(name)).expect("fixture parents");
+    }
+    let write = |name: &str, bytes: &[u8]| {
+        let path = directory.join(name);
+        fs::write(&path, bytes).expect("fixture bytes");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
+    };
+    for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
+        write(std::str::from_utf8(&name).expect("fixture path"), bytes.expose());
+    }
+    for (name, bytes) in [
+        ("worker.secret", b"worker-secret".as_slice()),
+        ("secrets/forge-1.user", b"42\n".as_slice()),
+        ("secrets/forge-1.api-token", b"forge-1-api-token-value".as_slice()),
+        ("secrets/forge-1.git-token", b"forge-1-git-token-value".as_slice()),
+        ("root.der", skein_tls_world::pki::ROOT),
+    ] {
+        write(name, bytes);
+    }
+    write("accounts/chat.json", br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#);
+    let (agent, document) = configuration::documents(&directory, "/fixture/temper");
+    write("agent.json", &agent);
+    let envelope = super::envelope_in(&directory, &document).expect("standalone envelope");
+    assert_no_descriptors_in(&directory);
+    let mut owned = Vec::new();
+    let service = super::prepare(&directory, &document, &mut owned).expect("same standalone preparation");
+    assert_eq!(envelope, (service.worst_case(), service.operations()));
+    drop(service);
+    super::close(owned);
+    assert_no_descriptors_in(&directory);
+    fs::remove_dir_all(directory).expect("remove envelope scratch");
+}
+fn assert_no_descriptors_in(directory: &std::path::Path) {
+    for entry in std::fs::read_dir("/proc/self/fd").expect("open descriptor list") {
+        let path = entry.expect("descriptor entry").path();
+        if let Ok(target) = std::fs::read_link(&path) {
+            assert!(!target.starts_with(directory), "descriptor {path:?} still holds {target:?}");
+        }
+    }
+}

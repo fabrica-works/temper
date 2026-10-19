@@ -368,6 +368,14 @@ fn close(owned: Vec<Fd>) {
         skein_shell::close_keeper_fd(fd);
     }
 }
+/// Derive the standalone admission envelope without retaining its descriptors.
+pub fn envelope_in(directory: &Path, config: &[u8]) -> Result<(u64, u32), String> {
+    let directory = std::path::absolute(directory).map_err(|why| prefixed("temper serve", &why.to_string()))?;
+    let mut owned = Vec::new();
+    let result = prepare(&directory, config, &mut owned).map(|service| (service.worst_case(), service.operations()));
+    close(owned);
+    result.map_err(|why| prefixed("temper serve", &why))
+}
 pub fn prepare_in(directory: &Path) -> Result<service::Service, String> {
     let directory = std::path::absolute(directory).map_err(|why| prefixed("temper serve", &why.to_string()))?;
     let bytes = skein_shell::read_file(&directory.join("config.json"), CONFIG_BYTES)
