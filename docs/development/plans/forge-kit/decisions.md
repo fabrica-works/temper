@@ -977,6 +977,18 @@ where its answer lands.
 
      Instructions: pass the README temporary source-search rule to the coordinator and any resumed implementer until the supervisor reports its removal. The hourly checker already uses source fallback for later source; no additional test, gate or executable attempt follows from this rule.
 
+150. **hourly05 primary graphs refreshed** (hourly check of 2026-10-19T10:32:03Z).
+     Reverses: ruling149, hourly check of2026-10-19T10:32:03Z, only its temporary graph-refresh hold. All other rules and dependencies remain.
+     Amends: README Rules, removes Graph refresh pending (hourly05).
+
+     The exact primary indexes have refreshed. Lift the temporary hold, using srv-data-git-runner-src-skein through5c8ae967570b8cfc33f10c83cdfc5495e3b42e99, indexed10:35:04Z with27598nodes/204634edges; srv-data-git-runner-src-temper through89d2db94520ac6807c559797a32fd908787fd1a5, indexed10:35:36Z with23285nodes/157063edges; srv-data-git-runner-src-jig throughc415911cc6e73d2359a30db896dc87e00d28b202, indexed10:36:18Z with57765nodes/480989edges. Verify every result in the actual session worktree. Later source changes require comparison under the permanent Graph freshness rule; source searches remain available.
+
+     Checked: pump/hourly05-graph-snapshots.json records exact roots, clean trees and HEAD=origin/main before indexing; a repeated git rev-parse HEAD origin/main and git status --porcelain after all requests returned the same three clean pairs. index_repository(mode=fast,persistence=true) completed for those primary roots only; index_status reports each ready at the timestamps/counts above. Structured diagnostics are in pump/hourly05-graph-results.json. search_graph(project=srv-data-git-runner-src-jig,file_pattern=tests/boundary/src/client_names.rs,name_pattern=under_client|seed) now returns under_client54–61 and seed64–68; primary rg independently reports the definitions at54/64.
+
+     Coverage gaps still require source fallback: skein3 partial files and8 intentionally hostile JSON documents; temper2 partial files; jig skips crates/jig-client-protocol-wire/src/generated/v9.rs on a parse timeout. The tools also exclude directories and lock/binary artifacts by policy. No graph absence proves source absence. No worktree index, code change, test retry or kit move occurred. The capped functions.wait calls during indexing were tool-yield handling, not coordinator work-completion polling.
+
+     Instructions: pass the refreshed commit coverage and remaining gaps to the coordinator and resumed implementers; remove only149's temporary restriction. Keep all test/proof layers, named fixtures and upstream prerequisites. Refresh further reached symbols/copies from actual source and record changed consumers in the implementation commit body.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
