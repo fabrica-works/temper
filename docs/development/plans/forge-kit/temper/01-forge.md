@@ -5,8 +5,10 @@ then delete their temper copies. Policy, configuration, files and the owner
 stay temper's; the bytes temper writes keep its word and credential.
 
 **Needs at start:** skein 01.1's `skein_forge::{api,locate}`; the tools
-plan's first temper repin, whose Cargo.lock names smith at or after
+plan's `temper-01.1`, whose Cargo.lock names smith at or after
 `b415f737` (README, sessions and Rules). Each capability must be on origin/main.
+The coordinator registers `plan await coordinator tools/temper-01.1`;
+this session starts only after that cross-machine landing.
 
 ## Read first
 

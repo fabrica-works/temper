@@ -111,6 +111,10 @@ chain.
 
 ## Rules of this plan
 
+- **Graph refresh at the claim.** Do not use the code graph for skein or
+  temper; search with `rg`. This holds from the claim until a supervisor
+  ruling removes this rule after refreshing their primary-checkout indexes.
+
 - **The tools plan runs beside this one,** on another machine, on the
   same temper `main` (temper's tools, area 1, first part: temper
   `1093544c3`). Its jig 01 and temper 01.1 repin jig and temper onto
@@ -160,11 +164,14 @@ chain.
   `crates/temper-service/src/family.rs` and `src/family/refusals.rs`
   (its README's hotspots name them for the forge kit) touch none of this
   plan's files: temper 03.1 here changes temper-service's `forge.rs`
-  and its neighbours, not the family. The director
-  starts this run after the tools plan's temper 11 has landed (its
-  `decisions.md`, G), so its first part's hotspots above are behind
-  `main` by then. A rebase conflict is resolved as `land` and the
-  implementer's card say.
+  and its neighbours, not the family. By the director's order for this
+  run, it starts before the tools plan's temper 11 lands. The tools run
+  is on `debian-16gb-hel1-1`, on the same temper `main`. The coordinator
+  must register `plan await coordinator tools/temper-01.1` and must not
+  start temper 01.1 here until that step is on `origin/main`. No other
+  hotspot above adds a wait for tools temper 11; rebase conflicts are
+  resolved as `land` and the implementer's card say. The fake and host
+  copy windows above still hold until their named landings.
 - **Each temper increment that needs a new skein step repins first,** in
   a commit of its own: `heavy cargo update -p skein-lib`, then `heavy
   cargo check --workspace --all-targets`. It moves every skein crate,

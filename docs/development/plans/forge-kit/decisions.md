@@ -287,6 +287,32 @@ where its answer lands.
 | 35 | a 429 on Merge's read after the merge | `Timeout`, as forge.md 5.4 now says (the base's `failure::classify` says RateLimited) | skein 10.3 | answered: the designer's open item in its second answers |
 | 36 | forge-connection.md 10: the requests the fake served against the costs reported, when a cut falls inside a request head | A: the requests whose first byte reached the fake equal the costs, counted at the world's pipe; the fake's served count at most that | skein 09.4 | answered: A, made exact: in every run the costs equal the requests whose first byte the component wrote, counted at the world's streams, and the fake served those less the ones cut inside their head |
 
+101. **Start beside tools; retain its first-repin dependency** (director's order at the claim).
+     Reverses: nothing.
+     Amends: README, Rules of this plan, tools-plan ordering and temporary graph rule; temper/01-forge.md, Needs at start.
+
+     The director authorizes this run to start before tools temper 11 lands.
+     The README says that tools temper 11's forge-facing flags “touch none of this
+     plan's files”; remove its contrary statement that the director waits for 11.
+     Temper 01.1 here still starts only after `tools/temper-01.1` reaches the shared
+     temper `origin/main`. The coordinator registers `plan await coordinator
+     tools/temper-01.1`. The tools run is on debian-16gb-hel1-1. Other hotspots
+     are handled by rebasing as `land` and the implementer's card say; the named
+     fake and host copy windows remain in force. Apply the same rebase rule to
+     further overlapping files and name them in the landing's commit body.
+
+     The claim's skein and temper graph indexes are older than `origin/main`.
+     Until their refresh is complete and a ruling removes the README's temporary
+     rule, use `rg` for these repositories.
+
+     ## Checked
+
+     - Ordering authority: director's message received this turn; recorded 2026-10-19T05:02:59Z.
+     - `git -C temper show origin/main:docs/development/plans/tools/temper/11-tools-forge.md`: 11.1 moves client-view words to client-domain::forge::words; 11.2 is tools adopt. README's hotspot list says those files do not overlap this plan.
+     - `rg -n 'plan await ROLE|plan ruling|plan ring' kit/scripts/dev/plan`: lines 17, 19, 21 document these commands; `plan await` accepts `[PLAN/]STEP`.
+     - MCP index_status: srv-data-git-runner-src-skein indexed 2026-10-13T09:30:32Z; srv-data-git-runner-src-temper indexed 2026-10-11T09:45:04Z; both ready, primary roots matched.
+     - `git show -s --format='%h %cI' origin/main`: skein d6d4abe 2026-10-19T05:46:18+01:00; temper f10b03ea7 2026-10-19T04:57:21Z.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
