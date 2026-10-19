@@ -87,6 +87,22 @@ pub(super) fn encode_task(value: &jig_client::contract::Task, out: &mut Encoder,
     super::subject_end(digest, out);
 }
 
+pub(super) fn encode_historical_task(
+    value: &jig_client::contract::Task,
+    result: &jig_client::contract::Result,
+    out: &mut Encoder,
+    budget: &mut super::Cut,
+) {
+    let digest = budget.digest.take();
+    out.object_start();
+    encode_task_from_label(value, out, budget);
+    encode_task_from_person_revision(value, out, budget);
+    encode_task_from_hold(value, out, budget);
+    out.key(b"result");
+    super::encode_result(result, out, budget);
+    super::subject_end(digest, out);
+}
+
 fn encode_task_from_label(value: &jig_client::contract::Task, out: &mut Encoder, budget: &mut super::Cut) {
     out.key(b"label");
     out.unsigned(u64::from(value.label));

@@ -16,6 +16,7 @@ pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
     pub answer_runs: bool,
+    pub park_runs: bool,
     keyed_fault: Option<RequestEnvelope>,
     reads: usize,
     read_loads: BTreeSet<Token>,
@@ -181,6 +182,7 @@ impl Joint {
             engine,
             sign_ins: 0,
             answer_runs: false,
+            park_runs: false,
             keyed_fault: None,
             reads: 0,
             read_loads: BTreeSet::new(),
@@ -412,6 +414,30 @@ impl Joint {
                     *channel,
                     run.raw(),
                     attempt.raw(),
+                    0,
+                    jig_domain_tasks::End::Parked,
+                    engine::Parts::none(),
+                );
+            }
+            if self.park_runs
+                && let engine::Delivery::Assigned { assignment, .. } = &delivery
+            {
+                if let Some(word) = assignment.messages.last() {
+                    self.engine.send(temper_engine_domain_world::protocol::turn(
+                        Token::new(7),
+                        assignment.task,
+                        assignment.attempt,
+                        1,
+                        0,
+                        Some(word.number),
+                        b"read messages",
+                    ));
+                    self.engine.settle();
+                }
+                self.engine.answer(
+                    Token::new(7),
+                    assignment.task,
+                    assignment.attempt,
                     0,
                     jig_domain_tasks::End::Parked,
                     engine::Parts::none(),

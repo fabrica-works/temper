@@ -12,6 +12,7 @@ use skein_ui::phrases::{PhraseLimits, Phrasebook};
 pub(crate) enum Document<'a> {
     Me(&'a Me),
     Task(&'a Task, Option<&'a Me>),
+    HistoricalTask(&'a Task, &'a jig_client::contract::Result, Option<&'a Me>),
     ReadSet(&'a crate::jig::runner::reads::Reading, Option<&'a Me>),
     Wait(waiting::Waiting<'a>),
     SizedTurn { task: u64, name: jig_client::contract::TurnName, bytes: u64 },
@@ -58,12 +59,18 @@ fn text(
         Document::Wait(wait) => waiting::text(wait, book, limits, owner_part, out),
         Document::Me(me) => me_text(me, book, out),
         Document::Task(task, me) => task_text(task, *me, book, owner_part, out),
+        Document::HistoricalTask(task, result, me) => {
+            task_text(task, *me, book, owner_part, out);
+            result_text(result, out);
+        }
         Document::ReadSet(reading, me) => read_sets::text(reading, *me, book, limits, owner_part, out),
         Document::SizedTurn { task, name, bytes } => super::turn::sized(*task, *name, *bytes, true, out),
     }
     match document {
         Document::Me(me) => subjects::text_digest(b"me", &super::Part::Me(me), limits, out),
-        Document::Task(task, _) => subjects::text_digest(b"task", &super::Part::Task(task), limits, out),
+        Document::Task(task, _) | Document::HistoricalTask(task, _, _) => {
+            subjects::text_digest(b"task", &super::Part::Task(task), limits, out);
+        }
         Document::ReadSet(..) | Document::SizedTurn { .. } | Document::Wait(_) => {}
     }
 }
@@ -132,6 +139,21 @@ fn me_text(me: &Me, book: &Phrasebook, out: &mut Text) {
     out.put(b"\nretention: ");
     out.number(me.retention.as_nanos());
     out.put(b" ns\n");
+}
+fn result_text(result: &jig_client::contract::Result, out: &mut Text) {
+    let bounds = skein_json::writer::Limits { depth: 32, length: u32::MAX };
+    let budget = || Cut { room: out.room, left: 0, turn: None, subject: false, digest: None };
+    let mut measured = Encoder::measure(&bounds);
+    encode_result(result, &mut measured, &mut budget());
+    let mut written = Encoder::write(measured.measured().expect("bounded historical result"), &bounds);
+    let mut budget = budget();
+    encode_result(result, &mut written, &mut budget);
+    out.room = budget.room;
+    out.left =
+        out.left.checked_add(usize::try_from(budget.left).expect("bounded result text")).expect("bounded result text");
+    out.put(b"result: ");
+    out.put(&written.finish());
+    out.put(b"\n");
 }
 fn role(role: HeldRole, out: &mut Text) {
     match role {
@@ -331,6 +353,10 @@ fn encode(document: &Document<'_>, limits: &Limits, out: &mut Encoder) {
         Document::Wait(wait) => waiting::encode(wait, limits, out),
         Document::Me(me) => subjects::encode(&super::Part::Me(me), limits, true, out),
         Document::Task(task, _) => subjects::encode(&super::Part::Task(task), limits, true, out),
+        Document::HistoricalTask(task, result, _) => {
+            cut.digest = Some(crate::jig::digest::part(&super::Part::Task(task), limits));
+            tasks::encode_historical_task(task, result, out, &mut cut);
+        }
         Document::ReadSet(reading, _) => read_sets::encode(reading, limits, out, &mut cut),
         Document::SizedTurn { task, name, bytes } => {
             out.object_start();

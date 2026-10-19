@@ -27,6 +27,12 @@ pub(super) fn text(
                 super::task_text(task, me, book, owner_part, out);
                 super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
             }
+            Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value))) => {
+                let (task, result) = super::super::historical_task(value).expect("validated historical task");
+                super::task_text(task, me, book, owner_part, out);
+                super::result_text(result, out);
+                super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
+            }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {
                 super::super::lists::tasks(page, call, limits, book, out);
             }
@@ -94,28 +100,16 @@ pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budg
                 }
                 super::subjects::encode(&super::super::Part::Task(task), limits, true, out);
             }
-            Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {
-                let call = &reading.called.call;
-                let next = super::super::lists::task_read_on(page, call);
-                if super::subjects::tasks_eligible(call) {
-                    out.object_start();
-                    out.key(b"tasks");
-                    super::subjects::encode(&super::super::Part::TaskPage(page), limits, true, out);
-                    out.key(b"read_on");
-                    match next {
-                        Some(next) => out.string(&next),
-                        None => out.null(),
-                    }
-                    out.object_end();
-                } else {
-                    super::encode_task_page(
-                        page,
-                        crate::jig::call::value(call, 4).is_some(),
-                        next.as_deref(),
-                        out,
-                        budget,
-                    );
+            Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value))) => {
+                let (task, result) = super::super::historical_task(value).expect("validated historical task");
+                if compound {
+                    out.key(b"task");
                 }
+                budget.digest = Some(crate::jig::digest::part(&super::super::Part::Task(task), limits));
+                super::tasks::encode_historical_task(task, result, out, budget);
+            }
+            Readout::Jig(c::ReadResult::Value(c::ReadValue::Tasks(page))) => {
+                encode_tasks(reading, page, limits, out, budget);
             }
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) => {
                 if compound {
@@ -198,5 +192,23 @@ fn encode_documents(reading: &Reading, limits: &Limits, compound: bool, out: &mu
             | c::Delivery::Deployment(_)
             | c::Delivery::OwnerDeployment(_) => unreachable!("selected watch value"),
         }
+    }
+}
+
+fn encode_tasks(reading: &Reading, page: &c::TaskPage, limits: &Limits, out: &mut Encoder, budget: &mut Cut) {
+    let call = &reading.called.call;
+    let next = super::super::lists::task_read_on(page, call);
+    if super::subjects::tasks_eligible(call) {
+        out.object_start();
+        out.key(b"tasks");
+        super::subjects::encode(&super::super::Part::TaskPage(page), limits, true, out);
+        out.key(b"read_on");
+        match next {
+            Some(next) => out.string(&next),
+            None => out.null(),
+        }
+        out.object_end();
+    } else {
+        super::encode_task_page(page, crate::jig::call::value(call, 4).is_some(), next.as_deref(), out, budget);
     }
 }

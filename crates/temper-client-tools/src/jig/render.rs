@@ -38,8 +38,8 @@ impl<'a> Part<'a> {
             ReadValue::OwnerInbox(value) => Some(Self::OwnerInboxPage(value)),
             ReadValue::Tasks(value) => Some(Self::TaskPage(value)),
             ReadValue::Task(value) => Some(Self::Task(value)),
+            ReadValue::Historical(value) => Some(Self::Task(historical_task(value)?.0)),
             ReadValue::OwnerProject(_)
-            | ReadValue::Historical(_)
             | ReadValue::Me(_)
             | ReadValue::Turn(_)
             | ReadValue::Proposal(_)
@@ -81,6 +81,26 @@ impl<'a> Part<'a> {
             | Delivery::OwnerDeployment(_) => None,
         }
     }
+}
+pub(crate) fn read_task(value: &ReadValue) -> Option<(&contract::Task, Option<&contract::Result>)> {
+    if let ReadValue::Task(task) = value {
+        return Some((task, None));
+    }
+    if let ReadValue::Historical(value) = value {
+        return match historical_task(value) {
+            Some((task, result)) => Some((task, Some(result))),
+            None => None,
+        };
+    }
+    None
+}
+pub(crate) fn historical_task(value: &contract::OwnerHistorical) -> Option<(&contract::Task, &contract::Result)> {
+    if let contract::OwnerHistoricalValue::Task { document, result } = &value.value
+        && value.matches(contract::ObjectKey::Task(document.chip.task))
+    {
+        return Some((document, result));
+    }
+    None
 }
 impl Part<'_> {
     #[must_use]
@@ -246,6 +266,17 @@ pub fn read(
             };
             document::print(document::Document::Task(task, party), json, limits, owner_part)
         }
+        Readout::Jig(ReadResult::Value(ReadValue::Historical(value))) if historical_task(value).is_some() => {
+            let (task, result) = historical_task(value).expect("matched historical task");
+            let party = match client.document(me) {
+                Some(document) => match document.latest {
+                    Some(Latest::Jig(Delivery::Me(me))) => Some(me.as_ref()),
+                    _ => None,
+                },
+                None => None,
+            };
+            document::print(document::Document::HistoricalTask(task, result, party), json, limits, owner_part)
+        }
         Readout::Jig(ReadResult::None(why)) => {
             let (reason, status): (&[u8], u8) = match why {
                 ReadNone::Refused => (b"refused", 2),
@@ -320,6 +351,7 @@ fn check_selected(tool: u8, local: u32, value: &ReadValue) -> Result<(), ()> {
         | (3, 2, ReadValue::Activity(_))
         | (4 | 5, 1, ReadValue::Activity(_))
         | (6, 1, ReadValue::Turn(_)) => Ok(()),
+        (3, 1, ReadValue::Historical(value)) if historical_task(value).is_some() => Ok(()),
         _ => Err(()),
     }
 }

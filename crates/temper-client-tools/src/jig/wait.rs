@@ -8,6 +8,7 @@ use crate::jig::{
     runner::{self, Called, Out, Runner},
     subject::{Condition, Subject},
 };
+use alloc::boxed::Box;
 use jig_client::{Client, Event, Handle, Latest, Readable, Readout, State, Told, Watchable, Why, contract as c};
 use skein_lib::{Deadlines, Env, Queue, Time};
 #[derive(Debug)]
@@ -206,6 +207,7 @@ fn complete(
     };
     let printed = render::waiting(
         render::document::waiting::Waiting {
+            result: None,
             delivery,
             me: live_me(client, runner.me()),
             name: wait.name,
@@ -322,10 +324,12 @@ fn page(
     }
     let wait = runner.waits.remove(&number).expect("finishing wait");
     let printed = match page {
-        Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
-            let delivery = c::Delivery::Task(task.clone());
+        Readout::Jig(c::ReadResult::Value(value)) if render::read_task(value).is_some() => {
+            let (task, result) = render::read_task(value).expect("task read");
+            let delivery = c::Delivery::Task(Box::new(task.clone()));
             render::waiting(
                 render::document::waiting::Waiting {
+                    result,
                     delivery: Some(&delivery),
                     me: live_me(client, runner.me()),
                     name: wait.name,

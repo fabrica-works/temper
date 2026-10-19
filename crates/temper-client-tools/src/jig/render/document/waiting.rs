@@ -7,6 +7,7 @@ use skein_ui::phrases::Phrasebook;
 #[derive(Debug)]
 pub(crate) struct Waiting<'a> {
     pub digest: Option<crate::jig::digest::Digest>,
+    pub result: Option<&'a c::Result>,
     pub delivery: Option<&'a c::Delivery>,
     pub me: Option<&'a c::Me>,
     pub name: &'a [u8],
@@ -17,6 +18,16 @@ pub(super) fn encode(wait: &Waiting<'_>, limits: &Limits, out: &mut Encoder) {
     out.object_start();
     out.key(wait.name);
     match wait.delivery {
+        Some(c::Delivery::Task(task)) if wait.result.is_some() => {
+            let mut cut = super::Cut {
+                room: usize::try_from(limits.text).expect("text fits"),
+                left: 0,
+                turn: None,
+                subject: true,
+                digest: wait.digest,
+            };
+            super::tasks::encode_historical_task(task, wait.result.expect("historical task result"), out, &mut cut);
+        }
         Some(delivery) => {
             super::subjects::encode_as(&Part::delivery(delivery).expect("subject form"), limits, wait.digest, out);
         }
@@ -65,6 +76,9 @@ pub(super) fn text(
             | c::Delivery::Chips(_)
             | c::Delivery::Deployment(_)
             | c::Delivery::OwnerDeployment(_) => unreachable!("wait subject"),
+        }
+        if let Some(result) = wait.result {
+            super::result_text(result, out);
         }
         let part = Part::delivery(delivery).expect("subject form");
         let list = match part {
