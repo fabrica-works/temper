@@ -531,6 +531,29 @@ pass:
      expect different outcomes are tests of their own. Landed tests stay; the
      rules apply to tests added or edited from now.
 
+127. **The real-loop world keeps its own name** (plan defect, temper 08's block of 2026-10-19T16:00:54Z).
+     Ruling 127: `temper-real-loop-world` joins the naming check's allowed
+     list, beside `temper-one-process-world`; 08.3 then lands.
+
+     jig's design, README.md section 15, "What a client crate is", answers in
+     its own words: "A crate that runs in the engine's process keeps the
+     engine's name, even when it serves clients; a crate shared by both ends
+     for another purpose keeps its own." `temper-real-loop-world` is "Temper's
+     standalone service and hosted tools on one real kernel": it joins
+     `temper-service` and `temper-client-shell-cli`, both ends, as
+     `temper-one-process-world` does, so it keeps its own name. The check's
+     `allowed` argument is how a caller says so.
+
+     - 08.3's Files gain `tests/client/tests/names.rs`: its call becomes
+       `breaches(&root, "temper", &["temper", "temper-one-process-world",
+       "temper-real-loop-world"])`. The test's name and assertion stay.
+     - No package is renamed.
+     - Any further world of both ends that a later step adds joins the same
+       list in that step, named in its commit body; a crate that exists for
+       the client alone takes the `temper-client` prefix instead.
+     - 08.3 lands past its Size without asking (implementer.md, "Past the
+       Size"); its report gives the count by file.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -240,7 +240,9 @@ designer's answer of 2026-10-19): temper-08.s1, before 08.3
 story's calls, one after another, stay within the small profile's two
 streams.
 Files: `tests/real-loop/src/{calls.rs, world.rs, fixtures.rs, lib.rs}`,
-`tests/real-loop/tests/tools.rs`, `tests/real-loop/Cargo.toml`.
+`tests/real-loop/tests/tools.rs`, `tests/real-loop/Cargo.toml`;
+`tests/client/tests/names.rs`, whose allowed list gains
+`temper-real-loop-world` beside `temper-one-process-world` (ruling 127).
 Shape:
 - `fixtures::CTL` hosted with `host_roots`: the root `parent` is
   DIRECTORY's parent, from the call's argv, and for a call that names
