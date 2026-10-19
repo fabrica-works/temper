@@ -358,7 +358,9 @@ and 10).
   3. a repository is adopted through temper's client, as above;
   4. a goal is given whose change, its CI passed, lands on the owned
      Forgejo, pushed by real git;
-  5. the binary is killed, and started again on the same directory;
+  5. the binary crashes: its whole tree is killed at once, as a
+     supervisor ends a crashed service's (skein's `shell.md`, 13), and
+     once nothing of it runs, it is started again on the same directory;
   6. the person finds the work, and the change's branch on the forge is
      at the run's commit.
 
@@ -366,6 +368,16 @@ and 10).
   board and its plan on its page, and finds the same after the restart.
   The forge's state is the story's proof of the change, read through
   Forgejo's API.
+- **Its endings.** The crash is the tier's one deliberate kill. It
+  proves what a crash of every process keeps on disk, the page cache
+  surviving it, not what a power loss does, which the one-process world
+  draws (2.5). Every other end of `temper serve`, after the restart and
+  in every other test of the tier, is a deployment's healthy stop
+  (skein's `shell.md`, 13): the test sends `Terminate`, the engine
+  drains (`root.md`, 9.2), the service closes what it started, and the
+  binary exits 0 with none of its tree running. A process left at that
+  exit is temper's failure, its shutdown's; one left by the crash's kill
+  is skein's test kit's (skein's `examples.md`, 6). Neither is relaxed.
 - **The terminal,** a second test, on a scratch directory of its own:
   `temper open DIRECTORY LINK` with stdin and stdout piped signs in by
   the link `temper serve` printed, prints the inbox, adopts a repository
@@ -413,10 +425,12 @@ and 10).
   `TEMPER_FORGEJO` (and, for a story with CI, `TEMPER_FORGEJO_RUNNER`),
   naming it.
 - **Its referee:** the person's script finishes within its deadline; the
-  binary does not exit before it is killed, or its stderr is shown; the
-  forge's state, read through Forgejo's API, shows the change; nothing
-  the person saw before the kill is lost after it; no process the binary
-  or the test started outlives it.
+  binary does not exit before the test stops or crashes it, or its
+  stderr is shown; a stopped binary exits 0; the forge's state, read
+  through Forgejo's API, shows the change; nothing the person saw before
+  the crash is lost after it; no process the binary or the test started
+  outlives it: none runs at a stopped binary's exit, and none of the
+  crashed tree when the binary starts again.
 - **Credentials:** none borrowed. The fake LLM peer accepts a key the test
   makes; until area 5's tools it is handed in as a `handed_in` file
   (2.4). With them, the person adds it from the client once signed in,

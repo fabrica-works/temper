@@ -466,13 +466,16 @@ Each needs nothing below the commands to change:
 
 - **systemd,** a unit per long step: `prepare` and `reconcile` as
   `ExecStartPre=`, `run` and `temper serve` as `ExecStart=`, the order as
-  the units' dependencies;
+  the units' dependencies; `temper serve`'s unit keeps systemd's default
+  kill of its control group, which ends a crashed service's whole tree
+  before its restart (skein's `shell.md`, 13);
 - **the process tier** (section 13.4), which runs the commands itself;
 - **QA's environments** (`../draft/qa.md`, 4.1), whose "temper in a box" is
   an owned setup with a scripted LLM, made by its own host from the same
   commands, its LLM key added from the client once signed in
   (`../client/tools.md`, section 10);
-- **a container image** whose entry point is `temper box`.
+- **a container image** whose entry point is `temper box`, every process
+  of its tree ending with the container.
 
 ## 8. The configuration
 

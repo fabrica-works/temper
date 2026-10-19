@@ -89,7 +89,7 @@ Derived fixture Files: `docs/examples/owned.json`; existing regression in
   whose body stays unchanged. Its consumers are `crates/temper/tests/support/owned.rs`
   (`EXAMPLE`), `tests/{startup,configuration,process}.rs` under that crate,
   and the copy command in `docs/guide/box.md`; preserve them and their assertions.
-Shape: five commits, each builds and passes its crates' tests.
+Shape: six commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
      `Event::Locked`, which the tools plan's first repin, landed before this
@@ -188,6 +188,30 @@ Shape: five commits, each builds and passes its crates' tests.
      beside `commit_text` keeps `commit_text(merge)`'s first
      `min(bound, its digits)` digits. `commit_text`, its parameter callers,
      every contract and bound, and jig stay as they are.
+  6. **The stories' endings** (design `domain/testing.md`, 2.6, "Its
+     endings": every end of `temper serve` but the restart's crash "is a
+     deployment's healthy stop (skein's `shell.md`, 13): the test sends
+     `Terminate`, … and the binary exits 0 with none of its tree
+     running"; skein's `examples.md`, 6, "A crash on purpose"), the
+     repair the process-cleanup diagnosis returned for, on the
+     five-commit checkpoint. In `crates/temper/tests/support/mod.rs`,
+     `run_story` takes an `Ending`, `Stop` or `Crash`: `run` stops, and
+     `run_until_landed`, whose one caller is `process.rs`'s `landing`
+     before its restart, crashes. A stopped story's binary starts as now
+     (`serve`: `Binary::start`, `EndsWithBinary`); `ChatJudge::act` sends
+     it `Signal::Terminate` where it sent `Signal::Kill` (line 396), and
+     `observe` asserts that once it has exited it exited `Exit::Code(0)`.
+     A crashed story's binary starts with `Binary::start_with_tree(…,
+     Mode::Pipes, 65_536, Expectation::Supervise, false)`, as
+     `support/boxed.rs` starts the box; `act` sends it
+     `signal_tree(Signal::Kill)`, `observe` asserts
+     `!stderr_overflowed()` (an overflow fails under `EndsWithBinary`),
+     and `run_story` asserts its `counts()` present before it returns, so
+     `landing`'s second `serve` starts only once nothing of the first
+     runs. `support/sign_in.rs`'s `Judge::act` (line 257) sends the engine
+     `Signal::Terminate` in place of `Signal::Kill`, and its `observe`
+     asserts the engine's exit, once it has one, `Exit::Code(0)`. No test
+     is added, renamed or loosened.
   Diagnostic exception for the pinned Jig UTF-8 panic: investigate the retained
   failed retry in run `logs/temper-02/process-attempt2/process`, comparing the
   failing four-commit tree and its actual pins with the last passing source.
@@ -280,7 +304,15 @@ Proof: process; `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-li
   TEMPER_FORGEJO_RUNNER=$WS/tmp/temper/forgejo/runner-v13.2.0/forgejo-runner-13.2.0-linux-amd64
   heavy --gate scripts/proof-one-process.sh` (README, Rules): its count at the step's
   start passed (19 at the base), <5 minutes (145.694 s in `base-runs.md`, 149.083 s alone here). Once: the keys
-  at rest and the engine's calls go through the new client.
+  at rest and the engine's calls go through the new client. With commit 6,
+  each story's `temper serve` stops and exits 0 with none of its tree
+  left (`EndsWithBinary`), but the landing's first, which crashes whole
+  (`Supervise`) and settles before the restart. A process left at a
+  stopped binary's exit ("binary exited while tree processes still ran")
+  is temper's shutdown's (`domain/root.md`, 9.2, and io's group close),
+  not a load failure to rerun: return it as a finding, with each PID's
+  command. One left by the crash's kill is skein's kit's: return it as a
+  question.
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the
   step's start less 70 (the client's 76 out, 6 in: 1809 from the base's 1879) and
   its fuzzy count unchanged (50 at the base; 3.754 s and 16.803 s), clean
@@ -296,13 +328,19 @@ Don't: add an alias, a re-export or a `mod client`; change
   raise a contract's words bound (the tests' 32 stay) or refuse a bound
   under the id's digits; relax jig's UTF-8 assertion, or rewrite, migrate or
   delete the run's retained failed artifacts (`logs/temper-02/`): their
-  stores keep the raw words, test artifacts that no fixed tree restores.
+  stores keep the raw words, test artifacts that no fixed tree restores;
+  end a story's healthy binary with `Binary::signal(Signal::Kill)`, give a
+  stopped story's binary an expectation other than `EndsWithBinary`, crash
+  the leader alone (`signal` or `signal_group` on the crashed binary), or
+  add a backstop kill or a longer deadline for a tree to settle.
 Size: about 680 lines moved (changed callers counted as moved: 561 lines
   of client state in 48 files, the callers among them; 88 of the purposes' encoding, the client's
   `identity.rs`; 31 of the two moved tests), 90 new (the three new tests and
   their vectors about 72, `key` and the module's lines about 15, the manifest
   and root entries about 3; commit 5 about 35: `landing_words` and its use
-  about 15, its unit about 15, the tightened assertion about 5). Under 300: no 02.2.
+  about 15, its unit about 15, the tightened assertion about 5; commit 6
+  about 40: the ending and the crash's start about 25, the two judges'
+  signals and assertions about 15). Under 300: no 02.2.
 Removes: `crates/temper-engine-domain-forge-client/`, 7,209 lines at the base
   (4,913 source, 2,283 test, 13 manifest; about 6,757 after 01.1 took the
   vocabulary and `locate.rs`): its 74 other tests live in skein; its
@@ -324,3 +362,7 @@ Removes: `crates/temper-engine-domain-forge-client/`, 7,209 lines at the base
   prints `client_copy_absent=True`. At the base it prints False.
 - `heavy cargo nextest run -p temper-engine-domain-forge tests::purpose`
   shows 5 passed.
+- `heavy rg -n '\.signal\(Signal::Kill\)' crates/temper/tests` prints
+  nothing (exit 1): no story ends its binary with a leader's kill. At the
+  base it prints `crates/temper/tests/support/mod.rs:396` and
+  `crates/temper/tests/support/sign_in.rs:257`.
