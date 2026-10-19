@@ -1,0 +1,36 @@
+[package]
+name = "temper-real-loop-world"
+description = "Temper's standalone service and hosted tools on one real kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-fake-peers.workspace = true
+skein-fake-llm-domain.workspace = true
+skein-fake-llm-protocol.workspace = true
+skein-llm.workspace = true
+skein-llm-world.workspace = true
+skein-world.workspace = true
+smith-agent-process-world.workspace = true
+jig-channel-world.workspace = true
+skein-lib.workspace = true
+skein-shell.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+wildcard_enum_match_arm = "deny"
+match_wildcard_for_single_variants = "deny"
+unwrap_used = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+disallowed_types = "deny"
+disallowed_methods = "deny"

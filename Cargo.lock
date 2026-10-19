@@ -2363,6 +2363,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-real-loop-world"
+version = "0.0.0"
+dependencies = [
+ "jig-channel-world",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-peers",
+ "skein-lib",
+ "skein-llm",
+ "skein-llm-world",
+ "skein-shell",
+ "skein-world",
+ "smith-agent-process-world",
+]
+
+[[package]]
 name = "temper-service"
 version = "0.0.0"
 dependencies = [

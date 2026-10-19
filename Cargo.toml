@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "tests/real-loop",
     "tests/forge-setup/reconcile",
     "crates/temper-box",
     "tools/live-login",
