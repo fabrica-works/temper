@@ -459,6 +459,13 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C ~/src/rust/temper grep -n 'fn adopts_flags_parse_and_its_absent_flags_stay_absent\|fn json_arguments_use_snake_case\|List::with_capacity(32)\|depth: 6\|depth: 2' origin/main -- crates/temper-client-tools/src/tests`: `table.rs:237` the adopt test, `table.rs:295` `List::with_capacity(32)`, `json.rs:168` `depth: 6`, `json.rs:180` `fn json_arguments_use_snake_case()`, `fixtures.rs:114` `writer::Limits { depth: 2, … }`.
      - The kit's testing-strategy.md, 10: line 540 "One behaviour per test", line 561 "Named fixtures and sizes".
 
+121. **L into temper 03.3** (For the user, L, decided by the director).
+     decisions.md, For the user, L, decided by the director (temper 09cfaca18): the default. temper/03-tools-root.md, 03.3's Lists, now names that decision: `tasks` reads one group per call, the live group without `--ended` and the ended group alone with it, as jig's view reads it; the call that reads on keeps `--ended`, its help reads "Only ended tasks", and an agent that wants both makes two calls, the printed cursor jig's, with no group byte. 03.3 no longer waits on L. later.md has its row for tools.md, 5.2, at the designer's next pass. Any further text that reads `--ended` as "include": make it "only", and list it in the commit body.
+
+     Checked:
+     - `git -C ~/src/rust/temper show 09cfaca18 --stat`: `Decide the tools plan's item L: one group of tasks per call`; decisions.md's L ends "the printed cursor stays jig's, with no group byte. tools.md, 5.2, says so at the designer's next pass, after this plan."
+     - `awk -F'\t' '$1 ~ /^temper-03/' ledger.tsv`: temper-03.1 ready, 03.2 to 03.4 waiting; no temper 03 session has started.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -213,10 +213,10 @@ Files: under `crates/temper-client-tools/`, `src/jig/render/{lists,activity,turn
 Shape:
 - **Lists.**
   - `inbox` reads `Read::Inbox` once per `InboxReadGroup`, needs first. `tasks` reads `Read::Tasks`, one group per call
-    (ruling 119, the default of decisions.md, For the user, L): without `--ended`, the live group, `--after C` its `live`;
+    (decisions.md, For the user, L, decided by the director, temper 09cfaca18): without `--ended`, the live group, `--after C` its `live`;
     with it, the ended group alone, as jig's view reads it (`query.phase = Some(PhaseClass::Ended)`, `live: None`,
     `--after C` its `ended`), the call that reads on keeping `--ended`; `rows.rs`'s `--ended` help reads
-    "Only ended tasks". Until L is decided, 03.3 builds the rest first.
+    "Only ended tasks". An agent that wants both makes two calls; the printed cursor stays jig's, with no group byte.
   - Each prints at most 32 rows, one a line, number first, then the call that reads on, or `no more`.
 - **A task's parts.**
   - `--tree` watches `Subject::Tree { task, window: 32 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
