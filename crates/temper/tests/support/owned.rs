@@ -212,6 +212,10 @@ pub struct Running {
 }
 impl Running {
     #[must_use]
+    pub fn id(&self) -> u32 {
+        self.child.as_ref().expect("owned child").id()
+    }
+    #[must_use]
     pub fn start(directory: &Path, program: &str) -> Self {
         let log = directory.join(if program == "forgejo" { "server.log" } else { "runner.log" });
         let output = fs::File::create(&log).expect("log");
@@ -394,7 +398,7 @@ pub fn reconcile(directory: &Path, forge: u16) -> Output {
         .output()
         .expect("temper forge reconcile")
 }
-/// Attaches the read-only proof handle with preparation's private admin token.
+/// Attaches the owned Forgejo through preparation's private admin token.
 #[must_use]
 pub fn attach(directory: &Path, port: u16, running: Running) -> skein_throwaway_forgejo::Instance {
     use skein_throwaway_forgejo::{Instance, Settings, Token};

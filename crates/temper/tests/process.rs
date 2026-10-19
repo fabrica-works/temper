@@ -65,6 +65,58 @@ fn a_wait_past_its_timeout_exits_3() {
 }
 
 #[test]
+fn an_adopt_cut_by_a_signal_is_made_once() {
+    use support::ctl::{Call, PROJECT, Step, Story, json};
+    let scratch = support::Scratch::new("ctl_cut");
+    let forgejo = support::forgejo::Throwaway::start(&scratch);
+    support::configuration(scratch.path(), &forgejo.forge());
+    let adopt = &[
+        "adopt",
+        "--project",
+        PROJECT,
+        "--owner",
+        "acme",
+        "--name",
+        "widget",
+        "--landing",
+        "main",
+        "--key",
+        "widget",
+        "--json",
+    ];
+    let seen = support::ctl::run(Story::on(
+        scratch.path(),
+        &forgejo,
+        vec![
+            Step::Run(Call::sign_in()),
+            Step::Run(Call::new(&["me", "--json"])),
+            Step::Pause,
+            Step::Start(Call::new(adopt)),
+            Step::Until(Call::new(&["pending"]), b"adopt"),
+            Step::Cut,
+            Step::Run(Call::new(&["pending", "--json"])),
+            Step::Resume,
+            Step::Run(Call::new(adopt)),
+            Step::Run(Call::new(&["pending"])),
+        ],
+    ));
+    let [_, me, cut, _, listed, again, empty] = seen.calls.as_slice() else { panic!("seven ctl ends") };
+    assert_eq!((cut.exit, cut.stdout.as_slice()), (Some(Exit::Code(143)), b"".as_slice()), "128 + SIGTERM");
+    let (party, listed) = (json(me)["party"]["number"].as_u64().expect("signed in"), json(listed));
+    let first_sent = listed["pending"][0]["first_sent"].clone();
+    assert!(first_sent.is_u64() || first_sent.is_null(), "{listed}");
+    let row = serde_json::json!({"operation": "adopt", "party": party, "first_sent": first_sent});
+    assert_eq!(listed, serde_json::json!({"pending": [row], "unread": 0}));
+    assert_eq!(again.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&again.stderr));
+    let adopted = json(again);
+    let kept: serde_json::Value = serde_json::from_slice(&again.stderr).expect("one kept line, JSON");
+    assert_eq!(kept, serde_json::json!({"operation": "adopt", "outcome": adopted}), "the first answer");
+    assert_eq!((empty.exit, empty.stdout.as_slice()), (Some(Exit::Code(0)), b"".as_slice()));
+    forgejo.stop();
+    scratch.remove();
+}
+
+#[test]
 fn temper_serve_prints_its_link_and_drains_on_a_signal() {
     let scratch = support::Scratch::new("drain");
     support::configuration(scratch.path(), &support::Forge::Unreached);

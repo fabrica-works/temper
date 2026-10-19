@@ -1,4 +1,4 @@
-//! The process tier's isolated Forgejo, credentials and landing scripts.
+//! The process tier's owned Forgejo, credentials and landing scripts.
 use super::{Forge, Scratch, owned, write_private};
 use serde_json::{Value, json};
 use skein_throwaway_forgejo::{Instance, Outgoing, Token};
@@ -13,8 +13,11 @@ const MEMBER_BYTES: u32 = 2048;
 // The landing story gathers its agent's brief before the person's next command.
 const BRIEF_GATHER_MS: u64 = 5000;
 
+/// The owned Forgejo of domain/testing.md 2.6, prepared and run by temper's
+/// commands and attached through skein's Instance.
 pub struct Throwaway {
     instance: Instance,
+    pid: u32,
     forgejo: PathBuf,
     runner: owned::Running,
     person: Token,
@@ -27,6 +30,7 @@ impl Throwaway {
     pub fn start(scratch: &Scratch) -> Self {
         let address = owned::tier_configuration(scratch.path());
         let running = owned::start(scratch.path());
+        let pid = running.id();
         let began = skein_shell::Clock::new().now().now;
         let instance = owned::attach(scratch.path(), address.port(), running);
         stage("attach", began);
@@ -52,6 +56,7 @@ impl Throwaway {
             .map(|address| address.parse().expect("webhooks address"));
         Self {
             instance,
+            pid,
             forgejo: owned::binaries().0,
             runner,
             person,
@@ -59,6 +64,12 @@ impl Throwaway {
             directory: scratch.path().into(),
             webhooks,
         }
+    }
+
+    /// Forgejo's pid, which `temper forge run` became.
+    #[must_use]
+    pub fn pid(&self) -> u32 {
+        self.pid
     }
 
     #[must_use]
