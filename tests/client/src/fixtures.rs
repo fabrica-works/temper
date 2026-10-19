@@ -719,3 +719,18 @@ pub fn read_whole(
         words = next;
     }
 }
+
+/// Copy an executable act from the first acts section of a printed document.
+#[must_use]
+pub fn printed_act(stdout: &[u8], act: &[u8]) -> Vec<Box<[u8]>> {
+    let stdout = std::str::from_utf8(stdout).expect("printed document UTF-8");
+    let act = std::str::from_utf8(act).expect("act UTF-8");
+    let line = stdout
+        .lines()
+        .skip_while(|line| *line != "acts:")
+        .skip(1)
+        .take_while(|line| line.starts_with("  "))
+        .find(|line| line.split_ascii_whitespace().next() == Some(act))
+        .expect("printed act");
+    line.split_ascii_whitespace().map(|word| Box::from(word.as_bytes())).collect()
+}

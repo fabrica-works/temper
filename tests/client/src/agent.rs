@@ -1,7 +1,7 @@
 //! The tools' root as a scripted client beside the person.
 use crate::app::{Event, Root, View};
 use skein_lib::{Env, Queue, Time};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use temper_client_domain::{self as domain, Request};
 use temper_client_tools::{jig::Printed, root};
 
@@ -11,6 +11,8 @@ pub struct Agent {
     kept_lines: Vec<Box<[u8]>>,
     printed: BTreeMap<u32, Printed>,
     calls: u32,
+    release_tasks: BTreeSet<u64>,
+    shown_revision: u64,
 }
 impl Agent {
     pub fn build(&self, render: &mut skein_ui::View, out: &mut Queue<skein_ui::Patch>) {
@@ -23,6 +25,7 @@ impl Agent {
             Link::SignedOut => (3, None),
             Link::OutOfDate => (4, None),
         };
+        let count = count + self.shown_revision * 5;
         if !render.stale(count) {
             return;
         }
@@ -39,6 +42,11 @@ impl Agent {
         builder.close();
         builder.close();
         builder.open(Role::Main);
+        for task in &self.release_tasks {
+            builder.open(Role::Item);
+            builder.key(skein_ui::Key { owner: temper_client_view::frame::owner(), kind: 2, a: *task, b: 0 });
+            builder.close();
+        }
         builder.close();
         builder.close();
         render.finish(builder, count, out);
@@ -81,6 +89,8 @@ pub fn new(seed: u64) -> (Root, View) {
             kept_lines: Vec::new(),
             printed: BTreeMap::new(),
             calls: 0,
+            release_tasks: BTreeSet::new(),
+            shown_revision: 0,
         })),
         View::Agent { render: skein_ui::View::new(&tree_limits), limits: tree_limits },
     )
@@ -131,10 +141,26 @@ fn drain(agent: &mut Agent, requests: &mut Queue<root::Request>, out: &mut Queue
             root::Request::Ready => agent.ready = true,
             root::Request::Kept { line } => agent.kept_lines.push(line),
             root::Request::Printed { number, printed } => {
+                for task in released_tasks(&printed) {
+                    if agent.release_tasks.insert(task) {
+                        agent.shown_revision += 1;
+                    }
+                }
                 agent.printed.insert(number, printed);
             }
         }
     }
+}
+fn released_tasks(printed: &Printed) -> Vec<u64> {
+    let stdout = std::str::from_utf8(&printed.stdout).expect("printed document UTF-8");
+    stdout
+        .lines()
+        .skip_while(|line| *line != "acts:")
+        .skip(1)
+        .take_while(|line| line.starts_with("  "))
+        .filter_map(|line| line.strip_prefix("  release "))
+        .map(|line| line.split_ascii_whitespace().next().expect("release task").parse().expect("task number"))
+        .collect()
 }
 pub fn fire(agent: &mut Agent, env: &Env<domain::Limits>, out: &mut Queue<Request>) {
     let mut requests =
