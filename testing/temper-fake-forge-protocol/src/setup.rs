@@ -1,12 +1,12 @@
 //! Setup's protocol state, separate from repository permissions (testing.md, 4.2).
 use crate::{Config, Limits, response::Reply};
 use alloc::boxed::Box;
-use skein_lib::{List, Secret, Writer, bytes};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::{self, User},
     request::Request,
     server::{self, Answer},
 };
+use skein_lib::{List, Secret, Writer, bytes};
 mod accounts;
 mod hooks;
 mod orgs;

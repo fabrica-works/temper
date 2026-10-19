@@ -1,7 +1,7 @@
 //! Forge component limits (protocol/forge.md, sections 2, 3.5, 7 and 8).
+use skein_forge::forgejo::limits as documents;
 use skein_lib::Duration;
 use temper_engine_domain_forge_client as client;
-use temper_forge_forgejo::limits as documents;
 
 /// The component's limits (protocol/forge.md, 7), in temper's `limits`
 /// member as `forge_component.<field>`; the profile `small`'s values are
@@ -390,7 +390,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
     // walker's depth stack. These envelopes exceed every 06.x decoder's fields.
     let inner = u64::from(l.string_bytes)
         .checked_mul(3)?
-        .checked_add(u64::try_from(size_of::<temper_forge_forgejo::document::User>()).ok()?.checked_mul(2)?)?
+        .checked_add(u64::try_from(size_of::<skein_forge::forgejo::document::User>()).ok()?.checked_mul(2)?)?
         .checked_add(u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_mul(2)?)?;
     let decoder = u64::from(l.string_bytes)
         .checked_mul(32)?
@@ -432,7 +432,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
                             .checked_mul(u64::from(l.string_bytes))?,
                     )?
                     .checked_add(u64::from(s.client.answer_bytes))?
-                    .checked_add(List::<temper_forge_forgejo::document::ChangedFile>::worst_case(s.client.rows)?)?
+                    .checked_add(List::<skein_forge::forgejo::document::ChangedFile>::worst_case(s.client.rows)?)?
                     .checked_add(u64::from(s.client.rows).checked_mul(u64::from(l.string_bytes).checked_mul(2)?)?)?
                     .checked_add(List::<api::File>::worst_case(s.client.rows)?)?
                     .checked_add(List::<api::Commit>::worst_case(s.client.rows)?)?
@@ -440,7 +440,7 @@ pub fn worst_case(l: &Limits, s: &Shared, forges: u32) -> Option<u64> {
                     .checked_add(u64::from(l.string_bytes).checked_mul(u64::from(l.inner).checked_add(5)?)?)?
                     .checked_add(
                         u64::from(l.inner)
-                            .checked_mul(u64::try_from(size_of::<temper_forge_forgejo::document::User>()).ok()?)?,
+                            .checked_mul(u64::try_from(size_of::<skein_forge::forgejo::document::User>()).ok()?)?,
                     )?,
             )?,
         )?;

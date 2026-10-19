@@ -79,7 +79,7 @@ fn failure(why: prepare::Failed, place: &Place) -> String {
     }
 }
 fn pinned(which: Which) -> (&'static str, &'static str) {
-    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
     match which {
         Which::Forgejo => ("forgejo", VERSION),
         Which::Runner => ("runner", RUNNER_VERSION),
@@ -112,7 +112,7 @@ fn run_refusal(why: Refusal, launch: &run::Launch, number: u16) -> String {
             "prepared at a version this temper cannot read: no command of this temper runs it".into()
         }
         Refusal::Versions { forgejo, runner, course } => {
-            use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+            use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
             let recorded =
                 runner.map_or_else(|| text(&forgejo), |runner| format!("{} / {}", text(&forgejo), text(&runner)));
             let pinned = if launch.runner { format!("{VERSION} / {RUNNER_VERSION}") } else { VERSION.into() };

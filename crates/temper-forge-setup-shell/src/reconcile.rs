@@ -26,7 +26,7 @@ pub struct Settings {
     pub backoff: Duration,
     pub backoff_max: Duration,
     pub http: skein_http::client::Limits,
-    pub documents: temper_forge_forgejo::limits::Limits,
+    pub documents: skein_forge::forgejo::limits::Limits,
     pub io: skein_io::Limits,
     pub entry: Entry,
     pub listener: Option<SocketAddr>,
@@ -119,7 +119,7 @@ struct Running {
     needs: Queue<Need>,
     event: Option<Event>,
     exchange: Option<Exchange>,
-    pending: Option<(temper_forge_forgejo::request::Request, Secret)>,
+    pending: Option<(skein_forge::forgejo::request::Request, Secret)>,
     socket: Option<Token>,
     connected: bool,
     closing: bool,
@@ -343,7 +343,7 @@ impl Host for Running {
             + Queue::<Submit>::worst_case(self.operations).expect("submissions fit")
             + Queue::<skein_io::Event>::worst_case(self.events.capacity()).expect("events fit")
             // Each row needs at least one input byte; retained text is bounded by the input too.
-            + u64::from(self.settings.documents.json.length).saturating_mul(u64::try_from(size_of::<temper_forge_forgejo::document::Row>()).expect("row size fits").saturating_add(1))
+            + u64::from(self.settings.documents.json.length).saturating_mul(u64::try_from(size_of::<skein_forge::forgejo::document::Row>()).expect("row size fits").saturating_add(1))
     }
     fn operations(&self) -> u32 {
         self.operations

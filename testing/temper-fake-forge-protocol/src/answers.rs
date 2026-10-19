@@ -1,9 +1,9 @@
 //! The fake's typed reads in Forgejo's document vocabulary (protocol/forge.md, 9).
 use crate::{Config, routes};
 use alloc::boxed::Box;
+use skein_forge::forgejo::{document as d, id::ObjectFormat, request::Request, server::Answer};
 use skein_lib::{List, Wall, Writer, bytes};
 use temper_fake_forge_domain::api as a;
-use temper_forge_forgejo::{document as d, id::ObjectFormat, request::Request, server::Answer};
 
 #[must_use]
 pub fn state(state: a::State) -> d::IssueState {
@@ -435,7 +435,7 @@ fn wall(at: Option<skein_lib::Time>) -> Option<Wall> {
     let at = at?;
     Some(Wall::from_nanos(at.as_nanos()))
 }
-fn optional_object(at: Option<u64>) -> Option<temper_forge_forgejo::id::ObjectId> {
+fn optional_object(at: Option<u64>) -> Option<skein_forge::forgejo::id::ObjectId> {
     let at = at?;
     Some(routes::object(at))
 }

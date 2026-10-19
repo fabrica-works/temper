@@ -1,8 +1,8 @@
 //! Call-specific HTTP refusals and table invalidation (protocol/forge.md, 3.4).
 use crate::connection::{Failure, Fields};
 use skein_forge::api;
+use skein_forge::forgejo::failure::Refusal;
 use skein_lib::Duration;
-use temper_forge_forgejo::failure::Refusal;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Asked {
     Read,

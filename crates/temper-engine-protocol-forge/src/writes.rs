@@ -11,12 +11,12 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_forge::api;
-use skein_lib::{Duration, List};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     id::ObjectId,
     request::{self as r, Request},
 };
+use skein_lib::{Duration, List};
 #[derive(Debug)]
 enum Stage {
     Write,
@@ -237,7 +237,7 @@ impl Plan {
                 if self.status != self.expected() {
                     let refusal = match &body {
                         Body::Document(d::Document::Error(error)) => match &error.message {
-                            d::Body::Kept(message) => temper_forge_forgejo::failure::refusal(self.status, message),
+                            d::Body::Kept(message) => skein_forge::forgejo::failure::refusal(self.status, message),
                             d::Body::Long(_) => None,
                         },
                         Body::Document(_) | Body::Empty | Body::Raw { .. } | Body::Malformed(_) => None,
@@ -251,7 +251,7 @@ impl Plan {
                 let document = match body {
                     Body::Document(document) => Some(document),
                     Body::Empty => None,
-                    Body::Malformed(temper_forge_forgejo::decode::Malformed::Bound { .. }) => {
+                    Body::Malformed(skein_forge::forgejo::decode::Malformed::Bound { .. }) => {
                         return Err(self.error(api::Error::TooLarge));
                     }
                     Body::Malformed(_) | Body::Raw { .. } => return Err(self.error(api::Error::Timeout)),

@@ -22,7 +22,7 @@ pub struct Limits {
     pub calls: u32,
     pub connections: u32,
     pub http: skein_http::server::Limits,
-    pub documents: temper_forge_forgejo::limits::Limits,
+    pub documents: skein_forge::forgejo::limits::Limits,
     pub raw_bytes: u32,
 }
 /// The repository's id, path and protected branch from the scenario.

@@ -21,7 +21,7 @@ fn the_run_refuses_an_older_preparation() {
         run::admit_state(&fixtures::launch(Which::Forgejo), Some(&state)),
         Err(Refusal::Versions {
             forgejo: b"0.0.0".as_slice().into(),
-            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into()),
+            runner: Some(skein_forge::forgejo::pin::RUNNER_VERSION.as_bytes().into()),
             course: crate::upgrade::Course::Older,
         })
     );
@@ -34,7 +34,7 @@ fn the_run_refuses_a_newer_preparation() {
         run::admit_state(&fixtures::launch(Which::Forgejo), Some(&state)),
         Err(Refusal::Versions {
             forgejo: b"999.0.0".as_slice().into(),
-            runner: Some(temper_forge_forgejo::pin::RUNNER_VERSION.as_bytes().into()),
+            runner: Some(skein_forge::forgejo::pin::RUNNER_VERSION.as_bytes().into()),
             course: crate::upgrade::Course::Newer,
         })
     );

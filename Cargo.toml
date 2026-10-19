@@ -18,7 +18,6 @@ members = [
     "crates/temper-client-tools",
     "crates/temper-service",
     "tests/worker/protocol-git",
-    "crates/temper-forge-forgejo",
     "crates/temper-forge-setup",
     "crates/temper-forge-setup-shell",
     "crates/temper-worker-protocol-git",
@@ -102,7 +101,6 @@ temper-service = { path = "crates/temper-service" }
 jig-protocol-config = { git = "https://github.com/forgetic/jig.git" }
 smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 temper-worker-protocol-git-world = { path = "tests/worker/protocol-git" }
-temper-forge-forgejo = { path = "crates/temper-forge-forgejo" }
 temper-worker-protocol-git = { path = "crates/temper-worker-protocol-git" }
 temper-client-protocol-wire = { path = "crates/temper-client-protocol-wire" }
 jig-client-protocol-wire = { git = "https://github.com/forgetic/jig.git" }

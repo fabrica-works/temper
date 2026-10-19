@@ -1,6 +1,4 @@
-use skein_lib::Wall;
-use temper_codecs_world::forgejo;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     decode::Malformed,
     document::{
@@ -10,6 +8,8 @@ use temper_forge_forgejo::{
     request::Request,
     server::{self, Answer},
 };
+use skein_lib::Wall;
+use temper_codecs_world::forgejo;
 fn file(n: u32) -> ChangedFile {
     ChangedFile {
         filename: format!("file-{n}.txt").into_bytes().into_boxed_slice(),
@@ -286,7 +286,7 @@ fn a_failing_actions_status_links_its_run_and_job() {
         panic!("status row");
     };
     assert_eq!(failed.status, StatusState::Failure);
-    let link = temper_forge_forgejo::header::job_link(&failed.target_url, b"http://127.0.0.1:3000/fixture/specimen");
+    let link = skein_forge::forgejo::header::job_link(&failed.target_url, b"http://127.0.0.1:3000/fixture/specimen");
     assert_eq!(link, Some((1, 1)));
     let (run_number, job_index) = link.expect("this repository's job link");
     let transcript = forgejo::transcript("actions-runs");

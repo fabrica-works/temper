@@ -253,7 +253,7 @@ pub(crate) fn start(f: &Fixture, binary: &Path, secrets: &mut Secrets) -> Result
 pub(crate) fn version(binary: &Path, scratch: &Path) -> Result<String> {
     let output = registration::capture(command(binary, scratch).arg("--version"))?;
     let version = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or_default().to_owned();
-    if !output.status.success() || !temper_throwaway_forgejo::names_runner(&version) {
+    if !output.status.success() || !skein_forge::forgejo::pin::names_runner(&version) {
         return Err(format!("runner {}: {version}", binary.display()).into());
     }
     Ok(version)

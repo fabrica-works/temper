@@ -7,7 +7,7 @@ TEMPER_FORGEJO=<absolute path to the pinned Forgejo> git-transcripts --git /usr/
 ```
 
 The tool starts and removes its own isolated Forgejo, with Actions off.
-`VERSION` in `crates/temper-forge-forgejo/src/pin.rs` pins it.
+`VERSION` in `skein_forge::forgejo::pin` pins it.
 It records 42 invocations using protocol/git.md's settings and whole
 environment; credentials are Basic headers in the environment, scanned
 before writing.

@@ -7,10 +7,10 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+skein-forge.workspace = true
 skein-lib.workspace = true
 skein-http.workspace = true
 skein-json.workspace = true
-temper-forge-forgejo.workspace = true
 temper-fake-forge-domain.workspace = true
 
 [lints]

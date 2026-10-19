@@ -3,13 +3,13 @@ use crate::{
     errors, route, routes,
     tally::{Route, Tally},
 };
-use skein_lib::{Duration, Time, Wall};
-use temper_fake_forge_domain::api::{self as a, Op, Read, Write};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     failure::Refusal,
     request::{self as r, Request},
 };
+use skein_lib::{Duration, Time, Wall};
+use temper_fake_forge_domain::api::{self as a, Op, Read, Write};
 
 fn read_rows() -> [(Request, Route, Op); 26] {
     let p = r::Page { page: Some(2), limit: Some(3) };
@@ -223,7 +223,7 @@ fn commit_counts_have_only_the_first_eight_bytes_in_sha1() {
         (u64::MAX, b"ffffffffffffffff000000000000000000000000"),
     ] {
         let object = routes::object(count);
-        assert_eq!(&*temper_forge_forgejo::id::write(&object), hex, "{count}");
+        assert_eq!(&*skein_forge::forgejo::id::write(&object), hex, "{count}");
         assert_eq!(routes::commit(&object), Some(count), "{count}");
     }
     for byte in 8..32 {
@@ -232,7 +232,7 @@ fn commit_counts_have_only_the_first_eight_bytes_in_sha1() {
         assert_eq!(routes::commit(&object), None, "byte {byte}");
     }
     let mut object = routes::object(1);
-    object.format = temper_forge_forgejo::id::ObjectFormat::Sha256;
+    object.format = skein_forge::forgejo::id::ObjectFormat::Sha256;
     assert_eq!(routes::commit(&object), None, "sha256");
 }
 

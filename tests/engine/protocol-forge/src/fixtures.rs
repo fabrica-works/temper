@@ -133,7 +133,7 @@ pub fn fake_limits() -> temper_fake_forge_protocol::Limits {
             response: 4096,
             send: 1024,
         },
-        documents: temper_forge_forgejo::limits::Limits {
+        documents: skein_forge::forgejo::limits::Limits {
             json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
             writer: skein_json::writer::Limits { depth: 16, length: 65536 },
             string_bytes: 512,

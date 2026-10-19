@@ -1,12 +1,12 @@
 use super::{Store, absent, empty, encoded, full, refusal};
 use crate::{Config, Limits, response::Reply};
 use alloc::boxed::Box;
-use skein_lib::List;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::{Org, TeamSpec},
     request::Page,
     server::Answer,
 };
+use skein_lib::List;
 /// A private organization and the person who owns it.
 #[derive(Debug)]
 pub struct Organization {
@@ -163,8 +163,8 @@ impl Store {
         absent(limits)
     }
 }
-fn document(team: &Team) -> temper_forge_forgejo::document::Team {
-    temper_forge_forgejo::document::Team { id: team.id, spec: team.spec.clone() }
+fn document(team: &Team) -> skein_forge::forgejo::document::Team {
+    skein_forge::forgejo::document::Team { id: team.id, spec: team.spec.clone() }
 }
 pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
     let cap = limits.documents.inner;

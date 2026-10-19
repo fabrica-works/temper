@@ -49,8 +49,8 @@ pub fn bot_tokens(world: &mut crate::World) -> u64 {
     id
 }
 #[must_use]
-pub fn team(name: &[u8]) -> temper_forge_forgejo::document::TeamSpec {
-    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+pub fn team(name: &[u8]) -> skein_forge::forgejo::document::TeamSpec {
+    use skein_forge::forgejo::document::{Access, TeamSpec, Units};
     TeamSpec {
         name: name.into(),
         permission: Access::Write,
@@ -75,7 +75,7 @@ pub fn converged(seed: u64) -> crate::World {
 /// The HTTP mutations since a given request, including any unintended route.
 #[must_use]
 pub fn write_routes(world: &crate::World, since: usize) -> Vec<temper_fake_forge_protocol::Route> {
-    use temper_forge_forgejo::{client, request::Method};
+    use skein_forge::forgejo::{client, request::Method};
     let limits = temper_engine_protocol_forge_world::fixtures::fake_limits();
     let mut routes = Vec::new();
     for request in &world.requests()[since..] {
@@ -94,8 +94,8 @@ pub fn file_writes(world: &crate::World) -> usize {
 pub const OTHER_URL: &[u8] = b"http://elsewhere.invalid/hook";
 pub const OTHER_SECRET: &[u8] = b"somebody-elses-hook-secret";
 #[must_use]
-pub fn stale_team() -> temper_forge_forgejo::document::TeamSpec {
-    use temper_forge_forgejo::document::{Access, Units};
+pub fn stale_team() -> skein_forge::forgejo::document::TeamSpec {
+    use skein_forge::forgejo::document::{Access, Units};
     let mut spec = team(b"temper");
     spec.permission = Access::Read;
     spec.includes_all_repositories = false;
@@ -123,7 +123,7 @@ pub fn assert_bot(world: &crate::World) {
     );
 }
 pub fn assert_org(world: &crate::World, org: &[u8]) {
-    use temper_forge_forgejo::delivery::SUBSCRIBED;
+    use skein_forge::forgejo::delivery::SUBSCRIBED;
     use temper_forge_setup::place::File;
     assert_eq!(world.store().organization(org).expect("org").owner.as_ref(), b"ada");
     let team = world.store().team(org, b"temper").expect("team");

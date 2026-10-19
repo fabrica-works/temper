@@ -5,7 +5,7 @@ use super::{
 };
 use crate::setup::{Entry, Mode};
 use alloc::boxed::Box;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::{Access, Document, Row, TeamSpec, Units},
     request::{Page, Request},
 };

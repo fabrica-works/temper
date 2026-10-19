@@ -1,12 +1,12 @@
 use super::fixtures::{at, boxed, config, limits};
 use crate::{answers, routes};
-use skein_lib::{Time, Wall, bytes};
-use temper_fake_forge_domain::api as a;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     request::{Page, Request},
     server::{self, Answer},
 };
+use skein_lib::{Time, Wall, bytes};
+use temper_fake_forge_domain::api as a;
 
 #[test]
 fn repositories_keep_the_scenarios_id_path_and_domain_settings() {
@@ -20,7 +20,7 @@ fn repositories_keep_the_scenarios_id_path_and_domain_settings() {
                 id: 2,
                 owner: d::User { id: 0, login: boxed(b"org"), is_admin: false, full_name: Box::from([]) },
                 name: boxed(b"repo"),
-                object_format: temper_forge_forgejo::id::ObjectFormat::Sha1,
+                object_format: skein_forge::forgejo::id::ObjectFormat::Sha1,
                 default_branch: boxed(b"trunk"),
                 default_merge_style: d::MergeStyle::Squash,
                 allow_merge_commits: false,
@@ -103,7 +103,7 @@ fn review_documents_keep_the_head_verdict_and_official_flag() {
                 id: 8,
                 user: d::User { id: 2, login: boxed(b"person"), is_admin: false, full_name: Box::from([]) },
                 state: expected,
-                commit_id: temper_forge_forgejo::id::read(b"0000000000000007000000000000000000000000")
+                commit_id: skein_forge::forgejo::id::read(b"0000000000000007000000000000000000000000")
                     .expect("literal"),
                 body: d::Body::Kept(boxed(b"review")),
                 submitted_at: Some(Wall::from_nanos(1_000_000_000)),

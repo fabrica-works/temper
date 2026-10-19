@@ -147,7 +147,7 @@ pub fn worst_case(limits: &Limits, config: &Config) -> Option<u64> {
         || limits.connections == 0
         || limits.raw_bytes == 0
         || skein_json::tokenizer::largest_demand(&limits.documents.json) > limits.http.read
-        || temper_forge_forgejo::limits::check(&limits.documents).is_err()
+        || skein_forge::forgejo::limits::check(&limits.documents).is_err()
     {
         return None;
     }

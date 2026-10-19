@@ -1,11 +1,5 @@
 //! Raw Forgejo transcripts and a bounded tokenizer driver.
-use skein_json::tokenizer;
-use skein_lib::{
-    Env, Intake, Queue, Time, Wall,
-    stream::{Down, Up},
-};
-use std::{collections::BTreeSet, fs, path::Path};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     decode::{Malformed, Step},
     document::{Document, Row},
@@ -13,6 +7,12 @@ use temper_forge_forgejo::{
     request::{Method, Page, Repo, Request},
     server,
 };
+use skein_json::tokenizer;
+use skein_lib::{
+    Env, Intake, Queue, Time, Wall,
+    stream::{Down, Up},
+};
+use std::{collections::BTreeSet, fs, path::Path};
 #[derive(Debug)]
 pub struct Transcript {
     pub method: Method,
@@ -115,7 +115,7 @@ pub fn decode_refusal(
     target: &[u8],
     body: &[u8],
     limits: &Limits,
-) -> temper_forge_forgejo::decode::Malformed {
+) -> skein_forge::forgejo::decode::Malformed {
     let server::Route::Body(decoder) = server::route(method, target, limits).expect("body route") else {
         panic!("a body decoder")
     };
@@ -125,7 +125,7 @@ fn decode_body(
     mut decoder: server::BodyDecoder,
     body: &[u8],
     limits: &Limits,
-) -> Result<(Request, usize), temper_forge_forgejo::decode::Malformed> {
+) -> Result<(Request, usize), skein_forge::forgejo::decode::Malformed> {
     let mut result = None;
     let first = server::body_first(&decoder);
     let steps = drive(body, limits, first, |event| match server::body(&mut decoder, limits, event) {
@@ -191,8 +191,8 @@ pub fn specimen() -> Repo {
     Repo { owner: Box::from(*b"fixture"), name: Box::from(*b"specimen") }
 }
 #[must_use]
-pub fn sha(n: u64) -> temper_forge_forgejo::id::ObjectId {
-    temper_forge_forgejo::id::read(format!("{n:040x}").as_bytes()).expect("masked sha")
+pub fn sha(n: u64) -> skein_forge::forgejo::id::ObjectId {
+    skein_forge::forgejo::id::read(format!("{n:040x}").as_bytes()).expect("masked sha")
 }
 #[must_use]
 pub fn page(page: u32, limit: u32) -> Page {
@@ -238,8 +238,8 @@ fn walk(value: &serde_json::Value, path: &str, set: &mut BTreeSet<(String, Kind)
 }
 
 #[must_use]
-pub fn user(id: u64) -> temper_forge_forgejo::document::User {
-    temper_forge_forgejo::document::User {
+pub fn user(id: u64) -> skein_forge::forgejo::document::User {
+    skein_forge::forgejo::document::User {
         id,
         login: Box::from(if id == 1 { b"fixture".as_slice() } else { b"writer" }),
         is_admin: false,
@@ -248,7 +248,7 @@ pub fn user(id: u64) -> temper_forge_forgejo::document::User {
 }
 #[must_use]
 pub fn write_cases() -> Vec<(&'static str, Request)> {
-    use temper_forge_forgejo::document::IssueState;
+    use skein_forge::forgejo::document::IssueState;
     let mut rows = vec![
         (
             "create-issue",
@@ -310,7 +310,7 @@ pub fn write_cases() -> Vec<(&'static str, Request)> {
     rows
 }
 fn write_other_cases() -> Vec<(&'static str, Request)> {
-    use temper_forge_forgejo::{
+    use skein_forge::forgejo::{
         document::{MergeStyle, StatusState},
         request::{ReviewEvent, UpdateStyle},
     };
@@ -506,7 +506,7 @@ pub fn delivery(case: &str) -> DeliveryRequest {
     let event = request[..end]
         .split(|b| *b == b'\n')
         .find_map(|line| {
-            line.strip_prefix(temper_forge_forgejo::delivery::EVENT_HEADER).and_then(|rest| rest.strip_prefix(b": "))
+            line.strip_prefix(skein_forge::forgejo::delivery::EVENT_HEADER).and_then(|rest| rest.strip_prefix(b": "))
         })
         .expect("event header")
         .strip_suffix(b"\r")
@@ -520,8 +520,8 @@ pub fn decode_delivery(
     event: &[u8],
     body: &[u8],
     limits: &Limits,
-) -> Result<temper_forge_forgejo::delivery::Delivery, Malformed> {
-    use temper_forge_forgejo::client::delivery::{self, Step};
+) -> Result<skein_forge::forgejo::delivery::Delivery, Malformed> {
+    use skein_forge::forgejo::client::delivery::{self, Step};
     let mut decoder = delivery::decoder(event, limits).expect("recorded delivery event");
     let mut result = None;
     drive(body, limits, delivery::first(&decoder), |event| match delivery::step(&mut decoder, limits, event) {
@@ -538,8 +538,8 @@ pub fn decode_delivery(
     result.expect("terminal delivery")
 }
 #[must_use]
-pub fn delivery_cases() -> Vec<(&'static str, temper_forge_forgejo::delivery::Delivery)> {
-    use temper_forge_forgejo::{
+pub fn delivery_cases() -> Vec<(&'static str, skein_forge::forgejo::delivery::Delivery)> {
+    use skein_forge::forgejo::{
         delivery::{Delivery, JobEnd, RefType},
         document::Body,
         request::ReviewEvent,
@@ -605,8 +605,8 @@ pub fn delivery_cases() -> Vec<(&'static str, temper_forge_forgejo::delivery::De
     cases
 }
 
-fn setup_team_spec() -> temper_forge_forgejo::document::TeamSpec {
-    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+fn setup_team_spec() -> skein_forge::forgejo::document::TeamSpec {
+    use skein_forge::forgejo::document::{Access, TeamSpec, Units};
     TeamSpec {
         name: Box::from(*b"writer"),
         permission: Access::Write,
@@ -616,7 +616,7 @@ fn setup_team_spec() -> temper_forge_forgejo::document::TeamSpec {
 }
 const SETUP_TEAM: u64 = 4;
 fn setup_org_cases() -> Vec<(&'static str, Request)> {
-    use temper_forge_forgejo::document::Access;
+    use skein_forge::forgejo::document::Access;
     let org = || Box::<[u8]>::from(*b"ensemble");
     let make_org = || Request::CreateOrg { person: Box::from(*b"fixture"), name: org() };
     let make_team = || Request::CreateTeam { org: org(), spec: setup_team_spec() };
@@ -687,8 +687,8 @@ pub fn setup_hook_events() -> Box<[Box<[u8]>]> {
     .map(|event| Box::from(event.as_bytes()))
     .collect()
 }
-fn setup_hook_spec(patched: bool, other: bool, narrow: bool) -> temper_forge_forgejo::request::HookSpec {
-    temper_forge_forgejo::request::HookSpec {
+fn setup_hook_spec(patched: bool, other: bool, narrow: bool) -> skein_forge::forgejo::request::HookSpec {
+    skein_forge::forgejo::request::HookSpec {
         url: Box::from(if other {
             b"http://127.0.0.1:3000/other".as_slice()
         } else {

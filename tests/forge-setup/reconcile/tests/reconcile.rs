@@ -1,5 +1,5 @@
+use skein_forge::forgejo::request::Request;
 use temper_fake_forge_protocol::Route;
-use temper_forge_forgejo::request::Request;
 use temper_forge_setup::place::File;
 use temper_forge_setup_reconcile_world::{Ended, World, fixtures};
 #[test]
@@ -89,7 +89,7 @@ fn a_managed_forge_missing_an_org_is_refused_naming_it() {
 }
 #[test]
 fn a_team_named_for_the_bot_is_made_with_write_on_every_repository() {
-    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+    use skein_forge::forgejo::document::{Access, TeamSpec, Units};
     let mut world = World::managed(7);
     assert_eq!(world.reconcile(), Ended::Done);
     let bot = world.store().find(b"temper").expect("bot").id;
@@ -107,7 +107,7 @@ fn a_team_named_for_the_bot_is_made_with_write_on_every_repository() {
 }
 #[test]
 fn a_listing_longer_than_a_page_is_read_to_its_end() {
-    use temper_forge_forgejo::request::Page;
+    use skein_forge::forgejo::request::Page;
     let mut world = World::managed(7);
     for name in [b"first".as_slice(), b"second", b"temper"] {
         world.store_mut().add_team(b"acme", fixtures::team(name));
@@ -122,7 +122,7 @@ fn a_listing_longer_than_a_page_is_read_to_its_end() {
 }
 #[test]
 fn an_org_hook_is_made_with_the_secret_the_events_json_and_active() {
-    use temper_forge_forgejo::delivery::SUBSCRIBED;
+    use skein_forge::forgejo::delivery::SUBSCRIBED;
     let mut world = World::owned(7);
     world.listening(fixtures::listener());
     world.put(File::WebhookSecret, fixtures::secret(fixtures::WEBHOOK));

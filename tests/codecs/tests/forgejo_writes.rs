@@ -1,5 +1,5 @@
+use skein_forge::forgejo::client;
 use temper_codecs_world::forgejo;
-use temper_forge_forgejo::client;
 #[test]
 fn write_requests_encode_as_the_tool_sent_them() {
     for (case, request) in forgejo::write_cases() {
@@ -16,14 +16,14 @@ fn write_requests_route_on_the_servers_side_to_the_same_request() {
         assert_eq!(forgejo::route(&forgejo::transcript(case)), request, "{case}");
     }
 }
-use skein_lib::Wall;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::{
         Body, Branch, Comment, CommitStatus, Document, Issue, IssueState, PullBranch, PullRequest, Review, ReviewState,
         StatusState,
     },
     server::{self, Answer},
 };
+use skein_lib::Wall;
 fn answers() -> Vec<(&'static str, Answer)> {
     let at = Wall::from_nanos(1_577_817_005_000_000_000);
     let mut rows = vec![];
@@ -211,7 +211,7 @@ fn write_transcript_mutations_are_malformed_naming_the_field() {
     let mut value: serde_json::Value = serde_json::from_slice(&body).expect("fixture value");
     value.as_object_mut().expect("fixture value").remove("id");
     let decoded = forgejo::decode(&request, &serde_json::to_vec(&value).expect("fixture value"));
-    assert_eq!(decoded.document, Err(temper_forge_forgejo::decode::Malformed::Missing { field: b"id" }));
+    assert_eq!(decoded.document, Err(skein_forge::forgejo::decode::Malformed::Missing { field: b"id" }));
 }
 #[test]
 fn write_bodies_enforce_fields_types_and_bounds() {
@@ -230,12 +230,12 @@ fn write_bodies_enforce_fields_types_and_bounds() {
     ];
     for (tail, body, field) in rows {
         let target = [b"/api/v1/repos/a/b/".as_slice(), tail].concat();
-        let error = forgejo::decode_route(temper_forge_forgejo::request::Method::Post, &target, body, &limits)
+        let error = forgejo::decode_route(skein_forge::forgejo::request::Method::Post, &target, body, &limits)
             .expect_err("malformed request");
         assert!(error.contains(&format!("{:?}", field.as_bytes())), "{field}: {error}");
     }
 }
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::ErrorBody,
     failure::{self, Refusal},
 };

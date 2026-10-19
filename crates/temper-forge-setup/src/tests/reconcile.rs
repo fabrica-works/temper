@@ -3,8 +3,8 @@ use crate::{
     place::File,
     reconcile::{Event, Failure, Need, Reply, Stage, Why},
 };
-use temper_forge_forgejo::{document::Document, request::Request};
-fn user(user: temper_forge_forgejo::document::User) -> Event {
+use skein_forge::forgejo::{document::Document, request::Request};
+fn user(user: skein_forge::forgejo::document::User) -> Event {
     Event::Reply(Reply::Document(Document::User(user)))
 }
 #[test]
@@ -175,7 +175,7 @@ fn hook_urls_are_written_for_loopback_v4_and_v6() {
 }
 #[test]
 fn a_lower_hook_met_later_deletes_the_higher_one_kept() {
-    use temper_forge_forgejo::request::{HookSpec, Page};
+    use skein_forge::forgejo::request::{HookSpec, Page};
     let mut run = Run::hook_listing();
     assert_eq!(
         run.step(Event::Reply(Reply::Rows(Box::new([fixtures::hook_row(7), fixtures::hook_row(3)])))),

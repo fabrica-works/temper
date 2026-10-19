@@ -1,6 +1,6 @@
 //! One call's exchanges, and its single terminal answer (protocol/forge.md, 3.2).
 use skein_forge::api;
-use temper_forge_forgejo::request;
+use skein_forge::forgejo::request;
 /// The bytes requested from a raw answer.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Range {

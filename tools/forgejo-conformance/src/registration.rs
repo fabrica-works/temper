@@ -7,13 +7,14 @@ use crate::{
     write::{SecretKind, Secrets},
 };
 use serde_json::Value;
+use skein_forge::forgejo::pin::RUNNER_VERSION;
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
     path::Path,
     process::{Command, Stdio},
 };
-use temper_throwaway_forgejo::{Output, RUNNER_VERSION};
+use temper_throwaway_forgejo::Output;
 pub(crate) const FACT_SECRET: &str = "0123456789abcdef0123456789abcdef01234567";
 pub(crate) const FACT_UUID: &str = "30313233-3435-3637-3839-616263646566";
 pub(crate) const RUNNER_SECRET: &str = "fedcba9876543210fedcba9876543210fedcba98";

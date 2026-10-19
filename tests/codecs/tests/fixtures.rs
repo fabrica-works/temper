@@ -1,5 +1,5 @@
+use skein_forge::forgejo::document::{AccessToken, User};
 use std::boxed::Box;
-use temper_forge_forgejo::document::{AccessToken, User};
 pub const BOT: u64 = 4;
 pub const PERSON: u64 = 5;
 pub const API_TOKEN: u64 = 6;
@@ -37,7 +37,7 @@ pub fn git_token(value: bool) -> AccessToken {
     token
 }
 
-use temper_forge_forgejo::document::{Access, Org, Team, TeamSpec, Units};
+use skein_forge::forgejo::document::{Access, Org, Team, TeamSpec, Units};
 pub const ORG: u64 = 6;
 pub const TEAM: u64 = 4;
 #[must_use]
@@ -69,8 +69,8 @@ pub fn owners() -> Team {
     }
 }
 #[must_use]
-pub fn hook(id: u64, other: bool, narrow: bool) -> temper_forge_forgejo::document::Hook {
-    temper_forge_forgejo::document::Hook {
+pub fn hook(id: u64, other: bool, narrow: bool) -> skein_forge::forgejo::document::Hook {
+    skein_forge::forgejo::document::Hook {
         id,
         url: Box::from(if other {
             b"http://127.0.0.1:3000/other".as_slice()

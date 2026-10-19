@@ -140,7 +140,7 @@ pub fn draw(value: u8) -> skein_lib::Secret {
     skein_lib::Secret::new(Box::new([value; 32]))
 }
 pub fn line(which: crate::spec::Which) -> Box<str> {
-    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
     let (prefix, version) = match which {
         crate::spec::Which::Forgejo => (b"forgejo version ".as_slice(), VERSION),
         crate::spec::Which::Runner => (b"forgejo-runner version v".as_slice(), RUNNER_VERSION),
@@ -159,7 +159,7 @@ pub fn first() -> crate::prepare::Found {
     crate::prepare::Found { state: None, admin_token: false, runner_secret: false, files: false }
 }
 pub fn later() -> crate::prepare::Found {
-    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
     crate::prepare::Found {
         state: Some(crate::state::encode(&crate::state::State {
             forgejo: VERSION.as_bytes().into(),
@@ -187,16 +187,16 @@ pub const ADMIN: &[u8] = b"site-admin-token";
 pub fn secret(value: &[u8]) -> skein_lib::Secret {
     skein_lib::Secret::new(bytes::copy_of(value))
 }
-pub fn admin() -> temper_forge_forgejo::document::User {
-    temper_forge_forgejo::document::User {
+pub fn admin() -> skein_forge::forgejo::document::User {
+    skein_forge::forgejo::document::User {
         id: 1,
         login: b"temper-admin".as_slice().into(),
         is_admin: true,
         full_name: Box::new([]),
     }
 }
-pub fn person(login: &[u8], full_name: &[u8]) -> temper_forge_forgejo::document::User {
-    temper_forge_forgejo::document::User {
+pub fn person(login: &[u8], full_name: &[u8]) -> skein_forge::forgejo::document::User {
+    skein_forge::forgejo::document::User {
         id: 42,
         login: bytes::copy_of(login),
         is_admin: false,
@@ -235,7 +235,7 @@ impl Run {
             place::File,
             reconcile::{Event, Need, Reply},
         };
-        use temper_forge_forgejo::{document::Document, request::Request};
+        use skein_forge::forgejo::{document::Document, request::Request};
         assert_eq!(self.step(Event::Begin), Need::Read(File::AdminToken));
         assert_eq!(
             self.step(Event::Read(Some(secret(ADMIN)))),
@@ -248,7 +248,7 @@ impl Run {
     }
 }
 pub fn prepared() -> crate::state::State {
-    use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
     crate::state::State {
         forgejo: VERSION.as_bytes().into(),
         runner: Some(RUNNER_VERSION.as_bytes().into()),
@@ -277,7 +277,7 @@ impl Run {
             place::File,
             reconcile::{Event, Need, Reply},
         };
-        use temper_forge_forgejo::{document::Document, request::Request};
+        use skein_forge::forgejo::{document::Document, request::Request};
         for next in [File::GitToken, File::User] {
             assert_eq!(
                 self.step(Event::Read(Some(secret(b"bot-token")))),
@@ -302,7 +302,7 @@ pub fn older(forgejo: Option<&[u8]>, runner: Option<&[u8]>) -> crate::prepare::F
     crate::prepare::Found { state: Some(crate::state::encode(&state)), ..later() }
 }
 pub fn backup(recorded: &[u8]) -> Box<[u8]> {
-    let pin = temper_forge_forgejo::pin::VERSION.as_bytes();
+    let pin = skein_forge::forgejo::pin::VERSION.as_bytes();
     let mut name = Writer::new(recorded.len().checked_add(pin.len()).unwrap().checked_add(16).unwrap());
     for piece in [b"forgejo-".as_slice(), recorded, b"-to-", pin, b".zip"] {
         name.put(piece).unwrap();
@@ -330,7 +330,7 @@ pub fn failed() -> crate::prepare::Event {
 impl Run {
     pub fn hook_listing() -> Self {
         use crate::reconcile::{Event, Reply};
-        use temper_forge_forgejo::document::{ApiSettings, Document, Org, Row, Team};
+        use skein_forge::forgejo::document::{ApiSettings, Document, Org, Row, Team};
         let mut run = Self::managed();
         run.machine = crate::reconcile::Reconcile::new(&run.entry, Some(SocketAddr::from((Ipv4Addr::LOCALHOST, 9898))));
         run.bot_lookup();
@@ -349,8 +349,8 @@ impl Run {
         run
     }
 }
-pub fn team_spec() -> temper_forge_forgejo::document::TeamSpec {
-    use temper_forge_forgejo::document::{Access, TeamSpec, Units};
+pub fn team_spec() -> skein_forge::forgejo::document::TeamSpec {
+    use skein_forge::forgejo::document::{Access, TeamSpec, Units};
     TeamSpec {
         name: b"temper".as_slice().into(),
         permission: Access::Write,
@@ -358,8 +358,8 @@ pub fn team_spec() -> temper_forge_forgejo::document::TeamSpec {
         units: Units { code: Access::Write, issues: Access::Write, pulls: Access::Write, actions: Access::Write },
     }
 }
-pub fn hook_row(id: u64) -> temper_forge_forgejo::document::Row {
-    temper_forge_forgejo::document::Row::Hook(temper_forge_forgejo::document::Hook {
+pub fn hook_row(id: u64) -> skein_forge::forgejo::document::Row {
+    skein_forge::forgejo::document::Row::Hook(skein_forge::forgejo::document::Hook {
         id,
         url: b"http://127.0.0.1:9898/hooks/1".as_slice().into(),
         events: Box::new([]),
@@ -369,7 +369,7 @@ pub fn hook_row(id: u64) -> temper_forge_forgejo::document::Row {
 
 pub fn subscribed() -> Box<[Box<[u8]>]> {
     let mut events = skein_lib::List::with_capacity(22);
-    for event in temper_forge_forgejo::delivery::SUBSCRIBED {
+    for event in skein_forge::forgejo::delivery::SUBSCRIBED {
         events.push(event.into()).expect("events");
     }
     events.into_boxed()

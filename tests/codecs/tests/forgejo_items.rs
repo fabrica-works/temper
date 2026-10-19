@@ -1,6 +1,4 @@
-use skein_lib::Wall;
-use temper_codecs_world::forgejo;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     decode::Malformed,
     document::{
@@ -10,6 +8,8 @@ use temper_forge_forgejo::{
     request::{IssueKind, Request, Sort, StateFilter},
     server::{self, Answer},
 };
+use skein_lib::Wall;
+use temper_codecs_world::forgejo;
 fn issue(number: u64, pull: bool, title: &[u8], body: &[u8], author: u64, at: u64) -> Issue {
     Issue {
         number,

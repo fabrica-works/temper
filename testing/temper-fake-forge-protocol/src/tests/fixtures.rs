@@ -1,7 +1,7 @@
 use crate::{Config, Faults, Limits, Repository};
 use alloc::boxed::Box;
+use skein_forge::forgejo::request::Repo;
 use skein_lib::{List, Secret, bytes};
-use temper_forge_forgejo::request::Repo;
 pub const FIXTURE_SECRET: &[u8] = b"fixture-hook-secret";
 pub fn hooked_config() -> Config {
     let mut config = config();
@@ -50,7 +50,7 @@ pub fn limits() -> Limits {
             response: 4096,
             send: 1024,
         },
-        documents: temper_forge_forgejo::limits::Limits {
+        documents: skein_forge::forgejo::limits::Limits {
             json: skein_json::tokenizer::Limits { chunk: 1024, string: 16384, number: 32, depth: 16, length: 65536 },
             writer: skein_json::writer::Limits { depth: 16, length: 65536 },
             string_bytes: 512,
@@ -227,7 +227,7 @@ impl Harness {
     pub fn status(&self) -> u16 {
         let bytes = self.output.as_slice();
         let digits = &bytes[9..12];
-        temper_forge_forgejo::id::unsigned(digits).expect("status").try_into().expect("u16")
+        skein_forge::forgejo::id::unsigned(digits).expect("status").try_into().expect("u16")
     }
     pub fn head(&self) -> Box<[u8]> {
         let out = self.output.as_slice();
@@ -352,12 +352,12 @@ pub fn setup_harness() -> Harness {
     h.service.setup_mut().account(b"temper", false, b"temper:bot");
     h
 }
-pub fn make_setup_token(h: &mut Harness) -> temper_forge_forgejo::document::AccessToken {
+pub fn make_setup_token(h: &mut Harness) -> skein_forge::forgejo::document::AccessToken {
     h.ask(b"POST", b"/api/v1/admin/users/temper/tokens", br#"{"name":"temper-api","scopes":["read:user"]}"#);
     assert_eq!(h.status(), 201);
     // The fake and the world share the codec's vocabulary, without another JSON reader.
     let token = h.service.setup().issued().last().expect("token made");
-    temper_forge_forgejo::document::AccessToken {
+    skein_forge::forgejo::document::AccessToken {
         id: token.id,
         name: token.name.clone(),
         scopes: token.scopes.clone(),

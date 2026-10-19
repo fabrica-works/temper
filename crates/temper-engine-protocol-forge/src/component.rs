@@ -359,7 +359,7 @@ impl Component {
         let state = self.starts.get_mut(at).expect("configured start");
         let previous = *state;
         *state = start::heard(previous, heard, forge.user, env.now, &env.limits);
-        if start_request(*state) == Some(temper_forge_forgejo::request::Request::ApiSettings)
+        if start_request(*state) == Some(skein_forge::forgejo::request::Request::ApiSettings)
             && *state != previous
             && let Some(Some(token)) = self.start_tokens.get(at)
             && let Some(id) = self.connections.get(token)
@@ -442,10 +442,10 @@ impl Component {
                         Heard::Head { status, fields } if status != 200 => {
                             Some(start::Heard::Status { status, retry: fields.retry_after })
                         }
-                        Heard::Done(Body::Document(temper_forge_forgejo::document::Document::User(user))) => {
+                        Heard::Done(Body::Document(skein_forge::forgejo::document::Document::User(user))) => {
                             Some(start::Heard::User { id: user.id })
                         }
-                        Heard::Done(Body::Document(temper_forge_forgejo::document::Document::ApiSettings(
+                        Heard::Done(Body::Document(skein_forge::forgejo::document::Document::ApiSettings(
                             settings,
                         ))) => Some(start::Heard::ApiSettings { max_response_items: settings.max_response_items }),
                         Heard::Done(_) | Heard::Failed(_) => Some(start::Heard::Unanswered),
@@ -554,10 +554,10 @@ impl Component {
     }
 }
 
-fn start_request(state: Start) -> Option<temper_forge_forgejo::request::Request> {
+fn start_request(state: Start) -> Option<skein_forge::forgejo::request::Request> {
     match state {
-        Start::Checking { .. } => Some(temper_forge_forgejo::request::Request::User),
-        Start::Settings { .. } => Some(temper_forge_forgejo::request::Request::ApiSettings),
+        Start::Checking { .. } => Some(skein_forge::forgejo::request::Request::User),
+        Start::Settings { .. } => Some(skein_forge::forgejo::request::Request::ApiSettings),
         Start::Waiting { .. } | Start::Ready { .. } | Start::Stopped(_) => None,
     }
 }

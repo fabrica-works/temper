@@ -1,13 +1,13 @@
 //! Per-route projections and post-write reads; one write precedes its readback.
 use crate::{Config, Limits, answers, errors, routes};
 use alloc::boxed::Box;
-use skein_lib::{Decimal, List, Writer, bytes};
-use temper_fake_forge_domain::api::{self as a, Answer};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     request::{Page, Request},
     server,
 };
+use skein_lib::{Decimal, List, Writer, bytes};
+use temper_fake_forge_domain::api::{self as a, Answer};
 #[derive(PartialEq, Eq, Debug)]
 pub enum Select {
     Document,
@@ -163,7 +163,7 @@ pub fn select(config: &Config, request: &Request, range: Option<Range>) -> Resul
             }
             let id = login.strip_prefix(b"u").ok_or(a::Error::Missing(a::What::Repository))?;
             Ok(Select::Permission(
-                temper_forge_forgejo::id::unsigned(id).ok_or(a::Error::Missing(a::What::Repository))?,
+                skein_forge::forgejo::id::unsigned(id).ok_or(a::Error::Missing(a::What::Repository))?,
             ))
         }
         Request::Raw { .. } | Request::JobLog { .. } => Ok(Select::Raw(range)),
@@ -494,7 +494,7 @@ pub fn range(value: Option<&[u8]>) -> Result<Option<Range>, a::Error> {
     };
     let value = value.strip_prefix(b"bytes=").ok_or(a::Error::Refused)?;
     if let Some(suffix) = value.strip_prefix(b"-") {
-        let count = temper_forge_forgejo::id::unsigned(suffix).ok_or(a::Error::Refused)?;
+        let count = skein_forge::forgejo::id::unsigned(suffix).ok_or(a::Error::Refused)?;
         if count == 0 {
             return Err(a::Error::Refused);
         }
@@ -502,10 +502,10 @@ pub fn range(value: Option<&[u8]>) -> Result<Option<Range>, a::Error> {
     }
     let dash = bytes::find(value, b"-").ok_or(a::Error::Refused)?;
     let first =
-        temper_forge_forgejo::id::unsigned(value.get(..dash).ok_or(a::Error::Refused)?).ok_or(a::Error::Refused)?;
+        skein_forge::forgejo::id::unsigned(value.get(..dash).ok_or(a::Error::Refused)?).ok_or(a::Error::Refused)?;
     let last = value.get(dash.saturating_add(1)..).ok_or(a::Error::Refused)?;
     let last =
-        if last.is_empty() { None } else { Some(temper_forge_forgejo::id::unsigned(last).ok_or(a::Error::Refused)?) };
+        if last.is_empty() { None } else { Some(skein_forge::forgejo::id::unsigned(last).ok_or(a::Error::Refused)?) };
     if let Some(last) = last
         && last < first
     {

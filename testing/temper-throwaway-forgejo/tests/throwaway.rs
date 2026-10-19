@@ -1,5 +1,6 @@
+use skein_forge::forgejo::pin::VERSION;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
-use temper_throwaway_forgejo::{Failure, Forgejo, Init, Outgoing, Refusal, Settings, VERSION};
+use temper_throwaway_forgejo::{Failure, Forgejo, Init, Outgoing, Refusal, Settings};
 #[test]
 fn a_binary_printing_another_version_is_refused_naming_it() {
     let scratch = Path::new(env!("CARGO_TARGET_TMPDIR")).join("wrong-version");

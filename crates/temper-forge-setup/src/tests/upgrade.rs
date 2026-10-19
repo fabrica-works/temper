@@ -6,7 +6,7 @@ use crate::{
     state,
     upgrade::{self, Course},
 };
-use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION};
+use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
 
 #[test]
 fn the_upgrade_dumps_an_older_forgejo_before_it_migrates() {

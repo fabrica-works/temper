@@ -4,7 +4,7 @@ The Rust tool starts only the pinned Forgejo binary named by
 `TEMPER_FORGEJO`, with fresh SQLite state on loopback. It creates the
 fixture and removes its instance and scratch directory when it ends.
 `VERSION` and `RUNNER_VERSION` in
-`crates/temper-forge-forgejo/src/pin.rs` pin both binaries.
+`skein_forge::forgejo::pin` pin both binaries.
 
 ```sh
 TEMPER_FORGEJO=<absolute path to the pinned Forgejo> heavy --gate \

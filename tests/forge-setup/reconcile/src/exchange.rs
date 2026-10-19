@@ -1,4 +1,9 @@
 //! One HTTP exchange, cut into seeded fragments; credentials never enter its trace.
+use skein_forge::forgejo::{
+    client as codec,
+    document::Document,
+    request::{Method, Request},
+};
 use skein_http::{Header, client as http};
 use skein_lib::{
     Env, Queue, Secret, Time, Token, Wall,
@@ -6,11 +11,6 @@ use skein_lib::{
 };
 use temper_engine_protocol_forge_world::pipe::{Cut, Pipe};
 use temper_fake_forge_protocol::{self as fake, Service};
-use temper_forge_forgejo::{
-    client as codec,
-    document::Document,
-    request::{Method, Request},
-};
 use temper_forge_setup::reconcile::Reply;
 struct Exchange {
     client: http::Client,

@@ -10,12 +10,12 @@ mod done;
 pub(crate) mod size;
 use alloc::boxed::Box;
 use skein_forge::api;
-use skein_lib::{List, Time, Wall, bytes};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     id::ObjectId,
     request::{self as r, Request},
 };
+use skein_lib::{List, Time, Wall, bytes};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum Stage {
     Resolve,

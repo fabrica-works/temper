@@ -401,8 +401,8 @@ pub fn specimen() -> crate::tables::Repository {
     crate::tables::Repository {
         owner: Box::from(&b"fixture"[..]),
         name: Box::from(&b"specimen"[..]),
-        object_format: temper_forge_forgejo::id::ObjectFormat::Sha1,
-        merge_style: temper_forge_forgejo::document::MergeStyle::Squash,
+        object_format: skein_forge::forgejo::id::ObjectFormat::Sha1,
+        merge_style: skein_forge::forgejo::document::MergeStyle::Squash,
         html_url: Box::from(&b"http://127.0.0.1:3000/fixture/specimen"[..]),
     }
 }
@@ -486,17 +486,17 @@ pub fn hook_settings() -> Settings {
 pub const HOOK_REPOSITORY: u64 = 2;
 pub const HOOK_NUMBER: u64 = 7;
 pub const HOOK_HEAD: [u8; 32] = [0x77; 32];
-pub fn hook_body() -> temper_forge_forgejo::document::Body {
-    temper_forge_forgejo::document::Body::Kept(Box::from(b"<!-- temper:key 0102 -->\nbody".as_slice()))
+pub fn hook_body() -> skein_forge::forgejo::document::Body {
+    skein_forge::forgejo::document::Body::Kept(Box::from(b"<!-- temper:key 0102 -->\nbody".as_slice()))
 }
-pub fn hook_id() -> temper_forge_forgejo::id::ObjectId {
-    temper_forge_forgejo::id::ObjectId { format: temper_forge_forgejo::id::ObjectFormat::Sha256, bytes: HOOK_HEAD }
+pub fn hook_id() -> skein_forge::forgejo::id::ObjectId {
+    skein_forge::forgejo::id::ObjectId { format: skein_forge::forgejo::id::ObjectFormat::Sha256, bytes: HOOK_HEAD }
 }
-pub fn hook_ref(reference: &[u8]) -> temper_forge_forgejo::delivery::Delivery {
-    temper_forge_forgejo::delivery::Delivery::Ref {
+pub fn hook_ref(reference: &[u8]) -> skein_forge::forgejo::delivery::Delivery {
+    skein_forge::forgejo::delivery::Delivery::Ref {
         repository: HOOK_REPOSITORY,
         reference: Box::from(reference),
         created: false,
-        ref_type: temper_forge_forgejo::delivery::RefType::Branch,
+        ref_type: skein_forge::forgejo::delivery::RefType::Branch,
     }
 }

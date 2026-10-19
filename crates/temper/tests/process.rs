@@ -194,7 +194,7 @@ fn a_prepared_forge_runs_forgejo_and_its_runner_once_each() {
     let version = owned::await_answer(port, "/api/v1/version", None);
     assert_eq!(
         version["version"].as_str().expect("version").split('+').next(),
-        Some(temper_throwaway_forgejo::VERSION)
+        Some(skein_forge::forgejo::pin::VERSION)
     );
     let token = std::fs::read_to_string(scratch.path().join("forge-1/admin_token")).expect("admin token");
     let admin = owned::await_answer(port, "/api/v1/user", Some(token.trim()));
@@ -227,7 +227,7 @@ fn an_older_recorded_forgejo_is_dumped_then_upgraded() {
     assert!(!partial.exists());
     let record = state::decode(&fs::read(owned::file(scratch.path(), 1, File::State)).expect("upgrade fixture"))
         .expect("upgrade fixture");
-    assert_eq!(&*record.forgejo, temper_throwaway_forgejo::VERSION.as_bytes());
+    assert_eq!(&*record.forgejo, skein_forge::forgejo::pin::VERSION.as_bytes());
     owned::record_versions(scratch.path(), Some(b"16.0.5"), None);
     let repeated = owned::prepare(scratch.path(), 1);
     assert!(repeated.status.success(), "{}", String::from_utf8_lossy(&repeated.stderr));

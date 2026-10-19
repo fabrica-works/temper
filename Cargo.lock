@@ -1783,6 +1783,7 @@ dependencies = [
  "skein-fake-llm-protocol",
  "skein-fake-peers",
  "skein-fake-person",
+ "skein-forge",
  "skein-io",
  "skein-json",
  "skein-lib",
@@ -1807,7 +1808,6 @@ dependencies = [
  "temper-client-shell-terminal",
  "temper-engine-domain",
  "temper-engine-protocol-forge",
- "temper-forge-forgejo",
  "temper-forge-setup",
  "temper-forge-setup-shell",
  "temper-protocol-store",
@@ -1940,6 +1940,7 @@ dependencies = [
  "jig-client-protocol-wire",
  "serde_json",
  "skein-codegen",
+ "skein-forge",
  "skein-json",
  "skein-lib",
  "temper-client-protocol-wire",
@@ -1948,7 +1949,6 @@ dependencies = [
  "temper-engine-domain-forge-client",
  "temper-engine-domain-forge-issues",
  "temper-engine-protocol-forge",
- "temper-forge-forgejo",
  "temper-protocol-store",
  "temper-protocol-worker-wire",
  "temper-service",
@@ -2114,7 +2114,6 @@ dependencies = [
  "skein-tls",
  "skein-world",
  "temper-engine-domain-forge-client",
- "temper-forge-forgejo",
 ]
 
 [[package]]
@@ -2137,7 +2136,6 @@ dependencies = [
  "temper-engine-protocol-forge",
  "temper-fake-forge-domain",
  "temper-fake-forge-protocol",
- "temper-forge-forgejo",
  "temper-service",
 ]
 
@@ -2181,12 +2179,12 @@ dependencies = [
 name = "temper-fake-forge-protocol"
 version = "0.0.0"
 dependencies = [
+ "skein-forge",
  "skein-http",
  "skein-json",
  "skein-lib",
  "temper-engine-forge-world",
  "temper-fake-forge-domain",
- "temper-forge-forgejo",
 ]
 
 [[package]]
@@ -2217,21 +2215,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "temper-forge-forgejo"
-version = "0.0.0"
-dependencies = [
- "skein-json",
- "skein-lib",
-]
-
-[[package]]
 name = "temper-forge-setup"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
+ "skein-forge",
  "skein-json",
  "skein-lib",
- "temper-forge-forgejo",
 ]
 
 [[package]]
@@ -2239,12 +2229,12 @@ name = "temper-forge-setup-reconcile-world"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
+ "skein-forge",
  "skein-http",
  "skein-lib",
  "temper-codecs-world",
  "temper-engine-protocol-forge-world",
  "temper-fake-forge-protocol",
- "temper-forge-forgejo",
  "temper-forge-setup",
 ]
 
@@ -2253,13 +2243,13 @@ name = "temper-forge-setup-shell"
 version = "0.0.0"
 dependencies = [
  "jig-protocol-config",
+ "skein-forge",
  "skein-http",
  "skein-io",
  "skein-json",
  "skein-lib",
  "skein-shell",
  "temper-engine-protocol-forge",
- "temper-forge-forgejo",
  "temper-forge-setup",
  "temper-service",
 ]
@@ -2452,8 +2442,8 @@ name = "temper-throwaway-forgejo"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "skein-forge",
  "skein-io",
- "temper-forge-forgejo",
 ]
 
 [[package]]

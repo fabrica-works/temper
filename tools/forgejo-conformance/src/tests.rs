@@ -153,7 +153,7 @@ fn the_runner_configuration_names_one_connection_by_its_token_file() {
 }
 #[test]
 fn a_listed_runner_is_found_by_its_uuid() {
-    let body: serde_json::Value = serde_json::from_str(&r#"[{"id":1,"uuid":"30313233-3435-3637-3839-616263646566","owner_id":0,"repo_id":0,"name":"r1","status":"idle","version":"v@","labels":["temper-host"],"description":"","ephemeral":false}]"#.replace('@', temper_throwaway_forgejo::RUNNER_VERSION)).expect("row");
+    let body: serde_json::Value = serde_json::from_str(&r#"[{"id":1,"uuid":"30313233-3435-3637-3839-616263646566","owner_id":0,"repo_id":0,"name":"r1","status":"idle","version":"v@","labels":["temper-host"],"description":"","ephemeral":false}]"#.replace('@', skein_forge::forgejo::pin::RUNNER_VERSION)).expect("row");
     let row = crate::registration::listed(&body, "30313233-3435-3637-3839-616263646566").expect("found");
     assert_eq!(row["name"], "r1");
     assert_eq!(crate::registration::listed(&body, "absent"), None);

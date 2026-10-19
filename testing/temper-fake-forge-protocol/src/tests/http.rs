@@ -178,10 +178,10 @@ fn a_rate_refusal_uses_the_forges_clock_for_retry_after() {
 }
 #[test]
 fn ci_statuses_keep_a_null_creator_before_and_after_a_success() {
-    let request = temper_forge_forgejo::request::Request::CombinedStatus {
+    let request = skein_forge::forgejo::request::Request::CombinedStatus {
         at: fixtures::at(),
         commit: crate::routes::object(2),
-        page: temper_forge_forgejo::request::Page { page: None, limit: None },
+        page: skein_forge::forgejo::request::Page { page: None, limit: None },
     };
     for (state, expected) in
         [(a::Check::Pending, b"\"status\":\"pending\"".as_slice()), (a::Check::Passed, b"\"status\":\"success\"")]
@@ -213,7 +213,7 @@ fn an_unpaged_thread_past_the_projection_budget_is_refused() {
         created: Time::ZERO,
         edited: None,
     }]));
-    let request = temper_forge_forgejo::request::Request::Comments { at: fixtures::at(), number: 1 };
+    let request = skein_forge::forgejo::request::Request::Comments { at: fixtures::at(), number: 1 };
     let mut limits = fixtures::limits();
     limits.documents.writer.length = 1024;
     assert_eq!(

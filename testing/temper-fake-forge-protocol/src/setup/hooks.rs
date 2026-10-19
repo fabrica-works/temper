@@ -1,12 +1,12 @@
 use super::{Store, absent, empty, encoded, full};
 use crate::{Config, Limits, response::Reply};
 use alloc::boxed::Box;
-use skein_lib::{List, Secret};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document::Hook,
     request::{HookSpec, Page},
     server::Answer,
 };
+use skein_lib::{List, Secret};
 /// A hook's private subscription, including the secret never sent in a reply.
 #[derive(Debug)]
 pub struct Subscription {

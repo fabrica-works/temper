@@ -7,7 +7,7 @@ use crate::{
     upgrade::{self, Course},
 };
 use alloc::boxed::Box;
-use temper_forge_forgejo::pin::{RUNNER_VERSION, VERSION, names_forgejo, names_runner};
+use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION, names_forgejo, names_runner};
 /// Why a run did not start; credentials never enter a refusal.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Refusal {

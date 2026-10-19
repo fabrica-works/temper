@@ -73,11 +73,11 @@ fn each_delivery_becomes_the_hint_forge_md_5_names() {
         );
     }
 }
-type HintRow = (temper_forge_forgejo::delivery::Delivery, skein_forge::api::Change, Option<Box<[u8]>>);
+type HintRow = (skein_forge::forgejo::delivery::Delivery, skein_forge::api::Change, Option<Box<[u8]>>);
 fn hint_rows() -> [HintRow; 7] {
     use fixtures::{HOOK_HEAD as HEAD, HOOK_NUMBER as NUMBER, HOOK_REPOSITORY as REPOSITORY};
     use skein_forge::api::Change;
-    use temper_forge_forgejo::{
+    use skein_forge::forgejo::{
         delivery::{Delivery, JobEnd},
         request::ReviewEvent,
     };
@@ -129,6 +129,6 @@ fn a_tag_delivery_hints_nothing() {
 #[test]
 fn a_repository_id_past_u32_hints_nothing() {
     let delivery =
-        temper_forge_forgejo::delivery::Delivery::Pull { repository: u64::MAX, number: fixtures::HOOK_NUMBER };
+        skein_forge::forgejo::delivery::Delivery::Pull { repository: u64::MAX, number: fixtures::HOOK_NUMBER };
     assert_eq!(crate::hooks::hint::hint(1, &delivery), None);
 }

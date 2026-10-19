@@ -1,4 +1,5 @@
 //! Fixtures for the owned forge commands, shared with the process tier.
+use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
 use skein_lib::Duration;
 use std::{
     fs,
@@ -7,7 +8,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Output},
 };
-use temper_throwaway_forgejo::{RUNNER_VERSION, VERSION};
 pub struct Names<'a> {
     pub forgejo: &'a Path,
     pub runner: Option<&'a Path>,

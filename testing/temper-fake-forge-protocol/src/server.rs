@@ -1,17 +1,17 @@
 //! One bounded HTTP connection over Forgejo documents and the fake's calls.
 use crate::{Error, Limits, Service, errors, response, routes, service::Call};
 use alloc::boxed::Box;
-use skein_http::{Header, Method, server as http};
-use skein_json::tokenizer::{self as json, Tokenizer};
-use skein_lib::stream::{Down, Read, Up};
-use skein_lib::{Env, Id, List, Queue, ReplyTo, Token, bytes};
-use temper_fake_forge_domain::{self as domain, api};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document,
     failure::Refusal,
     request::{self, Request},
     server as documents,
 };
+use skein_http::{Header, Method, server as http};
+use skein_json::tokenizer::{self as json, Tokenizer};
+use skein_lib::stream::{Down, Read, Up};
+use skein_lib::{Env, Id, List, Queue, ReplyTo, Token, bytes};
+use temper_fake_forge_domain::{self as domain, api};
 pub const MAX_UP: u32 = 3;
 pub const MAX_DOWN: u32 = 18;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -60,7 +60,7 @@ impl Server {
             || limits.connections == 0
             || limits.raw_bytes == 0
             || json::largest_demand(&limits.documents.json) > limits.http.read
-            || temper_forge_forgejo::limits::check(&limits.documents).is_err()
+            || skein_forge::forgejo::limits::check(&limits.documents).is_err()
         {
             return Err(Error::Limits);
         }

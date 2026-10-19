@@ -1,11 +1,11 @@
-use temper_codecs_world::forgejo;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     document::{ApiSettings, Document, MergeStyle, Repository, Row, User},
     id::ObjectFormat,
     request::Request,
     server::{self, Answer},
 };
+use temper_codecs_world::forgejo;
 fn repository() -> Repository {
     Repository {
         id: 1,

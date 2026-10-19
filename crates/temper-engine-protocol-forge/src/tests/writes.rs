@@ -3,8 +3,8 @@ use super::fixtures::{self, Harness};
 use crate::failure::{self, Asked, Classified, Drop};
 use alloc::boxed::Box;
 use skein_forge::api::{Answer, BranchCreation, Check, Error, Op, Verdict, Write};
+use skein_forge::forgejo::failure::Refusal;
 use skein_lib::{Duration, bytes};
-use temper_forge_forgejo::failure::Refusal;
 const ISSUE: &[u8] = br#"{"number":7,"state":"open","user":{"id":2,"login":"writer"},"labels":[],"updated_at":"2020-01-01T00:00:00Z","title":"title","body":"body"}"#;
 const COMMENT: &[u8] = br#"{"id":9,"user":{"id":2,"login":"writer"},"body":"body"}"#;
 const REVIEW: &[u8] = br#"{"id":11,"user":{"id":2,"login":"writer"},"state":"APPROVED","commit_id":"0100000000000000000000000000000000000000","body":"body","official":true,"dismissed":false}"#;
@@ -441,7 +441,7 @@ fn write_answers_with_another_object_format_are_uncertain() {
     for (name, write, code, body) in rows {
         let mut h = fixtures::known();
         let mut row = fixtures::specimen();
-        row.object_format = temper_forge_forgejo::id::ObjectFormat::Sha256;
+        row.object_format = skein_forge::forgejo::id::ObjectFormat::Sha256;
         h.known(fixtures::REPO, row);
         h.call(1, fixtures::REPO, Op::Write(write));
         response(&mut h, code, body);

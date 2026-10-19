@@ -35,13 +35,13 @@ fn pause_ends_at_the_deadline() {
 }
 #[test]
 fn a_listing_ends_as_the_rows_it_gathered_in_order() {
-    use temper_forge_forgejo::{
+    use skein_forge::forgejo::{
         decode::Step,
         document::{Document, Row},
     };
     let first =
-        temper_forge_forgejo::id::ObjectId { format: temper_forge_forgejo::id::ObjectFormat::Sha256, bytes: [1; 32] };
-    let second = temper_forge_forgejo::id::ObjectId { bytes: [2; 32], ..first };
+        skein_forge::forgejo::id::ObjectId { format: skein_forge::forgejo::id::ObjectFormat::Sha256, bytes: [1; 32] };
+    let second = skein_forge::forgejo::id::ObjectId { bytes: [2; 32], ..first };
     let mut gather = Gather::default();
     for head in [first, second] {
         assert!(matches!(

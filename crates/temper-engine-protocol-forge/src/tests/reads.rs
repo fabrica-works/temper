@@ -2,8 +2,8 @@
 use crate::reading;
 use alloc::boxed::Box;
 use skein_forge::api;
+use skein_forge::forgejo::document as d;
 use skein_lib::{Time, Wall};
-use temper_forge_forgejo::document as d;
 
 #[test]
 fn revisions_and_provenance_follow_the_body_and_its_times() {
@@ -141,7 +141,7 @@ fn an_owner_is_read_as_admin() {
 
 #[test]
 fn an_object_id_must_match_its_repositorys_format() {
-    use temper_forge_forgejo::id::{ObjectFormat, ObjectId};
+    use skein_forge::forgejo::id::{ObjectFormat, ObjectId};
     for (name, from, repository, expected) in [
         ("sha1", ObjectFormat::Sha1, ObjectFormat::Sha1, Some([0; 32])),
         ("sha256", ObjectFormat::Sha256, ObjectFormat::Sha256, Some([0; 32])),

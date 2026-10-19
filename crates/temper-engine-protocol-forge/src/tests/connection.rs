@@ -6,11 +6,11 @@ use crate::{
     plan::Range,
 };
 use alloc::boxed::Box;
+use skein_forge::forgejo::request;
 use skein_lib::{
     Duration, Time, Wall,
     stream::{Fault, Up},
 };
-use temper_forge_forgejo::request;
 
 #[test]
 fn the_capped_buffer_doubles_and_refuses_a_write_past_its_cap() {
@@ -63,8 +63,8 @@ fn a_json_response_is_decoded_through_its_body_end() {
     );
     assert_eq!(
         heard.get(1),
-        Some(&Heard::Done(crate::connection::Body::Document(temper_forge_forgejo::document::Document::User(
-            temper_forge_forgejo::document::User {
+        Some(&Heard::Done(crate::connection::Body::Document(skein_forge::forgejo::document::Document::User(
+            skein_forge::forgejo::document::User {
                 id: 2,
                 login: Box::from(&b"writer"[..]),
                 is_admin: false,
@@ -245,8 +245,8 @@ fn raw_request() -> request::Request {
     request::Request::Raw {
         at: request::Repo { owner: Box::from(&b"fixture"[..]), name: Box::from(&b"specimen"[..]) },
         path: Box::from(&b"file"[..]),
-        reference: temper_forge_forgejo::id::ObjectId {
-            format: temper_forge_forgejo::id::ObjectFormat::Sha1,
+        reference: skein_forge::forgejo::id::ObjectId {
+            format: skein_forge::forgejo::id::ObjectFormat::Sha1,
             bytes: [0; 32],
         },
     }
@@ -362,7 +362,7 @@ fn a_tail_read_past_body_bytes_in_is_malformed_and_closes() {
     let heard = h.answer(&fixtures::ok(b"abcdefghi"));
     assert_eq!(
         heard.last(),
-        Some(&Heard::Done(crate::connection::Body::Malformed(temper_forge_forgejo::decode::Malformed::Bound {
+        Some(&Heard::Done(crate::connection::Body::Malformed(skein_forge::forgejo::decode::Malformed::Bound {
             field: b"log"
         })))
     );

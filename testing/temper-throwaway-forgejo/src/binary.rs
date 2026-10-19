@@ -1,11 +1,11 @@
 use crate::{Failure, Instance, Settings};
+use skein_forge::forgejo::pin::names_forgejo;
 use std::{
     fmt::Write,
     fs,
     path::{Path, PathBuf},
     process::Command,
 };
-use temper_forge_forgejo::pin::names_forgejo;
 #[derive(Debug, Clone)]
 pub struct Forgejo {
     binary: PathBuf,

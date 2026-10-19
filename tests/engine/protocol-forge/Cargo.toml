@@ -11,7 +11,6 @@ skein-forge.workspace = true
 skein-lib.workspace = true
 skein-http.workspace = true
 skein-json.workspace = true
-temper-forge-forgejo.workspace = true
 skein-io.workspace = true
 skein-tls.workspace = true
 skein-world.workspace = true

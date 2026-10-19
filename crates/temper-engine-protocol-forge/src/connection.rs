@@ -1,7 +1,7 @@
 //! Forge connection (protocol/forge.md, sections 3 and 8).
 use alloc::boxed::Box;
+use skein_forge::forgejo::{decode, document, header};
 use skein_lib::{Duration, Wall};
-use temper_forge_forgejo::{decode, document, header};
 
 /// A forge connection's state; the component arms its deadline.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -75,13 +75,13 @@ use crate::{
     plan::Range,
     settings::{Forge, Transport},
 };
+use skein_forge::forgejo::{client as documents, request};
 use skein_http::client as http;
 use skein_json::tokenizer;
 use skein_lib::{
     Env, List, Queue, Time, Token, Writer, bytes,
     stream::{Down, Read, Up},
 };
-use temper_forge_forgejo::{client as documents, request};
 /// One exchange's response body state.
 #[derive(Debug)]
 enum Receiving {
@@ -446,7 +446,7 @@ impl Connection {
     }
     fn response(&mut self, env: &Env<Limits>, response: http::Response) {
         let date = match response.header(b"Date") {
-            Some(date) => temper_forge_forgejo::time::http_date(date),
+            Some(date) => skein_forge::forgejo::time::http_date(date),
             None => None,
         };
         let retry_after = match response.header(b"Retry-After") {

@@ -1,13 +1,13 @@
 //! Every non-table route is exactly one call to the fake domain.
 use crate::Config;
 use alloc::boxed::Box;
-use skein_lib::{Decimal, List, Time, Wall, Writer};
-use temper_fake_forge_domain::api::{self as a, Op, Read, Write};
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     document as d,
     id::{ObjectFormat, ObjectId},
     request::{self as r, Request},
 };
+use skein_lib::{Decimal, List, Time, Wall, Writer};
+use temper_fake_forge_domain::api::{self as a, Op, Read, Write};
 
 /// A fake's commit count in Forgejo's SHA-1 spelling.
 #[must_use]
@@ -137,7 +137,7 @@ fn uid(config: &Config, login: &[u8]) -> Option<u64> {
         }
     }
     if let Some(digits) = login.strip_prefix(b"u") {
-        return temper_forge_forgejo::id::unsigned(digits);
+        return skein_forge::forgejo::id::unsigned(digits);
     }
     None
 }

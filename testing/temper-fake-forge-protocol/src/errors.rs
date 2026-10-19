@@ -1,8 +1,8 @@
 //! Forgejo's status and refusal vocabulary for the fake's failures.
 use crate::Route;
+use skein_forge::forgejo::failure::{self, Refusal};
 use skein_lib::Time;
 use temper_fake_forge_domain::api::{Error, What};
-use temper_forge_forgejo::failure::{self, Refusal};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Failure {
     pub status: u16,

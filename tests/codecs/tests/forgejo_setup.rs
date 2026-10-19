@@ -1,13 +1,13 @@
 mod fixtures;
-use std::boxed::Box;
-use temper_codecs_world::forgejo;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     decode::Malformed,
     document::{Access, Document, Row},
     request::{Method, Request},
     server::{self, Answer},
 };
+use std::boxed::Box;
+use temper_codecs_world::forgejo;
 #[test]
 fn setup_requests_encode_as_the_tool_sent_them() {
     let limits = forgejo::profile_limits();
@@ -104,8 +104,8 @@ fn refused_answer(case: &str, status: u16, message: &[u8]) {
     assert_eq!(transcript.status, status);
     assert_eq!(
         forgejo::decode_answer(client::error_decoder(&limits), &transcript.body, &limits).document,
-        Ok(Document::Error(temper_forge_forgejo::document::ErrorBody {
-            message: temper_forge_forgejo::document::Body::Kept(Box::from(message)),
+        Ok(Document::Error(skein_forge::forgejo::document::ErrorBody {
+            message: skein_forge::forgejo::document::Body::Kept(Box::from(message)),
         }))
     );
 }
@@ -228,7 +228,7 @@ fn a_deleted_tokens_refusal_is_read_with_its_masked_value() {
 
 struct OrgAnswer {
     case: &'static str,
-    request: temper_forge_forgejo::request::Request,
+    request: skein_forge::forgejo::request::Request,
     document: Document,
     rows: Vec<Row>,
     answer: Answer,

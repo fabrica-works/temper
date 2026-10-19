@@ -1,6 +1,4 @@
-use skein_lib::Wall;
-use temper_codecs_world::forgejo;
-use temper_forge_forgejo::{
+use skein_forge::forgejo::{
     client,
     decode::Malformed,
     document::{
@@ -10,6 +8,8 @@ use temper_forge_forgejo::{
     request::Request,
     server::{self, Answer},
 };
+use skein_lib::Wall;
+use temper_codecs_world::forgejo;
 fn review(id: u64, state: ReviewState, official: bool, dismissed: bool, key: &[u8]) -> Review {
     Review {
         id,
@@ -247,7 +247,7 @@ fn open_pulls_rows_are_the_pull_transcripts_documents() {
     assert_eq!(decoded.rows, expected);
     assert!(forgejo::shape(&bytes).is_subset(&forgejo::shape(&body)));
     let encoded = client::encode(&request, &forgejo::limits()).expect("request");
-    assert_eq!(encoded.method, temper_forge_forgejo::request::Method::Get);
+    assert_eq!(encoded.method, skein_forge::forgejo::request::Method::Get);
     assert_eq!(&*encoded.target, b"/api/v1/repos/fixture/specimen/pulls?state=open&sort=oldest&page=1&limit=2");
     let server::Route::Ready(routed) =
         server::route(encoded.method, &encoded.target, &forgejo::limits()).expect("route")
@@ -257,7 +257,7 @@ fn open_pulls_rows_are_the_pull_transcripts_documents() {
     assert_eq!(routed, request);
 }
 
-fn open_pulls() -> (Vec<u8>, Vec<temper_forge_forgejo::document::PullRequest>) {
+fn open_pulls() -> (Vec<u8>, Vec<skein_forge::forgejo::document::PullRequest>) {
     let mut body = vec![b'['];
     let mut pulls = Vec::new();
     for (i, case) in ["pull", "pull-merged"].into_iter().enumerate() {

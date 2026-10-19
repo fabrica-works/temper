@@ -271,7 +271,7 @@ fn zero_documents_and_stacked_demands_are_refused_in_order() {
             "document depth",
             Limits { depth: 7, ..l },
             s,
-            Unusable::Documents(temper_forge_forgejo::limits::Problem::Depth),
+            Unusable::Documents(skein_forge::forgejo::limits::Problem::Depth),
         ),
         (
             "HTTP over TLS",

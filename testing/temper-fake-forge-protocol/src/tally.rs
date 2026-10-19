@@ -1,7 +1,7 @@
 //! Requests counted at their HTTP entrance (protocol/forge.md, section 9).
 use skein_lib::Map;
 pub(crate) const ROUTES: u32 = 64;
-use temper_forge_forgejo::request::Request;
+use skein_forge::forgejo::request::Request;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Route {
     Org,

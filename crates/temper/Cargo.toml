@@ -11,11 +11,11 @@ name = "temper"
 path = "src/main.rs"
 
 [dependencies]
+skein-forge.workspace = true
 jig-client-protocol-link.workspace = true
 temper-service.workspace = true
 temper-box.workspace = true
 temper-forge-setup.workspace = true
-temper-forge-forgejo.workspace = true
 temper-forge-setup-shell.workspace = true
 temper-client-shell-terminal.workspace = true
 skein-ui.workspace = true
