@@ -731,6 +731,30 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 138. **temper repin: jig repinned again past live-text's smith** (design, temper-repin's block of 2026-10-19 11:25:37 UTC).
      Not a question for the user: smith's live-text plan settles it (its README, "Repin": "jig and temper take this plan's skein and smith at the tools plan's closing jig-repin and temper-repin, with `live: None` in the start, an ignored `OpenEvent::Live`, and jig's four `smith_channel::v3` paths", from its decisions.md, answer 4, and "For the user" 9). Our `jig-repin` landed (jig 2f9c5f00, 08:28:45Z) before live-text's smith did (smith f925b180, 09:34:54Z, "Carry the host's live ask over channel version three", to cd76fb64), so jig's `main` pins smith 137a1cb4 and does not build at smith's `origin/main`. The supervisor adds a step, `jig-repin.s1` (development.md, 5.7, "The supervisor may add one earlier"): in a jig worktree at `origin/main`, it moves jig's skein and smith, together, to their `origin/main` (`heavy cargo update -p smith-channel`, then the skein package), runs `heavy cargo check --workspace --all-targets` and repairs what breaks the way live-text's own commits repaired smith's: `smith_channel::v2` becomes `smith_channel::v3` in `testing/jig-test-service/src/tests/fixtures.rs`, `tests/core/src/agents_tools.rs`, `tests/core/src/protocol.rs` and `tests/ops/src/conformance/scripts.rs`; each start takes `live: None`; `OpenEvent::Live` is ignored in `testing/jig-test-service/src/worker_route.rs`'s two matches, as `Opened` is. It lands with jig's gate, within 5.7's 200 lines and no change of design; a break past that is a question. `temper-repin` then starts again from temper's `origin/main`, moves skein, smith and jig to their `origin/main`, and makes the same two adaptations in temper (`crates/temper-service/src/worker_route.rs`, and each start). Refresh any further copy that the check names, and list it in the commit body.
 
+139. **Done when 13: temper's fuzzy aim missed** (Done when run of 2026-10-19T11:52:47Z).
+     Done when 13 misses one aim, for the user; the run is done either way, as
+     the item says. Measured once at `origin/main` on debian-16gb-hel1-1,
+     2026-10-19T11:52:47Z (done.md, "Done when, run 2026-10-19T11:52:47Z"):
+     temper's fuzzy suite, 50 tests, took 8.790 s, 9.210 s and 9.681 s, a median
+     of 9.210 s against the Pulse's 8 s. The other three aims are met: jig
+     focused 5.404 s (7 s), jig fuzzy 6.993 s (8 s), temper focused 3.501 s
+     (5 s).
+
+     Its three slowest tests, from one more fuzzy run (7.860 s) at
+     2026-10-19T11:57:17Z:
+     - `temper-engine-domain-world::fuzzy_walking
+       fuzzy_walking_commit_cuts_latency_replay_and_observation_pressure`,
+       7.859 s;
+     - `temper-conformance-world::fuzzy_shared
+       a_changed_judge_is_crashed_at_every_commit`, 2.935 s;
+     - `temper-conformance-world::fuzzy_stories
+       a_ci_repair_is_crashed_at_every_commit`, 2.448 s.
+
+     The reason: the suite runs no longer than its slowest test, and the first
+     alone nearly fills the aim, so the suite is over it whenever that test runs
+     slow. No step is added: the item records the miss rather than fixing it,
+     and the retrospective weighs that test against the aim.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
