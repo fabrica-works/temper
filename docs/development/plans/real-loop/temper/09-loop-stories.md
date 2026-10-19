@@ -3,8 +3,8 @@
 temper 08's world, with the stories of more than one call or run
 (tools.md, 11.3; testing.md, 2.4): a restart keeps the work (09.1); a
 lost answer reached under its name (09.2); DIRECTORY's lock (09.3).
-Each is smoke, one path per feature; its corner cases are proved where
-they belong (ruling 130). It extends 08's crate, fixtures and
+Each is smoke, one path per feature; its corner cases are tested in the
+lower world that owns them (testing.md, 2.4; ruling 130). It extends 08's crate, fixtures and
 steps by name, never redefines them.
 
 Needs at start: temper 08's world (08.1 to 08.4). Each increment names

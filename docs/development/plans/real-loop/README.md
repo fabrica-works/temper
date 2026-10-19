@@ -127,6 +127,13 @@ plan's own.
   extended by temper 09 and 13 and never redefined; a story builds its
   loop with the world's helpers, and a helper two stories need is the
   world's, said in the commit body.
+- **The real loop is smoke** (testing.md 2.4; ruling 130): one
+  end-to-end path per feature. A behaviour or corner case a step meets
+  is tested in the lower world that owns it (2.4 names the accounts'
+  owners), never in `tests/real-loop`; a real-loop test outside 2.4's
+  stories and the steps' Scopes is a question (development.md, 10.1),
+  raised before it is written. This rule replaces none; the steps' Scopes
+  stay as ruling 130 left them.
 - **A story's cost is understood, never hidden** (testing.md 6.1). Each
   increment that adds a real-loop story runs it alone, unoptimized,
   three times, and gives the median wall time in its commit body. A story

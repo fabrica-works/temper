@@ -137,7 +137,10 @@ behind the simulator (3.2).
 (testing-strategy.md, 2.8). One test process, one thread and one loop
 drive the standalone service, its agents, its clients and its fake peers
 over one real io_uring ring. This tier checks temper's assembled stack
-on the real kernel in the focused suite, within its budgets (6.1).
+on the real kernel in the focused suite, within its budgets (6.1). It is
+smoke, the testing pyramid's top, a way to climb in confidence: one
+end-to-end path per feature, and each behaviour and corner case tested
+in the lower world that owns it, never here.
 
 - **What runs:** `temper-service`'s system module, with the engine,
   store and one worker as standalone runs them; smith's agent hosts;
@@ -161,12 +164,15 @@ on the real kernel in the focused suite, within its budgets (6.1).
   the one-process world wherever they apply. Backend setup supplies
   real descriptors, directories and time here. The real loop replays
   neither the simulator's schedule nor its crashes and power losses.
-- **The stories:** sign-in, a scripted chat and reply, a wait satisfied by
-  another client, and a drained shutdown; a service restarted on the same
-  directory that retains the work; a call whose answer was lost, retried
-  under its named key and made once (../client/tools.md, 11.3); the
-  forge's API stories, and stories that clone, push or land, on the fake
-  git program (below).
+- **The stories,** one end-to-end path each: sign-in, a scripted chat
+  and reply, a wait satisfied by another client, and a drained shutdown;
+  a service restarted on the same directory that retains the work; a
+  call whose answer was lost, asked again under its named key and made
+  once; two acts on one DIRECTORY taking `temper ctl`'s lock in turn,
+  and a signed-in DIRECTORY private to its user (../client/tools.md,
+  11.3); a repository adopted, a hooked repository's webhook delivered,
+  and a chat's change cloned, pushed and landed on the fake git program
+  (below).
 - **An account first,** with area 5's tools (../client/tools.md, 5.5):
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be
@@ -176,29 +182,46 @@ on the real kernel in the focused suite, within its budgets (6.1).
   `handed_in` file of the configuration the test writes, the engine's
   handed-in account.
 - **LLM accounts' stories** (../protocol/credentials.md, section 7),
+  one path per source beside the key every story adds first (above),
   each scripted on the fake peers, never by chance:
   - **a sign-in:** on skein's fake issuer, the engine's redirect
     listener on a port the kernel assigns, and the redirect driven by
     the test, as a browser would; the account usable, then a run whose
     credential the fake LLM peer observes as that account's, by its
-    scheme, never its value; a sign-in refused, and one past its
-    deadline, each settled with no account usable;
-  - **limited, refused and unauthorized:** a scripted turn answering
-    with the provider's failure (exhausted with a reset and without,
-    refused, unauthorized), the run's notice reaching jig's accounts
-    child, and the account's state following (jig's
-    `domain/accounts.md`, 3.5); the next task waits for its account
-    (jig's `domain/authority.md`, 8.3) and runs once the reset passes,
-    or once `retry` is asked; a notice of a fenced attempt dropped;
+    scheme, never its value;
   - **a program's source:** declared from the client, smith's fake
     `claude` scripted signed in, the source verified, and a run through
     smith's program backend calling host tools the engine decides as a
-    direct run's; a usage limit the fake reports making the source
-    limited, and a login lost making it need sign-in (smith's
-    `protocol/programs.md`, 5.6);
+    direct run's;
   - **after each:** no key, token or record's value in the engine's
     store, a fact, a request, an answer, a trace, the client's small
     store or a printed page (../protocol/credentials.md, section 7).
+- **The accounts' cases are tested below,** each in the world that owns
+  it:
+  - **a sign-in refused, and one past its deadline,** each settled with
+    no account usable: `tests/client`, its answer scripted
+    (../client/tools.md, 11.2); the issuer's side in skein's OAuth
+    worlds (skein's `oauth.md`, sections 3 and 6.8) and jig's protocol
+    world (jig's `protocol/llm.md`, section 8);
+  - **a turn limited (exhausted with a reset and without), refused or
+    unauthorized,** and the account's state following (jig's
+    `domain/accounts.md`, 3.5): jig's protocol world, "failures of each
+    class" and "a source limited and resumed" (jig's `protocol/llm.md`,
+    section 8), and jig's accounts world (jig's `domain/testing.md`,
+    section 3); the next task waiting for its account until the reset
+    passes (jig's `domain/authority.md`, 8.3): jig's core world (jig's
+    `domain/testing.md`, section 4); in temper, the limited notice, the
+    next task waiting with `task N` saying why, then `retry` and the run
+    started: `tests/client` (../client/tools.md, 11.2);
+  - **a fenced attempt's notice dropped:** jig's fleet world, "Attempts
+    are fenced" (jig's `domain/engine.md`, section 8; jig's
+    `domain/testing.md`, section 3);
+  - **a program source's usage limit and its lost login** (smith's
+    `protocol/programs.md`, 5.6): smith's world over its fake `claude`
+    (smith's `protocol/programs.md`, section 8), relayed as limited and
+    as unauthorized in jig's channel world (jig's `protocol/channel.md`,
+    section 12); `verify` answered as each host reports: `tests/client`
+    (../client/tools.md, 11.2).
 - **Checks between iterations** are the strategy's for the real loop
   (testing-strategy.md, 2.8 and section 6), with the lower worlds'
   outside expectations; real deadlines bound waits, and the fake peers
@@ -250,10 +273,11 @@ on the real kernel in the focused suite, within its budgets (6.1).
     one; the story asserts that a piece it read is a prefix of the
     committed turn's text.
 
-Most behavioural cases remain in the domain and system worlds. This
-tier keeps a few stories of transport, persistence and lifecycle, within
-6.1's budgets. `temper ctl`'s lock and DIRECTORY's files run here
-(../client/tools.md, 11.3). The process tier keeps executable startup, CLI
+What only the real kernel shows is this tier's: transport, persistence
+and lifecycle, `temper ctl`'s lock and DIRECTORY's files
+(../client/tools.md, 11.3), within 6.1's budgets. A failure found here
+is rerun lower down as a scenario, where it replays (testing-strategy.md,
+2.8). The process tier keeps executable startup, CLI
 parsing, exit statuses, OS process launch and signal handling, the
 owned Forgejo and runner, and production's containment (section 6).
 
@@ -577,8 +601,9 @@ skein's (skein's `fake-llm.md`):
 - **Claude Code** is smith's fake `claude` (smith's
   `protocol/programs.md`, section 8), at the path the agent's
   configuration gives, scripted per story, with usage limits and a
-  login lost. The real loop runs it under smith's agent hosts, and the
-  process tier under `temper agent` and `temper program-login` (2.6).
+  login lost, which smith's and jig's worlds test (2.4). The real loop
+  runs it signed in, under smith's agent hosts, and the process tier
+  under `temper agent` and `temper program-login` (2.6).
 - **What temper's stories need of them** is skein's and smith's to
   design (skein's `fake-llm.md`, and skein's `oauth.md`, section 5;
   smith's `protocol/programs.md`, section 8); temper's stories code

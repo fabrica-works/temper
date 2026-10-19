@@ -850,6 +850,9 @@ harness's:
 - **The boundary:** `src/jig/` names no temper item (section 4).
 - **The bounds:** each of the tools' ceilings within the client's limit
   it reads from (section 12).
+- **DIRECTORY's records,** in `temper-client-shell-cli`'s tests: a
+  record of a store version the tools do not read counted by `pending`,
+  and the next call that sends saying it dropped it.
 
 ### 11.2 `tests/client`
 
@@ -890,9 +893,7 @@ settled. Then a service restart retains the work. A call whose answer was
 lost is made once: the tools' root is dropped once the engine holds its
 request, before its answer, and a fresh one, on another DIRECTORY signed
 in as the same party, asks under the same name and is answered the first
-answer; the party has one chat. A DIRECTORY whose store holds a record of
-a store version the tools do not read: `pending` counts it, and the next
-call that sends says it dropped it. One signed in again as another party:
+answer; the party has one chat. One signed in again as another party:
 the first party's kept request stays unsent, and the call goes on. The
 forge's stories adopt a repository, and clone, push and land through the
 fake git program on the shared in-memory fake forge, with CI by the fake
@@ -915,10 +916,6 @@ stories (`../domain/testing.md`, 2.4):
   visit and the redirect to the engine's loopback listener driven by the
   test, then `wait accounts --until settled`, the account usable, and a
   run on it whose request the peer observes with its bearer.
-- **A limit:** a scripted turn answering with the provider's exhausted,
-  with a reset, makes the source limited, and the next task waits for
-  its account (jig's `domain/authority.md`, 8.3); `retry`, then `wait
-  task N --until phase:running`.
 - **A program's login:** `declare`, with smith's fake `claude` as the
   agent's program, its login signed in in the source's directory under
   the agent's programs directory; `verify`, then `wait accounts --until
@@ -936,11 +933,14 @@ serialized by the lock: skein's `Lock` is `flock`, held per open
 descriptor (skein's `kernel.md`), so two programs of one process contend
 as two processes do.
 
-These are a small set of focused tests at the gate. They reuse lower
-worlds' scripts and outside expectations where applicable, and add
-checks of the full transport, persistence and teardown on the real
-kernel. Most tool behaviour stays in `tests/client`; the harness checks
-memory ownership, outstanding operations and release between iterations.
+These are smoke, one end-to-end path per feature, at the gate
+(`../domain/testing.md`, 2.4). A tool's behaviour and corner cases are
+`tests/client`'s (11.2) and the lower worlds' (11.1): a sign-in refused
+or past its deadline, a limit and `retry`, a record the tools do not
+read. These stories reuse lower worlds' scripts and outside expectations
+where applicable, and add checks of the full transport, persistence and
+teardown on the real kernel; the harness checks memory ownership,
+outstanding operations and release between iterations.
 A real-loop failure is kept with its trace and reproduced lower down
 where possible; its seed does not replay the kernel's schedule.
 

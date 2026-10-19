@@ -7,7 +7,9 @@ webhooks reach it at the address the world learns from io (decisions.md,
 change, CI by the content cue (testing.md, 2.4; tools.md, 11.3). It
 extends temper 08's world and fixtures, never redefining them; stories
 without the forge keep 08's unserved forge (decisions.md, 8). No temper
-forge host: draft 07 is dropped.
+forge host: draft 07 is dropped. Each story is smoke, one path per
+feature; its corner cases are tested in the lower world that owns them
+(testing.md, 2.4; ruling 130).
 
 Needs at start: temper 08; forge-kit's skein-05.5 (the forge peer's
 delivery; landed, inside the start pin) and forge-kit's temper-05.2 (fake git's `Transport` on the
@@ -44,8 +46,9 @@ as landed. Steps: `temper-13.1` to `temper-13.5`.
   ports the kernel assigns. 13.2, 13.5.
 - **testing.md 4.3:** fake git runs on the files it is given; here, the
   real filesystem's, measured first. 13.1.
-- **tools.md 6.3 and client/README 4.7:** adopted exits 0, not found
-  exits 2, each in 4.7's words. 13.4.
+- **tools.md 6.3 and client/README 4.7:** adopted exits 0, in 4.7's
+  words. 13.4. Not found, exit 2, is the tools' and `tests/client`'s
+  (13.4; ruling 130).
 - **domain/forge.md 8.2:** a merge lands the change and closes its task.
   13.5. **testing.md 6.1:** a real-loop story aims at 1 s.
 
