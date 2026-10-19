@@ -232,7 +232,13 @@ Scope: `temper ctl`'s host hosted per call: a sign-in, a `chat` act
 whose task runs on a hosted agent, then reads until the reply, with no
 provisional text before it (tools.md, 5.2, 5.3, 5.6, 8.1, 11.3).
 Needs: temper 05's reads (decisions.md, 5), its `sign-in` and its `chat`
-act (05.2 to 05.4), and temper-05.s1's FILE root (ruling 111).
+act (05.2 to 05.4), temper-05.s1's FILE root (ruling 111), and
+`temper-service` taking a peer's end, during a call it handed jig's
+engine end, as the call's end (`client/README.md`, section 8, from the
+designer's answer of 2026-10-19): the supervisor's step before 08.3
+lands. Each call's stream is then free once its process exits, so the
+story's calls, one after another, stay within the small profile's two
+streams.
 Files: `tests/real-loop/src/{calls.rs, world.rs, fixtures.rs, lib.rs}`,
 `tests/real-loop/tests/tools.rs`, `tests/real-loop/Cargo.toml`.
 Shape:
@@ -275,7 +281,9 @@ DIRECTORY is 0700, `token` and `address` 0600, each owned by the
 effective user (tools.md, 8.1).
 Proof: joint, as 08.2's.
 Don't: pass a descriptor of DIRECTORY to the host; retry a lock or
-end a call in the caller (temper 05's); read the link from argv.
+end a call in the caller (temper 05's); read the link from argv; raise
+`CALLS_AT_ONCE`, the profile's streams or the heartbeat, or wait in the
+caller, for a stream an ended call held (ruling 118).
 Size: at most ~200 lines of `tests/real-loop/src`, counted as 08.1.
 Removes: nothing.
 

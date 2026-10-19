@@ -686,6 +686,14 @@ temper ctl help [TOOL]
   other call.
 - **`--call FILE`** reads one call as JSON, `{"tool": ..., "arguments":
   {...}}`, from FILE, or from stdin for `-`.
+- **A call `--call` reads gives no argument of the type a file** (5.1),
+  a path or `-`: one that does is a usage error, exit 1, once the call
+  is decoded and before DIRECTORY opens. So `sign-in`, and each tool
+  of areas 3 to 5 that reads or writes a FILE, is called from its
+  arguments. A call opens a FILE only beneath a root its start opened
+  before the loop, the directory of the FILE its arguments name, and
+  `--call`'s call is decoded on the loop, from FILE or from stdin
+  alike.
 - **`sign-in FILE|-`** signs in by the link `temper serve` printed, read
   from FILE or stdin and never an argument (section 9), on loopback, and
   writes the token and the address the link names, as `temper open`
@@ -719,6 +727,15 @@ as the terminal's host is:
 6. print the result on stdout, close the stream, exit with the call's
    status.
 
+- **A call's stream ends with its connection.** Step 6's close ends the
+  stream's connection, and so does the kernel when the process ends any
+  other way. The clients' listener takes the peer's end as the call's
+  end (`README.md`, section 8), and the engine ends the stream then, not
+  at its next heartbeat. So a call holds one of the engine's streams,
+  which its profile bounds (jig's `protocol/client.md`, section 13),
+  only while its process runs, and calls that run one after another
+  never wait on their predecessors' streams. A read or a wait sends no
+  stream gone itself (8.3).
 - **A termination signal,** `SIGINT` or `SIGTERM`, arrives as skein's
   `Shutdown` (skein's `io.md`, section 7), and ends the call at once:
   it sends nothing more, leaves DIRECTORY's kept requests as they are,

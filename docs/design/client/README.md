@@ -1033,6 +1033,15 @@ does for the client:
   the prefix `/jig` (jig's `protocol/service.md`, section 2). Every
   other path is answered not found, the browser's page and bundle aside,
   when the configuration names a bundle (`browser.md`, 2.2).
+- **A client's leaving, on the listener.** `temper-service` reads each
+  connection's events below skein's server. When the peer ends a
+  connection before its call is finished, it aborts the connection, as
+  it does one that fails, and the call's owner hears the connection
+  closed: for a call under `/jig`, jig's engine end, which takes it as
+  the call's end (jig's `protocol/client.md`, 17.4: "A peer's end is
+  the call's end"). So a stream ends when the client closes it or its
+  process ends, and its room among the profile's streams is free for
+  the next call at once (`tools.md`, 8.2).
 - **The printed link opened in a browser:** a `GET` of the link's route
   spends nothing, and the mapping leaves it to the application's page
   (jig's `protocol/browser.md`, section 11). With a bundle, temper's
