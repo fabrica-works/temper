@@ -161,7 +161,8 @@ Needs: skein 01.3's plans, Bounds, exchange vocabulary, tables and marker.
 Files: component src/{lib,component,component/calls,connection,limits,
   settings,conventions,hooks,hooks/connection,tests,tests/fixtures,
   tests/connection,tests/reads,tests/writes,tests/contents,tests/hooks}.rs;
-  temper-service src/{forge,settings,tests/forge}.rs; manifests/Cargo.lock.
+  temper-service src/{forge,settings,tests/forge}.rs; manifests/Cargo.lock;
+  docs/examples/owned.json; crates/temper/tests/startup.rs (existing proof).
   Change direct Settings builders in component src/tests/fixtures.rs,
   tests/engine/protocol-forge/src/fixtures.rs and
   tools/forgejo-conformance/src/component/hosted.rs.
@@ -179,14 +180,15 @@ Shape: import `skein_forge::forgejo::plans::{Body,Fields,Heard,Failure}`
   Bounds mirrors page_size:u32, rows:u32, answer_bytes:u32, body_bytes:u32.
   Preserve cost accounting at written && !charged; Done carries only result.
   Add the owned word to Settings; service hands b"temper", as do every fixture
-  and conformance builder. The complete changed boundary (01.4 replaces Forge):
+  and conformance builder. Use settings.rs's existing Box and List imports
+  in these boundaries. The complete changed boundary (01.4 replaces Forge):
 ```rust
 // temper_engine_protocol_forge::settings
 /// Owner inputs held until the component closes.
 pub struct Settings {
-    pub forges: skein_lib::List<Forge>,
+    pub forges: List<Forge>,
     pub webhooks: Option<crate::hooks::Webhooks>,
-    pub word: alloc::boxed::Box<[u8]>,
+    pub word: Box<[u8]>,
 }
 ```
   Hooks::drive and Hooked::pump take &Settings instead of &Webhooks, so they
@@ -194,7 +196,13 @@ pub struct Settings {
   Hooked::verified(env: &Env<Limits>, word: &[u8]) passes it to
   `plans::hint::hint(forge, word, delivery)`. Keep response-before-hint order.
   Replace marker's 21 in limits::check by checked marker::length(word, op_bytes).
-  Price the held word (at most 16 bytes) in worst_case. Keep service's shipped
+  Price the held word (at most 16 bytes) in worst_case. After the complete
+  cutover, recompute docs/examples/owned.json's engine.memory_bytes through
+  temper-service/src/system.rs::startup_worst_case at the existing startup
+  fixture's bounds. The ready check's word-only sketch needed 32 bytes more
+  (16 inline and 16 held); measure the complete cutover rather than adopting
+  that sketch's literal. Refresh further copies and derived values found,
+  listing them in the commit body. Keep service's shipped
   temper body minimum 2*op_bytes+21. No new word refusal before skein 03.1.
   marker::hex stays private upstream: conventions::host and hook signature
   rendering use the same indexed hexadecimal digit expression locally.
@@ -243,7 +251,11 @@ Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at
   the step's start less 3 (four component tests leave, the owner unit
   enters) and its fuzzy count passed (1792 / 50 after 01.2's 1795 / 50 on
   the base), <15 s / <60 s.
-  The process proof follows 01.4's changed starts.
+Proof: joint; `heavy cargo nextest run -p temper --test startup
+  -E 'test(=serve_prepares_once_on_the_owned_example)'`: the existing
+  owned-example startup regression passes once after the complete cutover,
+  within the unchanged focused budget. The process proof follows 01.4's
+  changed starts.
 Don't: change call outcomes, page-size arithmetic, retry policy or user agent;
   duplicate Bounds/Heard/Body, move the component or its 68 Harness tests.
 Size: about 90 lines moved, 150 new.
@@ -257,14 +269,19 @@ Needs: skein 01.4's start::{Plan,Read,Step,Heard}, credential and host.
 Files: component src/{component,connection,start,settings,limits,conventions,
   tests,tests/fixtures,tests/connection}.rs; temper-service src/forge.rs;
   crates/temper/src/forge.rs; tests/engine/protocol-forge/src/fixtures.rs;
-  tools/forgejo-conformance/src/component/hosted.rs; manifests/Cargo.lock.
+  tools/forgejo-conformance/src/component/hosted.rs; manifests/Cargo.lock;
+  docs/examples/owned.json; crates/temper/tests/startup.rs (existing proof).
 Shape: replace start_request and drive_starts's request/document mapping
   with `skein_forge::forgejo::plans::start` Plan::new(Read::User/ApiSettings),
   begin and heard. Keep only the component's scheduling loop: bounded io,
   close/drain, wake, deadlines, identity check and backoff. Skein's plan
   does not drive sockets or time. One optional start plan per configured forge
   is created for each attempt; Done retires it before another attempt.
-  Price these holders in worst_case. Delete local start::Heard and import
+  Price these holders in worst_case. Recompute the owned example's
+  engine.memory_bytes through system::startup_worst_case after these changes,
+  as 01.3 does; the existing joint proof below includes
+  serve_prepares_once_on_the_owned_example. Refresh further copies and derived
+  values found, listing them in the commit body. Delete local start::Heard and import
   skein's; start::heard keeps (Start, Heard, user:u64, now:Time, &Limits)->Start.
   Starts remain outside call costs.
   Replace Forge.token with the upstream Credential; complete boundary:
@@ -276,7 +293,7 @@ pub struct Forge {
     pub kind: Kind,
     pub address: skein_io::Addr,
     pub transport: Transport,
-    pub host: alloc::boxed::Box<[u8]>,
+    pub host: Box<[u8]>,
     pub credential: skein_forge::credential::Credential,
     pub user: u64,
 }

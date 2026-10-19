@@ -328,6 +328,39 @@ where its answer lands.
      - Run kit numbers.sh graph_index, with root=/srv/data/git/runner/src: `graph_index skein` -> `srv-data-git-runner-src-skein current`; `graph_index temper` -> `srv-data-git-runner-src-temper current`.
      - Completed 2026-10-19T05:05:27Z. Existing malformed JSON transcripts remain direct-read coverage gaps in skein; no temper Rust parse gaps were reported.
 
+103. **temper 01's Shapes against main** (ready check of temper-01.1).
+     Reverses: nothing.
+     Amends: temper/01-forge.md, 01.3 and 01.4 Files, Shape and proof.
+
+     Temper 01's ready check corrects the Settings and Forge boundary sketches to
+     use settings.rs's existing Box and List imports. It adds docs/examples/owned.json
+     and its existing startup regression to 01.3/01.4's coverage. These increments
+     price newly held state in worst_case already; their complete cutovers must
+     refresh the derived engine.memory_bytes using system::startup_worst_case at
+     the existing startup fixture's bounds. The word-only sketch measured +32
+     bytes; that is evidence of the missed derived value, not a shipped literal
+     for either complete cutover. Refresh further copies and derived values found
+     and name them in the commit body.
+
+     The corrected runnable sketch passed clippy and both suites. The initial
+     32-byte shortfall is resolved by this plan correction; a concurrent focused
+     run's timeout cleared when run alone, within the existing budget. No suite
+     remains failing in the check, and no budget or ignore changes are authorized.
+     Missing skein symbols belong to the named upstream increments. The ready
+     check may be released while temper 01.1 continues to wait for the director's
+     tools/temper-01.1 dependency and its skein dependency.
+
+     ## Checked
+
+     - Check report: pump/ready-temper-01.md; starting origin/main skein 70cc62419296055c341a06f2d831d65306fb6d86, temper 10e5f18b84482c8620189e1b7200d86a18bcc42f.
+     - `git -C temper show origin/main:crates/temper-engine-protocol-forge/src/settings.rs | rg -n 'use alloc::boxed::Box|use skein_lib|pub (struct Settings|forges|host)'`: Box imported at 2, List/Secret at 4, Settings at 9, forges: List at 11, host: Box at 29.
+     - `git -C temper show origin/main:crates/temper-service/src/system.rs | rg -n 'fn startup_worst_case'`: 532: pub(crate) fn startup_worst_case(. Graph search independently located this function and the startup test.
+     - `git -C temper show origin/main:crates/temper/tests/startup.rs | rg -n 'fn serve_prepares_once_on_the_owned_example'`: 314; same-path baseline 1 PASS, corrected fixture passes too.
+     - `git -C temper show origin/main:docs/examples/owned.json | rg -n '78669036813526'`: 192, engine.memory_bytes.
+     - `rg -n 'serve_prepares_once_on_the_owned_example|78669036813526|78669036813558|startup_worst_case'` over temper, skein, smith, jig, hearth sources and examples: only temper's owned.json, startup test, system.rs and startup.rs caller. The check's downstream search found no affected users.
+     - Check's `heavy cargo nextest run --workspace`: sketch 69 passed/1 failed, corrected isolated 1,879 passed in 3.536 s, one skipped; corrected fuzzy 50 passed in 31.647 s. Clippy all targets passed.
+     - Kit plan line 22 documents `plan ready STEP [NOTE]`; existing Proof lines already use heavy cargo nextest. Recorded 2026-10-19T05:20:20Z.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
