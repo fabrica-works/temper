@@ -428,11 +428,11 @@ For jig's `docs/development/tech-debt.md`, and for temper and skein, which have 
 
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
+| 1 | adopted | |
+| 2 | adopted | |
+| 3 | adopted (M to Q go into tools.md in the design pass on hel8, 10-19) | |
+| 4 | adopted | |
+| 5 | adopted | |
+| 6 | adopted | |
+| 7 | adopted (the org rename to fabrig-dev makes it urgent) | |
+| 8 | adopted | |
