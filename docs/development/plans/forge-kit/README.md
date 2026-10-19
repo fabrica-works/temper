@@ -111,10 +111,6 @@ chain.
 
 ## Rules of this plan
 
-- **Primary code graphs temporarily unavailable:** do not use the skein or
-  temper graph until the supervisor confirms refreshed primary indexes in a
-  landed ruling. Search source with `rg` meanwhile and verify names in the
-  working checkout. This supersedes the graph permission of 2026-10-19T05:06:14Z.
 
 
 - **The tools plan runs beside this one,** on another machine, on the

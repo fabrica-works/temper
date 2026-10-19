@@ -454,6 +454,14 @@ where its answer lands.
 
      The scratch planned-value probe reproduces the absent prerequisite: two contents assertions fail, 52 versus 68, and the 4032-byte side remains accepted. Restored protocol baseline passes 117 focused tests; fuzzy selects none. Clippy passes for four reached packages, and the client/connector/client-world suites pass 130 focused and 2 fuzzy tests. Future key/measure implementations, actual migration/deletion, full joint/process/gate/browser proofs remain unrun until their declared steps. Evidence: pump/ready-temper-02.md and scratch-ready-temper-02/evidence/report.txt. This check does not hold any already running session.
 
+113. **Primary graphs refreshed** (hourly check of 2026-10-19T06:09:28Z).
+     Reverses: ruling 111 of 2026-10-19T06:21:24Z and its graph-restriction steer of 2026-10-19T06:22:09Z.
+     Amends: README, Rules of this plan, removing the temporary restriction.
+
+     Both exact primary-root indexes are refreshed and ready; the temporary graph restriction ends. Use the graphs for discovery and verify each name in the working checkout, as workspace AGENTS.md requires. The first temper refresh aborted before publication, preserving the earlier index; its retry succeeded. No implementation or start was held.
+
+     Checked codebase-memory-mcp index_status: srv-data-git-runner-src-skein is ready, root /srv/data/git/runner/src/skein, indexed_at 2026-10-19T06:22:53Z; srv-data-git-runner-src-temper is ready, root /srv/data/git/runner/src/temper, indexed_at 2026-10-19T06:25:11Z. git -C /srv/data/git/runner/src/skein log -1 --format='%H %cI' origin/main gives 7436461f0fce6d0178c483f3b631e1a4db5fc343 at 06:11:49Z; the same command for temper gives 280efe4fc91554f5fb226ea3c0b85090cb90b47b at 06:23:32Z. Both HEADs equal those origin/main commits; git diff --name-only HEAD origin/main -- crates testing tests tools Cargo.toml Cargo.lock prints nothing in both. Indexing postdates those snapshots. Preserve source searches for documented parser gaps and later worktree changes. The kit remains d6d4abe.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
