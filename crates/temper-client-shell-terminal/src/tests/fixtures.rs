@@ -323,7 +323,12 @@ pub fn page_words() -> temper_client_view::words::Words {
     static WORDS: std::sync::OnceLock<temper_client_view::words::Words> = std::sync::OnceLock::new();
     WORDS
         .get_or_init(|| {
-            temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, 32).expect("temper words fit")
+            temper_client_view::words::Words::english(
+                temper_client_protocol_wire::FORGE,
+                32,
+                temper_client_view::words::Shell::Terminal,
+            )
+            .expect("temper words fit")
         })
         .clone()
 }

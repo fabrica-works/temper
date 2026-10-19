@@ -281,6 +281,12 @@ impl Word {
         PhraseId { owner, number }
     }
 }
+/// The shell whose words the view says (client/browser.md, 2.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shell {
+    Terminal,
+    Browser,
+}
 #[derive(Clone, Debug)]
 pub struct Words {
     pub book: Phrasebook,
@@ -288,7 +294,7 @@ pub struct Words {
     pub connector: u16,
 }
 impl Words {
-    pub fn english(connector: u16, text: u32) -> Result<Words, Invalid> {
+    pub fn english(connector: u16, text: u32, shell: Shell) -> Result<Words, Invalid> {
         let joined = match text.checked_mul(2) {
             Some(bytes) => match bytes.checked_add(1) {
                 Some(bytes) => bytes,
@@ -299,7 +305,7 @@ impl Words {
         let mut shapes = List::with_capacity(320);
         let mut phrases = List::with_capacity(320);
         for word in ALL {
-            let (literals, kinds) = english(word);
+            let (literals, kinds) = english(word, shell);
             let mut holes = List::with_capacity(3);
             let mut segments = List::with_capacity(7);
             for (index, literal) in literals.iter().enumerate() {
@@ -389,7 +395,7 @@ impl Words {
         Some(most.max(crate::forge::words::capacity(self)?))
     }
 }
-fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
+fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
         Word::TaskHeader => (&[b"Task details"], &[]),
@@ -471,7 +477,10 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
         Word::Offline => (&[b"Offline"], &[]),
         Word::SignedOut => (&[b"Signed out"], &[]),
         Word::OutOfDate => (&[b"Out of date"], &[]),
-        Word::SignedOutMain => (&[b"Signed out."], &[]),
+        Word::SignedOutMain => match shell {
+            Shell::Terminal => (&[b"Signed out."], &[]),
+            Shell::Browser => (&[b"Signed out. To sign in, open a sign-in link temper serve printed."], &[]),
+        },
         Word::OutOfDateMain => (&[b"This temper is out of date: run the temper the engine runs."], &[]),
         Word::Connecting => (&[b"Connecting"], &[]),
         Word::Behind => (&[b"Behind"], &[]),

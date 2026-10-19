@@ -49,7 +49,14 @@ pub fn limits() -> Limits {
 }
 pub fn words() -> crate::words::Words {
     static WORDS: std::sync::OnceLock<crate::words::Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| crate::words::Words::english(FORGE, 64).expect("forge English fits")).clone()
+    WORDS.get_or_init(|| english(crate::words::Shell::Terminal)).clone()
+}
+pub fn browser_words() -> crate::words::Words {
+    static WORDS: std::sync::OnceLock<crate::words::Words> = std::sync::OnceLock::new();
+    WORDS.get_or_init(|| english(crate::words::Shell::Browser)).clone()
+}
+fn english(shell: crate::words::Shell) -> crate::words::Words {
+    crate::words::Words::english(FORGE, 64, shell).expect("forge English fits")
 }
 
 pub fn tree_limits() -> skein_ui::Limits {
@@ -126,8 +133,10 @@ pub fn built() -> crate::View {
     view
 }
 pub fn view() -> crate::View {
+    view_of(words())
+}
+fn view_of(words: crate::words::Words) -> crate::View {
     let domain = domain_limits();
-    let words = words();
     let limits = crate::Limits { tree: tree_limits() };
     crate::View::new(&limits, &domain, words, FORGE)
 }
@@ -698,6 +707,12 @@ pub mod chat {
 /// Build a page once for the status-only page tests.
 pub fn page_view(root: &temper_client_domain::Domain) -> crate::View {
     let mut view = view();
+    build(&mut view, root);
+    view
+}
+/// `page_view`'s, with the browser's words.
+pub fn browser_page_view(root: &temper_client_domain::Domain) -> crate::View {
+    let mut view = view_of(browser_words());
     build(&mut view, root);
     view
 }

@@ -108,6 +108,23 @@ fn signed_out_the_main_says_so_and_nothing_else() {
     assert_eq!(&*fixtures::main_text(view.tree()), b"Signed out.");
 }
 #[test]
+fn signed_out_the_browser_main_says_how_to_sign_in() {
+    let view = fixtures::browser_page_view(&fixtures::signed_out());
+    assert_eq!(
+        &*fixtures::main_text(view.tree()),
+        b"Signed out. To sign in, open a sign-in link temper serve printed.",
+    );
+}
+#[test]
+fn out_of_date_the_browser_main_keeps_its_words() {
+    let view = fixtures::browser_page_view(&fixtures::out_of_date());
+    assert_eq!(&*fixtures::main_text(view.tree()), b"This temper is out of date: run the temper the engine runs.");
+}
+#[test]
+fn the_browser_words_fit_the_views_limits() {
+    assert!(crate::Limits::of(&fixtures::domain_limits(), &fixtures::browser_words()).is_some());
+}
+#[test]
 fn signed_out_the_banner_says_the_links_state_alone() {
     let view = fixtures::page_view(&fixtures::signed_out());
     assert_eq!(fixtures::banner_statuses(view.tree()).as_ref(), [Box::from(*b"Signed out")]);

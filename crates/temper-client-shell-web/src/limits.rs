@@ -59,9 +59,12 @@ pub fn client() -> client::Limits {
 /// Checked words and the view bounds used at construction and accounting.
 #[must_use]
 pub fn view(client: &client::Limits) -> Option<(temper_client_view::Limits, temper_client_view::words::Words)> {
-    let words =
-        temper_client_view::words::Words::english(temper_client_protocol_wire::FORGE, client.client.domain.text)
-            .ok()?;
+    let words = temper_client_view::words::Words::english(
+        temper_client_protocol_wire::FORGE,
+        client.client.domain.text,
+        temper_client_view::words::Shell::Browser,
+    )
+    .ok()?;
     let view = temper_client_view::Limits::of(client, &words)?;
     Some((view, words))
 }

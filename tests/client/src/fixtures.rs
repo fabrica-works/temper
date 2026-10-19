@@ -68,7 +68,10 @@ pub fn phrasebooks(limits: &Limits) -> Books {
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
     books
         .entry(limits.client.domain.text)
-        .or_insert_with(|| view::words::Words::english(FORGE, limits.client.domain.text).expect("temper words fit"))
+        .or_insert_with(|| {
+            view::words::Words::english(FORGE, limits.client.domain.text, view::words::Shell::Terminal)
+                .expect("temper words fit")
+        })
         .clone()
 }
 #[must_use]
