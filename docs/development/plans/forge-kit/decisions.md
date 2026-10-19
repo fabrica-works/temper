@@ -1,0 +1,343 @@
+# forge-kit: decisions
+
+The decisions this plan rests on, numbered. The supervisor's rulings
+during the run follow them, from 101. Then the design's questions with
+their answers, and the choices left to the user. The user is away, and
+the director acts for them. The planner took each decision below as the
+planner's, choosing the most reversible option where the choice could
+be the user's (development.md, 10.4).
+
+## The plan's own
+
+1. **One crate per skein session, upstream first.** temper's design
+   (the forge kit's side, section 5) orders the work as skein-forge, the
+   client, the component, reconcile, then the fakes and the conformance.
+   The plan follows that order, and the last item takes five sessions:
+   skein 05 the fakes, skein 06 the throwaway, the conformance and the
+   dialect's document tests, skein 07 the client's and setup's worlds,
+   and skein 08 and 09 the component's worlds. Each skein session up to 06 is
+   followed by the temper session of its number, which repins and
+   deletes temper's copy (development.md 5.7); temper 07 deletes the
+   worlds that skein 07 to 09 moved. The component's worlds read the
+   conformance's transcripts and deliveries and drive the fake forge's
+   delivery, so they come after skein 05 and 06 (decision 23).
+
+2. **A copy follows temper's code onto skein's.** A skein step copies
+   temper's code from temper's `origin/main` at the step's start, and
+   only once that code already uses the skein crates moved before it.
+   For example, skein 02.1 copies the client after temper 01.1 has put
+   it on skein-forge's vocabulary. The commit body names the temper
+   commit it copied from, and temper deletes its own copy in the temper
+   step that follows. So no part has two live copies that drift, and
+   the moved code is the code that ran.
+
+3. **A move changes only what its new home forces.** That is: temper's
+   names out, handed by the owner; a downstream crate's type made plain
+   values; serde made skein-json; `skein_io::digest` made
+   `skein_lib::sha256`. Each such change is named in the move's Shape. A
+   difference between the code and the design is a later increment's,
+   with its own test: skein 10.4 and 10.5, 02.2, 03.2 and 04.2.
+
+4. **`api.rs` splits across two crates by its move.** The vocabulary
+   (lines 1 to about 417) goes to skein-forge (forge.md 3);
+   `answer_bytes_unbounded` stays the client's until the measure
+   replaces it in skein 02.2 (decision 24). The answer check (`accepts`) goes to the
+   client (forge-client 2.3). `locate::bytes` and `locate::accepts`
+   become `pub`, so that the client can reach them.
+
+5. **The effect key is bytes.** skein's client has
+   `effect_key(namespace, identity, max)` over opaque bytes.
+   `EffectPurpose` and its tags stay temper's connector's (forge.md 2.3).
+   temper 02.1 pins golden vectors (tags 1 to 5, the call key's 44 bytes
+   and the history key's 45), so that no key at rest changes.
+
+6. **All the call plans move in one increment, skein 01.3.** The
+   plans call each other: reads, writes, contents, actions, plan,
+   failure, tables, revision and `hooks/hint`. `Heard` and `Body` move
+   out of the component's `connection.rs` into the dialect with them.
+
+7. **`Host` is the dialect's; the user agent is the owner's.** By the
+   designer's answer 1, skein-forge's pure `host(address, name)` makes
+   `Host` for the component and setup alike, and moves with the start's
+   reads in skein 01.4; a plaintext transport carries its forge's name.
+   The rest of `conventions` (the user agent) becomes the owner's value
+   in skein 03.1. The start's two reads become dialect plans in skein
+   01.4: this is the design's first code gap. The head check counts the
+   user agent in skein 03.2: the second.
+
+8. **The 68 plan tests move with the component (skein 03.1).** They
+   drive a `Component` through a harness. skein 10 writes the plans'
+   pure `begin`/`heard` tests in skein-forge.
+
+9. **The fake forge's memory tests become the domain crate's own
+   `tests/` (skein 05.1).** `tests/forge/machine` is the component's
+   world (skein 08.1), not the fake's.
+
+10. **The dialect's document tests go in skein-forge's `tests/` (skein
+    06.3).** They read the transcripts that the conformance carries into
+    `tests/forge/conformance` (skein 06.2). This covers the codecs
+    world's `forgejo_*` tests, 55 focused and 3 fuzzy, which are not
+    serde. The rest of the codecs world stays temper's.
+
+11. **The over-ceiling tests move as they are.** The protocol world's
+    four `fuzzy_machine` tests take 7.5 to 7.7 s each at the base
+    (`findings/base-runs.md`). That is over the 5 s fuzzy aim, inside the
+    60 s budget. They move unchanged to `tests/forge/machine` in skein
+    08.1. Its report names what each test costs and why (testing-strategy
+    8: understood, never hidden). Making them cheaper would rewrite a
+    moved part, so it is not this plan's.
+
+12. **serde becomes skein-json** in the throwaway and the conformance,
+    about 15 files (skein's dependency allowlist), as their moves
+    require. The throwaway's HTTP goes onto skein-http under `drive`.
+
+13. **The repin is temper's alone.** Each temper increment that needs
+    a new skein step repins in its first commit, and repairs what skein's
+    steps since temper's last repin broke (README, Rules); the closing
+    `temper-repin` follows the last skein step (development.md, 5.7).
+    The tools plan's first repin (jig and temper onto skein's and smith's
+    `main`) is assumed landed before temper 01.1; if it has not, temper
+    01.1 waits for it (README, "The tools plan"). smith, jig and hearth
+    take skein at their next repins, as forge-setup's decision 3 did:
+    skein's changes are new crates and modules, which break none of them
+    (`later.md`).
+
+14. **The owner's word.** skein's kit takes the owner's word
+    (`[a-z0-9-]`, 1 to 16 bytes) for the marker, and the owner's user
+    agent and namespace. skein's tests use `kit`. temper hands `temper`,
+    and temper tests pin the bytes (`<!-- temper:key <hex> -->\n`,
+    `temper/0.0.0`), so that nothing temper writes on the wire or at
+    rest changes.
+
+15. **The fake forge peer replaces temper's `ForgeHost` (skein 05.4 and
+    05.5, temper 05.2).** The one-process world hands the peer's `address()`
+    to the engine, where it had 127.0.0.1:3000 fixed. In the simulated
+    world, whose engine is configured at spawn and whose restarted peer
+    rebinds the engine's address, both are given one constant,
+    `fixtures::FORGE`, and the referee asserts `address()` is `Some(FORGE)`
+    once the peer listens; the kernel-assigned address is handed over in
+    the real loop (temper's testing.md 4.2).
+
+16. **The conformance's masks are made whole, in two steps.** The
+    actions transcripts hold four stale UUID occurrences and 9 unquoted
+    log times. skein 06.2, the move, records once on the pinned binaries
+    with the base's mask, whose UUID rule clears the four; skein 06.4
+    changes the mask for the unquoted times, records once more, and its
+    test, `recorded_corpus_has_no_unmasked_uuid_or_log_time`, checks
+    that no unmasked UUID or log time remains. No transcript is edited
+    by hand.
+
+17. **No live service.** The Forgejo and runner binaries are the pinned
+    local ones, on loopback, as temper's process tier runs them today.
+
+18. **The suites' aims for the whole run.** At the base
+    (`findings/base-runs.md`), skein's default suite may grow by at most
+    1.5 s and its fuzzy suite by at most 6 s. temper's suites take no
+    longer than at the base, package by package, for what stays. A
+    moved test keeps its name, budget and time. The aims are the
+    suites' wall times, as the README's Done when 8 measures them; a
+    session's sum of its tests' times is not that, and is reported, not
+    held to them.
+
+19. **The over-800 files split as they next change.** `keep.rs` (1377
+    lines) and `outbox.rs` (1079) split in skein 02.2, which changes
+    them. `api.rs` (850) splits by its move (4).
+
+20. **The hotspots with the tools plan** are in the README, Rules. A
+    real-loop story stays temper's, on temper's forge host, until temper
+    05.2. A change to a fake forge crate lands where the crate lives on
+    `main`; between skein 05.1 and temper 05.1, such a change waits for
+    temper 05.1's repin.
+
+21. **The design's answers are in the plan before it lands.** The
+    session files were drafted with each recommendation below in place.
+    Each answer is patched into them, and each [shape] answer before
+    any draft is reviewed.
+
+22. **A world's test of temper's own policy stays temper's.** Of
+   `tests/engine/protocol-forge`'s remainder, the tests that drive
+   temper's connector, change and issue engines test what forge.md 2.3
+   leaves temper's, and skein never depends on temper. They stay in
+   temper's world, on skein's component and fakes, after temper 07; only
+   the tests of the component and the fakes move (skein 09.1).
+
+23. **The component's worlds are two sessions of their own, skein 08
+   and 09.** The machine and listener world (`tests/forge/machine`)
+   reads the conformance's transcripts (`case_bytes`) and deliveries,
+   and its hooks part imports the fake protocol layer's `delivery`, so
+   its copy needs temper 05.1 and skein 06.2 (the copy rule, decision
+   2). It moves after them, with its new tests, in skein 08. The
+   protocol world's remainder, on skein's client and the machine
+   world's joint, is skein 09. skein 03 ends at the component's own
+   changes; skein 07 keeps the client's and setup's worlds. One session
+   for both worlds would pass five increments, and its increments about
+   300 new lines, tests counted (code-organization.md 6).
+
+24. **The measure is one increment, skein 02.2.** forge.md 3.7's
+   measure is one rule: the dialect's `measure::op` and `measure::answer`
+   in skein-forge, and the client's `measure::stored`, `measure::effect`
+   and the rows check beside them, with the widths asserted at build. It
+   lands whole in skein 02.2, which changes skein-forge as well as the
+   client, rather than as a sixth increment of skein 01; it retires
+   `answer_bytes` and `answer_bytes_unbounded`, and the plans' running
+   measure (skein 01.3's) takes its widths. Its "temper's side" names
+   temper's callers, which the next temper repin repairs. skein 03.3's
+   page size needs it.
+
+25. **The Host's port follows answer 1 as written.** skein-forge's
+   `host(address, name)` leaves the port off when it is 443 or 80,
+   whatever the transport. The base chose the default by whether a TLS
+   server name was given (`conventions.rs:56`), which a named plaintext
+   forge would break, and the new signature carries no transport. So a
+   TLS forge on port 80 and a plaintext forge on port 443 now send no
+   port; skein 01.4 tests both edges. The alternative, a `host` that
+   takes the transport and drops only its own default port, is a
+   designer's change.
+
+26. **The forge peer is built from the base host (skein 05.4, 05.5).**
+    The tools plan as landed (temper `1093544c3`, area 1's first part)
+    does not move temper's forge host: the host's move to `testing/`, its
+    webhook delivery and the real-loop world are its next part, unplanned
+    (its `later.md`, drafts in its `findings/next/`). So skein 05.4 copies
+    the base host, `tests/one-process/src/forge.rs` (268 lines, no
+    delivery), with fake git's shared handle, and a new skein 05.5 builds
+    delivery in skein's peer (about 520 new lines in the two, from
+    `findings/base-skein-05.md`); temper 05.2, which needs 05.5, deletes
+    the host. The next part, planned after this, hosts its real loop on
+    skein's forge peer (testing.md 4.2) and drops its draft 07's host
+    move. The alternative, waiting for that host before skein 05.4, would
+    hold this plan's last steps (skein 05.4, temper 05.2, temper 07) on a
+    plan not yet written.
+
+27. **The conformance leaves serde in temper, before skein copies it
+    (temper 06.2 to 06.4).** Its 17 source files use serde_json: about
+    700 production lines change, 350 of them reads rewritten in place
+    (`findings/base-temper-03.md`). skein has no serde, so a skein copy
+    would replace it in the move, and skein 06.2 would then pass 300 new
+    lines. By the copy rule (decision 2), temper 06.2 to 06.4 put the
+    conformance on skein-json's `Document` and `writer::Encoder` first
+    (the module and the byte leaves, the reads, the writes), each proved
+    by its unit tests and the stable-fact check, and skein 06.2 copies
+    it renamed. They need nothing outside temper and follow temper
+    06.1's repoint onto skein's throwaway, so they run beside temper 03,
+    off the critical path. The reads stay one increment: a
+    half-converted family would hold two trees. The
+    throwaway's five serde lines and its 121-line HTTP client stay skein
+    06.1's, which is about 200 new lines with them.
+
+28. **skein-forge's plan tests and the settled differences are a
+    session of their own, skein 10.** In skein 01 they were one
+    increment of about 1,100 new lines (220 production, 880 tests),
+    with five behaviour changes in it. skein 10 splits them: the
+    harness and the read calls (10.1), the write calls and the failure
+    order (10.2), deliveries, markers and the statuses the base already
+    has (10.3), then answers 7, 9 and 12 (10.4) and 8 and 10 (10.5).
+    Nothing waits for it but the run's end, so it is off the critical
+    path. 10.5 needs skein 08.1: the Items-without-Date change breaks a
+    machine test whose scripted Items head has no Date, and skein 08.1
+    has moved that test to skein, where 10.5 repairs it; temper's next
+    repin repairs temper's copy while temper still has it.
+
+## Rulings
+
+None yet.
+
+## Design questions
+
+The inbox's questions (`~/src/tmp/director/inbox/forge-kit-planner.md`,
+2026-10-19), each with the recommendation the drafts carry and the step
+where its answer lands.
+
+| # | Question | Recommended | Lands in | Answer |
+|---|---|---|---|---|
+| 1 | [shape] who builds `Host` | the owner hands it, the component derives it by default | skein 01.4, 03.1, 03.2 | answered: skein-forge's pure `host(address, name)`; a plaintext transport carries its name; the owner hands no `Host` |
+| 2 | control bytes in the token or user agent | start refuses them, a new `Unusable` | skein 03.2 | answered: as recommended, with the existing `Unusable`: a credential or user agent that is empty or holds a byte below a space other than tab, or DEL, and a user id of 0 |
+| 3 | the signature header's shape | not 64 lowercase hex digits is no signature, 403 from the head | skein 03.2 | answered: as recommended (forge-connection.md 6.3) |
+| 4 | 6.3's "a `4xx`" for 501 and 505 | "the server's own answer" | design only | answered: "skein-http's own answer: a 4xx, or 501 or 505" |
+| 5 | the component's token space | stated in 2.1 | design only | answered: tokens below 2^60; API connections from 1, the listener at 2^59, hook connections above |
+| 6 | `Retry-After` at start; no `X-Forgejo-Event` | honoured as 3.3 says; 204 stated | skein 03.2 | answered: honoured however long (the rate holds, the sum saturates, the calls end at their deadlines, Unavailable); a verified delivery without the event header is 204, no hint |
+| 7 | a write's list past `inner` | `Timeout` | skein 10.4 | answered: TooLarge on a read, Timeout on a write; the client's own check of a write's answer stays InvalidAnswer; a body past `body_bytes_in`, the job log's read-through included, stays malformed (forge.md 5.3) |
+| 8 | which `404`/`3xx` drop the path | every one, stated | skein 10.5 | answered, B: a 404 that ends the call (MissingJob included) drops the path; one 5.2 calls an answer keeps it |
+| 9 | `File` past the room left | cuts like `Job` | skein 10.4 | answered: File and Job cut at the room left, `truncated`; a side of PullFiles or Compare is never cut |
+| 10 | absent answer headers | a missing `Date` on `Items` is malformed | skein 10.5 | answered: Items without Date is malformed; a 429 without Retry-After is `RateLimited { after: 0 }`; a listing without X-HasMore has more only when full |
+| 11 | success statuses | a status column in 5.2 | skein 10.3 | answered: a Success note in 5.2; any other 2xx is malformed |
+| 12 | `repositories/{id}` answering another id | `InvalidAnswer` for reads too | skein 10.4 | answered: in 5.3's malformed list |
+| 13 | the page size's row measure | the client's answer measure, with 14 | skein 03.3 | answered with 14 |
+| 14 | [shape] the byte measure | fixed widths in 2.3; the three functions named | skein 02.2, 03.3 | answered: one measure, the vocabulary's (forge.md 3.7), fixed widths; `measure::op`, `measure::answer` in skein-forge, `measure::stored`, `measure::effect` in the client |
+| 15 | which of two refusals wins | the code's order, written down | skein 02.2 | answered: the code's order, numbered for Keep (3), Read (5) and Make (7.2); a test per pair (forge-client.md 10) |
+| 16 | owner misuse | a Preconditions list, asserted | design only | answered: a Preconditions bullet in 2 |
+| 17 | [shape] Restore before a namespace | `bind_deployment` returns false | skein 02.2 | answered: false, changing nothing, once any `Restore`, `Keep`, `Make` or `Remake` was taken |
+| 18 | a rate-refused write sent again | each send is an attempt | skein 02.3 | answered: each send is an attempt, its deadline from the send |
+| 19 | an issue's provenance | issues settle by writer and key | design only | answered: comments and reviews need provenance; an issue settles by its key, alone |
+| 20 | an answered `Busy` | `InvalidAnswer` | skein 02.2 | answered: InvalidAnswer |
+| 21 | a withdraw that does nothing | stated as a no-op | skein 02.3 | answered: silent |
+| 22 | after a failed restore | terminal; the owner builds a new client | skein 02.3, 07.1 | answered: `restoration_failed()` is final, Keep is Busy from then on, the owner builds a new client; "every table full" is a world story |
+| 23 | [shape] the given values | a `Place` enum; one `Option<owner>` | skein 04.1 | answered: a `Place` per given value and limit (an org by index); `Option<owner>`, None stops with `OrgMissing` |
+| 24 | empty `orgs` | the check refuses zero | skein 04.2 | answered: refuses zero orgs |
+| 25 | the bot's marker | a boundary match | skein 04.2 | answered: the mark matched whole, both sides |
+| 26 | `BotIsAdmin` and `Unmarked` both | `Unmarked` first | skein 04.2 | answered: Unmarked first, tested |
+| 27 | empty items | empty means none for every item | skein 04.2 | answered: empty is none, for every item |
+| 28 | a kept token answered 403 | remade like a 401 | skein 04.2 | answered: 401 or 403 remakes; other statuses and Down stop |
+| 29 | temper's setup.md | the mapping test in the shell; the edge; `must_change_password` | temper 04.1 | answered, B: temper-forge-setup's step code maps the setup and runs the kit's check for every command, temper serve's too, no shell; a refused Place named by setup.md 5's path |
+| 30 | [shape] `Instance::attach` | moves with the admin's login as an argument | skein 06.1 | answered: `attach(child, port, scratch, admin_token, &Settings)` reads the login and id from `GET /api/v1/user` |
+| 31 | [shape] the binaries' paths | `--forgejo`, `--runner`; `SKEIN_FORGEJO(_RUNNER)` in tests only | skein 06.1, 06.2 | answered: the conformance's `--forgejo`, `--scratch`, `--out`, optional `--runner`; the kit's ignored tests read `SKEIN_FORGEJO(_RUNNER)` |
+| 32 | [shape] where the peer delivers | `host` is the loopback `ip:port` | skein 05.5, temper 05.2 | answered: as recommended; the owner of a port-0 listener sets the endpoint once known; no address, dropped and observed |
+| 33 | fake-forge.md 4's small ones | each stated | skein 05.2, 05.5 | answered: each stated (fake-forge.md 4): every review renders pull_request_approved; `new` refuses a none worst_case; a write's answer makes one more read on the same request; the 8 rendered named |
+| 34 | forge.md 4.2: a plan's end and its cost | the component counts the cost, as forge-connection.md and the base do; 4.2's sentence amended | skein 01.3 | answered: as recommended; the component counts one per request whose first byte it wrote; `Done` carries only the result; forge.md 4.2 says the plan counts nothing, and the plans' step tests drop the cost |
+| 35 | a 429 on Merge's read after the merge | `Timeout`, as forge.md 5.4 now says (the base's `failure::classify` says RateLimited) | skein 10.3 | answered: the designer's open item in its second answers |
+| 36 | forge-connection.md 10: the requests the fake served against the costs reported, when a cut falls inside a request head | A: the requests whose first byte reached the fake equal the costs, counted at the world's pipe; the fake's served count at most that | skein 09.4 | answered: A, made exact: in every run the costs equal the requests whose first byte the component wrote, counted at the world's streams, and the fake served those less the ones cut inside their head |
+
+## For the user
+
+- 1: the fakes, the conformance and the worlds take five sessions
+  (05 to 09).
+- 2: skein copies temper's code only after temper uses skein's crates,
+  so the two repositories alternate on the critical path.
+- 9 and 10: where the fake's memory tests and the dialect's document
+  tests live.
+- 11: the four `fuzzy_machine` tests move at 7.5 to 7.7 s each, over
+  the 5 s aim. Making them cheaper is later work.
+- 13: only temper repins. smith, jig and hearth keep their pins of
+  skein until their next repin (`later.md`).
+- 16: the actions transcripts are recorded again, on the pinned
+  binaries, to mask their UUIDs and times.
+- 18: the aims, +1.5 s and +6 s on skein's suites.
+- 22: the protocol world's tests of temper's connector, change and issue
+  engines stay temper's.
+- 23: the component's worlds are two sessions of their own, skein 08
+  and 09.
+- 24: the measure lands whole in skein 02.2, changing skein-forge too.
+- 25: the Host leaves off ports 443 and 80 whatever the transport.
+- 26: skein's forge peer is built from the base host, with its delivery
+  new in skein 05.5, rather than waiting for the tools plan's next part
+  to move the host; that part then builds its real loop on skein's peer.
+- 27: temper 06.2 to 06.4 put the conformance on skein-json before
+  skein 06.2 copies it; 06.3's reads, about 350 lines rewritten in
+  place, count as moved and stay one increment.
+- 28: skein-forge's plan tests and the settled differences are a session
+  of their own, skein 10, beside the critical path.
+
+## Answers received
+
+- **The director,** 2026-10-19: the questions went to the forge kit's
+  designer at 00:40Z, the [shape] ones (1, 14, 17, 23, 30, 31, 32) to be
+  answered first; the drafts carry the recommendations, marked pending.
+  The planner's decisions 9 and 10 stand.
+- **The designer,** 2026-10-19, the [shape] answers (1, 13 with 14, 17,
+  23, 30, 31, 32), landed in skein `d9f3e39` and temper `b4cfb999`:
+  `~/src/tmp/director/forge-kit-answers-1.md`; each in the table above,
+  and in the session files that build it. The design's inputs are now
+  at those commits; the code is the base's.
+- **The designer,** 2026-10-19, the rest of round 1 (2 to 12, 15, 16,
+  18 to 22, 24 to 29, 33), landed in skein `8938e16` and temper
+  `dd12b8e`: `~/src/tmp/director/forge-kit-answers-2.md`. Two differ
+  from the recommendation: 8 (B) and 29 (temper's step code, not the
+  shell). Its open item, a 429 on Merge's read after the merge, is row
+  35. The design's inputs are now at those commits; the code is the
+  base's.
+- **The designer,** 2026-10-19, question 34, landed in skein `25d2551`:
+  `~/src/tmp/director/forge-kit-answers-3.md`. Every design question is
+  answered.
+- **The designer,** 2026-10-19, question 36, landed in skein `064c55f`:
+  `~/src/tmp/director/forge-kit-answers-4.md`. A, made exact, so that
+  skein 09.4 checks it in every run. Every design question is answered.
