@@ -75,6 +75,11 @@ Files: Cargo.toml (root: delete the member `crates/temper-engine-domain-forge-cl
   New: `crates/temper-engine-domain-forge/src/{purpose.rs,tests/purpose.rs}`,
   with `pub mod purpose;` in `lib.rs` and `mod purpose;` in `tests.rs`.
   Deleted: `crates/temper-engine-domain-forge-client/`.
+Repin compatibility Files (README): `crates/temper-service/src/{worker_route.rs,
+  tests/worker.rs}`, `crates/temper-worker-domain/src/tests/fixtures.rs`,
+  `tests/worker/domain/src/protocol.rs`. Set the three Start literals to
+  `live: None`; in worker_route::{process,channel}, explicitly ignore only
+  `OpenEvent::Live` beside existing ignored variants; refresh codec-derived values.
 Shape: four commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
@@ -82,6 +87,14 @@ Shape: four commits, each builds and passes its crates' tests.
      plan's first, repairs: findings).
      It also takes jig's boundary-check repair (README, Rules); a commit 1
      made before that repair landed is amended to take it.
+     For this first compatible repin, also await jig01.s2 and take its
+     landed compatible jig source, retaining a newer compatible revision.
+     README's Settled smith adapters rule assigns this repin the three
+     Start live:None literals and explicit ignored OpenEvent::Live arms;
+     refresh the derived encode_start proof with the landed codec. This
+     follows live-text's director decision and next-repin assignment.
+     Refresh reached copies/derived values and name them in the commit
+     body; keep all bounds, assertions and existing proofs.
      If skein 02.3 is on `origin/main`, `bind_deployment`
      answers false once a Restore, Keep, Make or Remake was taken: the one
      caller, `restart.rs`'s deployment row (via `domain.rs`'s wrapper), already

@@ -257,7 +257,7 @@ Proof: process; both recordings, with `T` a fresh directory under `$WS/tmp` and 
   `$T/out/facts.txt` prints the counts and the digest, and the transcripts diff (the same) names
   exactly `merge-conflict/request` and `merge-stale-head/request`. The leaves `hooks::body` and the
   registration read run only live.
-Apply README's compatible smith source rule to the repin; the current fake-LLM fixture repair is owned by live-text/smith-02.1.
+Apply README's compatible smith source and Settled smith adapters rules. live-text/smith-02.1 is landed; shared compatibility now waits for jig01.s2 and temper02.1. Rebase their adapter landing before this repin's all-target check and both required recordings; retain the completed JSON checkpoint and every facts/transcript proof.
 Upstream reset cause/repair belongs to skein06.s1; the bounded diagnostic exception is complete. Recording proof waits for its evidenced repair to land, then a compatible skein repin with the existing all-target check. Independent JSON work/checkpoint stays; diagnostic probes do not replace required recording/facts/transcript proof.
 Proof: joint; `heavy --gate scripts/check.sh`: origin/main's focused count at the step's start plus 4,
   fuzzy unchanged, clippy and format clean (the gate runs both).

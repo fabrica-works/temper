@@ -134,7 +134,7 @@ Removes: the three crates, 14,086 Rust lines (8,320 + 5,309 + 457; manifests asi
 
 ### 05.2 The one-process world on the forge peer
 Scope: fake-forge.md 5; testing.md 2.4, 2.5 and 4.2; decisions 15 and 26, answer 32.
-Needs: 05.1; skein 05.5.
+Needs: 05.1; skein 05.5. For the shared compatibility block, jig01.s2 and temper02.1 must land before this repin resumes; rebase their settled adapters, preserving the independent peer checkpoint and every proof.
 Files, at the base:
   - Repin first (commit 1). Follow README's compatible smith source rule if
     the new skein interface breaks pinned smith; retain all existing checks.

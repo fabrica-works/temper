@@ -1077,6 +1077,16 @@ where its answer lands.
 
      The closing temper-repin is still waiting and also needs jig01.s2; no completed closing repin of this run requires repetition. The tools run's future closing temper repin observes the source landing and avoids duplicating this sweep. Existing live-display deferrals in live-text/later.md stay; this ruling defers no new work.
 
+155. **Complete the shared adapter session copies** (derived plan copy correction for ruling154).
+     Reverses: nothing; completes the derived session-copy updates of ruling154, with its scope and ordering unchanged.
+     Amends: temper/02-client.md02.1 compatibility Files/repin Shape; temper/05-fakes.md05.2 Needs; temper/06-throwaway.md06.2 repin rule.
+
+     Ruling154's landed README and jig01.s2 supplement already state the full settled next-repin policy. Its three derived temper session edits were omitted after an exact Markdown-context assertion failed before writing them. This landing applies those copies:02.1 names its four compatibility Files and settled adapter sweep;05.2/06.2 wait for jig01.s2 and temper02.1 and retain every existing proof/checkpoint. No new API policy, implementation scope, test expectation or budget is added.
+
+     Checked: git show --stat7d328f67a93f123bd95fa82f795264a495c64266 names README.md, decisions.md and new jig/01.s2-smith-adapters.md, with no temper session changes. Fresh scoped reads found02.1's unindented Shape label,05.2's original Needs and06.2's old smith-repair ownership sentence. All replacement contexts were checked before any of these three writes; git diff --check passes. The source/copy evidence remains ruling154's scratch-shared-adapters/evidence.txt; this correction changes no source premise.
+
+     Follow ruling154 and these completed session copies; keep the new jig step in normal check, not ready, until its fresh check/ruling. Give the checkpoint sessions their updated plan text alongside154. The existing unblock/Instructions remain authoritative and no second unblock or duplicate proof is needed.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
