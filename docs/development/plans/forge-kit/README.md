@@ -223,6 +223,14 @@ chain.
   lines are those code-organization.md 6's command finds unchanged but
   for paths, and the increment's tolerance applies to the new lines
   alone.
+- **A completed supervisor check releases its build outputs.** Once its worker
+  has ended and no queued/running heavy task uses its paths, remove its scratch
+  build targets, including a custom CARGO_TARGET_DIR, while retaining source,
+  patches, reports and logs. Count available filesystem bytes after cleanup:
+  Btrfs targets may share cache extents, so du totals do not measure reclaimed
+  space. When those targets are insufficient, preview tracked targets unused
+  for at least an hour and remove only inactive build outputs, after checking
+  the queue. Keep development.md 11.4's floors, concurrency limit and GC interval.
 - **The process tier runs where a Proof line or "Done when" says,**
   once, never in the gate, with the pinned binaries named:
   `TEMPER_FORGEJO=$WS/tmp/temper/forgejo/v17.0.0/forgejo-17.0.0-linux-amd64

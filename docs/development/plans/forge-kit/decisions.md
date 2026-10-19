@@ -427,6 +427,15 @@ where its answer lands.
 
      Corrected scratch clippy passes for skein-fake-forge-domain, protocol and peers. Sequential focused suites pass 100 domain tests (including 3 memory), 58 protocol probe tests and 8 existing peer tests; fuzzy/browser select zero in those packages. The probe confirms the written accounting values 4_645_153, 4_663_809 and 4_663_949. Full interface A, remaining future protocol units, peer capture/sharing/delivery, and downstream migrations remain unrun until declared implementations; temper 01.2 is the expected prerequisite. Evidence: pump/ready-skein-05.md and scratch-ready-skein-05/suite-results.tsv.
 
+110. **Restore the disk floor and release completed check targets** (infrastructure, skein 02's block of 2026-10-19T05:51:53Z).
+     The disk block is resolved: filesystem availability is 46,001,192,960 bytes (about 43 GiB), above the 40 GB start floor. The coordinator may start eligible sessions after its normal resource check; development.md 11.4's floors and six-session limit below 60 GB remain in force.
+
+     Development.md 11.4 permits removing an inactive session's target once none of its heavy tasks is queued or running. All six supervisor checks had ended and the queue held no unfinished task. Removed nine scratch build targets from those completed checks, retaining source, patches, reports and logs. Their apparent 29 GiB reclaimed only about 1 GiB because Btrfs shares cache extents.
+
+     After the ten-minute GC interval, kache gc --max-age 1h found older entries still cloned into targets and reclaimed nothing. Its tracked-target dry-run found 36 build targets unused for at least an hour, estimating 11.4 GiB reclaimable. The subsequent tracked cleanup removed those disposable outputs and restored the floor. Exact preview and cleanup output are retained in pump/disk-clean-preview.json and pump/disk-clean.out. No source checkout or retained check evidence was removed.
+
+     The README now requires completed supervisor checks to release scratch targets, including custom CARGO_TARGET_DIRs, once their workers and heavy tasks finish. Measure filesystem availability afterward; preview further inactive tracked targets if needed. Preserve source and evidence, and record further build-output paths cleaned. This supplements the existing session cleanup rule without changing start floors or GC cadence. The last GC was 05:56:06Z; the usual ten-minute interval still applies. Kache now reports 222.1 GiB private and 41.9 GiB cloned; its next eligible normal GC can reclaim cache formerly retained by stale outputs.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
