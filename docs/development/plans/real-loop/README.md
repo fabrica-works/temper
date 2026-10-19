@@ -117,9 +117,6 @@ plan's own.
 - **Waiting on a command, on Codex:** the one way to wait on a running
   command is `// @exec: {"yield_time_ms": 300000}`, never repeated
   `write_stdin` polls.
-- **The code graph** is not used for temper until the supervisor has
-  re-indexed it past its `origin/main` (AGENTS.md) and a steer says so.
-  Until then, search with `rg` in the worktree.
 - **temper alone.** No step edits skein, smith or jig, nor moves a pin
   (decisions.md, 3). A need upstream is a question (development.md,
   10.1), raised before any workaround.

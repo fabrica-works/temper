@@ -223,6 +223,11 @@ pass:
     native `Shell::keep(None)` writes it so; temper 05.5 reads a
     zero-byte `token` as none, and changes no jig code (3).
 
+## Rulings
+
+101. **The code graph for temper, re-indexed** (steer of 2026-10-19T13:51:25Z).
+     The code graph indexes temper again: re-indexed at 2026-10-19T13:51:25Z, at temper `ed725ce57`, past the claim. The README's rule "**The code graph** is not used for temper until the supervisor has re-indexed it past its `origin/main` (AGENTS.md) and a steer says so. Until then, search with `rg` in the worktree." is removed; AGENTS.md's rule stands in its place: "Check each name the graph gives with `rg` in the worktree before relying on it." The graph indexes the primary checkout's `main`, never a session's worktree, and lags behind what lands; the hourly check re-indexes it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
