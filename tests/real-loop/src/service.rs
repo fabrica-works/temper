@@ -1,6 +1,8 @@
 //! Deferred standalone preparation with its original admission envelope.
+mod cue;
 mod watch;
 use crate::fixtures;
+pub use cue::Cue;
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Queue, Time, Wall};
 use skein_shell::Host;
@@ -14,6 +16,7 @@ pub struct ServiceHost {
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
     watch: watch::Watch,
+    cues: Vec<Cue>,
     links: u32,
     path: PathBuf,
     signals: Fd,
@@ -34,6 +37,7 @@ impl ServiceHost {
             address: None,
             link: Vec::new(),
             watch: watch::Watch::default(),
+            cues: Vec::with_capacity(cue::CUES),
             links: 0,
             path,
             signals,
@@ -50,8 +54,19 @@ impl ServiceHost {
     pub fn links(&self) -> u32 {
         self.links
     }
-    pub(crate) fn arm(&mut self) {
+    pub(crate) fn arm_watch(&mut self) {
         self.watch.armed = true;
+    }
+    pub fn arm(&mut self, key: skein_lib::RequestKey) {
+        assert!(self.cues.len() < cue::CUES, "bounded held cues");
+        self.cues.push(Cue::new(key));
+    }
+    #[must_use]
+    pub fn held(&self) -> bool {
+        !self.cues.is_empty() && self.cues.iter().all(Cue::held)
+    }
+    pub(crate) fn held_at(&self, index: usize) -> bool {
+        self.cues.get(index).is_some_and(Cue::held)
     }
     pub(crate) fn watching(&self) -> bool {
         self.watch.armed
@@ -75,6 +90,9 @@ impl Host for ServiceHost {
         if let Some(service) = &mut self.service {
             for complete in service.completions().iter() {
                 self.watch.complete(complete);
+                for cue in &mut self.cues {
+                    cue.complete(complete);
+                }
             }
             temper_service::iterate(service, now, wall);
             while let Some(link) = service.links().pop() {
@@ -114,7 +132,7 @@ impl Host for ServiceHost {
         self.service.as_ref().is_some_and(temper_service::Service::is_empty)
     }
     fn worst_case(&self) -> u64 {
-        self.envelope.0 + watch::Watch::memory()
+        self.envelope.0 + watch::Watch::memory() + cue::CUES as u64 * Cue::memory()
     }
     fn operations(&self) -> u32 {
         self.envelope.1

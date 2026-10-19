@@ -2528,6 +2528,7 @@ dependencies = [
  "smith-agent-shell",
  "temper",
  "temper-client-shell-cli",
+ "temper-client-tools",
  "temper-service",
 ]
 

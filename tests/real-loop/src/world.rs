@@ -75,8 +75,13 @@ pub(crate) fn run(
     recipe: impl FnOnce() -> llm::Recipe,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> CheckedOutcome<Proc> {
-    let mut world =
-        World::new_controlled_checked(|controls| Judge { controls, stopping: false, finished: false, wake: None });
+    let mut world = World::new_controlled_checked(|controls| Judge {
+        controls,
+        stopping: false,
+        finished: false,
+        armed: false,
+        wake: None,
+    });
     world.spawn(|| Proc::Llm(Box::new(llm::peer(recipe()).expect("independent LLM peer"))));
     world.spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals))));
     let root = skein_shell::open_root(scratch.path()).expect("caller launch root");
@@ -107,6 +112,7 @@ pub(crate) fn run(
 struct Judge {
     controls: Controls,
     stopping: bool,
+    armed: bool,
     finished: bool,
     wake: Option<Time>,
 }
@@ -116,12 +122,19 @@ impl Referee<Proc> for Judge {
         let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller), ..] = procs else {
             panic!("root admission order")
         };
+        if !self.armed {
+            for name in caller.held_names() {
+                let name = temper_client_tools::jig::key::Name::new(name).expect("held request name");
+                service.arm(temper_client_tools::key::engine(&name));
+            }
+            self.armed = true;
+        }
         service.address = peer.address();
         if service.links() != 0 {
             caller.released = true;
         }
         if caller.watching.is_some() {
-            service.arm();
+            service.arm_watch();
             caller.watched = service.delivered();
         }
         if caller.is_empty() && !self.stopping {
@@ -137,6 +150,8 @@ impl Referee<Proc> for Judge {
         let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller), ..] = procs else {
             panic!("root admission order")
         };
+        caller.held.set(service.held_at(caller.held_index()));
+        caller.links.set(service.links());
         if (peer.address().is_some() && service.address.is_none())
             || (service.links() != 0 && !caller.released)
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))

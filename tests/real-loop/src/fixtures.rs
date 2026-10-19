@@ -156,3 +156,18 @@ pub fn signed_chat(key: &'static str) -> Vec<crate::calls::Step> {
     };
     vec![sign_in(D1), call(D1, argv!["chat", "--project", PROJECT, "--key", key, scripts::WORDS])]
 }
+
+/// Both directories ask for the same named request.
+pub const LOST_NAME: &str = "lost-answer";
+/// Sign-in is call zero, so the started request is call one.
+pub const LOST_CALL: usize = 1;
+
+/// Stop a sending call only after its named request is durably held.
+#[must_use]
+pub fn lost_chat() -> Vec<crate::calls::Step> {
+    use crate::calls::{Step, held, kill, start};
+    let mut steps = signed_chat(LOST_NAME);
+    let Step::Call { at, argv } = steps.pop().expect("chat opener") else { panic!("chat call") };
+    steps.extend([start(at, argv), held(LOST_NAME.as_bytes()), kill(LOST_CALL)]);
+    steps
+}

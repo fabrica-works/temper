@@ -32,6 +32,10 @@ impl Ran {
     pub fn number(&self, call: usize) -> u64 {
         calls::task_number(&self.calls()[call].stdout)
     }
+    fn requested_kills(&self) -> usize {
+        let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
+        caller.requested_kills()
+    }
     fn service(&self) -> &service::ServiceHost {
         let world::Proc::Service(service) = &self.outcome.procs[1] else { panic!("service root") };
         service
@@ -75,6 +79,9 @@ pub fn run_on(scratch: Scratch, recipe: impl FnOnce() -> llm::Recipe, steps: imp
     let outcome = world::run(&scratch, recipe, steps);
     let ran = Ran { outcome, scratch };
     assert_eq!(ran.served(), Some(&End::Drained), "service end {:?}", ran.served());
-    assert!(ran.killed().is_empty(), "drain killed {:?}", ran.killed());
+    assert_eq!(ran.killed().len(), ran.requested_kills(), "only requested kills: {:?}", ran.killed());
+    for killed in ran.killed() {
+        assert_eq!(killed.exit, Exit::Signal(9), "requested kill");
+    }
     ran
 }

@@ -1,12 +1,13 @@
 //! Hosted commands observed through their pipes, exit and a service watch cue.
 use crate::fixtures;
-use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Pipe, Spawn, Submit, Way};
+use skein_io::kernel::{Complete, Done, Exit, Fd, Op, Pipe, Signal, Spawn, Submit, Way};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
-use std::{collections::BTreeMap, os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{cell::Cell, collections::BTreeMap, os::unix::ffi::OsStrExt, path::PathBuf};
 #[derive(Clone, Copy)]
 pub struct Dir(pub u8);
 pub const D1: Dir = Dir(1);
+pub const D2: Dir = Dir(2);
 pub enum Arg {
     Lit(&'static str),
     Task(usize),
@@ -22,6 +23,9 @@ pub struct Argv(pub Vec<Arg>);
 macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($crate::calls::Arg::from($word)),*]) }; }
 pub enum Step {
     SignIn { at: Dir },
+    SameParty { at: Dir },
+    Held { name: &'static [u8] },
+    Kill { call: usize },
     Call { at: Dir, argv: Argv },
     Start { at: Dir, argv: Argv },
     Join { call: usize },
@@ -31,6 +35,26 @@ pub enum Step {
 #[must_use]
 pub fn sign_in(at: Dir) -> Step {
     Step::SignIn { at }
+}
+#[must_use]
+pub fn same_party(at: Dir) -> Step {
+    Step::SameParty { at }
+}
+#[must_use]
+pub fn held(name: &'static [u8]) -> Step {
+    Step::Held { name }
+}
+#[must_use]
+pub fn kill(call: usize) -> Step {
+    Step::Kill { call }
+}
+#[must_use]
+pub fn listed(stdout: &[u8]) -> Vec<u64> {
+    std::str::from_utf8(stdout)
+        .expect("tasks page")
+        .lines()
+        .filter_map(|line| line.split_once(" · ").and_then(|(number, _)| number.parse().ok()))
+        .collect()
 }
 #[must_use]
 pub fn call(at: Dir, argv: Argv) -> Step {
@@ -98,6 +122,9 @@ struct Running {
 }
 pub(crate) struct Caller {
     pub(crate) released: bool,
+    pub(crate) held: Cell<bool>,
+    pub(crate) links: Cell<u32>,
+    retry_link: Option<u32>,
     pub(crate) calls: Vec<Called>,
     steps: Vec<Step>,
     next: usize,
@@ -114,6 +141,25 @@ pub(crate) struct Caller {
     memory: u64,
 }
 impl Caller {
+    pub(crate) fn held_names(&self) -> impl Iterator<Item = &[u8]> {
+        self.steps.iter().filter_map(|step| match step {
+            Step::Held { name } => Some(*name),
+            Step::SignIn { .. }
+            | Step::SameParty { .. }
+            | Step::Kill { .. }
+            | Step::Call { .. }
+            | Step::Start { .. }
+            | Step::Join { .. }
+            | Step::Watching { .. }
+            | Step::Until { .. } => None,
+        })
+    }
+    pub(crate) fn held_index(&self) -> usize {
+        self.steps[..self.next].iter().filter(|step| matches!(step, Step::Held { .. })).count()
+    }
+    pub(crate) fn requested_kills(&self) -> usize {
+        self.steps.iter().filter(|step| matches!(step, Step::Kill { .. })).count()
+    }
     pub(crate) fn new(steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
         let memory = u64::try_from((steps.len() + 1) * (OUTPUT * 4 + 4096)).expect("caller memory")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
@@ -121,6 +167,9 @@ impl Caller {
         let count = steps.len();
         Self {
             released: false,
+            held: Cell::new(false),
+            links: Cell::new(0),
+            retry_link: None,
             calls: Vec::with_capacity(count),
             steps,
             next: 0,
@@ -150,7 +199,7 @@ impl Caller {
     }
     fn words(&self) -> Vec<Box<[u8]>> {
         let (at, argv) = match &self.steps[self.next] {
-            Step::SignIn { at } => {
+            Step::SignIn { at } | Step::SameParty { at } => {
                 return vec![
                     fixtures::directory(&self.scratch, *at).as_os_str().as_bytes().into(),
                     b"sign-in".as_slice().into(),
@@ -158,7 +207,7 @@ impl Caller {
                 ];
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
-            Step::Join { .. } | Step::Watching { .. } => panic!("command step"),
+            Step::Join { .. } | Step::Watching { .. } | Step::Held { .. } | Step::Kill { .. } => panic!("command step"),
         };
         let mut words = vec![fixtures::directory(&self.scratch, *at).as_os_str().as_bytes().into()];
         for arg in &argv.0 {
@@ -172,6 +221,9 @@ impl Caller {
     }
     fn spawn(&mut self, now: Time, index: usize) {
         let args = self.words().into_boxed_slice();
+        if matches!(self.steps[self.next], Step::SameParty { .. }) && self.current.is_none() {
+            self.retry_link = Some(self.links.get());
+        }
         if self.calls.len() == index {
             self.calls.push(Called {
                 exit: None,
@@ -267,7 +319,7 @@ impl Caller {
                 self.calls[index].ended = now;
                 self.submit(index, Op::Close { fd: pidfd });
             }
-            (Op::Close { .. }, Done::Nothing) => {}
+            (Op::Close { .. } | Op::Signal { .. }, Done::Nothing) => {}
             (kind, done) => panic!("caller completion {kind:?}: {done:?}"),
         }
     }
@@ -286,6 +338,10 @@ impl Caller {
         }
     }
     fn advance(&mut self, now: Time) {
+        if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
+            // Issue the following kill in this pass, before the hosted caller's next turn.
+            self.next += 1;
+        }
         let Some(step) = self.steps.get(self.next) else {
             if self.running.iter().all(Option::is_none)
                 && let Some(fd) = self.root.take()
@@ -295,6 +351,20 @@ impl Caller {
             return;
         };
         match step {
+            Step::Held { .. } => return,
+            Step::Kill { call } => {
+                let index = *call;
+                if self.current.is_none() {
+                    let pidfd = self.running[index].as_ref().expect("kill running call").pidfd.expect("spawned call");
+                    self.submit(index, Op::Signal { pidfd, signal: Signal::Kill, to: skein_io::kernel::Target::Child });
+                    self.current = Some(index);
+                    return;
+                }
+                if self.running[index].is_some() {
+                    return;
+                }
+                self.current = None;
+            }
             Step::Watching { call } => {
                 assert!(self.running[*call].as_ref().is_some_and(|r| r.started), "started watch call");
                 self.watching = Some(*call);
@@ -309,7 +379,11 @@ impl Caller {
                     return;
                 }
             }
-            Step::SignIn { .. } | Step::Call { .. } | Step::Start { .. } | Step::Until { .. } => {
+            Step::SignIn { .. }
+            | Step::SameParty { .. }
+            | Step::Call { .. }
+            | Step::Start { .. }
+            | Step::Until { .. } => {
                 let Some(index) = self.current else {
                     assert!(self.running.iter().flatten().count() < fixtures::CALLS_AT_ONCE as usize);
                     let index = self.calls.len();
@@ -325,6 +399,15 @@ impl Caller {
                     return;
                 }
                 let call = &mut self.calls[index];
+                if matches!(step, Step::SameParty { .. }) && call.tries == 1 {
+                    let link = *self.retry_link.get_or_insert(self.links.get());
+                    if self.links.get() <= link {
+                        return;
+                    }
+                    self.retry_link = None;
+                    self.spawn(now, index);
+                    return;
+                }
                 if let Step::Until { holds, early, .. } = step
                     && occurrences(&call.stdout, holds) == 0
                     && call.exit == Some(Exit::Code(0))
@@ -340,6 +423,10 @@ impl Caller {
     }
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
+            Some(Step::Held { .. }) => self.held.get(),
+            Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
+                self.retry_link.is_some_and(|link| self.links.get() > link)
+            }
             Some(Step::Watching { .. }) => self.watched || self.watching.is_none(),
             Some(Step::Join { call }) => self.running[*call].is_none(),
             Some(Step::Start { .. }) => {
