@@ -436,6 +436,14 @@ where its answer lands.
 
      The README now requires completed supervisor checks to release scratch targets, including custom CARGO_TARGET_DIRs, once their workers and heavy tasks finish. Measure filesystem availability afterward; preview further inactive tracked targets if needed. Preserve source and evidence, and record further build-output paths cleaned. This supplements the existing session cleanup rule without changing start floors or GC cadence. The last GC was 05:56:06Z; the usual ten-minute interval still applies. Kache now reports 222.1 GiB private and 41.9 GiB cloned; its next eligible normal GC can reclaim cache formerly retained by stale outputs.
 
+111. **Refresh stale primary graphs** (hourly check of 2026-10-19T06:09:28Z).
+     Reverses: graph permission of 2026-10-19T05:06:14Z, temporarily.
+     Amends: README, Rules of this plan.
+
+     The hourly check finds both primary indexes older than landed source. Until the supervisor refreshes and verifies them, the coordinator and implementers use source searches instead of either graph. The README records that temporary restriction. Existing checks continue; no start is held. The kit remains d6d4abe with the director's adapter.
+
+     Checked with codebase-memory-mcp index_status: srv-data-git-runner-src-skein indexed_at 2026-10-19T05:04:07Z; srv-data-git-runner-src-temper indexed_at 2026-10-19T05:04:37Z, both ready at their exact primary roots. git log -1 --format='%H %cI' origin/main gives skein 7436461f0fce6d0178c483f3b631e1a4db5fc343 at 2026-10-19T06:11:49Z, temper 037991de0b1b14a1e474bc9ca2766f4d49befcd6 at 2026-10-19T06:20:59Z. Both postdate their indexes. Commands plan ruling/ring are present in kit/scripts/dev/plan, dispatch lines 669 and 671.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
