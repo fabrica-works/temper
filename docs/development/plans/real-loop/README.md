@@ -95,7 +95,8 @@ plan's own.
 - **Then,** as each lands: temper 08.3 once temper 05.4 and
   temper-05.s1 (ruling 111) have, temper 08.4
   once temper 05 has; temper 10 once temper 05 has; temper 09 once temper
-  08 has; temper 13 once temper 08 and forge-kit's temper-05.2 have.
+  08 has; temper 13 once temper 08 and forge-kit's temper-05.2 have;
+  temper-13.s1 at once, and 13.4 after it (ruling 112).
 - **When slots are short,** start first: temper 05, temper 08, temper
   14; then temper 13, temper 09, temper 06 and temper 10.
 - **The longest chain,** 12 steps: temper 05.1 to 05.6 → temper 08.4 →
@@ -205,7 +206,10 @@ their files: `tests/system/src/lib.rs`'s "jig's fake store",
 
 No step edits skein's `skein-fake-peers` (its LLM or forge peer), skein's
 fake LLM's domain or protocol, smith's crates, `tests/one-process`, or
-`testing/temper-fake-git`'s transport.
+`testing/temper-fake-git`'s transport, but temper-13.s1 (ruling 112):
+the one-process world's cost, in `tests/one-process` and fake git's
+`src/`, which the forge kit's temper-05.2 also changes: the later landing
+rebases.
 
 ## Prerequisites the run checks at its start
 

@@ -78,7 +78,8 @@ as landed. Steps: `temper-13.1` to `temper-13.5`.
 ## Rules that bind it
 
 - **No edit** to skein, `tests/one-process` or `testing/temper-fake-git`
-  (hotspots): a need there is a question. **No sleeps:** a story ends on
+  (hotspots), but temper-13.s1's (ruling 112): a need there is a
+  question. **No sleeps:** a story ends on
   a cue, an `Until` or a wait, within 08's `PATIENCE`.
 - **Paces from the builder:** `application.limits.overrides`, applied by
   `temper_service::limits::{profile, apply}` and admitted as `admit`
@@ -246,7 +247,8 @@ Removes: those lines from `support/forgejo.rs`.
 Scope: the tools' `adopt` as a call on 13.2's world, adopted and not
 found (tools.md, 5.3, 6.3; client/README.md, 4.7).
 Needs: temper 05's acts and 13.2; the tools' `adopt` has landed
-(`crates/temper-client-tools/src/adopt.rs`).
+(`crates/temper-client-tools/src/adopt.rs`); temper-13.s1, the
+one-process world's cost (ruling 112).
 Files: `tests/real-loop/tests/forge.rs`.
 Shape: a test-local `adopt(name) -> Called` signs in on `D1` and calls
 `adopt --project 1 --owner acme --name NAME --landing main --key

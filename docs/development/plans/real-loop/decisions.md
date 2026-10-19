@@ -305,6 +305,34 @@ pass:
      - **05.6 reads `--call FILE` the same way,** beneath `file_parent`, and `ctl::run` opens it by `skein_shell::open_root`.
      - Any further place that builds `Startup` or loads a FILE argument beneath DIRECTORY's parent takes `file_parent` the same way: list it in the commit body.
 
+112. **temper 08.2: the worlds' sum is the worlds' guide, and the one-process world's cost a step** (design answer, temper 08's block of 2026-10-19T14:19:53Z).
+     Design answer, temper 2f97ab8bb (testing.md 6.1; the plan's README, Rules and Done when 5; 06, 08, 09 and 13's Questions; later.md; decisions.md, For the user L). Point 5's step is `temper-13.s1` (`temper/13.s1-one-process-cost.md`), its Files the README's Hotspots exception; it measures by instrumentation, since `perf` is not installed and `kernel.perf_event_paranoid` is 3.
+
+
+     1. **`main` does not miss the 4 s.** 6.1's guides sit "within" the suites' rules, which are "wall time on the development machine, run idle" (testing-strategy.md 8). The 5.059 s was measured in the build lane, beside another task. I measured idle through `heavy --gate`, at `94df159d3` (08.2 landed), with four runs after one build. The runs took 4.189, 3.972, 3.845 and 3.908 s; the median of the last three is **3.91 s**. Per world: client 0.92–0.99 s (not 2.0), one-process 1.54–1.67, forge protocol 0.61–0.67, reconcile 0.26–0.30, terminal 0.16, git 0.15–0.18, real loop 0.09–0.10. No test is past its own guide.
+        `heavy --gate -- sh -c 'export NEXTEST_DOUBLE_SPAWN=0; for i in 1 2 3 4; do cargo nextest run -p temper-client-shell-terminal -p temper-client-world -p temper-engine-protocol-forge-world -p temper-forge-setup-reconcile-world -p temper-one-process-world -p temper-real-loop-world -p temper-worker-protocol-git-world --profile measure -j 1 >below-$i.log 2>&1; done'`
+     2. **testing.md 6.1 now says how the sum is measured and whose it is:**
+        - "each test's own time, run alone on the idle development machine … with `--profile measure -j 1` through `heavy --gate`, the median of three runs. Beside another task, it measures that task."
+        - "The sum is the worlds' guide, never a landing's. A test within its own guide lands. A plan that adds to these worlds gives the sum at its base and at its end, with the real loop's part apart. When the worlds together pass the sum, their slowest tests are profiled, then made cheaper at the cause the profile shows or moved to the fuzzy suite, by steps a plan names."
+        - Reconcile's world joins the list (section 1 places it below the domain, and 08.2 counted it).
+     3. **The sum binds this plan as a guide, and the plan's stories will pass it.** The headroom is 0.09 s, and the plan adds sixteen real-loop and fourteen client stories (README, Pulse). The real loop joined the 4 s on 2026-10-18 (`a1c9f50b8`), and the 4 s stayed. Counting the real loop apart would raise a guide, and "Raising a budget is an explicit decision, not a fix" (testing-strategy.md 8). So it is the user's: decisions.md, For the user L, now with the director. I recommend (b): the real loop is counted apart, its sum is each plan's Pulse aim as the user accepts it (for this plan, C), and the other worlds keep 4 s.
+     4. **Until L is decided** (README, Rules, "The worlds' sum"; 06, 08, 09 and 13's Questions):
+        - Each step lands within its own tests' guides.
+        - No test is moved, cut or merged for the sum.
+        - Done when 5 measures the sum at the end, with the real loop apart and the three slowest tests named.
+        - later.md has the row.
+        - Ruling 109's hold on "a step that would … make an existing one cheaper, for the aggregate's sake" is lifted for point 5.
+     5. **The step that aims at the sum: a supplement step, which the supervisor names, before 13.4.**
+        - Why the one-process world: it is 40% of the sum. `an_adopted_repository_gets_its_change_pushed_through_git` takes 0.87 s and two stories take 0.24 s each. On skein's simulator that time is CPU, so its cause is in the code or the test. Its 0.95 s came from larger chunks (eb8abb6aa: 3.3 s → 0.95 s), which cut iterations; no profile was ever run.
+        - Why before 13.4: 13.4 and 13.5 drive the same adoption through fake git on the real loop ("near the real-loop story's 1 s aim", findings/base-times.md).
+        - Scope: profile the three stories (frame pointers are on; `perf record -g` on the unoptimized test binary). Fix the cause in the code or the test, never in a build setting. Give each story's time before and after, idle.
+        - Where to look first, from a reading (no profile yet):
+          - `Outcome.iterations` and `procs.len()` per story: finished git, sh and agent processes stay in `procs`, and `Referee::observe` (`tests/one-process/src/referee.rs:310`) runs after each turn, O(processes).
+          - The referee's per-iteration scans and per-commit `rows.clone_from` and `snapshot`.
+          - Fake git's per-invocation `Checkout` rebuild and tree clones (`testing/temper-fake-git/src/answer.rs`, `program.rs`).
+        - Its Files cross 08's "nothing of `tests/one-process`" and 13's "No edit to … `testing/temper-fake-git`". That exception is the supervisor's ruling.
+        - No step for the client world: 0.95 s for 37 tests is about 26 ms each.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
