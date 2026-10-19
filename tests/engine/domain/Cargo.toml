@@ -33,7 +33,7 @@ temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-client.workspace = true
 temper-engine-forge-world = { path = "../forge" }
-temper-fake-forge-domain.workspace = true
+skein-fake-forge-domain.workspace = true
 smith-domain.workspace = true
 smith-domain-run.workspace = true
 smith-domain-session.workspace = true

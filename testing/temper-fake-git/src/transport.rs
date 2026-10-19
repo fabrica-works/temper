@@ -1,9 +1,9 @@
 //! Git reaches the same forge domain the HTTP service owns in the world.
 use crate::check::Credential;
+use skein_fake_forge_domain::{self as domain, api};
 use skein_lib::{Env, Queue, ReplyTo, Secret, Time, Token, Wall};
 use std::{cell::RefCell, rc::Rc};
 use temper_fake_checkout::git::{Created, Fault, Pushed, Remote, Tree, Want, What};
-use temper_fake_forge_domain::{self as domain, api};
 
 /// The world's one forge, shared by HTTP and every hosted git invocation.
 #[derive(Debug)]
@@ -32,7 +32,7 @@ pub struct Transport {
 impl Transport {
     /// Copy the protocol scenario's identity tables before it takes ownership.
     #[must_use]
-    pub fn new(forge: Rc<RefCell<Forge>>, table: &temper_fake_forge_protocol::Config) -> Self {
+    pub fn new(forge: Rc<RefCell<Forge>>, table: &skein_fake_forge_protocol::Config) -> Self {
         Self {
             forge,
             tokens: Rc::new(table.tokens.iter().cloned().collect()),

@@ -15,7 +15,7 @@ temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-client.workspace = true
 temper-engine-domain-forge-issues = { path = "../../../crates/temper-engine-domain-forge-issues" }
 temper-engine-domain-forge-change = { path = "../../../crates/temper-engine-domain-forge-change" }
-temper-fake-forge-domain.workspace = true
+skein-fake-forge-domain.workspace = true
 
 [dev-dependencies]
 

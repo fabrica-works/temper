@@ -1,8 +1,8 @@
 use crate::{exchange, fixtures};
+use skein_fake_forge_protocol::{Service, Tally, setup::Store};
 use skein_forge::forgejo::{document::Document, request::Request};
 use skein_lib::{Env, Queue, Rng, Secret, Time, Wall};
 use std::net::SocketAddr;
-use temper_fake_forge_protocol::{Service, Tally, setup::Store};
 use temper_forge_setup::{
     place::File,
     reconcile::{self, Event, Failure, Need, Reconcile, Reply},
@@ -17,7 +17,7 @@ pub struct World {
     entry: Entry,
     listener: Option<SocketAddr>,
     service: Service,
-    env: Env<temper_fake_forge_protocol::Limits>,
+    env: Env<skein_fake_forge_protocol::Limits>,
     files: Vec<(File, Secret)>,
     rng: Rng,
     trace: Vec<String>,

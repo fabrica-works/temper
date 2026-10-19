@@ -104,7 +104,7 @@ fn a_context_repository_cannot_receive_a_write() {
 fn a_permission_refusal_rereads_capabilities_and_narrows_later_writes() {
     let mut world = World::new(5);
     world.adopt();
-    world.permission(temper_fake_forge_domain::api::Permission::Read);
+    world.permission(skein_fake_forge_domain::api::Permission::Read);
     let entry = client::Entry {
         number: 1,
         task: 9,
@@ -296,7 +296,7 @@ fn a_review_asking_for_changes_repeats_at_the_repaired_head() {
         change::Decision::Delegate(change::Delegate::Repair(change::Repair::Gate(9)))
     );
     world.push(b"temper/51", b"review repair");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let new_head = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     assert_eq!(
         change_step(&mut world, 3, change::Status::Passed, Box::new([])),
@@ -394,7 +394,7 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
     );
     assert_eq!(world.writes(), 1);
     world.resolve(b"temper/51", b"resolved content");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let resolved = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     assert_eq!(
         change_step(&mut world, 3, change::Status::Passed, Box::new([])),
@@ -422,14 +422,14 @@ fn a_clean_update_with_broken_ci_is_repaired_as_a_semantic_conflict() {
         change_step(&mut world, 1, change::Status::Passed, verdict.clone()),
         change::Decision::Effect(change::Effect::Update { .. })
     ));
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Failed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
     assert_eq!(
         change_step(&mut world, 2, change::Status::Passed, verdict),
         change::Decision::Delegate(change::Delegate::Repair(change::Repair::Semantic))
     );
     assert_eq!(world.writes(), 1);
     world.push(b"temper/51", b"semantic repair");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let repaired = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     assert_eq!(
         change_step(&mut world, 3, change::Status::Passed, Box::new([])),
@@ -474,7 +474,7 @@ fn a_pull_closed_by_someone_else_is_held_then_reopened_on_release() {
 #[test]
 fn a_broken_landing_branch_pauses_the_queue_for_one_repair() {
     let (mut world, head) = reviewed_change(true, change::Freshness::Clean);
-    world.status(b"main", temper_fake_forge_domain::api::Check::Failed);
+    world.status(b"main", skein_fake_forge_domain::api::Check::Failed);
     let report = Box::new([change::GateReport { number: 9, head, status: change::Status::Passed }]);
     assert_eq!(change_step(&mut world, 1, change::Status::Passed, report.clone()), change::Decision::QueueRepair);
     assert_eq!(world.writes(), 0);
@@ -505,8 +505,8 @@ fn an_aged_low_priority_change_takes_its_turn_ahead_of_later_work() {
     world.adopt();
     world.produce(b"temper/51");
     world.produce_file(b"temper/52", b"other", b"second change");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
-    world.status(b"temper/52", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/52", skein_fake_forge_domain::api::Check::Passed);
     let pull51 = world.open_pull(b"temper/51", b"main");
     let pull52 = world.open_pull(b"temper/52", b"main");
     let head51 = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
@@ -577,14 +577,14 @@ fn a_failed_ci_head_is_repaired_then_checked_again() {
         change_step(&mut world, 2, change::Status::Passed, Box::new([])),
         change::Decision::Effect(change::Effect::Open)
     );
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Failed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
     assert_eq!(
         change_step(&mut world, 3, change::Status::Passed, Box::new([])),
         change::Decision::Delegate(change::Delegate::Repair(change::Repair::Ci))
     );
     let before = world.writes();
     world.push(b"temper/51", b"repaired");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let mut finished = false;
     for entry in 4..20 {
         if let change::Decision::Finish { .. } = change_step(&mut world, entry, change::Status::Passed, Box::new([])) {
@@ -1139,7 +1139,7 @@ fn a_ci_subscription_reads_its_head_and_restarts_without_repeating_old_news() {
     let mut world = World::new(94);
     world.adopt();
     world.produce(b"temper/51");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let head = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
     let topic = top::Topic::Ci { repository: REPO, head };
     world.event(top::Event::Subscribe {
@@ -1163,7 +1163,7 @@ fn a_ci_subscription_reads_its_head_and_restarts_without_repeating_old_news() {
             .iter()
             .any(|request| matches!(request, top::Request::News { task: 51, news: top::News::Ci { .. }, .. }))
     );
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Failed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
     world.event(top::Event::Hint {
         hint: skein_forge::api::Hint { repository: REPO, change: skein_forge::api::Change::Commit(head), key: None },
     });

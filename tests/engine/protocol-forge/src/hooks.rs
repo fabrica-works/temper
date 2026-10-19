@@ -1,10 +1,10 @@
 //! A scripted socket world for the real webhook component.
 use crate::fixtures;
+use skein_fake_forge_protocol::delivery::Post;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall, bytes};
 use skein_world::stream::Wire;
 use std::collections::BTreeMap;
 use temper_engine_protocol_forge::{Component, Event, Limits, Request, Settings, hooks::Hinted};
-use temper_fake_forge_protocol::delivery::Post;
 
 #[derive(Debug)]
 pub struct Peer {
@@ -226,7 +226,7 @@ impl Listener {
 #[must_use]
 pub fn signed(path: &[u8], event: &[u8], body: &[u8]) -> Post {
     let signature =
-        temper_fake_forge_protocol::delivery::sign(&skein_lib::Secret::new(Box::from(fixtures::HOOK_SECRET)), body);
+        skein_fake_forge_protocol::delivery::sign(&skein_lib::Secret::new(Box::from(fixtures::HOOK_SECRET)), body);
     let mut head = format!("POST {} HTTP/1.1\r\nHost: 127.0.0.1:7200\r\nContent-Length: {}\r\nX-Forgejo-Event: {}\r\nX-Forgejo-Signature: ",
         core::str::from_utf8(path).expect("path"), body.len(), core::str::from_utf8(event).expect("event")).into_bytes();
     head.extend_from_slice(&signature);
@@ -238,6 +238,6 @@ pub fn signed(path: &[u8], event: &[u8], body: &[u8]) -> Post {
 pub fn push(branch: &[u8], commit: u64) -> Post {
     let limits = fixtures::fake_limits();
     let service =
-        temper_fake_forge_protocol::Service::new(fixtures::hooked_protocol_config(), &limits, 7).expect("service");
+        skein_fake_forge_protocol::Service::new(fixtures::hooked_protocol_config(), &limits, 7).expect("service");
     service.delivery(&fixtures::push_hook(branch, commit), &limits).expect("delivery")
 }

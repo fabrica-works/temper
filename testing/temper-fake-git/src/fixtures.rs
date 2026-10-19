@@ -51,13 +51,13 @@ pub fn spawn_of(command: &Command) -> Spawn {
 }
 
 use crate::{Answer, Forge, Transport, answer, check, id::id};
+use skein_fake_forge_domain::{self as domain, api};
 use skein_lib::{Duration, List};
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use temper_fake_checkout::{
     Checkout,
     git::{self as local, Remote, Tree},
 };
-use temper_fake_forge_domain::{self as domain, api};
 /// The protocol world's synchronous forge configuration, shared by the worlds.
 pub const CONFIG: domain::Config = temper_worker_checkout_world::forge::CONFIG;
 /// Each protocol or refusal case has its own equivalent checkout fixture.
@@ -89,7 +89,7 @@ pub fn scenario() -> Scenario {
 }
 /// The API table the HTTP and git processes share.
 #[must_use]
-pub fn table(full: &[u8], protected: Option<&[u8]>) -> temper_fake_forge_protocol::Config {
+pub fn table(full: &[u8], protected: Option<&[u8]>) -> skein_fake_forge_protocol::Config {
     let mut tokens = List::with_capacity(2);
     tokens.push((Secret::new(TOKEN.into()), 1)).expect("two tokens");
     tokens.push((Secret::new(b"fake-git-stranger-token".as_slice().into()), 2)).expect("two tokens");
@@ -98,9 +98,9 @@ pub fn table(full: &[u8], protected: Option<&[u8]>) -> temper_fake_forge_protoco
     users.push((2, b"stranger".as_slice().into())).expect("two users");
     let mut repositories = List::with_capacity(1);
     repositories
-        .push(temper_fake_forge_protocol::Repository { id: 2, full: full.into(), protected: protected.map(Into::into) })
+        .push(skein_fake_forge_protocol::Repository { id: 2, full: full.into(), protected: protected.map(Into::into) })
         .expect("one repository");
-    temper_fake_forge_protocol::Config {
+    skein_fake_forge_protocol::Config {
         base: b"http://127.0.0.1:3000".as_slice().into(),
         tokens,
         users,
@@ -108,7 +108,7 @@ pub fn table(full: &[u8], protected: Option<&[u8]>) -> temper_fake_forge_protoco
         max_response_items: 8,
         default_paging_num: 30,
         hooks: None,
-        faults: temper_fake_forge_protocol::Faults { reset: 0, drop: 0, server_error: 0 },
+        faults: skein_fake_forge_protocol::Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }
 /// The transcript's repository name, with an unborn fixture for fixture/empty.

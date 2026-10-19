@@ -11,7 +11,7 @@
 //! layer and io, which run each operation on the fakes after a latency,
 //! racing its deadline and any cancel: git's working trees on the fake disk
 //! ([`temper_fake_checkout`]), their remotes on the fake forge
-//! (`temper_fake_forge_domain`, through [`forge`]), with the faults the world
+//! (`skein_fake_forge_domain`, through [`forge`]), with the faults the world
 //! scripts: a repository that cannot be reached or refuses a push, io
 //! failing, another party advancing a branch, and specs that name what the
 //! forge does not have ([`translate`]).

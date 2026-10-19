@@ -1,4 +1,4 @@
-//! The fake forge (`temper_fake_forge_domain`) as io's git meets it, across the
+//! The fake forge (`skein_fake_forge_domain`) as io's git meets it, across the
 //! network (testing.md, 4.2 and 4.3): the transport a working tree's
 //! git reaches its remotes through ([`Remote`]), routed to the forge's domain
 //! as the worker's calls, and the forge's one store, where git names its
@@ -17,10 +17,10 @@
 //! What moved on the forge is what it observed: every move of a branch,
 //! drained by the world as [`Move`]s.
 
+use skein_fake_forge_domain::api::{Answer, Checks, Error, File, Git, Op, Permission, Read, Setup, What};
+use skein_fake_forge_domain::{Config, Domain, Event, Limits, MAX_OUT, Observation, Request, Skew};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use temper_fake_checkout::git::{self, Created, Fault, Pushed, Remote, Tree, Want};
-use temper_fake_forge_domain::api::{Answer, Checks, Error, File, Git, Op, Permission, Read, Setup, What};
-use temper_fake_forge_domain::{Config, Domain, Event, Limits, MAX_OUT, Observation, Request, Skew};
 
 /// The forge's users: the worker, whose identity every operation of io acts
 /// as; another party, who moves branches under it; and CI, which reports
@@ -124,13 +124,13 @@ impl Forge {
         let env = Env { now: self.now, wall: Wall::EPOCH, limits: CONFIG };
         let mut out = Queue::with_capacity(MAX_OUT);
         let reply_to = ReplyTo::new(Token::new(self.calls));
-        temper_fake_forge_domain::step(
+        skein_fake_forge_domain::step(
             &mut self.domain,
             &env,
             Event::Call { reply_to, user, repository: remote.into(), op },
             &mut out,
         );
-        temper_fake_forge_domain::fire(&mut self.domain, &env, &mut out);
+        skein_fake_forge_domain::fire(&mut self.domain, &env, &mut out);
         self.domain.reclaim();
         let Some(Request::Reply { to, result }) = out.pop() else {
             panic!("the forge answers a call at once");
@@ -142,7 +142,7 @@ impl Forge {
 
     /// Configure the authenticated identity used by an engine's adoption.
     pub fn grant(&mut self, remote: &[u8], user: u64, permission: Permission) {
-        temper_fake_forge_domain::grant(&mut self.domain, remote, user, permission);
+        skein_fake_forge_domain::grant(&mut self.domain, remote, user, permission);
     }
 
     // What a world does to the forge from outside.
@@ -170,21 +170,21 @@ impl Forge {
             protection: None,
             hooked: false,
         };
-        let first = temper_fake_forge_domain::repository(&mut self.domain, &CONFIG, setup);
-        temper_fake_forge_domain::grant(&mut self.domain, remote, WORKER, Permission::Write);
-        temper_fake_forge_domain::grant(&mut self.domain, remote, OTHER, Permission::Write);
+        let first = skein_fake_forge_domain::repository(&mut self.domain, &CONFIG, setup);
+        skein_fake_forge_domain::grant(&mut self.domain, remote, WORKER, Permission::Write);
+        skein_fake_forge_domain::grant(&mut self.domain, remote, OTHER, Permission::Write);
         first
     }
 
     /// Makes the repository at `remote` reachable, or not.
     pub fn set_reachable(&mut self, remote: &[u8], reachable: bool) {
-        temper_fake_forge_domain::set_reachable(&mut self.domain, remote, reachable);
+        skein_fake_forge_domain::set_reachable(&mut self.domain, remote, reachable);
     }
 
     /// Makes the repository at `remote` refuse what is pushed to it, branches
     /// created included, or not.
     pub fn set_refusing(&mut self, remote: &[u8], refusing: bool) {
-        temper_fake_forge_domain::set_refusing(&mut self.domain, remote, refusing);
+        skein_fake_forge_domain::set_refusing(&mut self.domain, remote, refusing);
     }
 
     /// Another party commits on `branch` of the repository at `remote`,
@@ -192,7 +192,7 @@ impl Forge {
     /// its own would. Returns the commit.
     pub fn advance(&mut self, remote: &[u8], branch: &[u8], path: &[u8], content: &[u8]) -> u64 {
         let env = Env { now: self.now, wall: Wall::EPOCH, limits: CONFIG };
-        let advanced = temper_fake_forge_domain::advance(&mut self.domain, &env, remote, branch, path, content, OTHER);
+        let advanced = skein_fake_forge_domain::advance(&mut self.domain, &env, remote, branch, path, content, OTHER);
         advanced.expect("the forge has room for another party's commit")
     }
 
@@ -286,9 +286,9 @@ impl Remote for Forge {
 
     fn fetch(&mut self, remote: &[u8], want: Want<'_>) -> Result<u64, Fault> {
         let want = match want {
-            Want::Branch(branch) => temper_fake_forge_domain::api::Want::Branch(branch.into()),
-            Want::Commit(commit) => temper_fake_forge_domain::api::Want::Commit(commit),
-            Want::Default => temper_fake_forge_domain::api::Want::Default,
+            Want::Branch(branch) => skein_fake_forge_domain::api::Want::Branch(branch.into()),
+            Want::Commit(commit) => skein_fake_forge_domain::api::Want::Commit(commit),
+            Want::Default => skein_fake_forge_domain::api::Want::Default,
         };
         let Answer::Commit(commit) = self.call(remote, WORKER, Git::Fetch { want })? else {
             panic!("a fetch is answered with the commit fetched");
@@ -310,8 +310,8 @@ impl Remote for Forge {
             panic!("a push is answered with how it went");
         };
         Ok(match pushed {
-            temper_fake_forge_domain::api::Pushed::Pushed => Pushed::Pushed,
-            temper_fake_forge_domain::api::Pushed::Rejected => Pushed::Rejected,
+            skein_fake_forge_domain::api::Pushed::Pushed => Pushed::Pushed,
+            skein_fake_forge_domain::api::Pushed::Rejected => Pushed::Rejected,
         })
     }
 
@@ -335,10 +335,10 @@ impl Remote for Forge {
     fn store(&mut self, parent: u64, merging: Option<u64>, tree: Tree, message: &[u8]) -> Option<u64> {
         match merging {
             Some(second) => Some(
-                temper_fake_forge_domain::merge_commit(&mut self.domain, &CONFIG, parent, second, files(tree), message)
+                skein_fake_forge_domain::merge_commit(&mut self.domain, &CONFIG, parent, second, files(tree), message)
                     .expect("the forge's store has room for every merge"),
             ),
-            None => temper_fake_forge_domain::commit(&mut self.domain, &CONFIG, parent, files(tree), message)
+            None => skein_fake_forge_domain::commit(&mut self.domain, &CONFIG, parent, files(tree), message)
                 .expect("the forge's store has room for every commit"),
         }
     }
@@ -348,10 +348,10 @@ fn files(tree: Tree) -> Box<[File]> {
     tree.into_iter().map(|(path, content)| File { path: path.into(), content: content.into() }).collect()
 }
 
-fn created_of(created: temper_fake_forge_domain::api::Created) -> Created {
+fn created_of(created: skein_fake_forge_domain::api::Created) -> Created {
     match created {
-        temper_fake_forge_domain::api::Created::Created => Created::Created,
-        temper_fake_forge_domain::api::Created::Exists => Created::Exists,
+        skein_fake_forge_domain::api::Created::Created => Created::Created,
+        skein_fake_forge_domain::api::Created::Exists => Created::Exists,
     }
 }
 

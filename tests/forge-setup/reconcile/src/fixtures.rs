@@ -1,6 +1,6 @@
 //! Configuration and credentials shared by the world's stories.
+use skein_fake_forge_protocol::{Config, Faults};
 use skein_lib::{List, Secret};
-use temper_fake_forge_protocol::{Config, Faults};
 use temper_forge_setup::{Setup, limits, problem::Problems, setup::Entry};
 pub const ADMIN: &[u8] = b"admin-token-for-the-setup-world";
 pub const API: &[u8] = b"api-token-issued-to-the-bot";
@@ -74,14 +74,14 @@ pub fn converged(seed: u64) -> crate::World {
 }
 /// The HTTP mutations since a given request, including any unintended route.
 #[must_use]
-pub fn write_routes(world: &crate::World, since: usize) -> Vec<temper_fake_forge_protocol::Route> {
+pub fn write_routes(world: &crate::World, since: usize) -> Vec<skein_fake_forge_protocol::Route> {
     use skein_forge::forgejo::{client, request::Method};
     let limits = temper_engine_protocol_forge_world::fixtures::fake_limits();
     let mut routes = Vec::new();
     for request in &world.requests()[since..] {
         let encoded = client::encode(request, &limits.documents).expect("world request");
         if encoded.method != Method::Get {
-            routes.push(temper_fake_forge_protocol::route(request));
+            routes.push(skein_fake_forge_protocol::route(request));
         }
     }
     routes

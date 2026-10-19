@@ -1,9 +1,9 @@
+use skein_fake_forge_protocol::Faults;
 use temper_engine_domain_forge as top;
 use temper_engine_protocol_forge_world::{
     fixtures,
     protocol::{Protocol, REPO},
 };
-use temper_fake_forge_protocol::Faults;
 #[test]
 fn stories_through_cut_streams_answer_each_call_once() {
     let faults = Faults { reset: 20, drop: 20, server_error: 20 };

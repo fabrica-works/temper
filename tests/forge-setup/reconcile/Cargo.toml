@@ -12,7 +12,7 @@ skein-lib.workspace = true
 skein-http.workspace = true
 jig-protocol-config.workspace = true
 temper-forge-setup.workspace = true
-temper-fake-forge-protocol.workspace = true
+skein-fake-forge-protocol.workspace = true
 temper-engine-protocol-forge-world = { path = "../../engine/protocol-forge" }
 temper-codecs-world = { path = "../../codecs" }
 

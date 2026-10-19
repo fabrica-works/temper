@@ -500,25 +500,25 @@ fn bounded_job_bytes_translate_to_a_truncated_attempt_log() {
     let asked = api::Op::Read(api::Read::Job { attempt, max_bytes: 4 });
     let result = temper_engine_forge_client_world::translate::answer(
         &asked,
-        temper_fake_forge_domain::api::Answer::Job {
-            job: temper_fake_forge_domain::api::Job { id: 7, run: 3, index: 0, attempt: 2 },
+        skein_fake_forge_domain::api::Answer::Job {
+            job: skein_fake_forge_domain::api::Job { id: 7, run: 3, index: 0, attempt: 2 },
             steps: Box::new([
-                temper_fake_forge_domain::api::Step {
+                skein_fake_forge_domain::api::Step {
                     number: 0,
                     name: Box::from(&b"Set up job"[..]),
-                    status: temper_fake_forge_domain::api::StepStatus::Success,
+                    status: skein_fake_forge_domain::api::StepStatus::Success,
                     log: Box::from(&b"set up\n"[..]),
                 },
-                temper_fake_forge_domain::api::Step {
-                    number: temper_fake_forge_domain::api::WORKFLOW_STEP,
+                skein_fake_forge_domain::api::Step {
+                    number: skein_fake_forge_domain::api::WORKFLOW_STEP,
                     name: Box::from(&b"Run build"[..]),
-                    status: temper_fake_forge_domain::api::StepStatus::Failure,
+                    status: skein_fake_forge_domain::api::StepStatus::Failure,
                     log: Box::from(&b"error"[..]),
                 },
-                temper_fake_forge_domain::api::Step {
+                skein_fake_forge_domain::api::Step {
                     number: 2,
                     name: Box::from(&b"Complete job"[..]),
-                    status: temper_fake_forge_domain::api::StepStatus::Failure,
+                    status: skein_fake_forge_domain::api::StepStatus::Failure,
                     log: Box::from(&b"job failed\n"[..]),
                 },
             ]),

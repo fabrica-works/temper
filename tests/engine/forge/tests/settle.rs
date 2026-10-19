@@ -1,10 +1,10 @@
+use skein_fake_forge_domain::api::Check;
 use skein_forge::api as client;
 use skein_lib::{Duration, Wall};
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
 use temper_engine_forge_world::changes::{change_row, change_step};
 use temper_engine_forge_world::{REPO, World, translate};
-use temper_fake_forge_domain::api::Check;
 
 /// First in its queue, a newly pushed head on a pull being checked now.
 fn first_on_a_checked_pull(mut world: World, span: Duration) -> World {

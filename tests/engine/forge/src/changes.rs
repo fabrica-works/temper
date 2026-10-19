@@ -99,7 +99,7 @@ pub fn reviewed_change(queued: bool, freshness: change::Freshness) -> (World, sk
     let mut world = World::new(17);
     world.adopt();
     world.produce(b"temper/51");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let pull = world.open_pull(b"temper/51", b"main");
     let head = crate::translate::commit(world.branch(b"temper/51"));
     let mut row = change_row();

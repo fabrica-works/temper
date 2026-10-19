@@ -1,3 +1,4 @@
+use skein_fake_forge_protocol::Route;
 use skein_lib::Wall;
 use temper_engine_domain_forge as top;
 use temper_engine_domain_forge_change as change;
@@ -7,7 +8,6 @@ use temper_engine_protocol_forge_world::{
     fixtures,
     protocol::{Protocol, REPO},
 };
-use temper_fake_forge_protocol::Route;
 fn change_row() -> top::ChangeRow {
     top::ChangeRow {
         task: 51,
@@ -168,14 +168,14 @@ fn a_failed_ci_head_is_repaired_then_checked_again() {
         change_step(&mut world, 2, change::Status::Passed, Box::new([])),
         change::Decision::Effect(change::Effect::Open)
     );
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Failed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
     assert_eq!(
         change_step(&mut world, 3, change::Status::Passed, Box::new([])),
         change::Decision::Delegate(change::Delegate::Repair(change::Repair::Ci))
     );
     let before = world.writes();
     world.push(b"temper/51", b"repaired");
-    world.status(b"temper/51", temper_fake_forge_domain::api::Check::Passed);
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Passed);
     let mut finished = false;
     for entry in 4..20 {
         if let change::Decision::Finish { .. } = change_step(&mut world, entry, change::Status::Passed, Box::new([])) {

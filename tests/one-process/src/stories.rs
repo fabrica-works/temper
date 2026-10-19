@@ -121,27 +121,27 @@ pub(crate) fn provider(story: Story) -> skein_fake_peers::llm::Peer {
     )
 }
 pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
-    let config = temper_fake_forge_domain::Config {
-        limits: temper_fake_forge_domain::Limits {
+    let config = skein_fake_forge_domain::Config {
+        limits: skein_fake_forge_domain::Limits {
             statuses: fixtures::FORGE_STATUSES,
             ..temper_fake_git::fixtures::CONFIG.limits
         },
         ..temper_fake_git::fixtures::CONFIG
     };
-    let mut domain = temper_fake_forge_domain::Domain::new(&config, fixtures::SEED);
-    let base = temper_fake_forge_domain::repository(
+    let mut domain = skein_fake_forge_domain::Domain::new(&config, fixtures::SEED);
+    let base = skein_fake_forge_domain::repository(
         &mut domain,
         &config,
-        temper_fake_forge_domain::api::Setup {
+        skein_fake_forge_domain::api::Setup {
             id: fixtures::REPOSITORY,
             name: b"acme/app".as_slice().into(),
             default: b"main".as_slice().into(),
-            tree: Box::new([temper_fake_forge_domain::api::File {
+            tree: Box::new([skein_fake_forge_domain::api::File {
                 path: b"conflict.txt".as_slice().into(),
                 content: b"base\n".as_slice().into(),
             }]),
             labels: Box::new([]),
-            checks: temper_fake_forge_domain::api::Checks {
+            checks: skein_fake_forge_domain::api::Checks {
                 contexts: Box::new([b"check".as_slice().into()]),
                 latency_min: Duration::ZERO,
                 latency_max: Duration::ZERO,
@@ -154,11 +154,11 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
             hooked: false,
         },
     );
-    temper_fake_forge_domain::grant(
+    skein_fake_forge_domain::grant(
         &mut domain,
         b"acme/app",
         fixtures::WORKER_USER,
-        temper_fake_forge_domain::api::Permission::Write,
+        skein_fake_forge_domain::api::Permission::Write,
     );
     let forge = std::rc::Rc::new(std::cell::RefCell::new(temper_fake_git::Forge::new(domain, config)));
     let mut transport = temper_fake_git::Transport::new(forge, &temper_fake_git::fixtures::table(b"acme/app", None));
@@ -176,7 +176,7 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
         let mut forge = transport.forge.borrow_mut();
         let config = forge.config;
         let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::from_nanos(0), limits: config };
-        let moved = temper_fake_forge_domain::advance(
+        let moved = skein_fake_forge_domain::advance(
             &mut forge.domain,
             &env,
             b"acme/app",
@@ -194,16 +194,16 @@ pub(crate) fn forge(story: Story) -> temper_fake_git::Transport {
 pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
     let mut forge = transport.forge.borrow_mut();
     let env = skein_lib::Env { now: forge.now, wall: skein_lib::Wall::EPOCH, limits: forge.config };
-    let mut replies = skein_lib::Queue::with_capacity(temper_fake_forge_domain::MAX_OUT);
+    let mut replies = skein_lib::Queue::with_capacity(skein_fake_forge_domain::MAX_OUT);
     let token = skein_lib::Token::new(1_u64 << 60);
-    temper_fake_forge_domain::step(
+    skein_fake_forge_domain::step(
         &mut forge.domain,
         &env,
-        temper_fake_forge_domain::Event::Call {
+        skein_fake_forge_domain::Event::Call {
             reply_to: skein_lib::ReplyTo::new(token),
             user: fixtures::WORKER_USER,
             repository: b"acme/app".as_slice().into(),
-            op: temper_fake_forge_domain::api::Op::Git(temper_fake_forge_domain::api::Git::Create {
+            op: skein_fake_forge_domain::api::Op::Git(skein_fake_forge_domain::api::Git::Create {
                 branch: fixtures::MERGE_BRANCH.into(),
                 commit: fixtures::BRANCH_HEAD,
             }),
@@ -214,10 +214,10 @@ pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
     for _ in 0..32 {
         while let Some(reply) = replies.pop() {
             match reply {
-                temper_fake_forge_domain::Request::Reply { to, result } => {
+                skein_fake_forge_domain::Request::Reply { to, result } => {
                     let destination = to.into_token();
                     if destination != token {
-                        forge.pending.push(temper_fake_forge_domain::Request::Reply {
+                        forge.pending.push(skein_fake_forge_domain::Request::Reply {
                             to: skein_lib::ReplyTo::new(destination),
                             result,
                         });
@@ -225,20 +225,20 @@ pub(crate) fn prepare_merge_branch(transport: &temper_fake_git::Transport) {
                     }
                     assert_eq!(
                         result,
-                        Ok(temper_fake_forge_domain::api::Answer::Branch(
-                            temper_fake_forge_domain::api::Created::Created
+                        Ok(skein_fake_forge_domain::api::Answer::Branch(
+                            skein_fake_forge_domain::api::Created::Created
                         )),
                         "the existing private merge branch"
                     );
                     created = true;
                 }
-                reply @ temper_fake_forge_domain::Request::Hook { .. } => forge.pending.push(reply),
+                reply @ skein_fake_forge_domain::Request::Hook { .. } => forge.pending.push(reply),
             }
         }
         if created {
             break;
         }
-        temper_fake_forge_domain::fire(&mut forge.domain, &env, &mut replies);
+        skein_fake_forge_domain::fire(&mut forge.domain, &env, &mut replies);
     }
     forge.domain.reclaim();
     assert!(created, "the existing private merge branch answered");

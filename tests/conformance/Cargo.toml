@@ -21,7 +21,7 @@ temper-engine-domain-forge.workspace = true
 temper-engine-domain-forge-change.workspace = true
 temper-engine-domain-forge-client.workspace = true
 temper-engine-forge-world = { path = "../engine/forge" }
-temper-fake-forge-domain.workspace = true
+skein-fake-forge-domain.workspace = true
 
 jig-conformance.workspace = true
 jig-fake-workers.workspace = true

@@ -1,4 +1,6 @@
 //! HTTP and git share one forge domain; factories take its handle from this world.
+use skein_fake_forge_domain as domain;
+use skein_fake_forge_protocol as protocol;
 use skein_io::{
     self as io,
     kernel::{Complete, Submit},
@@ -6,8 +8,6 @@ use skein_io::{
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use skein_shell::Host;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
-use temper_fake_forge_domain as domain;
-use temper_fake_forge_protocol as protocol;
 type Shared = Rc<RefCell<temper_fake_git::Forge>>;
 thread_local! { static SHARED: RefCell<Option<temper_fake_git::Transport>> = const { RefCell::new(None) }; }
 pub(crate) fn set(transport: Option<temper_fake_git::Transport>) {

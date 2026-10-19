@@ -1,10 +1,10 @@
 //! Independent typed-protocol projection. Keys live in hexadecimal body
 //! markers; fake counts stand in for full commit IDs. Paging is applied to
 //! the fake's bounded snapshots; comparisons remain whole responses.
+use skein_fake_forge_domain::api as forge;
 use skein_forge::api as client;
 use skein_lib::{List, Time};
 use temper_engine_domain_forge_client::Limits;
-use temper_fake_forge_domain::api as forge;
 const KEY: &[u8] = b"<!-- temper:key ";
 const END: &[u8] = b" -->\n";
 #[must_use]
@@ -546,8 +546,8 @@ pub fn locate_name(op: &client::Op) -> Option<Box<[u8]>> {
 
 /// Map a fake hook as the component maps a Forgejo delivery (protocol/forge.md 5).
 #[must_use]
-pub fn hint(repository: client::Repository, request: &temper_fake_forge_domain::Request) -> Option<client::Hint> {
-    let temper_fake_forge_domain::Request::Hook { change, number, branch, commit: head, by, body, ended, .. } = request
+pub fn hint(repository: client::Repository, request: &skein_fake_forge_domain::Request) -> Option<client::Hint> {
+    let skein_fake_forge_domain::Request::Hook { change, number, branch, commit: head, by, body, ended, .. } = request
     else {
         return None;
     };

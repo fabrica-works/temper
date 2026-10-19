@@ -11,7 +11,7 @@ skein-forge.workspace = true
 skein-world.workspace = true
 skein-lib.workspace = true
 temper-engine-domain-forge-client.workspace = true
-temper-fake-forge-domain.workspace = true
+skein-fake-forge-domain.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

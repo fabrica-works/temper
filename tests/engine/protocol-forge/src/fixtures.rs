@@ -120,8 +120,8 @@ pub fn branch() -> skein_forge::api::Op {
 
 /// The fake's HTTP and document bounds, matching the service's small profile.
 #[must_use]
-pub fn fake_limits() -> temper_fake_forge_protocol::Limits {
-    temper_fake_forge_protocol::Limits {
+pub fn fake_limits() -> skein_fake_forge_protocol::Limits {
+    skein_fake_forge_protocol::Limits {
         calls: 4,
         connections: 4,
         raw_bytes: 4096,
@@ -145,8 +145,8 @@ pub fn fake_limits() -> temper_fake_forge_protocol::Limits {
 }
 /// The token's writer is user 1; the scenario's repository is id 2.
 #[must_use]
-pub fn protocol_config() -> temper_fake_forge_protocol::Config {
-    use temper_fake_forge_protocol::{Config, Faults, Repository};
+pub fn protocol_config() -> skein_fake_forge_protocol::Config {
+    use skein_fake_forge_protocol::{Config, Faults, Repository};
     let mut tokens = List::with_capacity(1);
     tokens.push((Secret::new(Box::from(TOKEN)), 1)).expect("one token");
     let mut users = List::with_capacity(2);
@@ -228,9 +228,9 @@ pub fn hook_settings() -> Settings {
     settings
 }
 #[must_use]
-pub fn hooked_protocol_config() -> temper_fake_forge_protocol::Config {
+pub fn hooked_protocol_config() -> skein_fake_forge_protocol::Config {
     let mut config = protocol_config();
-    config.hooks = Some(temper_fake_forge_protocol::delivery::Endpoint {
+    config.hooks = Some(skein_fake_forge_protocol::delivery::Endpoint {
         forge: FORGE,
         host: Box::from(b"127.0.0.1:7200".as_slice()),
         secret: Secret::new(Box::from(HOOK_SECRET)),
@@ -238,8 +238,8 @@ pub fn hooked_protocol_config() -> temper_fake_forge_protocol::Config {
     config
 }
 #[must_use]
-pub fn push_hook(branch: &[u8], commit: u64) -> temper_fake_forge_domain::Request {
-    use temper_fake_forge_domain::{Request, api::Change};
+pub fn push_hook(branch: &[u8], commit: u64) -> skein_fake_forge_domain::Request {
+    use skein_fake_forge_domain::{Request, api::Change};
     Request::Hook {
         repository: Box::from(b"org/repo".as_slice()),
         change: Change::Push,

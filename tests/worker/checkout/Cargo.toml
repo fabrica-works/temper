@@ -11,7 +11,7 @@ skein-world.workspace = true
 skein-lib.workspace = true
 temper-worker-domain-checkout.workspace = true
 temper-fake-checkout.workspace = true
-temper-fake-forge-domain.workspace = true
+skein-fake-forge-domain.workspace = true
 
 # Ordinary Rust (programming-model.md, 10.2), so not the step crates' lints.
 # tests/clippy.toml bans what would make a run unrepeatable.
