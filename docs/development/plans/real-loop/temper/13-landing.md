@@ -377,8 +377,9 @@ pub fn fixture() -> forge::Fixture;
 
 - **13.3, the dev-dependency** `crates/temper` → `temper-real-loop-world`
   refused by cargo or a lint: raise it, never copy.
-- **A story over 1 s,** or the stories together past testing.md 6.1's
-  budget: profiled, then raised with what it waits on.
+- **A story over 1 s:** profiled, then raised with what it waits on.
+  The stories together past testing.md 6.1's 4 s hold no story within
+  its 1 s (README, Rules, "The worlds' sum").
 - **The landing stalls,** or the delegate does not end at the merge
   (domain/forge.md, 8.2): keep the trace, the peer's observations and
   the last stdout, and raise it before changing a fixture.

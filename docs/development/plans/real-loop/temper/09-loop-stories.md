@@ -398,9 +398,10 @@ decisions.md 9 and 10:
 - **The refused sign-in draws no fresh link,** or D2 lands as another
   party; **the second run refuses the kept scratch,** or asks the model
   again: raise it with what was observed.
-- **A story past 1 s, or the stories together past 4 s** with the other
-  worlds below the domain (testing.md, 6.1): profiled, then raised with
-  what it waits on; the restart first to `tests/fuzzy_restart.rs`.
+- **A story past 1 s:** profiled, then raised with what it waits on;
+  the restart first to `tests/fuzzy_restart.rs`. The stories together
+  past 4 s with the other worlds below the domain (testing.md, 6.1) hold
+  no story within its 1 s (README, Rules, "The worlds' sum").
 - **temper 05's or temper-03.4's names or lines** differ from `05-ctl.md`'s
   and tools.md 6.1's: follow the landed code; a kept name or key printed
   is a finding. **The native shell dials at start:** raise it.

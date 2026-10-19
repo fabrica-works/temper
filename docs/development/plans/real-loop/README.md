@@ -130,6 +130,18 @@ plan's own.
   three times, and gives the median wall time in its commit body. A story
   over its 1 s aim is made cheaper or moved to the fuzzy profile, never
   merged with another and never excepted; what it waits on is named.
+- **The worlds' sum below the domain holds no step** (testing.md 6.1, as
+  the designer's answer of 2026-10-19 restates it). It is the packages
+  `temper-client-shell-terminal`, `temper-client-world`,
+  `temper-engine-protocol-forge-world`,
+  `temper-forge-setup-reconcile-world`, `temper-one-process-world`,
+  `temper-real-loop-world` and `temper-worker-protocol-git-world`, each
+  test's own time, idle (`--profile measure -j 1` through `heavy
+  --gate`): 3.91 s at `94df159d3`, with 08.2, against 6.1's 4 s. This
+  plan's stories pass it; a test within its own guide lands, and no test
+  is moved, cut or merged for the sum until the user decides how 6.1
+  counts the real loop (decisions.md, For the user, L). Done when 5
+  gives it at the end.
 - **A world failure's cause, within a budget** (ruling 110;
   implementer.md, 8.7 and 8.8). A focused world test that fails with a
   symptom its three diagnostic runs did not name gets eight more runs
@@ -311,6 +323,18 @@ says.
    ```
    heavy --gate -- sh -c 'export NEXTEST_DOUBLE_SPAWN=0; for i in 1 2 3; do cargo nextest run --workspace >focused-$i.log 2>&1; cargo nextest run --workspace --profile fuzzy >fuzzy-$i.log 2>&1; done'
    for k in focused fuzzy; do for i in 1 2 3; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p' $k-$i.log | awk -v run=$k-$i '$2 ~ /^temper(-client-tools|-client-world|-engine-domain-world|-client-shell-cli|-real-loop-world)?$/ {s += $1} END {printf "%s %.2f\n", run, s}'; done; done
+   ```
+
+   Then the worlds' sum below the domain (testing.md 6.1; Rules, "The
+   worlds' sum"), four runs after one build, the last three counted,
+   against its 3.91 s at the base, with the real loop's part apart and
+   the three slowest of those tests by name in decisions.md's rulings,
+   for the user:
+
+   ```
+   P='-p temper-client-shell-terminal -p temper-client-world -p temper-engine-protocol-forge-world -p temper-forge-setup-reconcile-world -p temper-one-process-world -p temper-real-loop-world -p temper-worker-protocol-git-world'
+   heavy -- sh -c "cargo nextest run $P --no-run" && heavy --gate -- sh -c "export NEXTEST_DOUBLE_SPAWN=0; for i in 1 2 3 4; do cargo nextest run $P --profile measure -j 1 >below-\$i.log 2>&1; done"
+   for i in 2 3 4; do sed -nE 's/^ *PASS \[ *([0-9.]+)s\] \([^)]*\) ([^: ]+)[: ].*/\1 \2/p' below-$i.log | awk -v run=below-$i '{s += $1} $2 == "temper-real-loop-world" {r += $1} END {printf "%s %.2f, the real loop %.2f\n", run, s, r}'; done
    ```
 
 6. Nothing outside these items is checked.

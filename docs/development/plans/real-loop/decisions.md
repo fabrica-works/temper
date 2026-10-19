@@ -371,3 +371,17 @@ and the user, or the director, may veto it before the run:
   temper 14 spreads its cost over eight shards, each naming the cause,
   and the digest, the next plan, cures it.
   Decision: accepted, by director, 2026-10-19 (decision 12).
+- **L. How testing.md 6.1 counts the real loop** (the designer's answer
+  of 2026-10-19). 6.1 counts the real-loop world among the worlds below
+  the domain, together at most 4 s (the real loop joined that sum on
+  2026-10-18, and the 4 s stayed); they take 3.91 s at the base,
+  measured idle, and this plan adds
+  sixteen real-loop and fourteen client stories (C). The choices: (a)
+  keep the 4 s with the real loop in, and make cheaper or move to fuzzy
+  what passes it; (b) count the real loop apart: the other worlds keep
+  4 s, and the real loop's sum is each plan's Pulse aim, accepted by the
+  user (for this plan C's 16 s, about 8 s expected), each story at most
+  1 s; (c) no sum: the per-test guides and the 15 s rule alone. The
+  designer recommends (b). Until it is decided: measured, never moved,
+  cut or merged for the sum (README, Rules, "The worlds' sum").
+  Decision: pending, with the director.

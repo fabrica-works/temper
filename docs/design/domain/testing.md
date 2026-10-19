@@ -852,14 +852,24 @@ by the commands in `docs/development/workflow.md`. In temper:
   ending among them.
 - **Budgets.** The suites' 15 s and 60 s are rules, which nextest
   enforces. Within them, guides: the worlds below the domain (the
-  protocol, machine, client, one-process and real-loop worlds) together
-  at most 4 s of the default suite and 25 s of the fuzzy suite; a focused
-  protocol-world test at most 0.5 s, and a one-process or real-loop story
-  at most 1 s.
+  protocol, machine, client, one-process, reconcile and real-loop worlds)
+  together at most 4 s of the default suite and 25 s of the fuzzy suite;
+  a focused protocol-world test at most 0.5 s, and a one-process or
+  real-loop story at most 1 s.
   A test that misses its guide is made cheaper or moved to the fuzzy
   suite, never merged with another and never named as an exception: a
   real-loop story with CI and webhooks (2.4) is held to the 1 s as any
   other.
+- **The worlds' sum is measured as the suites' rules are:** each test's
+  own time, run alone on the idle development machine (testing-strategy.md,
+  section 8), with `--profile measure -j 1` through `heavy --gate`, the
+  median of three runs. Beside another task, it measures that task.
+- **The sum is the worlds' guide, never a landing's.** A test within its
+  own guide lands. A plan that adds to these worlds gives the sum at its
+  base and at its end, with the real loop's part apart. When the worlds
+  together pass the sum, their slowest tests are profiled, then made
+  cheaper at the cause the profile shows or moved to the fuzzy suite, by
+  steps a plan names.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
