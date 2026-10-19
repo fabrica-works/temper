@@ -371,6 +371,7 @@ and the user, or the director, may veto it before the run:
   prepared at build time needs a skein form for it (`later.md`). A veto
   keeps the wall-clock alone, or drops jig 04 and leaves the budget at
   30 s.
+  Decision: accepted, by director, 2026-10-19.
 - **B. Two plans, and the real loop in the second** (7, 16). This plan
   builds section 13 and the tools as a library, proven by unit tests in
   temper and by jig's worlds and joint stories; `temper ctl`, the client
@@ -386,6 +387,7 @@ and the user, or the director, may veto it before the run:
   next plan; jig 01.3 and temper 01.1 (C) prove repins on the process
   tier, which only the executables show. A veto runs area 1 as one plan
   of about 68 steps with a longest chain of about 31.
+  Decision: accepted, by director, 2026-10-19. Two plans, with the real loop built whole in the second.
 - **C. The process proofs, and where they run** (7). jig 01.3 drops a
   declared memory in jig's process tests; temper 01.1's process proof
   runs `a_native_chat_reaches_the_model`, which needs `TEMPER_FORGEJO`
@@ -393,6 +395,7 @@ and the user, or the director, may veto it before the run:
   the machine has it, temper 01.1's process proof runs where Forgejo is
   installed, or the supervisor rules it one layer down (implementer.md
   8.8). A veto installs Forgejo on the run's machine before the run.
+  Decision: vetoed, by director, 2026-10-19. Forgejo 17.0.0, the pinned build (sha256 5a3b07e1…42ca), is installed on the run's machine, debian-16gb-hel1-1, with TEMPER_FORGEJO set in its login profile and Claude's environment, so temper 01.1's process proof runs there (the client-api retrospective's proposal 7: no Proof lands "unavailable").
 - **D. The user's drafts** (temper `draft/llm-setup.md`, jig
   `draft/llm-accounts.md`): area 1 chooses nothing they must undo. The
   points that touch them:
@@ -406,23 +409,29 @@ and the user, or the director, may veto it before the run:
   - no config file (tools.md 8.1);
   - the named key (SHA-256 of `"temper-tools"`, a zero byte, the name)
     is generic: keyed account acts can reuse it.
+  Decision: accepted, by director, 2026-10-19.
 - **E. jig's jobs read as call outcomes** (jig 01.2): "Started as job
   N", "Job N ended: exit C", "Not run: after a failed write"; jobs never
   reach temper's engine (`Request::Job` answered `Problem::Type`).
+  Decision: accepted, by director, 2026-10-19.
 - **F. The repin absorbs smith's parity and wall-clock changes** (1):
   transcript v5, jobs, event vocabulary v3 and the larger shipped
   memory, into jig and temper, in jig 01 and temper 01.
+  Decision: accepted, by director, 2026-10-19.
 - **G. The forge kit** (skein `draft/forge.md`, temper
   `draft/forge-kit.md`) (10): temper 11 moves the forge's words from
   temper-client-view to temper-client-domain and builds `adopt` on them;
   the kit, which would move the forge client, will rebase them. The
   README's Hotspots list each file and step. The fake forge's host is
   the next plan's.
+  Decision: accepted, by director, 2026-10-19. The forge kit's run follows this one's temper 11, on another machine, by its own hotspot list.
 - **H. hearth's repin** (17): hearth has no checkout on the run's
   machine, and its own run on hel8 is paused. `hearth-repin` waits for
   a checkout and runs after jig-repin; if hearth's run resumes first,
   the two runs' pins meet in hearth's lock. A veto drops hearth-repin
   from this plan and leaves hearth on its own pins.
+  Decision: accepted, by director, 2026-10-19. hearth is cloned on debian-16gb-hel1-1; hearth's own run stays paused.
 - **I. The aims are this machine's** (18): jig 7 8 and temper 5 8, from
   three runs each on debian-16gb-hel1-1. A run on another machine
   measures new base times first.
+  Decision: accepted, by director, 2026-10-19. The run goes on debian-16gb-hel1-1.
