@@ -158,14 +158,22 @@ plan's own.
   port 0 and is found by its bound address; no story names a fixed port
   (testing.md 2.4).
 - **A setup written once, and rows carry data** (testing-strategy.md,
-  10). An opener two tests share is one helper of their fixtures; a size
-  an assertion reads is a named const with a line on what a smaller
-  value would miss; a case that extends a fixture is built from it, never
-  retyped.
+  10). An opener or helper two tests share, in one file or two, is one
+  helper of the crate's fixtures: before defining one, `rg 'fn <name>'
+  <crate>/tests <crate>/src/tests`, and move a sibling file's there. A
+  size an assertion reads is a named const with a line on what a smaller
+  value would miss; a story's parties, tasks, projects and tokens are
+  named fixtures with a line on their value, never bare numbers in a
+  test body; a case that extends a fixture is built from it, never
+  retyped. A table's body checks every row alike and never branches on a
+  row: rows that expect different outcomes are tests of their own
+  (ruling 126).
 - **One behaviour per test** (testing-strategy.md, 10), named for it,
   never with "and": it sets up, acts once, then asserts that behaviour.
   Nothing is asserted on the way to the step under test, and a bound
-  has both sides, from named constants (ruling 117).
+  has both sides, from named constants (ruling 117). The expected value
+  is a literal, a golden file or a named size, never computed by the
+  code under test (ruling 126).
 - **No lint exception for a plan's words.** A Shape or sketch that needs
   a call clippy.toml bans is a question, raised before any `#[expect]`;
   each new `#[expect]` or `#[allow]` is named in the report.

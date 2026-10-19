@@ -517,6 +517,20 @@ pass:
        wait in the caller, no raised bound.
      - 10.1 needs only 08.s1 (its Needs): it may start once 08.s1 lands.
 
+126. **Test-shape rules from the check of 15:46:32Z** (steer of 2026-10-19T15:46:32Z).
+     Test-shape rules refined from the check of 2026-10-19T15:46:32Z
+     (testing-strategy.md, 10). The README's "One behaviour per test" now says
+     the expected value is a literal, a golden file or a named size, never
+     computed by the code under test (05.6's `help_opens_nothing` builds its
+     bytes with `help::text`; 06.2's attempt test asserts `first_attempt + 1`).
+     "A setup written once, and rows carry data" now says: a helper two test
+     files share is one helper of the crate's fixtures, found first with `rg
+     'fn <name>' <crate>/tests <crate>/src/tests` (06.2 and 06.5 each define
+     `call`); a story's parties, tasks, projects and tokens are named fixtures,
+     never bare numbers; a table's body checks every row alike, and rows that
+     expect different outcomes are tests of their own. Landed tests stay; the
+     rules apply to tests added or edited from now.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
