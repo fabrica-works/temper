@@ -575,6 +575,33 @@ pass:
      - A further check that counts lines where it means occurrences takes
        `-o` in the same way, named in the ruling that meets it.
 
+129. **09.2 diagnoses the unanswered Me watch within ruling 110's budget** (process, temper 09's block of 2026-10-19T16:35:37Z).
+     Ruling 129: 09.2 diagnoses the unanswered Me watch itself, under the
+     README's rule "A world failure's cause, within a budget" (ruling 110).
+
+     That rule reads: "A focused world test that fails with a symptom its
+     three diagnostic runs did not name gets eight more runs and 40 minutes
+     for that symptom, reproduced in its world through `heavy`, diagnostics
+     removed before the commit. A fix within the step's Files and rulings
+     needs no question; past the budget, or for a fix outside them, raise it
+     with the cause found, or each run's finding." The four runs so far
+     narrowed the symptom (the new stream's seed is sent; no Me delivery and
+     no watch acknowledgement follow) but did not name its cause. No other
+     session owns the service now, and 09.2's world is the only reproduction.
+
+     - Session 09 has eight more world runs and 40 minutes for this symptom.
+       Its diagnostics may go into any of temper's crates (`temper-service`,
+       `temper-client-shell-cli`, `temper-client-tools`), and are removed
+       before any commit. jig and skein are read at temper's pins, never
+       edited.
+     - Keep the Choice's same-pass kill: the plan's order is what the story
+       proves. A kill moved later is no fix.
+     - A cause whose fix lies outside 09.2's Files (the service, the client
+       shell, jig, skein) is raised as a block with the cause found, before
+       any such file is changed; the ruling then adds the step that fixes it.
+     - 09.4's independent work may go on while a diagnostic run waits in
+       the queue, and never instead of the budget.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
