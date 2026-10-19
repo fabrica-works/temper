@@ -128,7 +128,7 @@ Removes: nothing.
 
 ### 10.2 The write calls and the failure order
 Scope: forge.md 3.2, 5.2, 5.4 (each row, the order, a request unseen and one seen).
-Needs: skein 10.1's Run and calls.rs.
+Needs: skein 10.1's Run and calls.rs. Carry the named-page fixture correction into this increment: calls.rs::{page_size_is_passed_to_each_listing,remarks_are_sliced_without_wire_paging} use PAGE_SIZE and a named one-row fixture for both size rows and expected slices, with the existing values, rows and outcomes. Keep integer conversions explicit and lint-clean.
 Files: new `forgejo/plans/tests/edges.rs`; `forgejo/plans/tests/calls.rs`,
   `forgejo/plans/tests.rs` (`mod edges;`), `forgejo/tests/fixtures.rs` changed. No production
   file.

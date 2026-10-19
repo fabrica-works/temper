@@ -833,6 +833,18 @@ where its answer lands.
 
      Add the README Diagnostic process attempts rule: a bounded process probe preflights a fresh instance path, its proper process harness and the exact request comparison; preserve prior evidence, count setup failures as attempts, and report budget exhaustion before another attempt. Refresh any further reached driver copy or diagnostic fixture and list it in the commit body. Propose this prerequisite rule for the retrospective, rather than changing the pinned kit during the run.
 
+140. **Hourly04 graph coverage and named page fixtures** (steer of2026-10-19T09:26:37Z).
+     Reverses: nothing.
+     Amends: README Rules, graph-refresh hold and named page fixtures; skein/10-plans.md10.2.
+
+     Hourly04 found new source beyond both reported primary graph refreshes. Index status reports skein09:00:04Z through6df8817b and temper08:57:37Z through3fe3cf80; checked primary HEAD skeinbd503f9e38ffdee4207224fcb0bd2219c1fccff9 and temper24756a9d0e03ecbd23b6fd4fa28a01c24ffe29bd, with temper origin/maina8e697c54c46e17cb76269a711d781d06a5290e1. Both worktrees are clean. Hold graph use for those repositories while the supervisor updates exact clean primaries and indexes them; scoped source discovery remains available. Report exact source coverage before lifting this hold.
+
+     The new calls.rs page fixtures repeat a named-size finding. Testing-strategy.md10, Named fixtures and sizes, applies: correct page_size_is_passed_to_each_listing and remarks_are_sliced_without_wire_paging in skein10.2 using PAGE_SIZE and a named derived one-row fixture consistently in table sizes and expected slices. Preserve the byte strings b"1"/b"2" and every row/input/outcome; ordinary domain IDs remain data. Explicit conversions must preserve the u32 page-size and usize slice-bound types under existing lints. No test count, production behavior or budget changes. A bounded follow-up scopes the required recurring-mechanical AST gate supplement under development.md14.4; it will be registered with its own normal ready check before implementation.
+
+     Checked: scoped rg and sed in primary forgejo/plans/tests/calls.rs find page_size_is_passed_to_each_listing's (1,b"1") row and remarks_are_sliced_without_wire_paging's REMARKS[..2]/[..1] rows. Shared forgejo/tests/fixtures.rs::PAGE_SIZE is u32=2, ROWS u32=8. Existing10.2 Files already include calls.rs; its current tests and fixture caller are the complete reached users. Refresh any further reached copy or derived size found by the correction and list it in the commit body. Pinned plan supports ruling/ring; the kit remainsd6d4abe and its --gate tool contract remains unchanged.
+
+     The pinned numbers.sh::record_check at lines538–542 excludes .sN headings; the five pulse flags are supplement headings, not malformed coordinator reports. Record a retrospective proposal with ordinary-session/supplement/malformed-heading controls; keep the kit fixed. Process974 and three downstream checks remain pending and unverified; completion director806964 owns them. Hearth975 already passes. No other proof is repeated by this ruling.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

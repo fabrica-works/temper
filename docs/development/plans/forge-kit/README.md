@@ -115,6 +115,8 @@ chain.
 
 ## Rules of this plan
 
+- **Graph refresh pending (hourly04):** do not use the code graph for skein or temper until the supervisor reports the next verified primary refresh; use scoped source searches. Coverage through6df8817b/3fe3cf80 predates newer source.
+
 - **Graph freshness:** the supervisor refreshes only the primary checkout indexes. Use the exact primary project names and check each result in the actual worktree. Until a stale index's refresh is reported, use source searches for that repository; a missing graph result proves no absence. A refresh applies through its reported source commit; later source landings require a fresh comparison. Source search remains available throughout.
 
 - **Diagnostic process attempts:** before spending an authorized process probe, select a fresh run-owned instance path and the harness for its process tier; verify prerequisites and the exact request comparison before execution. Preserve earlier evidence instead of reusing a nonempty instance. Setup failures still consume attempts. Exhausting a diagnostic budget requires a report and a new ruling before another attempt; it does not expand unit-suite time limits or authorize retries.
@@ -126,6 +128,8 @@ chain.
 - **Client recovery fixtures:** skein02.s2 owns hourly-03 recovery findings after02.s1, with the mapped assertions, independent boundary records and bounded Rust AST gate controls in its session/findings. Preserve every rejection cause and failed-instance persistence; the repeated identical generic fresh success is one independent behavior. The closing temper repin waits for02.s2. Final counts are relative; historical increment proofs retain their original meaning.
 
 - **Client contract fixtures:** skein 02.s1 owns hourly-02's new contract-test corrections after 02.4, following testing-strategy.md 10's One behaviour per test, The setup the assertion reads, A setup written once, Named fixtures and sizes, and A bound's two sides. The repeated setup/size findings also require the scoped Rust gate checks in that supplement (development.md 14.4). The closing temper repin waits for skein 02.s1; skein 01.s1's preserved-test scope stays.
+
+- **Named page fixtures:** in the plan-call tests, use the shared PAGE_SIZE and a named, derived one-row fixture for page-size rows and expected slices. Preserve every literal expected wire byte and assertion case. Recurring mechanical violations receive a scoped AST gate check under development.md14.4; its separate supplement is assigned after bounded scope verification.
 
 - **The hourly test supplement:** new tests follow testing-strategy.md 10.
   Only `skein/01.s1-test-shapes.md` may split its five named preserved tests,
