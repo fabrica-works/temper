@@ -980,3 +980,9 @@ and the user, or the director, may veto it before the run:
   the run (`plan join designer`, in a design session) and answers
   question.md. temper 03.4's kept line of a restored proposal, and its
   test, wait on it; the rest of 03.4 goes on.
+  Decision: the default, by director, 2026-10-19: a kept line of a
+  restored proposal prints its identity alone (`kept: chat, proposed:
+  t3/17`), with no `to`. A new call's outcome keeps `, to <recipient>`.
+  The kept line prints only what jig keeps, so it is never stale, and an
+  agent reads the proposal for its present recipient. tools.md, 6.1 and
+  8.2, says so at the designer's next pass.
