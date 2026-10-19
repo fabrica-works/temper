@@ -66,7 +66,9 @@ Capability: the tools' table.
   `pub(super)`, in a hotspot. Both stages exit 1 before anything is sent.
 - **Argv forms:** `--kind` takes `questions`, `proposals`,
   `escalations`, `person-tasks`, `results` and `replies`; `--order` takes
-  `activity|priority`; a duration is whole seconds, or a number ending in
+  `activity|priority`, and a `tasks` call without it reads by
+  `QueryOrder::Number`, ascending, `--ended` changing no order
+  (decisions.md, J); a duration is whole seconds, or a number ending in
   `s`, `m` or `h`; a cursor is lower-case hex, as temper 03 prints it;
   a word after `--` is positional.
 - **Proposal names:** `tN/K` is `Proposer::Task(N)`, `pN/K` is
@@ -187,9 +189,16 @@ Shape:
   once a call.
 - A project of all digits is a number, otherwise a name, which the root
   resolves through `me` (5.1). `--kind` and `--order` parse into
-  `InboxGroup` and `QueryOrder`.
+  `InboxGroup` and `QueryOrder`; a `tasks` call without `--order` carries
+  `QueryOrder::Number`.
 - `back` writes the positionals, then the flags, in the row's order, so
-  `parse(back(call)) == call`.
+  `parse(back(call)) == call` over every call `parse` makes. It writes no
+  `--order` for `QueryOrder::Number`, and refuses a call whose order is
+  `Changed` or `Ended` with `Unwritten::NoForm`: the tools never send
+  either, and no argv gives it (decisions.md, J); a refusal, never a guess.
+  Test shape's tables gain a `tasks` call without `--order`, which parses
+  to `Number` and prints back as it was given, and a case each for
+  `Changed` and `Ended`, whose `back` is `Err(Unwritten::NoForm)`.
 Test shape: `src/tests/table.rs`, its tables in `const`s; the fixtures
 `call(&[&str]) -> Call`, `parse`, `back` and `owned`; `EVERY_TOOL`
 holds one argv per row and form, extended in 02.3 for temper 12. Reference:
@@ -361,7 +370,9 @@ pub enum Usage { Tool, Unknown { at: u16 }, Extra { at: u16 }, Missing { argumen
 pub fn parse(table: &[&Tool], words: &[&[u8]], limits: &Limits) -> Result<Parsed, Usage>;
 /// The table's checks for argv and JSON; a failure ends parsing, exit 1.
 pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>;
-pub fn back(table: &[&Tool], call: &Call, out: &mut List<Box<[u8]>>) -> Result<(), Overflow>;
+/// Why `back` wrote no argv: the list's bound, or a call no argv gives (decisions.md, J).
+pub enum Unwritten { Overflow(Overflow), NoForm }
+pub fn back(table: &[&Tool], call: &Call, out: &mut List<Box<[u8]>>) -> Result<(), Unwritten>;
 // crates/temper-client-tools/src/jig/subject.rs
 pub enum Subject { Me, Inbox, Task(u64), Tree(u64), Run(u64), Tasks(Box<Call>) }
 pub enum Condition { Waiting, Updates, Ended, WaitingOnMe, Held, Replied, Phase(Phase) }
