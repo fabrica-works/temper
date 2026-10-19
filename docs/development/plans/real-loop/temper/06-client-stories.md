@@ -57,7 +57,7 @@ Steps: `temper-06.1`, `temper-06.2`, `temper-06.3`, `temper-06.4`,
   earlier reply" (06.2). **testing.md 5.1:** the large turn's values are
   the profile's, by name, with the reason (06.3).
 - **Not here:** `pending` is the host's (5.6; temper 05); `dropped:` is
-  temper 09.4's; the other party's parked line cannot be made, as
+  `temper-client-shell-cli`'s (ruling 130); the other party's parked line cannot be made, as
   `Joint::bind` binds one deployment owner: its lines are the tools
   plan's temper-03.4 units, and temper 09 leaves the story for later.
 

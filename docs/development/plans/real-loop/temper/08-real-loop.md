@@ -46,8 +46,8 @@ Steps: `temper-08.1`, `temper-08.2`, `temper-08.3`, `temper-08.4`.
   "A story never uses a fixed port." 08.1 to 08.3.
 - **2.4's stories and 11.3:** sign-in, a scripted chat and reply (08.3);
   a wait satisfied by another client (08.4); a drained shutdown, after
-  each story (08.2). A restart, a lost answer, an unread record and a
-  second party are temper 09's; the forge's, temper 13's.
+  each story (08.2). A restart, a lost answer and a
+  second party are temper 09's (ruling 130); the forge's, temper 13's.
 - **11.3, each call a hosted program:** `temper ctl`'s host, one per
   call, on its DIRECTORY; DIRECTORY's files and the call's exit on the
   real kernel (8.1, 8.2). 08.3.
@@ -333,8 +333,8 @@ Removes: nothing.
 
 ## Interface sketches
 
-What temper 09 and 13 extend: 09 adds `D2`, `same_party`, `number`, `kept`,
-its steps (`SameParty`, `Held`, `Kill`, `Probe`, `Release`, `Contended`, `Locked`, `Unread`)
+What temper 09 and 13 extend: 09 adds `D2`, `same_party`, `number`,
+its steps (`SameParty`, `Held`, `Kill`, `Probe`, `Release`, `Contended`; ruling 130)
 and its cue on `ServiceHost`; 13 the forge peer at `fixtures::write`'s
 forge address, after forge-kit's `skein-05.5` and `temper-05.2`.
 ```rust

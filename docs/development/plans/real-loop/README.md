@@ -196,7 +196,7 @@ The files of this plan they would also touch:
 
 | Files | Steps | Kind |
 |---|---|---|
-| `Cargo.toml`, `Cargo.lock` (temper's root) | 05.1, 05.5, 08.1, 08.2; `Cargo.lock` alone: 06.1, 06.3, 09.2, 09.4, 13.1, 13.2, 13.3 | **forge kit** (each repin, its crate removals), shared |
+| `Cargo.toml`, `Cargo.lock` (temper's root) | 05.1, 05.5, 08.1, 08.2; `Cargo.lock` alone: 06.1, 06.3, 09.2, 13.1, 13.2, 13.3 | **forge kit** (each repin, its crate removals), shared |
 | `tests/client/{Cargo.toml, src/front.rs, src/fixtures.rs, src/translate.rs}` | 06.1, 06.3 to 06.5; 06.2 `src/front.rs` (ruling 113) | **forge kit**'s temper-02.1, not landed at the start: the later landing rebases |
 | `crates/temper/tests/support/configuration.rs`, copied by 08.2 into `tests/real-loop/src/` | 08.2 (the copy); 10.1 and 13.3 read it | **browser-1**'s 01.1 adds `"bundle": null` to every configuration fixture: whichever lands later carries the field into the world's copy |
 | `crates/temper/tests/support/{forgejo.rs, mod.rs}`, `crates/temper/tests/process.rs` | 10.1, 10.2, 13.3 | within the plan: 10.2 and 13.3 on disjoint lines; the second to land rebases, neither waits (temper 13.3) |

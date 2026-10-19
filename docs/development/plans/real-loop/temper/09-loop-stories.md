@@ -2,8 +2,9 @@
 
 temper 08's world, with the stories of more than one call or run
 (tools.md, 11.3; testing.md, 2.4): a restart keeps the work (09.1); a
-lost answer reached under its name (09.2); DIRECTORY's lock (09.3); a
-record the tools cannot read (09.4). It extends 08's crate, fixtures and
+lost answer reached under its name (09.2); DIRECTORY's lock (09.3).
+Each is smoke, one path per feature; its corner cases are proved where
+they belong (ruling 130). It extends 08's crate, fixtures and
 steps by name, never redefines them.
 
 Needs at start: temper 08's world (08.1 to 08.4). Each increment names
@@ -43,10 +44,11 @@ Steps: `temper-09.1`, `temper-09.2`, `temper-09.3`, `temper-09.4`.
   `crates/temper-service/src/clients.rs`).
 - **8.2 and 6.1, the next call that sends** sends what DIRECTORY kept
   first; its line names operation and outcome, no name, no key. 09.2.
-- **8.3, the lock:** acts in turn; none for reads, waits and `pending`;
-  it ends with the process, however it ends. 09.3.
-- **5.6 and 11.3, an unread record:** `pending` counts it; the next call
-  that sends says `dropped:`. 09.4.
+- **8.3, the lock:** acts in turn. 09.3. None for reads, waits and
+  `pending` is `temper-client-shell-cli`'s; its end with the process is
+  the kernel's `flock` (ruling 130).
+- **5.6 and 11.3, an unread record:** `temper-client-shell-cli`'s and the
+  tools' (ruling 130); 09.4 is dropped.
 - **8.2 and design question 3, a signal:** a killed call's status is the
   OS's, `Exit::Signal(9)`: SIGKILL reaches no host. `Shutdown`'s 128 + N
   is temper 10.2's (143).
@@ -78,9 +80,6 @@ Steps: `temper-09.1`, `temper-09.2`, `temper-09.3`, `temper-09.4`.
 - **The lock's holder is a probe:** the caller's own `Op::Lock` on
   DIRECTORY until a `release` step, the hold a sending call takes, so a
   call meets it by construction, never by timing.
-- **The unread record is written by jig's own store writer:**
-  `jig_client_shell_native::Shell`, saving a record built from jig's
-  wire types as `other_store_version` builds it.
 - **A restart is two runs on one scratch:** `Ran::into_scratch`, then
   `run_on`.
 
@@ -88,7 +87,7 @@ Steps: `temper-09.1`, `temper-09.2`, `temper-09.3`, `temper-09.4`.
 
 - **08's rules hold:** nothing upstream, nothing of `tests/one-process`;
   limits from the builders; no sleeps for order; a kill only at a cue
-  (`held`, `locked`).
+  (`held`).
 - **One behaviour per test,** no "and" in a name (the plan's README); a
   helper two stories need is the world's.
 
@@ -145,8 +144,9 @@ Removes: nothing.
 ### 09.2 A lost answer is reached under its name
 
 Scope: a chat killed once the engine holds it; its name asked again from
-D2, signed in as the same party; then from D1 by the next act (tools.md,
-7, 8.2, 11.3).
+D2, signed in as the same party (tools.md, 7, 8.2, 11.3). The next act's
+answer on D1 is proved lower: `tests/client`'s `agent_recovery.rs` and
+`temper-client-shell-cli`'s tests (ruling 130).
 Needs: temper 05's `chat` act with the kept requests sent first (8.2,
 step 4); the tools plan's temper-03.4, the kept lines.
 Files: `tests/real-loop/src/{calls.rs, service.rs, world.rs, lib.rs,
@@ -163,12 +163,8 @@ Shape:
 - `same_party(at)` (Choices): `Step::SameParty`, a call at its index.
 - `run`'s end check: as many killed as `kill` steps, each
   `Exit::Signal(9)`, in place of 08's "nothing killed".
-- `calls::kept(call)`, an `Arg`: the task number of the one `kept:` line
-  on call's stderr. `calls::listed(stdout)`: the numbers that begin a
-  `tasks` page's rows (`N · ...`, `temper-client-tools`'s
-  `src/tests/golden/tasks_next.txt`).
-  `calls::kept_lines(stderr)`; `calls::nameless(stderr, name)`: neither
-  the name nor its engine key, raw or in hex, on stderr.
+- `calls::listed(stdout)`: the numbers that begin a `tasks` page's rows
+  (`N · ...`, `temper-client-tools`'s `src/tests/golden/tasks_next.txt`).
 Test shape: `tests/lost.rs`, the counting allocator.
 ```rust
 #[test]
@@ -190,24 +186,21 @@ fn a_lost_answer_reaches_its_name_from_another_directory() {
     assert_eq!(listed(&list.stdout), [ran.number(3)], "the party has one chat");
 }
 ```
-`a_killed_calls_request_is_answered_by_the_next_act_on_its_directory`:
-`chat_scripts(2)`; sign-in, the start, `held`, `kill(1)`, then `chat
---key next-act` on D1 and `until` each chat's reply (`kept(2)`,
-`task(2)`); the act exits 0, its stderr has one kept line, beginning
-`kept: chat, done: task `, and `nameless(.., b"lost-answer")`.
-Cost: one or two agent turns, a kill, a link drawn again: each about
-08.3's, under 1 s; measured as 08.2's.
+Cost: one agent turn, a kill, a link drawn again: about 08.3's, under
+1 s; measured as 08.2's.
 Proof: joint, as 09.1's.
 Don't: kill on a time or on the call's output; read D1's token for D2.
-Size: at most ~220 lines of `tests/real-loop/src`, counted as 09.1.
+Size: at most ~180 lines of `tests/real-loop/src`, counted as 09.1
+(ruling 130).
 Removes: 08.2's "nothing killed" end check, replaced by the count of
 `kill` steps.
 
 ### 09.3 DIRECTORY's lock
 
-Scope: two acts take the lock in turn; a read, a wait and `pending` run
-while it is held; a killed holder's lock is free to the next act
-(tools.md, 8.3).
+Scope: two acts take the lock in turn (tools.md, 8.3). Calls that send
+nothing run unlocked in `temper-client-shell-cli`'s
+`calls_that_send_nothing_take_no_lock`, and a killed holder's lock is
+the kernel's to free: neither is a real-loop story (ruling 130).
 Needs: temper 05's lock (its retry pace, its `limits`), its reads,
 waits and `pending`.
 Files: `tests/real-loop/src/{calls.rs, world.rs, lib.rs}`,
@@ -223,7 +216,7 @@ Shape:
   service's: `Called.locked`, when one completed taken, and
   `Called.busy`, how many completed `Busy`.
 - `contended(calls)` holds the caller until each named call's `busy` is
-  at least 1; `locked(call)` until call's `locked` is set.
+  at least 1.
 Test shape: `tests/lock.rs`, the counting allocator.
 ```rust
 #[test]
@@ -247,77 +240,24 @@ fn two_acts_on_one_directory_take_its_lock_in_turn() {
     assert!(one.ended <= b || two.ended <= a, "both held DIRECTORY's lock at once");
 }
 ```
-`calls_that_send_nothing_run_while_the_lock_is_held`: a chat to its
-reply, `probe(D1)`, then `task N`, `pending` and `wait task N --until
-replied`, then `release(D1)`; each exits 0 with `locked` `None` and
-`busy` 0.
-`a_killed_holders_lock_passes_to_the_next_act`: a started chat,
-`locked(1)`, `kill(1)`, then `chat --key next-act` and its reply; the act
-exits 0 with `busy` 0. Killed one turn after its lock, the holder has
-kept nothing, so `chat_scripts(1)` suffices.
-Cost: one or two agent turns; the first story waits on at least one
-100 ms retry: each about 08.3's, under 1 s; measured as 08.2's.
+Cost: two agent turns and at least one 100 ms retry: about 08.3's,
+under 1 s; measured as 08.2's.
 Proof: joint, as 09.1's: `flock` on the real kernel, which no lower
 world has.
 Don't: retry a lock in the caller; hold the probe past the story's steps.
-Size: at most ~160 lines of `tests/real-loop/src`, counted as 09.1.
+Size: at most ~120 lines of `tests/real-loop/src`, counted as 09.1
+(ruling 130).
 Removes: nothing.
 
 ### 09.4 A record these tools cannot read
 
-Scope: DIRECTORY's store holds a record of a store version the tools do
-not read: `pending` counts it; the next call that sends says it dropped
-it (tools.md, 5.6, 6.1, 11.3).
-Needs: temper 05's `pending` and its store's load; the tools plan's
-temper-03.4, the `dropped:` line.
-Files: `tests/real-loop/src/{unread.rs (new), fixtures.rs, world.rs,
-calls.rs, lib.rs}`, `tests/real-loop/tests/unread.rs` (new),
-`tests/real-loop/Cargo.toml` (`jig-client`, `jig-client-shell-native`,
-`jig-client-protocol-wire`; `temper-client-tools` comes with 09.2,
-`skein-io` and `skein-lib` with 08.2), root `Cargo.lock`.
-Shape:
-- `unread::record()`: a `jig_client::Record` keyed by
-  `temper_client_tools::key::engine` of the
-  `temper_client_tools::jig::key::Name` `unread`
-  (its `new` is an `Option`), whose bytes are
-  `jig_client_protocol_wire::Kept::new(&CEILINGS, KeptParts {
-  store_version: u16::MAX, record: Box::default() })` measured and
-  encoded into a `skein_lib::Writer`, as `other_store_version` does.
-  `start_store` drops it on its version before reading the rest.
-- `fixtures::UNREAD` hosted as `fixtures::CTL` is (`host_roots`, DIRECTORY's
-  parent): `unread::Unread` drives a `Shell` (`Settings` from temper 05's
-  `limits`, `engine` `127.0.0.1:0`, never dialled), `adopt`s DIRECTORY,
-  and once `loaded()` answers, `down(jig_client::Request::Save { .. })`
-  of the record; at `jig_client::Event::Stored` it closes and exits 0,
-  at `NotStored` 1. Its `Event` match names every variant
-  (`wildcard_enum_match_arm` is denied), and `Unread`'s `Debug` is
-  written by hand, since `jig_client_shell_native::Shell` has none
-  (`missing_debug_implementations` is denied).
-- `unread(at)`: `Step::Unread`, a call at its index.
-Test shape: `tests/unread.rs`, the counting allocator.
-```rust
-#[test]
-fn pending_counts_a_kept_record_these_tools_cannot_read() {
-    use temper_real_loop_world::{argv, calls::{call, occurrences, sign_in, unread, D1}, run, scripts, Exit};
-    let ran = run(|| scripts::chat_scripts(1), || vec![sign_in(D1), unread(D1), call(D1, argv!["pending"])]);
-    let [_, wrote, pending] = ran.calls() else { panic!("three calls") };
-    assert_eq!([wrote.exit, pending.exit], [Some(Exit::Code(0)); 2], "{}", String::from_utf8_lossy(&pending.stderr));
-    let line = b"1 kept records these tools cannot read; a call that sends drops them";
-    assert_eq!(occurrences(&pending.stdout, line), 1, "{}", String::from_utf8_lossy(&pending.stdout));
-}
-```
-`a_sending_call_says_it_dropped_the_unread_record`: sign-in, `unread`,
-`chat --key after-unread` and its reply; the act exits 0 and its stderr
-holds `dropped: 1 kept records these tools cannot read` once.
-Cost: the first has no agent turn, well under 08.3's; the second about
-08.3's; measured as 08.2's.
-Proof: joint, as 09.1's: the shell's store on the real filesystem, read
-by the call that the tools' host runs; `pending`'s count of a decoded
-store is temper 05's unit test.
-Don't: write the store's bytes by hand or with another encoder; name a
-port the writer dials.
-Size: at most ~130 lines of `tests/real-loop/src`, counted as 09.1.
-Removes: nothing.
+Dropped by ruling 130: no real-loop story. `pending`'s count of a record
+of a store version the tools do not read is `temper-client-shell-cli`'s
+`pending_counts_unread_records_in_its_line` and
+`pending_lists_each_kept_request`; the sending call's `dropped:` line is
+its `a_dropped_record_prints_its_line` and the tools' `jig/acts.rs`.
+The step writes no code: `unread.rs`, `fixtures::UNREAD` and the
+`jig-client` lines are not made.
 
 ## Interface sketches
 
@@ -336,28 +276,22 @@ pub struct Called {
     pub busy: u32,
 }
 
-// tests/real-loop/src/calls.rs; SameParty and Unread are calls, kept at their index.
+// tests/real-loop/src/calls.rs; SameParty is a call, kept at its index.
 pub const D2: Dir = Dir(2);
-pub enum Arg { Lit(&'static str), Task(usize), Number(u64), Kept(usize) }
+pub enum Arg { Lit(&'static str), Task(usize), Number(u64) }
 pub enum Step {
     /* 08's variants, then: */
     SameParty { at: Dir }, Held { name: &'static [u8] }, Kill { call: usize },
-    Probe { at: Dir }, Release { at: Dir }, Contended { calls: &'static [usize] }, Locked { call: usize },
-    Unread { at: Dir },
+    Probe { at: Dir }, Release { at: Dir }, Contended { calls: &'static [usize] },
 }
 pub fn number(task: u64) -> Arg;
-pub fn kept(call: usize) -> Arg;
 pub fn same_party(at: Dir) -> Step;
 pub fn held(name: &'static [u8]) -> Step;
 pub fn kill(call: usize) -> Step;
 pub fn probe(at: Dir) -> Step;
 pub fn release(at: Dir) -> Step;
 pub fn contended(calls: &'static [usize]) -> Step;
-pub fn locked(call: usize) -> Step;
-pub fn unread(at: Dir) -> Step;
 pub fn listed(stdout: &[u8]) -> Vec<u64>;
-pub fn kept_lines(stderr: &[u8]) -> Vec<&[u8]>;
-pub fn nameless(stderr: &[u8], name: &'static [u8]) -> bool;
 /// temper 05's `OneShot`, each `Lock` it submits and its completion noted before forwarding.
 pub struct Recorded { /* the host, the lock's token, locked, busy */ }
 
@@ -370,13 +304,6 @@ impl ServiceHost {
     pub fn links(&self) -> u32;
 }
 
-// tests/real-loop/src/fixtures.rs
-pub const UNREAD: &[u8] = b"/real-loop/unread-record";
-
-// tests/real-loop/src/unread.rs
-pub fn record() -> jig_client::Record;
-/// Saves `record()` in DIRECTORY's small store through jig's native shell, then exits.
-pub struct Unread { /* the shell, the root, saved */ }
 ```
 
 ## Left for later
@@ -410,9 +337,9 @@ decisions.md 9 and 10:
 
 Each prints what it says, on `origin/main`, after `git fetch`:
 
-- `git grep -c -E 'fn (a_restarted_service_keeps_the_chat_with_its_reply|a_lost_answer_reaches_its_name_from_another_directory|a_killed_calls_request_is_answered_by_the_next_act_on_its_directory|two_acts_on_one_directory_take_its_lock_in_turn|calls_that_send_nothing_run_while_the_lock_is_held|a_killed_holders_lock_passes_to_the_next_act|pending_counts_a_kept_record_these_tools_cannot_read|a_sending_call_says_it_dropped_the_unread_record)\(' origin/main -- tests/real-loop/tests`
-  prints counts that sum to 8.
-- `git grep -n -F -e 'Signal::Kill' -e 'Op::Lock' -e 'jig_client_shell_native::' origin/main -- tests/real-loop/src`
-  prints at least three lines.
+- `git grep -c -E 'fn (a_restarted_service_keeps_the_chat_with_its_reply|a_lost_answer_reaches_its_name_from_another_directory|two_acts_on_one_directory_take_its_lock_in_turn)\(' origin/main -- tests/real-loop/tests`
+  prints counts that sum to 3 (ruling 130).
+- `git grep -n -F -e 'Signal::Kill' -e 'Op::Lock' origin/main -- tests/real-loop/src`
+  prints at least two lines.
 - `git grep -n -E '127\.0\.0\.1:[1-9]' origin/main -- tests/real-loop`
   prints nothing.

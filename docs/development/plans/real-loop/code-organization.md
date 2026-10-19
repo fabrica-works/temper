@@ -31,14 +31,13 @@ fixtures (testing.md, 2.4). Dependencies, by the sessions' Files and sketches:
 `skein-llm`, `skein-llm-world`, `skein-world`, `smith-agent-process-world`,
 `jig-channel-world`; 08.2 `temper`, `temper-service`, `skein-scratch`,
 `skein-{io,lib,shell}`, `smith-agent-shell`, `serde_json`; 08.3
-`temper-client-shell-cli`; 09.2 `temper-client-tools`; 09.4 `jig-client`,
-`jig-client-shell-native`, `jig-client-protocol-wire`; 13.1 `temper-fake-git`,
+`temper-client-shell-cli`; 09.2 `temper-client-tools`; 13.1 `temper-fake-git`,
 `temper-worker-protocol-git`; 13.2 `skein-fake-forge-{domain,protocol}`. Never
 `tests/one-process` (08). Made by temper 08.1, added to by 08.2 to 08.4, 09, 13.
 
 | Existing crate or directory | Change | Session |
 |---|---|---|
-| root `Cargo.toml`, `Cargo.lock` | members `crates/temper-client-shell-cli`, `tests/real-loop`; workspace lines `jig-client-domain`, `temper`, `skein-scratch`; `Cargo.lock` alone in 06.1, 06.3, 09.2, 09.4, 13.1, 13.2, 13.3 | 05.1, 05.5; 08.1, 08.2 |
+| root `Cargo.toml`, `Cargo.lock` | members `crates/temper-client-shell-cli`, `tests/real-loop`; workspace lines `jig-client-domain`, `temper`, `skein-scratch`; `Cargo.lock` alone in 06.1, 06.3, 09.2, 13.1, 13.2, 13.3 | 05.1, 05.5; 08.1, 08.2 |
 | `crates/temper` | new `src/ctl.rs`; `lib.rs`, `tests.rs`, `Cargo.toml`; 13.3 a dev-dependency on the world, `Cargo.toml` alone | 05.6; 13.3 |
 | `crates/temper-client-tools` | new `src/jig/render/pending.rs`; `render.rs`, `src/guide.rs`, its goldens and help test; the nine comments citing `tools.md` or `testing.md` bare | 05.5 |
 | `tests/client` (`temper-client-world`) | the agent beside the person: new `src/agent.rs`; `app.rs`, `front.rs`, `fixtures.rs`, `translate.rs`; `Cargo.toml` (06.1, 06.3) | 06 |
@@ -72,10 +71,10 @@ lint refuses it, that is a question (13), never a copy.
   `src/tests/jig/pending.rs` (05.5).
 - **`tests/real-loop/src/`:** `lib` (`run`, `run_on`, `Ran`, `Called`), `llm`,
   `scripts` (08.1); `fixtures`, `world`, `service` (`ServiceHost`), `agent`,
-  `calls` (08.2); `unread` (09.4); `git` (13.1); `forge` (13.2); `landing`
+  `calls` (08.2); `git` (13.1); `forge` (13.2); `landing`
   (13.3, 13.5). Tests in `tests/`, one binary per subject, each with skein-world's
   `domain::heap::Counting` as its allocator: `peers`, `lifecycle`, `tools`,
-  `restart`, `lost`, `lock`, `unread`, `git`, `forge`; `landing` is a unit. A story
+  `restart`, `lost`, `lock`, `git`, `forge`; `landing` is a unit. A story
   past 1 s moves whole to `fuzzy_restart.rs` or `fuzzy_landing.rs` (09.1, 13.5).
 - **`tests/client`:** `agent.rs` (`Agent`, `new`, `limits`, `step`), `Root::Agent`
   and `Event::Call` in `app.rs` (06.1); `front.rs` `Joint::{next_client_limits,
@@ -91,8 +90,8 @@ lint refuses it, that is a question (13), never a copy.
 |---|---|---|
 | `host::{OneShot, Startup, Invocation}`, `arguments::parse`, `limits::*`, the host's `fixtures::*`, `Command::Ctl`, `ctl::run` | temper 05.1 (`ctl::run`, 05.6) | 05.2 to 05.6, each adding its own fixture; 08.3; 09.3 (`LOCK_TRY`); 10.1 |
 | `Agent`, `fixtures::{agent, call, give, answered, done_task}`, `Event::Call` | temper 06.1 | 06.2 to 06.5 |
-| `run`, `run_on`, `Ran`, `Called`, `llm::*`, `scripts::*`, `fixtures::{documents, write, AGENT, TOKEN, SEED}` (`CTL` 08.3's), `ServiceHost`, `calls::{Dir, D1, Arg, Argv, Step, task, occurrences}` | temper 08.1, 08.2 | 08.3, 08.4; 09 (`D2`, `Number`, `Kept`, lock and kill steps); 13 (`Advance`, `Delegate`) |
-| `Ran::number`, `Called.{locked, busy}`, `calls::Recorded`, `service::Cue`, `unread::*` | temper 09 | 13 |
+| `run`, `run_on`, `Ran`, `Called`, `llm::*`, `scripts::*`, `fixtures::{documents, write, AGENT, TOKEN, SEED}` (`CTL` 08.3's), `ServiceHost`, `calls::{Dir, D1, Arg, Argv, Step, task, occurrences}` | temper 08.1, 08.2 | 08.3, 08.4; 09 (`D2`, `Number`, lock and kill steps); 13 (`Advance`, `Delegate`) |
+| `Ran::number`, `Called.{locked, busy}`, `calls::Recorded`, `service::Cue` | temper 09 | 13 |
 | `git::*`, `forge::*`, `landing::*`, `run_forge`, `Ran::forge` | temper 13 | 13.4, 13.5; the process tier (`landing::{scripts, configure, EDIT}`, 13.3) |
 | `support::configuration::documents` | the process tier (exists) | copied by 08.2, named in its commit body |
 | `fixtures::{peer_limits, forge_limits}`, `hooks_address`, fake git's `Transport` | forge-kit's temper-05.2 | 13 copies the first three, imports the last |

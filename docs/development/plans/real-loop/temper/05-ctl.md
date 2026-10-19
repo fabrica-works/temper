@@ -278,7 +278,7 @@ Removes: nothing.
 
 ### 05.5 The other acts, sign-out, `sign-in -` and `pending`
 Scope: acts differing from `chat` (`close`, a drawn key, `adopt`), the
-rest of 5.6. Unblocks 08.4's `close`, 09.4, 10's `sign-in -`, 13.4.
+rest of 5.6. Unblocks 08.4's `close`, 10's `sign-in -`, 13.4.
 Needs: the act path (05.4).
 Files: new `src/pending.rs`; `src/{signing,host,tests}.rs`,
 `src/tests/fixtures.rs`, the crate's `Cargo.toml` (`jig-client-domain`);
@@ -326,8 +326,8 @@ not sent`, no network, unlocked), `pending_counts_unread_records_in_its_line`,
 `sign_in_dash_reads_stdin`, `close_kept_line`,
 `a_drawn_key_is_resent_from_directory`, `adopt_is_an_act`; each under 20 ms.
 Proof: unit, `heavy cargo nextest run -p temper-client-shell-cli -E
-'test(pending_lists_each_kept_request)'`: the unread line on
-the kernel is 09.4's, `sign-in -` through pipes temper 10's.
+'test(pending_lists_each_kept_request)'`: the unread line has
+no real-loop story (ruling 130), `sign-in -` through pipes temper 10's.
 Size: at most 300 production lines (the renderer's included).
 Don't: lock or dial for `pending`; rewrite `store`; print a key.
 Removes: nothing.

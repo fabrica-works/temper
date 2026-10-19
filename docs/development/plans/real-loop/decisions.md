@@ -602,6 +602,24 @@ pass:
      - 09.4's independent work may go on while a diagnostic run waits in
        the queue, and never instead of the budget.
 
+130. **Real-loop stories kept to smoke** (director's ruling of 2026-10-19).
+     Reverses: ruling 129 (2026-10-19T16:37Z), its last point: 09.4 has no work left to go on with.
+     Amends: `09-loop-stories.md` (intro, Read first, Choices, Rules, 09.2, 09.3, 09.4, the sketches, Done when); `13-landing.md` 13.4 and Done when; `code-organization.md`; README's hotspot row; `08-real-loop.md`, `06-client-stories.md`, `05-ctl.md` where they name 09.4.
+
+     The director's ruling, relaying the user: the real-loop stories "should follow the testing pyramid principles and they are mostly smoke, it's a way to slowly climb up confidence, but extensive behaviour and corner cases should always be testable and tested near where it belongs". The real loop keeps one end-to-end path per feature: S1 drain, S2 chat, S4 close and wait, S5 restart (landed); 09.2's lost answer made once; 09.3's two acts taking the lock in turn; 13.2's forge delivery; 13.4's adopt through ctl; 13.5's chat landing its change.
+
+     Dropped, each step keeping its code and its lower tests (on temper 58a712d69):
+     - 09.2 `a_killed_calls_request_is_answered_by_the_next_act_on_its_directory`, with `calls::{kept, kept_lines, nameless}` and `Arg::Kept`: `tests/client`'s `agent_recovery.rs` (`a_chat_cut_by_a_lost_answer_is_resent_with_its_kept_line`, `..._asked_again_under_its_name_is_made_once`).
+     - 09.3 `calls_that_send_nothing_run_while_the_lock_is_held`: `temper-client-shell-cli`'s `calls_that_send_nothing_take_no_lock`.
+     - 09.3 `a_killed_holders_lock_passes_to_the_next_act`, with `Step::Locked`: the kernel's `flock`; not folded into the two-acts story.
+     - 09.4 whole, its two stories, `unread.rs`, `fixtures::UNREAD` and its `jig-client` lines: `temper-client-shell-cli`'s `pending_counts_unread_records_in_its_line`, `pending_lists_each_kept_request` and `a_dropped_record_prints_its_line`. The coordinator sets `temper-09.4` dropped.
+     - 13.4 `adopt_of_an_unseen_repository_exits_2_in_its_words`: the tools' `each_forge_refusal_exits_2_in_its_words`, `tests/client`'s `adopting_a_repository_the_forge_lacks_says_not_found`, the engine domain's `an_adoption_of_a_repository_the_forge_lacks_is_refused_as_not_found`.
+     A case found not yet proved lower is proved in the lower world that owns it, in the same step, never in the real loop.
+
+     Kept: the landed `a_signed_in_directory_is_private_to_its_user` (`tests/real-loop/tests/tools.rs:30`): skein-io's `src/tests/private.rs` (skein 92e177c) proves the modes against scripted `Stat` records (`mode: 0o700`), so this story is the real kernel's only proof of them.
+
+     Done when: 09's names sum to 3, its kill and lock lines to at least two; 13's names sum to 8. 09.2's diagnosis (ruling 129) goes on for the story kept. The designer amends testing.md 2.4 to match, as a design question.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

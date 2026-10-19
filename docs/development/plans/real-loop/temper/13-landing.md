@@ -244,8 +244,12 @@ Removes: those lines from `support/forgejo.rs`.
 
 ### 13.4 `adopt` through `temper ctl`, against the peer
 
-Scope: the tools' `adopt` as a call on 13.2's world, adopted and not
-found (tools.md, 5.3, 6.3; client/README.md, 4.7).
+Scope: the tools' `adopt` as a call on 13.2's world, adopted (tools.md,
+5.3, 6.3; client/README.md, 4.7). Not found is the tools'
+`each_forge_refusal_exits_2_in_its_words`, `tests/client`'s
+`adopting_a_repository_the_forge_lacks_says_not_found` and the engine
+domain's `an_adoption_of_a_repository_the_forge_lacks_is_refused_as_not_found`
+(ruling 130).
 Needs: temper 05's acts and 13.2; the tools' `adopt` has landed
 (`crates/temper-client-tools/src/adopt.rs`); temper-13.s1, the
 one-process world's cost (ruling 112).
@@ -264,9 +268,6 @@ fn adopt_through_ctl_adopts_the_forges_repository() {
     assert!(adopted.stdout.starts_with(b"Adopted acme/app on forge 1 as owned.\n"), "{}", String::from_utf8_lossy(&adopted.stdout));
 }
 ```
-`adopt_of_an_unseen_repository_exits_2_in_its_words`: `adopt("absent")`
-exits `Code(2)` with "No repository acme/absent on forge 1 that
-temper's forge user can see." and a newline.
 Proof: joint, as 13.2's.
 Don't: read the forge from the test; add the adoption form (later.md).
 Size: 0 lines of `tests/real-loop/src`.
@@ -394,8 +395,8 @@ pub fn fixture() -> forge::Fixture;
 
 Each prints what it says, on `origin/main`, after `git fetch`:
 
-- `git grep -c -E 'fn (hosted_clone_creates_only_the_destination|hosted_git_commits_the_staged_real_files|hosted_clean_after_checkout_leaves_only_the_commits_files|hosted_commit_tree_keeps_exact_parents|a_forge_delivery_is_accepted_by_the_engines_listener|the_landing_grants_name_the_forges_bound_authority|adopt_through_ctl_adopts_the_forges_repository|adopt_of_an_unseen_repository_exits_2_in_its_words|a_chat_lands_its_change_on_the_forge)\(' origin/main -- tests/real-loop/tests`
-  prints counts that sum to 9.
+- `git grep -c -E 'fn (hosted_clone_creates_only_the_destination|hosted_git_commits_the_staged_real_files|hosted_clean_after_checkout_leaves_only_the_commits_files|hosted_commit_tree_keeps_exact_parents|a_forge_delivery_is_accepted_by_the_engines_listener|the_landing_grants_name_the_forges_bound_authority|adopt_through_ctl_adopts_the_forges_repository|a_chat_lands_its_change_on_the_forge)\(' origin/main -- tests/real-loop/tests`
+  prints counts that sum to 8 (ruling 130).
 - `git grep -n -F -e 'Git::new(' -e 'skein_fake_peers::forge::Peer' -e 'delivery::Endpoint' -e 'cue: Some(' -e 'hooked: true' -e '@coding Small fix' -e 'poll_ms' origin/main -- tests/real-loop/src`
   prints a line for each of the seven, and with `-e 'Command::Clean' -e 'Command::CommitTree' -e '"adopt"' -e 'merged_green()'` over `tests/real-loop/tests`, each of the four.
 - `git grep -n -F '@coding Small fix' origin/main -- crates/temper/tests/support/forgejo.rs`
