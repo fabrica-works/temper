@@ -183,6 +183,17 @@ chain.
   uses after its move names temper's lines it breaks in its Shape
   ("temper's side"), so that whichever temper increment repins next
   knows the repair.
+- **The first repin's jig repair** (temper 01.1): if its jig source is
+  still `719bd70d4`, the first skein repin also takes landed tools
+  `jig-02.1`, `b2eebe6ab91af9eca121588f2d44072fcbdf3b9c`, with
+  `heavy cargo update -p jig-client-domain --precise b2eebe6ab91af9eca121588f2d44072fcbdf3b9c`.
+  This repairs the RequestTable admission-number interface. Keep one jig
+  revision per source, retain the skein update, and run the existing
+  `heavy cargo check --workspace --all-targets` before the repin commit.
+  If another landing has already moved jig forward compatibly, keep it;
+  this rule authorizes no backward pin. The remaining tools steps add no
+  wait to this repair. Refresh derived fixtures reached by the normal check
+  and name further copies and repairs in the repin commit body.
 - **A move copies files and renames paths** (code-organization.md, 6):
   besides that, it changes only what its new home forces, each named in
   the increment's Shape: temper's names out of skein's code (the owner

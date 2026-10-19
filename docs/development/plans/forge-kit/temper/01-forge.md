@@ -75,7 +75,12 @@ Files: Cargo.toml/Cargo.lock; changed Cargo.toml and src/tests Rust users in
   Client src/{lib,api,bounds,boundary,calls,domain,facts,keep,outbox,identity}.rs and
   src/tests{.rs,/keep.rs,/outbox.rs,/locate.rs} change imports as needed;
   src/locate.rs deleted. Source destination: skein-forge/src/{api,locate}.rs.
-Shape: add workspace git dependency skein-forge and direct dependencies to
+Shape: follow README's first-repin jig repair rule when the lock still
+  names jig 719bd70d4: take landed tools jig-02.1 at
+  b2eebe6ab91af9eca121588f2d44072fcbdf3b9c in the same repin commit, retaining
+  the skein update; run the existing all-target check. Keep an already newer
+  compatible jig pin, and refresh derived fixtures reached by that check.
+  Add workspace git dependency skein-forge and direct dependencies to
   vocabulary users, keeping client dependencies where they still use state.
   Replace client::api, qualified client vocabulary paths, and local crate::api
   vocabulary references with `skein_forge::api`; locate with

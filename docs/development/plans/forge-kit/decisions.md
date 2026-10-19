@@ -361,6 +361,25 @@ where its answer lands.
      - Check's `heavy cargo nextest run --workspace`: sketch 69 passed/1 failed, corrected isolated 1,879 passed in 3.536 s, one skipped; corrected fuzzy 50 passed in 31.647 s. Clippy all targets passed.
      - Kit plan line 22 documents `plan ready STEP [NOTE]`; existing Proof lines already use heavy cargo nextest. Recorded 2026-10-19T05:20:20Z.
 
+104. **Take tools jig-02.1's landed repair in temper's first repin** (cross-session scope, temper 01.1's block of 2026-10-19T05:26:26Z).
+     Authorize the compatible jig repair in temper 01.1's existing first repin.
+     The README says a repin “repairs in its own commit what a skein step since
+     temper's last repin broke”; extend this repin to its required jig consumer.
+     Tools `jig-02.1`, commit `b2eebe6ab91af9eca121588f2d44072fcbdf3b9c`, has
+     already landed on jig's shared origin/main. It retains the RequestAdmission
+     and passes its number to RequestTable::not_kept. Use that landed revision
+     for the currently locked jig 719bd70d4, by running
+     `heavy cargo update -p jig-client-domain --precise b2eebe6ab91af9eca121588f2d44072fcbdf3b9c`
+     in temper's worktree, then the existing
+     `heavy cargo check --workspace --all-targets` before committing the repin.
+     Keep the skein update, one revision per git source, and any already newer
+     compatible jig pin that main has acquired; do not move such a pin backward.
+     The selected repair precedes the tools plan's later wire-version change;
+     this ruling adds no dependency on its remaining steps. Refresh further
+     revision entries and derived fixtures reached by the normal checks, naming
+     the copies and repairs in the repin commit body. A remaining incompatible
+     interface is reported with its compiler error. Vocabulary work continues.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
