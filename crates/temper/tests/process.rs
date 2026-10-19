@@ -6,6 +6,64 @@ use skein_lib::Duration;
 // Each whole-example box story is bounded at 120 seconds.
 const BOX_DEADLINE: Duration = Duration::from_secs(120);
 
+fn ctl_scratch(case: &str) -> support::Scratch {
+    let scratch = support::Scratch::new(case);
+    support::configuration(scratch.path(), &support::Forge::Unreached);
+    scratch
+}
+
+#[test]
+fn temper_ctl_help_prints_the_guide() {
+    let scratch = ctl_scratch("ctl_help");
+    let ended = support::ctl::alone(scratch.path(), support::ctl::Call::bare(&["help"]));
+    assert_eq!(ended.exit, Some(Exit::Code(0)));
+    assert!(ended.stdout.starts_with(b"Agent tools\n"));
+    assert_eq!(ended.stderr, b"");
+    scratch.remove();
+}
+
+#[test]
+fn temper_ctl_without_a_tool_exits_1() {
+    let scratch = ctl_scratch("ctl_usage");
+    let ended = support::ctl::alone(scratch.path(), support::ctl::Call::new(&[]));
+    assert_eq!(ended.exit, Some(Exit::Code(1)));
+    assert!(ended.stderr.starts_with(b"temper ctl: "));
+    let line = ended.stderr.strip_suffix(b"\n").expect("terminated diagnostic");
+    assert!(!line.contains(&b'\n'), "one diagnostic line");
+    scratch.remove();
+}
+
+#[test]
+fn temper_ctl_signs_in_by_the_link_read_on_stdin() {
+    use support::ctl::{Call, Step, Story};
+    let scratch = ctl_scratch("ctl_sign_in");
+    let steps = vec![Step::Run(Call::sign_in()), Step::Run(Call::new(&["me", "--json"]))];
+    let seen = support::ctl::run(Story::new(scratch.path(), steps));
+    let [signed, me] = seen.calls.as_slice() else { panic!("two ctl ends") };
+    assert_eq!(signed.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&signed.stderr));
+    let document = support::ctl::json(me);
+    assert_eq!((me.exit, document["party"]["number"].is_u64()), (Some(Exit::Code(0)), true), "{document}");
+    scratch.remove();
+}
+
+#[test]
+fn a_wait_past_its_timeout_exits_3() {
+    use support::ctl::{Call, Step, Story};
+    let scratch = ctl_scratch("ctl_timeout");
+    let seen = support::ctl::run(Story::new(
+        scratch.path(),
+        vec![
+            Step::Run(Call::sign_in()),
+            Step::Run(Call::new(&["me", "--json"])),
+            Step::Run(Call::new(&["wait", "me", "--timeout", "1", "--json"])),
+        ],
+    ));
+    let [_, me, wait] = seen.calls.as_slice() else { panic!("three ctl ends") };
+    assert_eq!(wait.exit, Some(Exit::Code(3)), "{}", String::from_utf8_lossy(&wait.stderr));
+    assert_eq!(support::ctl::json(wait)["me"]["digest"], support::ctl::json(me)["digest"]);
+    scratch.remove();
+}
+
 #[test]
 fn temper_serve_prints_its_link_and_drains_on_a_signal() {
     let scratch = support::Scratch::new("drain");

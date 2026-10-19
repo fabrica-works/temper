@@ -1,6 +1,7 @@
 //! Shared configuration fixtures for startup and the process tier.
 pub mod boxed;
 pub mod configuration;
+pub mod ctl;
 pub mod owned;
 pub mod sign_in;
 pub mod terminal;
@@ -199,6 +200,7 @@ impl Host for StdoutReader {
     }
 }
 enum Process {
+    Calls(Box<ctl::Calls>),
     Binary(Box<Binary>),
     Stdout(Box<StdoutReader>),
     Person(Box<person::Person>),
@@ -208,6 +210,7 @@ impl Process {
     fn host(&self) -> &dyn Host {
         match self {
             Self::Binary(x) => x.as_ref(),
+            Self::Calls(x) => x.as_ref(),
             Self::Stdout(x) => x.as_ref(),
             Self::Person(x) => x.as_ref(),
             Self::Peer(x) => x.as_ref(),
@@ -216,6 +219,7 @@ impl Process {
     fn host_mut(&mut self) -> &mut dyn Host {
         match self {
             Self::Binary(x) => x.as_mut(),
+            Self::Calls(x) => x.as_mut(),
             Self::Stdout(x) => x.as_mut(),
             Self::Person(x) => x.as_mut(),
             Self::Peer(x) => x.as_mut(),
@@ -415,7 +419,7 @@ impl Referee<Process> for ChatJudge<'_> {
                     .filter(|observation| matches!(observation, skein_fake_peers::llm::Observation::Query { .. }))
                     .count(),
             ),
-            Process::Binary(_) | Process::Person(_) | Process::Stdout(_) => None,
+            Process::Binary(_) | Process::Person(_) | Process::Stdout(_) | Process::Calls(_) => None,
         });
         assert!(
             person.failed.is_none(),
@@ -462,7 +466,7 @@ pub fn run(
 ) -> Seen {
     run_story(directory, script, peer, deadline, None)
 }
-/// testing.md 2.6 bounds each landing story at 180 seconds.
+/// domain/testing.md 2.6 bounds each landing story at 180 seconds.
 pub const LANDING: Duration = Duration::from_secs(180);
 /// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
 pub const RAISED_MS: u64 = 600_000;
