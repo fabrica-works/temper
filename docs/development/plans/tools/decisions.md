@@ -660,6 +660,20 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 129. **temper 03.3: the inbox's call that reads on, interim** (design, temper 03.3's block of 2026-10-19 09:18:06 UTC).
      Interim, until decisions.md, For the user, N, is decided: how the call that reads on after an `inbox` selects its group is a design gap, and waits (jig's `Read::Inbox` reads one `InboxReadGroup` a call, each with its own opaque cursor, and tools.md 5.2's table has no group selector); it goes to the user as N, as no designer is joined. temper 03.3 goes on with everything else: `tasks`, `task N --tree --activity K --run`, `activity N`, `run N`, `chat N`, `turn N A.T`, and `inbox`'s first answer, needs then updates, each `Read::Inbox` with `after: None`, as its Shape says. Its inbox tests and goldens use groups that end on their first page, printed with `no more`; the parse of `inbox --after C` and the printed call that reads on after an inbox are the one part that waits, and no inbox cursor is printed or parsed meanwhile. 03.3 does not land before the ruling on N reaches it. A further read whose cursor names no group: treat it as this one, and say so in the report.
 
+130. **temper 03.3: the inbox's call that reads on** (decision N, for temper 03.3's block of 2026-10-19 09:18:06 UTC).
+     decisions.md, For the user, N, decided by the director for the user (temper ad1b1f80f), the default, ruled into temper 03.3: an inbox's printed cursor is one group byte (0 needs, 1 updates), then jig's cursor, whole; the call that reads on stays in needs while needs has more, then moves to updates; `--after C` reads C's group, and with `--kind K` a C of the other group (`InboxReadGroup::of`) is a usage error, exit 1. temper/03-tools-root.md, 03.3's Shape, gains that bullet under Lists, its tests `an_inbox_reads_on_in_needs_while_needs_has_more`, `an_inbox_reads_on_in_updates_once_needs_ends` and `an_inbox_cursor_of_another_group_than_its_kind_exits_1`, and 40 lines of Size; later.md gains tools.md, 5.2's sentence, for the designer's next pass. This ends ruling 129's wait: 03.3 lands once its inbox call does this. A further read whose cursor names no group: treat it as this one, and list it in the commit body.
+
+     ## Checked
+
+     - `git -C ~/src/rust/temper show ad1b1f80f:docs/development/plans/tools/decisions.md | grep -n -A2 'Decision: the default, by director, 2026-10-19: the printed cursor is'`:
+         858:  Decision: the default, by director, 2026-10-19: the printed cursor is
+         859-  one group byte (0 needs, 1 updates) and then jig's cursor, whole. The
+         860-  call that reads on stays in needs while needs has more, then moves to
+     - `git -C ~/src/rust/jig show origin/main:crates/jig-client-domain/src/contract/reads.rs | grep -n 'pub const fn of'`:
+         33:    pub const fn of(kind: InboxGroup) -> Self {
+     - `grep -n -- '--text' ../kit/scripts/dev/plan | head -1`:
+         21:#   plan ruling [--text FILE] TITLE SOURCE  land a ruling in decisions.md, once
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

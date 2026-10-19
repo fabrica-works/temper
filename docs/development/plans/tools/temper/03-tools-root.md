@@ -220,6 +220,10 @@ Shape:
     with it, the ended group alone, as jig's view reads it (`query.phase = Some(PhaseClass::Ended)`, `live: None`,
     `--after C` its `ended`), the call that reads on keeping `--ended`; `rows.rs`'s `--ended` help reads
     "Only ended tasks". An agent that wants both makes two calls; the printed cursor stays jig's, with no group byte.
+  - `inbox`'s printed cursor (decisions.md, For the user, N, decided by the director, temper ad1b1f80f) is one group byte
+    (0 needs, 1 updates), then jig's cursor, whole. The call that reads on stays in needs while needs has more, then
+    moves to updates; `--after C` reads C's group, and with `--kind K` a C of the other group (`InboxReadGroup::of`) is
+    a usage error, exit 1.
   - Each prints at most 32 rows, one a line, number first, then the call that reads on, or `no more`.
 - **A task's parts.**
   - `--tree` watches `Subject::Tree { task, window: 32 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
@@ -238,6 +242,8 @@ Shape:
 - **Paths and authorities** print whole. Page and single read share `load_bytes`: the next plan's fixture must use the row-cost overlap jig 03 measures.
 Test shape: in `src/tests/jig/{lists,turn}.rs`, on the root harness, each under 20 ms:
 `a_list_prints_a_row_a_line_then_the_call_that_reads_on`, `inbox_prints_what_needs_the_party_then_updates`,
+`an_inbox_reads_on_in_needs_while_needs_has_more`, `an_inbox_reads_on_in_updates_once_needs_ends`,
+`an_inbox_cursor_of_another_group_than_its_kind_exits_1`,
 `task_with_tree_activity_and_run_answers_once_and_unwatches`,
 `a_turn_too_large_for_a_page_prints_by_its_size_and_its_call`,
 `a_turns_part_past_16_kib_is_cut_with_the_call_that_reads_on`, `a_turn_past_the_read_bound_exits_0_past_the_limit`,
@@ -263,7 +269,7 @@ fn a_turn_past_the_read_bound_exits_0_past_the_limit() {
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(/turn/)'` (under 1 s). It shows 5.2's three turn
 forms. The next plan's story "a turn too large for a page read whole" connects it.
 Don't: keep a watch past its first delivery; print more than 32 rows; cut a path.
-Size: at most 300 lines.
+Size: at most 340 lines, with the inbox's cursor (decisions.md, N).
 Removes: nothing.
 
 ### 03.4 jig's acts under their keys
