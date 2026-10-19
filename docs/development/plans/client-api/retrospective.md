@@ -732,14 +732,26 @@ For jig's `docs/development/tech-debt.md`, and for temper, which has none yet. "
 
 ## 10. Decisions
 
+2026-10-19. The director, acting for the user with their authority
+(development.md, section 2.7), adopted each proposal. A process designer
+applies them: the text to development.md, its cards and implementer.md,
+and the kit parts of proposals 3, 4, 5, 8 and 9 to `plan`, the pulse,
+`numbers.sh` and `metrics.sh`. "Where" names the commits once they land.
+
+Two reach the plans being written now, before the batch lands. The tools
+and forge kit planners check their plans against proposal 1's sizes, and
+split any that pass them. The tools plan's README gives its implementers
+proposal 3's wait (`// @exec: {"yield_time_ms": 300000}`) from its first
+step.
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
+| 1 | adopted | to apply: development.md, 2.2, 5.1 and 5.3 |
+| 2 | adopted | to apply: development.md, 5.2 and 10.3; implementer.md, 8.1 and 8.6 |
+| 3 | adopted | to apply: implementer.md, 8.3; development.md, 14.2; the pulse |
+| 4 | adopted | to apply: development.md, 3.6 and 12; supervisor.md, 3 |
+| 5 | adopted | to apply: development.md, 7.3, 7.4 and 10.3; `plan unblocked` and `plan steered` |
+| 6 | adopted | to apply: development.md, 2.1, 10.4 and 14.1; supervisor.md, 6 and 8; `plan`'s designer prompt |
+| 7 | adopted | to apply: development.md, 5.5, 10.4 and 14.1; implementer.md, 8.4; supervisor.md, 6 |
+| 8 | adopted | to apply: development.md, 11.4 and 14.1; `plan check`, `plan resume` and the pulse |
+| 9 | adopted | to apply: development.md, 15.2; `numbers.sh` and `metrics.sh` |
