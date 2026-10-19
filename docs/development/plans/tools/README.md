@@ -188,6 +188,15 @@ should move the pin and repair nothing (findings/base-repin.md).
 - **Forge- and LLM-facing work** stays in the increments the Hotspots
   section names, behind the interfaces that exist; no other increment
   edits those files beyond a compiler-forced arm.
+- **Joint stories share the fixture** (testing-strategy.md, 10: "A
+  setup written once", "Named fixtures and sizes"). A joint story in
+  jig's `tests/client/src/joint/` builds its turn with `fixture.rs`'s
+  `turn`, given a parameter there if it needs one, and writes no turn,
+  call or result of its own; a Shape that asks for one gets it once, in
+  `fixture.rs`, said in the commit body. Each size and job id is a
+  named const with a line on how its number is derived. The first
+  increment that edits `stories/job_stories.rs` moves its own `turn`,
+  `call` and `result` (jig-01.2) there too.
 
 ## Hotspots
 
@@ -231,8 +240,8 @@ and writes `blocked.md` (kind: process) on a failure:
 4. **When temper 01 becomes ready:** `test -x "$TEMPER_FORGEJO"`.
    temper 01.1's process proof runs `a_native_chat_reaches_the_model`,
    which starts a throwaway Forgejo from that binary
-   (`testing/temper-throwaway-forgejo/src/binary.rs`). It is unset on
-   this machine at the plan's start.
+   (`testing/temper-throwaway-forgejo/src/binary.rs`). It is set on
+   this machine: Forgejo 17.0.0, the pinned build (decisions.md, C).
 5. **When `hearth-repin` becomes ready:** `git -C ~/src/rust/hearth
    rev-parse origin/main` prints a commit. hearth has no checkout on this
    machine at the plan's start.
