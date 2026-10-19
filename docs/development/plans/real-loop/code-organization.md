@@ -10,6 +10,12 @@ skein, smith and jig change no file, and no pin moves (decisions.md, 3).
 
 ### temper: two crates added
 
+Each new crate's `[package]` inherits the workspace's fields, as
+`tests/client`'s does (`version`, `edition`, `rust-version`, `publish`),
+and `license.workspace = true` with them once temper's workspace names a
+license (the accounts run licenses jig and temper, as skein 1222e7b did
+skein); no gate checks it, so the step that makes the crate adds it.
+
 `temper-client-shell-cli` (`crates/temper-client-shell-cli`) is `temper ctl`'s
 one-shot host (tools.md, 4): a library, `forbid(unsafe_code)`, no `main`, its
 `clippy.toml` the terminal's. Dependencies (`.workspace = true`):

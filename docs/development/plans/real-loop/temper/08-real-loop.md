@@ -118,6 +118,9 @@ workspace lines `skein-fake-peers`, `skein-fake-llm-domain`,
 `smith-agent-process-world` and `jig-channel-world`); root `Cargo.toml` (member
 `tests/real-loop`) and `Cargo.lock` (hotspot: forge kit).
 Shape:
+- `[package]` inherits the workspace's fields, `license.workspace =
+  true` among them once temper's workspace names a license
+  (`code-organization.md`, 1).
 - `llm::Recipe` holds `Peer::new`'s arguments after its address, each
   in the peer's own type, so that several credentials, failures per
   credential and the observations the accounts and live-text plans add

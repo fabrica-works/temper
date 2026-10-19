@@ -91,6 +91,9 @@ workspace line); new `crates/temper-client-shell-cli/` (`Cargo.toml`,
 `clippy.toml`, `src/{lib,arguments,directory,host,output,limits}.rs`,
 `src/tests.rs`, `src/tests/fixtures.rs`).
 Shape:
+- `[package]` inherits the workspace's fields, `license.workspace =
+  true` among them once temper's workspace names a license
+  (`code-organization.md`, 1).
 - `forbid(unsafe_code)`; `clippy.toml` as the terminal's; dependencies,
   all root workspace lines: the tools, `temper-client-domain`, `jig-client`,
   `jig-client-shell-native`, `jig-client-protocol-{http,link,wire}`,
