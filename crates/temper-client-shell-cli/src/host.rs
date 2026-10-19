@@ -4,8 +4,10 @@ use crate::{
     directory::Directory,
     limits,
     output::Output,
+    signing::{Credential, Signing},
     transport::Memory,
 };
+use jig_client_shell_native::Shell;
 use skein_io::{
     self as io,
     file_layer::FileIo,
@@ -42,6 +44,8 @@ pub struct OneShot {
     root_env: Env<root::Limits>,
     requests: Queue<root::Request>,
     transport: Option<Memory>,
+    signing: Option<Signing>,
+    startup: Startup,
     until: Option<Time>,
     link: jig_client::Link,
     io: io::Io,
@@ -73,13 +77,15 @@ impl OneShot {
         let stdin = Some(io.adopt_read_pipe(startup.stdin).expect("stdin slot"));
         let signals = Some(io.adopt_signals(startup.signals).expect("signal slot"));
         let memory = io::worst_case(&limits.io).expect("io envelope")
-            + FileIo::worst_case(4, limits::ADDRESS, 1, limits::ADDRESS).expect("file envelope")
+            + FileIo::worst_case(4, limits::LINK, 1, limits::LINK).expect("file envelope")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions") * 3
             + Queue::<io::Event>::worst_case(ROOM).expect("io events")
             + Queue::<io::file::Event>::worst_case(16).expect("file events")
             + u64::from(limits.io.output) * 128
             + limits::transport(&limits).expect("native envelope")
+            + FileIo::worst_case(4, limits.connections.body_bytes, 1, limits.connections.body_bytes).expect("native file envelope")
+            + u64::from(limits.connections.body_bytes) * 3 // Loaded store, credential and routing copies.
             + jig_client::worst_case(&limits.root.domain.client).expect("client envelope")
             + Queue::<root::Request>::worst_case(request_room).expect("root outputs")
             + 8192; // Output lines and DIRECTORY's bounded path.
@@ -97,6 +103,8 @@ impl OneShot {
             root_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.root },
             requests: Queue::with_capacity(request_room),
             transport: None,
+            signing: None,
+            startup,
             until: None,
             link: jig_client::Link::SignedOut,
             io,
@@ -139,7 +147,12 @@ impl OneShot {
         if let Some(transport) = &mut self.transport {
             transport.close();
         }
-        self.directory.close();
+        if let Some(signing) = &mut self.signing {
+            signing.close();
+        }
+        if self.signing.is_none() {
+            self.directory.close();
+        }
         if signal {
             for request in self.output.close(true) {
                 self.request(request);
@@ -152,6 +165,102 @@ impl OneShot {
     }
     fn root_event(&mut self, event: jig_client::Event) {
         root::step(&mut self.root, &self.root_env, root::Event::Client { event }, &mut self.requests);
+    }
+    fn signing_start(&mut self) {
+        use temper_client_tools::jig::call::{Value, Values};
+        if self.class != Class::SignIn {
+            return;
+        }
+        if self.signing.is_none() && self.directory.ready() {
+            if let Some(bytes) = self.directory.link.take() {
+                match Signing::new(
+                    &bytes,
+                    self.directory.parent(),
+                    self.directory.leaf(),
+                    self.startup,
+                    &mut self.submit,
+                ) {
+                    Ok(signing) => {
+                        self.directory.address = signing.address.as_ref().map(|a| a[..a.len() - 1].into());
+                        self.signing = Some(signing);
+                        self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
+                    }
+                    Err(error) => self.fail(error),
+                }
+            } else if let Some(Parsed::Call { call, json }) = self.call.take() {
+                if let Some(Some(Values::One(Value::File(path)))) = call.values.first() {
+                    self.directory.load_link(path.clone());
+                    let Parsed::Call { call, .. } = arguments::parse(&[b"me"]).expect("me call") else {
+                        unreachable!()
+                    };
+                    self.call = Some(Parsed::Call { call, json });
+                } else {
+                    self.fail(b"a sign-in file is required");
+                }
+            }
+        }
+        let Some(signing) = &mut self.signing else { return };
+        if signing.error {
+            self.fail(b"the sign-in files could not be read");
+            return;
+        }
+        if signing.with.is_some()
+            && let Some((_, records)) = signing.shell.as_mut().and_then(Shell::loaded)
+        {
+            let with = signing.with.take().expect("link secret");
+            let mut kept = skein_lib::List::with_capacity(u32::try_from(records.len()).expect("bounded records"));
+            for record in records {
+                kept.push(record).expect("record room");
+            }
+            self.root_event(jig_client::Event::Start { kept });
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
+        }
+    }
+    fn signing_keep(&mut self) {
+        let Some(signing) = &mut self.signing else { return };
+        let Some(shell) = &mut signing.shell else { return };
+        if signing.credential == Credential::New
+            && let Some(credential) = self.root.client().link().credential
+        {
+            shell.keep(Some(credential.clone()));
+            signing.credential = Credential::Writing;
+            self.directory.store_address(self.env.now, signing.address.take().expect("parsed address"));
+        }
+        if let Some(kept) = shell.kept() {
+            if !kept {
+                self.fail(b"the sign-in token could not be kept");
+                return;
+            }
+            signing.credential = Credential::Kept;
+        }
+        if signing.credential == Credential::Kept
+            && self.directory.stored
+            && let Some(text) = signing.printed.take()
+        {
+            self.output.push(false, text);
+            self.finish(0, false);
+        }
+    }
+    fn client_events(&mut self) {
+        loop {
+            let event = if let Some(transport) = &mut self.transport {
+                transport.events.pop()
+            } else {
+                self.signing.as_mut().and_then(|s| s.shell.as_mut()).and_then(|s| s.events().pop())
+            };
+            let Some(event) = event else { break };
+            let signed = self.signing.as_mut().is_some_and(|s| {
+                if matches!(&event, jig_client::Event::Reply { exchange, .. } | jig_client::Event::Lost { exchange } if Some(*exchange) == s.exchange) {
+                    s.exchange = None;
+                    true
+                } else { false }
+            });
+            self.root_event(event);
+            if signed && self.root.client().link().credential.is_none() {
+                self.fail(b"the sign-in link was refused");
+                return;
+            }
+        }
     }
     fn client_progress(&mut self) {
         if self.status.is_some() {
@@ -167,11 +276,16 @@ impl OneShot {
             self.root_event(jig_client::Event::Start { kept: skein_lib::List::with_capacity(0) });
             self.root_event(jig_client::Event::SignIn { with: jig_client::With::Held(skein_lib::Secret::new(token)) });
         }
-        if self.transport.is_none() {
+        self.signing_start();
+        if self.signing.as_ref().is_some_and(|s| s.with.is_some()) {
             return;
         }
-        while let Some(event) = self.transport.as_mut().expect("memory").events.pop() {
-            self.root_event(event);
+        if self.transport.is_none() && self.signing.is_none() {
+            return;
+        }
+        self.client_events();
+        if self.status.is_some() {
+            return;
         }
         if root::next_deadline(&self.root).is_some_and(|at| self.env.now >= at) {
             root::fire(&mut self.root, &self.root_env, &mut self.requests);
@@ -179,7 +293,20 @@ impl OneShot {
         while let Some(request) = self.requests.pop() {
             match request {
                 root::Request::Client { request } => {
-                    self.transport.as_mut().expect("memory").down(self.env.now, request);
+                    if let Some(signing) = &mut self.signing
+                        && let jig_client::Request::Exchange {
+                            exchange,
+                            message: jig_client::Message::SignInLink(_),
+                            ..
+                        } = &request
+                    {
+                        signing.exchange = Some(*exchange);
+                    }
+                    if let Some(transport) = &mut self.transport {
+                        transport.down(self.env.now, request);
+                    } else if let Some(shell) = self.signing.as_mut().and_then(|s| s.shell.as_mut()) {
+                        shell.down(request);
+                    }
                 }
                 root::Request::Ready => {
                     if let Some(Parsed::Call { call, json }) = self.call.take() {
@@ -193,6 +320,12 @@ impl OneShot {
                     }
                 }
                 root::Request::Printed { printed, .. } => {
+                    if let Some(signing) = &mut self.signing
+                        && printed.status == 0
+                    {
+                        signing.printed = Some(printed.stdout);
+                        continue;
+                    }
                     self.output.push(false, printed.stdout);
                     if printed.status == 1 && !printed.stderr.is_empty() {
                         self.fail(printed.stderr.strip_suffix(b"\n").unwrap_or(&printed.stderr));
@@ -208,6 +341,10 @@ impl OneShot {
         if self.status.is_some() {
             return;
         }
+        self.signing_keep();
+        if self.status.is_some() {
+            return;
+        }
         let link = self.root.client().link().state;
         if link != self.link {
             if self.class == Class::Wait && self.call.is_none() && link == jig_client::Link::Live {
@@ -218,17 +355,35 @@ impl OneShot {
             self.link = link;
         }
         match link {
+            jig_client::Link::SignedOut if self.signing.as_ref().is_some_and(|s| s.credential == Credential::New) => {}
             jig_client::Link::SignedOut => self.fail(b"signed out"),
             jig_client::Link::OutOfDate => self.fail(b"client is out of date"),
             jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => {}
         }
-        if self.until.is_some_and(|at| self.env.now >= at) {
+    }
+    fn link_progress(&mut self, now: Time, wall: Wall) {
+        if let Some(shell) = self.signing.as_mut().and_then(|s| s.shell.as_mut()) {
+            shell.iterate(now, wall);
+            while self.submit.room() > 0 {
+                let Some(submit) = shell.submissions().pop() else { break };
+                self.submit.push(submit);
+            }
+        }
+        self.client_progress();
+        if self.status.is_some() && self.signing.as_ref().is_some_and(Signing::is_empty) {
+            self.directory.close();
+        }
+        if self.status.is_none() && self.until.is_some_and(|at| now >= at) {
             let address = std::str::from_utf8(self.directory.address.as_deref().expect("loaded address"))
                 .expect("numeric address");
             self.fail(format!("the engine at {address} did not answer within 30 s").as_bytes());
         }
     }
     fn complete(&mut self, mut complete: Complete) {
+        if complete.op.raw() & (TAG | FILES) == 0 {
+            self.signing.as_mut().expect("native completion").complete(complete);
+            return;
+        }
         let tag = if complete.op.raw() & FILES != 0 { FILES } else { TAG };
         complete.op = Token::new(complete.op.raw() & !tag);
         if let Op::Cancel { target } = &mut complete.kind {
@@ -334,7 +489,7 @@ impl Host for OneShot {
         if let Some(error) = self.directory.error.take() {
             self.fail(&error);
         }
-        self.client_progress();
+        self.link_progress(now, wall);
         if let Some(transport) = &mut self.transport {
             for request in transport.progress(now) {
                 self.request(request);
@@ -367,6 +522,7 @@ impl Host for OneShot {
             || self.io.is_due(now)
             || self.directory.pending(now)
             || self.transport.as_ref().is_some_and(Memory::pending)
+            || self.signing.as_ref().and_then(|s| s.shell.as_ref()).is_some_and(|s| s.work_pending(now))
             || self.status.is_none()
                 && (self.until.is_some_and(|at| now >= at)
                     || root::next_deadline(&self.root).is_some_and(|at| now >= at))
@@ -376,6 +532,7 @@ impl Host for OneShot {
             self.io.next_deadline(),
             self.directory.deadline(),
             self.transport.as_ref().and_then(Memory::next_deadline),
+            self.signing.as_ref().and_then(|s| s.shell.as_ref()).and_then(Shell::next_deadline),
             self.until,
             self.status.is_none().then(|| root::next_deadline(&self.root)).flatten(),
         ]
@@ -392,6 +549,7 @@ impl Host for OneShot {
             && self.io.is_empty()
             && self.directory.is_empty()
             && self.transport.as_ref().is_none_or(Memory::is_empty)
+            && self.signing.as_ref().is_none_or(Signing::is_empty)
             && self.complete.is_empty()
             && self.raw.is_empty()
             && self.submit.is_empty()
@@ -404,6 +562,6 @@ impl Host for OneShot {
         self.memory
     }
     fn operations(&self) -> u32 {
-        io::operations(&self.env.limits).expect("io operations") + 2
+        io::operations(&self.env.limits).expect("io operations") * 2 + 5
     }
 }

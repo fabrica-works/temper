@@ -7,16 +7,24 @@ use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Kind, Op, OpenHow, Servi
 use skein_lib::{Duration, Time, Wall};
 use skein_shell::Host;
 use std::collections::{BTreeMap, VecDeque};
+pub const LINK: &[u8] = b"http://127.0.0.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const LINK_FILE: Fd = Fd::new(23);
 pub const CHAT: &[&[u8]] = &[b"chat", b"hello", b"--project", b"shop", b"--key", b"start-chat"];
 const DIRECTORY: Fd = Fd::new(20);
 const ADDRESS: Fd = Fd::new(21);
 const TOKEN: Fd = Fd::new(22);
 const STDERR: Fd = Fd::new(3);
 const USER: u32 = 7;
-const TOKEN_BYTES: &[u8] = b"0123456789012345678901234567890123456789";
+pub const TOKEN_BYTES: &[u8] = b"0123456789012345678901234567890123456789";
 pub const PARTIAL: usize = 3; // More than one short write is needed for every host diagnostic.
 pub struct Frame {
     pub host: OneShot,
+    pub link: &'static [u8],
+    pub refuse_link: Option<()>,
+    hold_stores: Option<()>,
+    files: BTreeMap<Fd, Vec<u8>>,
+    names: BTreeMap<Box<[u8]>, Fd>,
+    stored: BTreeMap<Box<[u8]>, Vec<u8>>,
     sockets: BTreeMap<Fd, Socket>,
     held: Vec<Submit>,
     opened: Vec<Box<[u8]>>,
@@ -61,6 +69,12 @@ impl Frame {
         .expect("native limits");
         Self {
             host,
+            link: LINK,
+            refuse_link: None,
+            hold_stores: None,
+            files: BTreeMap::new(),
+            names: BTreeMap::new(),
+            stored: BTreeMap::new(),
             sockets: BTreeMap::new(),
             held: Vec::new(),
             opened: Vec::new(),
@@ -85,6 +99,25 @@ impl Frame {
             write_size: usize::MAX,
             writes: 0,
         }
+    }
+    pub fn sign_in(link: &'static [u8]) -> Self {
+        let mut frame = Self::act(&[b"sign-in", b"link-file"]);
+        frame.link = link;
+        frame.hold_stores = Some(());
+        frame
+    }
+    pub fn answer_sign_in_then_me(&mut self) {
+        self.sign_in_then_deliver_me();
+    }
+    pub fn store_token_with_address(&mut self) {
+        self.hold_stores = None;
+        self.run();
+    }
+    pub fn stored(&self, name: &[u8]) -> Option<&[u8]> {
+        self.stored.get(name).map(Vec::as_slice)
+    }
+    pub fn requests(&self) -> usize {
+        self.requests.len()
     }
     pub fn read(words: &[&str]) -> Self {
         Self::act(&words.iter().map(|word| word.as_bytes()).collect::<Vec<_>>())
@@ -141,8 +174,8 @@ impl Frame {
     pub fn run(&mut self) {
         for _ in 0..2000 {
             for mut submit in std::mem::take(&mut self.held) {
-                if let Op::Recv { fd, .. } = &submit.kind
-                    && self.sockets.get(fd).is_some_and(|s| !s.reply.is_empty())
+                if matches!(submit.kind, Op::Sync { .. }) && self.hold_stores.is_none()
+                    || matches!(&submit.kind, Op::Recv { fd, .. } if self.sockets.get(fd).is_some_and(|s| !s.reply.is_empty()))
                 {
                     let result = self.answer(&mut submit.kind);
                     self.host.completions().push(Complete { op: submit.op, kind: submit.kind, result });
@@ -153,6 +186,10 @@ impl Frame {
             self.host.iterate(self.now, Wall::EPOCH);
             let mut answered = false;
             while let Some(mut submit) = self.host.submissions().pop() {
+                if self.hold_stores.is_some() && matches!(submit.kind, Op::Sync { .. }) {
+                    self.held.push(submit);
+                    continue;
+                }
                 if matches!(submit.kind, Op::ReadSignal { .. }) {
                     self.signal = Some(submit);
                     continue;
@@ -177,48 +214,77 @@ impl Frame {
         let (kind, size, mode, links) = if fd == DIRECTORY {
             (Kind::Directory, 0, if self.refused { 0o777 } else { 0o700 }, 2)
         } else {
-            (
-                Kind::File,
-                u64::try_from(if fd == ADDRESS { self.address.len() } else { self.token.len() }).expect("fixture size"),
-                0o600,
-                1,
-            )
+            (Kind::File, u64::try_from(self.contents(fd).len()).expect("fixture size"), 0o600, 1)
         };
         Done::Stat(Stat { kind, size, mode, owner: USER, links })
     }
-    fn read_file(&self, fd: Fd, buf: &mut [u8], at: u64) -> Done {
-        let bytes = if fd == ADDRESS {
+    fn contents(&self, fd: Fd) -> &[u8] {
+        if fd == ADDRESS {
             self.address
-        } else {
-            assert_eq!(fd, TOKEN);
+        } else if fd == TOKEN {
             self.token
-        };
+        } else if fd == LINK_FILE {
+            self.link
+        } else {
+            self.files.get(&fd).expect("fixture file")
+        }
+    }
+    fn read_file(&self, fd: Fd, buf: &mut [u8], at: u64) -> Done {
+        let bytes = self.contents(fd);
         let start = usize::try_from(at).expect("fixture offset").min(bytes.len());
         let count = buf.len().min(bytes.len() - start);
         buf[..count].copy_from_slice(&bytes[start..start + count]);
         Done::Count(u32::try_from(count).expect("fixture count"))
     }
+    fn open_file(&mut self, path: &[u8], how: OpenHow) -> Result<Done, Error> {
+        self.opened.push(path.into());
+        if matches!(how, OpenHow::Create { .. } | OpenHow::CreateNoFollow { .. }) {
+            let fd = Fd::new(self.next_socket);
+            self.next_socket += 1;
+            self.files.insert(fd, Vec::new());
+            self.names.insert(path.into(), fd);
+            return Ok(Done::Fd(fd));
+        }
+        if path == b"link-file" {
+            return Ok(Done::Fd(LINK_FILE));
+        }
+        if path == b"store" {
+            return Err(Error::NotFound);
+        }
+        if path == b"directory" {
+            if how == OpenHow::ReadNoFollow {
+                self.private_opens += 1;
+            }
+            if self.absent {
+                return Err(Error::NotFound);
+            }
+            Ok(Done::Fd(DIRECTORY))
+        } else if path == b"address" {
+            Ok(Done::Fd(ADDRESS))
+        } else if path == b"token" {
+            self.token_reads += 1;
+            Ok(Done::Fd(TOKEN))
+        } else {
+            assert_eq!(path, b".");
+            Ok(Done::Fd(Fd::new(19)))
+        }
+    }
     fn answer(&mut self, kind: &mut Op) -> Result<Done, Error> {
         match kind {
-            Op::Open { path, how, .. } => {
-                self.opened.push(path.clone());
-                if path.as_ref() == b"directory" {
-                    if *how == OpenHow::ReadNoFollow {
-                        self.private_opens += 1;
-                    }
-                    if self.absent {
-                        return Err(Error::NotFound);
-                    }
-                    Ok(Done::Fd(DIRECTORY))
-                } else if path.as_ref() == b"address" {
-                    Ok(Done::Fd(ADDRESS))
-                } else if path.as_ref() == b"token" {
-                    self.token_reads += 1;
-                    Ok(Done::Fd(TOKEN))
-                } else {
-                    assert_eq!(path.as_ref(), b".");
-                    Ok(Done::Fd(Fd::new(19)))
-                }
+            Op::Open { path, how, .. } => self.open_file(path, *how),
+            Op::Write { fd, bytes, from, at } => {
+                let start = usize::try_from(*from).expect("write offset");
+                let at = usize::try_from(*at).expect("file offset");
+                let bytes = &bytes[start..];
+                let file = self.files.get_mut(fd).expect("temporary file");
+                file.resize(at + bytes.len(), 0);
+                file[at..].copy_from_slice(bytes);
+                Ok(Done::Count(u32::try_from(bytes.len()).expect("written size")))
+            }
+            Op::Rename { from, to, .. } => {
+                let fd = self.names.remove(from).expect("temporary name");
+                self.stored.insert(to.clone(), self.files.get(&fd).expect("temporary contents").clone());
+                Ok(Done::Nothing)
             }
             Op::Stat { fd } => Ok(self.stat(*fd)),
             Op::Read { fd, buf, at } => Ok(self.read_file(*fd, buf, *at)),
@@ -245,7 +311,9 @@ impl Frame {
                 self.sockets.insert(fd, Socket::default());
                 Ok(Done::Fd(fd))
             }
-            Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => Ok(Done::Nothing),
+            Op::Sync { .. } | Op::Remove { .. } | Op::Connect { .. } | Op::Shutdown { .. } | Op::Close { .. } => {
+                Ok(Done::Nothing)
+            }
             Op::Send { fd, bytes, from } => {
                 let start = usize::try_from(*from).expect("send offset");
                 self.sockets.get_mut(fd).expect("socket").request.extend_from_slice(&bytes[start..]);
@@ -278,12 +346,8 @@ impl Frame {
             Op::Bind { .. }
             | Op::Listen { .. }
             | Op::Accept { .. }
-            | Op::Write { .. }
             | Op::Append { .. }
             | Op::Truncate { .. }
-            | Op::Sync { .. }
-            | Op::Rename { .. }
-            | Op::Remove { .. }
             | Op::MakeDirectory { .. }
             | Op::List { .. }
             | Op::Spawn { .. }
@@ -303,6 +367,7 @@ struct Socket {
     answered: bool,
 }
 pub type Engine = Frame;
+pub type Disk = Frame;
 impl Frame {
     fn http_request(&mut self, fd: Fd) {
         let socket = self.sockets.get_mut(&fd).expect("socket");
@@ -322,6 +387,28 @@ impl Frame {
         self.requests.push(path.clone().into_boxed_slice());
         socket.answered = true;
         match path.as_slice() {
+            b"/jig/v1/sign-in/link" => {
+                let answer = if self.refuse_link.is_some() {
+                    w::SignInAnswer::Refused
+                } else {
+                    w::SignInAnswer::SignedIn(
+                        w::SignedIn::new(
+                            &w::CEILINGS,
+                            w::SignedInParts {
+                                token: Some(skein_lib::Secret::new(TOKEN_BYTES.into())),
+                                party: 1,
+                                expires: u64::MAX,
+                            },
+                        )
+                        .expect("signed-in answer"),
+                    )
+                };
+                let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+                answer.encode(&mut writer).expect("answer fits");
+                let body = writer.finish();
+                socket.reply.extend(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).bytes());
+                socket.reply.extend(body.iter().copied());
+            }
             b"/jig/v1/stream" => {
                 self.stream = Some(fd);
                 socket.reply.extend(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n");

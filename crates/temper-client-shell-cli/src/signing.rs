@@ -1,0 +1,90 @@
+//! A private native shell adopts its own parent while DIRECTORY keeps the lock.
+use crate::{directory, host::Startup, limits};
+use jig_client_shell_native::Shell;
+use skein_io::kernel::{Complete, Done, Fd, Op, OpenHow, Submit};
+use skein_lib::{Queue, Secret, Token};
+const OPEN: Token = Token::new(1 << 59);
+#[derive(PartialEq, Eq)]
+pub(crate) enum Credential {
+    New,
+    Writing,
+    Kept,
+}
+pub(crate) struct Signing {
+    pub(crate) shell: Option<Shell>,
+    pub(crate) with: Option<Secret>,
+    pub(crate) address: Option<Box<[u8]>>,
+    pub(crate) credential: Credential,
+    pub(crate) printed: Option<Box<[u8]>>,
+    pub(crate) error: bool,
+    pub(crate) exchange: Option<Token>,
+    opening: bool,
+    closing: bool,
+    startup: Startup,
+}
+impl Signing {
+    pub(crate) fn new(
+        bytes: &[u8],
+        parent: Fd,
+        leaf: Box<[u8]>,
+        startup: Startup,
+        out: &mut Queue<Submit>,
+    ) -> Result<Self, &'static [u8]> {
+        let bytes = bytes.strip_suffix(b"\n").unwrap_or(bytes);
+        let parsed = jig_client_protocol_http::printed(
+            &jig_client_protocol_http::Mapping::new(b"/jig").expect("mapping"),
+            bytes,
+        )
+        .map_err(|_| b"the sign-in link was refused".as_slice())?;
+        let mut address = b"http://".to_vec();
+        address.extend_from_slice(&parsed.host);
+        address.push(b'\n');
+        let engine = directory::address(&address)?;
+        let mut shell = Shell::new(limits::settings(engine, leaf));
+        let with = shell.sign_in(bytes).map_err(|_| b"the sign-in link was refused".as_slice())?;
+        out.push(Submit {
+            op: OPEN,
+            kind: Op::Open { root: parent, path: b".".as_slice().into(), how: OpenHow::ReadNoFollow },
+        });
+        Ok(Self {
+            shell: Some(shell),
+            with: Some(with),
+            address: Some(address.into_boxed_slice()),
+            credential: Credential::New,
+            printed: None,
+            error: false,
+            exchange: None,
+            opening: true,
+            closing: false,
+            startup,
+        })
+    }
+    pub(crate) fn complete(&mut self, complete: Complete) {
+        if complete.op != OPEN {
+            self.shell.as_mut().expect("native shell").completions().push(complete);
+            return;
+        }
+        self.opening = false;
+        if let Ok(Done::Fd(fd)) = complete.result {
+            let shell = self.shell.as_mut().expect("native shell");
+            shell.adopt(fd, self.startup.user, self.startup.seed);
+            if self.closing {
+                shell.close();
+            }
+        } else {
+            self.shell = None;
+            self.error = true;
+        }
+    }
+    pub(crate) fn close(&mut self) {
+        self.closing = true;
+        if !self.opening
+            && let Some(shell) = &mut self.shell
+        {
+            shell.close();
+        }
+    }
+    pub(crate) fn is_empty(&self) -> bool {
+        !self.opening && self.shell.as_ref().is_none_or(Shell::is_empty)
+    }
+}

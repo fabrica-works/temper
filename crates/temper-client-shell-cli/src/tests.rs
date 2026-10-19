@@ -153,5 +153,56 @@ fn host_bounds_cover_its_holders() {
         + jig_client::worst_case(&limits.root.domain.client).expect("native root bound")
         + skein_io::worst_case(&limits.io).expect("native io bound");
     assert!(f.host.worst_case() > holders);
-    assert_eq!(f.host.operations(), skein_io::operations(&limits.io).expect("native operation bound") + 2);
+    assert_eq!(f.host.operations(), skein_io::operations(&limits.io).expect("native operation bound") * 2 + 5);
+}
+#[test]
+fn sign_in_keeps_its_record_before_success() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.answer_sign_in_then_me();
+    assert_eq!(f.exit(), None);
+    f.store_token_with_address();
+    assert_eq!(f.stored(b"address"), Some(b"http://127.0.0.1:4000\n".as_slice()));
+    assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn a_non_loopback_link_exits_1_before_sending() {
+    let mut f = fixtures::Disk::sign_in(
+        b"http://192.0.2.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    );
+    f.drain();
+    assert_eq!(f.stderr(), b"temper ctl: the engine's address must be on loopback\n");
+    assert_eq!(f.requests(), 0);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn a_refused_link_never_prints_its_secret() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.refuse_link = Some(());
+    f.answer_sign_in_then_me();
+    assert_eq!(f.stdout(), b"");
+    assert_eq!(f.stderr(), b"temper ctl: the sign-in link was refused\n");
+    assert_eq!(f.stored(b"token"), None);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn sign_in_takes_the_lock() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.lock_busy();
+    assert_eq!(f.locks, 1);
+    assert!(!f.opened(b"link-file"));
+    assert_eq!(f.requests(), 0);
+    f.advance_past(limits::LOCK);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+}
+#[test]
+fn sign_in_waits_for_live_me() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.store_token_with_address();
+    assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.exit(), None);
+    assert_eq!(f.stdout(), b"");
+    f.answer_sign_in_then_me();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert!(!f.stdout().is_empty());
 }

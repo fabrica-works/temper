@@ -5,6 +5,7 @@ mod directory;
 pub mod host;
 pub mod limits;
 mod output;
+mod signing;
 #[cfg(test)]
 mod tests;
 mod transport;

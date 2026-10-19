@@ -17,6 +17,8 @@ enum Stage {
     Lock,
     Address,
     Token,
+    Link,
+    Store,
     Ready,
     Closing,
 }
@@ -31,6 +33,9 @@ pub(crate) struct Directory {
     started: Option<Time>,
     retry: Option<Time>,
     closing: bool,
+    link_path: Option<Box<[u8]>>,
+    pub(crate) link: Option<Box<[u8]>>,
+    pub(crate) stored: bool,
     pub(crate) engine: Option<Addr>,
     pub(crate) address: Option<Box<[u8]>>,
     pub(crate) token: Option<Box<[u8]>>,
@@ -40,7 +45,7 @@ pub(crate) struct Directory {
 }
 impl Directory {
     pub(crate) fn new(parent: Option<Fd>, leaf: Box<[u8]>, class: Class, user: u32, seed: u64) -> Self {
-        let mut io = FileIo::new(4, limits::ADDRESS, 1, Duration::from_secs(30)).with_effective_user(user);
+        let mut io = FileIo::new(4, limits::LINK, 1, Duration::from_secs(30)).with_effective_user(user);
         io.seed_randomness(seed);
         let root = parent.map(|fd| io.adopt_root(fd).expect("parent slot"));
         Self {
@@ -54,6 +59,9 @@ impl Directory {
             started: None,
             retry: None,
             closing: false,
+            link_path: None,
+            link: None,
+            stored: false,
             engine: None,
             address: None,
             token: None,
@@ -108,8 +116,9 @@ impl Directory {
         }
         if let file::Event::Refused { found, .. } = event {
             let part = match self.stage {
-                Stage::Address => "address",
+                Stage::Address | Stage::Store => "address",
                 Stage::Token => "token",
+                Stage::Link => "link",
                 Stage::Start
                 | Stage::Exists
                 | Stage::Checked
@@ -122,6 +131,14 @@ impl Directory {
             return;
         }
         match (self.stage, event) {
+            (Stage::Link, file::Event::Loaded { bytes, .. }) => {
+                self.link = Some(bytes);
+                self.stage = Stage::Ready;
+            }
+            (Stage::Store, file::Event::Stored { .. }) => {
+                self.stored = true;
+                self.stage = Stage::Ready;
+            }
             (Stage::Exists, file::Event::Opened { .. }) => self.stage = Stage::Checked,
             (Stage::Checked, file::Event::Closed { .. }) => {
                 self.check = None;
@@ -207,6 +224,13 @@ impl Directory {
                 self.stage = Stage::Ready;
                 return;
             }
+            Stage::Link => file::Request::Load {
+                owner: OWNER,
+                root,
+                path: self.link_path.take().expect("link file"),
+                max: limits::LINK,
+                no_follow: true,
+            },
             Stage::Address | Stage::Token => {
                 let (path, max) = if self.stage == Stage::Address {
                     (b"address".as_slice(), limits::ADDRESS)
@@ -221,9 +245,36 @@ impl Directory {
                     no_follow: true,
                 }
             }
-            Stage::Start | Stage::Ready | Stage::Closing => return,
+            Stage::Start | Stage::Ready | Stage::Store | Stage::Closing => return,
         };
         self.request(now, request);
+    }
+    pub(crate) fn ready(&self) -> bool {
+        self.stage == Stage::Ready && self.io.takes()
+    }
+    pub(crate) fn parent(&self) -> Fd {
+        self.io.descriptor(self.root.expect("parent")).expect("parent descriptor")
+    }
+    pub(crate) fn leaf(&self) -> Box<[u8]> {
+        self.leaf.clone()
+    }
+    pub(crate) fn load_link(&mut self, path: Box<[u8]>) {
+        self.link_path = Some(path);
+        self.stage = Stage::Link;
+    }
+    pub(crate) fn store_address(&mut self, now: Time, bytes: Box<[u8]>) {
+        self.stage = Stage::Store;
+        self.request(
+            now,
+            file::Request::Store {
+                owner: OWNER,
+                root: self.private.expect("locked directory"),
+                path: b"address".as_slice().into(),
+                bytes,
+                expected: file::Expect::Any,
+                no_follow: true,
+            },
+        );
     }
     fn request(&mut self, now: Time, request: file::Request) {
         file_layer::down(&mut self.io, now, request, &mut self.events, &mut self.submissions);

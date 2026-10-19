@@ -5,6 +5,13 @@ pub const INTERRUPTED: u8 = 130;
 pub const TERMINATED: u8 = 143;
 /// A numeric HTTP socket address with its one final newline.
 pub const ADDRESS: u32 = 64;
+/// The printed URL, including a possible final newline.
+pub const LINK: u32 = 256;
+#[must_use]
+pub fn settings(engine: skein_io::Addr, leaf: Box<[u8]>) -> jig_client_shell_native::Settings {
+    let limits = native();
+    jig_client_shell_native::Settings { engine, directory: leaf, limits: limits.connections, io: limits.io }
+}
 /// Concurrent HTTP exchanges, beside the event stream.
 pub const EXCHANGES: u32 = 8;
 /// The tools' root, native HTTP connections and socket io.
