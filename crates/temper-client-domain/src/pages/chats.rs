@@ -109,7 +109,7 @@ impl Chats {
         }
         let (Some(me), Some(project)) = (me, project) else { return };
         let Ok(words) = Text::new(self.words.clone(), env.limits.client.domain.text) else { return };
-        match jig_client::shapes::chat(me, project, words, env.wall) {
+        match jig_client::shapes::chat(me, project, words) {
             Ok(ask) => {
                 *serial = serial.checked_add(1).expect("page keys fit");
                 let key = Key { asker: Owner::Pages.asker(), number: *serial };
@@ -118,6 +118,7 @@ impl Chats {
                 self.outcome = None;
                 out.push(Request::Client(jig_client::Event::Send {
                     key,
+                    name: None,
                     request: jig_client::Ask::Jig(Box::new(ask)),
                 }));
             }

@@ -204,6 +204,7 @@ fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::History(_)
+        | ReadValue::Turn(_)
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)

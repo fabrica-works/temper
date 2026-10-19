@@ -326,6 +326,7 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
         pages.seen = Some((through, key));
         out.push(Request::Client(jig_client::Event::Send {
             key,
+            name: None,
             request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Seen {
                 through: jig_client::contract::SeenThrough::Results { through },
             })),

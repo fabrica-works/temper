@@ -70,6 +70,7 @@ pub(crate) fn route_forge(
                 env,
                 jig_client::Event::Send {
                     key: jig_client::Key { asker: Owner::Forge.asker(), number: request.raw() },
+                    name: None,
                     request: ask,
                 },
                 out,

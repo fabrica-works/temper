@@ -16,9 +16,7 @@ fn starting_a_chat_sends_the_chat_template_filled_once() {
     chats.write(Box::from(*b"Hello"), &limits);
     chats.start(&fixtures::env(&limits), Some(&me), Some(fixtures::PROJECT), &mut serial, &mut out);
     chats.start(&fixtures::env(&limits), Some(&me), Some(fixtures::PROJECT), &mut serial, &mut out);
-    let expected =
-        jig_client::shapes::chat(&me, fixtures::PROJECT, fixtures::acts::text(b"Hello"), fixtures::env(&limits).wall)
-            .expect("template");
+    let expected = jig_client::shapes::chat(&me, fixtures::PROJECT, fixtures::acts::text(b"Hello")).expect("template");
     assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [expected]);
 }
 #[test]

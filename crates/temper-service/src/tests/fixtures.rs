@@ -800,6 +800,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         parameters: Box::new([]),
         inputs: Box::new([]),
         budget: people::Budget::Named,
+        deadline: people::Deadline::Named,
         named: Box::new([]),
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {

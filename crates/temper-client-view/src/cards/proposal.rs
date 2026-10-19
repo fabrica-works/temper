@@ -67,6 +67,7 @@ pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u3
         | c::ReadValue::Ended(_)
         | c::ReadValue::OwnerEnded(_)
         | c::ReadValue::History(_)
+        | c::ReadValue::Turn(_)
         | c::ReadValue::Activity(_)
         | c::ReadValue::Inbox(_)
         | c::ReadValue::OwnerInbox(_)

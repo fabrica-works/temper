@@ -292,7 +292,11 @@ impl Chat {
         let key = Key { asker: Owner::Pages.asker(), number: *serial };
         self.pending.push((key, Sending::Close)).expect("one close fits");
         self.outcome = None;
-        out.push(Request::Client(jig_client::Event::Send { key, request: jig_client::Ask::Jig(Box::new(ask)) }));
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(ask)),
+        }));
     }
     fn watch_run(&mut self, task: &c::Task, out: &mut Queue<Request>) {
         if let c::ChipPhase::Owner {
@@ -392,7 +396,11 @@ impl Chat {
         }
         self.pending.push((key, kind)).expect("one request per chat act fits");
         self.outcome = None;
-        out.push(Request::Client(jig_client::Event::Send { key, request: jig_client::Ask::Jig(Box::new(ask)) }));
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(ask)),
+        }));
     }
 }
 #[must_use]

@@ -1674,6 +1674,7 @@ fn a_recurring_procedure_uses_the_root_period_route() {
     driver.settle();
     let mut member = tasks::New {
         label: 0,
+        deadline: tasks::Deadline::Named,
         flags: tasks::Flags::PLAIN,
         number: 1,
         project: 1,

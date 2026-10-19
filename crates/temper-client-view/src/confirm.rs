@@ -42,7 +42,7 @@ pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, b
                     words.card_text(b, P::LookAgain, &[]);
                 }
             }
-            Outcome::NotKept => words.status(b, P::RequestNotKept, &[]),
+            Outcome::NotKept | Outcome::Held => words.status(b, P::RequestNotKept, &[]),
             Outcome::Unknown => words.status(b, P::Unknown, &[]),
             Outcome::Limit => words.status(b, P::RequestsInFlight, &[]),
             Outcome::Unconfirmed => words.status(b, P::RequestUnconfirmed, &[]),

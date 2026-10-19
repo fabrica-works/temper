@@ -668,7 +668,8 @@ fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
         Read::Proposal { .. } => Some(ReadValue::Proposal(Box::new(jig_client_world::stories::proposal()))),
         Read::Inbox { group, .. } => Some(ReadValue::Inbox(Box::new(inbox_document(*group)))),
         Read::Activity { .. } => Some(ReadValue::Activity(Box::new(activity_document()))),
-        Read::Escalation { .. }
+        Read::Turn { .. }
+        | Read::Escalation { .. }
         | Read::Question { .. }
         | Read::PersonTask { .. }
         | Read::Result { .. }

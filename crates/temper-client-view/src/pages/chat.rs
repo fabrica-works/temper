@@ -147,7 +147,7 @@ pub(crate) fn conversation(b: &mut Builder, thread: &Thread, words: &Words, rows
                     words.status(b, P::TurnUnreadVersion, &[Hole::Number(u64::from(found))]);
                 }
                 c::TurnProblem::Malformed => words.status(b, P::TurnUnreadMalformed, &[]),
-                c::TurnProblem::TooLarge => words.status(b, P::TurnUnreadTooLarge, &[]),
+                c::TurnProblem::TooLarge { .. } => words.status(b, P::TurnUnreadTooLarge, &[]),
             },
             Line::RunBegan { attempt } => {
                 text(b, Role::Paragraph, &words.say(Word::RunBegan, &[Hole::Number(attempt)]));

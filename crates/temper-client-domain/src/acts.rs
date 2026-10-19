@@ -37,6 +37,7 @@ pub fn offers(page: &ReadValue) -> &[Offered] {
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::History(_)
+        | ReadValue::Turn(_)
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
@@ -71,6 +72,7 @@ pub fn revision(page: &ReadValue) -> Option<contract::Revision> {
         | ReadValue::Ended(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::History(_)
+        | ReadValue::Turn(_)
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
@@ -200,7 +202,11 @@ fn send(pages: &mut Pages, open: Confirm, out: &mut Queue<Request>) {
     pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
     let key = Key { asker: Owner::Pages.asker(), number: pages.serial };
     find_card(pages, open.object).expect("card retained").key = Some(key);
-    out.push(Request::Client(jig_client::Event::Send { key, request: jig_client::Ask::Jig(Box::new(ask)) }));
+    out.push(Request::Client(jig_client::Event::Send {
+        key,
+        name: None,
+        request: jig_client::Ask::Jig(Box::new(ask)),
+    }));
 }
 pub(super) fn told(pages: &mut Pages, told: &Told) -> bool {
     if let Told::Answered { key, outcome } = told

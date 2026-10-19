@@ -264,6 +264,7 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
                 Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)))
                 | Outcome::Unknown
                 | Outcome::Limit
+                | Outcome::Held
                 | Outcome::NotKept
                 | Outcome::Unconfirmed => Answer::Unknown,
             };

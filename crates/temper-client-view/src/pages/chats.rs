@@ -93,7 +93,7 @@ pub(crate) fn outcome_text(b: &mut Builder, words: &Words, outcome: &jig_client:
         Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Refused { refusal, .. })) => {
             words.refusal(b, refusal, text_limit);
         }
-        Outcome::NotKept => words.status(b, P::RequestNotKept, &[]),
+        Outcome::NotKept | Outcome::Held => words.status(b, P::RequestNotKept, &[]),
         Outcome::Unknown => words.status(b, P::Unknown, &[]),
         Outcome::Limit => words.status(b, P::RequestsInFlight, &[]),
         Outcome::Unconfirmed => words.status(b, P::RequestUnconfirmed, &[]),
