@@ -702,6 +702,22 @@ where its answer lands.
 
      Mark skein-01.s1 ready with the recorded skein/temper commits. At its actual post01.4 start retain all existing audit/proof obligations, preserve every original assertion case and report the relative count. No other session waits for this ready check.
 
+131. **Hourly graph freshness after source landings** (hourly check of 2026-10-19T08:20:55Z).
+     Reverses: ruling129 of 2026-10-19T08:19:26Z and steer of 2026-10-19T08:19:54Z only their current graph-use permission; the standing freshness rule remains.
+     Amends: README Rules, Graph freshness.
+
+     Follow README Graph freshness. Both primary indexes now precede source landings, so use source searches for skein and temper until the supervisor reports their exact primary refreshes. No worktree indexing; the kit stays d6d4abe. Further source landings require the same comparison rather than relying on an earlier permission.
+
+     ## Checked
+
+     - index_status(exact primary project): skein indexed_at08:17:08Z, root /srv/data/git/runner/src/skein; temper08:18:00Z, root /srv/data/git/runner/src/temper.
+     - git log origin/main: skein source7a7867bb,6e290792,49725eca follow5aaba054; temper sourcea6b1c197 at08:28:17Z follows its refreshed e83e552e source.
+     - git show -s --format=%cI e2985c1: ruling129 time2026-10-19T09:19:26+01:00; log.md records lift steer08:19:54Z. Kit scripts/dev/plan has ring and ruling dispatch; no command from newer main is required.
+
+     ## Instructions
+
+     Apply the temporary source-search instruction to running and ready-check sessions. Supervisor refreshes only the two exact primary indexes, then reports commits and partial/excluded coverage before lifting this temporary restriction. Check every graph name against the actual worktree and use source searches for every further uncovered copy.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
