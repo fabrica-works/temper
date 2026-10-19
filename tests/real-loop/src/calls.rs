@@ -10,6 +10,7 @@ pub const D1: Dir = Dir(1);
 pub enum Arg {
     Lit(&'static str),
     Task(usize),
+    Number(u64),
 }
 impl From<&'static str> for Arg {
     fn from(word: &'static str) -> Self {
@@ -52,12 +53,28 @@ pub fn watching(call: usize) -> Step {
     Step::Watching { call }
 }
 #[must_use]
+pub fn number(task: u64) -> Arg {
+    Arg::Number(task)
+}
+#[must_use]
 pub fn task(call: usize) -> Arg {
     Arg::Task(call)
 }
 #[must_use]
 pub fn occurrences(bytes: &[u8], needle: &[u8]) -> usize {
     bytes.windows(needle.len()).filter(|part| *part == needle).count()
+}
+pub(crate) fn task_number(stdout: &[u8]) -> u64 {
+    std::str::from_utf8(stdout)
+        .expect("call stdout")
+        .split("done: task ")
+        .nth(1)
+        .expect("created task")
+        .split(|c: char| !c.is_ascii_digit())
+        .next()
+        .expect("task number")
+        .parse()
+        .expect("created task number")
 }
 pub struct Called {
     pub exit: Option<Exit>,
@@ -147,18 +164,8 @@ impl Caller {
         for arg in &argv.0 {
             words.push(match arg {
                 Arg::Lit(word) => word.as_bytes().into(),
-                Arg::Task(call) => {
-                    let text = std::str::from_utf8(&self.calls[*call].stdout).expect("call stdout");
-                    let number = text
-                        .split("done: task ")
-                        .nth(1)
-                        .expect("created task")
-                        .split(|c: char| !c.is_ascii_digit())
-                        .next()
-                        .expect("task number");
-                    assert!(!number.is_empty(), "created task number");
-                    number.as_bytes().into()
-                }
+                Arg::Task(call) => task_number(&self.calls[*call].stdout).to_string().into_bytes().into(),
+                Arg::Number(number) => number.to_string().into_bytes().into(),
             });
         }
         words

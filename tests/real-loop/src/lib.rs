@@ -27,6 +27,11 @@ impl Ran {
         let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
         &caller.calls
     }
+    /// The task number printed by this call's completed act.
+    #[must_use]
+    pub fn number(&self, call: usize) -> u64 {
+        calls::task_number(&self.calls()[call].stdout)
+    }
     fn service(&self) -> &service::ServiceHost {
         let world::Proc::Service(service) = &self.outcome.procs[1] else { panic!("service root") };
         service

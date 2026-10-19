@@ -117,7 +117,7 @@ impl Referee<Proc> for Judge {
             panic!("root admission order")
         };
         service.address = peer.address();
-        if !service.link.is_empty() {
+        if service.links() != 0 {
             caller.released = true;
         }
         if caller.watching.is_some() {
@@ -138,7 +138,7 @@ impl Referee<Proc> for Judge {
             panic!("root admission order")
         };
         if (peer.address().is_some() && service.address.is_none())
-            || (!service.link.is_empty() && !caller.released)
+            || (service.links() != 0 && !caller.released)
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
             || (caller.is_empty() && !self.stopping)
             || (service.is_empty() && !self.finished)

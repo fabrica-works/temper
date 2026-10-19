@@ -14,6 +14,7 @@ pub struct ServiceHost {
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
     watch: watch::Watch,
+    links: u32,
     path: PathBuf,
     signals: Fd,
     forge: Option<TcpListener>,
@@ -33,6 +34,7 @@ impl ServiceHost {
             address: None,
             link: Vec::new(),
             watch: watch::Watch::default(),
+            links: 0,
             path,
             signals,
             forge: Some(forge),
@@ -43,6 +45,11 @@ impl ServiceHost {
     }
 }
 impl ServiceHost {
+    /// Links printed by this service start, independent of the scratch's old file.
+    #[must_use]
+    pub fn links(&self) -> u32 {
+        self.links
+    }
     pub(crate) fn arm(&mut self) {
         self.watch.armed = true;
     }
@@ -71,6 +78,8 @@ impl Host for ServiceHost {
             }
             temper_service::iterate(service, now, wall);
             while let Some(link) = service.links().pop() {
+                self.links += 1;
+                self.link.clear();
                 self.link.extend_from_slice(&link);
                 self.link.push(b'\n');
                 fixtures::private(&self.path.join("link"), &self.link).expect("private printed link");
