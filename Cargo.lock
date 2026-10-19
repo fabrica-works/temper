@@ -2444,14 +2444,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "temper-engine-domain-forge-client"
-version = "0.0.0"
-dependencies = [
- "skein-forge",
- "skein-lib",
-]
-
-[[package]]
 name = "temper-engine-domain-forge-issues"
 version = "0.0.0"
 dependencies = [

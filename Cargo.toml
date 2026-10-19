@@ -32,7 +32,6 @@ members = [
     "crates/temper-protocol-store",
     "crates/temper-engine-domain",
     "crates/temper-engine-smith",
-    "crates/temper-engine-domain-forge-client",
     "crates/temper-engine-domain-forge-change",
     "crates/temper-engine-protocol-forge",
     "crates/temper-engine-domain-forge-issues",
@@ -171,7 +170,6 @@ jig-domain-people = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-domain-tasks = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-domain-brief = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-domain-fleet = { git = "https://github.com/fabrig-dev/jig.git" }
-temper-engine-domain-forge-client = { path = "crates/temper-engine-domain-forge-client" }
 temper-engine-domain-forge-change = { path = "crates/temper-engine-domain-forge-change" }
 temper-engine-domain-forge-issues = { path = "crates/temper-engine-domain-forge-issues" }
 temper-engine-domain-forge = { path = "crates/temper-engine-domain-forge" }
