@@ -121,7 +121,8 @@ PlaintextName { forge: u16 },
   Their checks and wiring tests are part of this move, below.
   Refuse Word outside 1..=16 bytes of [a-z0-9-]; refuse PlaintextName when
   empty or containing a byte <=space, >=DEL or one of /:[], before any io.
-  Replace op_bytes*2+21 by checked op_bytes*2+word.len()+15. In
+  Retain landed skein_forge::marker::length(&settings.word, op_bytes),
+  whose checked formula is 2*op_bytes+word.len()+15. In
   tests::limits_that_disagree_with_the_client_name_both_limits, change the
   BodyBytes row from 1044/needed 1045 to 1041/needed 1042; fixtures::limits'
   body_bytes:1045 becomes 1042 for kit. Other fixture limits stay unchanged.
@@ -137,7 +138,9 @@ PlaintextName { forge: u16 },
   moved src/tests.rs and src/tests/hooks.rs bound callers too. Refresh any
   further caller, copied expected sum or derived startup fixture reached by
   the change, and list it in the commit body. This is pending owner-value code, not a ready-check
-  implementation. Keep the old fixture's complete sum 2,812,325 as the baseline.
+  implementation. Keep ready-check sum 2,812,325 as historical baseline;
+  the pre-owner-value fixture now measures 2,812,377 after landed holder changes
+  (recheck at temper9a2eda75). Neither figure is the final owner-byte sum.
   skein 08.5 adds its independent allocator measurement.
   Temper's side: crates/temper-service/src/forge.rs::{settings,shared,problems,
   indexed} must construct Forge/Credential/Transport, flatten Shared, handle
@@ -151,8 +154,9 @@ PlaintextName { forge: u16 },
   numbers in shared and protocol_shared. Keep the world's temper word and its
   1045-byte body bound until its skein 08 move adapts the word to kit.
   crates/temper/src/lib.rs::forges also imports the runtime transport; its
-  plaintext-name construction is temper 01.4's prerequisite, and its crate
-  path changes at the next temper repin. Verify
+  plaintext-name construction belongs to temper03.1's next repin (temper
+  01.4 retained the unit Plaintext variant); its component crate path changes
+  at that repin. Verify
   tests/system/src/composed/link.rs::assignment too: its settings::Transport
   is temper's configuration enum, not the component enum. Preserve that seam.
 Test shape: 112 inherited component test identities: root 12, connection 20, hooks 12,
@@ -262,7 +266,11 @@ Test shape: seven new tests, using fixtures::{limits,shared,settings,hook_settin
   tab/space/0x7e/0x80/0xff -> Ok; user 0/1 -> User{forge:1}/Ok.
   limits::check and Component::new agree, before begin/io; no secret in errors.
   New tests/hooks.rs tests: add fixtures::hook, fixtures::signed_head and
-  their small Hooked/Wire driver in fixtures.rs; all three are new. Model
+  their small Hooked/Wire driver in fixtures.rs; all three are new. The
+  driver retains full hook_settings() and passes &Settings to Hooked::pump,
+  including the owner word. signed_head uses a local lowercase digit table
+  for signature text; the old crate::marker::hex path is gone and skein
+  marker::hex is private. Model
   pumping on fixtures::ConnectionHarness::{pump,answer} and
   skein_world::stream::Wire (no copied machine world/fake dependency):
   signature_shape_is_refused_at_the_head: known HMAC, valid pull payload;
@@ -289,8 +297,9 @@ fn a_verified_delivery_without_an_event_is_answered_204_without_a_hint() {
   fixtures::Harness receives 429 on the identity start read only, at now=1 s;
   Retry-After=20 s, next=1 s, max=8 s -> Waiting{until:21 s,next:2 s}.
   Admit a call at 1 s: no answer at 11 s-1 ns, exactly one Unavailable,
-  cost 0 at 11 s; no reconnect before 21 s, one at 21 s. Separately call heard
-  directly for Start::Checking and Start::Settings, each with next=1 s and
+  cost 0 at 11 s; no reconnect before 21 s, one at 21 s. Separately call
+  start::heard using skein_forge::forgejo::plans::start::Heard for
+  Start::Checking and Start::Settings, each with next=1 s and
   retry=20 s: at now=1 s both give Waiting{until:21 s,next:2 s}; at
   Time::from_nanos(u64::MAX-1), both give until=Time::from_nanos(u64::MAX),
   next=2 s. This covers the gaps in moved

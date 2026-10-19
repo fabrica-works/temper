@@ -935,6 +935,20 @@ where its answer lands.
        two exempted crates, none exempted for using the forge client.
      - Nothing is deferred: no `later.md` row.
 
+147. **Skein03 references after the component's start cutover** (started recheck of skein-03.1).
+     Reverses: nothing; ruling120's owner-byte accounting, fixture bounds, token guard, route mapping and relative115/122/128 proofs remain.
+     Amends: skein/03-connection.md03.1 landed marker/body sizing, historical/current fixture baselines and next-repin ownership; 03.2 hook-driver/signature and start-result references.
+
+     Preserve the landed checked marker::length helper rather than resurrecting the old body formula. Ruling120's historical2,812,325-byte baseline remains historical; the changed pre-owner-value fixture measures2,812,377 in the recheck. Skein03.1 still measures the final owner-value sum after retaining the new owner bytes and holders; neither earlier number establishes its final bound. Plaintext's configured name is temper03.1's next-repin work, as temper01.4 says, rather than a landed unit-variant field.
+
+     The new hook test driver retains full Settings and passes it to Hooked::pump; use a local lowercase digit table in signed_head because the former crate marker path is removed and upstream hex is private. The direct start test consumes forgejo::plans::start::Heard. Preserve request bytes, assertions, bounds, test identities/counts and deadlines. Refresh further reached copies/derived fixture consumers under the existing Files and list them in the commit body.
+
+     Checked: recheck-skein-03-start/report.md and evidence/increment-audit.md cover03.1–03.3 at skein40d85476df1b696a9e4967c54b7c34cceed70163 and temper9a2eda75e47cd37749778df52ab691d38982e96c. Five-repository source/copy sweeps found no additional affected smith/jig/hearth forge user. Current inherited component identities112 remain; future additions stay assigned to03.1/.2/.3. Exact source verification: git grep marker::length in temper origin/main limits.rs gives line188; git show hooks/connection.rs232–253 gives pump(...,settings:&Settings,...); git grep enum Transport shows unit Plaintext in component/service; git grep Heard in skein plans/start.rs gives public enum Heard. temper/01-forge.md explicitly leaves configured plaintext name to temper03.1. Ruling120 has the same next-repin ownership rule.
+
+     Proof: pinned-heavy reached component/world focused165 pass; consumer focused363 and fuzzy5 pass; earlier component/world fuzzy6 pass; skein-forge focused136 pass with empty fuzzy successful. The old-baseline assertion exposed the changed fixture sum and its corrected exact assertion passed. Scratch-only lint/fixture errors consumed the three-attempt budget; final lint and late hook-driver corrections remain unchecked. This report supplies no final clippy, future owner-value implementation, post-repin integration, full-gate/live/process or TLS contract proof. Sources, patch, exact commands and logs retained in scratch-recheck-skein-03-start; workers ended and only owned targets removed.
+
+     Instructions: pass these plan corrections to skein03 and the temper03 ready checker. Normal implementation proofs cover the corrected references; no fourth supervisor executable attempt is authorized by this ruling. The separate TLS Name/IP Host question still blocks its dependent implementation/landing, and these corrections do not decide or authorize that public contract. Kit d6d4abe unchanged; rg kit/scripts/dev/plan confirms ruling --text and ring commands.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
