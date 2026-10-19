@@ -34,6 +34,8 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
     value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 598.into();
     // A minimal positive wait parks the scripted run and settles its withheld turn.
     value["engine"]["charters"][0]["waiting_ms"] = 1.into();
+    // The close story exercises the grace transition without a five-second real wait.
+    value["engine"]["templates"][0]["grace_ms"] = 1.into();
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["engine"]["connectors"] = serde_json::json!([1]);
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":llm.to_string()});
@@ -139,4 +141,18 @@ pub(crate) fn ctl(spawn: &skein_io::kernel::Spawn, inherited: &skein_world::Inhe
         )
         .expect("shipped tools limits"),
     ))
+}
+
+/// The project supplied by the standalone engine fixture.
+pub const PROJECT: &str = "1";
+
+/// A signed-in chat is the common opener for tools stories.
+#[must_use]
+pub fn signed_chat(key: &'static str) -> Vec<crate::calls::Step> {
+    use crate::{
+        argv,
+        calls::{D1, call, sign_in},
+        scripts,
+    };
+    vec![sign_in(D1), call(D1, argv!["chat", "--project", PROJECT, "--key", key, scripts::WORDS])]
 }

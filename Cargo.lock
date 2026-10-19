@@ -2399,6 +2399,7 @@ name = "temper-real-loop-world"
 version = "0.0.0"
 dependencies = [
  "jig-channel-world",
+ "jig-client-protocol-wire",
  "serde_json",
  "skein-fake-llm-domain",
  "skein-fake-llm-protocol",

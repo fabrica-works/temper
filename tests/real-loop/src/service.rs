@@ -1,4 +1,5 @@
 //! Deferred standalone preparation with its original admission envelope.
+mod watch;
 use crate::fixtures;
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Queue, Time, Wall};
@@ -12,6 +13,7 @@ pub struct ServiceHost {
     pub(crate) service: Option<temper_service::Service>,
     pub(crate) address: Option<SocketAddr>,
     pub(crate) link: Vec<u8>,
+    watch: watch::Watch,
     path: PathBuf,
     signals: Fd,
     forge: Option<TcpListener>,
@@ -30,6 +32,7 @@ impl ServiceHost {
             service: None,
             address: None,
             link: Vec::new(),
+            watch: watch::Watch::default(),
             path,
             signals,
             forge: Some(forge),
@@ -37,6 +40,17 @@ impl ServiceHost {
             completions: Queue::with_capacity(1),
             submissions: Queue::with_capacity(1),
         }
+    }
+}
+impl ServiceHost {
+    pub(crate) fn arm(&mut self) {
+        self.watch.armed = true;
+    }
+    pub(crate) fn watching(&self) -> bool {
+        self.watch.armed
+    }
+    pub(crate) fn delivered(&self) -> bool {
+        self.watch.delivered
     }
 }
 impl Host for ServiceHost {
@@ -52,6 +66,9 @@ impl Host for ServiceHost {
             self.service = Some(service);
         }
         if let Some(service) = &mut self.service {
+            for complete in service.completions().iter() {
+                self.watch.complete(complete);
+            }
             temper_service::iterate(service, now, wall);
             while let Some(link) = service.links().pop() {
                 self.link.extend_from_slice(&link);
@@ -88,7 +105,7 @@ impl Host for ServiceHost {
         self.service.as_ref().is_some_and(temper_service::Service::is_empty)
     }
     fn worst_case(&self) -> u64 {
-        self.envelope.0
+        self.envelope.0 + watch::Watch::memory()
     }
     fn operations(&self) -> u32 {
         self.envelope.1

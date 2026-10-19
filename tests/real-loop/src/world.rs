@@ -120,6 +120,10 @@ impl Referee<Proc> for Judge {
         if !service.link.is_empty() {
             caller.released = true;
         }
+        if caller.watching.is_some() {
+            service.arm();
+            caller.watched = service.delivered();
+        }
         if caller.is_empty() && !self.stopping {
             self.controls.signal(1, ServiceSignal::Terminate);
             self.stopping = true;
@@ -135,6 +139,7 @@ impl Referee<Proc> for Judge {
         };
         if (peer.address().is_some() && service.address.is_none())
             || (!service.link.is_empty() && !caller.released)
+            || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
             || (caller.is_empty() && !self.stopping)
             || (service.is_empty() && !self.finished)
         {

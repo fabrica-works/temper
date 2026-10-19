@@ -6,17 +6,15 @@ static HEAP: Counting = Counting;
 fn a_signed_in_chat_shows_its_reply_only_once_committed() {
     use temper_real_loop_world::{
         Exit, argv,
-        calls::{D1, call, occurrences, sign_in, task, until},
-        run, scripts,
+        calls::{D1, occurrences, task, until},
+        fixtures, run, scripts,
     };
     let ran = run(
         || scripts::chat_scripts(1),
         || {
-            vec![
-                sign_in(D1),
-                call(D1, argv!["chat", "--project", "1", "--key", "first", scripts::WORDS]),
-                until(D1, argv!["chat", task(1)], scripts::REPLY, scripts::EARLY),
-            ]
+            let mut steps = fixtures::signed_chat("first");
+            steps.push(until(D1, argv!["chat", task(1)], scripts::REPLY, scripts::EARLY));
+            steps
         },
     );
     let [signed, chat, read] = ran.calls() else { panic!("three calls") };
@@ -50,4 +48,30 @@ fn a_signed_in_directory_is_private_to_its_user() {
             path.display()
         );
     }
+}
+
+#[test]
+fn another_clients_close_meets_a_running_wait() {
+    use temper_real_loop_world::{
+        Exit, argv,
+        calls::{D1, call, join, start, task, watching},
+        fixtures, run, scripts,
+    };
+    let ran = run(
+        || scripts::chat_scripts(1),
+        || {
+            let mut steps = fixtures::signed_chat("waiting");
+            steps.extend([
+                call(D1, argv!["wait", "task", task(1), "--until", "replied"]),
+                start(D1, argv!["wait", "task", task(1), "--until", "ended"]),
+                watching(3),
+                call(D1, argv!["close", task(1), "--key", "close-waiting"]),
+                join(3),
+            ]);
+            steps
+        },
+    );
+    let (wait, close) = (&ran.calls()[3], &ran.calls()[4]);
+    assert_eq!([wait.exit, close.exit], [Some(Exit::Code(0)); 2], "{}", String::from_utf8_lossy(&wait.stderr));
+    assert!(wait.ended > close.ended, "the wait ended at {:?}, before the close", wait.ended);
 }

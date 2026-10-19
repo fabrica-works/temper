@@ -22,6 +22,7 @@ skein-llm-world.workspace = true
 skein-world.workspace = true
 smith-agent-process-world.workspace = true
 jig-channel-world.workspace = true
+jig-client-protocol-wire.workspace = true
 skein-lib.workspace = true
 skein-shell.workspace = true
 
