@@ -363,6 +363,9 @@ pass:
      - 4134983: `plan check` refuses an adopted retrospective proposal not yet applied; the run is past its check.
      - 2cedfab, e002687, 0b006b8, baaebb7: the pulse and the metrics read the run differently; no role acts on them during the run.
 
+117. **One behaviour per test: act once, assert after it, bounds named** (steer of 2026-10-19T14:50:52Z).
+     Steer of the check of 2026-10-19T14:50:52Z, point 1: the README's rule "One behaviour per test" now also says that a test sets up, acts once, then asserts that behaviour; that nothing is asserted on the way to the step under test; and that a bound has both sides, from named constants. Seen in 05.4's `crates/temper-client-shell-cli/src/tests.rs` (4445f2d9a): `two_writes_get_two_ordered_terminals` asserts `!f.act_sent()` before the step it waits for and then `f.store_count() >= first + 2`, a bound with one side computed by the test; `host_bounds_cover_its_holders` asserts `* 2 + 5` with both numbers unnamed. It applies to the tests each session adds or edits from its next increment. Landed tests are unchanged.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

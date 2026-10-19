@@ -163,7 +163,9 @@ plan's own.
   value would miss; a case that extends a fixture is built from it, never
   retyped.
 - **One behaviour per test** (testing-strategy.md, 10), named for it,
-  never with "and".
+  never with "and": it sets up, acts once, then asserts that behaviour.
+  Nothing is asserted on the way to the step under test, and a bound
+  has both sides, from named constants (ruling 117).
 - **No lint exception for a plan's words.** A Shape or sketch that needs
   a call clippy.toml bans is a question, raised before any `#[expect]`;
   each new `#[expect]` or `#[allow]` is named in the report.
