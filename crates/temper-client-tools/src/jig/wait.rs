@@ -9,7 +9,7 @@ use crate::jig::{
     subject::{Condition, Subject},
 };
 use jig_client::{Client, Event, Handle, Latest, Readable, Readout, State, Told, Watchable, Why, contract as c};
-use skein_lib::{Env, Queue, Time};
+use skein_lib::{Deadlines, Env, Queue, Time};
 #[derive(Debug)]
 pub(crate) struct Wait {
     pub(crate) called: Called,
@@ -23,7 +23,7 @@ pub(crate) struct Wait {
 }
 #[derive(Debug)]
 enum Stage {
-    Watching { deadline: Time },
+    Watching,
     Finishing { read: Handle },
 }
 impl Wait {
@@ -69,10 +69,15 @@ pub(crate) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
         since,
         first: None,
         me: until == Some(Condition::WaitingOnMe) || until == Some(Condition::Replied),
-        stage: Stage::Watching { deadline },
+        stage: Stage::Watching,
         name,
     };
     let number = wait.called.call_number;
+    if runner.wait_timers.is_none() {
+        runner.wait_timers = Some(Deadlines::with_capacity(env.limits.rows));
+    }
+    // One timer per admitted call: bounded and priced by Deadlines::worst_case(rows).
+    runner.wait_timers.as_mut().expect("wait timers").arm(number, deadline).expect("bounded calls");
     runner.waits.insert(number, wait);
     if handle == runner.me() {
         changed(runner, client, env, number, out);
@@ -185,6 +190,7 @@ fn complete(
     out: &mut Queue<Out>,
 ) {
     let Some(wait) = runner.waits.remove(&number) else { return };
+    runner.wait_timers.as_mut().expect("wait timers").cancel(number);
     let run = current_run(client, wait.handle);
     let latest = match client.document(wait.handle) {
         Some(document) => run.as_ref().or(document.latest),
@@ -217,35 +223,18 @@ fn complete(
     runner::finish(wait.called, printed, out);
 }
 pub(crate) fn fire(runner: &mut Runner, client: &Client, env: &Env<Limits>, out: &mut Queue<Out>) {
-    let mut next = None;
-    for _ in 0..runner.waits.len() {
-        let entry = match next {
-            None => runner.waits.first_key_value(),
-            Some(number) => {
-                runner.waits.range((core::ops::Bound::Excluded(number), core::ops::Bound::Unbounded)).next()
-            }
-        };
-        let Some((&number, wait)) = entry else { break };
-        next = Some(number);
-        if let Stage::Watching { deadline } = wait.stage
-            && deadline <= env.now
-        {
-            complete(runner, client, env, number, Err(b"timeout"), out);
-        }
+    let count = match &runner.wait_timers {
+        Some(timers) => timers.len(),
+        None => 0,
+    };
+    for _ in 0..count {
+        let Some(number) = runner.wait_timers.as_mut().expect("wait timers").expire(env.now) else { break };
+        complete(runner, client, env, number, Err(b"timeout"), out);
     }
 }
 #[must_use]
 pub(crate) fn next_deadline(runner: &Runner) -> Option<Time> {
-    let mut deadline = None;
-    for wait in runner.waits.values() {
-        if let Stage::Watching { deadline: due } = wait.stage {
-            deadline = Some(match deadline {
-                Some(old) => due.min(old),
-                None => due,
-            });
-        }
-    }
-    deadline
+    runner.wait_timers.as_ref()?.next()
 }
 
 fn finishing(runner: &mut Runner, number: u32, out: &mut Queue<Out>) {
@@ -253,6 +242,7 @@ fn finishing(runner: &mut Runner, number: u32, out: &mut Queue<Out>) {
     let Some(Value::Subject(Subject::Task(task))) = value(&wait.called.call, 0) else { unreachable!("task wait") };
     let read = Handle { asker: runner.asker, number: (u64::from(number) << 32u32) | 1 };
     wait.stage = Stage::Finishing { read };
+    runner.wait_timers.as_mut().expect("wait timers").cancel(number);
     out.push(Out::Client { event: Event::Unwatch { handle: wait.handle } });
     out.push(Out::Client { event: Event::Read { handle: read, read: Readable::Jig(c::Read::Task { task: *task }) } });
 }
@@ -306,6 +296,7 @@ fn ended(
                 Why::SubjectEnded => unreachable!("handled above"),
             };
             let wait = runner.waits.remove(&number).expect("active wait");
+            runner.wait_timers.as_mut().expect("wait timers").cancel(number);
             if wait.handle != runner.me() {
                 out.push(Out::Client { event: Event::Unwatch { handle: wait.handle } });
             }

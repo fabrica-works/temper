@@ -5,7 +5,7 @@ use jig_client::{
     Asker, Client, Event, Handle, Latest, State, Told, Watchable,
     contract::{Delivery, Subject},
 };
-use skein_lib::{Env, Queue};
+use skein_lib::{Deadlines, Env, Queue};
 mod acts;
 pub(crate) mod reads;
 mod recovery;
@@ -21,6 +21,7 @@ pub struct Runner {
     waiting: BTreeMap<u32, Called>,
     active: BTreeMap<u32, reads::Reading>,
     pub(crate) waits: BTreeMap<u32, wait::Wait>,
+    pub(crate) wait_timers: Option<Deadlines<u32>>,
     salt: &'static [u8],
     acts: BTreeMap<u32, acts::Reading>,
     sent: BTreeMap<jig_client::Key, acts::Sent>,
@@ -52,6 +53,7 @@ impl Runner {
             waiting: BTreeMap::new(),
             active: BTreeMap::new(),
             waits: BTreeMap::new(),
+            wait_timers: None,
             salt,
             acts: BTreeMap::new(),
             sent: BTreeMap::new(),
