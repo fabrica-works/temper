@@ -12,6 +12,7 @@ members = [
     "crates/temper",
     "tests/engine/protocol-forge",
     "crates/temper-client-shell-terminal",
+    "crates/temper-client-shell-cli",
     "tests/client",
     "crates/temper-client-view",
     "crates/temper-client-domain",
@@ -75,6 +76,7 @@ jig-protocol-engine-clients-http = { git = "https://github.com/fabrig-dev/jig.gi
 jig-protocol-engine-clients = { git = "https://github.com/fabrig-dev/jig.git" }
 skein-shell = { git = "https://github.com/fabrig-dev/skein.git" }
 temper-client-shell-terminal = { path = "crates/temper-client-shell-terminal" }
+temper-client-shell-cli = { path = "crates/temper-client-shell-cli" }
 jig-client = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-protocol-http = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-client-test-records = { git = "https://github.com/fabrig-dev/jig.git" }

@@ -1896,6 +1896,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-client-shell-cli"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "jig-client-protocol-http",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-shell-native",
+ "skein-http",
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+ "skein-shell",
+ "temper-client-domain",
+ "temper-client-tools",
+]
+
+[[package]]
 name = "temper-client-shell-terminal"
 version = "0.0.0"
 dependencies = [
