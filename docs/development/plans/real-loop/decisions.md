@@ -236,6 +236,14 @@ pass:
      - Also from temper 116d0a645 (tools.md 8.1, after the plan's base): `sign-out` "leaves `token` a zero-byte file, which a call reads as no token". 05.1: a zero-byte `token` exits 1 as an absent one, `temper ctl: DIRECTORY is not signed in`. New 05.1 tests: `an_absent_directory_is_never_made` (no `MakeDirectory` or `OpenPrivate` submitted; exit 1) and `a_zero_byte_token_is_not_signed_in`.
      - 05.5: `temper-client-tools`' `src/jig/rows.rs` joins its Files: `SIGN_OUT`'s `line`, "End sign-in and erase the token", becomes "End sign-in and leave the token empty" (tools.md 5.6: "leaves `token` empty, zero bytes, read as signed out"), with `tests/golden/help.txt`, which repeats it; its test `sign_out_waits_for_the_token_erase` is named `sign_out_waits_for_the_empty_token_stored`. Refresh any further copy of the old line, and list it in the commit body.
 
+103. **temper 06.1: the presentation allowance at the person's preset** (plan defect, temper 06's block of 2026-10-19T13:58:19Z).
+     Plan defect: Choice 1 keeps "`worst_case` stays one function of the limits", and Choice 2 gives the agent "the tools' preset", but the Shape did not foresee that `view::Limits::of` refuses that preset, so `Temper::worst_case(&limits::client())` panics at `fixtures.rs:76` before any heap peak exists. The proposal is adopted.
+
+     - `Temper::worst_case(limits)` is `domain::worst_case(limits)`, of the limits it takes, plus `2 × view::worst_case` computed wholly at `fixtures::domain_limits()`, the person's preset (its `phrasebooks`, `view_bounds` and limits). Every person world takes `domain_limits()`, so the person's value is unchanged; the agent's root needs no presentation, and this allowance is its upper bound.
+     - `agent::new`'s `View::Agent { limits }` is `fixtures::view_bounds(&fixtures::domain_limits(), ..).tree`; its tree stays empty.
+     - The agent's root, its `Joint` limits and its codec stay the tools' preset (Choice 2); the Don't's "the person's limits for the agent" means those. No tools-root `worst_case`, no upstream change.
+     - If `domain::worst_case` refuses the tools' preset, or the heap check fails, raise it with the error or the peak (06's Questions). Refresh any further copy of the presentation allowance computed at the supplied limits, and list it in the commit body.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

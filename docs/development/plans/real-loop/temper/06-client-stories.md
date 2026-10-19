@@ -76,7 +76,12 @@ Steps: `temper-06.1`, `temper-06.2`, `temper-06.3`, `temper-06.4`,
    the person's arm does; `domain::Event::Client` goes to the root, `Went` is ignored,
    any other variant panics, named. `take` and `build` do nothing, `act`
    returns `None`; `max_out` adds the runner's `2 × rows`; `worst_case`
-   stays one function of the limits (Questions).
+   stays one function of the limits (Questions): `domain::worst_case`
+   of the limits it takes, plus twice `view::worst_case` at
+   `fixtures::domain_limits()`, the person's preset, whose view bound
+   the tools' preset overflows (ruling 103). The agent's
+   `View::Agent { limits }` is that preset's tree bound; its tree stays
+   empty.
 2. **The agent's limits are the tools' preset.** `fixtures::agent` gives
    `Joint::next_client_limits` `temper_client_tools::limits::client()`,
    then `client_with(PARTY, inbox(), that, agent::new)`. The `Joint`
@@ -164,8 +169,9 @@ Proof: joint (temper's engine root and the tools' root on jig's client
 world), no higher than its test: the process tier belongs to temper 08,
 09 and 10.
 Don't: give the tools' root a `worst_case` (tools plan's crate); use the
-person's limits for the agent; route by `Request` variants the person
-lacks.
+person's limits for the agent's root or its `Joint` traffic (its
+presentation allowance and empty tree's bound are the person's, ruling
+103); route by `Request` variants the person lacks.
 Size: at most ~260 lines of `tests/client/src`, by the plan's command
 over that directory alone (`git diff -M --numstat origin/main...HEAD --
 tests/client/src`, summed by awk); 0 by part 1's count, which leaves out
