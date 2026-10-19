@@ -67,19 +67,25 @@ more says so in its row and its file. Dependencies are by capability:
 | `skein/10-plans.md` | skein 10: `skein-forge`'s plans' pure tests on canned exchanges, and the plans' differences from the design (answers 7 to 12 and 35), each its own increment (decision 28) | skein 01.4 | 10.5: skein 08.1 |
 | `skein/10.s1-named-page-fixtures.md` | skein10.s1: named page fixtures and scoped AST recurrence checks | skein10.5 | |
 
+### jig
+
+| File | Session | Needs at start | Increments that need more |
+|---|---|---|---|
+| `jig/01.s1-client-names.md` | jig01.s1: boundary naming seeds and whole project prefixes under the designer's answer | jig design9e9c350; normal ready check | |
+
 ### temper
 
 | File | Session | Needs at start | Increments that need more |
 |---|---|---|---|
 | `temper/01-forge.md` | temper 01: temper on `skein-forge`: the vocabulary's and the dialect's users moved, temper-forge-forgejo deleted, the component on skein's plans and start reads, temper's word handed | skein 01.1; the tools plan's first repin (Rules) | 01.2: skein 01.2; 01.3: skein 01.3; 01.4: skein 01.4 |
-| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig's boundary check repaired (Rules) |
+| `temper/02-client.md` | temper 02: temper on `skein-forge-client` and the measure; temper's client deleted; effects' purposes in temper's connector | skein 02.2, temper 01.3 | 02.1's naming proof and landing: jig01.s1 (Rules) |
 | `temper/03-connection.md` | temper 03: temper on `skein-forge-connection`; the component's crate deleted; temper-service hands the word, the user agent, the transport's name and the limits; the new refusals mapped | skein 03.1, temper 02.1 | 03.2: skein 03.3 |
 | `temper/04-setup.md` | temper 04: temper on `skein-forge-setup`; reconcile's modules deleted; temper's setup hands its values | skein 04.1 | |
 | `temper/05-fakes.md` | temper 05: temper on skein's fakes, temper's deleted; the one-process world on skein's forge peer | skein 05.2 | 05.2: skein 05.5 |
 | `temper/06-throwaway.md` | temper 06: temper's process tier, tools and conformance on skein's throwaway; temper's deleted; the conformance on skein-json (decision 27) | skein 06.1 | 06.2: skein06.s1 |
 | `temper/07-worlds.md` | temper 07: the moved worlds, the dialect's tests and the conformance with its transcripts deleted from temper; the protocol world keeps temper's own tests (decision 22) | skein 06.3; temper 06.1 | the client's world: skein 07.1; setup's: skein 07.3; the component's: skein 08.1 and 09.1; 07.1: temper 05.2 |
 
-17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1 and10.s1. The brief's fifth step, the fakes and
+17 original sessions: skein 10, temper 7; plus supplements skein01.s1,02.s1,02.s2,06.s1,10.s1 and jig01.s1. The brief's fifth step, the fakes and
 the conformance, is skein 05 to 09 and temper 05 to 07, by size. The
 increments per session are in each file.
 
@@ -232,7 +238,8 @@ chain.
   on jig's `origin/main`, the crates 02.1 moves onto `skein-forge-client`
   read as client crates, and `tests/client`'s
   `client_crates_carry_the_client_prefix` fails. The repair is this plan's
-  one jig change, a step the supervisor adds: the diagnosis's candidate
+  one jig change, jig01.s1 (`jig/01.s1-client-names.md`), with normal
+  readiness before implementation: the diagnosis's candidate
   (`client_names.rs` and its eight fixtures) is its evidence, with no
   system or forge word in jig and `breaches`' signature kept. temper 02.1
   takes it in its repin, with `heavy cargo update -p jig-boundary --precise
@@ -323,8 +330,8 @@ and fail naming the one that is unset (decisions.md, Design questions
 ## Repin
 
 temper's, in each temper increment that needs a new skein step (Rules),
-and the closing `temper-repin` once every skein step has landed,
-dropped or split (development.md, 5.7): temper 07.1's repin may land
+and the closing `temper-repin` once every skein step and jig01.s1 have
+landed, dropped or split (development.md, 5.7): temper 07.1's repin may land
 before skein's last tests do. skein's changes are new crates, a module
 of `skein-fake-peers` and new test crates, so nothing of smith, jig or
 hearth breaks; they take skein at their next repins (decisions.md, 13):

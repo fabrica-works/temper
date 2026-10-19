@@ -895,6 +895,46 @@ where its answer lands.
 
      Mark skein-10.s1 ready at these snapshots immediately; its existing skein-10.5 and closing temper-repin dependencies remain. Proof reaches checker/package only: no future increment behavior, full gate, process/live or downstream build is claimed. Relative N->N and historical counts keep their meaning. Re-resolve any later moved inputs/copies at start, refresh further reached copies and list them in the implementation commit body. Kit plan's ruling/ready commands are supported; no kit move or extra gate run is required by this readiness ruling.
 
+146. **Apply the designer's jig boundary answer** (design answer, temper02.1 block of2026-10-19T08:37:27Z).
+     Apply the designer's answer landed in jig `9e9c350529327f5aa7b2bfad8569c9868b5a5a72` (design) and temper `b72efd046f8c020969ee4410c178ccc31a8e891c` (plan).
+
+
+     The candidate's policy is the design. A dependency's name is evidence of a
+     client crate only under a client prefix of jig's or of the checked project
+     (by its whole name), less the records both ends read, and for skein's UI
+     kit, by its crates' names. No other UI kit is inferred: one counts once
+     section 15 names its crates. A `-client` in any other namespace,
+     `skein-forge-client`'s among them, never seeds. jig `9e9c350` adds this
+     to jig's `docs/design/README.md`, section 15 (and STATUS.md):
+
+     > A dependency is a client crate by its name in two cases only:
+     > - under a prefix this section gives, `<project>-client` or
+     >   `<project>-<application>-client`, where `<project>` is jig or the
+     >   checked project, by its whole name, … but not the records both ends
+     >   read …;
+     > - one of the UI kit's crates a client is built and tested on, by its
+     >   name: `skein-ui`, `skein-ui-text`, `skein-ui-web`, `skein-fake-person`
+     >   and `skein-fake-person-browser`; not the bundler, a tool.
+     >
+     > A name in any other namespace, skein's among them, follows its own
+     > repository's rules, and says nothing here: a `<kit>-<service>-client`
+     > there is a client of a service, which a crate in the engine's process
+     > may use, and makes no crate that depends on it a client crate.
+
+     It rests on section 15: "The project is jig, or an application under its
+     own name"; "A crate that runs in the engine's process keeps the engine's
+     name, even when it serves clients". For the run, temper `b72efd0` (README,
+     Rules: "The boundary check's jig repair"; `temper/02-client.md`, 02.1):
+     - The repair is jig's one change in this plan, a step the supervisor adds,
+       on the diagnosis's candidate (`client_names.rs`, its eight fixtures): no
+       system or forge word in jig; `breaches(root, project, allowed)` kept.
+     - temper 02.1 takes it in its repin (`heavy cargo update -p jig-boundary
+       --precise <the repair's commit>`); its migration, deletion and clippy go
+       on meanwhile; its naming proof and landing wait.
+     - `tests/client/tests/names.rs` does not change: empty `breaches`, the same
+       two exempted crates, none exempted for using the forge client.
+     - Nothing is deferred: no `later.md` row.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

@@ -59,7 +59,7 @@ repairs what they break (02.1, Shape).
 
 Scope: forge-client 7.1 and forge 2.3, 3.7; domain/forge 5 and 6.
 Needs: skein 02.2 and temper 01.3 on `origin/main` (README); for its naming
-  proof and its landing, jig's boundary check repaired on jig's `origin/main`
+  proof and its landing, jig01.s1's boundary check repair on jig's `origin/main`
   (README, Rules: the boundary check's jig repair). Skein 02.3's `bind_deployment`
   guard and 02.4's frame checks may be on it; if they are, the repin commit
   repairs the two places below.
