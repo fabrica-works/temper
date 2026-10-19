@@ -152,11 +152,15 @@ those directories: `crates/jig-domain-core/src/{tests,tests/fixtures}.rs`, `crat
 `tests/client/src/{stories,joint/engine_stories,joint/wire/history,joint/wire/historical/tests,joint/wire/projects/tests}.rs`
 and `tests/ops/src/conformance/mod.rs`; `crates/jig-protocol-store/src/sizes.rs` and `src/tests/format.rs`, whose
 worst-case sizes (81_241, 81_353, 17_499, 34_998) follow the grown rows; `tests/client-wire/tests/fuzzy_client_wire.rs`, whose hand-listed wire
-types gain `NewDeadline` here and `DeadlineSpan` in 05.3.
+types gain `NewDeadline` here and `DeadlineSpan` in 05.3. The shipped store profiles (ruling 118):
+`crates/jig-protocol-config/src/profile/{small,standard}.rs` (`STORE_KV`'s `value`, `chunk`, `page.bytes`) and
+`testing/jig-test-service/src/tests.rs` (`both_jig_profiles_have_a_bounded_service`'s rows).
 Shape: add the selector field and ONLY Named, as sketched below, to the existing types. Every producer supplies Named,
 every translation matches it exhaustively; made tasks' stored Authority stays wall-only. ProposedTask carries the selector
 through current and historical documents, including recurring batch documents. Share each existing batch codec between
 Create and Propose. Preserve all other fields. Recompute payload/worst-case accounting where the inline carrier grows.
+A shipped profile whose `value` a grown row passes (`sizes::check`'s needs over has) takes the growth, needs minus has,
+in `value`, `chunk` and `page.bytes` alike, and the service test's row follows (ruling 118).
 Regenerate store v4 as in 05.1; wire v9 with
 `SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift`; rerun without the variable.
 Test shape: extend existing link `src/tests/create.rs` and fixtures/create.rs, engine-client `src/tests/fixtures/create.rs`,
@@ -179,6 +183,7 @@ Files: 05.2's enums, schemas and translations; `crates/jig-domain-authority/src/
 `src/documents{,/objects,/offers,/deployment,/task_tree,/project_note}.rs`, `src/reads{,/rows}.rs` and core test callers;
 new `crates/jig-domain-core/src/routing/deadlines.rs` declared in `routing/mod.rs`;
 `crates/jig-domain-tasks/src/{batch,stored}.rs`; `crates/jig-protocol-store/src/sizes.rs` and `src/tests/format.rs`, as in 05.2;
+the shipped profiles and the service test's rows, as in 05.2 (ruling 118);
 `crates/jig-client-view/src/{cards/proposal,proposed_task,proposed_task_words}.rs` and their existing tests;
 `testing/jig-client-scripted-engine/src/{requests,requests/creating,payload/operations}.rs`;
 new `tests/core/tests/deadline_spans.rs`; `tests/client-protocol/src/client/operations.rs`,
@@ -393,7 +398,8 @@ No span is placed in TaskRecord.authority, a policy ceiling, or an amendment's a
 ## Questions to raise when reached
 
 - A changed carrier exceeds a shipped profile's memory/codec bound: report the measured needs and available room before
-  changing a limit. A proof exceeds 0.5 s: profile it; do not change optimization or wait on jig 04 to excuse the cost.
+  changing a limit. A store profile's `value`, `chunk` and `page.bytes` raised by the measured growth is no question
+  (ruling 118); a need in `commit`, `ops`, `queued` or memory is. A proof exceeds 0.5 s: profile it; do not change optimization or wait on jig 04 to excuse the cost.
 - Rebase reveals a newly landed consumer outside this inventory or a different format owner: report the exact source
   and necessary repair.
 
