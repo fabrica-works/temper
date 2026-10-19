@@ -1087,6 +1087,18 @@ where its answer lands.
 
      Follow ruling154 and these completed session copies; keep the new jig step in normal check, not ready, until its fresh check/ruling. Give the checkpoint sessions their updated plan text alongside154. The existing unblock/Instructions remain authoritative and no second unblock or duplicate proof is needed.
 
+156. **jig01.s2 Shapes against main** (ready check of jig-01.s2).
+     Reverses: nothing; completes ruling154/155's mechanical-copy inventory without changing its contract or dependency order.
+     Amends: jig/01.s2-smith-adapters.md Files, framing Shape and Size.
+
+     The fresh jig01.s2 ready check found one further framing fixture: testing/jig-test-service/src/tests/worker.rs::start_on_pipes constructs its ScriptedPeer at channel version2. Add it to Files and change only that argument to3 alongside the four channel-v3 consumers; retain every other argument and schema-derived control. The supplement now names seven Rust files plus Cargo.lock. Its existing copy rule remains: refresh any further reached copy or derived value within the settled contract and name it in the commit body; report a further structural/design difference before expanding scope.
+
+     Checked: git -C jig grep -n -A15 -B3 'fn start_on_pipes' c415911cc6e73d2359a30db896dc87e00d28b202 -- testing/jig-test-service/src/tests/worker.rs finds the helper at164, schema-derived kind.largest+8 sizing at174 and ScriptedPeer::new(...,2,...) at179. The primary graph query returned no matching node; exact landed source supplies this premise. scratch-ready-jig-01s2/full.diff changes that argument2 to3 with all other arguments preserved. Bounded plan-tree search found the old six-file count only in this supplement; the existing README rule already covers further framing copies. Downstream temper's three Start literals, two Live matches and encode_start proof remain assigned to temper02.1.
+
+     Validation: scratch-ready-jig-01s2/report.txt records all five full snapshots, three completed pinned-heavy attempts, exact compatible smith/skein updates and one revision per upstream source. Workspace/all-target check, four affected packages' all-target clippy -D warnings and formatting pass. Reached16-package suites preserve all identities/counts:1173 default pass8.903s,95 fuzzy pass24.237s, empty browser passes sequentially with --no-tests=pass. CallName remains16 bytes, smallest Start42→43 via None tag, charterv2/119 unchanged. Non-lock delta+17/-14; no limit, assertion, behavior or count waiver.
+
+     Accept the check with this plan correction and mark jig01.s2 ready using its recorded snapshots. The full repository gate stays at implementation landing; process/live/recordings, wasm/browser application tier and downstream temper compilation were not run or claimed. All checker workers ended before its own14GB target was removed. Other sessions' gates/proofs, checkpoints and154 dependency order remain unchanged.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
