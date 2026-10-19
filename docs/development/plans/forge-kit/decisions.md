@@ -876,6 +876,13 @@ where its answer lands.
 
      The checker claims only those bounded mechanical positions; assertion cases, semantic row behavior and fixture derivations retain explicit source review. The normal readiness audit re-resolves all post10.5 owners, copies and derived count users. Refresh any further reached copy and list it in the commit body. Existing budgets, production behavior and recovery/contract gates remain. Pinned kit plan supports ruling/ready/ring/bg and no kit move is authorized.
 
+144. **Await the assigned live-text smith repair** (cross-session scope, temper06.2's block of2026-10-19T09:46:34Z).
+     Ruling142 and README's compatible smith source rule already authorize temper06.2's forward smith source in its existing repin commit, subject to a landed compatible repair and unchanged all-target/gate checks. The same call/Piece/Hold mismatch in reports/temper-06-20261019T094528Z.md is covered; no new repair in a Cargo dependency checkout is authorized.
+
+     The upstream repair is assigned already: live-text's smith-02.1. Its README rule6 and smith/02-best-effort.md02.1 name tests/session/src/world.rs, every fake-LLM Event/Request match and Event::Call.call. Register plan await coordinator live-text/smith-02.1 once for both temper05.2 and06.2. After that trailer lands, take the earliest compatible landed smith revision under142, retain a newer compatible source and the full skein main update, and establish compatibility with the existing proofs. Preserve all assertions, bytes and budgets; mechanical callsites from that landed repair follow README's repin repair rule, with further copies named in the commit body. A structural/behavioral difference returns a scoped report.
+
+     Independent peer and JSON work/checkpoints remain authorized while the repair is pending. Required recordings wait for compatibility and retain their fresh scratch/facts/transcript proof. No duplicate upstream supplement is assigned because the live-text step owns the exact sites.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

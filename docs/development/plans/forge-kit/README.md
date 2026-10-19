@@ -231,6 +231,9 @@ chain.
   If no compatible repair has landed, continue independent work and report
   the owning upstream step for the coordinator's trailer-based await. Never
   patch Cargo's dependency checkout.
+  The current fake-LLM Event::Call.call / Request::Piece,Hold repair is
+  owned by live-text/smith-02.1; await its trailer before taking the
+  compatible source, then establish compatibility with the normal checks.
 - **Mechanical repairs during repins** belong to the existing repin commit.
   Follow landed upstream renames, paths, signatures and generated-version
   moves through their whole sweep, including source, tests, schema comments,
