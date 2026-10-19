@@ -341,6 +341,13 @@ pass:
      - **08.3's two headings** are answered here: ruling 111 answered the first, but its `Answer to` line left out the heading's time, so the block stayed. Nothing changes for 08.3: it goes on as ruling 111 says.
      - **06.3's `LOAD_BYTES`** is reached as `temper_engine_domain::LOAD_BYTES`: it joins `crates/temper-engine-domain/src/lib.rs`'s `pub use limits::{..}`, beside `VIEWS` and `WATCHES_PER_STREAM`, its sibling bounds; 06.3's Files gain that line, and its sketch's two asserts use the public path. 06.3's Files already named `limits.rs` (`LOAD_BYTES`); no running or waiting step changes `lib.rs`, and no session file names the private path again. A further copy of `limits::LOAD_BYTES` outside the crate takes the public path; list it in the commit body.
 
+114. **temper 06.4: the agent shows the held task it was offered** (plan defect, temper 06's block of 2026-10-19T14:51:28Z).
+     Plan defect, the proposal adopted with its shape fixed. jig's referee checks each fresh release against a card the client shows: `visible.contains_key` and the revision shown, which a card without a printed revision takes from the documents delivered to that client. Choice 1 gave the agent the link alone (ruling 108), so no agent's release can pass. For the agent, the card it saw is the read the tools printed for it: `Temper::receipts` already records a `task D` read that holds a hold as `Receipt::Card` of `Escalation(D)` at the hold's revision.
+
+     - **`Agent::build`'s `Main`** (`tests/client/src/agent.rs`) shows one keyed `Item` for each task D that a printed call's `acts:` line offers `release D` for: `Key { owner: frame::owner(), kind: 2, a: D, b: 0 }`, cards.rs's escalation, nested as the inbox nests its entries so that `outline::check` holds. It names no `Hold revision`: the referee compares the hold sent with the revision the agent's read delivered. `build` rebuilds when the link or the shown tasks change. Choice 1 says so; ruling 108's link `Status` is unchanged.
+     - **`--key NAME`** is the agent's own key (tools.md: "The agent names the key"): the test's chosen key stands.
+     - **06.4's Files** gain `tests/client/src/agent.rs`, and its Size is ~45 lines of `tests/client/src`. Its Don't: no revision printed in the agent's tree, and no `Sent` card or revision set apart for the agent; jig's check runs unchanged.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

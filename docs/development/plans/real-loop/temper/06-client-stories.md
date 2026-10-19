@@ -85,8 +85,9 @@ Steps: `temper-06.1`, `temper-06.2`, `temper-06.3`, `temper-06.4`,
    referee meets `Online` and `Offline` only from `Seen::Link` (ruling
    108): `Page` > `Banner` > `Region` at `view::frame::link_region()` >
    one `Status` named `Live` for `Link::Live`, `Offline` for
-   `Link::Offline`, none otherwise, then an empty `Main`, so that
-   `skein_ui::outline::check` holds; `build` rebuilds it when that state
+   `Link::Offline`, none otherwise, then a `Main` with one keyed `Item`
+   per task whose `release` act a printed call offered (ruling 114),
+   so that `skein_ui::outline::check` holds; `build` rebuilds it when that state
    changes (`render.stale`), from `root.client().link().state`, and the
    two names are consts that `Temper::seen` matches too. No bindings.
 2. **The agent's limits are the tools' preset.** `fixtures::agent` gives
@@ -277,11 +278,17 @@ Removes: nothing.
 
 Scope: 11.2's adoption and release (Choice 6).
 Needs: 06.1's agent.
-Files: `tests/client/src/fixtures.rs`, `tests/client/tests/agent.rs`.
+Files: `tests/client/src/{fixtures.rs, agent.rs}`, `tests/client/tests/agent.rs`.
 Shape: `fixtures::printed_act(stdout, act)`: the words of the first
 `acts:` line naming `act`. The release test calls
 `fixtures::goal_with_held_delegate` before `fixtures::agent`, as it
-replaces the front; the agent gives `task D`'s `release D --hold R --key NAME`, as printed.
+replaces the front; the agent gives `task D`'s `release D --hold R --key NAME`, as printed,
+its own key for NAME. `Agent::build`'s `Main` shows, for each task D a
+printed call's `acts:` line offers `release D` for, an `Item` keyed
+`Key { owner: frame::owner(), kind: 2, a: D, b: 0 }` (cards.rs's
+escalation), nested as the inbox nests its entries, with no `Hold
+revision` name: the referee then compares the hold sent with the
+revision the agent's read delivered (ruling 114).
 Test shape: `tests/agent.rs`, each focused, under 0.5 s.
 - `a_repository_the_agent_adopts_is_held_by_the_engine`: `adopt
   --project 1 --owner acme --name shop --landing main --key shop` (as
@@ -291,8 +298,9 @@ Test shape: `tests/agent.rs`, each focused, under 0.5 s.
   `done: task D, release`; `engine.task(D).tries == Tries::NONE`, as
   `task.rs`'s person story asserts.
 Proof: joint, no higher than its test (06.1).
-Don't: touch `translate/forge.rs`.
-Size: at most ~20 lines of `tests/client/src`, by the same command; 0
+Don't: touch `translate/forge.rs`; print a revision in the agent's
+tree, or set `Sent`'s card or revision for the agent apart (ruling 114).
+Size: at most ~45 lines of `tests/client/src`, by the same command; 0
 by part 1's count.
 Removes: nothing.
 
