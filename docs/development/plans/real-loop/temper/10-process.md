@@ -385,7 +385,7 @@ Each prints what it says, on `origin/main`, after `git fetch`:
   prints a line.
 - `git grep -c -E 'fn (temper_ctl_help_prints_the_guide|temper_ctl_without_a_tool_exits_1|temper_ctl_signs_in_by_the_link_read_on_stdin|a_wait_past_its_timeout_exits_3|an_adopt_cut_by_a_signal_is_made_once)\(' origin/main -- crates/temper/tests/process.rs`
   prints a count of 5.
-- `git grep -n -F -e '"-STOP"' -e '"-CONT"' origin/main -- crates/temper/tests/support/ctl.rs`
-  prints two lines.
+- `git grep -o -n -F -e '"-STOP"' -e '"-CONT"' origin/main -- crates/temper/tests/support/ctl.rs`
+  prints two lines, one for each signal (ruling 128).
 - `git grep -n -F -e 'read-only proof handle' -e 'isolated Forgejo' origin/main -- crates/temper/tests/support`
   prints nothing.

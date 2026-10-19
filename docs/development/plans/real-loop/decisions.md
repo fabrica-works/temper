@@ -554,6 +554,27 @@ pass:
      - 08.3 lands past its Size without asking (implementer.md, "Past the
        Size"); its report gives the count by file.
 
+128. **Session 10's signal check counts matches** (plan defect, temper 10's block of 2026-10-19T16:06:45Z).
+     Ruling 128: session 10's follow-up ed5325404 is not landed; the
+     session's check counts each signal instead.
+
+     The follow-up only splits `b"-STOP"` and `b"-CONT"` onto two lines so that
+     10-process.md's third "Done when" command, `git grep -n -F -e '"-STOP"'
+     -e '"-CONT"' … ctl.rs`, "prints two lines": on d26c5cfea both literals
+     are on one line, and `-n` prints matching lines. The check meant both
+     signals are there, and both are. The command becomes `git grep -o -n -F
+     -e '"-STOP"' -e '"-CONT"' origin/main --
+     crates/temper/tests/support/ctl.rs`, which prints one line per match:
+     two on `main` as it is.
+
+     - No step is added and no landing follows: 10.1 and 10.2 are landed, and
+       session 10 is done, with no successor.
+     - ed5325404 stays on `real-loop/temper-10-2-signals`, unlanded; its
+       worktree and target go with the coordinator's cleanup of ended
+       sessions.
+     - A further check that counts lines where it means occurrences takes
+       `-o` in the same way, named in the ruling that meets it.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
