@@ -425,6 +425,18 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C ~/src/rust/temper grep -n '"src' origin/main -- crates/temper-box/src/tests/boundary.rs`: 53 `pending.push(std::path::PathBuf::from("src"))`.
      - testing-strategy.md, 10: "Rows carry data" (546), "A setup written once" (555), "Named fixtures and sizes" (561), "A bound's two sides" (573).
 
+117. **temper 12.2's Shapes against main** (re-check of temper-12.1).
+     temper 12's re-check after its start (temper 1e089afb5; 12.1 landed there, so only 12.2 is corrected) found 12.2's usage rule short of the rows temper 02 landed. temper/12-tools-help.md, 12.2, now says: a switch is `[--name]`, read by its place before its kind; a repeated flag is `[--name SHOWN]...`; a positional's `Kind::Word` set shows its words joined by `|`; `Kind::Order` shows `activity|priority`; `src/jig/rows.rs` joins the Files and takes tools.md 5.3's order (`CHAT_CREATE`'s `project` before `text`, `CANCEL`'s `grace` before `reason`, `DECIDE`'s escalation form `hold` after `task`); help gives every row named `chat`, `help::text(Some(i))` row `i` and each later row of its name; `subject::live` becomes `pub(crate)` (`src/jig/subject.rs` joins the Files) with one const of every `Phase`; the guide's reference test and `fixtures::parse_line` are `for` loops over `GUIDE.get(at)`, since clippy.toml bans `Vec`, `slice::split`, `filter_map`, `collect` and `Option::is_none_or`; the help sketches import `skein_lib::{Overflow, Writer}`. Where a row's `shown` or order still differs from 5.2's to 5.6's line, the row changes to the line's, with each test whose expected text follows the rows' order: list each in the commit body.
+
+     Checked:
+     - `git show origin/main:crates/temper-client-tools/src/jig/rows.rs`: `CHAT_CREATE` lists `positional(b"text", …)` then `flag(b"project", …)`; `CANCEL` `reason` then `flag(b"grace", …)`; `DECIDE`'s second form ends `flag(b"hold", b"R", …)`; `TASKS` has `flag(b"order", b"O", Kind::Order, …)`.
+     - `git grep -n -E 'chat --project|cancel N|--hold R|--order' origin/main -- docs/design/tools.md`: 197 `chat --project P TEXT`; 206 `cancel N [--grace D] REASON`; 203 `decide N --hold R release|leave|pass-up [REASON]`; 162 `[--order activity|priority]`.
+     - `jig/table.rs:91`: `switch` builds `shown: b"", kind: Kind::Word { set: &[] }, … place: Place::Switch`.
+     - `jig/argv.rs:92`: `fn tool_index` returns the first row whose `name == word`; `table.rs:13,17`: `&rows::CHAT`, `&rows::CHAT_CREATE`.
+     - `jig/subject.rs:97`: `fn live(phase: Phase) -> bool` (private); `:79` `pub fn phase_word`.
+     - `git grep -n -E 'env!|disallowed_macros' origin/main -- crates/temper-client-tools/src`: nothing; ruling 116's mend of `sources()` is on main.
+     - The sub-agent's run at f0743c0e2 with the corrections: `heavy cargo clippy -p temper-client-tools --all-targets -- -D warnings` exit 0 (exit 101 as written); default profile 36 passed with the rows reordered.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

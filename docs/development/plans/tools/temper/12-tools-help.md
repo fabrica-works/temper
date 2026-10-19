@@ -196,7 +196,8 @@ Files: new `src/jig/help.rs`, `src/guide.rs`, `src/help.rs`,
 `src/tests/help.rs` and
 `src/tests/golden/{help,help_decide,help_close,help_wait,help_pending,help_adopt}.txt`
 (recorded by hand); `src/lib.rs`, `src/jig.rs`, `src/tests.rs`, `src/tests/fixtures.rs`,
-`src/tests/limits.rs` (`the_help_fits_the_tools_window`).
+`src/tests/limits.rs` (`the_help_fits_the_tools_window`); `src/jig/rows.rs` (5.3's
+argument order) and `src/jig/subject.rs` (`live`), as the Shape says.
 Shape:
 - `jig::help::usage` writes the name, each positional as `shown`, each
   flag as `--name SHOWN` (in `[...]` when optional, `...` after it when
@@ -206,6 +207,24 @@ Shape:
   `wait`'s help gives Choices' subject arguments and condition matrix,
   the ten live words from `subject::phase_word`, and `--until ended`.
   It explains the matching read's digest and combined since/until.
+- Against main (ruling 117): a switch (`Place::Switch`, its `shown`
+  empty) is `[--name]`, its place read before its kind; a repeated flag
+  is `[--name SHOWN]...`, as close's `[--move D]...`; a positional with
+  a `Kind::Word` set shows its words joined by `|`, as decide's
+  `release|leave|pass-up`; `Kind::Order` shows `activity|priority`, the
+  words `argv::value` reads. The rows take 5.3's order: in
+  `src/jig/rows.rs`, `CHAT_CREATE`'s `project` comes before `text`,
+  `CANCEL`'s `grace` before `reason`, and the escalation form of
+  `DECIDE` has `hold` after `task`. Where a row's `shown` or order still
+  differs from 5.2's to 5.6's line, the row changes to the line's, with
+  each test whose expected text follows the rows' order; list each in
+  the commit body. `table::TOOLS` names `chat` twice (`rows::CHAT`,
+  `rows::CHAT_CREATE`), and `argv::tool_index` finds the first: `help
+  chat`, `help chat --json` and the tool list give every row of a name,
+  in the table's order, and `help::text(Some(i))` writes row `i` and
+  each later row of its name. `subject::live` becomes `pub(crate)`, and
+  `wait`'s help writes `phase_word(p)` for each `p` it admits, over one
+  const of every `Phase` in `subject.rs`.
 - `jig::help::{tools, tool}` and temper's `help::text` measure into
   `skein_lib::Writer::new(text)`, `text` being
   `usize::try_from(limits::TEXT)`, then write into
@@ -249,6 +268,10 @@ fn every_call_line_of_the_guide_parses_with_the_table() {
     }
 }
 ```
+That is its meaning, not its form: clippy.toml bans `Vec`, `slice::split`,
+`filter_map` and `collect`. Write it as a `for` loop over
+`0..=guide::GUIDE.len()` with `match guide::GUIDE.get(at)`, counting the
+calls, and `fixtures::parse_line` likewise, without `Option::is_none_or`.
 The others, each under 20 ms: `the_help_prints_as_its_golden_files`,
 `each_derivation_names_every_tool` (compare `EVERY_TOOL`'s parsed rows
 and forms, help's list, the JSON records and the guide's generated tool
@@ -303,6 +326,7 @@ pub fn write_call(table: &[&Tool], call: &Call) -> Result<Box<[u8]>, Refusal>;
 /// A tool's record for help TOOL --json, including every argument form.
 pub fn write_tool(tool: &Tool) -> Result<Box<[u8]>, Refusal>;
 // crates/temper-client-tools/src/jig/help.rs
+use skein_lib::{Overflow, Writer};
 /// Write all of a tool's forms from its table record.
 pub fn usage(tool: &Tool, out: &mut Writer) -> Result<(), Overflow>;
 /// The table's complete tool list, used after the guide.
@@ -313,6 +337,7 @@ pub fn tool(tool: &Tool, out: &mut Writer) -> Result<(), Overflow>;
 /// The agents' guide; every example is checked against the table.
 pub const GUIDE: &[u8];
 // crates/temper-client-tools/src/help.rs
+use skein_lib::{Overflow, Writer};
 /// None: guide then tools; Some: that tool's record. The host writes the bytes.
 pub fn text(tool: Option<u8>, out: &mut Writer) -> Result<(), Overflow>;
 ```
