@@ -926,3 +926,9 @@ and the user, or the director, may veto it before the run:
   designer`, in a design session) and answers question.md. temper 03.3's
   `--limit` and `--activity K` calls that read on wait on it; the rest of
   03.3 goes on.
+  Decision: the default, by director, 2026-10-19: a page cut by `--limit
+  K` reads on with the same read without `--limit`, which prints the page
+  whole, its K rows again, then reads on at jig's `before`. `task N
+  --activity K` that cuts a page prints `read with: activity N`. The
+  printed cursor stays jig's. At most a page's rows repeat, and no row is
+  skipped. tools.md, 5.2, says so at the designer's next pass.
