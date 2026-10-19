@@ -335,6 +335,24 @@ chain.
   accounts/smith-repin. Its Downstream prescribes `without_credential: false`
   and one-entry credential slices; retain the exact sources, locks and
   diagnostics until that repair and downstream compilation establish proof.
+  Skein04.2's `Observation::Credential` in the same fake's `queries` also
+  belongs to accounts/smith-repin. Keep its full Downstream request-count,
+  observation-capacity and derived-memory sweep with that owner.
+  Accounts/jig-repin also owns skein08.3's `Ends::Refresh`/`Asked::Want`
+  matches and skein07.1–07.2's OpenID limits and `Failure::Unverified`:
+  retain the existing Grant mapping, decision16's unreachable arms, and
+  decision15's smallest valid unused limits, including the third accounts
+  fixture already listed by the owning step.
+  Smith02.2–02.3's notice/fault adapters stay with Accounts' closing Jig
+  and downstream repins: Jig's test-worker `domain.rs`, `hand_out.rs` and
+  `translate.rs`; Temper's worker-domain `agents.rs`, `translate.rs`,
+  `tests/entrance.rs` and engine-smith `finish.rs`. Accounts ruling130
+  settles the worker notice: Unauthorized maps as Rejected, Limited as
+  Exhausted, Refused raises no event. For model faults keep smith02.3's
+  Limited/Declined vocabulary and decision16 defaults; include the newly
+  reached non-Copy users in the existing owner's sweep. Retain exact
+  source/lock/error evidence and take compatible landed downstream adapters
+  before resuming the held Temper migration; do not duplicate that work.
   The channel-v4 copies in `tests/core/src/{protocol,agents_tools}.rs` belong
   to accounts/jig-repin.s1 under smith01.2; forge-kit/jig01.s2's earlier
   live-text adapters do not cover them. Report each reached typed failure
