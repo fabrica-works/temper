@@ -128,3 +128,18 @@ fn the_chat_composer_waits_for_the_person_and_project() {
     let mut view = fixtures::view();
     assert_eq!(fixtures::find(fixtures::build(&mut view, &root), Role::TextArea, b"Start a chat"), None);
 }
+
+#[test]
+fn enter_in_the_start_composer_starts_a_chat() {
+    let mut view = fixtures::page_view(&fixtures::chats_root());
+    let composer = fixtures::find(view.tree(), Role::TextArea, b"Start a chat").expect("composer");
+    assert_eq!(
+        crate::act(&mut view, composer, skein_ui::Act::Submit),
+        Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::StartChat)),
+    );
+}
+#[test]
+fn a_line_break_in_the_start_composer_is_kept() {
+    let mut root = fixtures::chats_root();
+    assert_eq!(&*fixtures::type_into(&mut root, b"Start a chat", b"Hello\nthere"), b"Hello\nthere");
+}

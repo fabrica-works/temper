@@ -42,6 +42,8 @@ impl Bindings {
                     (Act::CardWords { object, .. }, skein_ui::Act::Input { value }) => {
                         Act::CardWords { object: *object, words: value }
                     }
+                    (Act::ChatWords { .. }, skein_ui::Act::Submit) => Act::StartChat,
+                    (Act::MessageWords { .. }, skein_ui::Act::Submit) => Act::Send,
                     (meaning, skein_ui::Act::Press) => meaning.clone(),
                     _ => return None,
                 };

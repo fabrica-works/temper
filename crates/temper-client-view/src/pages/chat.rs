@@ -9,7 +9,7 @@ use jig_client::{
     contract as c,
     thread::{Line, Thread, Words as WordState},
 };
-use skein_ui::{Builder, Role, Run, phrases::Hole};
+use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{
     Domain,
     pages::{Act, chat::Chat},
@@ -97,6 +97,7 @@ fn composer(b: &mut Builder, chat: &Chat, task: &c::Task, words: &Words, binding
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
         b.open(Role::TextArea);
         b.name(&words.say(Word::Message, &[]));
+        b.state(State::SubmitsOnEnter);
         b.value(&chat.words, shown);
         b.bind(bindings.insert(Act::MessageWords { words: Box::default() }));
         b.close();

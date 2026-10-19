@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::{EndedGroup, TaskLine};
-use skein_ui::{Builder, Role, Run, phrases::Hole};
+use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{Address, Domain, pages::Act};
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
@@ -26,6 +26,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if root.pages().me(root.client()).is_some() && root.pages().project().is_some() {
             b.open(Role::TextArea);
             b.name(&words.say(Word::StartChat, &[]));
+            b.state(State::SubmitsOnEnter);
             b.value(&chats.words, temper_client_domain::pages::shown(root.pages()));
             b.bind(bindings.insert(Act::ChatWords { words: Box::default() }));
             b.close();

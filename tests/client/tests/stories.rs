@@ -38,6 +38,24 @@ fn a_double_press_of_start_makes_one_chat() {
     assert_eq!(fixtures::chats(&world.front().engine), 1, "one chat task for the two presses");
 }
 #[test]
+fn enter_in_the_start_composer_starts_one_chat_titled_by_its_first_line() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let person = world.client(fixtures::PARTY, fixtures::chats_page());
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: fixtures::WITHIN },
+            Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: Box::from(*b"Hello\nthere") },
+            Step::Send { find: Find::named(Role::TextArea, b"Start a chat") },
+            Step::Send { find: Find::named(Role::TextArea, b"Start a chat") },
+            Step::See { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
+            Step::See { find: Find::exactly_named(Role::Paragraph, b"Hello"), within: fixtures::WITHIN },
+        ],
+    );
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    assert_eq!(fixtures::chats(&world.front().engine), 1, "one chat task for the two Enters");
+}
+#[test]
 fn a_chat_started_on_the_chats_page_is_answered_by_the_run() {
     let mut world = fixtures::world(fixtures::SEED);
     world.front().engine.hello(skein_lib::Token::new(7));

@@ -491,6 +491,7 @@ pub mod chat {
     pub const CHAT_CHARTER: u32 = 1;
     pub const SINGLE_TEMPLATE: u32 = 1;
     pub const EMPTY_PARAMETERS: u32 = 0;
+    const MESSAGING_OFFERS: u32 = 2;
     pub const PROPOSAL: c::ProposalKey = c::ProposalKey { proposer: c::Proposer::Task(DELEGATE), number: 3 };
     pub const PROPOSAL_OUTPUTS: u32 = 256;
     pub const PROPOSAL_NOW: skein_lib::Time = skein_lib::Time::ZERO;
@@ -562,6 +563,13 @@ pub mod chat {
         b.finish()
     }
     pub fn chat_root() -> temper_client_domain::Domain {
+        chat_offering(false)
+    }
+    /// `chat_root`'s, with the message act offered beside the close.
+    pub fn messaging_root() -> temper_client_domain::Domain {
+        chat_offering(true)
+    }
+    fn chat_offering(message: bool) -> temper_client_domain::Domain {
         use temper_client_domain::{Address, Event};
         let (mut root, me_watch, task_watch) =
             fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
@@ -587,7 +595,12 @@ pub mod chat {
         let mut task = fixtures::task::document();
         task.chip.task = TASK;
         task.project = fixtures::PROJECT;
-        task.acts = List::with_capacity(SINGLE_TEMPLATE);
+        task.acts = List::with_capacity(if message { MESSAGING_OFFERS } else { SINGLE_TEMPLATE });
+        if message {
+            task.acts
+                .push(c::Offered { act: c::ActKind::Message, admission: c::Admission::Allowed, effect: None })
+                .expect("message");
+        }
         task.acts
             .push(c::Offered {
                 act: c::ActKind::Cancel,
@@ -704,6 +717,23 @@ pub mod chat {
     }
 }
 
+pub fn chats_root() -> temper_client_domain::Domain {
+    root_at(temper_client_domain::Address::Chats, &domain_limits()).0
+}
+/// Act `Input` on the named text area, as a person typing, and return the area's value after the root took it.
+pub fn type_into(root: &mut temper_client_domain::Domain, name: &[u8], words: &[u8]) -> Box<[u8]> {
+    let mut view = page_view(root);
+    let area = find(view.tree(), skein_ui::Role::TextArea, name).expect("text area");
+    let action = crate::act(&mut view, area, skein_ui::Act::Input { value: Box::from(words) }).expect("input action");
+    root_event(root, temper_client_domain::Event::Act { action });
+    let view = page_view(root);
+    for node in view.tree().nodes() {
+        if node.role == skein_ui::Role::TextArea && node.name.as_deref() == Some(name) {
+            return node.value.as_ref().expect("area value").text.clone();
+        }
+    }
+    panic!("text area");
+}
 /// Build a page once for the status-only page tests.
 pub fn page_view(root: &temper_client_domain::Domain) -> crate::View {
     let mut view = view();
