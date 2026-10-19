@@ -14,7 +14,9 @@
 - temper is built on skein, the io and generic-protocol kit, and follows
   the foundation documents in the `docs/foundation` directory of skein's
   repository. temper's code and documents cite them by file name:
-  - `programming-model.md`: how code is written; every crate follows it;
+  - `programming-model.md`: how code is written; every crate follows it,
+    and a departure from it or the next needs its reason, stated in the
+    design or the commit;
   - `testing-strategy.md`: how that code is tested;
   - `notes.md`: the questions still open, and why the memory strategy is
     what it is.
