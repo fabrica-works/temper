@@ -75,7 +75,7 @@ are temper 11's, **the tools' adopt**. temper 04 adds waits; the next plan hosts
 ## Increments
 
 ### 03.1 temper on jig's named send, turn read and spans
-Scope: temper's jig pin moves to a landing containing jig 02, jig 03 and jig 05, and its skein pin to that landing's own (skein 01's).
+Scope: temper's jig pin moves to a landing containing jig 02, jig 03 and jig 05; its skein pin stays where it descends from that landing's own (skein 01's), and moves to it where not; its smith packages share one revision (ruling 119).
 The repairs follow (development.md 5.7); step `temper-03.1`.
 Needs: jig's send under a named key, landed; jig's read of one turn, landed; jig's deadline spans, landed.
 Files: `Cargo.lock` is shared; `crates/temper-client-domain/src/forge.rs` is the forge hotspot, one arm:
@@ -84,12 +84,11 @@ Files: `Cargo.lock` is shared; `crates/temper-client-domain/src/forge.rs` is the
 - deadline signatures: `crates/temper-client-domain/src/pages/chats.rs` (`Chats::start`), `src/tests/pages/chats.rs`;
 - jig 05's callers: `crates/temper-service/src/tests/fixtures.rs` (`people_member`), `crates/temper-client-view/src/cards/words.rs`,
   `tests/{conformance/src/scenarios,engine/domain/tests/root_routes}.rs` (`tasks::New`);
-- store families at v4 (jig 05.1): `crates/temper-protocol-store/{src/records/{application,application/refusal}.rs,src/tests/records.rs}`
-  (`people_v3`), and its `schema/store-v2.schema` comment (line 176);
 - the turn read:
   - `crates/temper-client-view/src/pages/chat.rs` (`TurnProblem`);
   - `ReadValue`'s matches in `crates/temper-client-domain/src/acts.rs`, `crates/temper-client-view/src/cards/proposal.rs` and `src/pages/inbox.rs`;
-  - `ReadNone`'s match in `crates/temper-client-shell-terminal/src/terminal/native.rs`;
+  - `read_value` in `crates/temper-client-shell-terminal/src/tests/fixtures.rs` (ruling 119);
+- the owned example's sums: `docs/examples/owned.json` (`engine.memory_bytes`, ruling 119);
 - wire version 9:
   - `crates/temper-service/src/family.rs`, `src/family/refusals.rs`;
   - `crates/temper-service/src/tests/{clients,clients_unwatch,family}.rs`, `src/tests/fixtures/http.rs`;
@@ -99,8 +98,14 @@ Shape:
 1. **The pins.**
    - JIG_TOOLS is the ledger's landing commit containing every `jig-02.*`, `jig-03.*` and `jig-05.*` step and proof; the three final landings are its ancestors.
    - `git -C ~/src/rust/jig show JIG_TOOLS:Cargo.lock` names one skein, SKEIN01.
-   - Through `heavy`: `cargo update -p jig-domain-core --precise JIG_TOOLS`, then `cargo update -p skein-lib --precise
-     SKEIN01`. smith stays at `a277e922`, temper 01's pin. Its initial skein pin is `b4c6241`, replaced here by SKEIN01.
+   - Through `heavy`: `cargo update -p jig-domain-core --precise JIG_TOOLS`.
+   - skein (ruling 119): temper's own pin at the step's start stays where it descends from SKEIN01 (at temper a6f34f6af,
+     `0db7b1fc7307aa50980ce75637e686e384adc4e4`, a descendant of jig 590015b4's `93052c6b`): where the jig update moved it,
+     `cargo update -p skein-lib --precise <that full hash>`. Where it does not descend, `--precise SKEIN01`.
+   - smith (ruling 119): one revision, the newest temper's `Cargo.lock` holds at the step's start (at temper a6f34f6af,
+     `538ef49a574bbaf02d57a85cc2b02d0abf1d4e3b`, 19 packages, beside `a277e922`'s 9; the two differ in nothing under
+     `crates/`): `cargo update -p smith-domain --precise <that full hash>`; where cargo calls the name ambiguous, use the
+     package spec its error lists.
    - Check `Cargo.lock` with `grep -o 'git+https://github.com/forgetic/[a-z]*.git#[0-9a-f]*' Cargo.lock | sort -u`;
      one source revision per repository, each the selected one; `heavy cargo check --workspace --all-targets`.
 2. **`Outcome::Held`.** Nothing in temper open sends a name, so it is impossible there. It joins `NotKept`'s arm in
@@ -108,17 +113,22 @@ Shape:
 3. **The name.** Each `jig_client::Event::Send` literal gives `name: None`.
 4. **The turn read.**
    - `TurnProblem::TooLarge` takes `{ .. }`.
-   - `ReadValue::Turn(..)` and `ReadNone::{TooLarge { .. }, Malformed}` join the arms for "not this document".
+   - `ReadValue::Turn(..)` joins the arms for "not this document"; no match of `ReadNone` in temper needs an arm.
+     The terminal fixtures' `read_value` gains `Read::Turn { .. } => None` (ruling 119).
    - `jig_client_protocol_wire::v8` becomes `v9`.
 5. **Deadline spans and store families.** Drop `env.wall` from `shapes::chat` in `Chats::start` and its test. Follow jig 05's landed
    request/authority signature repairs, preserving spans; no client conversion to a wall. Its landing body names the other users.
-   `people_v3` becomes `people_v4` in the three `temper-protocol-store` files; nothing in temper names `tasks_v3`.
-6. **Any other break** follows 5.7: adapted as jig's landing adapted its own, named in the report, or raised as a question.
+   temper's store families are at v4 on `main` already: nothing names `people_v3` or `tasks_v3` (ruling 119).
+6. **The owned example's sums** (ruling 119). `docs/examples/owned.json`'s `engine.memory_bytes` rises by needs minus has,
+   as `temper::startup`'s `serve_prepares_once_on_the_owned_example` reports it at JIG_TOOLS (at jig 590015b4, +370824, to
+   78669037184614); the commit body names it.
+7. **Any other break** follows 5.7: adapted as jig's landing adapted its own, named in the report, or raised as a question.
 Test shape: no new test. Existing tests keep their names and expected values (5.7).
 Proof: joint, the gate (`scripts/check.sh` through `land`), whose `tests/one-process` referee speaks wire version 9.
 Don't: give `Held` words or behaviour; send a name; read a turn; hand-edit `Cargo.lock`.
 Size: at most 200 lines besides `Cargo.lock`.
-Removes: temper 01's jig and skein pins; `jig_client_protocol_wire::v8`.
+Removes: temper's jig pin at the step's start, its skein pin where SKEIN01 replaces it, and its older smith revision;
+`jig_client_protocol_wire::v8`.
 
 ### 03.2 The root and the runner, with `me` and `task N`
 Scope: root Start/sign-in/me live; runner call numbers and handles; text and JSON through
@@ -145,6 +155,10 @@ Shape:
   - Allowed: its call. A keyed tool's call ends ` --key NAME`.
   - Proposed: the call, then ` (proposed to <recipient>)`.
   - Refused: the act's name and why, in jig's words, with no call.
+  - Bounded (ruling 119; jig's `Admission::Bounded { within: Bounds, beyond: Beyond }`): its call, then the bounds a draft is
+    compared with (`within`, printed whole, as tools.md, 6.4, prints an authority), then beyond them ` (proposed to <recipient>)` for
+    `Beyond::Proposed`, or `refused beyond them: <why>`, in jig's words, for `Beyond::Refused`. tools.md, 4: "each act made,
+    proposable (to whom) or refused (why), with the bounds a draft is compared with".
 - **Exits.** `Readout`/`ReadNone` follow Choices; expose `client` and `kept_json` for the next plan's host before Start.
 - **JSON** prints the document's fields by jig's names, in snake case. A cursor prints as lower-case hex (temper 02).
 Test shape:
@@ -168,6 +182,8 @@ Test shape:
     `two_calls_in_flight_are_answered_each_under_its_own_number`, `new_calls_start_above_all_kept_call_numbers`,
     `every_call_key_and_handle_uses_its_prefix_and_one_owner`, `call_number_exhaustion_exits_1_without_sending`.
 - Extend the wire's existing owner-number round-trip test with `(Owner::Runner, 3)`; no new test file.
+- Extend `crates/temper-service/src/tests/family.rs`'s `a_request_under_the_pages_owner_is_answered_undecodable` to
+  `Owner::Runner` beside `Pages`, as one case per owner of the same setup, renamed for both (ruling 119).
 - Reference for `src/tests/root.rs` (the same harness):
   ```rust
   #[test]
@@ -182,7 +198,8 @@ Test shape:
   ```
 Proof: unit, `heavy cargo nextest run -p temper-client-tools -E 'test(=a_task_read_prints_its_header_fields_and_acts_as_calls)'`
 (under 1 s): a read through `jig_client::Client`, printed as 6.1. The next plan's stories bring the tools' world.
-Don't: name `temper` under `src/jig/`; keep a document across steps; print a float; send anything for a read but its read.
+Don't: write `temper`, in any case, anywhere under `src/jig/`, comments and strings included (`src/tests/boundary.rs`
+lowercases each file); keep a document across steps; print a float; send anything for a read but its read.
 Size: at most 300 lines.
 Removes: nothing.
 
@@ -191,10 +208,15 @@ Scope: `inbox`, `tasks`, `activity N`, `run N`, `chat N`, `turn N A.T`; `task N 
 turns by their size; cuts with their calls (tools.md 5.2, 6.4, 12); step `temper-03.3`.
 Needs: temper on jig's named send, turn read and spans.
 Files: under `crates/temper-client-tools/`, `src/jig/render/{lists,activity,turn}.rs` (new), `src/jig/runner.rs`,
+`src/jig/rows.rs` (`--ended`'s help, ruling 119), with any help golden that prints it,
 `src/tests/jig.rs`, `src/tests/jig/{lists,turn}.rs` (new), `src/tests/fixtures.rs`, goldens.
 Shape:
 - **Lists.**
-  - `inbox` reads `Read::Inbox` once per `InboxReadGroup`, needs first. `tasks` reads `Read::Tasks`.
+  - `inbox` reads `Read::Inbox` once per `InboxReadGroup`, needs first. `tasks` reads `Read::Tasks`, one group per call
+    (ruling 119, the default of decisions.md, For the user, L): without `--ended`, the live group, `--after C` its `live`;
+    with it, the ended group alone, as jig's view reads it (`query.phase = Some(PhaseClass::Ended)`, `live: None`,
+    `--after C` its `ended`), the call that reads on keeping `--ended`; `rows.rs`'s `--ended` help reads
+    "Only ended tasks". Until L is decided, 03.3 builds the rest first.
   - Each prints at most 32 rows, one a line, number first, then the call that reads on, or `no more`.
 - **A task's parts.**
   - `--tree` watches `Subject::Tree { task, window: 32 }`; `--run` watches `Subject::Run { task, turn: None, offset: 0 }`.
@@ -262,6 +284,9 @@ Shape:
   - `Refused` exits 2 with the refusal in jig's words, then its alternatives: `read again: <call>` where a revision
     moved, and `propose instead: <call>` where proposable. An engine key conflict also exits 2.
   - Client answers follow Choices: exit 1; Unconfirmed and a detected client key collision name the tools' bug.
+    jig's client panics on a key it holds for another request (`jig-client-domain`'s `requests.rs`, "request key
+    conflict"), so the runner asks `Client::pending(key)` before each `Event::Send`: a key held is the tools' bug, exit 1,
+    nothing sent. An identical named re-send is told nothing, so the test sends another ask under the same key (ruling 119).
 - **Kept lines.** Track restored operations by application key in memory; print Choices' text/JSON once answered as `Out::Kept`.
   `Root::kept()` counts told-but-unanswered requests for live `me`'s party only, using `Client::pending(key).party`.
   Report other parties' parked counts once `me` is live and `Told::Dropped { count }` without inspecting unread records.
@@ -338,12 +363,14 @@ impl Root {
     /// After Ready, kept but unanswered for me's party; the host separately awaits Stored.
     pub fn kept(&self) -> u32;
     /// Read-only link state for the next plan's host deadlines.
+    #[must_use]
     pub fn client(&self) -> &jig_client::Client;
     /// Set before Start, since kept results precede the new Call.
     pub fn kept_json(&mut self, json: bool);
 }
 pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Request>);
 pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>);
+#[must_use]
 pub fn next_deadline(root: &Root) -> Option<Time>;
 // crates/temper-client-tools/src/jig/runner.rs (03.2); src/jig.rs re-exports `Printed` as `jig::Printed`
 /// Terminal bytes and exit, consumed by the host.
@@ -361,9 +388,10 @@ pub enum Out {
     /// Call's terminal result.
     Printed { number: u32, printed: Printed },
 }
-impl Runner { pub fn new(asker: Asker, salt: &'static [u8]) -> Self; }
-pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, number: u32, call_number: u32,
-    call: Call, json: bool, out: &mut Queue<Out>);
+impl Runner { #[must_use] pub fn new(asker: Asker, salt: &'static [u8]) -> Self; }
+/// One call as Root hands it over: the host's number, Root's call prefix, the call and its form (ruling 119).
+pub struct Called { pub number: u32, pub call_number: u32, pub call: Call, pub json: bool }
+pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, called: Called, out: &mut Queue<Out>);
 pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, told: Told, out: &mut Queue<Out>);
 // crates/temper-client-tools/src/jig/render.rs (03.2)
 /// Application words for owner parts; temper 11 supplies the forge's.
@@ -372,7 +400,7 @@ pub trait Parts { fn owner_part(&self, part: &OwnerPart, out: &mut Text); }
 
 ## Questions to raise when reached
 
-- **03.1:** the selected lock names another skein/smith, or repairs exceed about 200 lines: report commits and compiler errors.
+- **03.1:** a repository still at two revisions after Shape 1's updates, or repairs exceed about 200 lines: report commits and compiler errors.
 - **03.3:** the landed turn interface loses the size at either bound: report the answer and its bytes; never substitute an unknown size.
 - **03.4:** unequal encoded asks for the same call and me across clocks: report both requests and the first differing field.
 

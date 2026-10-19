@@ -440,6 +440,18 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
 118. **jig 05.2's shipped store bounds** (plan defect, jig 05's block of 2026-10-19 06:47:37 UTC).
      Take the accounting repair the report proposes: in `crates/jig-protocol-config/src/profile/small.rs`, `STORE_KV`'s `value` 1_303_207, `chunk` 1_305_306 and `page.bytes` 1_305_286 (each +8); in `profile/standard.rs`, `value` 10_396_367, `chunk` 10_398_466 and `page.bytes` 10_398_446 (each +24); and the rows of `testing/jig-test-service/src/tests.rs`'s `both_jig_profiles_have_a_bounded_service` follow them (`value` only: `commit`, `ops` and `queued` stay as they are). These bounds are accounting that follows the encoded rows: no design text names them, and 05.2's Don't, "change … template configuration", is about templates, "the application's definition of a shape of work, numbered data in its configuration" (jig's `client/domain/README.md`), not a store profile's bounds. The session's question rule was kept: the report gave needs and has (Small needs 1_303_207, has 1_303_199; Standard 10_396_367 against 10_396_343). Both files join 05.2's Files, and 05.3's, whose Span carries a `Duration` and grows the rows again: there, too, a profile whose `value` a grown row passes takes the growth, needs minus has, in `value`, `chunk` and `page.bytes` alike, and the service test's row follows, listed in the commit body. A need in `commit`, `ops`, `queued` or memory is still a question. Nothing downstream copies these values: temper's own sums, as `docs/examples/owned.json`'s `engine.memory_bytes`, follow the jig that temper 03.1 pins, in that step. A further copy of a changed bound: change it by the same growth, and list it in the commit body.
 
+119. **temper 03's Shapes against main** (ready check of temper-03.1).
+     temper 03's ready check (skein c551a66, smith c241a7a4, jig 590015b4, temper a6f34f6af; scratch with the corrections, through heavy: default 1857 passed and 1 skipped, fuzzy 50 passed, clippy and fmt clean) corrected temper/03-tools-root.md. 03.1: the skein pin stays where temper's own descends from SKEIN01, and moves to it where not; smith's packages share one revision, the newest temper's `Cargo.lock` holds at the step's start; the store families are at v4 on main already; no match of `ReadNone` needs an arm, and the terminal fixtures' `read_value` gains `Read::Turn { .. } => None`; `docs/examples/owned.json`'s `engine.memory_bytes` rises by needs minus has, as `serve_prepares_once_on_the_owned_example` reports it (Shape 6). 03.2: `task N` prints `Admission::Bounded` as tools.md, 4 and 6.4, say; `a_request_under_the_pages_owner_is_answered_undecodable` takes `Owner::Runner` too; the Don't is `src/tests/boundary.rs`'s rule, any case, comments and strings included; the sketches take `#[must_use]` and `call` takes a `Called`. 03.3: `tasks` reads one group per call, the default of decisions.md, For the user, L, and builds the rest first until L is decided; `rows.rs` joins its Files. 03.4: the runner asks `Client::pending(key)` before each named send, since jig's client panics on a key held for another request. A further user of a value these change: change it as its step says, and list it in the commit body.
+
+     Checked:
+     - `git -C temper show a6f34f6af:Cargo.lock | grep -o 'git+…forgetic/[a-z]*.git#[0-9a-f]*' | sort | uniq -c`: skein `0db7b1fc` (30); smith `538ef49a` (19) and `a277e922` (9).
+     - `git -C jig show 590015b4:Cargo.lock`: skein `93052c6b`; `git -C skein merge-base --is-ancestor 93052c6b 0db7b1fc`: yes. `git -C smith diff --stat a277e922 538ef49a -- crates`: nothing.
+     - `git -C temper grep -n -E 'people_v3|tasks_v3' a6f34f6af`: only `docs/development/plans/client-api/`.
+     - `git grep 'ReadNone::'`: `terminal/native.rs:17`, one `ReadNone::SignedOut` arm in a non-exhaustive match; `tests/fixtures.rs:661`: `fn read_value(what: &contract::Read) -> Option<contract::ReadValue>`.
+     - jig 590015b4 `crates/jig-client-domain/src/requests.rs:59`: `assert!(held.request == request && named, "request key conflict")`; `contract/documents.rs:240`: `Bounded { within: Bounds, beyond: Beyond }`, `:265` `pub enum Beyond`.
+     - temper `crates/temper-client-tools/src/tests/boundary.rs:5`: `assert!(!text.to_ascii_lowercase().contains("temper"), …)`; `docs/examples/owned.json:192`: `"memory_bytes": 78669036813790`, +370824 is 78669037184614; `temper-service/src/tests/family.rs:276`: `fn a_request_under_the_pages_owner_is_answered_undecodable()`.
+     - jig `crates/jig-client-view/src/page/conversations.rs:405`: `query.phase = Some(contract::PhaseClass::Ended);` `jig-client-domain/src/contract/reads.rs:47`: `Tasks { query: super::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> }`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
@@ -565,3 +577,21 @@ and the user, or the director, may veto it before the run:
   11). A page of 32 rows serves the tools as well as 50, and changes
   later without a wire version; jig's wire stays as it is. tools.md, 12,
   says so at the designer's next pass, after this plan.
+- **L. One group of tasks per call** (question.md in the run's directory,
+  from temper 03.1's ready check; no designer is joined to answer it):
+  tools.md, 5.2, gives `tasks … [--ended]`, and "a read answers with a
+  document, or a page and its cursor" (tools.md, 5); jig's tasks are
+  "live first, then ended, in two groups, each with its own cursor"
+  (jig's client/domain/contract.md, 6.1), read as `Read::Tasks { query,
+  live: Option<Cursor>, ended: Option<Cursor> }`, and temper 02's help
+  says `--ended` is "Include ended tasks". One printed cursor cannot
+  carry both groups' cursors. Default: one group per call: without
+  `--ended`, the live group, `--after C` its `live`; with `--ended`, the
+  ended group alone, as jig's view reads it (`query.phase =
+  Some(PhaseClass::Ended)`, `live: None`, `--after C` its `ended`); the
+  call that reads on keeps `--ended`, and its help reads "Only ended
+  tasks"; tools.md, 5.2, says so at the designer's next pass, after this
+  plan. Or: `--ended` keeps "include", and the printed cursor carries a
+  group byte beside jig's; or a designer joins the run (`plan join
+  designer`, in a design session) and answers question.md. temper 03.3's
+  `tasks` waits on it; the rest of 03 goes on.
