@@ -474,3 +474,10 @@ and the user, or the director, may veto it before the run:
   `Ended`. Or: a designer joins the run (`plan join designer`, in a
   design session) and answers question.md. temper 02.2 waits on it;
   02.1 goes on.
+  Decision: the default, by director, 2026-10-19: without `--order`,
+  `tasks` reads by `QueryOrder::Number`, ascending, and `--ended`
+  changes no order. The tools never send `Changed` or `Ended`, so
+  `jig::argv::back` answers that a call with either order has no argv
+  form, a refusal and never a guess, and `parse(back(call)) == call`
+  holds over every call `parse` makes. tools.md, 5.2, says so at the
+  designer's next pass over tools.md, after this plan.
