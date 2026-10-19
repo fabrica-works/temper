@@ -318,6 +318,13 @@ chain.
   inner `Limits`, `ClientLimits` (`nonce_bytes`, `parameter_bytes`,
   `resource_bytes`) literals and `Failure::Incomplete` translation belong to
   accounts' existing closing `jig-repin`, inventoried by skein05.2–05.4.
+  Skein08.2's subsequent account-removal vocabulary has separate closing
+  owners: `Event::Removed` in smith-local-service's `Accounts::emit`
+  (`credentials.rs`) belongs to accounts/smith-repin; Jig's `translate::up`
+  for `Event::Removed` and `Asked::{Add,Remove}`, and `translate::refused`
+  for `Refusal::{Taken,Unusable}`, belong to accounts/jig-repin. Skein08.2's
+  Downstream and decision16 prescribe those mappings. Keep the Smith
+  closing-repin await separate from the earlier landed smith01.3 repair.
   The channel-v4 copies in `tests/core/src/{protocol,agents_tools}.rs` belong
   to accounts/jig-repin.s1 under smith01.2; forge-kit/jig01.s2's earlier
   live-text adapters do not cover them. Report each reached typed failure
