@@ -10,3 +10,88 @@ pub struct Limits {
     pub wait: Duration,
     pub wait_most: Duration,
 }
+/// A tool and each of its argument forms, tried in order.
+#[derive(Debug)]
+pub struct Tool {
+    pub name: &'static [u8],
+    pub line: &'static [u8],
+    pub result: &'static [u8],
+    pub forms: &'static [&'static [Argument]],
+    pub keyed: Keyed,
+    pub area: u8,
+}
+#[derive(Debug)]
+pub struct Argument {
+    pub name: &'static [u8],
+    pub shown: &'static [u8],
+    pub place: Place,
+    pub kind: Kind,
+    pub occurs: Occurs,
+    pub line: &'static [u8],
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Place {
+    Positional,
+    Flag,
+    Switch,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Occurs {
+    Required,
+    Optional,
+    Repeated { most: u32 },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Keyed {
+    Never,
+    Optional,
+    Required,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Number,
+    Count,
+    Word { set: &'static [&'static [u8]] },
+    Text,
+    File,
+    Project,
+    Turn,
+    Cursor,
+    Group,
+    Order,
+    Tool,
+}
+#[must_use]
+pub const fn positional(
+    name: &'static [u8],
+    shown: &'static [u8],
+    kind: Kind,
+    occurs: Occurs,
+    line: &'static [u8],
+) -> Argument {
+    Argument { name, shown, kind, occurs, line, place: Place::Positional }
+}
+#[must_use]
+pub const fn flag(
+    name: &'static [u8],
+    shown: &'static [u8],
+    kind: Kind,
+    occurs: Occurs,
+    line: &'static [u8],
+) -> Argument {
+    Argument { name, shown, kind, occurs, line, place: Place::Flag }
+}
+#[must_use]
+pub const fn switch(name: &'static [u8], line: &'static [u8]) -> Argument {
+    Argument { name, shown: b"", kind: Kind::Word { set: &[] }, occurs: Occurs::Optional, line, place: Place::Switch }
+}
+#[must_use]
+pub const fn repeated(
+    name: &'static [u8],
+    shown: &'static [u8],
+    kind: Kind,
+    most: u32,
+    line: &'static [u8],
+) -> Argument {
+    flag(name, shown, kind, Occurs::Repeated { most }, line)
+}

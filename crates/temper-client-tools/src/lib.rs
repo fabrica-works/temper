@@ -5,5 +5,6 @@ extern crate alloc;
 pub mod jig;
 pub mod key;
 pub mod limits;
+pub mod table;
 #[cfg(test)]
 mod tests;
