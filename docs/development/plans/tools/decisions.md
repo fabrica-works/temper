@@ -638,6 +638,25 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C temper show origin/main:docs/design/tools.md | sed -n '/^### 5.3/,/^### 5.4/p' | grep '^| `' | grep -o '`[A-Z][a-zA-Z]*`' | sort -u | tr '\n' ' '`:
          `Answer` `Cancel` `Create` `Decide` `Message` `Release` `Stop` 
 
+128. **jig's deadline_spans.rs mends to later** (steer of 2026-10-19T09:14:01Z).
+     The steer of 2026-10-19T08:18:50Z, point 1, which had jig's `tests/core/tests/deadline_spans.rs` mended at its next edit with no step of its own (ruling 122 and the README's "A setup written once, and rows carry data"), lapses: every jig step of this plan has landed, and neither that file nor `crates/jig-domain-core/src/tests/read_activity.rs`, which the same rule names, was edited after the rule. Their mends, and that of jig 05.5's `tests/client-protocol/tests/deadline_spans.rs`, whose `a_named_proposal_keeps_its_span_across_client_and_engine_restart` holds three behaviours with an "and" in its name (the hourly check of 09:02:04Z), go to `later.md`, for jig's next increment that edits either file, and to this plan's retrospective. The README's rule is unchanged: it holds for each test that temper's increments add or edit.
+
+     ## Checked
+
+     - `awk -F'\t' '$2=="jig" && $4!="landed"' ../ledger.tsv | wc -l`:
+         0
+     - `git -C ~/src/rust/jig log --oneline --since=2026-10-19T08:18Z origin/main -- tests/core/tests/deadline_spans.rs | wc -l`:
+         0
+     - `git -C ~/src/rust/jig log --oneline --since=2026-10-19T05:53Z origin/main -- crates/jig-domain-core/src/tests/read_activity.rs | wc -l`:
+         0
+     - `git -C ~/src/rust/jig grep -n 'fn a_named_proposal_keeps_its_span_across_client_and_engine_restart' origin/main -- tests/client-protocol/tests/deadline_spans.rs`:
+         origin/main:tests/client-protocol/tests/deadline_spans.rs:173:fn a_named_proposal_keeps_its_span_across_client_and_engine_restart() {
+     - `grep -n 'tests/core/tests/deadline_spans.rs' docs/development/plans/tools/README.md`:
+         210:  destructuring), and `tests/core/tests/deadline_spans.rs` (jig 05.3:
+     - `grep -n -- '--text' ../kit/scripts/dev/plan | head -2`:
+         21:#   plan ruling [--text FILE] TITLE SOURCE  land a ruling in decisions.md, once
+         490:# Decision of unblock.draft.md, or with --text a file's. It becomes the next
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
