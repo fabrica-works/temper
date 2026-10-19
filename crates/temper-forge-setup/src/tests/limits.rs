@@ -2,7 +2,7 @@ use super::fixtures;
 use crate::{check, limits, problem};
 #[test]
 fn the_small_profile_passes_the_setup_limit_checks() {
-    assert_eq!(limits::check(&limits::small()), Ok(()));
+    assert_eq!(skein_forge_setup::limits::check(&limits::small()), Ok(()));
     assert_eq!(
         check::checked(&fixtures::document(fixtures::TWO), 0, &fixtures::members(), false, &[]).unwrap().setup,
         fixtures::setup()

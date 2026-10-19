@@ -1,0 +1,75 @@
+//! Owner's words for the kit's refusal locations (protocol/setup.md, 5).
+use crate::problem::{Problems, What};
+use jig_protocol_config::{Path, Segment};
+use skein_forge_setup::given::{Place, Refused};
+
+/// Names a refused kit input using the setup entry's position.
+#[must_use]
+pub fn refusal(index: u32, why: Refused) -> Problems {
+    let root = Path::root();
+    let entry = root.member(b"application").member(b"setup").child(Segment::Index(index));
+    let limits = root.member(b"application").member(b"limits").member(b"overrides");
+    let mut what = What::Reason(b"invalid form");
+    let path = match why.place {
+        Place::BotLogin => entry.member(b"bot").member(b"login"),
+        Place::BotEmail => entry.member(b"bot").member(b"email"),
+        Place::Orgs => {
+            what = What::Reason(b"past its bound");
+            entry.member(b"orgs")
+        }
+        Place::Org(j) => entry.member(b"orgs").child(Segment::Index(j)),
+        Place::OrgOwner => entry.member(b"mode").member(b"owned").member(b"person").member(b"login"),
+        Place::OrgsLimit => {
+            what = What::Reason(b"outside its type");
+            limits.member(b"setup.orgs")
+        }
+        Place::Deadline => {
+            what = What::Reason(b"outside its type");
+            limits.member(b"setup.deadline_ms")
+        }
+        Place::Backoff => {
+            what = What::Reason(b"outside its type");
+            limits.member(b"setup.backoff_ms")
+        }
+        Place::BackoffMax => {
+            what = What::Reason(b"outside its type");
+            limits.member(b"setup.backoff_max_ms")
+        }
+        Place::Word => {
+            what = What::Own(b"temper's word");
+            root
+        }
+        Place::AdminName => {
+            what = What::Own(b"temper's admin name");
+            root
+        }
+        Place::ApiName => {
+            what = What::Own(b"temper's API token name");
+            root
+        }
+        Place::GitName => {
+            what = What::Own(b"temper's git token name");
+            root
+        }
+    };
+    if let Some(other) = why.other {
+        what = What::Against(match other {
+            Place::BackoffMax => b"setup.backoff_max_ms",
+            Place::Deadline => b"setup.deadline_ms",
+            Place::Word
+            | Place::BotLogin
+            | Place::BotEmail
+            | Place::AdminName
+            | Place::ApiName
+            | Place::GitName
+            | Place::Orgs
+            | Place::Org(_)
+            | Place::OrgOwner
+            | Place::OrgsLimit
+            | Place::Backoff => unreachable!("kit limit pairs name maximum backoff or deadline"),
+        });
+    }
+    let mut problems = Problems::empty();
+    problems.push(path, what);
+    problems
+}

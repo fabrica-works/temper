@@ -39,7 +39,7 @@ fn refused(bytes: &[u8], expected: &[u8]) {
 #[test]
 fn an_entry_past_the_orgs_limit_is_refused() {
     let bytes = fixtures::changed(br#""orgs":["acme"]"#, br#""orgs":["acme","extra"]"#);
-    let limits = limits::Limits { orgs: 1, ..limits::small() }; // Below the shipped eight.
+    let limits = skein_forge_setup::limits::Limits { orgs: 1, ..limits::small() }; // Below the shipped eight.
     let mut problems = Problems::empty();
     assert_eq!(Setup::read(&fixtures::document(&bytes), 0, &limits, &mut problems), None);
     assert_eq!(&*problem::lines(&problems), b"application.setup[0].orgs: past its bound\n");

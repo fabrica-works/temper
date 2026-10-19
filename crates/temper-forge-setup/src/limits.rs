@@ -1,24 +1,11 @@
 //! Reconcile's bounded orgs, deadline and wait (protocol/configuration.md, 7).
+use skein_forge_setup::limits::Limits;
 use skein_lib::Duration;
-/// Limits checked before a setup is read.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Limits {
-    pub orgs: u32,             // Orgs per forge.
-    pub deadline: Duration,    // Whole reconcile run.
-    pub backoff: Duration,     // First retry delay.
-    pub backoff_max: Duration, // Largest retry delay.
-}
 /// Why an override cannot be applied.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Refused {
     Unknown,
     Range,
-}
-/// Two limits whose values disagree.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Unfit {
-    pub name: &'static [u8],
-    pub other: &'static [u8],
 }
 /// The shipped profile (forge-setup decision 5).
 #[must_use]
@@ -52,14 +39,4 @@ fn duration(value: u64) -> Result<Duration, Refused> {
         Some(n) => Ok(Duration::from_nanos(n)),
         None => Err(Refused::Range),
     }
-}
-/// Checks both relationships, naming the offending pair.
-pub fn check(limits: &Limits) -> Result<(), Unfit> {
-    if limits.backoff > limits.backoff_max {
-        return Err(Unfit { name: b"setup.backoff_ms", other: b"setup.backoff_max_ms" });
-    }
-    if limits.backoff_max >= limits.deadline {
-        return Err(Unfit { name: b"setup.backoff_max_ms", other: b"setup.deadline_ms" });
-    }
-    Ok(())
 }

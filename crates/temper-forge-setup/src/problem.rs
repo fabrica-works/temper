@@ -6,6 +6,7 @@ use skein_lib::{Decimal, List, Writer};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum What {
     Reason(&'static [u8]),
+    Own(&'static [u8]),
     Against(&'static [u8]),
 }
 /// The opaque, bounded collection returned by the checks.
@@ -27,6 +28,12 @@ impl Problems {
         if self.entries.push((path, what)).is_err() {
             self.past = self.past.saturating_add(1);
         }
+    }
+    pub(crate) fn extend(&mut self, found: Problems) {
+        for (path, what) in &found.entries {
+            self.push(path.clone(), *what);
+        }
+        self.past = self.past.saturating_add(found.past);
     }
     pub(crate) fn append(&mut self, found: config::Problems) {
         for p in &found.problems {
@@ -86,8 +93,13 @@ fn render(ps: &Problems, w: &mut Writer, measure: bool) -> usize {
                 }
             }
         }
+        match what {
+            What::Own(label) => put(w, &mut n, measure, label),
+            What::Reason(_) | What::Against(_) => {}
+        }
         put(w, &mut n, measure, b": ");
         match what {
+            What::Own(_) => put(w, &mut n, measure, b"invalid form"),
             What::Reason(words) => put(w, &mut n, measure, words),
             What::Against(other) => {
                 put(w, &mut n, measure, b"must agree with application.limits.overrides.");

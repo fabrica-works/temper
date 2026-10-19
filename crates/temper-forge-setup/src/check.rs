@@ -1,12 +1,13 @@
 //! Cross-check the written forge members, without reading their files.
 use crate::{
-    limits::{self, Limits},
+    given, limits,
     problem::{Problems, What},
     setup::{Mode, Setup},
 };
 use alloc::boxed::Box;
 use core::net::SocketAddr;
 use jig_protocol_config::{Path, Segment};
+use skein_forge_setup::limits::Limits;
 use skein_json::Document;
 use skein_lib::Writer;
 /// How the forge's user is written.
@@ -151,8 +152,8 @@ pub fn checked(
             );
         }
     }
-    if let Err(w) = limits::check(&limits) {
-        ps.push(lp.member(w.name), What::Against(w.other));
+    if let Err(why) = skein_forge_setup::limits::check(&limits) {
+        ps.extend(given::refusal(0, why));
     }
     let setup = Setup::read(document, at, &limits, &mut ps);
     if let Some(setup) = &setup {

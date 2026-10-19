@@ -1,8 +1,12 @@
 //! Strict setup members and bounds (protocol/setup.md, 8).
-use crate::{limits::Limits, problem::Problems};
+use crate::problem::Problems;
 use alloc::boxed::Box;
 use core::net::SocketAddr;
 use jig_protocol_config::{self as config, Path, read};
+use skein_forge_setup::{
+    given::{email, login},
+    limits::Limits,
+};
 use skein_json::{Document, document::Kind};
 use skein_lib::List;
 /// A Forgejo account temper names.
@@ -95,32 +99,6 @@ fn valid(ok: bool, p: Path, ps: &mut config::Problems) {
 }
 fn path(b: &[u8]) -> bool {
     !b.is_empty() && !b.contains(&0)
-}
-fn login(b: &[u8]) -> bool {
-    if b.is_empty() || b.len() > 40 || !b.first().expect("not empty").is_ascii_alphanumeric() {
-        return false;
-    }
-    for c in b {
-        if !c.is_ascii_alphanumeric() && !b"._-".contains(c) {
-            return false;
-        }
-    }
-    true
-}
-fn email(b: &[u8]) -> bool {
-    if !(3..=254).contains(&b.len()) {
-        return false;
-    }
-    let mut ats = 0_u32;
-    for c in b {
-        if *c == b'@' {
-            ats = ats.saturating_add(1);
-        }
-        if c.is_ascii_whitespace() || c.is_ascii_control() || b"<>".contains(c) {
-            return false;
-        }
-    }
-    ats == 1
 }
 fn account(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Account> {
     let mut o = object(d, at, p, ps)?;
