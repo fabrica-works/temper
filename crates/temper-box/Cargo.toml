@@ -13,8 +13,8 @@ skein-io.workspace = true
 skein-shell.workspace = true
 
 [dev-dependencies]
-skein-sim = { git = "https://github.com/forgetic/skein.git" }
-skein-fake-machine = { git = "https://github.com/forgetic/skein.git" }
+skein-sim = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-machine = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-boundary.workspace = true
 
 [lints]

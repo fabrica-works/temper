@@ -32,7 +32,7 @@ jig-client-protocol-wire.workspace = true
 jig-protocol-config.workspace = true
 jig-protocol-store.workspace = true
 jig-conformance.workspace = true
-jig-test-service = { git = "https://github.com/forgetic/jig.git" }
+jig-test-service = { git = "https://github.com/fabrig-dev/jig.git" }
 jig-core-world.workspace = true
 smith-channel.workspace = true
 smith-charter.workspace = true
@@ -40,18 +40,18 @@ skein-lib.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true
 skein-world.workspace = true
-skein-sim = { git = "https://github.com/forgetic/skein.git" }
-skein-fake-machine = { git = "https://github.com/forgetic/skein.git" }
-skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
-skein-fake-llm-domain = { git = "https://github.com/forgetic/skein.git" }
-skein-llm = { git = "https://github.com/forgetic/skein.git" }
-skein-kv = { git = "https://github.com/forgetic/skein.git" }
-smith-agent-process-world = { git = "https://github.com/forgetic/smith.git" }
-smith-agent-shell = { git = "https://github.com/forgetic/smith.git" }
-smith-agent-service = { git = "https://github.com/forgetic/smith.git" }
-smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
-smith-local-service = { git = "https://github.com/forgetic/smith.git" }
-smith-protocol-llm = { git = "https://github.com/forgetic/smith.git" }
+skein-sim = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-machine = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-peers = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-fake-llm-domain = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-llm = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-kv = { git = "https://github.com/fabrig-dev/skein.git" }
+smith-agent-process-world = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-agent-shell = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-agent-service = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-host-protocol = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-local-service = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-protocol-llm = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-domain.workspace = true
 temper-engine-smith.workspace = true
 temper-engine-protocol-forge-world = { path = "../engine/protocol-forge" }

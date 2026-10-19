@@ -16,7 +16,7 @@ import sys
 
 metadata = json.load(sys.stdin)
 members = set(metadata["workspace_members"])
-print("[patch.\"https://github.com/forgetic/jig.git\"]")
+print("[patch.\"https://github.com/fabrig-dev/jig.git\"]")
 for package in sorted(metadata["packages"], key=lambda package: package["name"]):
     if package["id"] in members:
         path = str(pathlib.Path(package["manifest_path"]).parent)
@@ -50,11 +50,11 @@ distinct source lines against jig's lock at the pinned commit (Bash):
 
 ```bash
 jig_checkout=~/src/rust/jig
-jig_commit=$(sed -nE 's|^source = "git\+https://github\.com/forgetic/jig\.git#([0-9a-f]+)"$|\1|p' Cargo.lock | sort -u)
+jig_commit=$(sed -nE 's|^source = "git\+https://github\.com/fabrig-dev/jig\.git#([0-9a-f]+)"$|\1|p' Cargo.lock | sort -u)
 diff -u \
-  <(sed -nE '/^source = "git\+https:\/\/github\.com\/forgetic\/(skein|smith)\.git#[0-9a-f]+"$/p' Cargo.lock | sort -u) \
+  <(sed -nE '/^source = "git\+https:\/\/github\.com\/fabrig-dev\/(skein|smith)\.git#[0-9a-f]+"$/p' Cargo.lock | sort -u) \
   <(git -C "$jig_checkout" show "$jig_commit:Cargo.lock" |
-    sed -nE '/^source = "git\+https:\/\/github\.com\/forgetic\/(skein|smith)\.git#[0-9a-f]+"$/p' | sort -u)
+    sed -nE '/^source = "git\+https:\/\/github\.com\/fabrig-dev\/(skein|smith)\.git#[0-9a-f]+"$/p' | sort -u)
 ```
 
 No diff means the revisions match. Check without the local patch, when
