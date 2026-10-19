@@ -72,7 +72,7 @@ this turn read and jig 05's deadline spans), including this session's last step,
 - Change the existing enums and every exhaustive consumer in the same increment; add no catch-all, compatibility alias,
   retry loop, watched turn, or second fixture for the same world. The new modules below keep additions out of long files.
 - All cargo commands use `heavy`, unoptimized. Unit tests stay under 20 ms, focused world/joint stories under 0.5 s each;
-  the focused and fuzzy budgets remain 15 s and 60 s. Run each named proof once, besides land's gate. A proof naming a new
+  the focused and fuzzy budgets remain `.config/nextest.toml`'s, 30 s and 60 s. Run each named proof once, besides land's gate. A proof naming a new
   test becomes executable when its increment builds it; the supervisor checks the sketches at readiness.
 
 ## Increments
@@ -85,13 +85,36 @@ Files: `crates/jig-client-protocol-wire/schema/client-v8{,-part1}.schema` rename
 `tests/client-wire/tests/{drift,fuzzy_client_wire}.rs`. Mechanical imports and explicit jig-version literals in the users
 found by `rg -l 'jig_client_protocol_wire|client-v8|golden/v8' crates testing tests examples --glob '*.rs' --glob '!**/generated/**'`;
 notably both protocol ends, their HTTP mappings, the native shell, jig-client's tests, test-service and the client worlds.
-Shape: `pub mod v9`, its existing root re-export, and `VERSION: u32 = 9`; every jig served range is `9..=9`. Families keep
+The jig-version literals are those `rg -n 'first: 8|last: 8|version: 8|Owner::Jig, 8|minimum: 8|maximum: 8|version\(\), 8|contains\(8\)|\[1, 0, 0, 0, 0, 8,' crates testing tests examples --glob '*.rs' --glob '!**/generated/**'`
+finds, in 32 files at jig `1899792f`:
+- the scripted engines' hello answers, `self.engine.versions().contains(8)`, in `tests/client/src/scripted.rs` and
+  `tests/ops/src/client/transport.rs`: left at 8, every client story reads "Client out of date";
+- `assert_eq!(….version(), 8)` in `crates/jig-protocol-engine-clients/src/tests/fixtures.rs` (`final_record`),
+  `crates/jig-client-protocol-link/src/tests/attempts.rs` and `tests/engine-clients/tests/requests.rs`;
+- `SERVICE_ANSWER`'s version byte, `[1, 0, 0, 0, 0, 8, …`, in `crates/jig-protocol-engine-clients/src/tests/fixtures/answers.rs`;
+  both numbers of `Owner::Jig, 8, 8` in `src/tests/fixtures/envelope.rs`; `Versions { minimum: 8, maximum: 8 }` in
+  `tests/core/src/world.rs`;
+- the rest: `crates/jig-protocol-engine-clients/src/tests/{asks,reads}.rs`, `src/tests/fixtures/{reads,services,watches}.rs`;
+  `crates/jig-client-protocol-link/src/{tests,tests/stream,tests/fixtures,tests/fixtures/link_stream}.rs`;
+  `crates/jig-client-protocol-wire/src/tests/fixtures.rs`; `crates/jig-client/src/tests/unlinked.rs`;
+  `testing/jig-client-scripted-engine/src/truth.rs`; `tests/client/src/{stories,stories/client_construction,joint/transport}.rs`;
+  `tests/ops/src/{client/stories,joint/bytes}.rs`; `tests/client-protocol/src/fixtures.rs`;
+  `tests/engine-clients/src/{peer,fixtures}.rs`, `tests/engine-clients/tests/{closing,requests,stream,reads}.rs`.
+A family's number or version is no jig version, and stays: `Served { family: Some(9), first: 2 }`, the link's `first: 23`
+and `24`. The words go too: the three `a_v8_*` tests of `tests/engine-clients/tests/requests.rs` become `a_v9_*`; `v8` leaves
+the `unreachable!` and `expect` texts of `tests/client/src/joint/wire/{refusals,historical,historical/tests}.rs`;
+`docs/development/tech-debt.md` names `client-v9*.schema` and `generated/v9.rs`.
+Shape: `pub mod v9`, its existing root re-export, and `VERSION: u32 = 9`; every jig served range is `9..=9`. `schema/client-v9.schema`'s first line is
+`family jig-client-wire 9`, which the regeneration carries into `v9.rs` and the goldens. Families keep
 their own versions. Update drift's two input paths, generated-file arm and golden directory, and the fuzzy golden reader.
 Bootstrap the generated filename with the existing generated source so the test runner builds, then regenerate with
 `SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift -E 'test(=client_wire_schema_matches_generated_code_and_goldens)'`.
 Run the same drift test without the environment variable. No v8 module or translated reader remains. Add no turn fields yet.
 Test shape: the existing drift and wire round trips; in `tests/client-protocol/tests/client.rs`, retain
-`an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing`, with its incompatible version explicitly 8.
+`an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing`, with its incompatible version explicitly 8:
+`Story::serve_jig(8)` in place of its `u32::MAX`, expecting `VersionRange { first: 8, last: 8 }`; and
+`a_request_pending_across_a_restart_that_stops_serving_its_family_stays_unsent` serves 9 to 9 where it served 8. `cargo fmt`
+runs after, as it rewraps a `vec![Readout::NotServed { .. }]`.
 Use `fixtures::domain_limits`, `engine_limits` and the existing `Story::serve_jig`; family-version expectations stay intact.
 Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world --test client -E 'test(=an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing)'`.
 A v9 client refuses an engine serving v8 and sends nothing; under 0.5 s, above the wire's round trips.
@@ -111,13 +134,14 @@ Files: `crates/jig-domain-core/src/reads.rs`, `reads/vocabulary.rs`, new `reads/
 `crates/jig-client-domain/src/contract/reads.rs`; `crates/jig-client-protocol-link/src/translate/reads.rs`, `src/tests/reads.rs`;
 the exhaustive Why/ReadNone adapters in `testing/jig-client-test-domain/src/family/client.rs`,
 `crates/jig-client-view/src/{application,page/routing}.rs`, `tests/client/src/joint/read_packets.rs`,
-`tests/ops/src/client/transport.rs`; `tests/core/src/stories/reads.rs`, `tests/core/tests/reads.rs`.
+`tests/ops/src/client/transport.rs`, and the client `ReadNone` matches in `examples/ops/client-domain/src/family.rs` (two),
+`tests/client-protocol/src/family.rs` and `tests/client/src/scripted.rs`; `tests/core/src/stories/reads.rs`, `tests/core/tests/reads.rs`.
 Shape: `Loaded::TurnProblem` and `TurnFailure` as sketched below; `Why::{TooLarge { bytes }, Malformed}`;
 matching wire `ReadNone` variants (`too_large: TurnTooLarge`, `malformed`) and client `ReadNone` variants.
 The reference UI and family-read adapters never ask for a single turn; the new cases join their existing unavailable/unknown
 arms, without adding UI words. Extend the existing wire-none round-trip table and regenerate v9 as in 03.1.
 `reads/turn.rs` validates the scope, identity, evidence size and owner role, after `loaded`'s existing sign-in check;
-its answer still leaves through `Held::ReadAnswer`. Ordinary `Loaded::Gone` keeps its existing route.
+its answer still leaves through `Held::Read`. Ordinary `Loaded::Gone` keeps its existing route.
 In the store, distinguish exhausted search/no transcript place from a failed frame. The former stays an empty result;
 the latter gives Malformed for a single turn. Read the fixed metadata and payload length before allocating the payload;
 reuse the existing header/length validation and bounded frame walk. An oversized selected frame gives its payload length,
@@ -153,7 +177,8 @@ Files: `crates/jig-client-domain/src/contract/{reads,documents}.rs`, `src/tests/
 `crates/jig-client/src/facts.rs`, `src/tests/unlinked.rs`;
 exhaustive consumers in `crates/jig-client-view/src/{application,objects,page/inbox,page/routing,page/shown}.rs`,
 `testing/jig-client-scripted-engine/src/{reads,watches,requests,truth}.rs`, `testing/jig-client-test-kit/src/check.rs`,
-`tests/client/src/joint/{read_packets,wire/reads,wire/historical}.rs`, `tests/ops/src/client/transport.rs`;
+`tests/client/src/joint/{read_packets,wire/reads,wire/historical}.rs`, `ReadValue`'s matches in `tests/client/src/{observe,scripted,
+harness/referee,harness/referee/offers}.rs`, `tests/ops/src/client/transport.rs`;
 `tests/client-protocol/src/client{,/thread}.rs`, `src/fixtures.rs`, new `tests/client-protocol/tests/turn_read.rs`.
 No forge, LLM or provider hotspot.
 Shape: client `Read::Turn { task: u64, attempt: u64, turn: u32 }`, wire `ReadTurn` with those same fields;
@@ -216,7 +241,8 @@ Needs: one turn through the public client, from 03.3; nothing beyond the session
 Files: `crates/jig-client-domain/src/contract/turn.rs`;
 `crates/jig-client-protocol-link/src/translate/{pages,pages_part0,pages_part1,turn}.rs`, `src/tests/{pages,fixtures/turns}.rs`;
 `crates/jig-client-view/src/turns/turn.rs`, `src/tests/turn_read.rs`;
-`tests/client/src/joint/wire/{activity,turns}.rs`, `tests/client-protocol/tests/turn_read.rs`,
+`tests/client/src/joint/wire/{activity,turns,pages}.rs` (`pages.rs`'s three `client::TurnProblem::TooLarge`),
+`tests/client-protocol/tests/turn_read.rs`,
 `tests/client-protocol/src/client/thread.rs`, `tests/client-protocol/src/fixtures.rs`.
 Shape: change the variant in place. `archived_turn_fields` copies `w::TurnTooLarge::bytes()`; `turn_fields` captures the
 input payload length before decoding and keeps it on `Undecodable::TooLarge`. Share that decoder with the single read,
@@ -362,4 +388,4 @@ Run in jig, reading `origin/main` after fetching. The commands test properties o
 - `git grep -q -F 'ReadNone::TooLarge' origin/main -- crates/jig-client-protocol-link/src`
 - `git grep -q -F 'ReadNone::Malformed' origin/main -- crates/jig-client-protocol-link/src`
 - `test -n "$(git grep -l --all-match -e 'Read::Turn' -e 'ReadValue::Turn' origin/main -- tests/client-protocol/tests)"`
-- `test -n "$(git grep -l --all-match -e 'Read::Turn' -e 'restart' origin/main -- tests/client-protocol/tests tests/core/tests)"`
+- `git show origin/main:tests/client-protocol/tests/turn_read.rs | grep -q -F 'fn a_turn_read_after_restart_keeps_its_archive'`
