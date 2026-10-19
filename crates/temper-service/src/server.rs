@@ -180,7 +180,10 @@ impl Server {
         }
         None
     }
-    pub fn answer(&mut self, call: Token, request: http::Request, out: &mut Queue<Routed>) {
+    pub fn answer(&mut self, call: Token, mut request: http::Request, out: &mut Queue<Routed>) {
+        if let http::Request::Respond(response) = &mut request {
+            crate::clients::policy::add(response);
+        }
         if let http::Request::Next = request {
             self.done(call, out);
             return;

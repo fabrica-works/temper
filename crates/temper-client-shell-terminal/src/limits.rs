@@ -69,7 +69,7 @@ pub fn native() -> Limits {
             body_bytes: 33_554_432, // Whole small store and HTTP response bodies.
             http: skein_http::client::Limits {
                 head: 4096,    // Incoming HTTP head bytes.
-                headers: 8,    // Incoming HTTP fields.
+                headers: 16,   // Incoming HTTP fields.
                 request: 4096, // Outgoing HTTP head bytes.
                 read: 1024,    // Stream body chunk bytes.
                 send: 1024,    // Outgoing body chunk bytes.

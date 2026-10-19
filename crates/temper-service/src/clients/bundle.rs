@@ -2,7 +2,6 @@
 //! ui-web.md, 4.3 and 4.4). Copied from jig's testing/jig-test-service/src/server/bundle.rs.
 use super::Clients;
 use alloc::boxed::Box;
-use jig_protocol_engine_clients_http as kit_http;
 use skein_http::{Header, Method, server as http};
 use skein_lib::{
     List, Map, Token, bytes,
@@ -170,9 +169,6 @@ impl Clients {
                 field(&mut headers, b"ETag", &self.bundle.as_ref().expect("revalidated bundle").etag);
             }
             Answer::NotFound | Answer::NotAllowed => {}
-        }
-        if answer == Answer::NotFound && head.method == Method::Get && reply.path.as_ref() == b"/jig/v1/sign-in/link" {
-            headers.push(kit_http::link_page()).expect("answer fields");
         }
         let response = http::Response {
             status,

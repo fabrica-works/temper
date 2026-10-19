@@ -174,3 +174,50 @@ fn closing_waits_for_the_component_before_ending_its_call() {
     assert!(!server.advance(&mut out));
     assert_eq!(server.next_deadline(), Some(STALL_AT));
 }
+
+const ANSWERED: [(bool, &[u8]); 8] = [
+    (true, b"GET /chats/7 HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (true, b"GET /bundle/0123456789abcdef/boot.js HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (true, b"GET /robots.txt HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (true, b"GET / HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nIf-None-Match: \"0011223344556677\"\r\n\r\n"),
+    (true, b"GET /bundle/fedcba9876543210/boot.js HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (true, b"DELETE /chats/7 HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (false, b"GET /jig/v1/sign-in/link?secret=AAAA HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n"),
+    (false, b"POST /jig/v1/read HTTP/1.1\r\nHost: evil.test:7100\r\nContent-Type: application/octet-stream\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+];
+#[test]
+fn each_answer_carries_the_policys_five_fields() {
+    for (bundled, bytes) in ANSWERED {
+        let mut service = fixtures::started();
+        if bundled {
+            service.adopt_bundle(fixtures::bundle::bundle());
+        }
+        let mut peer = fixtures::request(&mut service, bytes);
+        let (_, headers) = fixtures::answered(&mut service, &mut peer);
+        for (name, value) in fixtures::bundle::POLICY {
+            assert_eq!(fixtures::header(&headers, name), Some(value), "{name:?} on {bytes:?}");
+        }
+    }
+}
+#[test]
+fn the_policy_keeps_a_field_the_answer_already_holds() {
+    let mut response = skein_http::server::Response {
+        status: 200,
+        headers: Box::new([skein_http::Header {
+            name: Box::from(b"referrer-policy".as_slice()),
+            value: Box::from(b"same-origin".as_slice()),
+        }]),
+        body: skein_http::server::Body::None,
+        close: false,
+    };
+    crate::clients::policy::add(&mut response);
+    let mut held = 0_u32;
+    for header in &response.headers {
+        if header.name.eq_ignore_ascii_case(b"Referrer-Policy") {
+            assert_eq!(&*header.value, b"same-origin");
+            held = held.checked_add(1).unwrap();
+        }
+    }
+    assert_eq!(held, 1);
+    assert_eq!(response.headers.len(), 5);
+}
