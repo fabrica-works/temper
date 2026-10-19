@@ -89,6 +89,9 @@ Derived fixture Files: `docs/examples/owned.json`; existing regression in
   whose body stays unchanged. Its consumers are `crates/temper/tests/support/owned.rs`
   (`EXAMPLE`), `tests/{startup,configuration,process}.rs` under that crate,
   and the copy command in `docs/guide/box.md`; preserve them and their assertions.
+HTTP room Files (commit 7): `crates/temper-service/src/{clients.rs,tests/server.rs}`,
+  already named in its Shape below; the shared `unclaimed` branch covers both
+  the existing 404 and the new 503.
 Shape: seven commits, each builds and passes its crates' tests.
   1. **The repin**: update and check; repair there what skein's steps broke
      since the last repin (at the base the check fails on `Op::Lock` and jig's
@@ -224,13 +227,22 @@ Shape: seven commits, each builds and passes its crates' tests.
      while `mount.room()` is not 0. One that finds none goes into
      `unclaimed`, as a path no one claims does, answered
      `Respond(Response { status: 503, headers: [], body: Body::None,
-     close: true })`; its end removes it and calls `server.done`, as now.
+     close: true })`. In that shared branch, both the existing 404 and
+     the new 503 send `Request::Discard` before `Respond`, including for
+     an empty body: skein's `http.md`, 5.3, says a response without reading
+     the body discards it, or `Done` never comes. Keep existing 404 headers
+     and both statuses, empty response bodies and `close: true`. Remove
+     `unclaimed` and call `server.done` only on `Done`, `Failed` or `Closed`,
+     as now; neither responding nor discarding retires the entry itself.
      One test in `crates/temper-service/src/tests/server.rs`,
      `a_call_past_the_mounts_room_is_answered_busy`: with the mount's
      `calls` (read from the limits, not a literal) each holding a read
      head whose body is withheld, the next call under `/jig` is answered
      503 with nothing reaching the root; once one of them is closed and
-     the mount has handled its end, a further call is mounted. No sum is
+     the mount has handled its end, a further call is mounted. Observe
+     the busy response's terminal and retirement in this same test; keep
+     its other assertions and add no test. Refresh further reached copies
+     within this step and list users in the commit body. No sum is
      re-derived: `clients::worst_case` already counts `unclaimed` at the
      server's connections, and a 503 with no header is within the
      response head's bound, so `system::memory`, the startup worst case

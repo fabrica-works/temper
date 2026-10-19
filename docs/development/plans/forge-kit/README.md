@@ -290,6 +290,13 @@ chain.
   changes. temper 02.1's commit 7 takes it with `heavy cargo update -p
   jig-protocol-engine-clients-http --precise <the repair's commit>`, one
   jig revision per source, and the closing temper repin waits for it.
+  In temper's shared `unclaimed` path, both the existing 404 and the new
+  503 send `Request::Discard` before `Respond`, including for an empty
+  request body (skein's `http.md`, 5.3). Keep each entry until its terminal
+  event is handled and `server.done` is called. The existing map is already
+  priced at the server's connections; this adds no allocation or sum term.
+  Refresh further reached copies within the owning step and list users in
+  its commit body.
 - **A compatible smith source during a temper repin:** if taking skein main
   breaks the pinned smith source, the same temper repin may take the earliest
   compatible smith revision landed on origin/main. Keep an already newer
