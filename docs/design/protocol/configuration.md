@@ -403,7 +403,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   - the channel's (channel.md, section 8): each of temper's largest
     parts within the ceiling jig's schema gives its field; the largest
     part the engine can send within what the worker's limits take; the
-    longest remote the routing can make (the longest `git` base, an
+    forge's `resources_per_task` equal to the checkout's `repositories`,
+    since the engine's terms take the smaller and a worker's parts past
+    them never open the link; the longest remote the routing can make (the longest `git` base, an
     owner and a name of the forge's `name_bytes`, two `/` and `.git`),
     and the forge's names and branches, within the checkout's
     `name_bytes`;
@@ -429,7 +431,9 @@ top-level `workers`, in the same order; standalone has one. Each:
   `core.escalation_reason_bytes`, `core.call_answer_bytes` and
   `core.load_slots`; as constants, in place of `views.`,
   `core.fill_mark`, `core.load_bytes` and `core.connectors`. An
-  override of one of these changes nothing the root holds.
+  override of one of these changes nothing the root holds, but for
+  `core.resume_bytes`: the core's resume setting is still taken from it,
+  above 0 and within `root.journal.transcript_bytes`.
 - **The engine's documents fit temper's client.** A document past the
   bounds a client decodes is refused there whole, as too large (jig's
   `protocol/client.md`, section 3), so the documents the engine serves

@@ -320,7 +320,8 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   task the forge's procedures make. The root holds its configuration to
   its limits as it is made, and a start that breaks one is refused,
   naming it (`../protocol/configuration.md`, section 2): one connector;
-  each charter's run within an assignment's bytes; the forge's charter
+  the deployment's provider other than 0, the forge's sign-in; each
+  charter's run within an assignment's bytes; the forge's charter
   one of the core's; the resume limit within a row's bytes; each seeded
   owner's project naming its escalation role; the landing rules and the
   permission mappings within a row's bytes, and within the forge's

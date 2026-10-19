@@ -723,7 +723,8 @@ pub enum Refused {
     /// A project's permission mappings, `None` past `u64`, beyond
     /// `journal.transcript_bytes`.
     Permissions { project: u32, bytes: Option<u64> },
-    /// The forges' writers or git identities beyond the forge's repositories.
+    /// The forges' writers or git identities beyond the forge's repositories,
+    /// or the namespace and writers beyond the forge client's `op_bytes`.
     Forges,
 }
 
@@ -752,6 +753,10 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
     if resume == 0 || resume > limits.journal.transcript_bytes {
         refused.push(Refused::Resume).expect("counted refusals");
     }
+    // Judges' tables smaller than the authority's refuse each landing set
+    // past them, so only the tables are named.
+    let judges = limits.forge.judge_projects >= limits.authority.projects
+        && limits.forge.judge_criteria >= limits.authority.requirements;
     if limits.forge.judge_projects < limits.authority.projects {
         refused.push(Refused::JudgeProjects).expect("counted refusals");
     }
@@ -810,7 +815,7 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         }
         None => false,
     };
-    if !deployment {
+    if !deployment && judges {
         refused.push(Refused::Landing { project: None }).expect("counted refusals");
     }
     for (&project, rules) in &config.landing.projects {
@@ -821,7 +826,7 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
             connector,
             limits,
         );
-        if !joined {
+        if !joined && judges {
             refused.push(Refused::Landing { project: Some(project) }).expect("counted refusals");
         }
     }

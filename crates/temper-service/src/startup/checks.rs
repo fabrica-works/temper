@@ -85,6 +85,21 @@ pub fn hub(engine: &config::Engine, problems: &mut Problems) {
         }
     }
 }
+/// The deployment's provider is not 0, which the root keeps for the forge's
+/// sign-in (domain/root.md, 6).
+pub fn provider(engine: &config::Engine, problems: &mut Problems) {
+    for (index, provider) in engine.providers.iter().enumerate() {
+        match provider.kind {
+            config::ProviderKind::Deployment if provider.number == 0 => {
+                problems.push(
+                    at(index, Path::root().member(b"engine").member(b"providers")).member(b"number"),
+                    What::Provider,
+                );
+            }
+            config::ProviderKind::Deployment | config::ProviderKind::Link | config::ProviderKind::Application => {}
+        }
+    }
+}
 /// Each git identity's number is one both the engine's and the worker's
 /// accounts tables hold.
 pub fn credentials(
@@ -235,8 +250,9 @@ pub fn channel(
     problems: &mut Problems,
 ) {
     names(longest_remote(forges, limits.forge.name_bytes), limits, problems);
-    // A worker's hello names its checkout's repositories, and the engine
-    // admits only a worker whose bound is its own (channel.md, 8).
+    // The engine's terms take the smaller of the two repository bounds
+    // (translate::limits), so a checkout's larger one makes the worker's
+    // parts past those terms and its hello never opens the link.
     let repository_shape = engine.repositories == worker.repositories;
     let engine = bounded(engine, true, problems);
     let worker = bounded(worker, false, problems);
@@ -371,7 +387,11 @@ pub fn root(
             domain::Refused::Run { charter, bytes } => (
                 at(charter, engine_path.member(b"charters")),
                 match bytes {
-                    Some(bytes) => What::Past { bytes, bound: u64::from(limits.journal.run_bytes) },
+                    Some(bytes) => What::Within {
+                        bytes,
+                        limit: b"root.journal.run_bytes",
+                        bound: u64::from(limits.journal.run_bytes),
+                    },
                     None => What::Jig(config::What::Bound),
                 },
             ),
@@ -394,7 +414,11 @@ pub fn root(
             domain::Refused::Permissions { project, bytes } => (
                 at(index_of(&numbers, project), engine_path.member(b"projects")).member(b"roles"),
                 match bytes {
-                    Some(bytes) => What::Past { bytes, bound: u64::from(limits.journal.transcript_bytes) },
+                    Some(bytes) => What::Within {
+                        bytes,
+                        limit: b"root.journal.transcript_bytes",
+                        bound: u64::from(limits.journal.transcript_bytes),
+                    },
                     None => What::Jig(config::What::Bound),
                 },
             ),
@@ -405,9 +429,10 @@ pub fn root(
                 at(index_of(landing_projects, project), landing_path.member(b"projects")).member(b"rules"),
                 What::Against { other: LANDING },
             ),
-            domain::Refused::Forges => {
-                (Path::root().member(b"application").member(b"forges"), What::Against { other: b"forge.repositories" })
-            }
+            domain::Refused::Forges => (
+                Path::root().member(b"application").member(b"forges"),
+                What::Against { other: b"forge.repositories and forge.client.op_bytes" },
+            ),
         };
         problems.push(path, what);
     }

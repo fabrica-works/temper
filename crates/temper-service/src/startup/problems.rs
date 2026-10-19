@@ -16,10 +16,12 @@ pub enum What {
     Override(limits::Refused),
     Against { other: &'static [u8] },
     Past { bytes: u64, bound: u64 },
+    Within { bytes: u64, limit: &'static [u8], bound: u64 },
     Agent,
     NoHub,
     Credentials,
     Escalation,
+    Provider,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problem {
@@ -79,11 +81,12 @@ fn words(what: What) -> &'static [u8] {
         What::Override(limits::Refused::Unknown) => b"no limit of temper's has this name",
         What::Override(limits::Refused::Range) => b"outside its type",
         What::Against { .. } => b"must agree with ",
-        What::Past { .. } => b"",
+        What::Past { .. } | What::Within { .. } => b"",
         What::Agent => b"not in the agent's configuration under the same name and account",
         What::NoHub => b"the root has no hub, so the fleet must place every run on a worker",
         What::Credentials => b"must be from 1 to accounts.credentials, in engine.limits and in the worker's limits",
         What::Escalation => b"an owner's project must name an escalation role from 0 to 3",
+        What::Provider => b"the deployment's provider must not be 0, the forge's sign-in provider",
         What::Jig(what) => match what {
             config::What::Json => b"invalid JSON",
             config::What::Unknown => b"unknown member",
@@ -140,6 +143,13 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 put(writer, &mut length, measuring, b" bytes, past its bound of ");
                 put(writer, &mut length, measuring, Decimal::of(bound).as_bytes());
             }
+            What::Within { bytes, limit, bound } => {
+                put(writer, &mut length, measuring, Decimal::of(bytes).as_bytes());
+                put(writer, &mut length, measuring, b" bytes, past ");
+                put(writer, &mut length, measuring, limit);
+                put(writer, &mut length, measuring, b" of ");
+                put(writer, &mut length, measuring, Decimal::of(bound).as_bytes());
+            }
             What::Jig(config::What::Memory { over }) => {
                 put(writer, &mut length, measuring, Decimal::of(over).as_bytes());
                 put(writer, &mut length, measuring, b" bytes");
@@ -188,7 +198,8 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::Agent
             | What::NoHub
             | What::Credentials
-            | What::Escalation => {}
+            | What::Escalation
+            | What::Provider => {}
         }
         put(writer, &mut length, measuring, b"\n");
     }

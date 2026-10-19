@@ -161,7 +161,7 @@ fn a_charters_run_past_its_bytes_refuses_the_start() {
     limits.journal.run_bytes = 16;
     let found = root(&limits);
     assert!(found.starts_with(b"engine.charters[0]: "), "{}", String::from_utf8_lossy(&found));
-    assert!(found.ends_with(b" bytes, past its bound of 16\n"), "{}", String::from_utf8_lossy(&found));
+    assert!(found.ends_with(b" bytes, past root.journal.run_bytes of 16\n"), "{}", String::from_utf8_lossy(&found));
 }
 #[test]
 fn permission_mappings_past_a_rows_bytes_refuse_the_start() {
@@ -171,7 +171,7 @@ fn permission_mappings_past_a_rows_bytes_refuse_the_start() {
     let found = root(&limits);
     assert!(
         String::from_utf8_lossy(&found).lines().any(|line| line.starts_with("engine.projects[0].roles: ")
-            && line.ends_with(" bytes, past its bound of 1")),
+            && line.ends_with(" bytes, past root.journal.transcript_bytes of 1")),
         "{}",
         String::from_utf8_lossy(&found)
     );
@@ -193,8 +193,16 @@ fn landing_rules_past_the_authoritys_requirements_refuse_the_start() {
     );
 }
 #[test]
-fn forges_past_the_forges_repositories_refuse_the_start() {
+fn forges_past_the_clients_op_bytes_refuse_the_start() {
     let mut limits = root_limits();
-    limits.forge.repositories = 0;
-    assert_eq!(&*root(&limits), b"application.forges: must agree with forge.repositories\n");
+    limits.forge.client.op_bytes = 1;
+    assert_eq!(&*root(&limits), b"application.forges: must agree with forge.repositories and forge.client.op_bytes\n");
+}
+#[test]
+fn a_deployment_provider_0_refuses_the_start() {
+    let document = fixtures::with(&fixtures::document(), b"engine.providers[1].number", b"0");
+    assert_eq!(
+        &*started(&document),
+        b"engine.providers[1].number: the deployment's provider must not be 0, the forge's sign-in provider\n"
+    );
 }
