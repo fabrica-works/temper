@@ -207,7 +207,11 @@ should move the pin and repair nothing (findings/base-repin.md).
   edits. jig's `crates/jig-domain-core/src/tests/read_activity.rs` (its
   `tiny` row and its three-line opener) and
   `crates/jig-client-domain/src/tests/requests.rs` (its save-then-send
-  destructuring) are mended by the first increment that edits them,
+  destructuring), and `tests/core/tests/deadline_spans.rs` (jig 05.3:
+  its aged-span test of three behaviours, its row loop that branches on
+  the expected value, its signed-in opener in three tests, its bare
+  seeds, request keys and walls; the steer of 08:18) are mended by the
+  first increment that edits them,
   said in its commit body. A case that extends a fixture is built from
   it (`[fixtures::ADOPTION, &["--no-home"]].concat()`), never retyped;
   each size a test uses (a depth, a capacity, a chunk) is a named const

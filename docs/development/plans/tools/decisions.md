@@ -466,6 +466,12 @@ These were raised while planning and answered by the designer (rounds 1 and 2) o
      - `git -C ~/src/rust/temper show 09cfaca18 --stat`: `Decide the tools plan's item L: one group of tasks per call`; decisions.md's L ends "the printed cursor stays jig's, with no group byte. tools.md, 5.2, says so at the designer's next pass, after this plan."
      - `awk -F'\t' '$1 ~ /^temper-03/' ledger.tsv`: temper-03.1 ready, 03.2 to 03.4 waiting; no temper 03 session has started.
 
+122. **deadline_spans.rs mended where next edited** (steer of 08:18).
+     From the hourly check of 07:56:50Z: the README's "A setup written once, and rows carry data" now names jig's `tests/core/tests/deadline_spans.rs` (jig 05.3) among the files the first increment that edits them mends: its aged-span test of three behaviours, its row loop that branches on the expected value, its signed-in opener in three tests, and its bare seeds, request keys and walls, beside `fixtures/deadlines.rs`'s `SPAN` and `CREATED`. No step is added for it.
+
+     Checked:
+     - `git -C ~/src/rust/jig grep -n -E 'fn an_aged_span_is_beyond_its_accepter_and_passed_up|fn a_resolved_span_beyond_the_creator_is_refused|const SPAN|const CREATED' origin/main -- tests/core` (jig c0142dc2): `tests/deadline_spans.rs:66` and `:79`, the two tests; `src/fixtures/deadlines.rs:9` `pub const SPAN`, `:42` `pub const CREATED: u64 = 2`.
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
