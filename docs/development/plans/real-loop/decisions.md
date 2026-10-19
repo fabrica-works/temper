@@ -637,6 +637,47 @@ pass:
      09.s1 gets none of its own: past its Size or a second failing gate, a
      block with what was seen.
 
+132. **testing.md 2.4: the real loop is smoke** (designer's answer, the supervisor's question of 2026-10-19T16:43:09Z).
+     The designer's answer, landed in temper 2f71813ad, decides the user's ruling into the design:
+
+     Landed in temper `2f71813ad` ("The real loop is smoke; its corner cases
+     are tested below"), with `land --docs`. real-loop's run takes it; no step's
+     Scope changes beyond ruling 130's.
+
+     testing.md 2.4's intro now says: "It is smoke, the testing pyramid's top,
+     a way to climb in confidence: one end-to-end path per feature, and each
+     behaviour and corner case tested in the lower world that owns it, never
+     here." "The stories" now read "one end-to-end path each", as ruling 130
+     kept them. The LLM accounts' stories keep "one path per source": "a
+     sign-in" and "a program's source". The refused and late sign-ins, the
+     limited, refused and unauthorized turns, the fenced notice, and the
+     program's limit and lost login move to a new bullet, "The accounts' cases
+     are tested below":
+     - a sign-in refused or past its deadline: `tests/client` (tools.md 11.2),
+       skein's OAuth worlds (oauth.md 3, 6.8), jig's protocol world (llm.md 8);
+     - a turn limited, refused or unauthorized: jig's protocol world ("failures
+       of each class", "a source limited and resumed"), accounts world and
+       core world (authority.md 8.3); `tests/client` for the limited notice,
+       `task N` and `retry`;
+     - a fenced attempt's notice dropped: jig's fleet world ("Attempts are
+       fenced", engine.md 8);
+     - a program's usage limit and lost login: smith's world over its fake
+       `claude` (programs.md 8), and jig's channel world ("a usage limit
+       relayed as limited … a login lost mid-run relayed as unauthorized").
+     The closing paragraph becomes "What only the real kernel shows is this
+     tier's", and adds testing-strategy.md 2.8's rule: a failure found here is
+     rerun lower down.
+
+     Also amended: tools.md 11.3's unread-record story moves to 11.1
+     (`temper-client-shell-cli`'s tests), its "A limit" goes (11.2 has it),
+     and its closing says smoke; STATUS.md's two LLM accounts' rows; the
+     plan's README rule "The real loop is smoke" (a real-loop test outside
+     2.4's stories and the steps' Scopes is a question, asked before it is
+     written); 09 and 13 cite 2.4; 13's Read first leaves not found to the
+     tools and `tests/client`; later.md's real-loop rows become one path per
+     feature. The moved accounts cases stay "not planned" in their existing
+     rows (STATUS.md's "The LLM accounts' tests"; later.md's area 5 row).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,
