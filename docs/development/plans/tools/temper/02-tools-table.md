@@ -82,7 +82,7 @@ Capability: the tools' table.
   condition, `tasks` none; `waiting-on-me` is `task N`'s alone (tools.md, 5.4).
 - **Bounded inputs:** TEXT and temper 12's JSON take at most `ask_bytes`; past it is a usage error.
 - **The preset is written out,** and a test compares it with the
-  terminal's `native().client`, `rows` aside, through a dev-dependency.
+  terminal's `native().client`, `rows` and `text` aside, through a dev-dependency.
 
 ## Rules that bind it
 
@@ -118,7 +118,7 @@ Shape:
   and `DOCUMENT: u64 = 1_048_576`; the `skein_lib::Duration`s `DEADLINE`
   (30 s), `LOCK` (60 s), `LOCK_TRY` (100 ms), `WAIT` (300 s) and
   `WAIT_MOST` (3600 s). `client()` writes out `native`'s numbers, with
-  `rows: ROWS` and `document_bytes: DOCUMENT`; `tools()` reads from it, with
+  `rows: ROWS`, `text: TEXT` and `document_bytes: DOCUMENT` (tools.md, 12: a result's text, 32 KiB, is the client's); `tools()` reads from it, with
   `TEXT`, `PART`, `WAIT` and `WAIT_MOST`, into `jig::table::Limits`, defined
   here and re-exported as `jig::Limits`: all that argv, 03's runner and 04's digest read.
 - `jig::key::named` feeds the salt, a zero byte and the name to
@@ -132,6 +132,7 @@ and `sources()`, reading `src/jig.rs` and `src/jig/**` under
 fn each_ceiling_is_within_the_client_limit_it_reads_from() {
     let client = limits::client().client.domain;
     assert_eq!(limits::ROWS, client.rows, "a page's rows are the client's rows per window");
+    assert_eq!(limits::TEXT, client.text, "a result's text is the client's text");
     assert!(u64::from(limits::TEXT) <= client.document_bytes, "a result's text fits one document");
     assert!(limits::PART <= limits::TEXT && limits::PART <= client.turn_bytes, "a part fits the text and a turn");
     assert!(limits::WAIT <= limits::WAIT_MOST && limits::LOCK_TRY <= limits::LOCK, "each default within its most");
@@ -337,7 +338,7 @@ pub enum Occurs { Required, Optional, Repeated { most: u32 } } // `most` within 
 pub enum Keyed { Never, Optional, Required }
 pub enum Kind { Number, Count, Word { set: &'static [&'static [u8]] }, Text, File, Duration,
     Project, Turn, Proposal, Cursor, Digest, Group, Order, Condition, Subject, Tool }
-/// jig's part's bounds, `Copy`, from temper's `limits::tools()`.
+/// jig's part's bounds, `Copy`, from the host's preset.
 pub struct Limits { pub rows: u32, pub ask_bytes: u64, pub text: u32, pub part: u32,
     pub wait: Duration, pub wait_most: Duration }
 // crates/temper-client-tools/src/jig/call.rs
@@ -397,4 +398,4 @@ Each in `~/src/rust/temper`, after `git fetch`:
 - `test -z "$(git grep -h -o -E 'crate::[a-z_]+' origin/main -- crates/temper-client-tools/src/jig.rs crates/temper-client-tools/src/jig | grep -vx 'crate::jig')"`
 - `git show origin/main:crates/temper-client-tools/src/limits.rs | grep -c -E 'pub const (ROWS: u32 = 50|TEXT: u32 = 32_768|PART: u32 = 16_384|DOCUMENT: u64 = 1_048_576);' | grep -qx 4`
 - `git grep -q -F 'b"temper-tools"' origin/main -- crates/temper-client-tools/src`
-- `! for t in me inbox tasks task chat activity turn run message close adopt answer decide release stop cancel wait sign-in sign-out pending help; do git grep -q -F "b\"$t\"" origin/main -- crates/temper-client-tools/src/jig/rows.rs crates/temper-client-tools/src/adopt.rs || echo "missing $t"; done | grep -q missing`
+- `! for t in me inbox tasks task chat activity turn run message close adopt answer decide release stop cancel wait sign-in sign-out pending help; do git grep -q -F "name: b\"$t\"" origin/main -- crates/temper-client-tools/src/jig/rows.rs crates/temper-client-tools/src/adopt.rs || echo "missing $t"; done | grep -q missing`
