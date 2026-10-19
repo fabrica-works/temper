@@ -20,6 +20,8 @@ use skein_lib::{
 };
 use skein_shell::Host;
 use temper_client_tools::{jig::call::Parsed, root};
+mod input;
+mod sign_in;
 const TAG: u64 = 1 << 61;
 const FILES: u64 = 1 << 62;
 const ROOM: u32 = (limits::EXCHANGES + 1) * 128; // Two bounded socket bursts plus pipe and file completions.
@@ -60,6 +62,7 @@ pub struct OneShot {
     signals: Option<Token>,
     stdin: Option<Token>,
     input: Option<Vec<u8>>,
+    preparing: bool,
     complete: Queue<Complete>,
     submit: Queue<Submit>,
     raw: Queue<Submit>,
@@ -84,7 +87,7 @@ impl OneShot {
         let stdin = Some(io.adopt_read_pipe(startup.stdin).expect("stdin slot"));
         let signals = Some(io.adopt_signals(startup.signals).expect("signal slot"));
         let memory = io::worst_case(&limits.io).expect("io envelope")
-            + FileIo::worst_case(5, limits::LINK, 1, limits::LINK).expect("file envelope")
+            + FileIo::worst_case(5, u32::try_from(limits.root.tools.ask_bytes).expect("call bound"), 1, u32::try_from(limits.root.tools.ask_bytes).expect("call bound")).expect("file envelope")
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions") * 3
             + Queue::<io::Event>::worst_case(ROOM).expect("io events")
@@ -97,6 +100,7 @@ impl OneShot {
             + Queue::<root::Request>::worst_case(request_room).expect("root outputs")
             + Queue::<jig_client::Request>::worst_case(request_room).expect("ordered store writes")
             + u64::from(request_room) * u64::from(limits.connections.body_bytes) // Queued store records.
+            + limits.root.tools.ask_bytes * 256 // Input and the JSON parser's per-byte token/document scratch.
             + 8192; // Output lines and DIRECTORY's bounded path.
         let mut host = Self {
             directory: Directory::new(
@@ -124,6 +128,7 @@ impl OneShot {
             signals,
             stdin,
             input: None,
+            preparing: true,
             complete: Queue::with_capacity(ROOM),
             submit: Queue::with_capacity(ROOM),
             raw: Queue::with_capacity(ROOM),
@@ -132,11 +137,7 @@ impl OneShot {
             closed: false,
             memory,
         };
-        if matches!(host.call, Some(Parsed::File { .. })) {
-            host.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]");
-        } else if class == Class::Help {
-            host.finish(0, false);
-        }
+        host.prepare_start();
         Ok(host)
     }
     fn request(&mut self, request: io::Request) {
@@ -179,112 +180,6 @@ impl OneShot {
         root::step(&mut self.root, &self.root_env, root::Event::Client { event }, &mut self.requests);
     }
 
-    fn signing_start(&mut self) {
-        use temper_client_tools::jig::call::{Value, Values};
-        if self.class != Class::SignIn {
-            return;
-        }
-        if self.signing.is_none() && self.directory.ready() && self.input.is_none() {
-            if let Some(bytes) = self.directory.link.take() {
-                match Signing::new(
-                    &bytes,
-                    self.directory.parent(),
-                    self.directory.leaf(),
-                    self.startup,
-                    &mut self.submit,
-                ) {
-                    Ok(signing) => {
-                        self.directory.address = signing.address.as_ref().map(|a| a[..a.len() - 1].into());
-                        self.signing = Some(signing);
-                        self.until = Some(self.env.now.saturating_add(limits::DEADLINE));
-                    }
-                    Err(error) => self.fail(error),
-                }
-            } else if let Some(Parsed::Call { call, json }) = self.call.take() {
-                match call.values.first() {
-                    Some(Some(Values::One(Value::Stdin))) => {
-                        self.input = Some(Vec::new());
-                        self.read_input();
-                    }
-                    Some(Some(Values::One(Value::File(path)))) => self.directory.load_link(path),
-                    _ => {
-                        self.fail(b"a sign-in file is required");
-                        return;
-                    }
-                }
-                let Parsed::Call { call, .. } = arguments::parse(&[b"me"]).expect("me call") else { unreachable!() };
-                self.call = Some(Parsed::Call { call, json });
-            }
-        }
-        let Some(signing) = &mut self.signing else { return };
-        if signing.error {
-            self.fail(b"the sign-in files could not be read");
-            return;
-        }
-        if signing.with.is_some()
-            && let Some((_, records)) = signing.shell.as_mut().and_then(Shell::loaded)
-        {
-            let with = signing.with.take().expect("link secret");
-            let mut kept = skein_lib::List::with_capacity(u32::try_from(records.len()).expect("bounded records"));
-            for record in records {
-                kept.push(record).expect("record room");
-            }
-            self.root_event(jig_client::Event::Start { kept });
-            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
-        }
-    }
-    fn signing_keep(&mut self) {
-        if self.class != Class::SignIn {
-            return;
-        }
-        let Some(signing) = &mut self.signing else { return };
-        let Some(shell) = &mut signing.shell else { return };
-        if signing.credential == Credential::New
-            && let Some(credential) = self.root.client().link().credential
-        {
-            shell.keep(Some(credential.clone()));
-            signing.credential = Credential::Writing;
-            self.directory.store_address(self.env.now, signing.address.take().expect("parsed address"));
-        }
-        if let Some(kept) = shell.kept() {
-            if !kept {
-                self.fail(b"the sign-in token could not be kept");
-                return;
-            }
-            signing.credential = Credential::Kept;
-        }
-        if signing.credential == Credential::Kept
-            && self.directory.stored
-            && let Some(text) = signing.printed.take()
-        {
-            self.output.push(false, text);
-            self.finish(0, false);
-        }
-    }
-    fn read_input(&mut self) {
-        self.request(io::Request::Stream {
-            stream: self.stdin.expect("stdin"),
-            down: Down::Demand { read: Read::Arrived { max: limits::LINK + 1 }, room: 0 },
-        });
-    }
-    fn input_event(&mut self, up: Up) {
-        match up {
-            Up::Bytes(bytes) => {
-                let input = self.input.as_mut().expect("reading input");
-                if input.len() + bytes.len() > limits::LINK as usize {
-                    self.fail(b"the sign-in link is too large");
-                    return;
-                }
-                input.extend_from_slice(&bytes);
-                self.read_input();
-            }
-            Up::End => {
-                self.directory.link = self.input.take().map(Vec::into_boxed_slice);
-            }
-            Up::Failed(_) => self.fail(b"the sign-in link could not be read"),
-            Up::Room => unreachable!("stdin never writes"),
-        }
-    }
     fn local_start(&mut self) {
         if !matches!(self.class, Class::Pending | Class::SignOut) || !self.directory.ready() || self.recovery.loaded {
             return;
@@ -580,6 +475,61 @@ impl OneShot {
             self.fail(format!("the engine at {address} did not answer within 30 s").as_bytes());
         }
     }
+    fn events(&mut self, now: Time) {
+        while let Some(event) = self.told.pop() {
+            let owner = match &event {
+                io::Event::Connecting { owner, .. }
+                | io::Event::Connected { owner }
+                | io::Event::Stream { owner, .. }
+                | io::Event::Closed { owner }
+                | io::Event::Failed { owner, .. } => Some(*owner),
+                io::Event::Output { .. }
+                | io::Event::Listening { .. }
+                | io::Event::Accepted { .. }
+                | io::Event::Spawned { .. }
+                | io::Event::Exited { .. }
+                | io::Event::Usage { .. }
+                | io::Event::Resized
+                | io::Event::Window { .. }
+                | io::Event::Shutdown { .. } => None,
+            };
+            if owner.is_some_and(Memory::owns) {
+                self.transport.as_mut().expect("memory socket").event(now, event);
+                continue;
+            }
+            match event {
+                io::Event::Shutdown { signal } => self.finish(
+                    match signal {
+                        ServiceSignal::Interrupt => limits::INTERRUPTED,
+                        ServiceSignal::Terminate => limits::TERMINATED,
+                    },
+                    true,
+                ),
+                io::Event::Stream { owner, up } => {
+                    if Some(owner) == self.stdin && self.input.is_some() {
+                        self.input_event(up);
+                        continue;
+                    }
+                    if !self.closed
+                        && let Some(request) = self.output.event(owner, &up)
+                    {
+                        self.request(request);
+                    }
+                }
+                io::Event::Closed { .. } | io::Event::Resized => {}
+                io::Event::Failed { .. } => self.fail(b"output failed"),
+                io::Event::Output { .. }
+                | io::Event::Listening { .. }
+                | io::Event::Accepted { .. }
+                | io::Event::Connecting { .. }
+                | io::Event::Connected { .. }
+                | io::Event::Spawned { .. }
+                | io::Event::Exited { .. }
+                | io::Event::Usage { .. }
+                | io::Event::Window { .. } => panic!("host owns only pipes and signals"),
+            }
+        }
+    }
     fn complete(&mut self, mut complete: Complete) {
         if complete.op.raw() & (TAG | FILES) == 0 {
             self.signing.as_mut().expect("native completion").complete(complete);
@@ -637,64 +587,17 @@ impl Host for OneShot {
         {
             io::fire(&mut self.io, &self.env, &mut self.told, &mut self.raw);
         }
-        while let Some(event) = self.told.pop() {
-            let owner = match &event {
-                io::Event::Connecting { owner, .. }
-                | io::Event::Connected { owner }
-                | io::Event::Stream { owner, .. }
-                | io::Event::Closed { owner }
-                | io::Event::Failed { owner, .. } => Some(*owner),
-                io::Event::Output { .. }
-                | io::Event::Listening { .. }
-                | io::Event::Accepted { .. }
-                | io::Event::Spawned { .. }
-                | io::Event::Exited { .. }
-                | io::Event::Usage { .. }
-                | io::Event::Resized
-                | io::Event::Window { .. }
-                | io::Event::Shutdown { .. } => None,
-            };
-            if owner.is_some_and(Memory::owns) {
-                self.transport.as_mut().expect("memory socket").event(now, event);
-                continue;
-            }
-            match event {
-                io::Event::Shutdown { signal } => self.finish(
-                    match signal {
-                        ServiceSignal::Interrupt => limits::INTERRUPTED,
-                        ServiceSignal::Terminate => limits::TERMINATED,
-                    },
-                    true,
-                ),
-                io::Event::Stream { owner, up } => {
-                    if Some(owner) == self.stdin && self.input.is_some() {
-                        self.input_event(up);
-                        continue;
-                    }
-                    if !self.closed
-                        && let Some(request) = self.output.event(owner, &up)
-                    {
-                        self.request(request);
-                    }
-                }
-                io::Event::Closed { .. } | io::Event::Resized => {}
-                io::Event::Failed { .. } => self.fail(b"output failed"),
-                io::Event::Output { .. }
-                | io::Event::Listening { .. }
-                | io::Event::Accepted { .. }
-                | io::Event::Connecting { .. }
-                | io::Event::Connected { .. }
-                | io::Event::Spawned { .. }
-                | io::Event::Exited { .. }
-                | io::Event::Usage { .. }
-                | io::Event::Window { .. } => panic!("host owns only pipes and signals"),
-            }
+        self.events(now);
+        self.prepare_progress();
+        if !self.preparing || self.status.is_some() {
+            self.directory.progress(now);
         }
-        self.directory.progress(now);
         if let Some(error) = self.directory.error.take() {
             self.fail(&error);
         }
-        self.link_progress(now, wall);
+        if !self.preparing || self.status.is_some() {
+            self.link_progress(now, wall);
+        }
         if let Some(transport) = &mut self.transport {
             for request in transport.progress(now) {
                 self.request(request);
@@ -725,7 +628,8 @@ impl Host for OneShot {
             || !self.submit.is_empty()
             || self.io.is_ready()
             || self.io.is_due(now)
-            || self.directory.pending(now)
+            || self.preparation_pending(now)
+            || (!self.preparing || self.status.is_some()) && self.directory.pending(now)
             || self.transport.as_ref().is_some_and(Memory::pending)
             || self.signing.as_ref().and_then(|s| s.shell.as_ref()).is_some_and(|s| s.work_pending(now))
             || self.status.is_none()
@@ -747,7 +651,10 @@ impl Host for OneShot {
         .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        self.directory.retry()
+        [self.directory.retry(), self.until, self.status.is_none().then(|| root::next_deadline(&self.root)).flatten()]
+            .into_iter()
+            .flatten()
+            .min()
     }
     fn is_empty(&self) -> bool {
         self.status.is_some()

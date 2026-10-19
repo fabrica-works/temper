@@ -17,6 +17,7 @@ macro_rules! encode {
 }
 pub mod local;
 mod recovery;
+pub mod waits;
 pub use recovery::{dropped, kept_chat, other_party, small_store};
 pub const LINK: &[u8] = b"http://127.0.0.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const LINK_FILE: Fd = Fd::new(23);
@@ -53,6 +54,8 @@ pub struct Frame {
     requests: Vec<Box<[u8]>>,
     deliver: Option<()>,
     watch: Option<u64>,
+    wait_task: Option<u64>,
+    stopping: Option<()>,
     stream: Option<Fd>,
     stdout: Vec<u8>,
     next_socket: i32,
@@ -113,6 +116,8 @@ impl Frame {
             requests: Vec::new(),
             deliver: None,
             watch: None,
+            wait_task: None,
+            stopping: None,
             stream: None,
             stdout: Vec::new(),
             next_socket: 100,
@@ -207,7 +212,7 @@ impl Frame {
         for _ in 0..2000 {
             for mut submit in std::mem::take(&mut self.held) {
                 if matches!(submit.kind, Op::Sync { .. }) && self.hold_stores.is_none()
-                    || matches!(&submit.kind, Op::Recv { fd, .. } if self.sockets.get(fd).is_some_and(|s| !s.reply.is_empty()))
+                    || matches!(&submit.kind, Op::Recv { fd, .. } if self.sockets.get(fd).is_some_and(|s| !s.reply.is_empty() || s.eof.is_some()))
                 {
                     let result = self.answer(&mut submit.kind);
                     self.host.completions().push(Complete { op: submit.op, kind: submit.kind, result });
@@ -227,7 +232,7 @@ impl Frame {
                     continue;
                 }
                 if let Op::Recv { fd, .. } = &submit.kind
-                    && self.sockets.get(fd).is_some_and(|s| s.reply.is_empty())
+                    && self.sockets.get(fd).is_some_and(|s| s.reply.is_empty() && s.eof.is_none())
                 {
                     self.held.push(submit);
                     continue;
@@ -279,7 +284,7 @@ impl Frame {
             self.names.insert(path.into(), fd);
             return Ok(Done::Fd(fd));
         }
-        if path == b"link-file" || path == b"link" {
+        if path == b"call.json" || path == b"link-file" || path == b"link" {
             self.link_root = Some(root);
             self.link_leaf = Some(path.into());
             return Ok(Done::Fd(LINK_FILE));
@@ -410,6 +415,7 @@ struct Socket {
     request: Vec<u8>,
     reply: VecDeque<u8>,
     answered: bool,
+    eof: Option<()>,
 }
 pub type Engine = Frame;
 pub type Disk = Frame;
@@ -430,6 +436,9 @@ impl Frame {
         }
         let path = head.split_whitespace().nth(1).expect("request path").as_bytes().to_vec();
         self.requests.push(path.clone().into_boxed_slice());
+        if self.stopping.is_some() {
+            return;
+        }
         socket.answered = true;
         match path.as_slice() {
             b"/jig/v1/sign-in/link" => {
@@ -458,7 +467,13 @@ impl Frame {
             b"/jig/v1/watch" => {
                 let open = w::Open::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&socket.request[end + 4..]))
                     .expect("watch record");
-                self.watch = Some(open.watch());
+                let subject = w::Subject::decode(&w::CEILINGS, &mut skein_lib::Reader::new(open.subject().record()))
+                    .expect("watch subject");
+                if subject == w::Subject::Me {
+                    self.watch = Some(open.watch());
+                } else {
+                    self.wait_task = Some(open.watch());
+                }
                 let answer = w::OpenAnswer::Admitted;
                 let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
                 answer.encode(&mut writer).expect("answer fits");
@@ -466,7 +481,11 @@ impl Frame {
                 socket.reply.extend(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).bytes());
                 socket.reply.extend(body.iter().copied());
                 if self.deliver.is_some() {
-                    self.deliver_me();
+                    if subject == w::Subject::Me {
+                        self.deliver_me();
+                    } else {
+                        self.deliver_task(false);
+                    }
                 }
             }
             b"/jig/v1/request" => {

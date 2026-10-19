@@ -423,3 +423,139 @@ fn adopt_is_an_act() {
     assert_eq!(f.locks, 1);
     assert_eq!(f.exit(), Some(Exit::Code(1)));
 }
+
+#[test]
+fn a_stopping_engine_exits_the_wait_only_at_the_link_deadline() {
+    for (span, expected) in [(fixtures::waits::BEFORE_DEADLINE, None), (limits::DEADLINE, Some(Exit::Code(1)))] {
+        let mut f = fixtures::Engine::wait(&["wait", "task", "41"]);
+        f.engine_stopping();
+        f.advance_past(span);
+        assert_eq!(f.exit(), expected, "{span:?}");
+        assert_eq!(
+            f.stderr(),
+            if expected.is_some() {
+                b"temper ctl: the engine at http://127.0.0.1:4000 did not answer within 30 s\n".as_slice()
+            } else {
+                b""
+            },
+            "{span:?}"
+        );
+    }
+}
+#[test]
+fn a_live_wait_passes_30_seconds() {
+    let mut f = fixtures::Engine::wait(&["wait", "task", "41"]);
+    f.advance_live(fixtures::waits::LONG_LIVE);
+    assert_eq!(f.exit(), None);
+}
+#[test]
+fn a_wait_timeout_exits_3() {
+    let mut f = fixtures::Engine::wait(&["wait", "task", "41"]);
+    f.advance_live(temper_client_tools::limits::WAIT);
+    assert_eq!(f.exit(), Some(Exit::Code(3)));
+    assert_eq!(f.stderr(), b"");
+    assert!(f.stdout().ends_with(b"not met: timeout\n"));
+}
+#[test]
+fn a_changed_wait_exits_0() {
+    let mut f = fixtures::Engine::wait(&["wait", "task", "41"]);
+    f.change_task();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn a_refused_wait_exits_2() {
+    let mut f = fixtures::Engine::wait(&["wait", "task", "41"]);
+    f.refuse_wait();
+    assert_eq!(f.exit(), Some(Exit::Code(2)));
+}
+#[test]
+fn help_opens_nothing() {
+    for words in [&[b"help".as_slice()][..], &[b"help".as_slice(), b"wait"], &[b"help".as_slice(), b"wait", b"--json"]]
+    {
+        let mut f = fixtures::Frame::act(words);
+        f.drain();
+        assert_eq!(f.exit(), Some(Exit::Code(0)), "{words:?}");
+        assert!(f.no_directory(), "{words:?}");
+        let parsed = crate::arguments::parse(words).expect("help call");
+        let temper_client_tools::jig::call::Parsed::Call { call, json } = parsed else { unreachable!() };
+        let selected = call.values.iter().find_map(|v| match v {
+            Some(temper_client_tools::jig::call::Values::One(temper_client_tools::jig::call::Value::Tool(n))) => {
+                Some(*n)
+            }
+            _ => None,
+        });
+        let expected = if let Some(n) = selected.filter(|_| json) {
+            temper_client_tools::jig::json::write_tool(temper_client_tools::table::TOOLS[usize::from(n)])
+                .expect("JSON help")
+        } else {
+            let mut out = skein_lib::Writer::new(temper_client_tools::limits::TEXT as usize);
+            temper_client_tools::help::text(selected, &mut out).expect("help");
+            let mut exact = skein_lib::Writer::new(out.written());
+            temper_client_tools::help::text(selected, &mut exact).expect("measured help");
+            exact.finish()
+        };
+        assert_eq!(f.stdout(), expected.as_ref(), "{words:?}");
+    }
+}
+#[test]
+fn call_stdin_cannot_also_give_text() {
+    let mut f = fixtures::Frame::read(&["--call", "-"]);
+    f.input = br#"{"tool":"chat","arguments":{"project":"shop","text":"-","key":"start-chat"}}"#;
+    f.drain();
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert!(f.no_directory());
+}
+#[test]
+fn usage_exits_1_before_directory_opens() {
+    let mut f = fixtures::Frame::read(&["--call", "-"]);
+    f.input = br#"{"tool":"unknown","arguments":{}}"#;
+    f.drain();
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stderr(), b"temper ctl: usage: temper ctl DIRECTORY TOOL [ARGUMENT...]\n");
+    assert!(f.no_directory());
+}
+#[test]
+fn a_json_call_reads_its_file_beneath_the_file_root() {
+    let mut f = fixtures::Frame::read(&["--call", "/elsewhere/call.json"]);
+    f.link = br#"{"tool":"me","arguments":{}}"#;
+    f.sign_in_then_deliver_me();
+    assert_eq!(f.link_root, Some(fixtures::FILE_PARENT));
+    assert_eq!(f.link_leaf.as_deref(), Some(b"call.json".as_slice()));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+#[test]
+fn text_dash_reads_stdin() {
+    let mut f = fixtures::Frame::act_words_with(
+        &[b"chat", b"-", b"--project", b"shop", b"--key", b"start-chat"],
+        fixtures::small_store(&[]),
+    );
+    f.input = b"hello";
+    f.answer_new_act();
+    f.store_erase();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert_eq!(f.stdout(), b"done: task 41, chat\n");
+}
+
+#[test]
+fn a_wait_exposes_its_root_policy_deadline() {
+    use skein_shell::Host;
+    let f = fixtures::Engine::wait(&["wait", "task", "41"]);
+    let expected = temper_client_tools::root::next_deadline(&f.host.root).expect("live wait has a deadline");
+    assert_eq!(f.host.next_policy_deadline(), Some(expected));
+}
+#[test]
+fn a_json_call_reads_stdin() {
+    let mut f = fixtures::Frame::read(&["--call", "-"]);
+    f.input = br#"{"tool":"me","arguments":{}}"#;
+    f.sign_in_then_deliver_me();
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    assert!(!f.opened(b"call.json"));
+    assert!(!f.stdout().is_empty());
+}
+
+#[test]
+fn a_file_call_advertises_its_initial_work() {
+    use skein_shell::Host;
+    let f = fixtures::Frame::read(&["--call", "/elsewhere/call.json"]);
+    assert!(f.host.work_pending(skein_lib::Time::ZERO));
+}

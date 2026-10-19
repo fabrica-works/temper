@@ -35,6 +35,7 @@ pub(crate) struct Directory {
     retry: Option<Time>,
     closing: bool,
     link_path: Option<Box<[u8]>>,
+    link_max: u32,
     pub(crate) link: Option<Box<[u8]>>,
     pub(crate) stored: bool,
     pub(crate) engine: Option<Addr>,
@@ -53,7 +54,13 @@ impl Directory {
         user: u32,
         seed: u64,
     ) -> Self {
-        let mut io = FileIo::new(5, limits::LINK, 1, Duration::from_secs(30)).with_effective_user(user);
+        let mut io = FileIo::new(
+            5,
+            u32::try_from(limits::native().root.tools.ask_bytes).expect("call bound"),
+            1,
+            Duration::from_secs(30),
+        )
+        .with_effective_user(user);
         io.seed_randomness(seed);
         let root = parent.map(|fd| io.adopt_root(fd).expect("parent slot"));
         let file_root = file_parent.map(|fd| io.adopt_root(fd).expect("file parent slot"));
@@ -70,6 +77,7 @@ impl Directory {
             retry: None,
             closing: false,
             link_path: None,
+            link_max: limits::LINK,
             link: None,
             stored: false,
             engine: None,
@@ -244,7 +252,7 @@ impl Directory {
                 owner: OWNER,
                 root: self.file_root.expect("FILE's parent"),
                 path: self.link_path.take().expect("link file"),
-                max: limits::LINK,
+                max: self.link_max,
                 no_follow: true,
             },
             Stage::Address | Stage::Token => {
@@ -274,11 +282,20 @@ impl Directory {
     pub(crate) fn leaf(&self) -> Box<[u8]> {
         self.leaf.clone()
     }
+    pub(crate) fn start(&mut self, class: Class) {
+        self.class = class;
+        self.stage = Stage::Start;
+    }
+    pub(crate) fn load_call(&mut self, path: &[u8]) {
+        self.load_link(path);
+        self.link_max = u32::try_from(limits::native().root.tools.ask_bytes).expect("call bound");
+    }
     pub(crate) fn load_link(&mut self, path: &[u8]) {
         if self.file_root.is_none() {
             self.fail(b"DIRECTORY could not be read: link file has no parent");
             return;
         }
+        self.link_max = limits::LINK;
         let start = path.iter().rposition(|byte| *byte == b'/').map_or(0, |at| at + 1);
         self.link_path = Some(path[start..].into());
         self.stage = Stage::Link;

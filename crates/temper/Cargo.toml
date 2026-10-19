@@ -11,6 +11,8 @@ name = "temper"
 path = "src/main.rs"
 
 [dependencies]
+temper-client-shell-cli.workspace = true
+temper-client-tools.workspace = true
 skein-forge.workspace = true
 jig-client-protocol-link.workspace = true
 temper-service.workspace = true

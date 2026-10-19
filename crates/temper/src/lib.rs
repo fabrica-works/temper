@@ -16,13 +16,14 @@ use temper_service::{
 };
 
 pub mod box_command;
+pub mod ctl;
 pub mod forge;
 mod host;
 pub mod open;
 mod setup;
 pub mod sign_in;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json";
+pub const USAGE: &str = "usage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -31,6 +32,7 @@ pub enum Command {
     Box { configuration: PathBuf },
     Agent { configuration: PathBuf },
     Open { arguments: Vec<OsString> },
+    Ctl { arguments: Vec<OsString> },
     SignIn { arguments: Vec<OsString> },
     Forge { arguments: Vec<OsString> },
 }
@@ -49,6 +51,9 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
     let command = args.next().ok_or_else(usage)?;
     if command == "forge" {
         return Ok(Command::Forge { arguments: args.collect() });
+    }
+    if command == "ctl" {
+        return Ok(Command::Ctl { arguments: args.collect() });
     }
     if command == "open" {
         return Ok(Command::Open { arguments: args.collect() });
@@ -79,6 +84,7 @@ pub fn run(command: Command) -> Result<u8, String> {
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))
             .map_err(|why| prefixed("temper agent", &why))?,
         Command::Forge { arguments } => return Ok(forge::run(&arguments)),
+        Command::Ctl { arguments } => return Ok(ctl::run(&arguments, &Clock::new())),
         Command::Open { arguments } => return Ok(open::run(&arguments, &Clock::new())),
         Command::SignIn { arguments } => return Ok(sign_in::run(&arguments, &Clock::new())),
     };

@@ -4,14 +4,14 @@ use super::configure;
 fn serve_without_a_configuration_path_is_a_usage_error() {
     assert_eq!(
         configure(["serve".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
     );
 }
 #[test]
 fn an_unknown_command_prints_the_usage_line() {
     assert_eq!(
         configure(["unknown".into(), "config.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into())
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into())
     );
 }
 
@@ -140,12 +140,12 @@ fn box_with_one_path_is_the_box_command() {
 #[test]
 fn box_without_a_path_prints_the_usage() {
     assert_eq!(configure(["box".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into()));
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
 }
 #[test]
 fn box_with_two_paths_prints_the_usage() {
     assert_eq!(configure(["box".into(), "one.json".into(), "two.json".into()].into_iter()),
-        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json\n".into()));
+        Err("temper: invalid arguments\nusage: temper serve CONFIG.json | temper agent AGENT.json | temper open DIRECTORY LINK_OR_ADDRESS | temper sign-in CONFIG.json ACCOUNT | temper forge prepare CONFIG.json FORGE | temper forge run CONFIG.json FORGE forgejo|runner | temper forge reconcile CONFIG.json FORGE | temper box CONFIG.json | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]\n".into()));
 }
 
 #[test]
@@ -193,5 +193,13 @@ fn assert_no_descriptors_in(directory: &std::path::Path) {
         if let Ok(target) = std::fs::read_link(&path) {
             assert!(!target.starts_with(directory), "descriptor {path:?} still holds {target:?}");
         }
+    }
+}
+
+#[test]
+fn ctl_is_configured() {
+    for arguments in [vec!["help".into()], vec!["directory".into(), "me".into()]] {
+        let words = std::iter::once("ctl".into()).chain(arguments.clone());
+        assert_eq!(configure(words), Ok(super::Command::Ctl { arguments }));
     }
 }
