@@ -590,6 +590,30 @@ where its answer lands.
 
      Instructions: coordinator passes the lifting graph instruction to running implementers, retaining worktree source verification and source fallbacks. Hourly-02 contract findings and unfinished process/downstream results remain under their bounded follow-ups, not waived.
 
+125. **Keep only the setup decoder's used result fields** (ready check of skein-07.1).
+     Reverses: nothing.
+     Amends: skein/07-worlds.md, 07.3 Shape.
+
+     ## Decision
+
+     The private setup world's decoder result carries only the fields its exchange reads: `rows` and `document`. In skein 07.3 omit `Decoded.steps` from `tests/forge/setup/src/decode.rs`, discard the tokenizer driver's returned count, and preserve its execution bound and all decoder outcomes. The original `tests/codecs/src/forgejo.rs::Decoded.steps` and its fuzzy bound assertion stay in temper. No test case or moved test name changes.
+
+     The ready-check prototype's `#[expect(dead_code)]` is not adopted: development.md 14.3's Weight requires “no lint exception in tests.” Do not add a setup assertion merely to read the field. Refresh any further private copy reached by this move and list it in the commit body; retain counters that an actual assertion consumes.
+
+     The static ready check found no other mismatch across 07.1–07.4. Its compiler/test tasks never started before the timebox; no executable proof is claimed. The increment's clippy and focused/fuzzy proofs remain required.
+
+     ## Checked
+
+     - Graph: `search_graph(project=srv-data-git-runner-src-temper, file_pattern=tests/codecs/src/forgejo.rs, name_pattern=Decoded|decode_answer)` found Decoded62–66 and decode_answer74–94; verified in the primary source.
+     - `sed -n '62,94p' temper/tests/codecs/src/forgejo.rs`: Decoded has rows/document/steps; decode_answer stores drive's usize count. The driver is bounded and has no must_use annotation.
+     - `sed -n '166,184p' temper/tests/forge-setup/reconcile/src/exchange.rs`: decode_answer's result reads document and rows only. `rg -n '\.steps\b' temper/tests/forge-setup/reconcile temper/tests/codecs` finds only tests/codecs/tests/fuzzy_forgejo.rs:15, outside this move.
+     - Ready report pump/ready-skein-07.md checked skein283a7ec9144a4db7ffed00aedeaf0871cde12aca and temperab7ef9b9403f4f7041f6c678c8ea7e483dbbbece, all four increments and downstream consumers; tasks813/817/820/821 were cancelled while queued, with no targets created.
+     - Pinned kit/scripts/dev/plan declares ruling at line30 and ready at31; kit remains d6d4abe with the director adapter.
+
+     ## Instructions
+
+     Mark skein-07.1 ready with those checked commits. Implement the revised private result in 07.3 and run its existing proofs; its capability dependencies and the coordinator's landing checks still apply.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions

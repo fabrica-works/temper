@@ -215,8 +215,12 @@ Shape: keep `World::{managed,owned,reconcile,missing_org,listening,put,
   call its `fixtures::fake_limits`. lib.rs declares private `decode`;
   exchange.rs calls `crate::decode::decode_answer`. decode.rs imports
   `skein_json::tokenizer`, skein-lib and `skein_forge::forgejo`.
-  `Decoded`, `decode_answer` and the tokenizer driver retain their
-  fields and signatures; they are plain moves, with skein-forge imports.
+  `decode_answer` and the tokenizer driver retain their signatures and
+  bounded execution. The private `Decoded` copy keeps `rows` and `document`;
+  omit its unread `steps` field and discard the driver's returned count.
+  The source codecs world's `Decoded.steps` and its fuzzy bound assertion
+  stay in temper. Add no lint exception or setup assertion for the omitted
+  field. Other helpers are plain moves, with skein-forge imports.
 Test shape: 21 focused + 1 fuzzy at the base, every name retained.
   Reuse `fixtures::{config,random,bot_tokens,assert_bot,assert_org,
   assert_other_hooks,write_routes,file_writes}`, `exchange::send` and
