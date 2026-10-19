@@ -21,7 +21,7 @@ pub(crate) struct Engine {
     pub(crate) first_periods: List<(u32, u64)>,
     pub(crate) drain: Option<stop::Drain>,
     pub(crate) blocked: bool,
-    pending: Option<Box<root::Event>>,
+    pub(crate) pending: Option<Box<root::Event>>,
     begin: bool,
     pub(crate) credentials: List<u32>,
     ready: bool,
@@ -257,7 +257,7 @@ fn release(engine: &mut Engine) {
             break;
         }
         root::release(&mut engine.domain, &engine.env, &mut engine.requests);
-        if engine.requests.is_empty() && !engine.blocked {
+        if engine.requests.is_empty() {
             root::try_step(&mut engine.domain, &engine.env, root::Event::Resume).expect("owner continuation admitted");
             engine.drain_facts();
             root::release(&mut engine.domain, &engine.env, &mut engine.requests);

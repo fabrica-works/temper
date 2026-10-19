@@ -695,7 +695,7 @@ pub fn settle_root(
     }
     panic!("chat settled");
 }
-pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
+pub fn signed_worker() -> crate::Service {
     use temper_engine_domain as root;
     let mut service = ready();
     service.engine.step(root::Event::Worker(root::WorkerInput::Link {
@@ -728,6 +728,11 @@ pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
         },
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
+    service
+}
+pub fn claimed_chat() -> (crate::Service, temper_engine_domain::Assignment) {
+    use temper_engine_domain as root;
+    let mut service = signed_worker();
     service.engine.step(root::Event::Party(root::PartyInput::Ask {
         reply_to: skein_lib::ReplyTo::new(Token::new(101)),
         sign_in: 1,

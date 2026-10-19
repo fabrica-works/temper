@@ -163,3 +163,54 @@ fn an_io_listener_failure_stops_the_engine() {
     fixtures::turn(&mut service);
     assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Listener)));
 }
+
+// Both note scopes and their store replies must fit before the held input is retried.
+const OWNER_PASSES: u32 = 16;
+const WATCHER: skein_lib::Token = skein_lib::Token::new(17);
+// A notes page leaves its Core::Notes::Loaded continuation for the next Resume.
+fn a_notes_page_waiting_for_its_owner() -> crate::Service {
+    use skein_lib::{Queue, ReplyTo, Token, Wall};
+    let mut service = fixtures::signed_worker();
+    service.engine.step(root::Event::Party(root::PartyInput::Watch {
+        watcher: WATCHER,
+        sign_in: 1,
+        subject: jig_domain_core::documents::Watched::Frame,
+        window: jig_domain_core::documents::Window { rows: 1, after: None },
+    }));
+    fixtures::settle_root(&mut service, &mut Queue::with_capacity(32));
+    service.engine.step(root::Event::Party(root::PartyInput::Delivered { watcher: WATCHER }));
+    fixtures::settle_root(&mut service, &mut Queue::with_capacity(32));
+    service.engine.step(root::Event::Party(root::PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(101)),
+        sign_in: 1,
+        key: [31; 16],
+        ask: fixtures::chat(1, b"question"),
+    }));
+    // Startup is settled; the created task's preparation now reads its notes.
+    for _ in 0..OWNER_PASSES {
+        crate::engine::iterate(&mut service.engine, Time::from_nanos(1), Wall::from_nanos(1));
+        if let Some(jig_protocol_store::Event::Loaded { .. }) = service.engine.store.above.iter().next() {
+            let event = service.engine.store.above.pop().expect("notes page");
+            crate::store::route::up(&mut service.engine.store.routes, event, &mut service.engine.store.routed);
+            let Some(crate::store::route::Up::Root(event)) = service.engine.store.routed.pop() else {
+                panic!("notes page routed to the root")
+            };
+            service.engine.step(*event);
+            return service;
+        }
+    }
+    panic!("task preparation asks for notes");
+}
+
+#[test]
+fn an_unwatch_refused_behind_owner_work_is_admitted() {
+    use skein_lib::Wall;
+    let mut service = a_notes_page_waiting_for_its_owner();
+    let engine = &mut service.engine;
+    engine.step(root::Event::Party(root::PartyInput::Unwatch { watcher: WATCHER }));
+    let refused = engine.blocked && engine.pending.is_some();
+    for _ in 0..OWNER_PASSES {
+        crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
+    }
+    assert_eq!((refused, engine.pending.is_none(), engine.blocked), (true, true, false));
+}
