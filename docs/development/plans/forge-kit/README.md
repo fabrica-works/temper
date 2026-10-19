@@ -112,6 +112,8 @@ chain.
 
 ## Rules of this plan
 
+- **Graph refresh, hourly-02:** do not use the code graph for skein or temper; search with `rg` until the supervisor has refreshed their primary indexes and lifted this rule.
+
 - **The hourly test supplement:** new tests follow testing-strategy.md 10.
   Only `skein/01.s1-test-shapes.md` may split its five named preserved tests,
   after the source moves; it retains every assertion case with an old/new

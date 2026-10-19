@@ -548,6 +548,16 @@ where its answer lands.
 
      Instructions: mark skein-03.1 ready after this ruling, retaining its checked commits; normal prerequisites still govern its start. Future declarations are required implementation work, with complete worst-case and relative test-count proofs. The kit's plan ready/ruling/ring dispatch is present.
 
+121. **Refresh hourly graph indexes** (hourly check of 2026-10-19T07:15:01Z).
+     Reverses: ruling 113 of 2026-10-19T06:26:42Z only as to permission to use stale graph indexes; its primary-project identity and worktree verification rules stand.
+     Amends: README Rules of this plan, temporary hourly-02 graph restriction.
+
+     Both primary indexes are older than origin/main. Until refreshed, do not use the code graph for skein or temper; search with rg. This follows development.md 14.1 step 2. The supervisor refreshes the primary checkout indexes and lands the lifting rule after checking the result. Worktree source remains authoritative; empty/stale graphs prove no absence.
+
+     Checked: index_status reports srv-data-git-runner-src-skein at /srv/data/git/runner/src/skein indexed 2026-10-19T06:22:53Z and srv-data-git-runner-src-temper at /srv/data/git/runner/src/temper indexed 2026-10-19T06:25:11Z. git log -1 origin/main reports skein 283a7ec9144a4db7ffed00aedeaf0871cde12aca at 07:06:15Z and temper ab7ef9b9403f4f7041f6c678c8ea7e483dbbbece at 07:06:22Z, both later. The known hostile JSON parse gaps remain source-search cases. Kit plan ruling/ring dispatch is present; no kit move is authorized.
+
+     Instructions: coordinator passes the README restriction word for word to all running implementers; new sessions read it there. Continue implementation using source searches. The supervisor's refresh does not hold a ready/start check or any session.
+
 ## For the user
 
 - 1: the fakes, the conformance and the worlds take five sessions
