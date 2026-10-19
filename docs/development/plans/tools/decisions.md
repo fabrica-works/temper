@@ -463,3 +463,14 @@ and the user, or the director, may veto it before the run:
   three runs each on debian-16gb-hel1-1. A run on another machine
   measures new base times first.
   Decision: accepted, by director, 2026-10-19. The run goes on debian-16gb-hel1-1.
+- **J. The order of `tasks` without `--order`** (question.md in the run's
+  directory, from temper 02.1's ready check; no designer is joined to
+  answer it): tools.md, 5.2, gives `tasks … [--ended] [--order
+  activity|priority]` and no default, and jig's task query has no
+  unordered form (`TaskQuery.order` is a `QueryOrder`: `Number`,
+  `Changed`, `Activity`, `Priority` or `Ended`). Default: without
+  `--order`, `tasks` reads by number, ascending (`QueryOrder::Number`),
+  `--ended` changes no order, and the tools never send `Changed` or
+  `Ended`. Or: a designer joins the run (`plan join designer`, in a
+  design session) and answers question.md. temper 02.2 waits on it;
+  02.1 goes on.
