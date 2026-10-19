@@ -78,7 +78,9 @@ A pending proposal retains the span, including across restart. Five increments, 
   `crates/temper-protocol-store/src/records/{application,application/refusal}.rs` and `src/tests/records.rs` move to people_v4.
   These are the repin's inputs, not work assigned here; neither a tools-local clock adapter nor a changed template is needed.
 - **Other jig users:** the reference UI's `page/{conversations,project/goals}.rs` and `sections/project/goals.rs`, the protocol world's
-  `src/client/shapes.rs` and `tests/{client.rs,client/goals.rs}`, and jig-client's shape tests pass the wall today.
+  `src/client/shapes.rs` and `tests/{client.rs,client/goals.rs}`, the client world's
+  `src/{stories,stories/goals,harness/referee/offers}.rs`, the ops world's `src/client/stories.rs` and
+  `tests/client_stories/creating.rs`, and jig-client's shape tests call `shapes::{chat,set_goal,fall}` today.
   `examples/ops` and `testing/` have no direct call of these two shapes; the testing service constructs people::Member,
   and the scripted client engine owns typed NewTask payloads/admission. Those carriers and the typed joint adapter follow.
 - **Judgments use working copies.** 05.3 threads the step's `Env.wall` through each span-judging function, including
@@ -105,7 +107,8 @@ Scope: move the two affected store-family versions before changing their fields;
 Needs: nothing beyond the session's start.
 Files: `crates/jig-protocol-store/schema/{people,tasks}-v3.schema` renamed to v4; corresponding `src/generated/`
 modules and `golden/{people,tasks}/v4/`; `src/{lib,format,codec,sizes}.rs`, `src/codec/{core,people,tasks}.rs` and their
-child modules' imports; `src/tests/{open,codec}.rs` and codec submodules; `tests/store-codecs/tests/{drift,memory,fuzzy_decode}.rs`.
+child modules' imports; `src/tests/{format,commits,open,codec}.rs` and codec submodules;
+`tests/store-codecs/tests/{drift,memory,fuzzy_decode}.rs`.
 Shape: change each family declaration to 4 and `format::current` to `tasks: 4, people: 4`. Update every active
 people_v3/tasks_v3 import and golden reader, including core's embedded-task codec limits. Core remains 3, notes/component 1.
 Bootstrap generated filenames from the old generated modules, then run
@@ -114,6 +117,12 @@ Old generated modules/current golden readers go; no record fields change yet. No
 Test shape: existing codec/drift tests; `src/tests/open.rs` reuses `planted`, `version_put`, `assert_refusal` for
 `a_store_of_another_tasks_version_refuses_naming_tasks` (found 3, wanted 4), plus the equivalent people test.
 Extend the fixture's format construction for people without duplicating it. Existing old-row codec checks use v3 bytes.
+The version cases follow: `format.rs`'s `a_format_row_of_another_tasks_version_is_refused_naming_tasks` and `open.rs`'s
+`a_store_of_another_tasks_version_refuses_naming_tasks` want 4; `another_family_is_refused_naming_the_first_difference`'s
+people case finds 5, wanted 4, with an arm per family (clippy denies `wildcard_enum_match_arm`); `commits.rs`'s
+`a_first_commit_puts_the_format_row_with_its_header` expects `tasks: 4, people: 4`; `codec.rs`'s
+`a_people_row_of_another_version_does_not_decode` writes version 5. `memory.rs` and `fuzzy_decode.rs` say core is 3 and
+tasks and people 4.
 Proof: joint, `heavy cargo nextest run -p jig-client-protocol-world --test client -E 'test(=the_engine_restarting_under_a_pending_stop_answers_it_once)'`;
 the real engine/store reopens its new family tuple and answers the retained request once, under 0.5 s.
 Don't: move the client wire, core/store component version or pins; change schema fields; retain a migration reader.
@@ -135,7 +144,9 @@ Files: `crates/jig-client-domain/src/contract/{operations,documents}.rs`; `crate
 `crates/jig-protocol-store/src/codec/{people/batch,tasks/phase}.rs`.
 Also `testing/jig-client-scripted-engine/src/{payload,payload/operations}.rs`, `tests/client/src/joint/wire/asks/create.rs`
 and proposal/history adapters; all constructors in the surveyed unit/world fixtures, notably `testing/jig-test-service/src/tests/fixtures.rs`,
-`tests/{core,people,tasks,conformance,channel,client-browser,client-protocol}/` and `crates/jig-client-view/src/tests/`.
+`tests/{core,people,tasks,conformance,channel,client-browser,client-protocol}/` and `crates/jig-client-view/src/tests/`;
+`tests/client/tests/stories.rs` (its `NewTask`); `tests/client-wire/tests/fuzzy_client_wire.rs`, whose hand-listed wire
+types gain `NewDeadline` here and `DeadlineSpan` in 05.3.
 Shape: add the selector field and ONLY Named, as sketched below, to the existing types. Every producer supplies Named,
 every translation matches it exhaustively; made tasks' stored Authority stays wall-only. ProposedTask carries the selector
 through current and historical documents, including recurring batch documents. Share each existing batch codec between
@@ -157,8 +168,8 @@ Scope: add Span through 05.2's carriers, resolve at Create/acceptance, and retai
 authority.md 7, 8.1, tasks.md 4, 9, engine.md 4; step `jig-05.3`.
 Needs: nothing beyond 05.2's deadline selectors.
 Files: 05.2's enums, schemas and translations; `crates/jig-domain-authority/src/{lib,value}.rs` and existing tests;
-`crates/jig-domain-core/src/{goals,proposals,effects,acts,acts/objects,acts/objects/decisions}.rs`,
-`src/routing/{create,propose,party_decisions,parties,tasks,runs,procedure_steps,views}.rs`,
+`crates/jig-domain-core/src/{goals,proposals,effects,acts,acts/requests,acts/objects,acts/objects/decisions}.rs`
+(`acts::request` calls `admit`), `src/routing/{create,propose,party_decisions,parties,people,tasks,runs,procedure_steps,views}.rs`,
 `src/documents{,/objects,/offers,/deployment,/task_tree,/project_note}.rs`, `src/reads{,/rows}.rs` and core test callers;
 new `crates/jig-domain-core/src/routing/deadlines.rs` declared in `routing/mod.rs`;
 `crates/jig-domain-tasks/src/{batch,stored}.rs`;
@@ -188,7 +199,10 @@ The new core file reuses `stories::offers::world_with`, `fixtures::{ask_as,peopl
 limits come from world_with's existing profile-derived builder. Its reference:
 
 ```rust
-use jig_core_world::{fixtures::{ask_as, live_row, people_member}, stories::offers::world_with};
+use jig_core_world::{
+    fixtures::{ask_as, live_row, people_member},
+    stories::offers::world_with,
+};
 use jig_domain_people as p;
 use skein_lib::{Duration, Time, Wall};
 #[test]
@@ -222,7 +236,7 @@ use skein_lib::Duration;
 fn a_span_crosses_the_client_wire_to_task_admission() {
     let mut story = Story::live_batch(fixtures::SEED, true);
     let mut tasks = fixtures::create_tasks();
-    tasks.get_mut(0).unwrap().deadline = c::NewDeadline::Span(Duration::from_secs(5));
+    tasks.get_mut(0).expect("first task").deadline = c::NewDeadline::Span(Duration::from_secs(5));
     let before = story.wall().as_nanos();
     let key = Key { asker: Asker::JIG, number: 85 };
     story.send(key, Ask::Jig(Box::new(c::Ask::Create { project: 1, tasks })));
@@ -246,7 +260,9 @@ Scope: clock-free spans and draft judgments, contract.md 5.3, client.md 19; step
 Needs: nothing beyond 05.3's engine judgments of spans.
 Files: `crates/jig-client/src/{shapes,tests/shapes}.rs`;
 `crates/jig-client-view/src/page/{conversations,project/goals}.rs`, `src/sections/project/goals.rs`, `src/tests/shapes.rs`;
-`tests/client-protocol/src/client/shapes.rs`, `tests/client-protocol/tests/{client.rs,client/goals.rs,deadline_spans.rs}`.
+`tests/client-protocol/src/client/shapes.rs`, `tests/client-protocol/tests/{client.rs,client/goals.rs,deadline_spans.rs}`;
+`tests/client/src/{stories,stories/goals,harness/referee/offers}.rs`;
+`tests/ops/src/client/stories.rs`, `tests/ops/tests/client_stories/creating.rs`.
 Shape: `chat(me, project, words)`, `set_goal(me, project, draft, reason)` and private fill take no Wall. None/Given use
 Named and the existing optional wall; a template Span produces Span and clears the authority wall. GoalDraft's user-given
 deadline remains Option<Wall>. Pass the filled NewDeadline to fall: Span is within both `within.latest` and
