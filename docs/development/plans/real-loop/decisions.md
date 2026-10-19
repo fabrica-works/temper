@@ -484,6 +484,13 @@ pass:
        leaving no DIRECTORY. 05.6's Shape now names that step. Nothing is
        deferred, so there is no later.md row.
 
+124. **temper 10.1 waits for 08.s1's freed streams** (plan defect, temper 10's block of 2026-10-19T15:30:28Z).
+     Not a design gap: the design question has been answered (ruling 123). tools.md 8.2 now says the engine ends an ended call's stream "then, not at its next heartbeat. So a call holds one of the engine's streams, which its profile bounds …, only while its process runs, and calls that run one after another never wait on their predecessors' streams." The story's `sign-in` and `me` run before the wait, and the wait arms its timer only after about 20 s of connection deadlines: the predecessors' streams. temper-08.s1 is the change that frees them.
+
+     - **10.1 waits for temper-08.s1** to land: its Needs gain it. 10.1 keeps its WIP commit and its four tests as written, then rebases onto `origin/main` and runs its Proof again. The ceiling stands.
+     - **A fresh allowance of three diagnostic runs** begins after 08.s1 lands. If the wait still misses its ceiling then, the cause is a new one: report it as a block with the run's log.
+     - **Until then,** nothing in 10.1 goes round the cause: no wait or retry in `support::ctl`, no bound or heartbeat changed, no test moved (ruling 118's Don't).
+
 ## For the user
 
 The choices below have long-term consequences; each is the planner's,

@@ -158,7 +158,8 @@ Scope: `support::ctl` runs a story's calls one after another beside
 serve, or one call alone; it proves help, a usage error, `sign-in -` and
 a wait past its timeout, each as the OS reports it (tools.md, 6.3, 8.1,
 11.4).
-Needs: temper 05 (05.6's executable, 05.5's `sign-in -`).
+Needs: temper 05 (05.6's executable, 05.5's `sign-in -`); temper-08.s1,
+which frees each ended call's stream (ruling 124).
 Files: `crates/temper/tests/support/ctl.rs` (new);
 `crates/temper/tests/support/mod.rs` (`pub mod ctl;`, and
 `Process::Calls` with its arms in `Process::host`, `host_mut` and
