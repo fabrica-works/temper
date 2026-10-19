@@ -328,6 +328,13 @@ chain.
   for `Refusal::{Taken,Unusable}`, belong to accounts/jig-repin. Skein08.2's
   Downstream and decision16 prescribe those mappings. Keep the Smith
   closing-repin await separate from the earlier landed smith01.3 repair.
+  Skein04.1's fake-provider `Config::without_credential` literals in smith's
+  `tests/agent-process/src/fake.rs::configured_bounds` and
+  `tests/protocol-llm/tests/component_peer.rs::run`, and the latter's
+  `provider::{start,down,up,resume}` credential arguments, also belong to
+  accounts/smith-repin. Its Downstream prescribes `without_credential: false`
+  and one-entry credential slices; retain the exact sources, locks and
+  diagnostics until that repair and downstream compilation establish proof.
   The channel-v4 copies in `tests/core/src/{protocol,agents_tools}.rs` belong
   to accounts/jig-repin.s1 under smith01.2; forge-kit/jig01.s2's earlier
   live-text adapters do not cover them. Report each reached typed failure
