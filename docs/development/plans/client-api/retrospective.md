@@ -748,10 +748,10 @@ step.
 |---|---|---|
 | 1 | adopted | skein 656ef69: development.md 5.1 (a plan's size); 2.2 already had the split; skein 1d105bc: 5.3 (a chain of about 20 increments) |
 | 2 | adopted | skein 1d105bc: development.md 5.2 (the rules under about 300 lines) and 10.3 (a steer replaces a rule's text); implementer.md 8.1 and 8.6 |
-| 3 | adopted | skein 1d105bc: implementer.md 8.3 (`// @exec`, `write_stdin`'s 31 s); the pulse's count by return, with 7.4 and 14.2: skein's kit, to land |
+| 3 | adopted | skein 1d105bc: implementer.md 8.3 (`// @exec`, `write_stdin`'s 31 s); skein 2cedfab: the pulse's count by return, with 7.4 and 14.2 |
 | 4 | adopted | skein 1d105bc: development.md 3.6, 12 and 14.1; supervisor.md 3 and 6. No kit: the supervisor runs `test-plan` in `kit/` |
-| 5 | adopted | skein's kit, to land: `plan unblocked` and `plan steered`, with development.md 7.3, 7.4 and 10.3 |
-| 6 | adopted | skein 1d105bc: development.md 2.1 and 14.1; supervisor.md 4, 5, 6 and 8; `plan`'s designer prompt, with 10.4: skein's kit, to land |
+| 5 | adopted | skein 2349030: `plan unblocked` and `plan steered` set the ledger and print what the coordinator sends; the watch, `plan status` and the pulse take its heartbeat from its rollout too; development.md 7.4 and 10.3 |
+| 6 | adopted | skein 1d105bc: development.md 2.1 and 14.1; supervisor.md 4, 5, 6 and 8; skein e1053a7: `plan`'s designer prompt, with 10.4 |
 | 7 | adopted | skein 1d105bc: development.md 5.5 and 14.1; implementer.md 8.4, 8.7 and 8.8; supervisor.md 6; testing-strategy.md 8 |
 | 8 | adopted | skein 1d105bc: development.md 11.4, by hand; `plan check`, `plan resume` and the pulse: the next kit batch (which filesystem, sudo, and a btrfs machine to test on) |
-| 9 | adopted | skein's kit, to land: `numbers.sh` and `metrics.sh`, with development.md 15.2 |
+| 9 | adopted | skein baaebb7: `numbers.sh` and `metrics.sh`, with development.md 15.2 |

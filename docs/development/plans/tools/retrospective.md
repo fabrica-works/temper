@@ -432,11 +432,11 @@ For jig's `docs/development/tech-debt.md`, and for temper and skein, which have 
 | 2 | adopted | skein 656ef69: development.md, 2.2 and 5.4 |
 | 3 | adopted (M to Q go into tools.md in the design pass on hel8, 10-19) | skein 656ef69: development.md, 2.7 and 10.4, the process rule |
 | 4 | adopted | skein 656ef69: supervisor.md, 5; development.md, 3.5 and 10.4 |
-| 5 | adopted | skein 656ef69: development.md, 5.2 and 15.2; `plan metrics`' `chain_step_min` goes to the next kit batch |
-| 6 | adopted | skein's branch design/process-7, to land: `land`; development.md, 5.2 and 9.1 |
-| 7 | adopted (the org rename to fabrig-dev makes it urgent) | skein 656ef69: development.md, 4.5, 5.2 and 5.4; `plan check`'s refusal of an organization in a pin check is on skein's branch design/process-7, to land |
-| 8 | adopted | skein's branch design/process-7, to land: numbers.sh; development.md, 15.2 |
+| 5 | adopted | skein 656ef69: development.md, 5.2 and 15.2; skein 0b006b8: `plan metrics`' `chain_step_min` and `chain_step_max`, one metric with live text's proposal 6 |
+| 6 | adopted | skein ebf24d5: `land`; development.md, 5.2 and 9.1 |
+| 7 | adopted (the org rename to fabrig-dev makes it urgent) | skein 656ef69: development.md, 4.5, 5.2 and 5.4; skein ebf24d5: `plan check`'s refusal of an organization in a pin check |
+| 8 | adopted | skein ebf24d5: numbers.sh; development.md, 15.2 |
 
-The kit's commit on skein's branch design/process-7 waits for a gate
-that passes: on hetzner, test-plan runs 48 s, past its 40 s and its 5 s
-margin, as `main`'s own does (10-19).
+The kit's commit landed as skein ebf24d5 once skein a02b122 ran
+test-plan's checks in three parts at once, in about 25 s on hetzner
+against 48 s, within its 40 s budget (10-19).
