@@ -98,7 +98,7 @@ pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     if bound.binding.owner == crate::frame::owner() {
         return view.pages.decode(bound.binding.token, bound.act);
     }
-    if bound.binding.owner == forge::bindings::owner(view.forge_words.connector) {
+    if bound.binding.owner == temper_client_domain::forge::words::owner(view.forge_words.connector) {
         forge::bindings::decode(&view.forge, bound.binding.token, bound.act)
     } else {
         None

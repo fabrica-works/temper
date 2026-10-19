@@ -96,33 +96,9 @@ pub enum Word {
     Behind,
     SignOut,
     SignOutLost,
-    Connector,
-    Repository,
-    Branch,
-    Pull,
-    Issue,
-    Adopted,
-    Path,
-    Read,
-    Push,
-    OpenPull,
-    MergePull,
-    Review,
-    Status,
-    Comment,
-    CreateIssue,
-    CreateBranch,
-    EditPull,
-    UpdatePull,
-    ClosePull,
-    EditIssue,
-    Reviewers,
-    DeleteBranch,
-    OtherKind,
-    Shown,
     Unshowable,
 }
-const ALL: [Word; 109] = [
+const ALL: [Word; 85] = [
     Word::TaskHeader,
     Word::Asked,
     Word::Plan,
@@ -207,34 +183,9 @@ const ALL: [Word; 109] = [
     Word::Behind,
     Word::SignOut,
     Word::SignOutLost,
-    Word::Connector,
-    Word::Repository,
-    Word::Branch,
-    Word::Pull,
-    Word::Issue,
-    Word::Adopted,
-    Word::Path,
-    Word::Read,
-    Word::Push,
-    Word::OpenPull,
-    Word::MergePull,
-    Word::Review,
-    Word::Status,
-    Word::Comment,
-    Word::CreateIssue,
-    Word::CreateBranch,
-    Word::EditPull,
-    Word::UpdatePull,
-    Word::ClosePull,
-    Word::EditIssue,
-    Word::Reviewers,
-    Word::DeleteBranch,
-    Word::OtherKind,
-    Word::Shown,
     Word::Unshowable,
 ];
 impl Word {
-    #[expect(clippy::too_many_lines, reason = "closed phrase identifier codec, exhaustive over Word")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
             Self::SignedOut => 180,
@@ -323,55 +274,11 @@ impl Word {
             Self::Behind => 107,
             Self::SignOut => 108,
             Self::SignOutLost => 109,
-            Self::Connector => 0,
-            Self::Repository => 1,
-            Self::Branch => 2,
-            Self::Pull => 3,
-            Self::Issue => 4,
-            Self::Adopted => 5,
-            Self::Path => 6,
-            Self::Read => 7,
-            Self::Push => 8,
-            Self::OpenPull => 9,
-            Self::MergePull => 10,
-            Self::Review => 11,
-            Self::Status => 12,
-            Self::Comment => 13,
-            Self::CreateIssue => 14,
-            Self::CreateBranch => 15,
-            Self::EditPull => 16,
-            Self::UpdatePull => 17,
-            Self::ClosePull => 18,
-            Self::EditIssue => 19,
-            Self::Reviewers => 20,
-            Self::DeleteBranch => 21,
-            Self::OtherKind => 22,
-            Self::Shown => 23,
             Self::Unshowable => 24,
         };
-        let owner = if number >= 100 { crate::frame::owner() } else { crate::forge::bindings::owner(connector) };
+        let owner =
+            if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
         PhraseId { owner, number }
-    }
-}
-#[must_use]
-pub const fn kind(kind: u16) -> Option<Word> {
-    match kind {
-        1 => Some(Word::Read),
-        2 => Some(Word::Push),
-        3 => Some(Word::OpenPull),
-        4 => Some(Word::MergePull),
-        5 => Some(Word::Review),
-        6 => Some(Word::Status),
-        7 => Some(Word::Comment),
-        8 => Some(Word::CreateIssue),
-        9 => Some(Word::CreateBranch),
-        10 => Some(Word::EditPull),
-        11 => Some(Word::UpdatePull),
-        12 => Some(Word::ClosePull),
-        13 => Some(Word::EditIssue),
-        14 => Some(Word::Reviewers),
-        15 => Some(Word::DeleteBranch),
-        _ => None,
     }
 }
 #[derive(Clone, Debug)]
@@ -425,7 +332,8 @@ impl Words {
             phrases.push(phrase).expect("jig words fit");
         }
         crate::cards::words::extend(text, &mut shapes, &mut phrases);
-        crate::forge::words::extend(connector, text, &mut shapes, &mut phrases);
+        temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
+        resource_phrases(connector, joined, &mut shapes, &mut phrases);
         let language = Language {
             plural: PluralRule::English,
             span_unit: SpanUnit::Seconds,
@@ -454,9 +362,20 @@ impl Words {
     pub fn text(&self, builder: &mut Builder, word: Word, holes: &[Hole]) {
         builder.text(Run::Plain, &self.say(word, holes));
     }
+    pub fn resource_text(
+        &self,
+        builder: &mut Builder,
+        word: temper_client_domain::forge::words::ResourceWord,
+        holes: &[Hole],
+    ) {
+        let text = self.book.say(self.language, word.id(self.connector), holes).expect("checked resource phrase").text;
+        builder.text(Run::Plain, &text);
+    }
     #[must_use]
     pub(crate) fn path_bytes(&self) -> u32 {
-        self.book.capacity(Word::Path.id(self.connector)).expect("checked path word")
+        self.book
+            .capacity(temper_client_domain::forge::words::ResourceWord::Path.id(self.connector))
+            .expect("checked path word")
     }
     #[must_use]
     pub fn capacity(&self) -> Option<u32> {
@@ -470,7 +389,6 @@ impl Words {
         Some(most.max(crate::forge::words::capacity(self)?))
     }
 }
-#[expect(clippy::too_many_lines, reason = "closed English phrase codec, one row per Word")]
 fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
@@ -559,30 +477,6 @@ fn english(word: Word) -> (&'static [&'static [u8]], &'static [HoleKind]) {
         Word::Behind => (&[b"Behind"], &[]),
         Word::SignOut => (&[b"Sign out"], &[]),
         Word::SignOutLost => (&[b"Sign out did not reach the engine."], &[]),
-        Word::Connector => (&[b"forge"], &[]),
-        Word::Repository => (&[b"", b" on ", b""], &[Name, Name]),
-        Word::Branch => (&[b"branch ", b" of ", b" on ", b""], &[Name, Name, Name]),
-        Word::Pull => (&[b"pull request #", b" of ", b" on ", b""], &[Name, Name, Name]),
-        Word::Issue => (&[b"issue #", b" of ", b" on ", b""], &[Name, Name, Name]),
-        Word::Adopted => (&[b"repository ", b" on forge ", b""], &[Number, Number]),
-        Word::Path => (&[b"", b""], &[Name]),
-        Word::Read => (&[b"read"], &[]),
-        Word::Push => (&[b"push"], &[]),
-        Word::OpenPull => (&[b"open a pull request"], &[]),
-        Word::MergePull => (&[b"merge a pull request"], &[]),
-        Word::Review => (&[b"post a review"], &[]),
-        Word::Status => (&[b"set a commit status"], &[]),
-        Word::Comment => (&[b"post a comment"], &[]),
-        Word::CreateIssue => (&[b"create an issue"], &[]),
-        Word::CreateBranch => (&[b"create a branch"], &[]),
-        Word::EditPull => (&[b"edit a pull request"], &[]),
-        Word::UpdatePull => (&[b"update a pull request from its base"], &[]),
-        Word::ClosePull => (&[b"close or reopen a pull request"], &[]),
-        Word::EditIssue => (&[b"edit, close or reopen an issue"], &[]),
-        Word::Reviewers => (&[b"set reviewers"], &[]),
-        Word::DeleteBranch => (&[b"delete a branch"], &[]),
-        Word::OtherKind => (&[b"kind ", b""], &[Number]),
-        Word::Shown => (&[b"Shown on the forge."], &[]),
         Word::Unshowable => (&[b"Cannot show this part."], &[]),
     }
 }
@@ -617,4 +511,28 @@ pub fn jig_language() -> Language {
         }
     }
     language
+}
+
+fn resource_phrases(connector: u16, joined: u32, shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>) {
+    for word in temper_client_domain::forge::words::RESOURCES {
+        let (literals, kinds) = temper_client_domain::forge::words::resource_english(word);
+        let mut holes = List::with_capacity(3);
+        let mut segments = List::with_capacity(7);
+        for (index, literal) in literals.iter().enumerate() {
+            segments.push(Segment::Text(copy_of(literal))).expect("closed English segments fit");
+            if let Some(kind) = kinds.get(index) {
+                holes
+                    .push(HoleShape { kind: *kind, bytes: if *kind == HoleKind::Name { joined } else { 0 } })
+                    .expect("three holes fit");
+                segments
+                    .push(Segment::Hole { index: u16::try_from(index).expect("three hole indices fit"), kind: *kind })
+                    .expect("closed segments fit");
+            }
+        }
+        let id = word.id(connector);
+        shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural: None }).expect("closed shapes fit");
+        phrases
+            .push(Phrase { id, forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]) })
+            .expect("closed phrases fit");
+    }
 }

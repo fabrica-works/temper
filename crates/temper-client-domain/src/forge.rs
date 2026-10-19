@@ -4,6 +4,7 @@ pub mod family;
 mod form;
 pub(crate) mod me;
 mod vocabulary;
+pub mod words;
 pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form};
 pub use vocabulary::*;
 

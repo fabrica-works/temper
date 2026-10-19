@@ -36,7 +36,7 @@ impl Bindings {
         self.next = self.next.checked_add(1).expect("binding tokens fit");
         let token = Token::new(self.next);
         self.entries.push(Entry { token, meaning }).expect("form bindings fit");
-        Binding { owner: owner(self.connector), token }
+        Binding { owner: forge::words::owner(self.connector), token }
     }
 }
 #[must_use]
@@ -103,9 +103,4 @@ fn check(values: &mut List<u32>, text: &[u8]) -> Option<()> {
 #[must_use]
 pub fn worst_case(capacity: u32) -> Option<u64> {
     List::<Entry>::worst_case(capacity)
-}
-
-#[must_use]
-pub fn owner(connector: u16) -> skein_ui::Owner {
-    skein_ui::Owner { number: u32::from(connector) }
 }

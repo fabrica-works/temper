@@ -1,13 +1,13 @@
 //! The ordered adoption form in temper's frame (client/README.md, 4.4 and 5.2).
 use super::{
     bindings::{Bindings, Meaning},
-    words::{self, Word},
+    words,
 };
 use crate::words::Words;
 use alloc::boxed::Box;
 use skein_lib::{RequestProgress, Writer, bytes::copy_of};
 use skein_ui::{Builder, Role, State, phrases::Hole};
-use temper_client_domain::forge;
+use temper_client_domain::forge::{self, words::Word};
 pub fn page(
     builder: &mut Builder,
     form: &forge::Form,
@@ -122,32 +122,13 @@ fn status(builder: &mut Builder, word: Word, holes: &[Hole], words: &Words) {
     builder.close();
 }
 fn broken(builder: &mut Builder, broken: Option<forge::Broken>, words: &Words) {
-    let word = match broken {
-        None => return,
-        Some(forge::Broken::Required) => Word::Required,
-        Some(forge::Broken::ForgeNumber) => Word::ForgeNumber,
-        Some(forge::Broken::Checks) => Word::BadChecks,
-        Some(forge::Broken::ContextHome) => Word::ContextHome,
-        Some(forge::Broken::NoCheck) => Word::NoCheck,
-        Some(forge::Broken::Long { bound }) => {
-            status(builder, Word::Long, &[Hole::Number(u64::from(bound))], words);
-            return;
-        }
-    };
-    status(builder, word, &[], words);
+    if let Some((word, holes)) = forge::words::broken(broken) {
+        status(builder, word, &holes, words);
+    }
 }
+
 fn kinds(kinds: forge::Kinds, words: &Words) -> Box<[u8]> {
-    let rows = [
-        (kinds.read, Word::Read),
-        (kinds.push, Word::Push),
-        (kinds.open, Word::Open),
-        (kinds.land, Word::Land),
-        (kinds.review, Word::Review),
-        (kinds.status, Word::Status),
-        (kinds.comment, Word::Comment),
-        (kinds.issue, Word::Issue),
-        (kinds.branch, Word::Branch),
-    ];
+    let rows = forge::words::kinds(kinds);
     let mut bytes = 0_usize;
     for (on, word) in rows {
         if on {
@@ -173,17 +154,12 @@ fn kinds(kinds: forge::Kinds, words: &Words) -> Box<[u8]> {
 fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, words: &Words, text_limit: u32) {
     match answer {
         forge::Answer::Adopted(adopted) => {
-            let role = match adopted.role {
-                forge::Role::Owned => Word::Owned,
-                forge::Role::Adopted => Word::AdoptedRole,
-                forge::Role::Fork => Word::Fork,
-                forge::Role::Context => Word::Context,
-            };
+            let role = forge::words::role(adopted.role);
             status(
                 builder,
                 Word::Adopted,
                 &[
-                    Hole::Name(super::full_name(&adopted.owner, &adopted.name)),
+                    Hole::Name(forge::words::full_name(&adopted.owner, &adopted.name)),
                     Hole::Number(u64::from(adopted.forge)),
                     Hole::Name(words::say(words, role, &[])),
                 ],
@@ -211,7 +187,7 @@ fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, wo
         forge::Answer::ForgeRefused(reason) => {
             builder.open(Role::Alert);
             let [forge, owner, name, prefix, _, _] = &form.texts;
-            let name = Hole::Name(super::full_name(&owner.text, &name.text));
+            let name = Hole::Name(forge::words::full_name(&owner.text, &name.text));
             let number = Hole::Name(forge.text.clone());
             match reason {
                 forge::Reason::NoSuchForge => words::text(words, builder, Word::NoSuchForge, &[number]),
@@ -229,7 +205,7 @@ fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, wo
         }
         forge::Answer::Unknown => {
             let [_, owner, name, _, _, _] = &form.texts;
-            status(builder, Word::Unknown, &[Hole::Name(super::full_name(&owner.text, &name.text))], words);
+            status(builder, Word::Unknown, &[Hole::Name(forge::words::full_name(&owner.text, &name.text))], words);
         }
     }
 }

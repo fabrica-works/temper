@@ -302,9 +302,9 @@ impl App for Temper {
         if adoption_page(tree)
             && tree.nodes().iter().any(|value| {
                 value.id == node
-                    && value
-                        .binding
-                        .is_some_and(|binding| binding.owner == view::forge::bindings::owner(fixtures::FORGE))
+                    && value.binding.is_some_and(|binding| {
+                        binding.owner == temper_client_domain::forge::words::owner(fixtures::FORGE)
+                    })
             })
         {
             Some(adoption_card())

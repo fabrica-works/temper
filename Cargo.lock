@@ -1881,6 +1881,7 @@ dependencies = [
  "jig-client-protocol-wire",
  "jig-client-test-records",
  "skein-lib",
+ "skein-ui",
  "temper-client-protocol-wire",
 ]
 
